@@ -1,0 +1,100 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering | %FileCheck %s
+
+// These are all regression tests to ensure that the memory promotion pass
+// doesn't crash.
+
+// REQUIRES: objc_interop
+
+import Builtin
+import Swift
+import Foundation
+
+sil @$ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
+sil @superinit : $@convention(method) (@in Any, @owned Super) -> @owned Super
+sil [exact_self_class] [ossa] @$s4main5SuperCyACypcfC : $@convention(method) (@in Any, @thick Super.Type) -> @owned Super
+sil [ossa] @$s4main5SuperCfD : $@convention(method) (@owned Super) -> ()
+sil [ossa] @$s4main3SubCfD : $@convention(method) (@owned Sub) -> ()
+sil [exact_self_class] [ossa] @$s4main3SubCyACSo8NSStringCcfC : $@convention(method) (@owned NSString, @thick Sub.Type) -> @owned Sub
+
+class Super {
+  var t: Any
+  init(_ t: Any) {
+    self.t = t
+  }
+}
+
+class Sub : Super {
+  init(_ i: NSString) {
+    super.init(i.lowercased as NSString)
+  }
+}
+
+
+// CHECK-LABEL: sil hidden [ossa] @cast_to_nsstring : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         [[SUB_1:%[^,]+]] = load [take] [[STACK]]
+// CHECK:         [[SUPER_1:%[^,]+]] = upcast [[SUB_1]] : $Sub to $Super
+// CHECK:         switch_enum
+// CHECK-SAME:        case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
+// CHECK:       [[NONE]]:
+// CHECK:         [[SUB_1:%[^,]+]] = unchecked_ref_cast [[SUPER_1]] : $Super to $Sub
+// CHECK:         [[SUB_META_1:%[^,]+]] = metatype $@thick Sub.Type
+// CHECK:         dealloc_partial_ref
+// CHECK-SAME:        [[SUB_1]]
+// CHECK-SAME:        [[SUB_META_1]]
+// CHECK:         [[SUB_1:%[^,]+]] = load [take] [[STACK]]
+// CHECK:         [[SUB_META_1:%[^,]+]] = metatype $@thick Sub.Type
+// CHECK:         dealloc_partial_ref
+// CHECK-SAME:        [[SUB_1]]
+// CHECK-SAME:        [[SUB_META_1]]
+// CHECK-LABEL: } // end sil function 'cast_to_nsstring'
+sil hidden [ossa] @cast_to_nsstring : $@convention(method) (@owned NSString, @owned Sub) -> @owned Sub {
+bb0(%0 : @owned $NSString, %1 : @owned $Sub):
+  %2 = alloc_stack [lexical] [var_decl] $Sub
+  %3 = mark_uninitialized [derivedself] %2 : $*Sub
+  store %1 to [init] %3 : $*Sub
+  %6 = load [take] %3 : $*Sub
+  %7 = upcast %6 : $Sub to $Super
+  %8 = alloc_stack $Any
+  %9 = objc_method %0 : $NSString, #NSString.lowercased!getter.foreign : (NSString) -> () -> String, $@convention(objc_method) (NSString) -> @autoreleased Optional<NSString>
+  %10 = apply %9(%0) : $@convention(objc_method) (NSString) -> @autoreleased Optional<NSString>
+  switch_enum %10 : $Optional<NSString>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  destroy_value %7 : $Super
+  %13 = string_literal utf8 "main/main.swift"
+  %14 = integer_literal $Builtin.Word, 15
+  %15 = integer_literal $Builtin.Int1, -1
+  %16 = integer_literal $Builtin.Word, 14
+  %17 = integer_literal $Builtin.Word, 18
+  %18 = integer_literal $Builtin.Int1, -1
+  %19 = function_ref @$ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
+  %20 = apply %19(%13, %14, %15, %16, %18) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Int1) -> ()
+  destroy_addr %3 : $*Sub
+  destroy_value %0 : $NSString
+  unreachable
+
+bb2(%24 : @owned $NSString):
+  %25 = init_existential_addr %8 : $*Any, $NSString
+  store %24 to [init] %25 : $*NSString
+  %27 = function_ref @superinit : $@convention(method) (@in Any, @owned Super) -> @owned Super
+  %28 = apply %27(%8, %7) : $@convention(method) (@in Any, @owned Super) -> @owned Super
+  dealloc_stack %8 : $*Any
+  %30 = unchecked_ref_cast %28 : $Super to $Sub
+  store %30 to [init] %3 : $*Sub
+  %32 = load [copy] %3 : $*Sub
+  destroy_value %0 : $NSString
+  destroy_addr %3 : $*Sub
+  dealloc_stack %2 : $*Sub
+  return %32 : $Sub
+}
+
+sil_vtable Super {
+  #Super.init!allocator: (Super.Type) -> (Any) -> Super : @$s4main5SuperCyACypcfC
+  #Super.deinit!deallocator: @$s4main5SuperCfD
+}
+
+sil_vtable Sub {
+  #Sub.init!allocator: (Sub.Type) -> (NSString) -> Sub : @$s4main3SubCyACSo8NSStringCcfC
+  #Sub.deinit!deallocator: @$s4main3SubCfD
+}

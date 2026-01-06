@@ -28,11 +28,11 @@ func _stdlib_atomicCompareExchangeStrongPtr(
   desired: UnsafeRawPointer?
 ) -> Bool {
   // We use Builtin.Word here because Builtin.RawPointer can't be nil.
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
+  let (oldValue, won) = unsafe Builtin.cmpxchg_seqcst_seqcst_Word(
     target._rawValue,
     UInt(bitPattern: expected.pointee)._builtinWordValue,
     UInt(bitPattern: desired)._builtinWordValue)
-  expected.pointee = UnsafeRawPointer(bitPattern: Int(oldValue))
+  unsafe expected.pointee = UnsafeRawPointer(bitPattern: Int(oldValue))
   return Bool(won)
 }
 
@@ -70,11 +70,11 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
   desired: UnsafeMutablePointer<T>
 ) -> Bool {
-  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+  let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  let rawExpected = UnsafeMutableRawPointer(expected).assumingMemoryBound(
+  let rawExpected = unsafe UnsafeMutableRawPointer(expected).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  return _stdlib_atomicCompareExchangeStrongPtr(
+  return unsafe _stdlib_atomicCompareExchangeStrongPtr(
     object: rawTarget,
     expected: rawExpected,
     desired: UnsafeRawPointer(desired))
@@ -114,11 +114,11 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>?>,
   desired: UnsafeMutablePointer<T>?
 ) -> Bool {
-  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+  let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  let rawExpected = UnsafeMutableRawPointer(expected).assumingMemoryBound(
+  let rawExpected = unsafe UnsafeMutableRawPointer(expected).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  return _stdlib_atomicCompareExchangeStrongPtr(
+  return unsafe _stdlib_atomicCompareExchangeStrongPtr(
     object: rawTarget,
     expected: rawExpected,
     desired: UnsafeRawPointer(desired))
@@ -135,27 +135,19 @@ func _stdlib_atomicInitializeARCRef(
   // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
   // that simply points to the same memory.
   var expected: UnsafeRawPointer? = nil
-  let unmanaged = Unmanaged.passRetained(desired)
-  let desiredPtr = unmanaged.toOpaque()
-  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+  let unmanaged = unsafe Unmanaged.passRetained(desired)
+  let desiredPtr = unsafe unmanaged.toOpaque()
+  let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-#if $TypedThrows
-  let wonRace = withUnsafeMutablePointer(to: &expected) {
-    _stdlib_atomicCompareExchangeStrongPtr(
+  let wonRace = unsafe withUnsafeMutablePointer(to: &expected) {
+    unsafe _stdlib_atomicCompareExchangeStrongPtr(
       object: rawTarget, expected: $0, desired: desiredPtr
     )
   }
-#else
-  let wonRace = __abi_se0413_withUnsafeMutablePointer(to: &expected) {
-    _stdlib_atomicCompareExchangeStrongPtr(
-      object: rawTarget, expected: $0, desired: desiredPtr
-    )
-  }
-#endif
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
-    unmanaged.release()
+    unsafe unmanaged.release()
   }
   return wonRace
 }
@@ -167,8 +159,8 @@ func _stdlib_atomicLoadARCRef(
   object target: UnsafeMutablePointer<AnyObject?>
 ) -> AnyObject? {
   let value = Builtin.atomicload_seqcst_Word(target._rawValue)
-  if let unwrapped = UnsafeRawPointer(bitPattern: Int(value)) {
-    return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
+  if let unwrapped = unsafe UnsafeRawPointer(bitPattern: Int(value)) {
+    return unsafe Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
   }
   return nil
 }
@@ -176,7 +168,6 @@ func _stdlib_atomicLoadARCRef(
 @_transparent
 @_alwaysEmitIntoClient
 @discardableResult
-@_unavailableInEmbedded
 public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>,
   desired: __owned T
@@ -184,364 +175,46 @@ public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
   // that simply points to the same memory, and that `nil` is represented by an
   // all-zero bit pattern.
-  let unmanaged = Unmanaged.passRetained(desired)
-  let desiredPtr = unmanaged.toOpaque()
+  let unmanaged = unsafe Unmanaged.passRetained(desired)
+  let desiredPtr = unsafe unmanaged.toOpaque()
 
   let (value, won) = Builtin.cmpxchg_acqrel_acquire_Word(
     target._rawValue,
     0._builtinWordValue,
     Builtin.ptrtoint_Word(desiredPtr._rawValue))
 
-  if Bool(won) { return unmanaged }
+  if Bool(won) { return unsafe unmanaged }
 
   // Some other thread initialized the value before us. Balance the retain that
   // we performed on 'desired', and return what we loaded.
-  unmanaged.release()
+  unsafe unmanaged.release()
   let ptr = UnsafeRawPointer(Builtin.inttoptr_Word(value))
-  return Unmanaged<T>.fromOpaque(ptr)
+  return unsafe Unmanaged<T>.fromOpaque(ptr)
 }
 
 @_alwaysEmitIntoClient
 @_transparent
-@_unavailableInEmbedded
 public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>
 ) -> Unmanaged<T>? {
   let value = Builtin.atomicload_acquire_Word(target._rawValue)
   if Int(value) == 0 { return nil }
   let opaque = UnsafeRawPointer(Builtin.inttoptr_Word(value))
-  return Unmanaged<T>.fromOpaque(opaque)
+  return unsafe Unmanaged<T>.fromOpaque(opaque)
 }
 
 //===----------------------------------------------------------------------===//
 // Conversion of primitive types to `String`
 //===----------------------------------------------------------------------===//
 
-/// A 32 byte buffer.
-internal struct _Buffer32 {
-  internal var _x0: UInt8 = 0
-  internal var _x1: UInt8 = 0
-  internal var _x2: UInt8 = 0
-  internal var _x3: UInt8 = 0
-  internal var _x4: UInt8 = 0
-  internal var _x5: UInt8 = 0
-  internal var _x6: UInt8 = 0
-  internal var _x7: UInt8 = 0
-  internal var _x8: UInt8 = 0
-  internal var _x9: UInt8 = 0
-  internal var _x10: UInt8 = 0
-  internal var _x11: UInt8 = 0
-  internal var _x12: UInt8 = 0
-  internal var _x13: UInt8 = 0
-  internal var _x14: UInt8 = 0
-  internal var _x15: UInt8 = 0
-  internal var _x16: UInt8 = 0
-  internal var _x17: UInt8 = 0
-  internal var _x18: UInt8 = 0
-  internal var _x19: UInt8 = 0
-  internal var _x20: UInt8 = 0
-  internal var _x21: UInt8 = 0
-  internal var _x22: UInt8 = 0
-  internal var _x23: UInt8 = 0
-  internal var _x24: UInt8 = 0
-  internal var _x25: UInt8 = 0
-  internal var _x26: UInt8 = 0
-  internal var _x27: UInt8 = 0
-  internal var _x28: UInt8 = 0
-  internal var _x29: UInt8 = 0
-  internal var _x30: UInt8 = 0
-  internal var _x31: UInt8 = 0
-
-  internal init() {}
-
-  internal mutating func withBytes<Result>(
-    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
-    return try withUnsafeMutablePointer(to: &self) {
-      try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
-    }
-  }
-}
-
-/// A 72 byte buffer.
-internal struct _Buffer72 {
-  internal var _x0: UInt8 = 0
-  internal var _x1: UInt8 = 0
-  internal var _x2: UInt8 = 0
-  internal var _x3: UInt8 = 0
-  internal var _x4: UInt8 = 0
-  internal var _x5: UInt8 = 0
-  internal var _x6: UInt8 = 0
-  internal var _x7: UInt8 = 0
-  internal var _x8: UInt8 = 0
-  internal var _x9: UInt8 = 0
-  internal var _x10: UInt8 = 0
-  internal var _x11: UInt8 = 0
-  internal var _x12: UInt8 = 0
-  internal var _x13: UInt8 = 0
-  internal var _x14: UInt8 = 0
-  internal var _x15: UInt8 = 0
-  internal var _x16: UInt8 = 0
-  internal var _x17: UInt8 = 0
-  internal var _x18: UInt8 = 0
-  internal var _x19: UInt8 = 0
-  internal var _x20: UInt8 = 0
-  internal var _x21: UInt8 = 0
-  internal var _x22: UInt8 = 0
-  internal var _x23: UInt8 = 0
-  internal var _x24: UInt8 = 0
-  internal var _x25: UInt8 = 0
-  internal var _x26: UInt8 = 0
-  internal var _x27: UInt8 = 0
-  internal var _x28: UInt8 = 0
-  internal var _x29: UInt8 = 0
-  internal var _x30: UInt8 = 0
-  internal var _x31: UInt8 = 0
-  internal var _x32: UInt8 = 0
-  internal var _x33: UInt8 = 0
-  internal var _x34: UInt8 = 0
-  internal var _x35: UInt8 = 0
-  internal var _x36: UInt8 = 0
-  internal var _x37: UInt8 = 0
-  internal var _x38: UInt8 = 0
-  internal var _x39: UInt8 = 0
-  internal var _x40: UInt8 = 0
-  internal var _x41: UInt8 = 0
-  internal var _x42: UInt8 = 0
-  internal var _x43: UInt8 = 0
-  internal var _x44: UInt8 = 0
-  internal var _x45: UInt8 = 0
-  internal var _x46: UInt8 = 0
-  internal var _x47: UInt8 = 0
-  internal var _x48: UInt8 = 0
-  internal var _x49: UInt8 = 0
-  internal var _x50: UInt8 = 0
-  internal var _x51: UInt8 = 0
-  internal var _x52: UInt8 = 0
-  internal var _x53: UInt8 = 0
-  internal var _x54: UInt8 = 0
-  internal var _x55: UInt8 = 0
-  internal var _x56: UInt8 = 0
-  internal var _x57: UInt8 = 0
-  internal var _x58: UInt8 = 0
-  internal var _x59: UInt8 = 0
-  internal var _x60: UInt8 = 0
-  internal var _x61: UInt8 = 0
-  internal var _x62: UInt8 = 0
-  internal var _x63: UInt8 = 0
-  internal var _x64: UInt8 = 0
-  internal var _x65: UInt8 = 0
-  internal var _x66: UInt8 = 0
-  internal var _x67: UInt8 = 0
-  internal var _x68: UInt8 = 0
-  internal var _x69: UInt8 = 0
-  internal var _x70: UInt8 = 0
-  internal var _x71: UInt8 = 0
-
-  internal init() {}
-
-  internal mutating func withBytes<Result>(
-    _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
-    return try withUnsafeMutablePointer(to: &self) {
-      try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
-    }
-  }
-}
-
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-// Note that this takes a Float32 argument instead of Float16, because clang
-// doesn't have _Float16 on all platforms yet.
-@available(SwiftStdlib 5.3, *)
-@_silgen_name("swift_float16ToString")
-internal func _float16ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: Float16,
-  _ debug: Bool
-) -> Int
-
-@available(SwiftStdlib 5.3, *)
-@_unavailableInEmbedded
-internal func _float16ToString(
-  _ value: Float16,
-  debug: Bool
-) -> (buffer: _Buffer32, length: Int) {
-  _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
-  var buffer = _Buffer32()
-  let length = buffer.withBytes { (bufferPtr) in
-    _float16ToStringImpl(bufferPtr, 32, value, debug)
-  }
-  return (buffer, length)
-}
-#endif
-
-// Returns a UInt64, but that value is the length of the string, so it's
-// guaranteed to fit into an Int. This is part of the ABI, so we can't
-// trivially change it to Int. Callers can safely convert the result
-// to any integer type without checks, however.
-@_silgen_name("swift_float32ToString")
-internal func _float32ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: Float32,
-  _ debug: Bool
-) -> UInt64
-
-@_unavailableInEmbedded
-internal func _float32ToString(
-  _ value: Float32,
-  debug: Bool
-) -> (buffer: _Buffer32, length: Int) {
-  _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
-  var buffer = _Buffer32()
-  let length = buffer.withBytes { (bufferPtr) in Int(
-    truncatingIfNeeded: _float32ToStringImpl(bufferPtr, 32, value, debug)
-  )}
-  return (buffer, length)
-}
-
-// Returns a UInt64, but that value is the length of the string, so it's
-// guaranteed to fit into an Int. This is part of the ABI, so we can't
-// trivially change it to Int. Callers can safely convert the result
-// to any integer type without checks, however.
-@_silgen_name("swift_float64ToString")
-internal func _float64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: Float64,
-  _ debug: Bool
-) -> UInt64
-
-@_unavailableInEmbedded
-internal func _float64ToString(
-  _ value: Float64,
-  debug: Bool
-) -> (buffer: _Buffer32, length: Int) {
-  _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
-  var buffer = _Buffer32()
-  let length = buffer.withBytes { (bufferPtr) in Int(
-    truncatingIfNeeded: _float64ToStringImpl(bufferPtr, 32, value, debug)
-  )}
-  return (buffer, length)
-}
-
-
-#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
-
-// Returns a UInt64, but that value is the length of the string, so it's
-// guaranteed to fit into an Int. This is part of the ABI, so we can't
-// trivially change it to Int. Callers can safely convert the result
-// to any integer type without checks, however.
-@_silgen_name("swift_float80ToString")
-internal func _float80ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: Float80,
-  _ debug: Bool
-) -> UInt64
-
-@_unavailableInEmbedded
-internal func _float80ToString(
-  _ value: Float80,
-  debug: Bool
-) -> (buffer: _Buffer32, length: Int) {
-  _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
-  var buffer = _Buffer32()
-  let length = buffer.withBytes { (bufferPtr) in Int(
-    truncatingIfNeeded: _float80ToStringImpl(bufferPtr, 32, value, debug)
-  )}
-  return (buffer, length)
-}
-#endif
-
-// Returns a UInt64, but that value is the length of the string, so it's
-// guaranteed to fit into an Int. This is part of the ABI, so we can't
-// trivially change it to Int. Callers can safely convert the result
-// to any integer type without checks, however.
-@_silgen_name("swift_int64ToString")
-internal func _int64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: Int64,
-  _ radix: Int64,
-  _ uppercase: Bool
-) -> UInt64
-
-@_unavailableInEmbedded
-internal func _int64ToString(
-  _ value: Int64,
-  radix: Int64 = 10,
-  uppercase: Bool = false
-) -> String {
-  if radix >= 10 {
-    var buffer = _Buffer32()
-    return buffer.withBytes { (bufferPtr) in
-      let actualLength = _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
-  } else {
-    var buffer = _Buffer72()
-    return buffer.withBytes { (bufferPtr) in
-      let actualLength = _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
-  }
-}
-
-// Returns a UInt64, but that value is the length of the string, so it's
-// guaranteed to fit into an Int. This is part of the ABI, so we can't
-// trivially change it to Int. Callers can safely convert the result
-// to any integer type without checks, however.
-@_silgen_name("swift_uint64ToString")
-internal func _uint64ToStringImpl(
-  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UInt,
-  _ value: UInt64,
-  _ radix: Int64,
-  _ uppercase: Bool
-) -> UInt64
-
-@_unavailableInEmbedded
-public // @testable
-func _uint64ToString(
-    _ value: UInt64,
-    radix: Int64 = 10,
-    uppercase: Bool = false
-) -> String {
-  if radix >= 10 {
-    var buffer = _Buffer32()
-    return buffer.withBytes { (bufferPtr) in
-      let actualLength = _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
-  } else {
-    var buffer = _Buffer72()
-    return buffer.withBytes { (bufferPtr) in
-      let actualLength = _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
-        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
-      ))
-    }
-  }
-}
-
 @inlinable
-@_unavailableInEmbedded
 internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
-    UInt64(
-      UInt(bitPattern: UnsafeRawPointer(value))),
-      radix: 16,
-      uppercase: false
-    )
-  for _ in 0..<(2 * MemoryLayout<UnsafeRawPointer>.size - result.utf16.count) {
+    UInt64(UInt(bitPattern: UnsafeRawPointer(value))),
+    radix: 16,
+    uppercase: false
+  )
+  for _ in unsafe 0..<(2 * MemoryLayout<UnsafeRawPointer>.size - result.utf16.count) {
     result = "0" + result
   }
   return "0x" + result

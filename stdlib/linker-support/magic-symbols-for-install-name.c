@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,74 +19,54 @@
 
 #if defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
-#include <Availability.h>
+#include <mach-o/loader.h>
 #include <TargetConditionals.h>
 #include "swift/shims/Visibility.h"
 
-#define RPATH_INSTALL_NAME_DIRECTIVE_IMPL2(name, major, minor) \
-  SWIFT_RUNTIME_EXPORT const char install_name_ ## major ## _ ## minor \
-  __asm("$ld$install_name$os" #major "." #minor "$@rpath/lib" #name ".dylib"); \
-  const char install_name_ ## major ## _ ## minor = 0;
+// Swift was supported as an embedded library in macOS (née OS X) 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0.
+// It became part of the OS in macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2. Projects can continue
+// to embed Swift, but the linker will see the OS version and try to link on that by default. In order
+// to support back deployment, add a magic symbol to the OS library so that back deployment will link
+// on the embedded library instead. When running on a newer OS, the OS version of the library will be
+// used due to Xcode inserting a runpath search path of /usr/lib/swift based on the deployment target
+// being less than SupportedTargets[target][SwiftOSRuntimeMinimumDeploymentTarget] in SDKSettings.plist.
 
-#define RPATH_INSTALL_NAME_DIRECTIVE_IMPL(name, major, minor) \
-  RPATH_INSTALL_NAME_DIRECTIVE_IMPL2(name, major, minor)
+// The linker uses a specially formatted symbol to do the back deployment:
+// $ld$previous$<install-name>$<compatibility-version>$<platform>$<start-version>$<end-version>$<symbol-name>$
+// compatibility-version and symbol-name are left off to apply to all library versions and symbols.
+// This symbol isn't a legal C identifier, so it needs to be specified with __asm.
+#define RPATH_PREVIOUS_DIRECTIVE_IMPL(name, platform, startVersion, endVersion) \
+  SWIFT_RUNTIME_EXPORT const char ld_previous_ ## platform \
+  __asm("$ld$previous$@rpath/lib" __STRING(name) ".dylib$$" __STRING(platform) "$" __STRING(startVersion) "$" __STRING(endVersion) "$$"); \
+  const char ld_previous_ ## platform = 0;
+// Using the __STRING macro is important so that name and platform get expanded before being
+// stringified. The versions could just be #version, __STRING is only used for consistency.
 
-#define RPATH_INSTALL_NAME_DIRECTIVE(major, minor) \
-  RPATH_INSTALL_NAME_DIRECTIVE_IMPL(SWIFT_TARGET_LIBRARY_NAME, major, minor)
+#define RPATH_PREVIOUS_DIRECTIVE(platform, startVersion, endVersion) \
+  RPATH_PREVIOUS_DIRECTIVE_IMPL(SWIFT_TARGET_LIBRARY_NAME, platform, startVersion, endVersion)
 
-
-#if TARGET_OS_WATCH
-  // Check watchOS first, because TARGET_OS_IPHONE includes watchOS.
-  RPATH_INSTALL_NAME_DIRECTIVE( 2, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 2, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 2, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 3, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 3, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 3, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 5, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 5, 1)
-#elif TARGET_OS_IPHONE
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 1)
-#elif TARGET_OS_OSX
-  RPATH_INSTALL_NAME_DIRECTIVE(10,  9)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 10)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 11)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 12)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 13)
-
-  // When building with a deployment target of < macOS 10.14,
-  // treat macOS 10.14 as an "older OS."
-#if __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_14
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 14)
-#endif
-
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_MACOS, 10.9, 10.14.4)
+#elif TARGET_OS_IOS && !TARGET_OS_VISION
+#if TARGET_OS_SIMULATOR
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOSSIMULATOR, 7.0, 12.2)
 #else
-  #error Unknown target.
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOS, 7.0, 12.2)
 #endif
+#elif TARGET_OS_WATCH
+#if TARGET_OS_SIMULATOR
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOSSIMULATOR, 2.0, 5.2)
+#else
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOS, 2.0, 5.2)
+#endif
+#elif TARGET_OS_TV
+#if TARGET_OS_SIMULATOR
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOSSIMULATOR, 9.0, 12.2)
+#else
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOS, 9.0, 12.2)
+#endif
+#endif
+// Swift wasn't supported as an embedded library in any other OS, so no need to create back deployment
+// symbols for any of the other ones.
 
 #endif // defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

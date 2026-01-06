@@ -34,6 +34,7 @@ public:
   CanGenericSignature genSig;
   CanType shapeType;
   SubstitutionMap genSubs; // optional
+  CanGenericSignature reqSig;
   FormalLinkage linkage;
 
   /// Get the extended existential type shape for the given

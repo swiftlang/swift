@@ -53,9 +53,9 @@ internal func _stringCompareInternal(
   }
 
   let isNFC = lhs.isNFC && rhs.isNFC
-  return lhs.withFastUTF8 { lhsUTF8 in
-    return rhs.withFastUTF8 { rhsUTF8 in
-      return _stringCompareFastUTF8(
+  return unsafe lhs.withFastUTF8 { lhsUTF8 in
+    return unsafe rhs.withFastUTF8 { rhsUTF8 in
+      return unsafe _stringCompareFastUTF8(
         lhsUTF8, rhsUTF8, expecting: expecting, bothNFC: isNFC)
     }
   }
@@ -88,16 +88,16 @@ internal func _stringCompareInternal(
   }
 
   let isNFC = lhs.isNFC && rhs.isNFC
-  return lhs.withFastUTF8(range: lhsRange) { lhsUTF8 in
-    return rhs.withFastUTF8(range: rhsRange) { rhsUTF8 in
-      return _stringCompareFastUTF8(
+  return unsafe lhs.withFastUTF8(range: lhsRange) { lhsUTF8 in
+    return unsafe rhs.withFastUTF8(range: rhsRange) { rhsUTF8 in
+      return unsafe _stringCompareFastUTF8(
         lhsUTF8, rhsUTF8, expecting: expecting, bothNFC: isNFC)
     }
   }
 }
 
 @_effects(readonly)
-private func _stringCompareFastUTF8(
+internal func _stringCompareFastUTF8(
   _ utf8Left: UnsafeBufferPointer<UInt8>,
   _ utf8Right: UnsafeBufferPointer<UInt8>,
   expecting: _StringComparisonResult,
@@ -115,11 +115,11 @@ private func _stringCompareFastUTF8(
     if expecting == .equal && utf8Left.count != utf8Right.count {
         return false
     }
-    let cmp = _binaryCompare(utf8Left, utf8Right)
+    let cmp = unsafe _binaryCompare(utf8Left, utf8Right)
     return _lexicographicalCompare(cmp, 0, expecting: expecting)
   }
 
-  return _stringCompareFastUTF8Abnormal(
+  return unsafe _stringCompareFastUTF8Abnormal(
     utf8Left, utf8Right, expecting: expecting)
 }
 
@@ -130,7 +130,7 @@ private func _stringCompareFastUTF8Abnormal(
   expecting: _StringComparisonResult
 ) -> Bool {
   // Do a binary-equality prefix scan, to skip over long common prefixes.
-  guard let diffIdx = _findDiffIdx(utf8Left, utf8Right) else {
+  guard let diffIdx = unsafe _findDiffIdx(utf8Left, utf8Right) else {
     // We finished one of our inputs.
     //
     // TODO: This gives us a consistent and good ordering, but technically it
@@ -140,17 +140,17 @@ private func _stringCompareFastUTF8Abnormal(
       utf8Left.count, utf8Right.count, expecting: expecting)
   }
 
-  let scalarDiffIdx = _scalarAlign(utf8Left, diffIdx)
-  _internalInvariant(scalarDiffIdx == _scalarAlign(utf8Right, diffIdx))
+  let scalarDiffIdx = unsafe _scalarAlign(utf8Left, diffIdx)
+  unsafe _internalInvariant(scalarDiffIdx == _scalarAlign(utf8Right, diffIdx))
 
-  let (leftScalar, leftLen) = _decodeScalar(utf8Left, startingAt: scalarDiffIdx)
-  let (rightScalar, rightLen) = _decodeScalar(
+  let (leftScalar, leftLen) = unsafe _decodeScalar(utf8Left, startingAt: scalarDiffIdx)
+  let (rightScalar, rightLen) = unsafe _decodeScalar(
     utf8Right, startingAt: scalarDiffIdx)
 
   // Very frequent fast-path: point of binary divergence is a NFC single-scalar
   // segment. Check that we diverged at the start of a segment, and the next
   // scalar is both NFC and its own segment.
-  if _fastPath(
+  if unsafe _fastPath(
     leftScalar._isNFCStarter && rightScalar._isNFCStarter &&
     utf8Left.hasNormalizationBoundary(before: scalarDiffIdx &+ leftLen) &&
     utf8Right.hasNormalizationBoundary(before: scalarDiffIdx &+ rightLen)
@@ -166,12 +166,12 @@ private func _stringCompareFastUTF8Abnormal(
 
   // Back up to the nearest normalization boundary before doing a slow
   // normalizing compare.
-  let boundaryIdx = Swift.min(
+  let boundaryIdx = unsafe Swift.min(
     _findBoundary(utf8Left, before: diffIdx),
     _findBoundary(utf8Right, before: diffIdx))
   _internalInvariant(boundaryIdx <= diffIdx)
 
-  return _stringCompareSlow(
+  return unsafe _stringCompareSlow(
     UnsafeBufferPointer(rebasing: utf8Left[boundaryIdx...]),
     UnsafeBufferPointer(rebasing: utf8Right[boundaryIdx...]),
     expecting: expecting)
@@ -206,8 +206,8 @@ private func _stringCompareSlow(
 ) -> Bool {
   // TODO: Just call the normalizer directly
 
-  let left = _StringGutsSlice(_StringGuts(leftUTF8, isASCII: false))
-  let right = _StringGutsSlice(_StringGuts(rightUTF8, isASCII: false))
+  let left = unsafe _StringGutsSlice(_StringGuts(leftUTF8, isASCII: false))
+  let right = unsafe _StringGutsSlice(_StringGuts(rightUTF8, isASCII: false))
   return left.compare(with: right, expecting: expecting)
 }
 
@@ -220,7 +220,7 @@ private func _findDiffIdx(
   let count = Swift.min(left.count, right.count)
   var idx = 0
   while idx < count {
-    guard left[_unchecked: idx] == right[_unchecked: idx] else {
+    guard unsafe left[_unchecked: idx] == right[_unchecked: idx] else {
       return idx
     }
     idx &+= 1
@@ -250,21 +250,22 @@ private func _findBoundary(
   }
 
   // Back up to scalar boundary
-  while UTF8.isContinuation(utf8[_unchecked: idx]) {
+  while unsafe UTF8.isContinuation(utf8[_unchecked: idx]) {
     idx &-= 1
   }
 
   while true {
     if idx == 0 { return 0 }
 
-    let scalar = _decodeScalar(utf8, startingAt: idx).0
+    let scalar = unsafe _decodeScalar(utf8, startingAt: idx).0
 
     if scalar._isNFCStarter {
       return idx
     }
 
-    idx &-= _utf8ScalarLength(utf8, endingAt: idx)
+    unsafe idx &-= _utf8ScalarLength(utf8, endingAt: idx)
   }
+  fatalError()
 }
 
 @frozen
@@ -297,7 +298,7 @@ internal enum _StringComparisonResult {
 internal func _binaryCompare<UInt8>(
   _ lhs: UnsafeBufferPointer<UInt8>, _ rhs: UnsafeBufferPointer<UInt8>
 ) -> Int {
-  var cmp = Int(truncatingIfNeeded:
+  var cmp = unsafe Int(truncatingIfNeeded:
     _swift_stdlib_memcmp(
       lhs.baseAddress._unsafelyUnwrappedUnchecked,
       rhs.baseAddress._unsafelyUnwrappedUnchecked,
@@ -316,9 +317,9 @@ extension _StringGutsSlice {
   ) -> Bool {
     if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
       Builtin.onFastPath() // aggressively inline / optimize
-      let isEqual = self.withFastUTF8 { utf8Self in
-        return other.withFastUTF8 { utf8Other in
-          return 0 == _binaryCompare(utf8Self, utf8Other)
+      let isEqual = unsafe self.withFastUTF8 { utf8Self in
+        return unsafe other.withFastUTF8 { utf8Other in
+          return unsafe 0 == _binaryCompare(utf8Self, utf8Other)
         }
       }
       if isEqual { return expecting == .equal }
@@ -333,8 +334,8 @@ extension _StringGutsSlice {
     with other: _StringGutsSlice,
     expecting: _StringComparisonResult
   ) -> Bool {
-    var iter1 = Substring(self)._internalNFC.makeIterator()
-    var iter2 = Substring(other)._internalNFC.makeIterator()
+    var iter1 = Substring(self).unicodeScalars._internalNFC.makeIterator()
+    var iter2 = Substring(other).unicodeScalars._internalNFC.makeIterator()
 
     var scalar1: Unicode.Scalar? = nil
     var scalar2: Unicode.Scalar? = nil

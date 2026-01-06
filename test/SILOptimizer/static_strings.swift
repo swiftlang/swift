@@ -9,6 +9,10 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 // REQUIRES: swift_in_compiler
 
+// The required relocation format for a single return LLVM instruction are not necessarily
+// supported on object file formats other than Mach-O.
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchOS || OS=xros
+
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for static String variables.
 
@@ -42,10 +46,10 @@ public struct S {
 // CHECK-NEXT: }
 
 // getter for S.largestr
-// CHECK: define {{.*largestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK:      define {{.*largestr.*}}gZ"
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 
 // unsafeMutableAddressor for S.unicodestr
 // CHECK: define {{.*unicodestr.*}}u"
@@ -55,9 +59,9 @@ public struct S {
 
 // getter for S.unicodestr
 // CHECK: define {{.*unicodestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 
 // unsafeMutableAddressor for S.emptystr
 // CHECK: define {{.*emptystr.*}}u"
@@ -81,18 +85,18 @@ public func get_smallstr() -> String {
 }
 
 // CHECK-LABEL: define {{.*}}get_largestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 @inline(never)
 public func get_largestr() -> String {
   return S.largestr
 }
 
 // CHECK-LABEL: define {{.*}}get_unicodestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-NOT:    load
+// CHECK-NOT:    call
+// CHECK:        ret
 @inline(never)
 public func get_unicodestr() -> String {
   return S.unicodestr

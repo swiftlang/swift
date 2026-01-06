@@ -14,12 +14,14 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is
 // loaded too late").
 // REQUIRES: no_asan
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyFile1.swift
 

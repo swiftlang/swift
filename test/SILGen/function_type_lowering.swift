@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -disable-availability-checking -module-name main %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -target %target-swift-5.1-abi-triple -module-name main %s | %FileCheck %s
 
 
 // Similarly-abstract generic signatures should share an unsubstituted type

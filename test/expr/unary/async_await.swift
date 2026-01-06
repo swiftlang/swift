@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 // REQUIRES: concurrency
 
@@ -6,7 +6,7 @@ func test1(asyncfp : () async -> Int, fp : () -> Int) async {
   _ = await asyncfp()
   _ = await asyncfp() + asyncfp()
   _ = await asyncfp() + fp()
-  _ = await fp() + 42  // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await fp() + 42  // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
   _ = 32 + asyncfp() + asyncfp() // expected-error {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   // expected-note@-1:12{{call is 'async'}}
   // expected-note@-2:24{{call is 'async'}}
@@ -216,4 +216,51 @@ func testAsyncLetOutOfAsync() {
 
   _ = await x  // expected-error{{'async let' in a function that does not support concurrency}}
   _ = x // expected-error{{'async let' in a function that does not support concurrency}}
+}
+
+class A {}
+class B: A {}
+func f(_ x: String) async -> String? { x }
+func testAsyncExprWithoutAwait() async {
+  async let result: B? = nil
+  if let result: A = result {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{22-22=await }}
+  // expected-warning@-1 {{immutable value 'result' was never used; consider replacing with '_' or removing it}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  if let result: A {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{18-18=await }}
+  // expected-warning@-1 {{immutable value 'result' was never used; consider replacing with '_' or removing it}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  if let result = result {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{19-19=await }}
+  // expected-warning@-1 {{value 'result' was defined but never used; consider replacing with boolean test}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  if let result {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{16-16= = await result}}
+  // expected-warning@-1 {{value 'result' was defined but never used; consider replacing with boolean test}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  let a = f("a") // expected-error {{expression is 'async' but is not marked with 'await'}} {{11-11=await }}
+  // expected-warning@-1 {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-note@-2 {{call is 'async'}}
+}
+
+// https://github.com/swiftlang/swift/issues/85818
+func testNoAsyncInAwait() async {
+  func g() {}
+  await g() // expected-warning {{no 'async' operations occur within 'await' expression}}{{3-9=}}
+  _ = (g(), await (g())) // expected-warning {{no 'async' operations occur within 'await' expression}}{{13-19=}}
+
+  @MainActor struct MA {
+    func f() {}
+    func g() async {
+      await f() // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+    }
+
+    static func h(_ ma: MA) async {
+      await ma.f() // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+    }
+  }
+
+  actor A {
+    func f() {}
+    func g() async {
+      await f() // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
+    }
+  }
 }

@@ -25,14 +25,23 @@
 AVAILABILITY_PLATFORM(iOS, "iOS")
 AVAILABILITY_PLATFORM(tvOS, "tvOS")
 AVAILABILITY_PLATFORM(watchOS, "watchOS")
+AVAILABILITY_PLATFORM(visionOS, "visionOS")
 AVAILABILITY_PLATFORM(macOS, "macOS")
 AVAILABILITY_PLATFORM(iOSApplicationExtension, "application extensions for iOS")
 AVAILABILITY_PLATFORM(tvOSApplicationExtension, "application extensions for tvOS")
 AVAILABILITY_PLATFORM(watchOSApplicationExtension, "application extensions for watchOS")
+AVAILABILITY_PLATFORM(visionOSApplicationExtension, "application extensions for visionOS")
 AVAILABILITY_PLATFORM(macOSApplicationExtension, "application extensions for macOS")
 AVAILABILITY_PLATFORM(macCatalyst, "Mac Catalyst")
 AVAILABILITY_PLATFORM(macCatalystApplicationExtension, "application extensions for Mac Catalyst")
+AVAILABILITY_PLATFORM(DriverKit, "DriverKit")
+/// A meta-platform representing the built-in Swift runtime.
+AVAILABILITY_PLATFORM(Swift, "Swift")
+/// A meta-platform for Apple operating systems with unified versioning.
+AVAILABILITY_PLATFORM(anyAppleOS, "any Apple OS")
+AVAILABILITY_PLATFORM(FreeBSD, "FreeBSD")
 AVAILABILITY_PLATFORM(OpenBSD, "OpenBSD")
 AVAILABILITY_PLATFORM(Windows, "Windows")
+AVAILABILITY_PLATFORM(Android, "Android")
 
 #undef AVAILABILITY_PLATFORM

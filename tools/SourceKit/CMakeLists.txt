@@ -79,16 +79,6 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   else()
     message(FATAL_ERROR "Can't understand SOURCEKIT_DEPLOYMENT_OS '${SOURCEKIT_DEPLOYMENT_OS}';")
   endif()
-
-  # Add deployment target to C/C++ compiler and linker flags.
-  # FIXME: CMAKE_OSX_DEPLOYMENT_TARGET falls over when used for iOS versions.
-  if (XCODE)
-    if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
-      set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
-    else()
-      set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
-    endif()
-  endif()
 endif()
 
 include_directories(BEFORE

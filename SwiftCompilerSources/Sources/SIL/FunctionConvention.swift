@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 /// SIL function parameter and result conventions based on the AST
@@ -22,24 +23,28 @@ import SILBridging
 /// The underlying FunctionType must be contextual and expanded. SIL
 /// has no use for interface types or unexpanded types.
 public struct FunctionConvention : CustomStringConvertible {
-  let bridgedFunctionType: BridgedASTType
+  let functionType: CanonicalType
   let hasLoweredAddresses: Bool
 
-  init(for bridgedFunctionType: BridgedASTType, in function: Function) {
-    assert(!bridgedFunctionType.hasTypeParameter(), "requires contextual type")
-    self.bridgedFunctionType = bridgedFunctionType
-    self.hasLoweredAddresses = function.hasLoweredAddresses
+  public init(for functionType: CanonicalType, in function: Function) {
+    self.init(for: functionType, hasLoweredAddresses: function.hasLoweredAddresses)
+  }
+
+  public init(for functionType: CanonicalType, hasLoweredAddresses: Bool) {
+    assert(!functionType.hasTypeParameter, "requires contextual type")
+    self.functionType = functionType
+    self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   /// All results including the error.
   public var results: Results {
-    Results(bridged: bridgedFunctionType.SILFunctionType_getResultsWithError(),
+    Results(bridged: SILFunctionType_getResultsWithError(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
   public var errorResult: ResultInfo? {
     return ResultInfo(
-      bridged: bridgedFunctionType.SILFunctionType_getErrorResult(),
+      bridged: SILFunctionType_getErrorResult(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
@@ -48,51 +53,82 @@ public struct FunctionConvention : CustomStringConvertible {
   public var indirectSILResultCount: Int {
     // TODO: Return packs directly in lowered-address mode
     return hasLoweredAddresses
-    ? bridgedFunctionType.SILFunctionType_getNumIndirectFormalResultsWithError()
-    : bridgedFunctionType.SILFunctionType_getNumPackResults()
+    ? SILFunctionType_getNumIndirectFormalResultsWithError(functionType.bridged)
+    : SILFunctionType_getNumPackResults(functionType.bridged)
   }
 
-  /// Indirect results including the error.
-  public var indirectSILResults: LazyFilterSequence<Results> {
-    hasLoweredAddresses
-    ? results.lazy.filter { $0.isSILIndirect }
-    : results.lazy.filter { $0.convention == .pack }
+  /// Returns the indirect result - including the error - at `index`.
+  public func indirectSILResult(at index: Int) -> ResultInfo {
+    let indirectResults = results.lazy.filter {
+      hasLoweredAddresses ? $0.isSILIndirect : $0.convention == .pack
+    }
+    // Note that subscripting a LazyFilterCollection (with the base index, e.g. `Int`) does not work
+    // as expected, because it returns the nth element of the base collection!
+    // Therefore we need to implement the subscript "manually".
+    return indirectResults.enumerated().first{ $0.offset == index }!.element
   }
 
   public var parameters: Parameters {
-    Parameters(bridged: bridgedFunctionType.SILFunctionType_getParameters(),
+    Parameters(bridged: SILFunctionType_getParameters(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
   public var hasSelfParameter: Bool {
-    bridgedFunctionType.SILFunctionType_hasSelfParam()
+    SILFunctionType_hasSelfParam(functionType.bridged)
   }
 
   public var yields: Yields {
-    Yields(bridged: bridgedFunctionType.SILFunctionType_getYields(),
+    Yields(bridged: SILFunctionType_getYields(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
-  /// If the function result depends on any parameters, return a
-  /// Collection of LifetimeDependenceConvention indexed on the
-  /// function parameter.
-  public var resultDependencies: ResultDependencies? {
-    let deps = bridgedFunctionType.SILFunctionType_getLifetimeDependenceInfo()
-    if deps.empty() {
-      return nil
+  /// If the function result depends on any parameters, return a Collection of LifetimeDependenceConventions for the
+  /// dependence source parameters.
+  public var resultDependencies: LifetimeDependencies? {
+    lifetimeDependencies(for: parameters.count)
+  }
+
+  /// If the parameter indexed by 'targetParameterIndex' is the target of any dependencies on other parameters, return a
+  /// Collection of LifetimeDependenceConventions for the dependence source parameters.
+  public func parameterDependencies(for targetParameterIndex: Int) -> LifetimeDependencies? {
+    lifetimeDependencies(for: targetParameterIndex)
+  }
+
+  public func hasLifetimeDependencies() -> Bool {
+    return SILFunctionType_getLifetimeDependencies(functionType.bridged).count() != 0
+  }
+
+  public var hasGuaranteedResult: Bool {
+    if results.count != 1 {
+      return false
     }
-    return ResultDependencies(bridged: deps,
-                                         parameterCount: parameters.count,
-                                         hasSelfParameter: hasSelfParameter)
+    if hasLoweredAddresses {
+      return results[0].convention == .guaranteed
+    }
+    return results[0].convention == .guaranteed || results[0].convention == .guaranteedAddress
+  }
+
+  public var hasAddressResult: Bool {
+    if results.count != 1 {
+      return false
+    }
+    if hasLoweredAddresses {
+      return results[0].convention == .guaranteedAddress || results[0].convention == .inout
+    }
+    return results[0].convention == .inout
   }
 
   public var description: String {
-    var str = String(taking: bridgedFunctionType.getDebugDescription())
-    parameters.forEach { str += "\nparameter: " + $0.description }
+    var str = functionType.description
+    for paramIdx in 0..<parameters.count {
+      str += "\nparameter: " + parameters[paramIdx].description
+      if let deps = parameterDependencies(for: paramIdx) {
+        str += "\n lifetime: \(deps)"
+      }
+    }
     results.forEach { str += "\n   result: " + $0.description }
-    str += (hasLoweredAddresses ? "\n[lowered_address]" : "\n[sil_opaque]")
     if let deps = resultDependencies {
-      str += "\nresult dependences \(deps)"
+      str += "\n lifetime: \(deps)"
     }
     return str
   }
@@ -104,9 +140,23 @@ public struct ResultInfo : CustomStringConvertible {
   /// calling convention of the parameter.
   ///
   /// TODO: For most purposes, you probably want \c returnValueType.
-  public let type: BridgedASTType
+  public let type: CanonicalType
   public let convention: ResultConvention
+  public let options: UInt8
   public let hasLoweredAddresses: Bool
+
+  // Must be kept consistent with 'SILResultInfo::Flag'
+  public enum Flag : UInt8 {
+    case notDifferentiable = 0x1
+    case isSending = 0x2
+  };
+
+  public init(type: CanonicalType, convention: ResultConvention, options: UInt8, hasLoweredAddresses: Bool) {
+    self.type = type
+    self.convention = convention
+    self.options = options
+    self.hasLoweredAddresses = hasLoweredAddresses
+  }
 
   /// Is this result returned indirectly in SIL? Most formally
   /// indirect results can be returned directly in SIL. This depends
@@ -114,17 +164,20 @@ public struct ResultInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirect:
-      return hasLoweredAddresses || type.isOpenedExistentialWithError()
+      return hasLoweredAddresses || type.isExistentialArchetypeWithError
     case .pack:
       return true
-    case .owned, .unowned, .unownedInnerPointer, .autoreleased:
+    case .owned, .unowned, .unownedInnerPointer, .autoreleased, .guaranteed, .guaranteedAddress, .inout:
       return false
     }
   }
 
   public var description: String {
-    convention.description + ": "
-    + String(taking: type.getDebugDescription())
+    convention.description + ": " + type.description
+  }
+
+  public func getReturnValueType(function: Function) -> CanonicalType {
+    CanonicalType(bridged: self._bridged.getReturnValueType(function.bridged))
   }
 }
 
@@ -151,10 +204,26 @@ extension FunctionConvention {
 public struct ParameterInfo : CustomStringConvertible {
   /// The parameter type that describes the abstract calling
   /// convention of the parameter.
-  public let type: BridgedASTType
+  public let type: CanonicalType
   public let convention: ArgumentConvention
   public let options: UInt8
   public let hasLoweredAddresses: Bool
+  
+  // Must be kept consistent with 'SILParameterInfo::Flag'
+  public enum Flag : UInt8 {
+    case notDifferentiable = 0x1
+    case sending = 0x2
+    case isolated = 0x4
+    case implicitLeading = 0x8
+    case const = 0x10
+  };
+
+  public init(type: CanonicalType, convention: ArgumentConvention, options: UInt8, hasLoweredAddresses: Bool) {
+    self.type = type
+    self.convention = convention
+    self.options = options
+    self.hasLoweredAddresses = hasLoweredAddresses
+  }
 
   /// Is this parameter passed indirectly in SIL? Most formally
   /// indirect results can be passed directly in SIL (opaque values
@@ -163,8 +232,8 @@ public struct ParameterInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirectIn, .indirectInGuaranteed:
-      return hasLoweredAddresses || type.isOpenedExistentialWithError()
-    case .indirectInout, .indirectInoutAliasable:
+      return hasLoweredAddresses || type.isExistentialArchetypeWithError
+    case .indirectInout, .indirectInoutAliasable, .indirectInCXX:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
       return false
@@ -176,13 +245,20 @@ public struct ParameterInfo : CustomStringConvertible {
   }
 
   public var description: String {
-    convention.description + ": "
-    + String(taking: type.getDebugDescription())
+    "\(convention): \(type)"
+  }
+  
+  public func hasOption(_ flag: Flag) -> Bool {
+    return options & flag.rawValue != 0
+  }
+
+  public func getArgumentType(function: Function) -> CanonicalType {
+    CanonicalType(bridged: self._bridged.getArgumentType(function.bridged))
   }
 }
 
 extension FunctionConvention {
-  public struct Parameters : Collection {
+  public struct Parameters : RandomAccessCollection {
     let bridged: BridgedParameterInfoArray
     let hasLoweredAddresses: Bool
 
@@ -223,7 +299,25 @@ extension FunctionConvention {
 
 public enum LifetimeDependenceConvention : CustomStringConvertible {
   case inherit
-  case scope
+  case scope(addressable: Bool, addressableForDeps: Bool)
+
+  public var isScoped: Bool {
+    switch self {
+    case .inherit:
+      return false
+    case .scope:
+      return true
+    }
+  }
+
+  public func isAddressable(for value: Value) -> Bool {
+    switch self {
+    case .inherit:
+      return false
+    case let .scope(addressable, addressableForDeps):
+      return addressable || (addressableForDeps && value.type.isAddressableForDeps(in: value.parentFunction))
+    }
+  }
 
   public var description: String {
     switch self {
@@ -236,8 +330,22 @@ public enum LifetimeDependenceConvention : CustomStringConvertible {
 }
 
 extension FunctionConvention {
+  // 'targetIndex' is either the parameter index or parameters.count for the function result.
+  private func lifetimeDependencies(for targetIndex: Int) -> LifetimeDependencies? {
+    let bridgedDependenceInfoArray = SILFunctionType_getLifetimeDependencies(functionType.bridged)
+    for infoIndex in 0..<bridgedDependenceInfoArray.count() {
+      let bridgedDependenceInfo = bridgedDependenceInfoArray.at(infoIndex)
+      if bridgedDependenceInfo.targetIndex == targetIndex {
+        return LifetimeDependencies(bridged: bridgedDependenceInfo,
+                                    parameterCount: parameters.count,
+                                    hasSelfParameter: hasSelfParameter)
+      }
+    }
+    return nil
+  }
+
   /// Collection of LifetimeDependenceConvention? that parallels parameters.
-  public struct ResultDependencies : Collection, CustomStringConvertible {
+  public struct LifetimeDependencies : Collection, CustomStringConvertible {
     let bridged: BridgedLifetimeDependenceInfo
     let paramCount: Int
     let hasSelfParam: Bool
@@ -266,19 +374,15 @@ extension FunctionConvention {
         return .inherit
       }
       if scope {
-        return .scope
+        let addressable = bridged.checkAddressable(bridgedIndex(parameterIndex: index))
+        let addressableForDeps = bridged.checkConditionallyAddressable(bridgedIndex(parameterIndex: index))
+        return .scope(addressable: addressable, addressableForDeps: addressableForDeps)
       }
       return nil
     }
 
-    // In Sema's LifetimeDependenceInfo, 'self' is always index zero,
-    // whether it exists or not. In SILFunctionType, 'self' is the
-    // last parameter if it exists.
     private func bridgedIndex(parameterIndex: Int) -> Int {
-      if hasSelfParam, parameterIndex == (paramCount - 1) {
-        return 0
-      }
-      return parameterIndex + 1
+      return parameterIndex
     }
 
     public var description: String {
@@ -294,6 +398,18 @@ public enum ResultConvention : CustomStringConvertible {
 
   /// The caller is responsible for destroying this return value.  Its type is non-trivial.
   case owned
+
+  /// The caller is responsible for using the returned address within a valid
+  /// scope. This is valid only for borrow accessors.
+  case guaranteedAddress
+
+  /// The caller is responsible for using the returned value within a valid
+  /// scope. This is valid only for borrow accessors.
+  case guaranteed
+
+  /// The caller is responsible for mutating the returned address within a valid
+  /// scope. This is valid only for mutate accessors.
+  case `inout`
 
   /// The caller is not responsible for destroying this return value.  Its type may be trivial, or it may simply be offered unsafely.  It is valid at the instant of the return, but further operations may invalidate it.
   case unowned
@@ -334,6 +450,12 @@ public enum ResultConvention : CustomStringConvertible {
       return "autoreleased"
     case .pack:
       return "pack"
+    case .guaranteed:
+      return "guaranteed"
+    case .guaranteedAddress:
+      return "guaranteedAddress"
+    case .inout:
+      return "inout"      
     }
   }
 }
@@ -342,14 +464,22 @@ public enum ResultConvention : CustomStringConvertible {
 
 extension ResultInfo {
   init(bridged: BridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type)
+    self.type = CanonicalType(bridged: bridged.type)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
+    self.options = bridged.options
   }
-  init(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type!)
+  init?(bridged: OptionalBridgedResultInfo, hasLoweredAddresses: Bool) {
+    if bridged.type.getRawType().type == nil {
+      return nil
+    }
+    self.type = CanonicalType(bridged: bridged.type)
     self.convention = ResultConvention(bridged: bridged.convention)
     self.hasLoweredAddresses = hasLoweredAddresses
+    self.options = bridged.options
+  }
+  public var _bridged: BridgedResultInfo {
+    BridgedResultInfo(type.bridged, convention.bridged, options)
   }
 }
 
@@ -362,21 +492,38 @@ extension ResultConvention {
       case .UnownedInnerPointer: self = .unownedInnerPointer
       case .Autoreleased:        self = .autoreleased
       case .Pack:                self = .pack
+      case .Guaranteed:          self = .guaranteed
+      case .GuaranteedAddress:   self = .guaranteedAddress
+      case .Inout:               self = .inout
       default:
         fatalError("unsupported result convention")
+    }
+  }
+
+  var bridged: BridgedResultConvention {
+    switch self {
+    case .indirect:            return .Indirect
+    case .owned:               return .Owned
+    case .unowned:             return .Unowned
+    case .unownedInnerPointer: return .UnownedInnerPointer
+    case .autoreleased:        return .Autoreleased
+    case .pack:                return .Pack
+    case .guaranteed:          return .Guaranteed
+    case .guaranteedAddress:   return .GuaranteedAddress
+    case .inout:               return .Inout
     }
   }
 }
 
 extension ParameterInfo {
   init(bridged: BridgedParameterInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type)
+    self.type = CanonicalType(bridged: bridged.type)
     self.convention = bridged.convention.convention
     self.options = bridged.options
     self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   public var _bridged: BridgedParameterInfo {
-    BridgedParameterInfo(type.type!, convention.bridged, options)
+    BridgedParameterInfo(type.bridged, convention.bridged, options)
   }
 }

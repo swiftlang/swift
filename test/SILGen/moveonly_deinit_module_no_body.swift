@@ -2,8 +2,7 @@
 
 // Just make sure we don't crash.
 
-@_moveOnly
-public struct S {
+public struct S: ~Copyable {
   private let desc: Int
 
   internal init(desc: Int) {

@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser, OS=macosx
+// REQUIRES: swift_feature_FreestandingMacros
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/src
@@ -99,7 +100,7 @@ public struct FuncFooBarNoAttrsMacro: DeclarationMacro {
 @available(SwiftStdlib 9999, *)
 #globalDecls
 
-func testGlobal() { // expected-note 2 {{add @available attribute to enclosing global function}}
+func testGlobal() { // expected-note 2 {{add '@available' attribute to enclosing global function}}
   globalFunc() // expected-error {{'globalFunc()' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
   _ = globalVar // expected-error {{'globalVar' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
 }
@@ -108,7 +109,7 @@ struct S {
   @available(SwiftStdlib 9999, *)
   #memberDecls
 }
-func testMember(value: S) { // expected-note 2 {{add @available attribute to enclosing global function}}
+func testMember(value: S) { // expected-note 2 {{add '@available' attribute to enclosing global function}}
   value.memberFunc() // expected-error {{'memberFunc()' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
   _ = value.memberVar // expected-error {{'memberVar' is only available in macOS 9999 or newer}} expected-note {{add 'if #available' version check}}
 }
@@ -158,11 +159,20 @@ struct S1 {
 }
 
 // FIXME: Diagnostics could be better.
-struct S2 { // expected-note 4 {{add @available attribute to enclosing struct}}
-  // expected-note@+3 6 {{in expansion of macro 'funcFromClosureMacro' here}}
+struct S2 { // expected-note 4 {{add '@available' attribute to enclosing struct}}
   // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}}
-  // expected-error@+2 {{'APIFrom99()' is only available in macOS 99 or newer}} expected-note@+2 {{add 'if #available' version check}}
+  // expected-error@+12 {{'APIFrom99()' is only available in macOS 99 or newer}} expected-note@+12 {{add 'if #available' version check}}
   #funcFromClosureMacro(APIFrom99()) {
+    /*
+    expected-note@-2 6 {{in expansion of macro 'funcFromClosureMacro' here}}
+    expected-expansion@-3:3{{
+      expected-note@1:6 2{{add '@available' attribute to enclosing instance method}}
+      expected-error@2:9{{'APIFrom99()' is only available in macOS 99 or newer}}
+      expected-note@2:9{{add 'if #available' version check}}
+      expected-error@14:11{{'APIFrom99()' is only available in macOS 99 or newer}}
+      expected-note@14:11{{add 'if #available' version check}}
+    }}
+    */
     _ = APIFrom99()
     if #available(macOS 999, *) {
       _ = APIFrom99()

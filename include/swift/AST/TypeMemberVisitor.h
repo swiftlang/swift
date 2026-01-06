@@ -41,17 +41,7 @@ public:
   BAD_MEMBER(Operator)
   BAD_MEMBER(PrecedenceGroup)
   BAD_MEMBER(Macro)
-
-  // The children of these are automatically inserted into the
-  // surrounding context.
-  RetTy visitIfConfigDecl(IfConfigDecl *D) {
-    return RetTy();
-  }
-
-  // These decls are disregarded.
-  RetTy visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
-    return RetTy();
-  }
+  BAD_MEMBER(Using)
 
   RetTy visitMacroExpansionDecl(MacroExpansionDecl *D) {
     // Expansion already visited as auxiliary decls.

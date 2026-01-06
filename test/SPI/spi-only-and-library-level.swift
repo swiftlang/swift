@@ -5,16 +5,16 @@
 // RUN:   -module-name Lib -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -swift-version 5
 // RUN: %target-swift-frontend -emit-module %t/APILib.swift -I %t \
-// RUN:   -swift-version 5 -verify \
+// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports \
 // RUN:   -library-level api \
 // RUN:   -require-explicit-availability=ignore
 // RUN: %target-swift-frontend -emit-module %t/SPILib.swift -I %t \
-// RUN:   -swift-version 5 -verify \
+// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports \
 // RUN:   -library-level spi
 // RUN: %target-swift-frontend -emit-module %t/OtherLib.swift -I %t \
-// RUN:   -swift-version 5 -verify \
+// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports
 
 //--- Lib.swift

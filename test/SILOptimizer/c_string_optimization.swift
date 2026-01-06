@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -O %s -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-build-swift -O %s -module-name=test -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
@@ -10,6 +10,8 @@
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
 #else
@@ -24,7 +26,7 @@
 // CHECK-NOT: apply
 // CHECK:    [[O:%[0-9]+]] = enum $Optional<UnsafePointer<Int8>>, #Optional.some!enumelt, [[P]]
 // CHECK-NOT: apply
-// CHECK:    [[F:%[0-9]+]] = function_ref @puts
+// CHECK:    [[F:%[0-9]+]] = function_ref @$sSo4putsys5Int32VSPys4Int8VGSgFTo
 // CHECK:    apply [[F]]([[O]])
 // CHECK: } // end sil function '$s4test0A26StringConstantForCFunctionyyF'
 @inline(never)
@@ -40,7 +42,7 @@ public func testStringConstantForCFunction() {
 // CHECK-NOT: apply
 // CHECK:    [[O:%[0-9]+]] = enum $Optional<UnsafePointer<Int8>>, #Optional.some!enumelt, [[P]]
 // CHECK-NOT: apply
-// CHECK:    [[F:%[0-9]+]] = function_ref @puts
+// CHECK:    [[F:%[0-9]+]] = function_ref @$sSo4putsys5Int32VSPys4Int8VGSgFTo
 // CHECK:    apply [[F]]([[O]])
 // CHECK: } // end sil function '$s4test0A17TypeInterpolationyyF'
 @inline(never)

@@ -1,0 +1,46 @@
+// RUN: %target-sil-opt -sil-print-types --onone-simplification %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Builtin
+import Swift
+
+class Klass {}
+
+enum EnumTy: ~Copyable {
+    case klass(Klass)
+    case int(Builtin.Word)
+}
+
+// CHECK-LABEL: sil [ossa] @test_switch_trivial_arm
+sil [ossa] @test_switch_trivial_arm : $@convention(thin) (@guaranteed EnumTy) -> () {
+entry(%a : @guaranteed $EnumTy):
+  %b = explicit_copy_value %a : $EnumTy
+  // CHECK: [[MOVE:%.*]] = move_value
+  %c = move_value %b : $EnumTy
+  // CHECK: [[BORROW:%.*]] = begin_borrow [[MOVE]]
+  %d = begin_borrow %c : $EnumTy
+  // CHECK: switch_enum [[BORROW]] : {{.*}}, case #EnumTy.int!enumelt: [[INTBB:bb[0-9]+]]
+  switch_enum %d : $EnumTy, case #EnumTy.klass!enumelt: klass, case #EnumTy.int!enumelt: int
+
+klass(%e : @guaranteed $Klass):
+  end_borrow %d : $EnumTy
+  %f = unchecked_enum_data %c : $EnumTy, #EnumTy.klass!enumelt
+  destroy_value %f : $Klass
+  br end
+
+// We shouldn't remove the `unchecked_enum_data` here because it consumes the
+// original enum, even though it otherwise appears dead.
+// CHECK: [[INTBB]]({{.*}}):
+int(%p : $Builtin.Word):
+  // CHECK: end_borrow [[BORROW]]
+  end_borrow %d : $EnumTy
+  // CHECK: unchecked_enum_data [[MOVE]]
+  %q = unchecked_enum_data %c : $EnumTy, #EnumTy.int!enumelt
+  br end
+
+end:
+  return undef : $()
+}
+
+

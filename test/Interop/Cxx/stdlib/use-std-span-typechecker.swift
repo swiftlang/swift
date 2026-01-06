@@ -1,0 +1,17 @@
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1
+// REQUIRES: std_span
+
+import StdSpan
+
+let arr: [Int32] = [1, 2, 3]
+arr.withUnsafeBufferPointer { ubpointer in
+    let _ = ConstSpanOfInt(ubpointer) // okay
+    let _ = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count) 
+    // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
+}
+
+arr.withUnsafeBufferPointer { ubpointer in 
+    // FIXME: this crashes the compiler once we import span's templated ctors as Swift generics.
+    let _ = ConstSpanOfInt(ubpointer.baseAddress, ubpointer.count)
+    // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
+}

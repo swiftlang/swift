@@ -1,5 +1,3 @@
-import SwiftOnoneSupport
-
 func %%% (lhs: Int, rhs: Int) -> Int
 postfix func =-> (lhs: Int) -> Int
 postfix func => (lhs: Int) -> Int
@@ -39,7 +37,7 @@ enum MyQuickLookObject {
 }
 var globalVar: Int
 func hiddenImport()
-func overlayedFoo()
+func overlaidFoo()
 func visibleImport()
 precedencegroup High {
   associativity: left

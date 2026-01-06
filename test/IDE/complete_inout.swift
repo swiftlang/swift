@@ -9,7 +9,7 @@ struct Foo {
     var myInt: Int
 
     func bar() {
-        let context = Bar(wihtInout: &self.#^COMPLETE_INOUT?check=CHECK^#)
+        let context = Bar(withInout: &self.#^COMPLETE_INOUT?check=CHECK^#)
         let context = Bar(withPointer: &self.#^COMPLETE_POINTER?check=CHECK^#)
     }
 }

@@ -82,8 +82,7 @@ public:
   }
   
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
-    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts,
-                         TypeCheckerOptions(), SILOptions(), "unknown");
+    swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts, "unknown");
     SmallVector<ASTNode, 8> items;
     PU.getParser().parseTopLevelItems(items);
     return PU.getParser().getSplitTokens();

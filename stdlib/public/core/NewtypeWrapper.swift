@@ -10,11 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if !$Embedded
 /// An implementation detail used to implement support importing
 /// (Objective-)C entities marked with the swift_newtype Clang
 /// attribute.
 public protocol _SwiftNewtypeWrapper
 : RawRepresentable, _HasCustomAnyHashableRepresentation { }
+#else
+/// An implementation detail used to implement support importing
+/// (Objective-)C entities marked with the swift_newtype Clang
+/// attribute.
+public protocol _SwiftNewtypeWrapper
+: RawRepresentable { }
+#endif
 
 extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
   /// The hash value.
@@ -39,6 +47,7 @@ extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue: Hashable {
   }
 }
 
+#if !$Embedded
 extension _SwiftNewtypeWrapper {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return nil
@@ -87,18 +96,17 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
 
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     if let value = _value as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
     if let value = _value.rawValue as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
     return false
   }
 }
 
-#if _runtime(_ObjC)
 extension _SwiftNewtypeWrapper where Self.RawValue: _ObjectiveCBridgeable {
   // Note: This is the only default typealias for _ObjectiveCType, because
   // constrained extensions aren't allowed to define types in different ways.

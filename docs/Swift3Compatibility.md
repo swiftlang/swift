@@ -106,7 +106,7 @@ Any other changes are likely to break clients, even more so if overrides are a p
 - If it's a parameter for a top-level function, a struct or enum method, or a class method you call but don't override, there should be no problem.
 - If it's an index for a subscript you call but don't override, there should be no problem.
 
-Unfortunately, the remaining changes are clearly unsafe, but may still happen because of APIs that were mis-annotated.
+Unfortunately, the remaining changes are clearly unsafe, but may still happen because of APIs that were misannotated.
 
 - If it's a property or a subscript element, this change **breaks source compatibility.**
 - If it's a result type for a top-level function, struct or enum method, or class method, this change **breaks source compatibility.**

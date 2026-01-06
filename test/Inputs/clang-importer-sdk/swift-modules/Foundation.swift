@@ -4,6 +4,11 @@
 
 public let NSUTF8StringEncoding: UInt = 8
 
+// This extension will cause ClangImporter/newtype_conformance.swift to fail
+// unless rdar://142693093 is fixed. To reproduce, it's important that this
+// extension come *before* the _ObjectiveCBridgeable extension for String.
+extension NSFileAttributeKey { }
+
 extension AnyHashable : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSObject {
     return NSObject()

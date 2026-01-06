@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=upcoming-swift)
+// RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-5.9 -O)
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -cxx-interoperability-mode=swift-6 -O)
 
-//
 // REQUIRES: executable_test
 
 import MoveOnlyCxxValueType
@@ -70,4 +70,8 @@ MoveOnlyCxxValueType.test("Test move only field access in derived holder") {
   expectEqual(c.x.x, 5)
 }
 
+MoveOnlyCxxValueType.test("Test move only field in anonymous struct") {
+  let a = FieldInAnonStructNC()
+  let b = a
+}
 runAllTests()

@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -typecheck -enable-builtin-module -D BUILTIN_IMPORT %s
 // RUN: %target-swift-frontend -typecheck -enable-experimental-feature BuiltinModule -D BUILTIN_IMPORT %s
 
+// REQUIRES: swift_feature_BuiltinModule
+
 // CHECK-NO-BUILTIN: no such module 'Builtin'
 
 #if BUILTIN_IMPORT

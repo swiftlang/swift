@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name EffProps -disable-availability-checking
-// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name EffProps -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name EffProps -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name EffProps -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s < %t.swiftinterface
 
 public struct MyStruct {}

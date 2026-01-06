@@ -14,9 +14,9 @@ struct G<X> {}
 // CHECK-NEXT: Generic signature: <X where X == Derived>
 extension G where X : Base, X : P, X == Derived {}
 
-// RULE: + (requirement "\xCF\x84_0_0" subclass_of "Base")
-// RULE: + (requirement "\xCF\x84_0_0" conforms_to "P")
-// RULE: + (requirement "\xCF\x84_0_0" same_type "Derived")
+// RULE: + (requirement "τ_0_0" subclass_of "Base")
+// RULE: + (requirement "τ_0_0" conforms_to "P")
+// RULE: + (requirement "τ_0_0" same_type "Derived")
 
 // RULE: Rewrite system: {
 // RULE-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]

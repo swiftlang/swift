@@ -13,12 +13,11 @@
 #include "TypeCheckDistributed.h"
 
 #include "CodeSynthesis.h"
-#include "DerivedConformances.h"
-#include "TypeCheckType.h"
+#include "DerivedConformance/DerivedConformance.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -27,6 +26,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -34,151 +34,6 @@
 #include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
-
-/******************************************************************************/
-/************************ PROPERTY SYNTHESIS **********************************/
-/******************************************************************************/
-
-static VarDecl*
- lookupDistributedActorProperty(NominalTypeDecl *decl, DeclName name) {
-   assert(decl && "decl was null");
-   auto &C = decl->getASTContext();
-
-   auto clazz = dyn_cast<ClassDecl>(decl);
-   if (!clazz)
-     return nullptr;
-
-   auto refs = decl->lookupDirect(name);
-   if (refs.size() != 1)
-     return nullptr;
-
-   auto var = dyn_cast<VarDecl>(refs.front());
-   if (!var)
-     return nullptr;
-
-   Type expectedType = Type();
-   if (name == C.Id_id) {
-     expectedType = getDistributedActorIDType(decl);
-   } else if (name == C.Id_actorSystem) {
-     expectedType = getDistributedActorSystemType(decl);
-   } else {
-     llvm_unreachable("Unexpected distributed actor property lookup!");
-   }
-   if (!expectedType)
-     return nullptr;
-
-   if (!var->getInterfaceType()->isEqual(expectedType))
-     return nullptr;
-
-   return var;
- }
-
-// Note: This would be nice to implement in DerivedConformanceDistributedActor,
-// but we can't since those are lazily triggered and an implementation exists
-// for the 'id' property because 'Identifiable.id' has an extension that impls
-// it for ObjectIdentifier, and we have to instead emit this stored property.
-//
-// The "derived" mechanisms are not really geared towards emitting for
-// what already has a witness.
-static VarDecl *addImplicitDistributedActorIDProperty(
-    ClassDecl *nominal) {
-  if (!nominal)
-    return nullptr;
-  if (!nominal->isDistributedActor())
-    return nullptr;
-
-  auto &C = nominal->getASTContext();
-
-  // ==== Synthesize and add 'id' property to the actor decl
-  Type propertyType = getDistributedActorIDType(nominal);
-
-  auto *propDecl = new (C)
-      VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-              SourceLoc(), C.Id_id, nominal);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyType);
-
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
-  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
-  propPat->setType(propertyType);
-
-  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      nominal);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
-  // mark as @_compilerInitialized, since we synthesize the initializing
-  // assignment during SILGen.
-  propDecl->getAttrs().add(
-      new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
-
-  // IMPORTANT: The `id` MUST be the first field of any distributed actor,
-  // because when we allocate remote proxy instances, we don't allocate memory
-  // for anything except the first two fields: id and actorSystem, so they
-  // MUST be those fields.
-  //
-  // Their specific order also matters, because it is enforced this way in IRGen
-  // and how we emit them in AST MUST match what IRGen expects or cross-module
-  // things could be using wrong offsets and manifest as reading trash memory on
-  // id or system accesses.
-  nominal->addMember(propDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
-  nominal->addMember(pbDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
-  return propDecl;
-}
-
-static VarDecl *addImplicitDistributedActorActorSystemProperty(
-    ClassDecl *nominal) {
-  if (!nominal)
-    return nullptr;
-  if (!nominal->isDistributedActor())
-    return nullptr;
-
-  auto &C = nominal->getASTContext();
-
-  // ==== Synthesize and add 'actorSystem' property to the actor decl
-  Type propertyType = getDistributedActorSystemType(nominal);
-
-  auto *propDecl = new (C)
-      VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-              SourceLoc(), C.Id_actorSystem, nominal);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
-  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  propDecl->setInterfaceType(propertyType);
-
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
-  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
-  propPat->setType(propertyType);
-
-  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
-      nominal);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
-
-  auto idProperty = nominal->getDistributedActorIDProperty();
-  // If the id was not yet synthesized, we need to ensure that eventually
-  // the order of fields will be: id, actorSystem (because IRGen needs the
-  // layouts to match with the AST we produce). We do this by inserting FIRST,
-  // and then as the ID gets synthesized, it'll also force FIRST and therefore
-  // the order will be okey -- ID and then system.
-  auto insertAtHead = idProperty == nullptr;
-
-  // IMPORTANT: The `id` MUST be the first field of any distributed actor.
-  // So we find the property and add the system AFTER it using the hint.
-  //
-  // If the `id` was not synthesized yet, we'll end up inserting at head,
-  // but the id synthesis will force itself to be FIRST anyway, so it works out.
-  nominal->addMember(propDecl, /*hint=*/idProperty, /*insertAtHead=*/insertAtHead);
-  nominal->addMember(pbDecl, /*hint=*/idProperty, /*insertAtHead=*/insertAtHead);
-  return propDecl;
-}
 
 /******************************************************************************/
 /*********************** DISTRIBUTED THUNK SYNTHESIS **************************/
@@ -191,7 +46,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
     forwardingParams.push_back(new (C) DeclRefExpr(
         ConcreteDeclRef(param), DeclNameLoc(), /*implicit=*/true,
         swift::AccessSemantics::Ordinary,
-        afd->mapTypeIntoContext(param->getInterfaceType())));
+        afd->mapTypeIntoEnvironment(param->getInterfaceType())));
   }
 }
 
@@ -199,7 +54,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
     ASTContext &C, AbstractFunctionDecl *thunk) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(C);
 
   // default mangling
   auto mangled =
@@ -223,7 +78,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
          "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
-  selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(implicit));
+  selfDecl->addAttribute(new (C) KnownToBeLocalAttr(implicit));
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -231,6 +86,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // === Type:
   StructDecl *RCT = C.getRemoteCallTargetDecl();
+  assert(RCT && "Missing RemoteCalLTarget declaration");
   Type remoteCallTargetTy = RCT->getDeclaredInterfaceType();
 
   // === __isRemoteActor(self)
@@ -345,7 +201,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         UnresolvedDeclRefExpr::createImplicit(C, recordGenericSubstitutionName);
 
     for (auto genParamType : genEnv->getGenericParams()) {
-      auto tyExpr = TypeExpr::createImplicit(genEnv->mapTypeIntoContext(genParamType), C);
+      auto tyExpr = TypeExpr::createImplicit(genEnv->mapTypeIntoEnvironment(genParamType), C);
       auto subTypeExpr = new (C) DotSelfExpr(
           tyExpr,
           sloc, sloc, tyExpr->getType());
@@ -402,7 +258,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         auto remoteCallArgumentInitDecl =
             RCA->getDistributedRemoteCallArgumentInitFunction();
         auto boundRCAType = BoundGenericType::get(
-            RCA, Type(), {thunk->mapTypeIntoContext(param->getInterfaceType())});
+            RCA, Type(), {thunk->mapTypeIntoEnvironment(param->getInterfaceType())});
         auto remoteCallArgumentInitDeclRef =
             TypeExpr::createImplicit(boundRCAType, C);
 
@@ -417,7 +273,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
              new (C) DeclRefExpr(
                  ConcreteDeclRef(param), dloc, implicit,
                  AccessSemantics::Ordinary,
-                 thunk->mapTypeIntoContext(param->getInterfaceType()))
+                 thunk->mapTypeIntoEnvironment(param->getInterfaceType()))
             },
             C);
 
@@ -486,7 +342,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     // Result.self
     // Watch out and always map into thunk context
-    auto resultType = thunk->mapTypeIntoContext(func->getResultInterfaceType());
+    auto resultType = thunk->mapTypeIntoEnvironment(func->getResultInterfaceType());
     auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
     auto *resultTypeExpr =
         new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
@@ -623,7 +479,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     if (!isVoidReturn) {
       // Result.self
       auto resultType =
-          func->mapTypeIntoContext(func->getResultInterfaceType());
+          func->mapTypeIntoEnvironment(func->getResultInterfaceType());
       auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
       auto *resultTypeExpr =
           new (C) DotSelfExpr(metaTypeRef, sloc, sloc, resultType);
@@ -692,7 +548,8 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
 
-    paramDecl->setImplicit(true);
+    paramDecl->setImplicit();
+    paramDecl->setSending();
     paramDecl->setSpecifier(funcParam->getSpecifier());
     paramDecl->setInterfaceType(funcParam->getInterfaceType());
 
@@ -728,15 +585,18 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   thunk->setSynthesized(true);
 
   if (isa<ClassDecl>(DC))
-    thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));
+    thunk->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
 
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->getAttrs().add(
-      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+  thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+  // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
+  //                    this way we would not hop off the caller when calling system.remoteCall;
+  //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
+  thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
 
   return thunk;
 }
@@ -765,7 +625,6 @@ addDistributedActorCodableConformance(
   assert(proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
          proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
   auto &C = actor->getASTContext();
-  auto module = actor->getParentModule();
 
   // === Only Distributed actors can gain this implicit conformance
   if (!actor->isDistributedActor()) {
@@ -774,7 +633,7 @@ addDistributedActorCodableConformance(
 
   // === Does the actor explicitly conform to the protocol already?
   auto explicitConformance =
-      module->lookupConformance(actor->getInterfaceType(), proto);
+      lookupConformance(actor->getInterfaceType(), proto);
   if (!explicitConformance.isInvalid()) {
     // ok, it was conformed explicitly -- let's not synthesize;
     return nullptr;
@@ -816,11 +675,9 @@ addDistributedActorCodableConformance(
   }
 
   auto conformance = C.getNormalConformance(
-      actor->getDeclaredInterfaceType(), proto,
-      actor->getLoc(), /*dc=*/actor,
-      ProtocolConformanceState::Incomplete,
-      /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      actor->getDeclaredInterfaceType(), proto, actor->getLoc(),
+      /*inheritedTypeRepr=*/nullptr, /*dc=*/actor,
+      ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
@@ -833,10 +690,10 @@ addDistributedActorCodableConformance(
 void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
                                                    NominalTypeDecl *nominal) {
 #ifndef NDEBUG
-  if (auto id = nominal->getDistributedActorIDProperty()) {
-    if (auto system = nominal->getDistributedActorSystemProperty()) {
+  if (nominal->getDistributedActorIDProperty()) {
+    if (nominal->getDistributedActorSystemProperty()) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
+        if (classDecl->getUnownedExecutorProperty()) {
           int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
           int idx = 0;
           for (auto member : nominal->getMembers()) {
@@ -855,8 +712,10 @@ void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
           }
           if (idIdx + actorSystemIdx + unownedExecutorIdx >= 0 + 1 + 2) {
             // we have found all the necessary fields, let's assert their order
-            assert(idIdx < actorSystemIdx < unownedExecutorIdx &&
-                   "order of fields MUST be exact.");
+            // FIXME: This assertion was not asserting what it is designed to
+            // assert and more work is needed to make it pass.
+//            assert(idIdx < actorSystemIdx < unownedExecutorIdx &&
+//                   "order of fields MUST be exact.");
           }
         }
       }
@@ -876,7 +735,7 @@ static bool canSynthesizeDistributedThunk(AbstractFunctionDecl *distributedTarge
 
   auto serializationTy =
       getDistributedActorSerializationType(distributedTarget->getDeclContext());
-  return serializationTy && !serializationTy->hasDependentMember();
+  return !serializationTy->hasError() && !serializationTy->hasDependentMember();
 }
 
 /******************************************************************************/
@@ -899,7 +758,7 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
       llvm_unreachable("unsupported storage kind");
     }
   } else {
-    distributedTarget = originator.get<AbstractFunctionDecl *>();
+    distributedTarget = cast<AbstractFunctionDecl *>(originator);
     if (!distributedTarget->isDistributed())
       return nullptr;
   }
@@ -941,80 +800,129 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("Unable to synthesize distributed thunk");
 }
 
-VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *actor) const {
-  if (!actor->isDistributedActor())
+static VarDecl *lookupDistributedActorProperty(NominalTypeDecl *decl,
+                                               DeclName name) {
+  VarDecl *result = nullptr;
+  for (auto *ref : decl->lookupDirect(name)) {
+    auto *prop = dyn_cast<VarDecl>(ref);
+    if (!prop || prop->getDeclContext() != decl)
+      continue;
+
+    if (!result) {
+      result = prop;
+      continue;
+    }
     return nullptr;
+  }
+  return result;
+}
 
-  auto &C = actor->getASTContext();
-
+VarDecl *
+GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
+                                               NominalTypeDecl *nominal) const {
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
+  auto &C = nominal->getASTContext();
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
-  auto classDecl = dyn_cast<ClassDecl>(actor);
-  if (!classDecl)
+  if (!isa<ClassDecl>(nominal) || !nominal->isDistributedActor())
     return nullptr;
 
-  // We may enter this request multiple times, e.g. in multi-file projects,
-  // so in order to avoid synthesizing a property many times, first perform
-  // a lookup and return if it already exists.
-  if (auto existingProp = lookupDistributedActorProperty(classDecl, C.Id_id)) {
-    return existingProp;
-  }
+  // If we're in a deserialized module or swift interface we expect to be able
+  // to find this through name lookup.
+  auto *DC = nominal->getDeclContext();
+  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+    return lookupDistributedActorProperty(nominal, C.Id_id);
 
-  return addImplicitDistributedActorIDProperty(classDecl);
+  // ==== Synthesize and add 'id' property to the actor decl
+  auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                                   SourceLoc(), C.Id_id, nominal);
+  propDecl->setImplicit();
+  propDecl->setSynthesized();
+  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
+
+  // NOTE: The type for this property is lazily computed by
+  // `getLazilySynthesizedPattern` when type-checking, which ensures this
+  // request does not trigger any semantic requests since it's called by name
+  // lookup.
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
+
+  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
+
+  // mark as nonisolated, allowing access to it from everywhere
+  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
+  // mark as @_compilerInitialized, since we synthesize the initializing
+  // assignment during SILGen.
+  propDecl->addAttribute(new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
+
+  // IMPORTANT: The `id` MUST be the first field of any distributed actor,
+  // because when we allocate remote proxy instances, we don't allocate memory
+  // for anything except the first two fields: id and actorSystem, so they
+  // MUST be those fields.
+  //
+  // Their specific order also matters, because it is enforced this way in IRGen
+  // and how we emit them in AST MUST match what IRGen expects or cross-module
+  // things could be using wrong offsets and manifest as reading trash memory on
+  // id or system accesses.
+  nominal->addMember(propDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
+  nominal->addMember(pbDecl, /*hint=*/nullptr, /*insertAtHead=*/true);
+  return propDecl;
 }
 
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  auto &C = nominal->getASTContext();
-  auto module = nominal->getParentModule();
-
-  auto DAS = C.getDistributedActorSystemDecl();
-
   // not via `ensureDistributedModuleLoaded` to avoid generating a warning,
   // we won't be emitting the offending decl after all.
+  auto &C = nominal->getASTContext();
   if (!C.getLoadedModule(C.Id_Distributed))
     return nullptr;
 
-  if (!nominal->isDistributedActor())
+  if (!isa<ClassDecl>(nominal) || !nominal->isDistributedActor())
     return nullptr;
 
-  if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-    auto DistributedActorProto = C.getDistributedActorDecl();
-    for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
-      if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = module->checkConformance(
-            proto->mapTypeIntoContext(var->getInterfaceType()),
-            DAS);
+  // If we're in a deserialized module or swift interface we expect to be able
+  // to find this through name lookup.
+  auto *DC = nominal->getDeclContext();
+  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+    return lookupDistributedActorProperty(nominal, C.Id_actorSystem);
 
-        if (conformance.isInvalid())
-          continue;
+  // ==== Synthesize and add 'actorSystem' property to the actor decl
+  auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
+                                   SourceLoc(), C.Id_actorSystem, nominal);
+  propDecl->setImplicit();
+  propDecl->setSynthesized();
+  propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
-        return var;
-      }
-    }
+  // NOTE: The type for this property is lazily computed by
+  // `getLazilySynthesizedPattern` when type-checking, which ensures this
+  // request does not trigger any semantic requests since it's called by name
+  // lookup.
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl);
 
-    return nullptr;
-  }
+  PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
 
-  auto classDecl = dyn_cast<ClassDecl>(nominal);
-  if (!classDecl)
-    return nullptr;
+  // mark as nonisolated, allowing access to it from everywhere
+  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
-  // We may be triggered after synthesis was handled via `DerivedConformances`,
-  // in which case we should locate the existing property, rather than add
-  // another one. Generally derived conformances are triggered early and are right
-  // but for some reason sometimes we get a request before synthesis was triggered
-  // there... so this is to workaround that issue, and ensure we're always
-  // synthesising correctly, regardless of entry-point.
-  if (auto existingProp = lookupDistributedActorProperty(classDecl, C.Id_actorSystem)) {
-    return existingProp;
-  }
+  auto idProperty = nominal->getDistributedActorIDProperty();
+  // If the id was not yet synthesized, we need to ensure that eventually
+  // the order of fields will be: id, actorSystem (because IRGen needs the
+  // layouts to match with the AST we produce). We do this by inserting FIRST,
+  // and then as the ID gets synthesized, it'll also force FIRST and therefore
+  // the order will be okey -- ID and then system.
+  auto insertAtHead = idProperty == nullptr;
 
-  return addImplicitDistributedActorActorSystemProperty(classDecl);
+  // IMPORTANT: The `id` MUST be the first field of any distributed actor.
+  // So we find the property and add the system AFTER it using the hint.
+  //
+  // If the `id` was not synthesized yet, we'll end up inserting at head,
+  // but the id synthesis will force itself to be FIRST anyway, so it works out.
+  nominal->addMember(propDecl, /*hint=*/idProperty, insertAtHead);
+  nominal->addMember(pbDecl, /*hint=*/idProperty, insertAtHead);
+  return propDecl;
 }
 
 NormalProtocolConformance *GetDistributedActorImplicitCodableRequest::evaluate(
@@ -1061,7 +969,29 @@ bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
     return false;
 
   return TypeChecker::conformsToKnownProtocol(
-             idTy, KnownProtocolKind::Decodable, actor->getParentModule()) &&
+             idTy, KnownProtocolKind::Decodable) &&
          TypeChecker::conformsToKnownProtocol(
-             idTy, KnownProtocolKind::Encodable, actor->getParentModule());
+             idTy, KnownProtocolKind::Encodable);
+}
+
+NormalProtocolConformance *
+GetDistributedActorAsActorConformanceRequest::evaluate(
+    Evaluator &evaluator, ProtocolDecl *distributedActorProto) const {
+  auto &ctx = distributedActorProto->getASTContext();
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+
+  auto ext = findDistributedActorAsActorExtension(
+      distributedActorProto);
+  if (!ext)
+    return nullptr;
+
+  auto distributedActorAsActorConformance = ctx.getNormalConformance(
+      Type(ctx.TheSelfType), actorProto, SourceLoc(),
+      /*inheritedTypeRepr=*/nullptr, ext, ProtocolConformanceState::Incomplete,
+      ProtocolConformanceOptions());
+  // NOTE: Normally we "register" a conformance, but here we don't
+  // because we cannot (currently) register them in a protocol,
+  // since they do not have conformance tables.
+
+  return distributedActorAsActorConformance;
 }

@@ -1,13 +1,15 @@
-// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: volatile
+// REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
 
 import _Volatile
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 @discardableResult
 func putchar(_: CInt) -> CInt
 

@@ -1,7 +1,10 @@
 // Tests lookup and mangling of local types
 
+// Avoid emitting the module separately since that would skip non-inlinable
+// function bodies without types, and we want to print the decls in
+// `singleDefaultArgument`.
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
+// RUN: %target-swiftc_driver -v -no-emit-module-separately -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
 // RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypes -source-filename %s > %t.dump
 // RUN: %FileCheck %s < %t.dump
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.dump

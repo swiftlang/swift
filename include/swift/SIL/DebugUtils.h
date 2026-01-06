@@ -204,45 +204,6 @@ inline Operand *getAnyDebugUse(SILValue value) {
   return *ii;
 }
 
-/// Erases the instruction \p I from it's parent block and deletes it, including
-/// all debug instructions which use \p I.
-/// Precondition: The instruction may only have debug instructions as uses.
-/// If the iterator \p InstIter references any deleted instruction, it is
-/// incremented.
-///
-/// \p callBack will be invoked before each instruction is deleted. \p callBack
-/// is not responsible for deleting the instruction because this utility
-/// unconditionally deletes the \p I and its debug users.
-///
-/// Returns an iterator to the next non-deleted instruction after \p I.
-inline SILBasicBlock::iterator eraseFromParentWithDebugInsts(
-    SILInstruction *I, llvm::function_ref<void(SILInstruction *)> callBack =
-                           [](SILInstruction *) {}) {
-
-  auto nextII = std::next(I->getIterator());
-
-  auto results = I->getResults();
-
-  bool foundAny;
-  do {
-    foundAny = false;
-    for (auto result : results) {
-      while (!result->use_empty()) {
-        foundAny = true;
-        auto *User = result->use_begin()->getUser();
-        assert(User->isDebugInstruction());
-        if (nextII == User->getIterator())
-          nextII++;
-        callBack(User);
-        User->eraseFromParent();
-      }
-    }
-  } while (foundAny);
-
-  I->eraseFromParent();
-  return nextII;
-}
-
 /// Return true if the def-use graph rooted at \p V contains any non-debug,
 /// non-trivial users.
 bool hasNonTrivialNonDebugTransitiveUsers(
@@ -437,16 +398,24 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
 
   Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
 
-  std::optional<SILDebugVariable> getVarInfo() const {
+  /// Returns the debug variable information attached to the instruction.
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(**this)->getVarInfo();
+      return cast<DebugValueInst>(**this)->getVarInfo(complete);
     case Kind::AllocStack:
-      return cast<AllocStackInst>(**this)->getVarInfo();
+      return cast<AllocStackInst>(**this)->getVarInfo(complete);
     case Kind::AllocBox:
-      return cast<AllocBoxInst>(**this)->getVarInfo();
+      return cast<AllocBoxInst>(**this)->getVarInfo(complete);
     }
     llvm_unreachable("covered switch");
   }

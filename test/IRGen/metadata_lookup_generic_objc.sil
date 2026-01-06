@@ -1,0 +1,44 @@
+// RUN: %empty-directory(%t)
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+import Builtin
+import Swift
+import gizmo
+
+protocol Q<T> {
+  associatedtype T
+  func f()
+}
+
+// This used to assert/crash on a local type metadata lookup.
+
+sil @metadata_lookup_crash : $@convention(method) (@in_guaranteed any Q<ObjcGenericClass<Gizmo>>, Builtin.Int1) -> () {
+bb0(%0 : $*any Q<ObjcGenericClass<Gizmo>>, %1: $Builtin.Int1):
+  %2 = open_existential_addr immutable_access %0 : $*any Q<ObjcGenericClass<Gizmo>> to $*@opened("AA505436-9CC9-11EF-8085-32F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self
+  %3 = witness_method $@opened("AA505436-9CC9-11EF-8085-32F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self, #Q.f : <Self where Self : Q> (Self) -> () -> (), %2 : $*@opened("AA505436-9CC9-11EF-8085-32F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened("AA505436-9CC9-11EF-8085-32F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self>(%2) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %5 = open_existential_addr immutable_access %0 : $*any Q<ObjcGenericClass<Gizmo>> to $*@opened("AA505436-9CC9-11EF-8085-42F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self
+  %6 = witness_method $@opened("AA505436-9CC9-11EF-8085-42F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self, #Q.f : <Self where Self : Q> (Self) -> () -> (), %5 : $*@opened("AA505436-9CC9-11EF-8085-42F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("AA505436-9CC9-11EF-8085-42F16C24A34B", any Q<ObjcGenericClass<Gizmo>>) Self>(%5) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> ()
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: define swiftcc void @metadata_lookup_crash
+// CHECK:   call ptr @__swift_project_boxed_opaque_existential_1
+// CHECK:   br i1
+
+// CHECK:   call ptr @__swift_project_boxed_opaque_existential_1
+// CHECK:   ret void

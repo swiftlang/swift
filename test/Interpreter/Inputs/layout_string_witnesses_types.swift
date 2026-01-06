@@ -1,4 +1,5 @@
 import Swift
+import CTypes
 
 public class SimpleClass {
     public let x: Int
@@ -39,6 +40,25 @@ public struct Simple {
     }
 }
 
+public struct CTypeAligned {
+    let x = BigAlignment()
+    let y: SimpleClass
+
+    public init(_ y: SimpleClass) {
+        self.y = y
+    }
+}
+
+public struct CTypeUnderAligned {
+    let w: Int32 = 0
+    let x: UnderAligned? = UnderAligned()
+    let y: SimpleClass
+
+    public init(_ y: SimpleClass) {
+        self.y = y
+    }
+}
+
 public struct GenericStruct<T> {
     let x: Int = 0
     let y: T
@@ -57,17 +77,17 @@ public class GenericClass<T> {
 }
 
 public struct GenericBig<T> {
-    let x: T   
-    let x1: T  
-    let x2: T  
-    let x3: T  
-    let x4: T  
-    let x5: T  
-    let x6: T  
-    let x7: T  
-    let x8: T  
-    let x9: T  
-    let x10: T 
+    let x: T
+    let x1: T
+    let x2: T
+    let x3: T
+    let x4: T
+    let x5: T
+    let x6: T
+    let x7: T
+    let x8: T
+    let x9: T
+    let x10: T
 
     public init(x: T) {
         self.x = x
@@ -321,10 +341,12 @@ public struct NestedWrapper<T> {
     }
 }
 
-struct InternalGeneric<T> {
+struct InternalGeneric<T: ~Copyable>: ~Copyable {
     let y: Int
     let x: T
 }
+
+extension InternalGeneric: Copyable where T: Copyable {}
 
 public enum SinglePayloadSimpleClassEnum {
     case empty0
@@ -345,6 +367,11 @@ public struct ContainsSinglePayloadSimpleClassEnum {
         self.x = x
         self.y = y
     }
+}
+
+public enum TestOptional<T> {
+    case empty
+    case nonEmpty(T)
 }
 
 public enum SinglePayloadEnum<T> {
@@ -592,6 +619,75 @@ public enum MultiPayloadError {
     case empty
     case error1(Int, Error)
     case error2(Int, Error)
+    case error3(Int, Error)
+}
+
+public enum TwoPayloadInner {
+    case x(Int)
+    case y(AnyObject)
+}
+
+public enum TwoPayloadOuter {
+    case x(Int)
+    case y(TwoPayloadInner)
+}
+
+public enum OneExtraTagValue {
+    public enum E0 {
+        case a(Bool)
+        case b(Bool)
+    }
+
+    public enum E1 {
+        case a(E0)
+        case b(Bool)
+    }
+    public enum E2 {
+        case a(E1)
+        case b(Bool)
+    }
+    public enum E3 {
+        case a(E2)
+        case b(Bool)
+    }
+
+    public enum E4 {
+        case a(E3)
+        case b(Bool)
+    }
+
+    case x0(E4, Int8, Int16, Int32)
+    case x1(E4, Int8, Int16, Int32)
+    case x2(E4, Int8, Int16, Int32)
+    case x3(E4, Int8, Int16, Int32)
+    case y(SimpleClass)
+    case z
+}
+
+public enum ErrorWrapper {
+    case x(Error)
+    case y(Error)
+}
+
+public enum MultiPayloadAnyObject {
+    case x(AnyObject)
+    case y(AnyObject)
+    case z(AnyObject)
+}
+
+public struct NonCopyableGenericStruct<T>: ~Copyable {
+    let x: Int
+    let y: T
+
+    public init(x: Int, y: T) {
+        self.x = x
+        self.y = y
+    }
+}
+
+public enum NonCopyableGenericEnum<T>: ~Copyable {
+    case x(Int, T?)
+    case y(Int)
 }
 
 @inline(never)
@@ -617,7 +713,7 @@ public func preSpec() {
 }
 
 @inline(never)
-public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
+public func testAssign<T: ~Copyable>(_ ptr: UnsafeMutablePointer<T>, from x: consuming T) {
     ptr.pointee = x
 }
 
@@ -627,7 +723,7 @@ public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
 }
 
 @inline(never)
-public func testInit<T>(_ ptr: UnsafeMutablePointer<T>, to x: T) {
+public func testInit<T: ~Copyable>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
     ptr.initialize(to: x)
 }
 
@@ -637,38 +733,43 @@ public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
 }
 
 @inline(never)
-public func testDestroy<T>(_ ptr: UnsafeMutablePointer<T>) {
-    ptr.deinitialize(count: 1)
+public func testDestroy<T: ~Copyable>(_ ptr: UnsafeMutablePointer<T>) {
+    _ = ptr.move()
 }
 
 @inline(never)
-public func allocateInternalGenericPtr<T>(of tpe: T.Type) -> UnsafeMutableRawPointer {
+public func allocateInternalGenericPtr<T: ~Copyable>(of tpe: T.Type) -> UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(
         UnsafeMutablePointer<InternalGeneric<T>>.allocate(capacity: 1))
 }
 
 @inline(never)
-public func testGenericAssign<T>(_ ptr: __owned UnsafeMutableRawPointer, from x: T) {
+public func testGenericAssign<T: ~Copyable>(_ ptr: __owned UnsafeMutableRawPointer, from x: consuming T) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     let x = InternalGeneric(y: 23, x: x)
     testAssign(ptr, from: x)
 }
 
 @inline(never)
-public func testGenericInit<T>(_ ptr: __owned UnsafeMutableRawPointer, to x: T) {
+public func testGenericInit<T: ~Copyable>(_ ptr: __owned UnsafeMutableRawPointer, to x: consuming T) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     let x = InternalGeneric(y: 23, x: x)
     testInit(ptr, to: x)
 }
 
 @inline(never)
-public func testGenericDestroy<T>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
+public func testGenericDestroy<T: ~Copyable>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     testDestroy(ptr)
 }
 
 @inline(never)
 public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    buffer.deinitialize()
+}
+
+@inline(never)
+public func testGenericArrayDestroy<T: ~Copyable>(_ buffer: UnsafeMutableBufferPointer<T>) {
     buffer.deinitialize()
 }
 

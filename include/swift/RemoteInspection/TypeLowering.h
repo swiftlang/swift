@@ -23,6 +23,7 @@
 #include "llvm/Support/Casting.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Remote/TypeInfoProvider.h"
+#include "swift/RemoteInspection/BitMask.h"
 #include "swift/RemoteInspection/DescriptorFinder.h"
 
 #include <memory>
@@ -34,6 +35,7 @@ using llvm::cast;
 using llvm::dyn_cast;
 using remote::RemoteRef;
 
+class TypeConverter;
 class TypeRef;
 class TypeRefBuilder;
 class BuiltinTypeDescriptor;
@@ -115,6 +117,7 @@ enum class TypeInfoKind : unsigned {
   Reference,
   Invalid,
   Enum,
+  Array,
 };
 
 class TypeInfo {
@@ -158,6 +161,11 @@ public:
     return false;
   }
 
+  // Calculate and return the spare bit mask for this type
+  virtual BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+    return BitMask::zeroMask(getSize());
+  }
+
   virtual ~TypeInfo() { }
 };
 
@@ -177,6 +185,8 @@ public:
   explicit BuiltinTypeInfo(TypeRefBuilder &builder,
                            BuiltinTypeDescriptorBase &descriptor);
 
+  explicit BuiltinTypeInfo(unsigned Size, unsigned Alignment, unsigned Stride,
+                           unsigned NumExtraInhabitants, bool BitwiseTakable);
   /// Construct an empty builtin type info.
   BuiltinTypeInfo()
       : TypeInfo(TypeInfoKind::Builtin,
@@ -194,6 +204,8 @@ public:
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
@@ -221,6 +233,8 @@ public:
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *index) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
@@ -330,8 +344,28 @@ public:
     return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
 
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Reference;
+  }
+};
+
+/// Array based layouts like Builtin.FixedArray<N, T>
+class ArrayTypeInfo : public TypeInfo {
+  const TypeInfo *ElementTI;
+
+public:
+  explicit ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI);
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeInfo *getElementTypeInfo() const { return ElementTI; }
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Array;
   }
 };
 
@@ -339,8 +373,8 @@ public:
 class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
-  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>,
-                 const TypeInfo *> Cache;
+  using KeyT = std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>;
+  llvm::DenseMap<KeyT, const TypeInfo *> Cache;
   llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
                  const ReferenceTypeInfo *> ReferenceCache;
@@ -354,10 +388,29 @@ class TypeConverter {
   const TypeInfo *ThinFunctionTI = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
   const TypeInfo *AnyMetatypeTI = nullptr;
+  const TypeInfo *DefaultActorStorageTI = nullptr;
   const TypeInfo *EmptyTI = nullptr;
+
+  /// Used for lightweight error handling. We don't have access to
+  /// llvm::Expected<> here, so TypeConverter just stores a pointer to the last
+  /// encountered error instead that is stored in the cache.
+  using TCError = std::pair<const char *, const TypeRef *>;
+  TCError LastError = {nullptr, nullptr};
+  std::unique_ptr<llvm::DenseMap<KeyT, TCError>> ErrorCache;
 
 public:
   explicit TypeConverter(TypeRefBuilder &Builder) : Builder(Builder) {}
+
+  /// Called by LLDB.
+  void enableErrorCache() {
+    ErrorCache = std::make_unique<llvm::DenseMap<KeyT, TCError>>();
+  }
+
+  /// Set the LastError variable.
+  void setError(const char *msg, const TypeRef *TR = nullptr);
+
+  /// Retreive the error and reset it.
+  std::string takeLastError();
 
   TypeRefBuilder &getBuilder() { return Builder; }
 
@@ -411,6 +464,8 @@ private:
   const TypeInfo *getThinFunctionTypeInfo();
   const TypeInfo *getThickFunctionTypeInfo();
   const TypeInfo *getAnyMetatypeTypeInfo();
+  const TypeInfo *getDefaultActorStorageTypeInfo();
+  const TypeInfo *getRawUnsafeContinuationTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
@@ -437,8 +492,10 @@ public:
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       BitwiseTakable(true), Kind(Kind), Empty(true), Invalid(false) {}
 
-  bool isInvalid() const {
-    return Invalid;
+  bool isInvalid() const { return Invalid; }
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
   }
 
   unsigned addField(unsigned fieldSize, unsigned fieldAlignment,

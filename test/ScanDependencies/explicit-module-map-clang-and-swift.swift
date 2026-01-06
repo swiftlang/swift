@@ -55,7 +55,7 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/Foo.swiftmodule -disable-implicit-swift-modules -module-cache-path %t.module-cache -explicit-swift-module-map-file %t/inputs/map.json -Rmodule-loading -Xcc -Rmodule-import %s 2>&1 | %FileCheck %s
 
-// CHECK: <unknown>:0: remark: importing module 'A' from {{.*}}{{/|\\}}explicit-module-map-clang-and-swift.swift.tmp{{/|\\}}inputs{{/|\\}}A.pcm'
+// CHECK: <unknown>:0: remark: importing module 'A' from 'TMP_DIR{{/|\\}}inputs{{/|\\}}A.pcm'
 
 import A
 

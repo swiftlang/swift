@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend                           \
 // RUN:     -primary-file %s                             \
 // RUN:     -emit-ir                                     \
-// RUN:     -disable-availability-checking               \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
+// RUN:     -target %target-swift-5.9-abi-triple         \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: asserts
@@ -13,11 +12,11 @@
 import Foundation
 import Builtin
 
-struct Box<T : _BitwiseCopyable> : _BitwiseCopyable {
+struct Box<T : BitwiseCopyable> : BitwiseCopyable {
   var t: T
 }
 
-struct Boxx<each T : _BitwiseCopyable> {
+struct Boxx<each T : BitwiseCopyable> {
   var ts: (repeat each T)
 }
 

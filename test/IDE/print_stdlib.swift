@@ -19,7 +19,7 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface-doc > %t-doc.txt
 // RUN: %FileCheck %s < %t-doc.txt
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface -skip-underscored-stdlib-protocols > %t-prot.txt
+// RUN: %target-swift-ide-test -print-module -module-to-print=Swift -source-filename %s -print-interface -skip-underscored-system-protocols > %t-prot.txt
 
 // CHECK-ARGC: static var argc: Int32 { get }
 

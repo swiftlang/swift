@@ -1,0 +1,49 @@
+// RUN: %target-swift-frontend -enable-experimental-feature Sensitive -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %module-target-future -enable-experimental-feature Sensitive -emit-ir %s | %FileCheck %s
+
+// REQUIRES: swift_feature_Sensitive
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@sensitive struct SensitiveStruct {
+  @_hasStorage @_hasInitialValue var a: Int64
+  @_hasStorage @_hasInitialValue var b: Int64
+  @_hasStorage @_hasInitialValue var c: Int64
+}
+
+
+// CHECK-LABEL: define{{.*}}void @testDestroy
+// CHECK:         call {{(i[0-9]+ @memset_s|void @swift_clearSensitive)\(ptr %0, i[0-9]+ 24}}
+// CHECK:         ret void
+sil @testDestroy : $@convention(thin) (@in SensitiveStruct) -> () {
+bb0(%0 : $*SensitiveStruct):
+  destroy_addr %0 : $*SensitiveStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: define{{.*}}void @testCopyAddrTake
+// CHECK:         call void @llvm.memcpy
+// CHECK-NEXT:    call {{(i[0-9]+ @memset_s|void @swift_clearSensitive)\(ptr %1, i[0-9]+ 24}}
+// CHECK:         ret void
+sil @testCopyAddrTake : $@convention(thin) (@in SensitiveStruct) -> @out SensitiveStruct {
+bb0(%0 : $*SensitiveStruct, %1 : $*SensitiveStruct):
+  copy_addr [take] %1 to [init] %0 : $*SensitiveStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: define{{.*}}void @testCopyAddrCopy
+// CHECK-NOT:     memset_s
+// CHECK-NOT:     swift_clearSensitive
+// CHECK:         ret void
+sil @testCopyAddrCopy : $@convention(thin) (@in_guaranteed SensitiveStruct) -> @out SensitiveStruct {
+bb0(%0 : $*SensitiveStruct, %1 : $*SensitiveStruct):
+  copy_addr %1 to [init] %0 : $*SensitiveStruct
+  %r = tuple ()
+  return %r : $()
+}
+

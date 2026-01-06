@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-sil-verify-all -verify %s | %FileCheck %s
+
+// Verify move-only diagnostics on unsafe addressors.
+//
+// Note: .sil tests cannot easily recover variable names, so we see 'unknown' variables.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {
+  deinit
+  init()
+}
+
+struct NC : ~Copyable {
+  @_hasStorage @_hasInitialValue var c: C { get set }
+  deinit
+  init()
+  init(c: C = C())
+}
+
+struct SNC : ~Copyable {
+  var data: NC { get }
+  var mutableData: NC { get set }
+  init()
+}
+
+sil @unsafeAddressor : $@convention(method) (@guaranteed SNC) -> UnsafePointer<NC>
+
+sil @consumeNC : $@convention(thin) (@owned NC) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @test_read_borrow : $@convention(thin) (@inout SNC) -> () {
+sil hidden [ossa] @test_read_borrow : $@convention(thin) (@inout SNC) -> () {
+bb0(%0 : $*SNC):
+  debug_value %0 : $*SNC, var, name "snc", argno 1, expr op_deref
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*SNC
+  %3 = begin_access [read] [static] %2 : $*SNC
+  %4 = load_borrow [unchecked] %3 : $*SNC
+  %5 = function_ref @unsafeAddressor : $@convention(method) (@guaranteed SNC) -> UnsafePointer<NC>
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed SNC) -> UnsafePointer<NC>
+  %7 = struct_extract %6 : $UnsafePointer<NC>, #UnsafePointer._rawValue
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*NC
+  %9 = mark_dependence [nonescaping] %8 : $*NC on %3 : $*SNC
+  %10 = begin_access [read] [unsafe] %9 : $*NC
+  %11 = mark_unresolved_non_copyable_value [no_consume_or_assign] %10 : $*NC  // expected-error {{'unknown' is borrowed and cannot be consumed}}
+  %12 = load [copy] %11 : $*NC
+  end_access %10 : $*NC
+  end_borrow %4 : $SNC
+  end_access %3 : $*SNC
+  %16 = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %17 = apply %16(%12) : $@convention(thin) (@owned NC) -> () // expected-note {{consumed here}}
+  %18 = tuple ()
+  return %18 : $()
+}

@@ -1,6 +1,5 @@
 
-@_moveOnly
-public struct MoveOnlyStruct {
+public struct MoveOnlyStruct: ~Copyable {
   private let desc: Int
 
   public init(desc: Int) {
@@ -10,8 +9,7 @@ public struct MoveOnlyStruct {
   deinit { }
 }
 
-@_moveOnly
-public enum MoveOnlyEnum {
+public enum MoveOnlyEnum: ~Copyable {
     case lhs(Int)
     case rhs(Int)
 

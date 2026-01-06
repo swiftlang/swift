@@ -220,8 +220,8 @@
 
 // WebAssembly doesn't reserve low addresses. But without "extra inhabitants" of
 // the pointer representation, runtime performance and memory footprint are
-// worse. So assume that compiler driver uses wasm-ld and --global-base=1024 to
-// reserve low 1KB.
+// worse. So assume that compiler driver uses wasm-ld and --global-base=4096 to
+// reserve low 4KB.
 #define SWIFT_ABI_WASM32_LEAST_VALID_POINTER 4096
 
 #endif // SWIFT_STDLIB_SHIMS_ABI_SYSTEM_H

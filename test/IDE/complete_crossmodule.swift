@@ -7,8 +7,8 @@
 // BEGIN MyModule.swift
 
 public protocol HasAssocWithConstraint {
-  associatedtype AssocWithContraint: HasAssocWithConstraint
-  var value: AssocWithContraint { get }
+  associatedtype AssocWithConstraint: HasAssocWithConstraint
+  var value: AssocWithConstraint { get }
 }
 
 // BEGIN Test.swift

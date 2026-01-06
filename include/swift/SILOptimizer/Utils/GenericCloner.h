@@ -30,11 +30,11 @@
 namespace swift {
 
 class GenericCloner
-  : public TypeSubstCloner<GenericCloner, SILOptFunctionBuilder> {
-  using SuperTy = TypeSubstCloner<GenericCloner, SILOptFunctionBuilder>;
+  : public TypeSubstCloner<GenericCloner> {
+  using SuperTy = TypeSubstCloner<GenericCloner>;
 
   SILOptFunctionBuilder &FuncBuilder;
-  IsSerialized_t Serialized;
+  SerializedKind_t Serialized;
   const ReabstractionInfo &ReInfo;
   CloneCollector::CallbackType Callback;
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>

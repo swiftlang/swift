@@ -9,5 +9,6 @@
 
 import _Differentiation
 
-// expected-error @+1 {{type 'ConformingStruct' does not conform to protocol 'P1'}}
+// expected-error @+2 {{type 'ConformingStruct' does not conform to protocol 'P1'}} 
+// expected-note @+1 {{add stubs for conformance}}
 struct ConformingStruct: P2 {}

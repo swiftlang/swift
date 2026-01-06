@@ -362,6 +362,7 @@ Welcome to SourceKit.  Type ':help' for assistance.
     <key.modulename>:       (string) // Full module name, e.g. "Foundation.NSArray"
     [opt] <key.compilerargs> [string*] // array of zero or more strings for the compiler arguments
                                        // e.g ["-sdk", "/path/to/sdk"]
+    [opt] <key.enabledeclarations> (int) // 0 by default, 1 to enable the declarations array in the output
 }
 ```
 
@@ -369,9 +370,11 @@ Welcome to SourceKit.  Type ':help' for assistance.
 
 This will return the Swift interface of the specified module.
 
-- `key.sourcetext`: The pretty-printed module interface in swift source code
+- `key.sourcetext`: The pretty-printed module interface in swift source code.
 - `key.syntaxmap`: An array of syntactic annotations, same as the one returned for the source.request.editor.open request.
 - `key.annotations`: An array of semantic annotations, same as the one returned for the source.request.editor.open request.
+- `key.substructure`: An array of dictionaries representing ranges of structural elements in the result description, such as the parameters of a function.
+- (optional, only if `key.enabledeclarations: 1`) `key.declarations`: An array of declarations, containing the kind, USR (if available), offset, and length of the declaration.
 
 All SourceKit requests that don't modify the source buffer should work on the
 opened document, by passing the associated 'name' for the document.

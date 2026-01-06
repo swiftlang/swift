@@ -25,6 +25,11 @@ class DiagnosticEngine;
 namespace driver {
 namespace toolchains {
 
+/// True if any *generation* mode of instrumentation-based profile is enabled.
+///
+/// This is used to determine if the profiler runtime should be linked.
+bool needsInstrProfileRuntime(const llvm::opt::ArgList &Args);
+
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
 
@@ -65,9 +70,6 @@ protected:
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
-
-  void addPluginArguments(const llvm::opt::ArgList &Args,
-                          llvm::opt::ArgStringList &Arguments) const override;
 
   void validateArguments(DiagnosticEngine &diags,
                          const llvm::opt::ArgList &args,
@@ -117,9 +119,6 @@ public:
 
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
-
-  void addPluginArguments(const llvm::opt::ArgList &Args,
-                          llvm::opt::ArgStringList &Arguments) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY WebAssembly : public ToolChain {
@@ -173,9 +172,6 @@ public:
   ~GenericUnix() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
-
-  void addPluginArguments(const llvm::opt::ArgList &Args,
-                          llvm::opt::ArgStringList &Arguments) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {

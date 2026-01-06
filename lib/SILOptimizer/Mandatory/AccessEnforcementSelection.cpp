@@ -33,6 +33,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "access-enforcement-selection"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILArgument.h"
@@ -284,7 +285,6 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
     auto user = use->getUser();
     assert(!isa<BeginAccessInst>(user));
     assert(!isa<PartialApplyInst>(user) ||
-           onlyUsedByAssignByWrapper(cast<PartialApplyInst>(user)) ||
            onlyUsedByAssignOrInit(cast<PartialApplyInst>(user)));
   }
 #endif
@@ -707,9 +707,11 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
   if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(address))
     return getSourceAccess(mmci->getOperand());
 
-  // Recurse through moveonlywrapper_to_copyable_addr.
+  // Recur through moveonlywrapper_to_copyable_addr or vice versa.
   if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(address))
     return getSourceAccess(m->getOperand());
+  if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address))
+    return getSourceAccess(c->getOperand());
 
   // Recurse through drop_deinit.
   if (auto *ddi = dyn_cast<DropDeinitInst>(address))

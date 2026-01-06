@@ -31,6 +31,7 @@ namespace semanticarc {
 
 struct LLVM_LIBRARY_VISIBILITY Context {
   SILFunction &fn;
+  SILPassManager *pm = nullptr;
   ARCTransformKind transformKind = ARCTransformKind::All;
   DeadEndBlocks &deadEndBlocks;
   ValueLifetimeAnalysis::Frontier lifetimeFrontier;
@@ -119,25 +120,18 @@ struct LLVM_LIBRARY_VISIBILITY Context {
 
   DeadEndBlocks &getDeadEndBlocks() { return deadEndBlocks; }
 
-  Context(SILFunction &fn, DeadEndBlocks &deBlocks, bool onlyMandatoryOpts,
+  Context(SILFunction &fn, SILPassManager *pm, DeadEndBlocks &deBlocks, bool onlyMandatoryOpts,
           InstModCallbacks callbacks)
-      : fn(fn), deadEndBlocks(deBlocks), lifetimeFrontier(),
+      : fn(fn), pm(pm), deadEndBlocks(deBlocks), lifetimeFrontier(),
         addressToExhaustiveWriteListCache(constructCacheValue),
         onlyMandatoryOpts(onlyMandatoryOpts), instModCallbacks(callbacks) {}
 
   void verify() const;
 
   bool shouldPerform(ARCTransformKind testKind) const {
-    // When asserts are enabled, we allow for specific arc transforms to be
-    // turned on/off via LLVM args. So check that if we have asserts, perform
-    // all optimizations otherwise.
-#ifndef NDEBUG
     if (transformKind == ARCTransformKind::Invalid)
       return false;
     return bool(testKind & transformKind);
-#else
-    return true;
-#endif
   }
 
   void reset() {

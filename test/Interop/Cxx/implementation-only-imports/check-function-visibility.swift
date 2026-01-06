@@ -11,7 +11,7 @@
 @_implementationOnly import UserA
 import UserB
 
-@_inlineable
+@inlinable
 public func callFortyTwo() -> CInt {
   return getFortyTwo()
 }

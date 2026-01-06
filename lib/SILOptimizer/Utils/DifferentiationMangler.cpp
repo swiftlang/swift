@@ -15,6 +15,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILGlobalVariable.h"
 
@@ -31,7 +32,7 @@ static NodePointer mangleGenericSignatureAsNode(GenericSignature sig,
                                                 Demangler &demangler) {
   if (!sig)
     return nullptr;
-  ASTMangler sigMangler;
+  ASTMangler sigMangler(sig->getASTContext());
   auto mangledGenSig = sigMangler.mangleGenericSignature(sig);
   auto demangledGenSig = demangler.demangleSymbol(mangledGenSig);
   assert(demangledGenSig->getKind() == Node::Kind::Global);
@@ -81,7 +82,7 @@ std::string DifferentiationMangler::mangleAutoDiffFunction(
     Demangler demangler;
     auto node = mangleAutoDiffFunctionAsNode(
         originalName, kind, config, demangler);
-    auto mangling = Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node, Flavor);
     assert(mangling.isSuccess());
     return mangling.result();
   }
@@ -123,7 +124,7 @@ static NodePointer mangleDerivativeFunctionSubsetParametersThunkAsNode(
     thunk->addChild(child, demangler);
   NodePointer toTypeNode = nullptr;
   {
-    ASTMangler typeMangler;
+    ASTMangler typeMangler(toType->getASTContext());
     toTypeNode = demangler.demangleType(
         typeMangler.mangleTypeWithoutPrefix(toType));
     assert(toTypeNode && "Cannot demangle the to-type as node");
@@ -164,7 +165,7 @@ DifferentiationMangler::mangleDerivativeFunctionSubsetParametersThunk(
     auto node = mangleDerivativeFunctionSubsetParametersThunkAsNode(
         originalName, toType, kind, fromParamIndices, fromResultIndices,
         toParamIndices, demangler);
-    auto mangling = Demangle::mangleNode(node);
+    auto mangling = Demangle::mangleNode(node, Flavor);
     assert(mangling.isSuccess());
     return mangling.result();
   }

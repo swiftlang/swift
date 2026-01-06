@@ -1,0 +1,10 @@
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+let x: Int?
+
+let _ = [
+%for i in range(0, N):
+  "${i}" : x ?? 0,
+%end
+]

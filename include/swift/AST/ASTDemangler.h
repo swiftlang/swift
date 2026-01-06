@@ -22,6 +22,7 @@
 #ifndef SWIFT_AST_ASTDEMANGLER_H
 #define SWIFT_AST_ASTDEMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
@@ -31,8 +32,10 @@
 #include <optional>
 
 namespace swift {
- 
+
+class Decl;
 class TypeDecl;
+class DeclName;
 
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
@@ -49,10 +52,14 @@ TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
                             llvm::StringRef usr,
                             GenericSignature genericSig=GenericSignature());
 
+Decl *getDeclForUSR(ASTContext &ctx, llvm::StringRef usr,
+                    GenericSignature genericSig = GenericSignature());
+
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
 class ASTBuilder {
   ASTContext &Ctx;
+  Mangle::ManglingFlavor ManglingFlavor;
   Demangle::NodeFactory Factory;
 
   /// The notional context in which we're writing and type-checking code.
@@ -67,6 +74,15 @@ class ASTBuilder {
 
   /// For saving and restoring generic parameters.
   llvm::SmallVector<decltype(ParameterPacks), 2> ParameterPackStack;
+
+  /// The depth and index of each value parameter in the current generic
+  /// signature. We need this becasue the mangling for a type parameter
+  /// doesn't record whether it is a value or not; we find the correct
+  /// depth and index in this array, and use its value-ness.
+  llvm::SmallVector<std::tuple<std::pair<unsigned, unsigned>, Type>, 1> ValueParameters;
+
+  /// For saving and restoring generic parameters.
+  llvm::SmallVector<decltype(ValueParameters), 1> ValueParametersStack;
 
   /// This builder doesn't perform "on the fly" substitutions, so we preserve
   /// all pack expansions. We still need an active expansion stack though,
@@ -88,18 +104,39 @@ public:
 
   static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
 
-  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig)
-    : Ctx(ctx) {
+  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig) : Ctx(ctx) {
+    ManglingFlavor = ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? Mangle::ManglingFlavor::Embedded
+                 : Mangle::ManglingFlavor::Default;
+
     for (auto *paramTy : genericSig.getGenericParams()) {
       if (paramTy->isParameterPack())
         ParameterPacks.emplace_back(paramTy->getDepth(), paramTy->getIndex());
+
+      if (paramTy->isValue()) {
+        auto pair = std::make_pair(paramTy->getDepth(), paramTy->getIndex());
+        auto tuple = std::make_tuple(pair, paramTy->getValueType());
+        ValueParameters.emplace_back(tuple);
+      }
     }
   }
 
   ASTContext &getASTContext() { return Ctx; }
+  Mangle::ManglingFlavor getManglingFlavor() { return ManglingFlavor; }
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
+
+  /// Finds the \c Decl associated with the provided \p node.
+  /// Attempts to find a type declaration using \c createTypeDecl, if not found,
+  /// it performs a lookup for the declaration and returns the first declaration
+  /// for which \c isMatchingValueDecl returns true.
+  ///
+  /// \note \p isMatchingValueDecl is not evaluated for type declarations, it's
+  /// only used to choose among lookup results when \c createTypeDecl fails.
+  Decl *
+  findDecl(NodePointer node,
+           llvm::function_ref<bool(const ValueDecl *)> isMatchingValueDecl);
 
   Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
@@ -121,6 +158,8 @@ public:
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
   
+  OpaqueTypeDecl *resolveOpaqueTypeDecl(NodePointer opaqueDescriptor);
+
   Type resolveOpaqueType(NodePointer opaqueDescriptor,
                          ArrayRef<ArrayRef<Type>> args,
                          unsigned ordinal);
@@ -227,9 +266,15 @@ public:
 
   Type createArrayType(Type base);
 
+  Type createInlineArrayType(Type count, Type element);
+
   Type createDictionaryType(Type key, Type value);
 
-  Type createParenType(Type base);
+  Type createIntegerType(intptr_t value);
+
+  Type createNegativeIntegerType(intptr_t value);
+
+  Type createBuiltinFixedArrayType(Type size, Type element);
 
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,
@@ -254,7 +299,14 @@ private:
       NominalTypeDecl *nominalDecl,
       NodePointer node);
   DeclContext *findDeclContext(NodePointer node);
-  ModuleDecl *findModule(NodePointer node);
+
+  /// Find all the ModuleDecls that correspond to a module node's identifier.
+  /// The module name encoded in the node is either the module's real or ABI
+  /// name. Multiple modules can share the same name. This function returns
+  /// all modules that contain that name.
+  llvm::ArrayRef<ModuleDecl *> findPotentialModules(NodePointer node,
+                                                    ModuleDecl *&scratch);
+
   Demangle::NodePointer findModuleNode(NodePointer node);
 
   enum class ForeignModuleKind {
@@ -275,6 +327,10 @@ private:
 
   static GenericTypeDecl *getAcceptableTypeDeclCandidate(ValueDecl *decl,
                                               Demangle::Node::Kind kind);
+
+  /// Returns an identifier with the given name, automatically removing any
+  /// surrounding backticks that are present for raw identifiers.
+  Identifier getIdentifier(StringRef name);
 };
 
 SWIFT_END_INLINE_NAMESPACE

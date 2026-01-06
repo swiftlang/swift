@@ -13,13 +13,41 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
+import _StringProcessing
 
 public enum DebugDescriptionMacro {}
 public enum _DebugDescriptionPropertyMacro {}
 
+/// The member role is used only to perform diagnostics. The member role ensures any diagnostics are emitted once per
+/// type. The macro's core behavior begins with the `MemberAttributeMacro` conformance.
+extension DebugDescriptionMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  )
+  throws -> [DeclSyntax]
+  {
+    guard !declaration.is(ProtocolDeclSyntax.self) else {
+      let message: ErrorMessage = "cannot be attached to a protocol"
+      context.diagnose(node: node, error: message)
+      return []
+    }
+
+    guard declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause == nil else {
+      let message: ErrorMessage = "cannot be attached to a generic definition"
+      context.diagnose(node: node, error: message)
+      return []
+    }
+
+    return []
+  }
+}
+
 /// A macro which orchestrates conversion of a description property to an LLDB type summary.
 ///
-/// The job of conversion is split across two macros. This macro performs some analysis on the attached
+/// The process of conversion is split across multiple macros/roles. This role performs some analysis on the attached
 /// type, and then delegates to `@_DebugDescriptionProperty` to perform the conversion step.
 extension DebugDescriptionMacro: MemberAttributeMacro {
   public static func expansion(
@@ -31,8 +59,12 @@ extension DebugDescriptionMacro: MemberAttributeMacro {
   throws -> [AttributeSyntax]
   {
     guard !declaration.is(ProtocolDeclSyntax.self) else {
-      let message: ErrorMessage = "cannot be attached to a protocol"
-      context.diagnose(node: node, error: message)
+      // Diagnostics for this case are emitted by the `MemberMacro` conformance.
+      return []
+    }
+
+    guard declaration.asProtocol(WithGenericParametersSyntax.self)?.genericParameterClause == nil else {
+      // Diagnostics for this case are emitted by the `MemberMacro` conformance.
       return []
     }
 
@@ -158,12 +190,20 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
       return []
     }
 
+    // LLDB syntax is not allowed in debugDescription/description.
+    let allowLLDBSyntax = onlyBinding.name == "lldbDescription"
+
     // Iterate the string's segments, and convert property expressions into LLDB variable references.
     var summarySegments: [String] = []
     for segment in descriptionString.segments {
       switch segment {
       case let .stringSegment(segment):
-        summarySegments.append(segment.content.text)
+        var literal = segment.content.text
+        if !allowLLDBSyntax {
+          // To match debugDescription/description, escape `$` characters. LLDB must treat them as a literals they are.
+          literal = literal.escapedForLLDB()
+        }
+        summarySegments.append(literal)
       case let .expressionSegment(segment):
         guard let onlyLabeledExpr = segment.expressions.only, onlyLabeledExpr.label == nil else {
           // This catches `appendInterpolation` overrides.
@@ -212,17 +252,17 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
     let summaryString = summarySegments.joined()
 
     // Serialize the type summary into a global record, in a custom section, for LLDB to load.
+    let (encodedValue, encodedType) = encodeTypeSummaryRecord(typeIdentifier, summaryString)
     let decl: DeclSyntax = """
         #if !os(Windows)
         #if os(Linux)
-        @_section(".lldbsummaries")
+        @section(".lldbsummaries")
         #else
-        @_section("__TEXT,__lldbsummaries")
+        @section("__TEXT,__lldbsummaries")
         #endif
-        @_used
-        static let _lldb_summary = (
-            \(raw: encodeTypeSummaryRecord(typeIdentifier, summaryString))
-        )
+        @used
+        static let _lldb_summary: \(raw: encodedType) =
+            \(raw: encodedValue)
         #endif
         """
 
@@ -232,7 +272,7 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
 
 /// The names of properties that can be converted to LLDB type summaries, in priority order.
 fileprivate let DESCRIPTION_PROPERTIES = [
-  "_debugDescription",
+  "lldbDescription",
   "debugDescription",
   "description",
 ]
@@ -263,23 +303,33 @@ fileprivate let ENCODING_VERSION: UInt = 1
 ///
 /// The strings (type identifier and summary) are encoded with both a length prefix (also ULEB)
 /// and with a null terminator.
-fileprivate func encodeTypeSummaryRecord(_ typeIdentifier: String, _ summaryString: String) -> String {
+fileprivate func encodeTypeSummaryRecord(_ typeIdentifier: String, _ summaryString: String) -> (valueString: String, typeString: String) {
   let encodedIdentifier = typeIdentifier.byteEncoded
   let encodedSummary = summaryString.byteEncoded
   let recordSize = UInt(encodedIdentifier.count + encodedSummary.count)
-  return """
+  return (valueString: """
+    (
     /* version */ \(swiftLiteral: ENCODING_VERSION.ULEBEncoded),
     /* record size */ \(swiftLiteral: recordSize.ULEBEncoded),
     /* "\(typeIdentifier)" */ \(swiftLiteral: encodedIdentifier),
     /* "\(summaryString)" */ \(swiftLiteral: encodedSummary)
+    )
+    """,
+    typeString: """
+    (
+    \(Array(repeating: "UInt8", count: ENCODING_VERSION.ULEBEncoded.count +
+        recordSize.ULEBEncoded.count + encodedIdentifier.count + 
+        encodedSummary.count).joined(separator: ", "))
+    )
     """
+  )
 }
 
 extension DefaultStringInterpolation {
   /// Generate a _partial_ Swift literal from the given bytes. It is partial in that must be embedded
   /// into some other syntax, specifically as a tuple.
   fileprivate mutating func appendInterpolation(swiftLiteral bytes: [UInt8]) {
-    let literalBytes = bytes.map({ "\($0) as UInt8" }).joined(separator: ", ")
+    let literalBytes = bytes.map({ "\($0)" }).joined(separator: ", ")
     appendInterpolation(literalBytes)
   }
 }
@@ -470,6 +520,28 @@ extension String {
       return nil
     }
     self = string
+  }
+}
+
+extension String {
+  fileprivate func escapedForLLDB() -> String {
+    guard #available(macOS 13, *) else {
+      guard self.firstIndex(of: "$") != nil else {
+        return self
+      }
+
+      var result = ""
+      for char in self {
+        if char == "$" {
+          result.append("\\$")
+        } else {
+          result.append(char)
+        }
+      }
+      return result
+    }
+
+    return self.replacing("$", with: "\\$")
   }
 }
 

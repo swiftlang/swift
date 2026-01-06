@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -336,48 +336,6 @@ bb0(%a0 : $Int32):
   return %t1 : $()
 }
 
-// Test the SSA Updater utility: replaceBBArgWithCast().
-//
-// CHECK-LABEL: struct_arg
-// CHECK: bb0:
-// CHECK:  cond_br
-// CHECK: bb1:
-// CHECK:  br bb3
-// CHECK: bb3({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
-// CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
-// CHECK:  apply {{.*}}([[STRUCT]])
-// CHECK:  cond_br
-// CHECK: bb6({{.*}}):
-// CHECK:  return
-sil @struct_arg : $@convention(thin) () -> () {
-bb0:
-  %c0 = integer_literal $Builtin.Int32, 0
-  %c100 = integer_literal $Builtin.Int32, 100
-  br bb1(%c0 : $Builtin.Int32, %c0 : $Builtin.Int32)
-
-bb1(%a1 : $Builtin.Int32, %a0 : $Builtin.Int32):
-  %s0 = struct $Int32 (%a0 : $Builtin.Int32)
-  %z1 = builtin "cmp_eq_Word"(%a0 : $Builtin.Int32, %c100 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %z1, bb2, bb3
-
-bb3:
-  %c1 = integer_literal $Builtin.Int32, 1
-  %z2 = integer_literal $Builtin.Int1, 0
-  %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %t1 = tuple_extract %d1 : $(Builtin.Int32, Builtin.Int1), 0
-  %d2 = builtin "sadd_with_overflow_Word"(%a1 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %t2 = tuple_extract %d2 : $(Builtin.Int32, Builtin.Int1), 0
-  %f1 = function_ref @readInt : $@convention(thin) (Int32) -> ()
-  %l1 = apply %f1(%s0) : $@convention(thin) (Int32) -> ()
-  br bb1(%t2 : $Builtin.Int32, %t1 : $Builtin.Int32)
-
-bb2:
-  %14 = struct $Int32 (%a1 : $Builtin.Int32)
-  %t3 = tuple ()
-  return %t3 : $()
-
-}
-
 // Test LoopRotate insertBackedgeBlock.
 //
 // CHECK-LABEL: insert_backedge_block
@@ -464,4 +422,40 @@ bb2:
 bb3:
  %1 = tuple ()
  return %1 : $()
+}
+
+struct Wrapper : Sendable {
+  let id: Int
+}
+ 
+// CHECK-LABEL: sil @test_open_pack_element :
+// CHECK: bb0{{.*}}:
+// CHECK-NOT: open_pack_element
+// CHECK: br bb2
+// CHECK:  } // end sil function 'test_open_pack_element'
+sil @test_open_pack_element : $@convention(thin) (@pack_guaranteed Pack{KeyPath<Wrapper, Wrapper>}) -> () {
+bb0(%0 : $*Pack{KeyPath<Wrapper, Wrapper>}):
+  %5 = alloc_stack $KeyPath<Wrapper, Wrapper>
+  %6 = integer_literal $Builtin.Word, 0           // user: %8
+  br bb2(%6 : $Builtin.Word)
+
+bb1:
+  dealloc_stack %5 : $*KeyPath<Wrapper, Wrapper>
+  %35 = tuple ()
+  return %35 : $()
+
+bb2(%37 : $Builtin.Word):
+  %38 = dynamic_pack_index %37 of $Pack{KeyPath<Wrapper, Wrapper>}
+  %39 = open_pack_element %38 of <Topic, each Value where Topic : AnyObject, repeat each Value : Sendable> at <Wrapper, Pack{Wrapper}>, shape $each Value, uuid "94218A22-3595-11EF-8496-4EA2A866E4C5"
+  %40 = pack_element_get %38 of %0 : $*Pack{KeyPath<Wrapper, Wrapper>} as $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %41 = unchecked_addr_cast %5 : $*KeyPath<Wrapper, Wrapper> to $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %42 = load %40 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  store %42 to %41 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %7 = integer_literal $Builtin.Word, 1           // users: %45, %44
+  %44 = builtin "add_Word"(%37 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Word // users: %48, %45
+  cond_br undef, bb1, bb3
+
+bb3:
+  strong_retain %42 : $KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  br bb2(%44 : $Builtin.Word)
 }

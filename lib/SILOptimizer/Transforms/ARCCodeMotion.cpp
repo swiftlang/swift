@@ -70,6 +70,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-rr-code-motion"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -432,9 +433,12 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
         continue;
       if (!parentTransform->continueWithNextSubpassRun(&II))
         continue;
+      SILValue Root = getRCRoot(&II);
+      if (Root->getType().isMoveOnly()) {
+        continue;
+      }
       retainInstructions.insert(&II);
       RCInstructions.insert(&II);
-      SILValue Root = getRCRoot(&II);
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;
       RCRootIndex[Root] = RCRootVault.size();
@@ -817,8 +821,11 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
         continue;
       if (!parentTransform->continueWithNextSubpassRun(&II))
         continue;
-      releaseInstructions.insert(&II);
       SILValue Root = getRCRoot(&II);
+      if (Root->getType().isMoveOnly()) {
+        continue;
+      }
+      releaseInstructions.insert(&II);
       RCInstructions.insert(&II);
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;

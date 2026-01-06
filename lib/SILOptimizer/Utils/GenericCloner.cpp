@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -43,13 +44,14 @@ SILFunction *GenericCloner::createDeclaration(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
-      ReInfo.isSerialized(), IsNotDynamic, IsNotDistributed,
+      ReInfo.getSerializedKind(), IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible, Orig->getEntryCount(), Orig->isThunk(),
       Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
+  NewF->setOptimizationMode(Orig->getOptimizationMode());
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }
@@ -67,6 +69,8 @@ void GenericCloner::populateCloned() {
   SILBasicBlock *OrigEntryBB = &*Original.begin();
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
+
+  RemappedScopeCache.insert({Original.getDebugScope(), Cloned->getDebugScope()});
 
   // Create the entry basic block with the function arguments.
   auto origConv = Original.getConventions();
@@ -122,11 +126,19 @@ void GenericCloner::populateCloned() {
             return true;
           }
         }
-      } else if (ReInfo.isDroppedMetatypeArg(ArgIdx)) {
-        // Replace the metatype argument with an `metatype` instruction in the
-        // entry block.
-        auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
-        entryArgs.push_back(mtInst);
+      } else if (ReInfo.isDroppedArgument(ArgIdx)) {
+        if (OrigArg->getType().isAddress()) {
+          // Create an uninitialized alloc_stack for unused indirect arguments.
+          // This will be removed by other optimizations.
+          createAllocStack();
+          entryArgs.push_back(ASI);
+        } else {
+          // Dropped direct (= non-address) arguments are metatype arguments.
+          // Replace the metatype argument with an `metatype` instruction in the
+          // entry block.
+          auto *mtInst = getBuilder().createMetatype(Loc, mappedType);
+          entryArgs.push_back(mtInst);
+        }
         return true;
       } else {
         // Handle arguments for formal parameters.
@@ -138,30 +150,11 @@ void GenericCloner::populateCloned() {
               mappedType, OrigArg->getDecl());
           NewArg->copyFlags(cast<SILFunctionArgument>(OrigArg));
 
-          // Try to create a new debug_value from an existing debug_value w/
-          // address value for the argument. We do this before storing to
-          // ensure that when we are cloning code in ossa the argument has
-          // not been consumed by the store below.
-          for (Operand *ArgUse : OrigArg->getUses()) {
-            if (auto *DVI = DebugValueInst::hasAddrVal(ArgUse->getUser())) {
-              auto *oldScope = getBuilder().getCurrentDebugScope();
-              getBuilder().setCurrentDebugScope(
-                  remapScope(DVI->getDebugScope()));
-              auto VarInfo = DVI->getVarInfo();
-              assert(VarInfo && VarInfo->DIExpr &&
-                     "No DebugVarInfo or no DIExpr operand?");
-              // Drop the op_deref
-              VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
-              getBuilder().createDebugValue(DVI->getLoc(), NewArg, *VarInfo);
-              getBuilder().setCurrentDebugScope(oldScope);
-              break;
-            }
-          }
-
           // Store the new direct parameter to an alloc_stack.
           createAllocStack();
           SILValue addr;
-          if (NewArg->getArgumentConvention().isGuaranteedConvention() &&
+          if (NewArg->getArgumentConvention()
+                  .isGuaranteedConventionInCallee() &&
               NewArg->getFunction()->hasOwnership()) {
             auto *sbi = getBuilder().createStoreBorrow(Loc, NewArg, ASI);
             StoreBorrowsToCleanup.push_back(sbi);

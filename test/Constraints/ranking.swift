@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 | %FileCheck %s
 
 protocol P {
   var p: P { get set }
@@ -439,4 +439,14 @@ extension SignalProtocol where Element: SignalProtocol, Error == Never {
 
 func no_ambiguity_error_vs_never<Element, Error>(_ signals: [Signal<Element, Error>]) -> Signal<Element, Error> {
   return Signal(sequence: signals).flatten() // Ok
+}
+
+// Regression test for a crash I reduced from the stdlib that wasn't covered
+// by tests
+struct HasIntInit {
+  init(_: Int) {}
+}
+
+func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
+  return .init(Int(x / numericCast(y)))
 }

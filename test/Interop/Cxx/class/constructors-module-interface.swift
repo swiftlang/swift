@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=Constructors -I %S/Inputs/ -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// XFAIL: OS=linux-androideabi
 
 // CHECK:      struct ExplicitDefaultConstructor {
 // CHECK-NEXT:   init()
@@ -32,6 +33,9 @@
 // CHECK-NEXT: struct CopyAndMoveConstructor {
 // CHECK-NEXT:   @available(*, deprecated, message
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   init(value: Int32, ptr: UnsafeMutablePointer<Int32>!)
+// CHECK-NEXT:   var value: Int32
+// CHECK-NEXT:   var ptr: UnsafeMutablePointer<Int32>!
 // CHECK-NEXT: }
 // CHECK-NEXT: struct Base {
 // CHECK-NEXT:   init()

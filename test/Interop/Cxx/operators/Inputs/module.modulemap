@@ -17,3 +17,8 @@ module NonMemberOutOfLine {
   header "non-member-out-of-line.h"
   requires cplusplus
 }
+
+module RenamedOperators {
+  header "renamed-operators.h"
+  requires cplusplus
+}

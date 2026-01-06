@@ -12,7 +12,7 @@
 
 import SIL
 
-extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if optimizeLoadOfAddrUpcast(context) {
       return
@@ -20,10 +20,13 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     if optimizeLoadFromStringLiteral(context) {
       return
     }
-    if optmizeLoadFromEmptyCollection(context) {
+    if optimizeLoadFromEmptyCollection(context) {
       return
     }
     if replaceLoadOfGlobalLet(context) {
+      return
+    }
+    if tryRemoveAddressCast(context) {
       return
     }
     removeIfDead(context)
@@ -75,7 +78,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
        index < stringLiteral.value.count {
 
       let builder = Builder(before: self, context)
-      let charLiteral = builder.createIntegerLiteral(Int(stringLiteral.value[index]), type: type)
+      let charLiteral = builder.createIntegerLiteral(stringLiteral.value[index], type: type)
       uses.replaceAll(with: charLiteral, context)
       context.erase(instruction: self)
       return true
@@ -85,7 +88,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
 
   /// Loading `count` or `capacity` from the empty `Array`, `Set` or `Dictionary` singleton
   /// is replaced by a 0 literal.
-  private func optmizeLoadFromEmptyCollection(_ context: SimplifyContext) -> Bool {
+  private func optimizeLoadFromEmptyCollection(_ context: SimplifyContext) -> Bool {
     if self.isZeroLoadFromEmptyCollection() {
       let builder = Builder(before: self, context)
       let zeroLiteral = builder.createIntegerLiteral(0, type: type)
@@ -104,15 +107,36 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     if !globalInitVal.canBeCopied(into: parentFunction, context) {
       return false
     }
-    var cloner = StaticInitCloner(cloneBefore: self, context)
+    var cloner = Cloner(cloneBefore: self, context)
     defer { cloner.deinitialize() }
 
-    let initVal = cloner.clone(globalInitVal)
+    let initVal = cloner.cloneRecursively(globalInitValue: globalInitVal)
 
     uses.replaceAll(with: initVal, context)
     // Also erases a builtin "once" on which the global_addr depends on. This is fine
     // because we only replace the load if the global init function doesn't have any side effect.
     transitivelyErase(load: self, context)
+    return true
+  }
+
+  /// Replaces address casts of heap objects
+  /// ```
+  ///   %1 = unchecked_addr_cast %0 : $*SomeClass to $*OtherClass
+  ///   %2 = load [copy] %1
+  /// ```
+  /// with ref-casts of the loaded value
+  /// ```
+  ///   %1 = load [copy] %0
+  ///   %2 = unchecked_ref_cast %1 : $SomeClass to $OtherClass
+  /// ```
+  private func tryRemoveAddressCast(_ context: SimplifyContext) -> Bool {
+    guard let addrCast = address.isAddressCastOfHeapObjects else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let newLoad = builder.createLoad(fromAddress: addrCast.fromAddress, ownership: loadOwnership)
+    let cast = builder.createUncheckedRefCast(from: newLoad, to: addrCast.type.objectType)
+    replace(with: cast, context)
     return true
   }
 
@@ -136,7 +160,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         }
       case let sea as StructElementAddrInst:
         let structType = sea.struct.type
-        if structType.nominal.name == "_SwiftArrayBodyStorage" {
+        if structType.nominal!.name == "_SwiftArrayBodyStorage" {
           guard let fields = structType.getNominalFields(in: parentFunction) else {
             return false
           }
@@ -154,7 +178,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
         addr = sea.struct
       case let rea as RefElementAddrInst:
         let classType = rea.instance.type
-        switch classType.nominal.name {
+        switch classType.nominal!.name {
         case "__RawDictionaryStorage",
               "__RawSetStorage":
           // For Dictionary and Set we support "count" and "capacity".
@@ -234,8 +258,30 @@ private func getGlobalInitValue(address: Value, _ context: SimplifyContext) -> V
     }
   case let bai as BeginAccessInst:
     return getGlobalInitValue(address: bai.address, context)
+  case let rta as RefTailAddrInst:
+    return getGlobalTailElement(of: rta, index: 0)
+  case let ia as IndexAddrInst:
+    if let rta = ia.base as? RefTailAddrInst,
+       let literal = ia.index as? IntegerLiteralInst,
+       let index = literal.value
+    {
+      return getGlobalTailElement(of: rta, index: index)
+    }
+  case let rea as RefElementAddrInst:
+    if let object = rea.instance.immutableGlobalObjectRoot {
+      return object.baseOperands[rea.fieldIndex].value
+    }
   default:
     break
+  }
+  return nil
+}
+
+private func getGlobalTailElement(of refTailAddr: RefTailAddrInst, index: Int) -> Value? {
+  if let object = refTailAddr.instance.immutableGlobalObjectRoot,
+     index >= 0 && index < object.tailOperands.count
+  {
+    return object.tailOperands[index].value
   }
   return nil
 }
@@ -250,7 +296,10 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   }
   let initFn = initFnRef.referencedFunction
   context.notifyDependency(onBodyOf: initFn)
-  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, allowGlobalValue: true)  else {
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, context, handleUnknownInstruction: {
+    // Accept `global_value` because the class header can be initialized at runtime by the `global_value` instruction.
+    return $0 is GlobalValueInst
+  }) else {
     return nil
   }
   return storeToGlobal.source
@@ -273,7 +322,9 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
       context.erase(instruction: inst)
       return
     }
-    let operandInst = inst.operands[0].value as! SingleValueInstruction
+    guard let operandInst = inst.operands[0].value as? SingleValueInstruction else {
+      return
+    }
     context.erase(instruction: inst)
     inst = operandInst
   }
@@ -281,10 +332,6 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
 
 private extension Value {
   func canBeCopied(into function: Function, _ context: SimplifyContext) -> Bool {
-    if !function.isSerialized {
-      return true
-    }
-
     // Can't use `ValueSet` because the this value is inside a global initializer and
     // not inside a function.
     var worklist = Stack<Value>(context)
@@ -296,8 +343,13 @@ private extension Value {
     handled.insert(ObjectIdentifier(self))
 
     while let value = worklist.pop() {
+      if value is VectorInst {
+        return false
+      }
       if let fri = value as? FunctionRefInst {
-        if !fri.referencedFunction.hasValidLinkageForFragileRef {
+        if function.isAnySerialized,
+           !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
+        {
           return false
         }
       }
@@ -321,6 +373,31 @@ private extension Value {
     }
     return (baseAddress: self, offset: 0)
   }
+
+  // If the reference-root of self references a global object, returns the `object` instruction of the
+  // global's initializer. But only if the global is a let-global.
+  var immutableGlobalObjectRoot: ObjectInst? {
+    if let gv = self.referenceRoot as? GlobalValueInst,
+       gv.global.isLet,
+       let initval = gv.global.staticInitValue,
+       let object = initval as? ObjectInst
+    {
+      return object
+    }
+    return nil
+  }
+}
+
+extension Value {
+  var isAddressCastOfHeapObjects: UncheckedAddrCastInst? {
+    if let addrCast = self as? UncheckedAddrCastInst,
+       addrCast.fromAddress.type.isHeapObjectReferenceType,
+       addrCast.type.isHeapObjectReferenceType
+    {
+      return addrCast
+    }
+    return nil
+  }
 }
 
 private extension Instruction {
@@ -334,4 +411,75 @@ private extension Instruction {
     }
     return shiftValue > 0
   }
+}
+
+/// Analyses the global initializer function and returns the `alloc_global` and `store`
+/// instructions which initialize the global.
+/// Returns nil if `function` has any side-effects beside initializing the global.
+///
+/// The function's single basic block must contain following code pattern:
+/// ```
+///   alloc_global @the_global
+///   %a = global_addr @the_global
+///   %i = some_const_initializer_insts
+///   store %i to %a
+/// ```
+///
+/// For all other instructions `handleUnknownInstruction` is called and such an instruction
+/// is accepted if `handleUnknownInstruction` returns true.
+private func getGlobalInitialization(
+  of function: Function,
+  _ context: some Context,
+  handleUnknownInstruction: (Instruction) -> Bool
+) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
+  guard let block = function.blocks.singleElement else {
+    return nil
+  }
+
+  var allocInst: AllocGlobalInst? = nil
+  var globalAddr: GlobalAddrInst? = nil
+  var store: StoreInst? = nil
+
+  for inst in block.instructions {
+    switch inst {
+    case is ReturnInst,
+         is DebugValueInst,
+         is DebugStepInst,
+         is BeginAccessInst,
+         is EndAccessInst:
+      continue
+    case let agi as AllocGlobalInst:
+      if allocInst == nil {
+        allocInst = agi
+        continue
+      }
+    case let ga as GlobalAddrInst:
+      if let agi = allocInst, agi.global == ga.global {
+        globalAddr = ga
+      }
+      continue
+    case let si as StoreInst:
+      if store == nil,
+         let ga = globalAddr,
+         si.destination == ga
+      {
+        store = si
+        continue
+      }
+    // Note that the initializer must not contain a `global_value` because `global_value` needs to
+    // initialize the class metadata at runtime.
+    default:
+      if inst.isValidInStaticInitializerOfGlobal(context) {
+        continue
+      }
+    }
+    if handleUnknownInstruction(inst) {
+      continue
+    }
+    return nil
+  }
+  if let store = store {
+    return (allocInst: allocInst!, storeToGlobal: store)
+  }
+  return nil
 }

@@ -29,6 +29,7 @@
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
@@ -45,6 +46,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Allocator.h"
@@ -160,6 +162,7 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  using DefaultOverrideTableListType = llvm::ilist<SILDefaultOverrideTable>;
   using DifferentiabilityWitnessListType =
       llvm::ilist<SILDifferentiabilityWitness>;
   using SILMoveOnlyDeinitListType = llvm::ArrayRef<SILMoveOnlyDeinit *>;
@@ -184,6 +187,7 @@ private:
   friend SILBasicBlock;
   friend SILCoverageMap;
   friend SILDefaultWitnessTable;
+  friend SILDefaultOverrideTable;
   friend SILDifferentiabilityWitness;
   friend SILFunction;
   friend SILGlobalVariable;
@@ -231,6 +235,10 @@ private:
   llvm::StringMap<SILFunction *> FunctionTable;
   llvm::StringMap<SILFunction *> ZombieFunctionTable;
 
+  /// Lookup table for SIL functions by their asmnames, for those that
+  /// have them.
+  llvm::StringMap<SILFunction *> FunctionByAsmNameTable;
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
 
@@ -255,6 +263,11 @@ private:
   llvm::DenseMap<const RootProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;
 
+  /// Lookup table for specialized witness tables from conformances.
+  /// Currently only used in embedded mode.
+  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
+  specializedWitnessTableMap;
+
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
 
@@ -264,6 +277,12 @@ private:
 
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
+
+  /// Lookup table for SIL default override tables from classes.
+  llvm::DenseMap<const ClassDecl *, SILDefaultOverrideTable *>
+      DefaultOverrideTableMap;
+
+  DefaultOverrideTableListType defaultOverrideTables;
 
   /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
   llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
@@ -294,6 +313,9 @@ private:
 
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
+
+  /// Lookup table for SIL Global Variables, indexed by their asmnames.
+  llvm::StringMap<SILGlobalVariable *> GlobalVariableByAsmNameMap;
 
   /// The list of SILGlobalVariables in the module.
   GlobalListType silGlobals;
@@ -343,7 +365,7 @@ private:
   /// projections, shared between all functions in the module.
   std::unique_ptr<IndexTrieNode> indexTrieRoot;
 
-  /// A mapping from root local archetypes to the instructions which define
+  /// A mapping from local generic environments to the instructions which define
   /// them.
   ///
   /// The value is either a SingleValueInstruction or a PlaceholderValue,
@@ -351,10 +373,10 @@ private:
   /// deserializing SIL, where local archetypes can be forward referenced.
   ///
   /// In theory we wouldn't need to have the SILFunction in the key, because
-  /// local archetypes \em should be unique across the module. But currently
+  /// local environments should be unique across the module. But currently
   /// in some rare cases SILGen re-uses the same local archetype for multiple
   /// functions.
-  using LocalArchetypeKey = std::pair<LocalArchetypeType *, SILFunction *>;
+  using LocalArchetypeKey = std::pair<GenericEnvironment *, SILFunction *>;
   llvm::DenseMap<LocalArchetypeKey, SILValue> RootLocalArchetypeDefs;
 
   /// The number of PlaceholderValues in RootLocalArchetypeDefs.
@@ -380,10 +402,6 @@ private:
   bool parsedAsSerializedSIL;
 
   /// Set if we have registered a deserialization notification handler for
-  /// lowering ownership in non transparent functions.
-  /// This gets set in NonTransparent OwnershipModelEliminator pass.
-  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in transparent functions.
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
@@ -398,6 +416,10 @@ private:
   ActionCallback SerializeSILAction;
 
   BasicBlockNameMapType basicBlockNames;
+
+  // Specialization attributes which need to be added to a function once it is created.
+  // The key of this map is the function name.
+  llvm::StringMap<std::vector<SILSpecializeAttr *>> pendingSpecializeAttrs;
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
@@ -431,14 +453,8 @@ public:
     deserializationNotificationHandlers.erase(handler);
   }
 
-  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  }
   bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     return regDeserializationNotificationHandlerForAllFuncOME;
-  }
-  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
   }
   void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     regDeserializationNotificationHandlerForAllFuncOME = true;
@@ -449,6 +465,27 @@ public:
   }
   void setHasAccessMarkerHandler() {
     hasAccessMarkerHandler = true;
+  }
+
+  /// Returns the instruction which defines the given local generic environment,
+  /// e.g. an open_existential_addr.
+  ///
+  /// In case the generic environment is not defined yet (e.g. during parsing or
+  /// deserialization), a PlaceholderValue is returned. This should not be the
+  /// case outside of parsing or deserialization.
+  SILValue getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
+                                         SILFunction *inFunction);
+
+  /// Returns the instruction which defines the given local generic environment,
+  /// e.g. an open_existential_addr.
+  ///
+  /// In contrast to getLocalGenericEnvironmentDef, it is required that all local
+  /// generic environments are resolved.
+  SingleValueInstruction *
+  getLocalGenericEnvironmentDefInst(GenericEnvironment *genericEnv,
+                                    SILFunction *inFunction) {
+    return dyn_cast<SingleValueInstruction>(
+        getLocalGenericEnvironmentDef(genericEnv, inFunction));
   }
 
   /// Returns the instruction which defines the given root local archetype,
@@ -476,6 +513,11 @@ public:
   ///
   /// This should only be the case during parsing or deserialization.
   bool hasUnresolvedLocalArchetypeDefinitions();
+
+  /// If we added any instructions that reference unresolved local archetypes
+  /// and then deleted those instructions without resolving those archetypes,
+  /// we must reclaim those unresolved local archetypes.
+  void reclaimUnresolvedLocalArchetypeDefinitions();
 
   /// Get a unique index for a struct or class field in layout order.
   ///
@@ -556,6 +598,12 @@ public:
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
 
+  /// Erase a differentiability witness from the module.
+  void eraseDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+
+  /// Erase all differentiability witnesses for function f.
+  void eraseAllDifferentiabilityWitnesses(SILFunction *f);
+
   /// Create and return an empty SIL module suitable for generating or parsing
   /// SIL into.
   ///
@@ -618,6 +666,13 @@ public:
     return {functions.begin(), functions.end()};
   }
 
+  /// Move \p fn to be in the function list before \p moveBefore.
+  void moveBefore(SILModule::iterator moveBefore, SILFunction *fn);
+
+  /// Move \p fn to be in the function list after \p moveAfter. It is assumed
+  /// that \p moveAfter is not end.
+  void moveAfter(SILModule::iterator moveAfter, SILFunction *fn);
+
   const_iterator zombies_begin() const { return zombieFunctions.begin(); }
   const_iterator zombies_end() const { return zombieFunctions.end(); }
 
@@ -678,6 +733,22 @@ public:
   }
   iterator_range<default_witness_table_const_iterator> getDefaultWitnessTables() const {
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
+  }
+
+  using default_override_table_iterator = DefaultOverrideTableListType::iterator;
+  using default_override_table_const_iterator = DefaultOverrideTableListType::const_iterator;
+  DefaultOverrideTableListType &getDefaultOverrideTableList() { return defaultOverrideTables; }
+  const DefaultOverrideTableListType &getDefaultOverrideTableList() const { return defaultOverrideTables; }
+  default_override_table_iterator default_override_table_begin() { return defaultOverrideTables.begin(); }
+  default_override_table_iterator default_override_table_end() { return defaultOverrideTables.end(); }
+  default_override_table_const_iterator default_override_table_begin() const { return defaultOverrideTables.begin(); }
+  default_override_table_const_iterator default_override_table_end() const { return defaultOverrideTables.end(); }
+  iterator_range<default_override_table_iterator> getDefaultOverrideTables() {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
+  }
+  iterator_range<default_override_table_const_iterator>
+  getDefaultOverrideTables() const {
+    return {defaultOverrideTables.begin(), defaultOverrideTables.end()};
   }
 
   using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
@@ -758,14 +829,20 @@ public:
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
-  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
+  SILGlobalVariable *lookUpGlobalVariable(StringRef name,
+                                          bool byAsmName = false) const {
+    if (byAsmName)
+      return GlobalVariableByAsmNameMap.lookup(name);
+
     return GlobalVariableMap.lookup(name);
   }
 
   /// Look for a function by name.
   ///
   /// \return null if this module has no such function
-  SILFunction *lookUpFunction(StringRef name) const {
+  SILFunction *lookUpFunction(StringRef name, bool byAsmName = false) const {
+    if (byAsmName)
+      return FunctionByAsmNameTable.lookup(name);
     return FunctionTable.lookup(name);
   }
 
@@ -800,19 +877,25 @@ public:
   /// Returns true if linking succeeded, false otherwise.
   bool linkFunction(SILFunction *F, LinkingMode LinkMode);
 
+  /// Attempt to deserialize witness table for protocol conformance \p PC.
+  ///
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
+
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
 
-  /// Look up the SILWitnessTable representing the lowering of a protocol
-  /// conformance, and collect the substitutions to apply to the referenced
-  /// witnesses, if any.
-  ///
-  /// \arg C The protocol conformance mapped key to use to lookup the witness
-  ///        table.
-  /// \arg deserializeLazily If we cannot find the witness table should we
-  ///                        attempt to lazily deserialize it.
+  /// Look up the SILWitnessTable representing the lowering of a conformance `C`.
+  /// If a specialized witness table exists for the conformance, return the specialized table.
+  /// Specialized witness tables are currently only used in embedded mode.
   SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C);
+
+  /// Look up the SILWitnessTable representing the lowering of a conformance `C`.
+  /// The `isSpecialized` flag specifies if only non-specialized or specialized witness
+  /// tables are looked up.
+  /// Specialized witness tables are currently only used in embedded mode.
+  SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C, bool isSpecialized);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
   ///
@@ -820,6 +903,7 @@ public:
   std::pair<SILFunction *, SILWitnessTable *>
   lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                SILDeclRef Requirement,
+                               bool lookupInSpecializedWitnessTable,
                                SILModule::LinkingMode linkingMode);
 
   /// Look up the SILDefaultWitnessTable representing the default witnesses
@@ -832,6 +916,12 @@ public:
   lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
                                       SILDeclRef Requirement,
                                       bool deserializeLazily=true);
+
+  /// Look up the SILDefaultOverrideTable containing the default overrides to be
+  /// applied to subclasses of a resilient class.
+  SILDefaultOverrideTable *
+  lookUpDefaultOverrideTable(const ClassDecl *decl,
+                             bool deserializeLazily = true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C, bool deserializeLazily = true);
@@ -876,6 +966,12 @@ public:
   /// Deletes a dead witness table.
   void deleteWitnessTable(SILWitnessTable *Wt);
 
+  /// Define a default override table for the indicated resilient class \p decl
+  /// consisting of the specified \p entries.
+  SILDefaultOverrideTable *createDefaultOverrideTableDefinition(
+      const ClassDecl *decl, SILLinkage linkage,
+      ArrayRef<SILDefaultOverrideTable::Entry> entries);
+
   /// Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
 
@@ -902,6 +998,8 @@ public:
   }
 
   IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
+
+  TypeExpansionContext getMaximalTypeExpansionContext() const;
 
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
@@ -936,6 +1034,9 @@ public:
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
+
+  /// Pretty-print the module with DebugInfo.
+  void dump(bool Verbose, bool DebugInfo) const;
 
   /// Pretty-print the module to a file.
   /// Useful for dumping the module when running in a debugger.
@@ -1018,6 +1119,10 @@ public:
   /// See scheduledForDeletion for details.
   void flushDeletedInsts();
 
+  bool hasInstructionsScheduledForDeletion() const {
+    return !scheduledForDeletion.empty();
+  }
+
   /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///
   /// \returns Returns llvm::Intrinsic::not_intrinsic if the function is not an
@@ -1047,12 +1152,29 @@ public:
   /// Gather prespecialized from extensions.
   void performOnceForPrespecializedImportedExtensions(
       llvm::function_ref<void(AbstractFunctionDecl *)> action);
+
+  void addPendingSpecializeAttr(StringRef functionName, SILSpecializeAttr *attr) {
+    pendingSpecializeAttrs[functionName].push_back(attr);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   M.print(OS);
   return OS;
 }
+
+void verificationFailure(
+    const Twine &complaint, const SILFunction *fn,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILInstruction *atInstruction,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILArgument *atArgument,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, SILValue atValue,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {
@@ -1082,6 +1204,9 @@ namespace Lowering {
 /// Determine whether the given class will be allocated/deallocated using the
 /// Objective-C runtime, i.e., +alloc and -dealloc.
 LLVM_LIBRARY_VISIBILITY bool usesObjCAllocator(ClassDecl *theClass);
+/// Determine if isolating destructor is needed.
+LLVM_LIBRARY_VISIBILITY bool needsIsolatingDestructor(DestructorDecl *dd);
+
 } // namespace Lowering
 } // namespace swift
 

@@ -114,11 +114,11 @@ static llvm::cl::opt<std::string> PassPipeline(
 //                               Helper Methods
 //===----------------------------------------------------------------------===//
 
-static llvm::CodeGenOpt::Level GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
+static llvm::CodeGenOptLevel GetCodeGenOptLevel(const SwiftLLVMOptOptions &options) {
   // TODO: Is this the right thing to do here?
   if (options.Optimized)
-    return llvm::CodeGenOpt::Default;
-  return llvm::CodeGenOpt::None;
+    return llvm::CodeGenOptLevel::Default;
+  return llvm::CodeGenOptLevel::None;
 }
 
 // Returns the TargetMachine instance or zero if no triple is provided.
@@ -135,7 +135,7 @@ getTargetMachine(llvm::Triple TheTriple, StringRef CPUStr,
   }
 
   return TheTarget->createTargetMachine(
-      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
+      TheTriple, CPUStr, FeaturesStr, targetOptions,
       std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
       llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
 }
@@ -174,7 +174,8 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // If we are supposed to override the target triple, do so now.
   if (!options.TargetTriple.empty())
-    M->setTargetTriple(llvm::Triple::normalize(options.TargetTriple));
+    M->setTargetTriple(
+        llvm::Triple(llvm::Triple::normalize(options.TargetTriple)));
 
   // Figure out what stream we are supposed to write to...
   std::unique_ptr<llvm::ToolOutputFile> Out;
@@ -214,7 +215,10 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Opts.OutputKind = IRGenOutputKind::LLVMAssemblyAfterOptimization;
 
     // Then perform the optimizations.
-    performLLVMOptimizations(Opts, M.get(), TM.get(), &Out->os());
+    SourceManager SM;
+    DiagnosticEngine Diags(SM);
+    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(),
+                             &Out->os());
   } else {
     std::string Pipeline = PassPipeline;
     llvm::TargetLibraryInfoImpl TLII(ModuleTriple);

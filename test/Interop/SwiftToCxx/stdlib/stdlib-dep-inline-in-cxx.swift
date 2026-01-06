@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -emit-clang-header-path %t/stdlib.h
+// RUN: %target-swift-frontend %s -module-name UseOptional -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/stdlib.h
 // RUN: %FileCheck %s < %t/stdlib.h
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/stdlib_expose_flag.h
+// RUN: %target-swift-frontend %s -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -typecheck -verify -emit-clang-header-path %t/stdlib_expose_flag.h
 // RUN: %FileCheck %s < %t/stdlib_expose_flag.h
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional2 -enable-experimental-cxx-interop -emit-clang-header-path %t/stdlib2.h
+// RUN: %target-swift-frontend %s -module-name UseOptional2 -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/stdlib2.h
 
 // RUN: cat %t/stdlib.h %t/stdlib2.h > %t/two_includes.h
 

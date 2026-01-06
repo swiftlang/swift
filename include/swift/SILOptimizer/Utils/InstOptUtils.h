@@ -35,6 +35,7 @@ namespace swift {
 class DominanceInfo;
 class DeadEndBlocks;
 class BasicCalleeAnalysis;
+class DestructorAnalysis;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
@@ -194,16 +195,23 @@ SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
 /// BranchInst (a phi is never the last guaranteed user). \p builder's current
 /// insertion point must dominate all \p usePoints.
 std::pair<SILValue, bool /* changedCFG */>
-castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
+castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
+                             SILLocation Loc,
                              SILValue value, SILType srcTy, SILType destTy,
                              ArrayRef<SILInstruction *> usePoints);
-/// Peek through trivial Enum initialization, typically for pointless
-/// Optionals.
+
+/// Returns true if the layout of a generic nominal type is dependent on its generic parameters.
+/// This is usually the case. Some examples, where they layout is _not_ dependent:
+/// ```
+///    struct S<T> {
+///      var x: Int // no members which depend on T
+///    }
 ///
-/// The returned InitEnumDataAddr dominates the given
-/// UncheckedTakeEnumDataAddrInst.
-InitEnumDataAddrInst *
-findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai);
+///    struct S<T> {
+///      var c: SomeClass<T> // a class reference does not depend on the layout of the class
+///    }
+/// ```
+bool layoutIsTypeDependent(NominalTypeDecl *decl);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
@@ -233,7 +241,7 @@ SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
-    SILFunction *fn, DominanceInfo *dt, DeadEndBlocks *deBlocks,
+    SILFunction *fn, SILPassManager *pm, DominanceInfo *dt, DeadEndBlocks *deBlocks,
     SmallVectorImpl<SILBasicBlock *> &blocksForWorklist,
     bool EnableOSSARewriteTerminator);
 
@@ -402,12 +410,6 @@ ignore_expect_uses(ValueBase *value) {
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SingleValueInstruction *inst);
 
-/// True if a type can be expanded without a significant increase to code size.
-///
-/// False if expanding a type is invalid. For example, expanding a
-/// struct-with-deinit drops the deinit.
-bool shouldExpand(SILModule &module, SILType ty);
-
 /// Check if the value of value is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
@@ -570,7 +572,8 @@ SILValue makeValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// use blocks inside a loop relative to \p value. The client must create
 /// separate copies for any uses within the loop.
 void endLifetimeAtLeakingBlocks(SILValue value,
-                                ArrayRef<SILBasicBlock *> userBBs);
+                                ArrayRef<SILBasicBlock *> userBBs,
+                                DeadEndBlocks *deadEndBlocks = nullptr);
 
 /// Given a forwarding instruction, eliminate it if all of its users are debug
 /// instructions and ownership uses.
@@ -581,19 +584,13 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
 
-/// Performs "predictable" memory access optimizations.
-///
-/// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction *fn, DominanceInfo *domInfo);
-
 /// Performs "predictable" dead allocation optimizations.
 ///
 /// See the PredictableDeadAllocationElimination pass.
 bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
 
-SILVTable *specializeVTableForType(SILType type, SILModule &mod, SILTransform *transform);
-
 bool specializeClassMethodInst(ClassMethodInst *cm);
+bool specializeWitnessMethodInst(WitnessMethodInst *wm);
 
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
@@ -615,6 +612,12 @@ SILValue createEmptyAndUndefValue(SILType ty, SILInstruction *insertionPoint,
 /// Check if a struct or its fields can have unreferenceable storage.
 bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                 SILFunction *func);
+
+SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
+
+bool isDestructorSideEffectFree(SILInstruction *mayRelease,
+                                DestructorAnalysis *DA);
+
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H

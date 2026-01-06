@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // UNSUPPORTED: use_os_stdlib
 
 // rdar://77087867
@@ -127,6 +128,9 @@ PrintTests.test("Printable_Float16") {
   expectEqual(Float16.infinity.debugDescription, "inf")
   expectEqual((-Float16.infinity).debugDescription, "-inf")
   
+  // Platforms without float 16 argument passing can cause NaNs to be changed
+  // while being passed.
+  #if !arch(wasm32)
   for bitPattern in (0x7c01 as UInt16) ... 0x7fff {
     expectEqual(Float16(bitPattern: bitPattern).description, "nan")
     expectEqual(Float16(bitPattern: 0x8000 | bitPattern).description, "nan")
@@ -144,6 +148,7 @@ PrintTests.test("Printable_Float16") {
     expectEqual(Float16(bitPattern: bitPattern).debugDescription, expected)
     expectEqual(Float16(bitPattern: 0x8000 | bitPattern).debugDescription, "-\(expected)")
   }
+  #endif
 #endif
 }
 

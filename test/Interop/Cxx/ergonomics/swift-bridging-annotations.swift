@@ -27,6 +27,19 @@ public protocol Proto {
 #if BRIDGING_HEADER_TEST
 func f() -> SharedObject { return SharedObject.create() }
 
+func g() {
+  var logger: LoggerSingleton?
+  var loggerPtr: UnsafeMutablePointer<LoggerSingleton?>?
+  var loggerPtrPtr: UnsafeMutablePointer<UnsafeMutablePointer<LoggerSingleton?>?>?
+
+  takeLoggersByPointer(logger, &logger, &loggerPtr)
+  takeLoggersByPointer(logger, loggerPtr, loggerPtrPtr)
+  takeLoggersByPointer(nil, nil, nil)
+  
+  takeLoggersByReference(logger!, &logger, &loggerPtr)
+  takeLoggersByReference(logger!, &loggerPtr!.pointee, &loggerPtrPtr!.pointee)
+}
+
 func releaseSharedObject(_: SharedObject) { }
 #endif
 
@@ -71,6 +84,12 @@ public:
     static LoggerSingleton *getInstance();
 };
 
+void takeLoggersByPointer(LoggerSingleton *ptr, LoggerSingleton **ptr_ptr, LoggerSingleton ***ptr_ptr_ptr);
+void takeLoggersByReference(LoggerSingleton &ref, LoggerSingleton *&ref_ptr, LoggerSingleton **&ref_ptr_ptr);
+
+void takeLoggersByConstPointer(const LoggerSingleton **pointee0, LoggerSingleton const **pointee1, LoggerSingleton *const *pointer);
+void takeLoggersByConstReference(const LoggerSingleton *&pointee0, LoggerSingleton const *&pointee1, LoggerSingleton *const &pointer);
+
 class SWIFT_UNSAFE_REFERENCE UnsafeNonCopyable {
 public:
     UnsafeNonCopyable(UnsafeNonCopyable &) = delete;
@@ -109,6 +128,26 @@ private:
 // CHECK: class LoggerSingleton {
 // CHECK:   class func getInstance() -> LoggerSingleton!
 // CHECK: }
+
+// CHECK-LABEL: func takeLoggersByPointer(
+// CHECK-SAME: _ ptr: LoggerSingleton!,
+// CHECK-SAME: _ ptr_ptr: UnsafeMutablePointer<LoggerSingleton?>!,
+// CHECK-SAME: _ ptr_ptr_ptr: UnsafeMutablePointer<UnsafeMutablePointer<LoggerSingleton?>?>!)
+
+// CHECK-LABEL: func takeLoggersByReference(
+// CHECK-SAME: _ ref: LoggerSingleton,
+// CHECK-SAME: _ ref_ptr: inout LoggerSingleton!,
+// CHECK-SAME: _ ref_ptr_ptr: inout UnsafeMutablePointer<LoggerSingleton?>!)
+
+// CHECK-LABEL: func takeLoggersByConstPointer(
+// CHECK-SAME: _ pointee0: UnsafeMutablePointer<LoggerSingleton?>!,
+// CHECK-SAME: _ pointee1: UnsafeMutablePointer<LoggerSingleton?>!,
+// CHECK-SAME: _ pointer: UnsafePointer<LoggerSingleton?>!)
+
+// CHECK-LABEL: func takeLoggersByConstReference(
+// CHECK-SAME: _ pointee0: inout LoggerSingleton!,
+// CHECK-SAME: _ pointee1: inout LoggerSingleton!,
+// CHECK-SAME: _ pointer: LoggerSingleton!)
 
 // CHECK: class UnsafeNonCopyable {
 // CHECK: }

@@ -40,3 +40,27 @@ bb0(%0 : $K):
 
 sil @our_closure_function2 : $@convention(thin) (@owned K) -> Bool
 sil @our_closure_function1 : $@convention(thin) (Int64) -> Bool
+
+sil @toBeClosed : $@convention(thin) (@guaranteed @sil_unowned K) -> ()
+sil @takeClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil @opt_partial_apply_of_an_unowned : {{.*}} {
+// CHECK:       bb0([[UNOWNED_VALUE:%[^,]+]] :
+// CHECK:         [[TO_BE_CLOSED:%[^,]+]] = function_ref @toBeClosed
+// CHECK:         unowned_retain [[UNOWNED_VALUE]]
+// CHECK:         apply [[TO_BE_CLOSED]]([[UNOWNED_VALUE]])
+// CHECK:         unowned_release [[UNOWNED_VALUE]]
+// CHECK:         unowned_release [[UNOWNED_VALUE]]
+// CHECK-LABEL: } // end sil function 'opt_partial_apply_of_an_unowned'
+sil @opt_partial_apply_of_an_unowned : $@convention(thin) (@guaranteed @sil_unowned K) -> () {
+bb0(%1 : @closureCapture $@sil_unowned K):
+  %678 = function_ref @toBeClosed : $@convention(thin) (@guaranteed @sil_unowned K) -> ()
+  %680 = partial_apply [callee_guaranteed] %678(%1) : $@convention(thin) (@guaranteed @sil_unowned K) -> ()
+  %681 = function_ref @takeClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  strong_retain %680 : $@callee_guaranteed () -> ()
+  %683 = partial_apply [callee_guaranteed] %681(%680) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %876 = apply %680() : $@callee_guaranteed () -> ()
+  strong_release %680 : $@callee_guaranteed  () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}

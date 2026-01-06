@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -disable-availability-checking
+// RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple
 
 // Make sure we can lower all of these types without crashing.
 

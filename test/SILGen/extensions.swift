@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden [ossa] @$s10extensions3FooC3zim{{[_0-9a-zA-Z]*}}F

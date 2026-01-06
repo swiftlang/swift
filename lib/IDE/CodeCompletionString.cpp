@@ -11,14 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletionString.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
 using namespace swift::ide;
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
-  std::uninitialized_copy(Chunks.begin(), Chunks.end(),
-                          getTrailingObjects<Chunk>());
+  std::uninitialized_copy(Chunks.begin(), Chunks.end(), getTrailingObjects());
   NumChunks = Chunks.size();
 }
 

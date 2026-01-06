@@ -57,7 +57,7 @@ public struct Struct: Differentiable {
 // 11 swift-frontend           0x0000000109ae8196 swift::autodiff::PullbackCloner::Implementation::visitSILBasicBlock(swift::SILBasicBlock*) + 838
 // 12 swift-frontend           0x0000000109ae5504 swift::autodiff::PullbackCloner::Implementation::run() + 7268
 // 13 swift-frontend           0x0000000109b077d3 swift::autodiff::VJPCloner::Implementation::run() + 1539
-// 14 swift-frontend           0x0000000109c4e0b4 (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::IsSerialized_t) + 7172
+// 14 swift-frontend           0x0000000109c4e0b4 (anonymous namespace)::DifferentiationTransformer::canonicalizeDifferentiabilityWitness(swift::SILFunction*, swift::SILDifferentiabilityWitness*, swift::autodiff::DifferentiationInvoker, swift::SerializedKind_t) + 7172
 // 15 swift-frontend           0x0000000109c4bafa (anonymous namespace)::Differentiation::run() + 1530
 // 16 swift-frontend           0x0000000109c9c86e swift::SILPassManager::runModulePass(unsigned int) + 558
 // 17 swift-frontend           0x0000000109ca144a swift::SILPassManager::execute() + 666

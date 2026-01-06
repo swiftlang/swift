@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -O -enable-library-evolution -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -O -enable-library-evolution -enable-testing -primary-file %s | %FileCheck %s --check-prefix=CHECK-TESTING
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -enable-library-evolution -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -enable-library-evolution -enable-testing -primary-file %s | %FileCheck %s --check-prefix=CHECK-TESTING
 
 // REQUIRES: swift_in_compiler
 

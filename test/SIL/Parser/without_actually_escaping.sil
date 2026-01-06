@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s | %FileCheck %s
 
 // thunk for @escaping @callee_guaranteed () -> ()
 // Check that the [without_actually_escaping] thunk attribute is parsed and printed.

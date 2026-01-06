@@ -29,6 +29,7 @@ public struct VolatileMappedRegister<Pointee> {
   let _rawPointer: Builtin.RawPointer
 
   @_transparent
+  @unsafe
   public init(unsafeBitPattern: UInt) {
      self._rawPointer = Builtin.inttoptr_Word(unsafeBitPattern._builtinWordValue)
   }

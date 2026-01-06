@@ -35,3 +35,23 @@
 //                                            -- Your friendly stdlib engineers
 
 // RegexBuilder Symbols
+
+// Add property descriptors for static properties
+Added: _$s12RegexBuilder6AnchorV11startOfLineACvpZMV
+Added: _$s12RegexBuilder6AnchorV12endOfSubjectACvpZMV
+Added: _$s12RegexBuilder6AnchorV12wordBoundaryACvpZMV
+Added: _$s12RegexBuilder6AnchorV14startOfSubjectACvpZMV
+Added: _$s12RegexBuilder6AnchorV19textSegmentBoundaryACvpZMV
+Added: _$s12RegexBuilder6AnchorV25endOfSubjectBeforeNewlineACvpZMV
+Added: _$s12RegexBuilder6AnchorV30firstMatchingPositionInSubjectACvpZMV
+Added: _$s12RegexBuilder6AnchorV9endOfLineACvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE10whitespaceAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE13anyNonNewlineAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE15newlineSequenceAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE18anyGraphemeClusterAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE18verticalWhitespaceAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE20horizontalWhitespaceAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE3anyAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE4wordAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE5digitAFvpZMV
+Added: _$s17_StringProcessing14RegexComponentP0C7BuilderAD14CharacterClassVRszrlE8hexDigitAFvpZMV

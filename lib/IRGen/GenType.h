@@ -112,6 +112,7 @@ private:
   const LoadableTypeInfo *JobTI = nullptr;
   const LoadableTypeInfo *ExecutorTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
+  const LoadableTypeInfo *ImplicitActorTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
   const TypeInfo *TaskContinuationFunctionPtrTI = nullptr;
@@ -183,7 +184,9 @@ private:
 #define REF_STORAGE(Name, ...) \
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
-  
+  const TypeInfo *convertBuiltinFixedArrayType(BuiltinFixedArrayType *T);
+
+
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
@@ -200,6 +203,7 @@ public:
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
   const LoadableTypeInfo &getJobTypeInfo();
@@ -406,6 +410,12 @@ bool tryEmitDestroyUsingDeinit(IRGenFunction &IGF,
 bool tryEmitConsumeUsingDeinit(IRGenFunction &IGF,
                                Explosion &explosion,
                                SILType T);
+
+/// Most fixed size types currently are always ABI accessible (value operations
+/// can be done without metadata). One notable exception is non-copyable types
+/// with a deinit. Their type metadata is required to call destroy if the deinit
+/// function is not available to the current SIL module.
+IsABIAccessible_t isTypeABIAccessibleIfFixedSize(IRGenModule &IGM, CanType ty);
 
 } // end namespace irgen
 } // end namespace swift

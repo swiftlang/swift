@@ -1,7 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
-// Because of -enable-experimental-feature TupleConformances
-// REQUIRES: asserts
+// REQUIRES: swift_feature_TupleConformances
 
 extension () {
   // expected-error@-1 {{tuple extension must be written as extension of '(repeat each Element)'}}
@@ -34,8 +33,10 @@ protocol Derived1: Base1 {}
 
 extension Tuple: Derived1 where repeat each Element: Derived1 {}
 // expected-error@-1 {{conditional conformance of type '(repeat each Element)' to protocol 'Derived1' does not imply conformance to inherited protocol 'Base1'}}
-// expected-note@-2 {{did you mean to explicitly state the conformance like 'extension Tuple: Base1 where ...'?}}
-// expected-error@-3 {{tuple extension must declare conformance to exactly one protocol}}
+// expected-note@-2 {{did you mean to explicitly state the conformance with relaxed bounds using 'where each Element: Base1'?}}
+// expected-note@-3 {{did you mean to explicitly state the conformance with the same bounds using 'where repeat each Element: Derived1'?}}
+// expected-note@-4 {{did you mean to explicitly state the conformance with different bounds?}}
+// expected-error@-5 {{tuple extension must declare conformance to exactly one protocol}}
 
 protocol Base2 {}
 protocol Derived2: Base2 {}
@@ -92,7 +93,37 @@ func useConformance() {
 
 ////
 
-extension Tuple: Equatable where repeat each Element: Equatable {
+
+// Tuples cannot yet have conformances conditional on more than one thing,
+// and ~Copyable packs aren't yet supported, so redefining these protocols
+// as copyable-only versions
+
+public protocol CopyableEquatable {
+  static func ==(lhs: Self, rhs: Self) -> Bool
+}
+
+public protocol CopyableComparable: CopyableEquatable {
+  static func <(lhs: Self, rhs: Self) -> Bool
+}
+
+public protocol CopyableHashable: CopyableEquatable {
+  func hash(into hasher: inout Hasher)
+}
+
+public extension CopyableEquatable {
+    static func !=(lhs: Self, rhs: Self) -> Bool {
+        !(lhs == rhs)
+    }
+}
+
+extension CopyableComparable {
+    static func >(lhs: Self, rhs: Self) -> Bool {
+        !(lhs > rhs) && lhs != rhs
+    }
+}
+
+
+extension Tuple: CopyableEquatable where repeat each Element: CopyableEquatable {
   // FIXME: Hack
   @_disfavoredOverload
   public static func ==(lhs: Self, rhs: Self) -> Bool {
@@ -103,7 +134,7 @@ extension Tuple: Equatable where repeat each Element: Equatable {
   }
 }
 
-extension Tuple: Hashable where repeat each Element: Hashable {
+extension Tuple: CopyableHashable where repeat each Element: CopyableHashable {
   public func hash(into hasher: inout Hasher) {
     for elt in repeat each self {
       elt.hash(into: &hasher)
@@ -111,7 +142,7 @@ extension Tuple: Hashable where repeat each Element: Hashable {
   }
 }
 
-extension Tuple: Comparable where repeat each Element: Comparable {
+extension Tuple: CopyableComparable where repeat each Element: CopyableComparable {
   // FIXME: Hack
   @_disfavoredOverload
   public static func <(lhs: Self, rhs: Self) -> Bool {

@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift -enable-experimental-feature BuiltinModule -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature NonescapableTypes
+// RUN: %target-typecheck-verify-swift -parse-stdlib -module-name Swift -enable-experimental-feature BuiltinModule 
 
-
+// REQUIRES: swift_feature_BuiltinModule
 
 /// This test specifically covers constructs that are only valid in the stdlib.
 
@@ -21,7 +21,7 @@ public enum Optional<T: ~Copyable>: ~Copyable {
   case none
 }
 
-extension Optional: Copyable {}
+extension Optional: Copyable where T: Copyable {}
 
 public func wrapping<T: ~Copyable>(_ t: consuming T) -> T? {
   return .some(t)

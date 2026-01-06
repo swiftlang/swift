@@ -1,4 +1,4 @@
-//===--- MetadataRequest.cpp - IR generation for metadata requests --------===//
+//===--- GenericArguments.h - IR generation for metadata requests ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -50,8 +50,9 @@ struct GenericArguments {
   /// The values to use to initialize the arguments structure.
   SmallVector<llvm::Value *, 8> Values;
   SmallVector<llvm::Type *, 8> Types;
+  bool hasPacks = false;
 
- void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
+  void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
     GenericTypeRequirements requirements(IGM, nominal);
     collectTypes(IGM, requirements);
   }
@@ -59,13 +60,13 @@ struct GenericArguments {
   void collectTypes(IRGenModule &IGM,
                     const GenericTypeRequirements &requirements) {
     for (auto &requirement : requirements.getRequirements()) {
+      hasPacks = hasPacks || requirement.isAnyPack();
       Types.push_back(requirement.getType(IGM));
     }
   }
 
   void collect(IRGenFunction &IGF, CanType type) {
-    auto decl = type.getNominalOrBoundGenericNominal();
-    auto subs = type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
+    auto subs = type->getContextSubstitutionMap();
     collect(IGF, subs);
   }
 

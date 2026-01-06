@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t.framework)
 // RUN: %empty-directory(%t.framework/Headers)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/ -module-name Mixed -import-underlying-module -parse-as-library %s -typecheck -emit-objc-header-path %t.framework/Headers/mixed.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/ -module-name Mixed -import-underlying-module -parse-as-library %s -typecheck -verify -emit-objc-header-path %t.framework/Headers/mixed.h
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=FRAMEWORK %s < %t.framework/Headers/mixed.h
 // RUN: %check-in-clang -Watimport-in-framework-header -F %S/Inputs/ %t.framework/Headers/mixed.h
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name Mixed -import-objc-header %S/Inputs/Mixed.framework/Headers/Mixed.h %s -typecheck -emit-objc-header-path %t.framework/Headers/mixed-header.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name Mixed -import-objc-header %S/Inputs/Mixed.framework/Headers/Mixed.h %s -typecheck -verify -emit-objc-header-path %t.framework/Headers/mixed-header.h
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=HEADER %s < %t.framework/Headers/mixed-header.h
 // RUN: %check-in-clang -Watimport-in-framework-header -include %S/Inputs/Mixed.framework/Headers/Mixed.h %t.framework/Headers/mixed-header.h
 
@@ -12,7 +12,8 @@
 
 // CHECK: #pragma clang diagnostic push
 
-// CHECK-LABEL: #if __has_feature(objc_modules)
+// CHECK: #if __has_feature(objc_modules)
+// CHECK: #if __has_feature(objc_modules)
 // CHECK-NEXT: #if __has_warning("-Watimport-in-framework-header")
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Watimport-in-framework-header"
 // CHECK-NEXT: #endif

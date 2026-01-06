@@ -15,22 +15,22 @@
 // RUN:   -module-name LibC -emit-module-path %t/LibC.swiftmodule \
 // RUN:   -swift-version 5 -enable-library-evolution -I %t
 
-// RUN: %target-swift-frontend -typecheck %t/TwoIOI.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/TwoIOI.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI1.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI1.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI2.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI2.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/TwoSPIOnly.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/TwoSPIOnly.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly1.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly1.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
-// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly2.swift -I %t -verify \
+// RUN: %target-swift-frontend -typecheck %t/OneSPIOnly2.swift -I %t -verify -verify-ignore-unrelated \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 
@@ -45,18 +45,22 @@ public struct LibAStruct {}
 
 //--- TwoIOI.swift
 @_implementationOnly import LibB
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 @_implementationOnly import LibC
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public func foo(a: LibAStruct) {} // expected-error {{cannot use struct 'LibAStruct' here; 'LibA' has been imported as implementation-only}}
 
 //--- SPIOnlyAndIOI1.swift
 @_spiOnly import LibB
 @_implementationOnly import LibC
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 public func foo(a: LibAStruct) {} // expected-error {{cannot use struct 'LibAStruct' here; 'LibA' was imported for SPI only}}
 
 //--- SPIOnlyAndIOI2.swift
 @_implementationOnly import LibB
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 @_spiOnly import LibC
 
 public func foo(a: LibAStruct) {} // expected-error {{cannot use struct 'LibAStruct' here; 'LibA' was imported for SPI only}}

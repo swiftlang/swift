@@ -14,4 +14,22 @@ ComparisonTypeInferenceTests.test("Int8") {
   expectTrue( 1 << 7 <= Int8.max)
 }
 
+ComparisonTypeInferenceTests.test("Int128") {
+  if #available(SwiftStdlib 6.0, *) {
+    expectTrue(Int128.max != 9_999_999_999_999_999_999_999_999_999_999_999)
+    expectTrue(Int128.max > 9_999_999_999_999_999_999_999_999_999_999_999)
+    expectTrue(Int128.max >= 9_999_999_999_999_999_999_999_999_999_999_999)
+    expectFalse(Int128.max <= 9_999_999_999_999_999_999_999_999_999_999_999)
+  }
+}
+
+ComparisonTypeInferenceTests.test("UInt128") {
+  if #available(SwiftStdlib 6.0, *) {
+    expectTrue(UInt128.max != 9_999_999_999_999_999_999_999_999_999_999_999)
+    expectTrue(UInt128.max > 9_999_999_999_999_999_999_999_999_999_999_999)
+    expectTrue(UInt128.max >= 9_999_999_999_999_999_999_999_999_999_999_999)
+    expectFalse(UInt128.max <= 9_999_999_999_999_999_999_999_999_999_999_999)
+  }
+}
+
 runAllTests()

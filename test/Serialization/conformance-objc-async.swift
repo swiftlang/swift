@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-emit-module-interface(%t/Conformance.swiftinterface) -target %target-swift-abi-5.5-triple -module-name Conformance -I %t %t/Conformance.swift
-// RUN: %target-swift-emit-module-interface(%t/Conformance.swiftinterface) -target %target-swift-abi-5.5-triple -module-name Conformance -experimental-lazy-typecheck -I %t %t/Conformance.swift
+// RUN: %target-swift-emit-module-interface(%t/Conformance.swiftinterface) -target %target-swift-5.5-abi-triple -module-name Conformance -I %t %t/Conformance.swift
+// RUN: %target-swift-emit-module-interface(%t/Conformance.swiftinterface) -target %target-swift-5.5-abi-triple -module-name Conformance -experimental-lazy-typecheck -I %t %t/Conformance.swift
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Conformance.swiftinterface -module-name Conformance -o /dev/null -I %t
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

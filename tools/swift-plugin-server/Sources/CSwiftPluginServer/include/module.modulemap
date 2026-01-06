@@ -1,4 +1,0 @@
-module CSwiftPluginServer {
-  header "PluginServer.h"
-  export *
-}

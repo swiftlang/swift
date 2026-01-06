@@ -20,6 +20,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
@@ -31,20 +32,31 @@ raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 // Helpers
 //===----------------------------------------------------------------------===//
 
+static SILValue getArrayValueOfElementAddress(SILValue v) {
+  while (true) {
+    switch (v->getKind()) {
+    case ValueKind::IndexAddrInst:
+    case ValueKind::RefTailAddrInst:
+    case ValueKind::UncheckedRefCastInst:
+    case ValueKind::StructExtractInst:
+    case ValueKind::BeginBorrowInst:
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+      break;
+    default:
+      return v;
+    }
+  }
+}
+
 ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
-  // Find the `pointer_to_address` result, peering through `index_addr`.
-  auto *ptai = dyn_cast<PointerToAddressInst>(v);
-  if (auto *iai = dyn_cast<IndexAddrInst>(v))
-    ptai = dyn_cast<PointerToAddressInst>(iai->getOperand(0));
-  if (!ptai)
+  SILValue arr = getArrayValueOfElementAddress(v);
+
+  auto *mvir = dyn_cast<MultipleValueInstructionResult>(arr);
+  if (!mvir)
     return nullptr;
-  auto *mdi = dyn_cast<MarkDependenceInst>(
-      ptai->getOperand()->getDefiningInstruction());
-  if (!mdi)
-    return nullptr;
+
   // Return the `array.uninitialized_intrinsic` application, if it exists.
-  if (auto *dti = dyn_cast<DestructureTupleInst>(
-          mdi->getValue()->getDefiningInstruction()))
+  if (auto *dti = dyn_cast<DestructureTupleInst>(mvir->getParent()))
     return ArraySemanticsCall(dti->getOperand(),
                               semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;
@@ -60,10 +72,10 @@ bool isSemanticMemberAccessor(SILFunction *original) {
   auto *accessor = dyn_cast<AccessorDecl>(decl);
   if (!accessor)
     return false;
-  // Currently, only getters and setters are supported.
-  // TODO(https://github.com/apple/swift/issues/55084): Support `modify` accessors.
+  // Currently, only getters, setters and _modify accessors are supported.
   if (accessor->getAccessorKind() != AccessorKind::Get &&
-      accessor->getAccessorKind() != AccessorKind::Set)
+      accessor->getAccessorKind() != AccessorKind::Set &&
+      accessor->getAccessorKind() != AccessorKind::Modify)
     return false;
   // Accessor must come from a `var` declaration.
   auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage());
@@ -266,12 +278,12 @@ void collectMinimalIndicesForFunctionCall(
 std::optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
-    return swift::transform(asi->getVarInfo(),  [&](SILDebugVariable var) {
+    return swift::transform(asi->getVarInfo(false),  [&](SILDebugVariable var) {
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      return swift::transform(dvi->getVarInfo(), [&](SILDebugVariable var) {
+      return swift::transform(dvi->getVarInfo(false), [&](SILDebugVariable var) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)
@@ -416,7 +428,7 @@ SILValue emitMemoryLayoutSize(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
           builtin->getGenericSignature(), ArrayRef<Type>{type},
-          LookUpConformanceInSignature(builtin->getGenericSignature().getPointer())),
+          LookUpConformanceInModule()),
       {metatypeVal});
 }
 
@@ -475,7 +487,6 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
         original->getInterfaceType()->castTo<AnyFunctionType>());
 
     if (silParameterIndices->getCapacity() < parameterIndices->getCapacity()) {
-      assert(original->getCaptureInfo().hasLocalCaptures());
       silParameterIndices =
         silParameterIndices->extendingCapacity(original->getASTContext(),
                                                parameterIndices->getCapacity());
@@ -538,9 +549,14 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "definitions with explicit differentiable attributes");
 
   return SILDifferentiabilityWitness::createDeclaration(
-      module, SILLinkage::PublicExternal, original, kind,
-      minimalConfig->parameterIndices, minimalConfig->resultIndices,
-      minimalConfig->derivativeGenericSignature);
+      module,
+      // Witness for @_alwaysEmitIntoClient original function must be emitted,
+      // otherwise a linker error would occur due to undefined reference to the
+      // witness symbol.
+      original->markedAsAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
+                                               : SILLinkage::PublicExternal,
+      original, kind, minimalConfig->parameterIndices,
+      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
 }
 
 } // end namespace autodiff

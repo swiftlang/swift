@@ -48,7 +48,7 @@ func test3() {
 
 // RUN: %complete-test %s -group=stems -no-fuzz -tok=S1_QUAL_1 | %FileCheck %s -check-prefix=S1_QUAL_1_PREFIX
 // RUN: %complete-test %s -group=stems -fuzz -tok=S1_QUAL_1 | %FileCheck %s -check-prefix=S1_QUAL_1_FUZZ
-func test3() {
+func test4() {
   #^S1_QUAL_1,foo,bar,tast,footast^#
 // S1_QUAL_1_PREFIX-LABEL: Results for filterText: foo [
 // S1_QUAL_1_PREFIX-NEXT:    fooBar:

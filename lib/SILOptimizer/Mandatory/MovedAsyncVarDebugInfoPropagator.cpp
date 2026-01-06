@@ -61,6 +61,7 @@
 
 #define DEBUG_TYPE "sil-move-async-var-debuginfo-propagator"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/ApplySite.h"
@@ -95,7 +96,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), false,
+                                  *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -106,7 +107,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), false,
+                                  *original.getVarInfo(), DontPoisonRefs,
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -119,7 +120,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -131,7 +132,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 namespace {
@@ -347,8 +348,11 @@ struct DebugInfoPropagator {
     // var with a count already and return that value. If we did not, we insert
     // with the new count before expanding the set (initializing the map with
     // the correct value).
+    auto debugVariable = debugVar;
+    debugVariable.DIExpr = debugVariable.DIExpr.getFragmentPart();
+    debugVariable.Type = {};
     auto iter = dbgVarToDbgVarIndexMap.insert(
-        {debugVar, dbgVarToDbgVarIndexMap.size()});
+        {debugVariable, dbgVarToDbgVarIndexMap.size()});
     LLVM_DEBUG(if (iter.second) llvm::dbgs()
                    << "Mapping: [" << iter.first->second
                    << "] = " << iter.first->first.Name << '\n';);

@@ -32,8 +32,8 @@
 
 #include "swift/SILOptimizer/Transforms/SimplifyCFG.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -51,6 +51,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -180,7 +181,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                           << " to bb" << ti.Dest->getDebugID() << '\n');
   auto *SrcTerm = cast<BranchInst>(ti.Src->getTerminator());
 
-  BasicBlockCloner Cloner(SrcTerm->getDestBB());
+  BasicBlockCloner Cloner(SrcTerm->getDestBB(), PM);
   if (!Cloner.canCloneBlock())
     return false;
 
@@ -231,6 +232,7 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
                    (*ThreadedSuccessorBlock->args_begin())->getType() &&
                "Argument types must match");
         Builder.createBranch(SEI->getLoc(), ThreadedSuccessorBlock, {UED});
+        Cloner.registerBlockWithNewPhiArg(ThreadedSuccessorBlock);
       } else {
         assert(SEI->getDefaultBB() == ThreadedSuccessorBlock);
         auto *OldBlockArg = ThreadedSuccessorBlock->getArgument(0);
@@ -302,7 +304,8 @@ static SILValue createValueForEdge(SILInstruction *UserInst,
 
   if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
     return Builder.createIntegerLiteral(
-        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0);
+        CBI->getLoc(), CBI->getCondition()->getType(), EdgeIdx == 0 ? -1 : 0,
+        /*treatAsSigned=*/true);
 
   auto *SEI = cast<SwitchEnumInst>(DominatingTerminator);
   auto *DstBlock = SEI->getSuccessors()[EdgeIdx].getBB();
@@ -571,7 +574,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // Do dominator based simplification of terminator condition. This does not
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
-    if (tryCheckedCastBrJumpThreading(&Fn, DT, deBlocks, BlocksForWorklist,
+    if (tryCheckedCastBrJumpThreading(&Fn, PM, DT, deBlocks, BlocksForWorklist,
                                       EnableOSSACheckedCastBrJumpThreading)) {
       for (auto BB: BlocksForWorklist)
         addToWorklist(BB);
@@ -642,7 +645,7 @@ bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
     addToWorklist(S);
 
   LLVM_DEBUG(llvm::dbgs() << "remove dead bb" << BB->getDebugID() << '\n');
-  removeDeadBlock(BB);
+  BB->removeDeadBlock();
   ++NumBlocksDeleted;
   return true;
 }
@@ -1023,7 +1026,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // If it looks potentially interesting, decide whether we *can* do the
   // operation and whether the block is small enough to be worth duplicating.
   int copyCosts = 0;
-  BasicBlockCloner Cloner(DestBB);
+  BasicBlockCloner Cloner(DestBB, PM);
   for (auto &inst : *DestBB) {
     copyCosts += getThreadingCost(&inst);
     if (ThreadingBudget <= copyCosts)
@@ -1077,7 +1080,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGTryJumpThreading(
-    "simplify-cfg-try-jump-threading",
+    "simplify_cfg_try_jump_threading",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -1287,7 +1290,13 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
       assert(DestBB->getArgument(i) != BI->getArg(i));
       SILValue Val = BI->getArg(i);
-      DestBB->getArgument(i)->replaceAllUsesWith(Val);
+      SILValue arg = DestBB->getArgument(i);
+      if (auto *bfi = getBorrowedFromUser(arg)) {
+        bfi->replaceAllUsesWith(Val);
+        bfi->eraseFromParent();
+      }
+      arg->replaceAllUsesWith(Val);
+
       if (!isVeryLargeFunction) {
         if (auto *I = dyn_cast<SingleValueInstruction>(Val)) {
           // Replacing operands may trigger constant folding which then could
@@ -1472,7 +1481,8 @@ static SILValue invertExpectAndApplyTo(SILBuilder &Builder,
   if (!IL)
     return V;
   SILValue NegatedExpectedValue = Builder.createIntegerLiteral(
-      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0);
+      IL->getLoc(), Args[1]->getType(), IL->getValue() == 0 ? -1 : 0,
+      /*treatAsSigned=*/true);
   return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(), {},
                                {V, NegatedExpectedValue});
 }
@@ -1545,8 +1555,12 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     // Erase in reverse order to pop each element as we go.
     for (unsigned i = destBB->getArguments().size(); i != 0;) {
       --i;
-      destBB->getArgument(i)->replaceAllUsesWith(
-        trampolineDest.newSourceBranchArgs[i]);
+      SILArgument *arg = destBB->getArgument(i);
+      if (auto *bfi = getBorrowedFromUser(arg)) {
+        bfi->replaceAllUsesWith(arg);
+        bfi->eraseFromParent();
+      }
+      arg->replaceAllUsesWith(trampolineDest.newSourceBranchArgs[i]);
       destBB->eraseArgument(i);
     }
   };
@@ -1772,16 +1786,19 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     addToWorklist(SEI->getParent());
     SILBuilderWithScope(SEI).createUnreachable(SEI->getLoc());
     for (auto &succ : SEI->getSuccessors()) {
-      removeDeadBlock(succ.getBB());
+      succ.getBB()->removeDeadBlock();
     }
     SEI->eraseFromParent();
     return true;
   }
 
-  if (!Element || !Element->hasAssociatedValues() || Dest->args_empty()) {
-    assert(Dest->args_empty() && "Unexpected argument at destination!");
-
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
+  if (Dest->args_empty()) {
+    SILBuilderWithScope builder(SEI);
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      // Note that a `destroy_value` would be wrong for non-copyable enums with deinits.
+      builder.createEndLifetime(SEI->getLoc(), SEI->getOperand());
+    }
+    builder.createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
     addToWorklist(Dest);
@@ -1790,16 +1807,25 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  auto &Mod = SEI->getModule();
-  auto OpndTy = SEI->getOperand()->getType();
-  auto Ty = OpndTy.getEnumElementType(
-      Element, Mod, TypeExpansionContext(*SEI->getFunction()));
-  auto *UED = SILBuilderWithScope(SEI)
-    .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
-
+  // If the Dest has an argument, it's case should have an associated value or
+  // it is the default case in ossa.
+  assert((Element && Element->hasAssociatedValues()) ||
+         (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+          Dest == SEI->getDefaultBB()));
+  SILValue newValue;
+  if (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+      Dest == SEI->getDefaultBB()) {
+    newValue = SEI->getOperand();
+  } else {
+    auto OpndTy = SEI->getOperand()->getType();
+    auto Ty = OpndTy.getEnumElementType(
+        Element, SEI->getModule(), TypeExpansionContext(*SEI->getFunction()));
+    newValue = SILBuilderWithScope(SEI).createUncheckedEnumData(
+        SEI->getLoc(), SEI->getOperand(), Element, Ty);
+  }
   assert(Dest->args_size() == 1 && "Expected only one argument!");
   auto *DestArg = Dest->getArgument(0);
-  DestArg->replaceAllUsesWith(UED);
+  DestArg->replaceAllUsesWith(newValue);
   Dest->eraseArgument(0);
 
   SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
@@ -1817,7 +1843,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
-    "simplify-cfg-simplify-switch-enum-unreachable-blocks",
+    "simplify_cfg_simplify_switch_enum_unreachable_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2127,7 +2153,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
-    "simplify-cfg-simplify-switch-enum-on-objc-class-optional",
+    "simplify_cfg_simplify_switch_enum_on_objc_class_optional",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2176,11 +2202,16 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
                                                 EnumCase.get());
     }
     Builder.createBranch(loc, LiveBlock, PayLoad);
+    SEI->eraseFromParent();
+    updateGuaranteedPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
   } else {
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      Builder.createDestroyValue(loc, SEI->getOperand());
+    }
     Builder.createBranch(loc, LiveBlock);
+    SEI->eraseFromParent();
   }
 
-  SEI->eraseFromParent();
   if (EI && isInstructionTriviallyDead(EI)) {
     EI->replaceAllUsesOfAllResultsWithUndef();
     EI->eraseFromParent();
@@ -2201,7 +2232,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
-    "simplify-cfg-simplify-switch-enum-block",
+    "simplify_cfg_simplify_switch_enum_block",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2561,7 +2592,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
       }
       // Cast argument if required.
       std::tie(Arg, std::ignore) = castValueToABICompatibleType(
-          &Builder, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
+          &Builder, PM, TAI->getLoc(), Arg, origConv.getSILArgumentType(i, context),
           targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
       Args.push_back(Arg);
       calleeArgIdx += 1;
@@ -2596,7 +2627,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     // Non-guaranteed values don't need use points when casting.
     SILValue CastedResult;
     std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
-      &Builder, Loc, NewAI, ResultTy, OrigResultTy, /*usePoints*/ {});
+      &Builder, PM, Loc, NewAI, ResultTy, OrigResultTy, /*usePoints*/ {});
 
     BranchInst *branch = Builder.createBranch(Loc, NormalBB, { CastedResult });
 
@@ -2651,7 +2682,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
-    "simplify-cfg-simplify-term-with-identical-dest-blocks",
+    "simplify_cfg_simplify_term_with_identical_dest_blocks",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2817,6 +2848,7 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ThrowAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
+    case TermKind::ReturnBorrowInst:
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;
@@ -2897,7 +2929,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
-    "simplify-cfg-canonicalize-switch-enum",
+    "simplify_cfg_canonicalize_switch_enum",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -2985,7 +3017,7 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     // Okay, it looks like we want to do this and we can.  Duplicate the
     // destination block into this one, rewriting uses of the BBArgs to use the
     // branch arguments as we go.
-    BasicBlockCloner Cloner(DestBB);
+    BasicBlockCloner Cloner(DestBB, PM);
     if (!Cloner.canCloneBlock())
       continue;
 
@@ -3293,6 +3325,12 @@ static bool splitBBArguments(SILFunction &Fn) {
 }
 
 bool SimplifyCFG::run() {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+  // This pass results in verification failures when Swift sources are not
+  // enabled.
+  LLVM_DEBUG(llvm::dbgs() << "SimplifyCFG disabled in C++-only Swift compiler\n");
+  return false;
+#endif //!SWIFT_ENABLE_SWIFT_IN_SWIFT
   LLVM_DEBUG(llvm::dbgs() << "### Run SimplifyCFG on " << Fn.getName() << '\n');
 
   // Disable some expensive optimizations if the function is huge.
@@ -3666,7 +3704,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyBlockArgs(
-    "simplify-cfg-simplify-block-args",
+    "simplify_cfg_simplify_block_args",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -3691,10 +3729,11 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
     return simplifySwitchEnumToSelectEnum(BB, i, A);
 
   // For now, just focus on cases where there is a single use.
-  if (!A->hasOneUse())
+  SILValue argVal = lookThroughBorrowedFromUser(A);
+  if (!argVal->hasOneUse())
     return false;
 
-  auto *Use = *A->use_begin();
+  auto *Use = *argVal->use_begin();
   auto *User = Use->getUser();
 
   auto disableInOSSA = [](SingleValueInstruction *inst) {
@@ -3705,8 +3744,6 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
     }
     if (inst->getOwnershipKind() == OwnershipKind::Owned)
       return !inst->getSingleUse();
-    if (BorrowedValue borrow = BorrowedValue(inst->getOperand(0)))
-      return borrow.isLocalScope();
     return false;
   };
 
@@ -3740,6 +3777,10 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
+  if (auto *bfi = getBorrowedFromUser(A)) {
+    bfi->replaceAllUsesWith(A);
+    bfi->eraseFromParent();
+  }
   A->replaceAllUsesWith(SILUndef::get(A));
   auto *NewArg = BB->replacePhiArgument(i, proj->getType(),
                                         BB->getArgument(i)->getOwnershipKind());
@@ -3762,6 +3803,8 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   proj->eraseFromParent();
 
+  updateGuaranteedPhis(PM, { NewArg });
+
   return true;
 }
 
@@ -3772,7 +3815,7 @@ namespace swift::test {
 /// Dumps:
 /// - nothing
 static FunctionTest SimplifyCFGSimplifyArgument(
-    "simplify-cfg-simplify-argument",
+    "simplify_cfg_simplify_argument",
     [](auto &function, auto &arguments, auto &test) {
       auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
       passToRun->injectPassManager(test.getPassManager());
@@ -3821,7 +3864,21 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // An argument has one result value. We need to replace this with the *value*
   // of the incoming block(s).
   LLVM_DEBUG(llvm::dbgs() << "replace arg with incoming value:" << *A);
-  A->replaceAllUsesWith(V);
+  while (!A->use_empty()) {
+    Operand *op = *A->use_begin();
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(op->getUser())) {
+      if (op->getOperandNumber() == 0) {
+        bfi->replaceAllUsesWith(V);
+        bfi->eraseFromParent();
+        continue;
+      }
+      if (auto *prevBfi = dyn_cast<BorrowedFromInst>(V)) {
+        op->set(prevBfi->getBorrowedValue());
+        continue;
+      }
+    }
+    op->set(V);
+  }
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {

@@ -1,4 +1,4 @@
-REQUIRES: sftp_server
+REQUIRES: rsync
 
 RUN: %empty-directory(%t)
 RUN: %empty-directory(%t-REMOTE)

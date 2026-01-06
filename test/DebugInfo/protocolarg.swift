@@ -8,11 +8,11 @@ public protocol IGiveOutInts {
 }
 
 // CHECK: define {{.*}}@"$s11protocolarg16printSomeNumbersyyAA12IGiveOutInts_pF"
-// CHECK: @llvm.dbg.declare(metadata ptr %
-// CHECK-SAME:              metadata ![[ARG:[0-9]+]],
-// CHECK-SAME:              metadata !DIExpression(DW_OP_deref))
-// CHECK: @llvm.dbg.declare(metadata ptr %
-// CHECK-SAME:              metadata ![[VAR:.*]], metadata !DIExpression())
+// CHECK: #dbg_declare(ptr %
+// CHECK-SAME:              ![[ARG:[0-9]+]],
+// CHECK-SAME:              !DIExpression(DW_OP_deref)
+// CHECK: #dbg_declare(ptr %
+// CHECK-SAME:              ![[VAR:.*]], !DIExpression()
 
 public func printSomeNumbers(_ gen: IGiveOutInts) {
   var gen = gen

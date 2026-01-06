@@ -1,5 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 class C {
   func f() -> Int { return 42 }
@@ -65,6 +64,16 @@ func test0(c c: C) {
 func testClosureOverWeak() {
   weak var bC = C()
   takeClosure { bC!.f() }
+}
+
+func testClosureOverWeakLet() {
+  weak let bC = C()
+  takeClosure { bC!.f() }
+}
+
+func testClosureOverWeakCapture() {
+  let bC = C()
+  takeClosure { [weak bC] in bC!.f() }
 }
 
 class CC {

@@ -1,4 +1,4 @@
-// RUN: %sil-opt -temp-rvalue-opt %s -o /dev/null 
+// RUN: %sil-opt -temp-rvalue-elimination %s -o /dev/null 
 
 // This test exposes a bug in the MemBehavior cache invalidation mechanism.
 // With this bug, the optimizer aborts with a SIL memory lifetime failure

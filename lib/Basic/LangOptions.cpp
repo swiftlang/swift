@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,7 +17,9 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
@@ -34,19 +36,20 @@ using namespace swift;
 LangOptions::LangOptions() {
   // Add all promoted language features
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  Features.insert(Feature::FeatureName);
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
+  enableFeature(Feature::FeatureName);
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
 
   // Special case: remove macro support if the compiler wasn't built with a
   // host Swift.
 #if !SWIFT_BUILD_SWIFT_SYNTAX
-  Features.removeAll({Feature::Macros, Feature::FreestandingExpressionMacros,
-                      Feature::AttachedMacros, Feature::ExtensionMacros});
+  disableFeature(Feature::Macros);
+  disableFeature(Feature::FreestandingExpressionMacros);
+  disableFeature(Feature::AttachedMacros);
+  disableFeature(Feature::ExtensionMacros);
 #endif
-
-  // Note: Introduce default-on language options here.
 
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
@@ -72,6 +75,8 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "tvOS",
   "watchOS",
   "iOS",
+  "visionOS",
+  "xrOS",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -95,7 +100,9 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv32",
   "riscv64",
+  "avr"
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -104,6 +111,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationEndianness
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationPointerBitWidths[] = {
+  "_16",
   "_32",
   "_64"
 };
@@ -133,13 +141,20 @@ static const SupportedConditionalValue SupportedConditionalCompilationHasAtomicB
   "_128"
 };
 
+static const SupportedConditionalValue SupportedConditionalCompilationObjectFileFormats[] = {
+  "MachO",
+  "ELF",
+  "COFF",
+  "Wasm",
+};
+
 static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
 #define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
-ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+static ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
   switch (Kind) {
   case PlatformConditionKind::OS:
     return SupportedConditionalCompilationOSs;
@@ -159,12 +174,14 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationPtrAuthSchemes;
   case PlatformConditionKind::HasAtomicBitWidth:
     return SupportedConditionalCompilationHasAtomicBitWidths;
+  case PlatformConditionKind::ObjectFileFormat:
+    return SupportedConditionalCompilationObjectFileFormats;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
-PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
-                                                     std::vector<StringRef> &suggestedValues) {
+static PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
+                                                            std::vector<StringRef> &suggestedValues) {
   std::string lower = V.lower();
   for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
@@ -183,8 +200,8 @@ PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind,
   return Kind;
 }
 
-bool isMatching(PlatformConditionKind Kind, const StringRef &V,
-                PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
+static bool isMatching(PlatformConditionKind Kind, const StringRef &V,
+                       PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
   // Compare against known values, ignoring case to avoid penalizing
   // characters with incorrect case.
   unsigned minDistance = std::numeric_limits<unsigned>::max();
@@ -223,6 +240,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::TargetEnvironment:
   case PlatformConditionKind::PtrAuth:
   case PlatformConditionKind::HasAtomicBitWidth:
+  case PlatformConditionKind::ObjectFileFormat:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -244,6 +262,9 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
+  // Note: BridgedASTContext_enumerateBuildConfigurationEntries has a redundant
+  // copy of these special cases.
+
   // Check a special case that "macOS" is an alias of "OSX".
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
@@ -281,12 +302,59 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
       != CustomConditionalCompilationFlags.end();
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (Features.contains(feature))
+bool LangOptions::FeatureState::isEnabled() const {
+  return state == FeatureState::Kind::Enabled;
+}
+
+bool LangOptions::FeatureState::isEnabledForMigration() const {
+  ASSERT(feature.isMigratable() && "You forgot to make the feature migratable!");
+
+  return state == FeatureState::Kind::EnabledForMigration;
+}
+
+LangOptions::FeatureStateStorage::FeatureStateStorage()
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
+
+void LangOptions::FeatureStateStorage::setState(Feature feature,
+                                                FeatureState::Kind state) {
+  auto index = size_t(feature);
+
+  states[index] = state;
+}
+
+LangOptions::FeatureState
+LangOptions::FeatureStateStorage::getState(Feature feature) const {
+  auto index = size_t(feature);
+
+  return FeatureState(feature, states[index]);
+}
+
+LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
+    return state;
+
+  if (auto version = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(*version)) {
+      return FeatureState(feature, FeatureState::Kind::Enabled);
+    }
+  }
+
+  return state;
+}
+
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
-  if (auto version = getFeatureLanguageVersion(feature))
-    return isSwiftVersionAtLeast(*version);
+  if (auto version = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(*version))
+      return true;
+  }
+
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }
@@ -301,6 +369,24 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
     return hasFeature(*feature);
 
   return false;
+}
+
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
+}
+
+void LangOptions::enableFeature(Feature feature, bool forMigration) {
+  if (forMigration) {
+    ASSERT(feature.isMigratable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForMigration);
+    return;
+  }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
+}
+
+void LangOptions::disableFeature(Feature feature) {
+  featureStates.setState(feature, FeatureState::Kind::Off);
 }
 
 void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
@@ -451,6 +537,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::IOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
     break;
+  case llvm::Triple::XROS:
+    addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
+    addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
+    break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)
       addPlatformConditionValue(PlatformConditionKind::OS, "Android");
@@ -529,8 +619,14 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
     break;
+  case llvm::Triple::ArchType::riscv32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv32");
+    break;
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
+    break;
+  case llvm::Triple::ArchType::avr:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "avr");
     break;
   default:
     UnsupportedArch = true;
@@ -555,10 +651,23 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   }
 
   // Set the "_pointerBitWidth" platform condition.
-  if (Target.isArch32Bit()) {
+  if (Target.isArch16Bit()) {
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_16");
+  } else if (Target.isArch32Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
   } else if (Target.isArch64Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+  }
+
+  // Set the "objectFormat" platform condition.
+  if (Target.isOSBinFormatMachO()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "MachO");
+  } else if (Target.isOSBinFormatELF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "ELF");
+  } else if (Target.isOSBinFormatCOFF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "COFF");
+  } else if (Target.isOSBinFormatWasm()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "Wasm");
   }
 
   // Set the "runtime" platform condition.
@@ -596,69 +705,6 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // in the common case.
 
   return { false, false };
-}
-
-llvm::StringRef swift::getFeatureName(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return #FeatureName;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-bool swift::isFeatureAvailableInProduction(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return true;
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
-  case Feature::FeatureName: return AvailableInProd;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<std::optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-      .Default(std::nullopt);
-}
-
-std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<std::optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-      .Default(std::nullopt);
-}
-
-std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
-  case Feature::FeatureName: return Version;
-#include "swift/Basic/Features.def"
-  default:
-    return std::nullopt;
-  }
-}
-
-bool swift::includeInModuleInterface(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
-  case Feature::FeatureName:                                                   \
-    return true;
-#define EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(FeatureName, AvailableInProd) \
-  case Feature::FeatureName: return false;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
 }
 
 llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
@@ -713,22 +759,23 @@ namespace {
         "-working-directory=",
         "-working-directory"};
 
-constexpr std::array<std::string_view, 15> knownClangDependencyIgnorablePrefiexes =
-     {"-I",
-      "-F",
-      "-fmodule-map-file=",
-      "-iquote",
-      "-idirafter",
-      "-iframeworkwithsysroot",
-      "-iframework",
-      "-iprefix",
-      "-iwithprefixbefore",
-      "-iwithprefix",
-      "-isystemafter",
-      "-isystem",
-      "-isysroot",
-      "-working-directory=",
-      "-working-directory"};
+  constexpr std::array<std::string_view, 16>
+      knownClangDependencyIgnorablePrefiexes = {"-I",
+                                                "-F",
+                                                "-fmodule-map-file=",
+                                                "-ffile-compilation-dir",
+                                                "-iquote",
+                                                "-idirafter",
+                                                "-iframeworkwithsysroot",
+                                                "-iframework",
+                                                "-iprefix",
+                                                "-iwithprefixbefore",
+                                                "-iwithprefix",
+                                                "-isystemafter",
+                                                "-isystem",
+                                                "-isysroot",
+                                                "-working-directory=",
+                                                "-working-directory"};
 }
 
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
@@ -797,4 +844,15 @@ ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
   }
 
   return filtered_args;
+}
+
+std::string ClangImporterOptions::getPCHInputPath() const {
+  if (!BridgingHeaderPCH.empty())
+    return BridgingHeaderPCH;
+
+  if (llvm::sys::path::extension(BridgingHeader)
+          .ends_with(file_types::getExtension(file_types::TY_PCH)))
+    return BridgingHeader;
+
+  return {};
 }

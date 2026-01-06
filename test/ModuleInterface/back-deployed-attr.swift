@@ -72,6 +72,21 @@ public func backDeployTopLevelFunc_macOS() -> Int {
 #endif
 }
 
+// CHECK: @backDeployed(before: macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0)
+// CHECK: public func backDeployedBeforeVersionsMappingTo26() -> Swift.Int { return 26 }
+@backDeployed(before: macOS 16.0, iOS 19.0, tvOS 19.0, watchOS 12.0, visionOS 3.0)
+public func backDeployedBeforeVersionsMappingTo26() -> Int { return 26 }
+
+// CHECK: @backDeployed(before: macOS 27.0, iOS 27.0, tvOS 27.0, watchOS 27.0, visionOS 27.0)
+// CHECK: public func backDeployedBeforeVersionsMappingTo27() -> Swift.Int { return 27 }
+@backDeployed(before: macOS 17.0, iOS 20.0, tvOS 20.0, watchOS 13.0, visionOS 4.0)
+public func backDeployedBeforeVersionsMappingTo27() -> Int { return 27 }
+
+// CHECK: @backDeployed(before: macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0)
+// CHECK: public func backDeployedBefore26() -> Swift.Int { return 26 }
+@backDeployed(before: macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0, visionOS 26.0)
+public func backDeployedBefore26() -> Int { return 26 }
+
 // MARK: - Availability macros
 
 // CHECK: @backDeployed(before: macOS 12.1)

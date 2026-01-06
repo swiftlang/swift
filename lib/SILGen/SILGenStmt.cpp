@@ -20,11 +20,15 @@
 #include "RValue.h"
 #include "SILGen.h"
 #include "Scope.h"
+#include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -314,16 +318,13 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   for (auto &ESD : S->getElements()) {
     
     if (auto D = ESD.dyn_cast<Decl*>()) {
-      if (isa<IfConfigDecl>(D))
-        continue;
-
       // Hoisted declarations are emitted at the top level by emitSourceFile().
       if (D->isHoisted())
         continue;
 
       // PatternBindingBecls represent local variable bindings that execute
       // as part of the function's execution.
-      if (!isa<PatternBindingDecl>(D)) {
+      if (!isa<PatternBindingDecl>(D) && !isa<VarDecl>(D)) {
         // Other decls define entities that may be used by the program, such as
         // local function declarations. So handle them here, before checking for
         // reachability, and then continue looping.
@@ -356,21 +357,22 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
           continue;
         }
       } else if (auto *E = ESD.dyn_cast<Expr*>()) {
-        // Optional chaining expressions are wrapped in a structure like.
-        //
-        // (optional_evaluation_expr implicit type='T?'
-        //   (call_expr type='T?'
-        //     (exprs...
-        //
-        // Walk through it to find out if the statement is actually implicit.
-        if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
-          if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
-            if (IIO->getSubExpr()->isImplicit()) continue;
-          if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
-            if (C->isImplicit()) continue;
-        } else if (E->isImplicit()) {
-          // Ignore all other implicit expressions.
-          continue;
+        if (E->isImplicit()) {
+          // Some expressions, like `OptionalEvaluationExpr` and
+          // `OpenExistentialExpr`, are implicit but may contain non-implicit
+          // children that should be diagnosed as unreachable. Check
+          // descendants here to see if there is anything to diagnose.
+          bool hasDiagnosableDescendant = false;
+          E->forEachChildExpr([&](auto *childExpr) -> Expr * {
+            if (!childExpr->isImplicit())
+              hasDiagnosableDescendant = true;
+
+            return hasDiagnosableDescendant ? nullptr : childExpr;
+          });
+
+          // If there's nothing to diagnose, ignore this expression.
+          if (!hasDiagnosableDescendant)
+            continue;
         }
       } else if (auto D = ESD.dyn_cast<Decl*>()) {
         // Local declarations aren't unreachable - only their usages can be. To
@@ -427,13 +429,10 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      auto *D = ESD.get<Decl*>();
-
-      // Only PatternBindingDecls should be emitted here.
-      // Other decls were handled above.
-      auto PBD = cast<PatternBindingDecl>(D);
-
-      SGF.visit(PBD);
+      auto *D = cast<Decl *>(ESD);
+      assert((isa<PatternBindingDecl>(D) || isa<VarDecl>(D)) &&
+             "other decls should be handled before the reachability check");
+      SGF.visit(D);
     }
   }
 }
@@ -485,7 +484,7 @@ createIndirectResultInit(SILGenFunction &SGF, SILValue addr,
   if (cleanup.isValid())
     cleanups.push_back(cleanup);
 
-  return InitializationPtr(temporary.release());
+  return temporary;
 }
 
 static InitializationPtr
@@ -671,7 +670,7 @@ prepareIndirectResultInit(SILGenFunction &SGF, SILLocation loc,
 ///   components of the result
 /// \param cleanups - will be filled (after initialization completes)
 ///   with all the active cleanups managing the result values
-std::unique_ptr<Initialization>
+InitializationPtr
 SILGenFunction::prepareIndirectResultInit(
                                  SILLocation loc,
                                  AbstractionPattern origResultType,
@@ -701,10 +700,162 @@ SILGenFunction::prepareIndirectResultInit(
   return init;
 }
 
+static Expr *lookThroughProjections(Expr *expr) {
+  auto *lookupExpr = dyn_cast<LookupExpr>(expr);
+  if (!lookupExpr) {
+    return expr;
+  }
+  return lookThroughProjections(lookupExpr->getBase());
+}
+
+bool SILGenFunction::emitBorrowOrMutateAccessorResult(
+    SILLocation loc, Expr *ret, SmallVectorImpl<SILValue> &directResults) {
+  auto *afd = cast<AbstractFunctionDecl>(FunctionDC->getAsDecl());
+  assert(cast<AccessorDecl>(afd)->isBorrowAccessor() ||
+         cast<AccessorDecl>(afd)->isMutateAccessor());
+
+  auto emitLoadBorrowFromGuaranteedAddress =
+      [&](ManagedValue guaranteedAddress) -> SILValue {
+    assert(guaranteedAddress.getValue()->getType().isAddress());
+    assert(F.getConventions().hasGuaranteedResult());
+    auto regularLoc = RegularLocation::getAutoGeneratedLocation();
+    auto load = B.createLoadBorrow(regularLoc, guaranteedAddress).getValue();
+    // unchecked_ownership is used to silence the ownership verifier for
+    // returning a value produced within a load_borrow scope. SILGenCleanup
+    // eliminates it and introduces return_borrow appropriately.
+    return B.createUncheckedOwnership(regularLoc, load);
+  };
+
+  // If the return expression is a literal, emit as a regular return
+  // expression.
+  if (isa<LiteralExpr>(ret)) {
+    auto RV = emitRValue(ret);
+    std::move(RV).forwardAll(*this, directResults);
+    return false;
+  }
+
+  auto storageRefResult =
+      StorageRefResult::findStorageReferenceExprForBorrow(ret);
+  auto lvExpr = storageRefResult.getTransitiveRoot();
+  // If the return expression is not an lvalue, diagnose.
+  if (!lvExpr) {
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::invalid_borrow_accessor_return);
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::borrow_accessor_not_a_projection_note);
+    return true;
+  }
+
+  // Emit return value at +0.
+  FormalEvaluationScope scope(*this);
+  LValueOptions options;
+
+  if (cast<AccessorDecl>(afd)->isMutateAccessor()) {
+    options = options.forGuaranteedAddressReturn(true);
+  } else {
+    assert(cast<AccessorDecl>(afd)->isBorrowAccessor());
+    if (F.getSelfArgument()->getType().isObject()) {
+      options = options.forGuaranteedReturn(true);
+    } else {
+      options = options.forGuaranteedAddressReturn(true);
+    }
+  }
+
+  auto lvalue = emitLValue(ret,
+                           F.getSelfArgument()->getType().isObject()
+                               ? SGFAccessKind::BorrowedObjectRead
+                           : cast<AccessorDecl>(afd)->isBorrowAccessor()
+                               ? SGFAccessKind::BorrowedAddressRead
+                               : SGFAccessKind::Write,
+                           options);
+
+  // If the accessor is annotated with @_unsafeSelfDependentResultAttr,
+  // disable diagnosing the return expression.
+  // If the accessor is annotated with @_unsafeSelfDependentResultAttr,
+  // disable diagnosing the return expression.
+  // This is needed to implement borrow accessors for Unsafe*Pointer based
+  // Container types where the compiler cannot analyze the safety of return
+  // expressions based on pointer arithmetic and unsafe addressors.
+  // Example:
+  // public struct Container<Element: ~Copyable>: ~Copyable {
+  //   var _storage: UnsafeMutableBufferPointer<Element>
+  //   var _count: Int
+  //
+  //   public subscript(index: Int) -> Element {
+  //     @_unsafeSelfDependentResult
+  //     borrow {
+  //       precondition(index >= 0 && index < _count, "Index out of bounds")
+  //       return _storage.baseAddress.unsafelyUnwrapped.advanced(by:
+  //       index).pointee
+  //     }
+  //   }
+  // }
+  if (afd->getAttrs().hasAttribute<UnsafeSelfDependentResultAttr>()) {
+    auto regularLoc = RegularLocation::getAutoGeneratedLocation();
+    auto resultMV = emitRawProjectedLValue(regularLoc, std::move(lvalue));
+    SILValue result = resultMV.getValue();
+    if (resultMV.getType().isAddress() &&
+        F.getConventions().hasGuaranteedResult()) {
+      result = emitLoadBorrowFromGuaranteedAddress(resultMV);
+    }
+    directResults.push_back(result);
+    return false;
+  }
+
+  // If the return expression is not a transitive projection of self,
+  // diagnose.
+  auto *baseExpr = lookThroughProjections(storageRefResult.getStorageRef());
+  if (!baseExpr->isSelfExprOf(afd)) {
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::invalid_borrow_accessor_return);
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::borrow_accessor_not_a_projection_note);
+    return true;
+  }
+
+  auto resultMV =
+      tryEmitProjectedLValue(ret, std::move(lvalue), TSanKind::None);
+  if (!resultMV) {
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::invalid_borrow_accessor_return);
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::borrow_accessor_not_a_projection_note);
+    return true;
+  }
+  // For now diagnose multiple return statements in borrow/mutate accessors.
+  // We need additional support for this.
+  // 1. Address phis are banned in SIL.
+  // 2. borrowed from is not inserted in SILGenCleanup.
+  if (!ReturnDest.getBlock()->getPredecessorBlocks().empty()) {
+    diagnose(getASTContext(), ret->getStartLoc(),
+             diag::invalid_multiple_return_borrow_accessor);
+    return true;
+  }
+
+  SILValue result = resultMV->getValue();
+  SILType selfType = F.getSelfArgument()->getType();
+ 
+  if (F.getConventions().hasGuaranteedResult()) {
+    // If we are returning the result of borrow accessor, strip the
+    // unnecessary copy_value + mark_unresolved_non_copyable_value
+    // instructions.
+    if (selfType.isMoveOnly()) {
+      result = lookThroughMoveOnlyCheckerPattern(result);
+    }
+    // If the SIL convention is @guaranteed and the generated result is an
+    // address, emit a load_borrow.
+    if (result->getType().isAddress()) {
+      result = emitLoadBorrowFromGuaranteedAddress(*resultMV);
+    }
+  }
+
+  directResults.push_back(result);
+  return false;
+}
+
 void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
                                     Expr *ret) {
   SmallVector<SILValue, 4> directResults;
-
   auto retTy = ret->getType()->getCanonicalType();
   
   AbstractionPattern origRetTy = TypeContext
@@ -729,9 +880,18 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     for (auto cleanup : resultCleanups) {
       Cleanups.forwardCleanup(cleanup);
     }
+  } else if (F.getConventions().hasGuaranteedResult() ||
+             F.getConventions().hasAddressResult()) {
+    bool hasError =
+        emitBorrowOrMutateAccessorResult(branchLoc, ret, directResults);
+    if (hasError) {
+      return;
+    }
+    assert(!directResults.empty());
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
+    FormalEvaluationScope writeback(*this);
     
     // Does the return context require reabstraction?
     RValue RV;
@@ -777,7 +937,11 @@ void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
     return;
   }
 
-  ManagedValue exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  ManagedValue exn;
+  {
+    FormalEvaluationScope scope(SGF);
+    exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  }
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
 
@@ -1248,30 +1412,32 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         PackType::get(SGF.getASTContext(), expansion->getType())
             ->getCanonicalType());
 
-    JumpDest continueDest = createJumpDest(S->getBody());
-    JumpDest breakDest = createJumpDest(S->getBody());
+    std::optional<JumpDest> continueDest;
+    std::optional<JumpDest> breakDest;
 
     SGF.emitDynamicPackLoop(
         SILLocation(expansion), formalPackType, 0,
         expansion->getGenericEnvironment(),
+        [&]() -> SILBasicBlock * {
+          breakDest = createJumpDest(S->getBody());
+          continueDest = createJumpDest(S->getBody());
+          return continueDest->getBlock();
+        },
         [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
             SILValue packIndex) {
           Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
           auto letValueInit =
-              SGF.emitPatternBindingInitialization(S->getPattern(), continueDest);
+              SGF.emitPatternBindingInitialization(S->getPattern(), *continueDest);
 
           SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
 
           // Set the destinations for 'break' and 'continue'.
-          SGF.BreakContinueDestStack.push_back({S, breakDest, continueDest});
+          SGF.BreakContinueDestStack.push_back({S, *breakDest, *continueDest});
           visit(S->getBody());
           SGF.BreakContinueDestStack.pop_back();
+        });
 
-          return;
-        },
-        continueDest.getBlock());
-
-    emitOrDeleteBlock(SGF, breakDest, S);
+    emitOrDeleteBlock(SGF, *breakDest, S);
 
     return;
   }
@@ -1495,23 +1661,29 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 
 /// Return a basic block suitable to be the destination block of a
 /// try_apply instruction.  The block is implicitly emitted and filled in.
+///
+/// \param errorAddrOrType Either the address of the indirect error result where
+/// the result will be stored, or the type of the expected Owned error value.
+///
+/// \param suppressErrorPath Should the error path be emitted as unreachable?
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
                                      ExecutorBreadcrumb prevExecutor,
-                                     SILResultInfo errorResult,
-                                     SILValue indirectErrorAddr,
+                                     TaggedUnion<SILValue, SILType> errorAddrOrType,
                                      bool suppressErrorPath) {
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
 
   SILValue errorValue;
-  if (errorResult.getConvention() == ResultConvention::Owned) {
-    errorValue = destBB->createPhiArgument(getSILType(errorResult, fnTy),
-                                           OwnershipKind::Owned);
+  if (auto ownedErrorTy = errorAddrOrType.dyn_cast<SILType>()) {
+    errorValue = destBB->createPhiArgument(*ownedErrorTy,
+                                               OwnershipKind::Owned);
   } else {
-    errorValue = indirectErrorAddr;
+    auto errorAddr = errorAddrOrType.get<SILValue>();
+    assert(errorAddr->getType().isAddress());
+    errorValue = errorAddr;
   }
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
@@ -1584,33 +1756,27 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
       } else {
         // Call the _willThrowTyped entrypoint, which handles
         // arbitrary error types.
-        SILValue tmpBuffer;
-        SILValue error;
-
         FuncDecl *entrypoint = ctx.getWillThrowTyped();
         auto genericSig = entrypoint->getGenericSignature();
         SubstitutionMap subMap = SubstitutionMap::get(
             genericSig, [&](SubstitutableType *dependentType) {
               return exnMV.getType().getASTType();
-            }, LookUpConformanceInModule(getModule().getSwiftModule()));
+            }, LookUpConformanceInModule());
 
         // Generic errors are passed indirectly.
         if (!exnMV.getType().isAddress() && useLoweredAddresses()) {
           // Materialize the error so we can pass the address down to the
           // swift_willThrowTyped.
           exnMV = exnMV.materialize(*this, loc);
-          error = exnMV.getValue();
-          exn = exnMV.forward(*this);
-        } else {
-          // Claim the exception value.
-          exn = exnMV.forward(*this);
-          error = exn;
         }
 
         emitApplyOfLibraryIntrinsic(
             loc, entrypoint, subMap,
-            { ManagedValue::forForwardedRValue(*this, error) },
+            { exnMV },
             SGFContext());
+
+        // Claim the exception value.
+        exn = exnMV.forward(*this);
       }
     } else {
       // Claim the exception value.
@@ -1634,7 +1800,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
     ProtocolConformanceRef conformances[1] = {
-      getModule().getSwiftModule()->checkConformance(
+      checkConformance(
         exn->getType().getASTType(), getASTContext().getErrorDecl())
     };
 
@@ -1660,11 +1826,12 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     if (exn->getType().isAddress()) {
       B.createCopyAddr(loc, exn, indirectErrorAddr,
                        IsTake, IsInitialization);
-    } else {
-      // An indirect error is written into the destination error address.
-      emitSemanticStore(loc, exn, indirectErrorAddr,
-                        getTypeLowering(destErrorType), IsInitialization);
     }
+    
+    // If the error is represented as a value, then we should forward it into
+    // the indirect error return slot. We have to wait to do that until after
+    // we pop cleanups, though, since the value may have a borrow active in
+    // scope that won't be released until the cleanups pop.
   } else if (!throwBB.getArguments().empty()) {
     // Load if we need to.
     if (exn->getType().isAddress()) {
@@ -1679,6 +1846,17 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
       B.createDestroyAddr(loc, exn);
   }
 
-  // Branch to the cleanup destination.
-  Cleanups.emitBranchAndCleanups(ThrowDest, loc, args, IsForUnwind);
+  // Emit clean-ups needed prior to entering throw block.
+  Cleanups.emitCleanupsBeforeBranch(ThrowDest, IsForUnwind);
+  
+  if (indirectErrorAddr && !exn->getType().isAddress()) {
+    // Forward the error value into the return slot now. This has to happen
+    // after emitting cleanups because the active scope may be borrowing the
+    // error value, and we can't forward ownership until those borrows are
+    // released.
+    emitSemanticStore(loc, exn, indirectErrorAddr,
+                      getTypeLowering(destErrorType), IsInitialization);
+  }
+  
+  getBuilder().createBranch(loc, ThrowDest.getBlock(), args);
 }

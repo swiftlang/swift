@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -typecheck -verify %s %S/main1.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s %S/main1.swift
 
 // Serialized partial AST support:
 // RUN: %target-swift-frontend -module-name main -emit-module-path %t.swiftmodule -primary-file %s %S/main1.swift
-// RUN: %target-swift-frontend -module-name main -parse-as-library -typecheck %t.swiftmodule -primary-file %S/main1.swift -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend -module-name main -parse-as-library -typecheck %t.swiftmodule -primary-file %S/main1.swift -verify -verify-ignore-unrelated -verify-ignore-unknown
 
 @main // expected-error{{'main' attribute can only apply to one type in a module}}
 class EvilMain {

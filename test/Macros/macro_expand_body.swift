@@ -1,12 +1,13 @@
-// REQUIRES: swift_swift_parser, executable_test, asserts, concurrency
+// REQUIRES: swift_swift_parser, executable_test, asserts, concurrency, concurrency_runtime
+// REQUIRES: swift_feature_PreambleMacros
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 
 // Diagnostics testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature BodyMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature PreambleMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
 
 // Execution testing
-// RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature BodyMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature PreambleMacros -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -45,7 +46,6 @@ func log(_ message: String) {
   print(message)
 }
 
-@available(SwiftStdlib 5.1, *)
 func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String: Any]) async throws -> Result {
   let printedArgs = arguments.keys.sorted().map { key in
     "\(key): \(arguments[key]!)"
@@ -54,7 +54,6 @@ func remoteCall<Result: ConjureRemoteValue>(function: String, arguments: [String
   return Result.conjureValue()
 }
 
-@available(SwiftStdlib 5.1, *)
 @Remote
 func f(a: Int, b: String) async throws -> String
 
@@ -70,7 +69,6 @@ func useLogger() {
   print(x)
 }
 
-@available(SwiftStdlib 5.1, *)
 @Remote
 @Traced
 @Logged
@@ -79,7 +77,6 @@ func g(a: Int, b: String) async throws -> String {
 }
 
 #if compiler(>=6.0) && TEST_DIAGNOSTICS
-@available(SwiftStdlib 5.1, *)
 @Remote
 func h(a: Int, b: String) async throws -> String {
   does not
@@ -92,17 +89,15 @@ func h(a: Int, b: String) async throws -> String {
 // CHECK-NEXT: Exiting doubleTheValue(value:)
 _ = doubleTheValue(value: 7)
 
-if #available(SwiftStdlib 5.1, *) {
-  // CHECK: Remote call f(a: 5, b: Hello)
-  print(try await f(a: 5, b: "Hello"))
+// CHECK: Remote call f(a: 5, b: Hello)
+print(try await f(a: 5, b: "Hello"))
 
-  // CHECK: Entering g(a: 5, b: World)
-  // CHECK: Logger entering g(a: 5, b: World)
-  // CHECK: Remote call g(a: 5, b: World)
-  // CHECK: Logger exiting g(a:b:)
-  // CHECK: Exiting g(a:b:)
-  print(try await g(a: 5, b: "World"))
-}
+// CHECK: Entering g(a: 5, b: World)
+// CHECK: Logger entering g(a: 5, b: World)
+// CHECK: Remote call g(a: 5, b: World)
+// CHECK: Logger exiting g(a:b:)
+// CHECK: Exiting g(a:b:)
+print(try await g(a: 5, b: "World"))
 
 // CHECK: Logger entering useLogger()
 // CHECK: --- use it

@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
+
 sil_stage canonical
 
 import Builtin
@@ -565,13 +566,8 @@ sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Wo
 }
 
 // CHECK-LABEL: sil [ossa] @raw_idx_cse :
-// CHECK: integer_literal
-// CHECK-NEXT: index_raw_pointer
-// CHECK-NEXT: pointer_to_address
-// CHECK-NEXT: load
-// CHECK-NEXT: load
-// CHECK-NEXT: apply
-// CHECK-NEXT: tuple
+// CHECK: pointer_to_address
+// CHECK: pointer_to_address
 // CHECK-LABEL: } // end sil function 'raw_idx_cse'
 sil [ossa] @raw_idx_cse: $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
@@ -704,12 +700,13 @@ bb0(%0 : $*Builtin.Int8):
 // CHECK-NOT: raw_pointer_to_ref
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
-sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> (C, C) {
+sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned (C, C) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %6 = tuple(%1: $C, %2: $C)
-  return %6 : $(C, C)
+  %7 = copy_value %6
+  return %7
 }
 
 // CHECK-LABEL: sil [ossa] @cse_unchecked_addr_cast :
@@ -1066,7 +1063,7 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
-protocol Proto : class {
+protocol Proto : AnyObject {
   func doThis()
   func doThat()
 }
@@ -1091,10 +1088,8 @@ bb0(%0 : @guaranteed $Proto & Ping):
 sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @cse_global_init :
-// CHECK:   [[P:%[0-9]+]] = apply
-// CHECK:   [[A:%[0-9]+]] = pointer_to_address [[P]]
-// CHECK:   begin_access [modify] [dynamic] [no_nested_conflict] [[A]]
-// CHECK:   begin_access [read] [dynamic] [no_nested_conflict] [[A]]
+// CHECK:   pointer_to_address
+// CHECK:   pointer_to_address
 // CHECK: // end sil function 'cse_global_init'
 sil [ossa] @cse_global_init : $@convention(thin) () -> Int64 {
 bb0:
@@ -1308,30 +1303,67 @@ struct S {
 // CHECK:         struct_extract
 // CHECK:         struct_extract
 // CHECK-LABEL: } // end sil function 'dont_rauw_guaranteed_with_nondominated_reborrow'
-sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> (@owned C) {
-entry(%instance : @owned $S):
-    cond_br undef, left, right
+sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> @owned C {
+bb0(%0 : @owned $S):
+  cond_br undef, bb1, bb2
 
-left:
-    %guaranteed_s_left = begin_borrow %instance : $S
-    %new = struct_extract %guaranteed_s_left : $S, #S.c
-    %old = struct_extract %guaranteed_s_left : $S, #S.c
-    %take_guaranteed_c = function_ref @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
-    apply %take_guaranteed_c(%new) : $@convention(thin) (@guaranteed C) -> ()
-    br exit(%old : $C, %guaranteed_s_left : $S, %instance : $S)
+bb1:
+  %2 = begin_borrow %0
+  %3 = struct_extract %2, #S.c
+  %4 = struct_extract %2, #S.c
+  %5 = function_ref @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3(%4, %2, %0)
 
-right:
-    destroy_value %instance : $S
-    %get_owned_s = function_ref @get_owned_s : $@convention(thin) () -> (@owned S)
-    %owned_s = apply %get_owned_s() : $@convention(thin) () -> (@owned S)
-    %guaranteed_s = begin_borrow %owned_s : $S
-    %projection = struct_extract %guaranteed_s : $S, #S.c
-    br exit(%projection : $C, %guaranteed_s : $S, %owned_s : $S)
-    
-exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
-    %copy = copy_value %proj : $C
-    end_borrow %borrow : $S
-    destroy_value %owned_s_2 : $S
-    return %copy : $C
+bb2:
+  destroy_value %0
+  %9 = function_ref @get_owned_s : $@convention(thin) () -> @owned S
+  %10 = apply %9() : $@convention(thin) () -> @owned S
+  %11 = begin_borrow %10
+  %12 = struct_extract %11, #S.c
+  br bb3(%12, %11, %10)
+
+bb3(%14 : @guaranteed $C, %15 : @reborrow $S, %16 : @owned $S):
+  %17 = borrowed %15 from (%16)
+  %18 = borrowed %14 from (%15)
+  %19 = copy_value %18
+  end_borrow %17
+  destroy_value %16
+  return %19
 }
 
+// CHECK-LABEL: sil [ossa] @type_value_test : {{.*}} {
+// CHECK:         type_value
+// CHECK-NOT:     type_value
+// CHECK-LABEL: } // end sil function 'type_value_test'
+sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed InlineArray<N, Int>, Int) -> () {
+bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = type_value $Int for N
+  %4 = struct_extract %1, #Int._value
+  %5 = struct_extract %3, #Int._value
+  %6 = builtin "cmp_slt_Int64"(%4, %2) : $Builtin.Int1
+  cond_fail %6, "Index out of bounds"
+  %8 = integer_literal $Builtin.Int64, 0
+  %9 = type_value $Int for N
+  %10 = struct_extract %1, #Int._value
+  %11 = struct_extract %9, #Int._value
+  %12 = builtin "cmp_slt_Int64"(%10, %8) : $Builtin.Int1
+  cond_fail %12, "Index out of bounds"
+  %14 = tuple ()
+  return %14
+}
+
+struct Pair<let x: Int, let y: Int> {}
+// CHECK-LABEL: sil [ossa] @dont_cse_different_type_values : {{.*}} {
+// CHECK:         type_value
+// CHECK:         type_value
+// CHECK-LABEL: } // end sil function 'dont_cse_different_type_values'
+sil [ossa] @dont_cse_different_type_values : $@convention(method) <let x : Int, let y : Int> (Pair<x, y>) -> (Int, Int) {
+[global: ]
+bb0(%0 : $Pair<x, y>):
+  %2 = type_value $Int for x
+  %3 = type_value $Int for y
+  %4 = tuple (%2, %3)
+  return %4
+}

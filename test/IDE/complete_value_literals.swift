@@ -8,8 +8,8 @@ func testAll0() {
 // NO_CONTEXT_0-DAG: Literal[Boolean]/None:              false[#Bool#];
 // NO_CONTEXT_0-DAG: Literal[Nil]/None:                  nil;
 // NO_CONTEXT_0-DAG: Literal[String]/None:               "{#(abc)#}"[#String#];
-// NO_CONTEXT_0-DAG: Literal[Array]/None:                [{#(values)#}][#Array#];
-// NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary#];
+// NO_CONTEXT_0-DAG: Literal[Array]/None:                [{#(values)#}][#Array<Element>#];
+// NO_CONTEXT_0-DAG: Literal[Dictionary]/None:           [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#];
 // NO_CONTEXT_0-DAG: Literal[_Color]/None:               #colorLiteral({#red: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#});
 // NO_CONTEXT_0-DAG: Literal[_Image]/None:               #imageLiteral({#resourceName: String#});
 }
@@ -146,7 +146,7 @@ func testString5() {
 func testArray0() {
   let x: Int = #^ARRAY_0^#
 }
-// ARRAY_0: Literal[Array]/None: [{#(values)#}][#Array#];
+// ARRAY_0: Literal[Array]/None: [{#(values)#}][#Array<Element>#];
 
 func testArray1() {
   let x: MyArray1<MyInt1> = #^ARRAY_1^#
@@ -161,7 +161,7 @@ func testArray2() {
 func testDict0() {
   let x: Int = #^DICT_0^#
 }
-// DICT_0: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#];
+// DICT_0: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#];
 
 func testDict1() {
   let x: MyDict1<MyInt1, MyString1> = #^DICT_1^#

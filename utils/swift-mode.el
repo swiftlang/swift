@@ -76,7 +76,7 @@
                     "convenience" "dynamic" "optional"
                     "indirect" "override" "open" "final"
                     "required" "lazy" "weak"
-                    "_compilerInitialized" "_const" "_local" "_resultDependsOnSelf"
+                    "_compilerInitialized" "_const" "_local"
                     "nonisolated" "distributed")
                   'words) . font-lock-keyword-face)
    `("\\<unowned\\((\\(un\\)?safe)\\)?\\>" . font-lock-keyword-face)
@@ -503,6 +503,7 @@ directory."
              (funcall swift-find-executable-fn "swiftc")
              temp-file)))
 
+(require 'flymake-proc)
 (add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift$" flymake-swift-init))
 
 (setq flymake-err-line-patterns

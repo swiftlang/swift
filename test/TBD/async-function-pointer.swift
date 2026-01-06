@@ -1,6 +1,6 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: concurrency
-// RUN: %target-swift-frontend -emit-ir %s  -disable-availability-checking -validate-tbd-against-ir=all -module-name test | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s  -target %target-swift-5.1-abi-triple -validate-tbd-against-ir=all -module-name test | %FileCheck %s
 
 // CHECK: @barTu = global %swift.async_func_pointer
 @_silgen_name("bar")

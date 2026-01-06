@@ -76,7 +76,7 @@ CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)
 
 /// The superclass of a protocol composition type.
-SIMPLE_LOCATOR_PATH_ELT(ProtocolCompositionSuperclassType)
+CUSTOM_LOCATOR_PATH_ELT(ProtocolCompositionMemberType)
 
 /// The constraint of an existential type.
 SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
@@ -153,8 +153,8 @@ CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 /// type at the base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
 
-/// An optional payload.
-SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
+/// The optional payload in an optional injection, ie a T -> T? conversion.
+SIMPLE_LOCATOR_PATH_ELT(OptionalInjection)
 
 /// The parent of a nested type.
 SIMPLE_LOCATOR_PATH_ELT(ParentType)
@@ -252,9 +252,6 @@ CUSTOM_LOCATOR_PATH_ELT(ConformanceRequirement)
 /// A source-specified placeholder.
 CUSTOM_LOCATOR_PATH_ELT(PlaceholderType)
 
-/// The implicit conversion applied at a given location.
-CUSTOM_LOCATOR_PATH_ELT(ImplicitConversion)
-
 /// An implicit call to a 'dynamicMember' subscript for a dynamic member lookup.
 SIMPLE_LOCATOR_PATH_ELT(ImplicitDynamicMemberSubscript)
 
@@ -286,6 +283,11 @@ SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 
 /// A fallback type for some AST location (i.e. key path literal).
 SIMPLE_LOCATOR_PATH_ELT(FallbackType)
+
+/// An implicit conversion (upcast) associated with an existential member access
+/// performed to abstract the member reference type away from context-specific
+/// types like `Self` that are not well-formed in the access context.
+SIMPLE_LOCATOR_PATH_ELT(ExistentialMemberAccessConversion)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

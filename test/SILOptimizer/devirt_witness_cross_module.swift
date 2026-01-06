@@ -48,7 +48,7 @@ public struct Local: P {
 
 // CHECK-LABEL: sil @$s4Main24testGenericInOtherModuleyyF
 // CHECK-NOCMO:   [[F:%[0-9]+]] = witness_method $S, #P.foo
-// CHECK-CMO:     [[F:%[0-9]+]] = function_ref @$s6Module1SV3foo1xyx_tSkRzSi7ElementRtzlFSaySiG_Tgq5{{.*}}
+// CHECK-CMO:     [[F:%[0-9]+]] = function_ref @$s6Module1SV3foo1xyx_tSkRzSi7ElementRtzlFSaySiG_Ttg{{.*}}
 // CHECK:         apply [[F]]
 // CHECK:       } // end sil function '$s4Main24testGenericInOtherModuleyyF'
 public func testGenericInOtherModule() {
@@ -75,7 +75,7 @@ public func testGenericRequirementInOtherModule() {
 }
 
 // CHECK-LABEL: sil @$s4Main23testGenericInSameModuleyyF
-// CHECK:         [[F:%[0-9]+]] = function_ref @$s4Main5LocalV3foo1xyx_tSkRzSi7ElementRtzlFSaySiG_Tg5
+// CHECK:         [[F:%[0-9]+]] = function_ref @$s4Main5LocalV3foo1xyx_tSkRzSi7ElementRtzlFSaySiG_Ttg5
 // CHECK:         apply [[F]]
 // CHECK:       } // end sil function '$s4Main23testGenericInSameModuleyyF'
 public func testGenericInSameModule() {

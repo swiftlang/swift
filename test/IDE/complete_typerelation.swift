@@ -1,8 +1,7 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -disable-objc-attr-requires-foundation-module
+// RUN: %batch-code-completion -disable-objc-attr-requires-foundation-module
 
 // SE-0353
-struct ConstraintedExistentialTest {
+struct ConstrainedExistentialTest {
   protocol Producer<Event> {
     associatedtype Event
   }
@@ -21,8 +20,8 @@ struct ConstraintedExistentialTest {
   let stringProducer: StringProducer
 
   func test() {
-    takeStringProducer(self.#^IN_CONSTRAINTED_EXISTENTIAL_CONTEXT^#)
+    takeStringProducer(self.#^IN_CONSTRAINED_EXISTENTIAL_CONTEXT^#)
   }
-// IN_CONSTRAINTED_EXISTENTIAL_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      intProducer[#IntProducer#];
-// IN_CONSTRAINTED_EXISTENTIAL_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: stringProducer[#StringProducer#];
+// IN_CONSTRAINED_EXISTENTIAL_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal:      intProducer[#IntProducer#];
+// IN_CONSTRAINED_EXISTENTIAL_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: stringProducer[#StringProducer#];
 }

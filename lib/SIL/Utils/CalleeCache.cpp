@@ -12,7 +12,9 @@
 
 #include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Compiler.h"
 
 #define DEBUG_TYPE "CalleeCache"
@@ -205,7 +207,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
     // If we can't resolve the witness, conservatively assume it can call
     // anything.
     if (!Requirement.getDecl()->isProtocolRequirement() ||
-        !WT.getConformance()->hasWitness(Requirement.getDecl())) {
+        !WT.getConformance()->getRootConformance()->hasWitness(Requirement.getDecl())) {
       TheCallees.setInt(true);
       continue;
     }
@@ -228,7 +230,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
         LLVM_FALLTHROUGH;
       case AccessLevel::FilePrivate:
       case AccessLevel::Private: {
-        auto Witness = Conf->getWitness(Requirement.getDecl());
+        auto Witness = Conf->getRootConformance()->getWitness(Requirement.getDecl());
         auto DeclRef = SILDeclRef(Witness.getDecl());
         canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
       }
@@ -255,8 +257,7 @@ CalleeCache::getSingleCalleeForWitnessMethod(WitnessMethodInst *WMI) const {
   SILWitnessTable *WT;
 
   // Attempt to find a specific callee for the given conformance and member.
-  std::tie(CalleeFn, WT) = WMI->getModule().lookUpFunctionInWitnessTable(
-      WMI->getConformance(), WMI->getMember(), SILModule::LinkingMode::LinkNormal);
+  std::tie(CalleeFn, WT) = lookUpFunctionInWitnessTable(WMI, SILModule::LinkingMode::LinkNormal);
 
   return CalleeFn;
 }

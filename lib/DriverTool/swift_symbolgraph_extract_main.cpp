@@ -83,8 +83,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   if (auto *A = ParsedArgs.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
   } else {
-    Diags.diagnose(SourceLoc(), diag::error_option_required, "-target");
-    return EXIT_FAILURE;
+    Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
   }
 
   std::string OutputDir;
@@ -119,7 +118,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     Invocation.getClangImporterOptions().ExtraArgs.push_back(A->getValue());
   }
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
+  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths;
   for (const auto *A : ParsedArgs.filtered(OPT_F)) {
     FrameworkSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
   }
@@ -129,12 +128,19 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.setFrameworkSearchPaths(FrameworkSearchPaths);
   Invocation.getSearchPathOptions().LibrarySearchPaths =
       ParsedArgs.getAllArgValues(OPT_L);
-  Invocation.setImportSearchPaths(ParsedArgs.getAllArgValues(OPT_I));
+  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths;
+  for (const auto *A : ParsedArgs.filtered(OPT_I)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
+  }
+  for (const auto *A : ParsedArgs.filtered(OPT_Isystem)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ true});
+  }
+  Invocation.setImportSearchPaths(ImportSearchPaths);
 
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().DebuggerSupport = true;
 
-  Invocation.getFrontendOptions().EnableLibraryEvolution = true;
+  Invocation.getLangOptions().enableFeature(Feature::LibraryEvolution);
 
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {
@@ -163,6 +169,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     }
   }
 
+  SmallVector<StringRef, 4> AllowedRexports;
+  if (auto *A =
+          ParsedArgs.getLastArg(OPT_experimental_allowed_reexported_modules)) {
+    for (const auto *val : A->getValues())
+      AllowedRexports.emplace_back(val);
+  }
+
   symbolgraphgen::SymbolGraphOptions Options;
   Options.OutputDir = OutputDir;
   Options.Target = Target;
@@ -172,9 +185,11 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Options.SkipInheritedDocs = ParsedArgs.hasArg(OPT_skip_inherited_docs);
   Options.SkipProtocolImplementations = ParsedArgs.hasArg(OPT_skip_protocol_implementations);
   Options.IncludeSPISymbols = ParsedArgs.hasArg(OPT_include_spi_symbols);
+  Options.ShortenOutputNames = ParsedArgs.hasArg(OPT_symbol_graph_shorten_output_names);
   Options.EmitExtensionBlockSymbols =
       ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
                          OPT_omit_extension_block_symbols, /*default=*/false);
+  Options.AllowedReexportedModules = AllowedRexports;
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
     Options.MinimumAccessLevel =
@@ -187,6 +202,20 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Case("private", AccessLevel::Private)
             .Default(AccessLevel::Public);
   }
+
+  if (auto *A = ParsedArgs.getLastArg(OPT_allow_availability_platforms,
+        OPT_block_availability_platforms)) {
+    llvm::SmallVector<StringRef> AvailabilityPlatforms;
+    StringRef(A->getValue())
+        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
+               /*KeepEmpty*/ false);
+    Options.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
+        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
+    Options.AvailabilityIsBlockList = A->getOption().matches(OPT_block_availability_platforms);
+  }
+
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
+                                                    Invocation.getFrontendOptions());
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {

@@ -150,11 +150,11 @@ extension StaticBigInt: CustomDebugStringConvertible {
     // Equivalent to `ceil(bitWidthExcludingSignBit / fourBitsPerHexDigit)`.
     // Underestimated for `-(16 ** y)` values (e.g. "-0x1", "-0x10", "-0x100").
     let capacity = indicator.utf8.count + (((bitWidth - 1) + 3) / 4)
-    var result = String(unsafeUninitializedCapacity: capacity) { utf8 in
+    var result = unsafe String(unsafeUninitializedCapacity: capacity) { utf8 in
 
       // Pre-initialize with zeros, ignoring extra capacity.
-      var utf8 = utf8.prefix(capacity)
-      utf8.initialize(repeating: UInt8(ascii: "0"))
+      var utf8 = unsafe utf8.prefix(capacity)
+      unsafe utf8.initialize(repeating: UInt8(ascii: "0"))
 
       // Use a 32-bit element type, to generate small hexadecimal strings.
       typealias Element = UInt32
@@ -176,8 +176,8 @@ extension StaticBigInt: CustomDebugStringConvertible {
 
         // Overwrite trailing zeros with hexadecimal digits.
         let hexDigits = String(element, radix: 16, uppercase: true).utf8
-        _ = utf8.suffix(hexDigits.count).update(fromContentsOf: hexDigits)
-        utf8 = utf8.dropLast(hexDigitsPerElement)
+        _ = unsafe utf8.suffix(hexDigits.count).update(fromContentsOf: hexDigits)
+        unsafe utf8 = unsafe utf8.dropLast(hexDigitsPerElement)
       }
       return capacity
     }

@@ -1615,6 +1615,167 @@ public struct MinimalBidirectionalCollection<T> : BidirectionalCollection {
   internal let _collectionState: _CollectionState
 }
 
+/// A minimal implementation of `Collection` with extra checks.
+public struct MinimalBidirectionalRandomAccessCollection<T> : BidirectionalCollection, RandomAccessCollection {
+  /// Creates a collection with given contents, but a unique modification
+  /// history.  No other instance has the same modification history.
+  public init<S : Sequence>(
+    elements: S,
+    underestimatedCount: UnderestimatedCountBehavior = .value(0)
+  ) where S.Element == T {
+    self._elements = Array(elements)
+
+    self._collectionState = _CollectionState(
+      newRootStateForElementCount: self._elements.count)
+
+    switch underestimatedCount {
+    case .precise:
+      self.underestimatedCount = _elements.count
+
+    case .half:
+      self.underestimatedCount = _elements.count / 2
+
+    case .overestimate:
+      self.underestimatedCount = _elements.count * 3 + 5
+
+    case .value(let count):
+      self.underestimatedCount = count
+    }
+  }
+
+
+  public let timesMakeIteratorCalled = ResettableValue(0)
+
+  public func makeIterator() -> MinimalIterator<T> {
+    timesMakeIteratorCalled.value += 1
+    return MinimalIterator(_elements)
+  }
+
+  public typealias Index = MinimalIndex
+
+  internal func _index(forPosition i: Int) -> MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: i,
+      startIndex: _elements.startIndex,
+      endIndex: _elements.endIndex)
+  }
+
+  internal func _uncheckedIndex(forPosition i: Int) -> MinimalIndex {
+    return MinimalIndex(
+      _collectionState: _collectionState,
+      uncheckedPosition: i)
+  }
+
+  public let timesStartIndexCalled = ResettableValue(0)
+
+  public var startIndex: MinimalIndex {
+    timesStartIndexCalled.value += 1
+    return _uncheckedIndex(forPosition: _elements.startIndex)
+  }
+
+  public let timesEndIndexCalled = ResettableValue(0)
+
+  public var endIndex: MinimalIndex {
+    timesEndIndexCalled.value += 1
+    return _uncheckedIndex(forPosition: _elements.endIndex)
+  }
+
+
+  public func _failEarlyRangeCheck(
+    _ index: MinimalIndex,
+    bounds: Range<MinimalIndex>
+  ) {
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: index.position),
+      index)
+
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: bounds.lowerBound.position),
+      bounds.lowerBound)
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: bounds.upperBound.position),
+      bounds.upperBound)
+
+    expectTrapping(
+      index.position,
+      in: bounds.lowerBound.position..<bounds.upperBound.position)
+  }
+
+  public func _failEarlyRangeCheck(
+    _ range: Range<MinimalIndex>,
+    bounds: Range<MinimalIndex>
+  ) {
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: range.lowerBound.position),
+      range.lowerBound)
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: range.upperBound.position),
+      range.upperBound)
+
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: bounds.lowerBound.position),
+      bounds.lowerBound)
+    _expectCompatibleIndices(
+      _uncheckedIndex(forPosition: bounds.upperBound.position),
+      bounds.upperBound)
+
+    expectTrapping(
+      range.lowerBound.position..<range.upperBound.position,
+      in: bounds.lowerBound.position..<bounds.upperBound.position)
+  }
+
+  public func index(after i: MinimalIndex) -> MinimalIndex {
+    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+    return _uncheckedIndex(forPosition: i.position + 1)
+  }
+
+  public func index(before i: MinimalIndex) -> MinimalIndex {
+    // FIXME: swift-3-indexing-model: perform a range check and use
+    // return _uncheckedIndex(forPosition: i.position - 1)
+    return _index(forPosition: i.position - 1)
+  }
+
+  public func distance(from start: MinimalIndex, to end: MinimalIndex)
+    -> Int {
+    // FIXME: swift-3-indexing-model: perform a range check properly.
+    if start != endIndex {
+      _failEarlyRangeCheck(start, bounds: startIndex..<endIndex)
+    }
+    if end != endIndex {
+      _failEarlyRangeCheck(end, bounds: startIndex..<endIndex)
+    }
+    return end.position - start.position
+  }
+
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    // FIXME: swift-3-indexing-model: perform a range check properly.
+    if i != endIndex {
+      _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+    }
+    return _index(forPosition: i.position + n)
+  }
+
+  public subscript(i: MinimalIndex) -> T {
+    get {
+      _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+      return _elements[i.position]
+    }
+  }
+
+  public subscript(bounds: Range<MinimalIndex>) -> Slice<MinimalBidirectionalRandomAccessCollection<T>> {
+    get {
+      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+      return Slice(base: self, bounds: bounds)
+    }
+  }
+
+
+  public var underestimatedCount: Int
+
+  internal var _elements: [T]
+  internal let _collectionState: _CollectionState
+}
 
 /// A minimal implementation of `Collection` with extra checks.
 public struct MinimalRangeReplaceableBidirectionalCollection<T> : BidirectionalCollection, RangeReplaceableCollection {

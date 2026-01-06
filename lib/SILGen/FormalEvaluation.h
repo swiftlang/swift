@@ -14,6 +14,7 @@
 #define SWIFT_SILGEN_FORMALEVALUATION_H
 
 #include "Cleanup.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILValue.h"
 #include <optional>
@@ -222,6 +223,14 @@ public:
     popImpl();
     savedDepth.reset();
   }
+
+  /// Defers the emission of clean-ups in this scope until the
+  /// immediate outer evaluation scope is popped.
+  ///
+  /// This is useful for getting-around tightly-nested formal
+  /// access scopes, when a borrow of a value needs to be
+  /// returned and copying the value is not an option.
+  void deferPop() &&;
 
   FormalEvaluationScope(const FormalEvaluationScope &) = delete;
   FormalEvaluationScope &operator=(const FormalEvaluationScope &) = delete;

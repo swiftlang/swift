@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 public func foo() {
     bar([42])
@@ -11,4 +11,4 @@ public func foo() {
 func bar(_: UnsafePointer<UInt?>) {
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(

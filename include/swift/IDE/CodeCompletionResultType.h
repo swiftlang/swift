@@ -34,6 +34,8 @@ enum class CustomAttributeKind : uint8_t {
   ContextMacro = 1 << 4,
   /// A macro that can be used on any declaration.
   DeclMacro = 1 << 5,
+  /// A macro that can by used on any function.
+  FunctionMacro = 1 << 6,
 };
 
 /// The expected contextual type(s) for code-completion.
@@ -205,6 +207,10 @@ private:
   /// allocated.
   const USRBasedTypeArena &Arena;
 
+  /// A cached set of type relations for this given type context.
+  mutable llvm::DenseMap<const USRBasedType *, CodeCompletionResultTypeRelation>
+      CachedTypeRelations;
+
   SmallVector<ContextualType, 4> ContextualTypes;
 
   /// See \c ExpectedTypeContext::ExpectedAttributeKinds.
@@ -248,12 +254,6 @@ class USRBasedType {
                OptionSet<CustomAttributeKind> CustomAttributeKinds)
       : USR(USR), Supertypes(Supertypes),
         CustomAttributeKinds(CustomAttributeKinds) {}
-
-  /// Implementation of \c typeRelation. \p VisistedTypes keeps track which
-  /// types have already been visited.
-  CodeCompletionResultTypeRelation
-  typeRelationImpl(const USRBasedType *ResultType, const USRBasedType *VoidType,
-                   SmallPtrSetImpl<const USRBasedType *> &VisitedTypes) const;
 
 public:
   /// A null \c USRBasedType that's represented by an empty USR and has no

@@ -71,6 +71,7 @@ _TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> ^ postfix(_:_:)
 _TFC3foo3barCfT_S0_ ---> bar.__allocating_init()
 _TFC3foo3barcfT_S0_ ---> bar.init()
 _TFC3foo3barD ---> bar.__deallocating_deinit
+_TFC3foo3barZ ---> bar.__isolated_deallocating_deinit
 _TFC3foo3bard ---> bar.deinit
 _TMPC3foo3bar ---> generic type metadata pattern for bar
 _TMnC3foo3bar ---> nominal type descriptor for bar
@@ -213,3 +214,4 @@ _TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> speciali
 _TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
 _$s4main1fSiyYaFTQ0_ ---> f()
 _$s4main1fSiyYaFTY0_ ---> f()
+_$sBAIgHgIL_BAIegHgIL_TR ---> thunk for @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> ()

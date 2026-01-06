@@ -16,6 +16,7 @@
 #include "Scope.h"
 #include "SILGenBuilder.h"
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -162,15 +163,25 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
 /// emitBranchAndCleanups - Emit a branch to the given jump destination,
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
-void CleanupManager::emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
+void CleanupManager::emitBranchAndCleanups(JumpDest dest,
+                                           SILLocation branchLoc,
                                            ArrayRef<SILValue> args,
                                            ForUnwind_t forUnwind) {
+  emitCleanupsBeforeBranch(dest, forUnwind);
+  SGF.getBuilder().createBranch(branchLoc, dest.getBlock(), args);
+}
+
+/// emitCleanupsBeforeBranch - Emit the cleanups necessary before branching to
+/// the given jump destination. This does not pop the cleanup stack, nor does
+/// it emit the actual branch.
+void CleanupManager::emitCleanupsBeforeBranch(JumpDest dest,
+                                              ForUnwind_t forUnwind) {
   SILGenBuilder &builder = SGF.getBuilder();
-  assert(builder.hasValidInsertionPoint() && "Emitting branch in invalid spot");
+  assert(builder.hasValidInsertionPoint() && "no insertion point for cleanups");
   emitCleanups(dest.getDepth(), dest.getCleanupLocation(),
                forUnwind, /*popCleanups=*/false);
-  builder.createBranch(branchLoc, dest.getBlock(), args);
 }
+
 
 void CleanupManager::emitCleanupsForReturn(CleanupLocation loc,
                                            ForUnwind_t forUnwind) {

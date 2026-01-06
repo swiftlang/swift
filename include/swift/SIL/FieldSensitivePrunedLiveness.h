@@ -21,6 +21,7 @@
 #define SWIFT_SIL_FIELDSENSITIVEPRUNTEDLIVENESS_H
 
 #include "swift/AST/TypeExpansionContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
@@ -239,8 +240,11 @@ private:
 /// s a struct => count(s) := sum(s.fields, { f in count(type(f)) })
 ///                             + s.hasDeinit
 /// e an enum  => count(e) := sum(e.elements, { elt in count(type(elt)) })
-///                             + e.hasDeinit
 ///                             + 1 // discriminator
+///                             + e.hasDeinit
+///
+/// The deinit bit is at the end to make drop_deinit produce a value whose
+/// leaves are contiguous.
 struct TypeSubElementCount {
   unsigned number;
 
@@ -893,10 +897,7 @@ public:
                      const std::pair<SILInstruction *, InterestingUser> &)>>;
   UserBlockRange getAllUserBlocks() const {
     assert(isInitialized());
-    function_ref<SILBasicBlock *(
-        const std::pair<SILInstruction *, InterestingUser> &)>
-        op;
-    op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
+    auto op = [](const std::pair<SILInstruction *, InterestingUser> &pair)
         -> SILBasicBlock * { return pair.first->getParent(); };
     return UserBlockRange(getAllUsers(), op);
   }

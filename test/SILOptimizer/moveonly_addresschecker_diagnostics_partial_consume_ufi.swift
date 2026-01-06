@@ -3,14 +3,12 @@
 // RUN:     %s                                                      \
 // RUN:     -emit-sil -verify -verify-additional-prefix fragile-    \
 // RUN:     -sil-verify-all                                         \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library
 // RUN: %target-swift-frontend                                      \
 // RUN:     %s                                                      \
 // RUN:     -emit-sil -verify -verify-additional-prefix resilient-  \
 // RUN:     -sil-verify-all                                         \
 // RUN:     -enable-library-evolution                               \
-// RUN:     -enable-experimental-feature MoveOnlyPartialConsumption \
 // RUN:     -module-name Library
 
 public func take(_ u: consuming Ur) {}
@@ -36,10 +34,10 @@ internal struct Agg_Internal_UFI : ~Copyable {
 
 @_alwaysEmitIntoClient
 func piecewise_Agg_Internal_UFI(_ a: consuming Agg_Internal_UFI) {
-  take(a.u1) // expected-fragile-error{{cannot partially consume 'a' of non-frozen usableFromInline type 'Agg_Internal_UFI' within a function annotated @_alwaysEmitIntoClient}}
+  take(a.u1) // expected-fragile-error{{cannot partially consume 'a' of non-frozen usableFromInline type 'Agg_Internal_UFI' within a function annotated '@_alwaysEmitIntoClient'}}
              // expected-resilient-error@-1{{field 'a.u1' was consumed but not reinitialized; the field must be reinitialized during the access}}
              // expected-resilient-note@-2{{consumed here}}
-  take(a.u2) // expected-fragile-error{{cannot partially consume 'a' of non-frozen usableFromInline type 'Agg_Internal_UFI' within a function annotated @_alwaysEmitIntoClient}}
+  take(a.u2) // expected-fragile-error{{cannot partially consume 'a' of non-frozen usableFromInline type 'Agg_Internal_UFI' within a function annotated '@_alwaysEmitIntoClient'}}
              // expected-resilient-error@-1{{field 'a.u2' was consumed but not reinitialized; the field must be reinitialized during the access}}
              // expected-resilient-note@-2{{consumed here}}
 }

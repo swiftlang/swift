@@ -64,7 +64,8 @@ struct TypeOffsetSizePair {
   /// be a child type of \p ancestorType.
   std::optional<std::pair<TypeOffsetSizePair, SILType>>
   walkOneLevelTowardsChild(TypeOffsetSizePair ancestorOffsetSize,
-                           SILType ancestorType, SILFunction *fn) const;
+                           SILType ancestorType, SILType childType,
+                           SILFunction *fn) const;
 
   /// Given an ancestor offset \p ancestorOffset and a type called \p
   /// ancestorType, walk one level towards this current type inserting on value,
@@ -128,12 +129,13 @@ public:
   }
 };
 
-inline Feature partialMutationFeature(PartialMutation::Kind kind) {
+inline std::optional<Feature>
+partialMutationFeature(PartialMutation::Kind kind) {
   switch (kind) {
   case PartialMutation::Kind::Consume:
-    return Feature::MoveOnlyPartialConsumption;
+    return std::nullopt;
   case PartialMutation::Kind::Reinit:
-    return Feature::MoveOnlyPartialReinitialization;
+    return {Feature::MoveOnlyPartialReinitialization};
   }
 }
 
@@ -163,8 +165,10 @@ class PartialMutationError {
   struct NonfrozenUsableFromInlineType {
     NominalTypeDecl &nominal;
   };
+  struct ConsumeDuringDeinit {
+  };
   using Payload = TaggedUnion<FeatureDisabled, HasDeinit, NonfrozenImportedType,
-                              NonfrozenUsableFromInlineType>;
+                              NonfrozenUsableFromInlineType, ConsumeDuringDeinit>;
   Payload payload;
 
   PartialMutationError(SILType type, Payload payload)
@@ -184,7 +188,7 @@ public:
   enum class Kind : uint8_t {
     /// The partial consumption feature is disabled.
     ///
-    /// See -enable-experimental-feature MoveOnlyPartialConsumption.
+    /// See -enable-experimental-feature MoveOnlyPartialReinitialization.
     FeatureDisabled,
     /// A partially consumed/reinitialized aggregate has a deinit.
     ///
@@ -211,6 +215,8 @@ public:
     /// with library evolution, prevent the aggregate from being partially
     /// mutated.
     NonfrozenUsableFromInlineType,
+    /// The value was fully consumed in a `deinit`.
+    ConsumeDuringDeinit,
   };
 
   operator Kind() {
@@ -220,8 +226,12 @@ public:
       return Kind::HasDeinit;
     else if (payload.isa<NonfrozenImportedType>())
       return Kind::NonfrozenImportedType;
-    assert(payload.isa<NonfrozenUsableFromInlineType>());
-    return Kind::NonfrozenUsableFromInlineType;
+    else if (payload.isa<NonfrozenUsableFromInlineType>())
+      return Kind::NonfrozenUsableFromInlineType;
+    else if (payload.isa<ConsumeDuringDeinit>())
+      return Kind::ConsumeDuringDeinit;
+    
+    llvm_unreachable("unhandled tag");
   }
 
   static PartialMutationError featureDisabled(SILType type,
@@ -242,6 +252,10 @@ public:
   static PartialMutationError
   nonfrozenUsableFromInlineType(SILType type, NominalTypeDecl &nominal) {
     return PartialMutationError(type, NonfrozenUsableFromInlineType{nominal});
+  }
+
+  static PartialMutationError consumeDuringDeinit(SILType type) {
+    return PartialMutationError(type, ConsumeDuringDeinit{});
   }
 
   PartialMutation::Kind getKind() {

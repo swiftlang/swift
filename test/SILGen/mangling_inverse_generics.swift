@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   > %t/test.silgen
 
@@ -110,7 +108,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   public func foo() {}
 
   // DEMANGLED: test.A.weird() -> ()
-  // CHECK: sil [ossa] @$s4test1AV5weirdyyF : $@convention(method) <T> (@guaranteed A<T>) -> () {
+  // CHECK: sil [ossa] @$s4test1AV5weirdyyF : $@convention(method) <T> (A<T>) -> () {
   public func weird() where T: Copyable {}
 
   // DEMANGLED: variable initialization expression of (extension in test):test.A< where A: ~Swift.Copyable>.property : Swift.Int
@@ -146,7 +144,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
 }
 
-extension A: Copyable {}
+extension A: Copyable where T: Copyable {}
 
 // <T: ~Copyable>
 extension A where T: ~Copyable {
@@ -155,7 +153,7 @@ extension A where T: ~Copyable {
   func bar() {}
 
   // DEMANGLED: test.A.weird2() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AV6weird2yyF : $@convention(method) <T> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AV6weird2yyF : $@convention(method) <T> (A<T>) -> () {
   func weird2() where T: Copyable {}
 }
 
@@ -172,11 +170,11 @@ extension A {
   // requirements must be mangled as if there were no inverse generics.
 
   // DEMANGLED: test.A.baz() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AV3bazyyF : $@convention(method) <T> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AV3bazyyF : $@convention(method) <T> (A<T>) -> () {
   func baz() {}
 
   // DEMANGLED: test.A.computedAgain.getter : Swift.Int
-  // CHECK: sil hidden [ossa] @$s4test1AV13computedAgainSivg : $@convention(method) <T> (@guaranteed A<T>) -> Int {
+  // CHECK: sil hidden [ossa] @$s4test1AV13computedAgainSivg : $@convention(method) <T> (A<T>) -> Int {
   var computedAgain: Int {
     123
   }
@@ -188,7 +186,7 @@ extension A where T: CopyableProto {
   // the extra constraints and not any inverses.
 
   // DEMANGLED: (extension in test):test.A<A where A: test.CopyableProto>.something() -> ()
-  // CHECK: sil hidden [ossa] @$s4test1AVA2A13CopyableProtoRzlE9somethingyyF : $@convention(method) <T where T : CopyableProto> (@guaranteed A<T>) -> () {
+  // CHECK: sil hidden [ossa] @$s4test1AVA2A13CopyableProtoRzlE9somethingyyF : $@convention(method) <T where T : CopyableProto> (A<T>) -> () {
   func something() {}
 }
 
@@ -286,15 +284,27 @@ public struct E<T: ~Copyable>: ~Copyable {
   public func __existential2__(_ t: consuming any ~Copyable) {}
 
   // DEMANGLED: test.E.something<A>() -> A1
-  // CHECK: sil [ossa] @$s4test1EV9somethingqd__ylF : $@convention(method) <T><U where U : ~Copyable> (@guaranteed E<T>) -> @out U {
+  // CHECK: sil [ossa] @$s4test1EV9somethingqd__ylF : $@convention(method) <T where T : ~Copyable><U where U : ~Copyable> (@guaranteed E<T>) -> @out U {
   @_preInverseGenerics
   public func something<U: ~Copyable>() -> U {
     fatalError()
   }
 
   // DEMANGLED: (extension in test):test.E< where A: ~Swift.Copyable>.something<A>() -> A1
-  // CHECK: sil [ossa] @$s4test1EVAARi_zrlE9somethingqd__ylF : $@convention(method) <T><U> (@guaranteed E<T>) -> @out U {
+  // CHECK: sil [ossa] @$s4test1EVAARi_zrlE9somethingqd__ylF : $@convention(method) <T where T : ~Copyable><U> (@guaranteed E<T>) -> @out U {
   public func something<U>() -> U {
+    fatalError()
+  }
+
+  // DEMANGLED: test.E.something2<A>() -> A1
+  // CHECK: sil [ossa] @$s4test1EV10something2qd__ylF : $@convention(method) <T><U> (@guaranteed E<T>) -> @out U {
+  public func something2<U>() -> U where T: Copyable {
+    fatalError()
+  }
+
+  // DEMANGLED: test.E.something2<A where A1: ~Swift.Copyable>() -> A1
+  // CHECK: sil [ossa] @$s4test1EV10something2qd__yRi_d__lF : $@convention(method) <T><U where U : ~Copyable> (@guaranteed E<T>) -> @out U {
+  public func something2<U: ~Copyable>() -> U where T: Copyable {
     fatalError()
   }
 

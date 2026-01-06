@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -parse-stdlib -module-name Swift \
-// RUN:   -enable-experimental-feature NoncopyableGenerics
+// RUN:   -parse-stdlib -module-name Swift
 
 @_marker protocol Copyable {}
 
@@ -14,7 +13,7 @@
 @_marker protocol Sendable {}
 
 enum E: ~Copyable, Sendable {}
-@_moveOnly struct S: Sendable {}
+struct S: ~Copyable, Sendable {}
 
 // expected-note@+2 3{{add}}
 // expected-error@+1 {{parameter of noncopyable type 'T' must specify ownership}}

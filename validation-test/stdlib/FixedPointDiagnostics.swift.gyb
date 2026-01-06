@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 4.2 %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -swift-version 4.2 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{no '-' candidates produce the expected contextual result type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
@@ -53,8 +53,8 @@ func testMixedSignArithmetic() {
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Int'}} {{10-10=Int(}}
-    y -= ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Int'}} {{10-10=Int(}}
+    y += ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Stride' (aka 'Int')}} {{10-10=Stride(}}
+    y -= ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Stride' (aka 'Int')}} {{10-10=Stride(}}
   }
 % end
 }

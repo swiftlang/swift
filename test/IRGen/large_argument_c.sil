@@ -1,0 +1,38 @@
+// RUN: %target-swift-frontend %s -Osize -Xllvm -sil-disable-pass=lower-aggregate-instrs -disable-large-loadable-types-reg2mem -import-objc-header %S/Inputs/large_argument_result_c.h -emit-ir -o - 2>&1 | %FileCheck %s
+
+// REQUIRES: PTRSIZE=64
+// REQUIRES: CPU=arm64 || CPU=arm64e
+
+sil_stage lowered
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct ContainingLargeThing {
+  var y : large_thing
+  var x : large_thing
+}
+
+sil @pass_and_return : $@convention(c) (large_thing, large_thing) -> large_thing
+
+// Make sure that we are not dropping the struct_element_addr projection on the
+// floor
+
+// CHECK: define{{.*}} swiftcc void @test(ptr {{.*}} dereferenceable(256) %0)
+// CHECK:   [[TMP:%.*]] = alloca %TSo11large_thinga
+// CHECK:   [[PROJ_ADDR:%.*]] = getelementptr inbounds{{.*}} i8, ptr %0, i64 128
+// CHECK:   [[VAL:%.*]] = load i64, ptr %.sroa.3.0..sroa_idx
+// CHECK:   store i64 [[VAL]], ptr [[TMP]]
+sil @test : $@convention(thin) (@in ContainingLargeThing) -> () {
+bb0(%0 : $*ContainingLargeThing):
+  %1 = alloc_stack $ContainingLargeThing
+  copy_addr [take] %0 to [init] %1 : $*ContainingLargeThing
+	%2 = struct_element_addr %1 : $*ContainingLargeThing, #ContainingLargeThing.x
+  %3 = function_ref @pass_and_return : $@convention(c) (large_thing, large_thing) -> large_thing
+  %4 = load %2 : $*large_thing                    // user: %9
+  %5 = apply %3(%4, %4) : $@convention(c) (large_thing, large_thing) -> large_thing
+  dealloc_stack %1 : $*ContainingLargeThing
+  %6 = tuple()
+  return %6 : $()
+}

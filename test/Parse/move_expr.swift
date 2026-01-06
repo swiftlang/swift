@@ -2,7 +2,7 @@
 
 var global: Int = 5
 func testGlobal() {
-    let _ = consume global
+    let _ = consume global // expected-warning {{'consume' applied to bitwise-copyable type 'Int' has no effect}}
 }
 
 func testLet() {
@@ -76,9 +76,9 @@ struct Foo {
 
     func consumePropertyWrapper() {
         // should still parse, even if it doesn't semantically work out
-        _ = consume wrapperTest // expected-error{{can only be applied to a local binding ('let', 'var', or parameter)}}
-        _ = consume _wrapperTest // expected-error{{can only be applied to a local binding ('let', 'var', or parameter)}}
-        _ = consume $wrapperTest // expected-error{{can only be applied to a local binding ('let', 'var', or parameter)}}
+        _ = consume wrapperTest // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+        _ = consume _wrapperTest // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
+        _ = consume $wrapperTest // expected-error{{'consume' can only be used to partially consume storage of a noncopyable type}}
     }
 }
 

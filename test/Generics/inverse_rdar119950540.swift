@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen -enable-experimental-feature NoncopyableGenerics > /dev/null
+// RUN: %target-swift-frontend %s -emit-silgen > /dev/null
 
 
 

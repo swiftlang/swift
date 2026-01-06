@@ -17,6 +17,10 @@ InlineStaticMemberVarTestSuite.test("read-inline-static-member-address") {
     WithInlineStaticMember.getStaticMemberAddress())
 }
 
+InlineStaticMemberVarTestSuite.test("read-inline-static-member-init-at-runtime") {
+  expectEqual(42, WithInlineStaticMember.staticMemberInitializedAtRuntime)
+}
+
 InlineStaticMemberVarTestSuite.test("write-inline-static-member-from-cxx") {
   expectNotEqual(128, WithInlineStaticMember.staticMember)
   WithInlineStaticMember.setStaticMemberFromCxx(128)

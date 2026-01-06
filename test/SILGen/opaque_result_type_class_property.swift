@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-library-evolution -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-library-evolution -target %target-swift-5.1-abi-triple | %FileCheck %s
 
 public protocol V {}
 public struct E : V {}

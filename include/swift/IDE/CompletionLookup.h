@@ -24,7 +24,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IDE/CodeCompletionContext.h"
 #include "swift/IDE/CodeCompletionResult.h"
-#include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/PossibleParamInfo.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -32,6 +31,8 @@
 
 namespace swift {
 namespace ide {
+
+class CodeCompletionResultBuilder;
 
 using DeclFilter =
     std::function<bool(ValueDecl *, DeclVisibilityKind, DynamicLookupInfo)>;
@@ -185,6 +186,11 @@ private:
   /// \p selfTy must be a \c Self type of the context.
   static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD);
 
+  /// Retrieve the type to use as the base for a member completion.
+  Type getMemberBaseType() const {
+    return BaseType ? BaseType : ExprType;
+  }
+
 public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;
@@ -320,6 +326,8 @@ public:
 
   void addImportModuleNames();
 
+  void addUsingSpecifiers();
+
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo);
@@ -335,6 +343,8 @@ public:
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
 
+  void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
+
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T,
@@ -344,12 +354,6 @@ public:
       CodeCompletionResultBuilder &Builder, Type T,
       GenericSignature genericSig = GenericSignature(),
       bool dynamicOrOptional = false);
-
-  /// For printing in code completion results, replace archetypes with
-  /// protocol compositions.
-  ///
-  /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature genericSig);
 
   Type getTypeOfMember(const ValueDecl *VD,
                        DynamicLookupInfo dynamicLookupInfo);
@@ -365,31 +369,7 @@ public:
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo);
 
-  static bool hasInterestingDefaultValue(const ParamDecl *param);
-
   bool shouldAddItemWithoutDefaultArgs(const AbstractFunctionDecl *func);
-
-  /// Build argument patterns for calling. Returns \c true if any content was
-  /// added to \p Builder. If \p declParams is non-empty, the size must match
-  /// with \p typeParams.
-  bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
-                               ArrayRef<AnyFunctionType::Param> typeParams,
-                               ArrayRef<const ParamDecl *> declParams,
-                               GenericSignature genericSig,
-                               bool includeDefaultArgs = true);
-
-  /// Build argument patterns for calling. Returns \c true if any content was
-  /// added to \p Builder. If \p Params is non-nullptr, \F
-  bool addCallArgumentPatterns(CodeCompletionResultBuilder &Builder,
-                               const AnyFunctionType *AFT,
-                               const ParameterList *Params,
-                               GenericSignature genericSig,
-                               bool includeDefaultArgs = true);
-
-  static void addEffectsSpecifiers(CodeCompletionResultBuilder &Builder,
-                                   const AnyFunctionType *AFT,
-                                   const AbstractFunctionDecl *AFD,
-                                   bool forceAsync = false);
 
   void addPoundAvailable(std::optional<StmtKind> ParentKind);
 
@@ -428,6 +408,9 @@ public:
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
 
+  Type getTypeAliasType(const TypeAliasDecl *TAD,
+                        DynamicLookupInfo dynamicLookupInfo);
+
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo);
 
@@ -441,9 +424,15 @@ public:
 
   void addPrecedenceGroupRef(PrecedenceGroupDecl *PGD);
 
+  /// Add a builtin member reference pattern. This is used for members that
+  /// do not have associated decls, e.g tuple access and '.isolation'.
+  void addBuiltinMemberRef(StringRef Name, Type TypeAnnotation);
+
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
+  void addMacroCallArguments(const MacroDecl *MD, DeclVisibilityKind Reason,
+                             bool forTrivialTrailingClosure = false);
   void addMacroExpansion(const MacroDecl *MD, DeclVisibilityKind Reason);
 
   void addKeyword(
@@ -505,6 +494,9 @@ public:
                          DynamicLookupInfo dynamicLookupInfo);
 
   bool tryTupleExprCompletions(Type ExprType);
+
+  /// Try add the completion for '.isolation' for @isolated(any) function types.
+  void tryFunctionIsolationCompletion(Type ExprType);
 
   bool tryFunctionCallCompletions(
       Type ExprType, const ValueDecl *VD,
@@ -586,19 +578,22 @@ public:
 
   void getTypeCompletions(Type BaseType);
 
+  /// Add completions for types that can appear after a \c ~ prefix.
+  void getInvertedTypeCompletions();
+
   void getGenericRequirementCompletions(DeclContext *DC,
                                         SourceLoc CodeCompletionLoc);
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                    bool IsConcurrencyEnabled,
+                                    const LangOptions &langOpts,
                                     std::optional<DeclKind> DK, StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(CustomSyntaxAttributeKind AttrKind,
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
                                         int ParamIndex, bool HasLabel);
 
-  void getTypeAttributeKeywordCompletions();
+  void getTypeAttributeKeywordCompletions(CompletionKind completionKind);
 
   void collectPrecedenceGroups();
 
@@ -624,8 +619,6 @@ public:
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
 
   void getOptionalBindingCompletions(SourceLoc Loc);
-
-  void addWithoutConstraintTypes();
 };
 
 } // end namespace ide

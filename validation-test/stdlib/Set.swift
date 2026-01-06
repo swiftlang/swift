@@ -16,6 +16,7 @@ import Foundation
 
 extension Set {
   func _rawIdentifier() -> Int {
+    _blackHole(self)
     return unsafeBitCast(self, to: Int.self)
   }
 }
@@ -4893,5 +4894,20 @@ if #available(SwiftStdlib 5.1, *) {
   }
 }
 #endif
+
+SetTestSuite.test("Identical") {
+  let s1: Set = [0, 1, 2, 3]
+  expectTrue(s1.isTriviallyIdentical(to: s1))
+
+  let s2: Set = s1
+  expectTrue(s1.isTriviallyIdentical(to: s2))
+
+  var s3: Set = s2
+  s3.reserveCapacity(0)
+  expectFalse(s1.isTriviallyIdentical(to: s3))
+
+  let s4: Set = [0, 1, 2, 3]
+  expectFalse(s1.isTriviallyIdentical(to: s4))
+}
 
 runAllTests()

@@ -1,0 +1,56 @@
+{
+    "CanonicalName": "xros1.0",
+    "DefaultDeploymentTarget": "1.0",
+    "DefaultProperties": {},
+    "DisplayName": "visionOS 1.0",
+    "IsBaseSDK": "YES",
+    "MaximumDeploymentTarget": "1.0.99",
+    "MinimalDisplayName": "1.0",
+    "SupportedTargets": {
+        "xros": {
+            "Archs": [
+                "arm64e",
+                "arm64"
+            ],
+            "BuildVersionPlatformID": "11",
+            "ClangRuntimeLibraryPlatformName": "xros",
+            "DefaultDeploymentTarget": "1.0",
+            "DeploymentTargetSettingName": "XROS_DEPLOYMENT_TARGET",
+            "DeviceFamilies": [
+                {
+                    "DisplayName": "Apple Vision",
+                    "Identifier": "7"
+                }
+            ],
+            "LLVMTargetTripleEnvironment": "",
+            "LLVMTargetTripleSys": "xros",
+            "LLVMTargetTripleVendor": "apple",
+            "MaximumDeploymentTarget": "1.0.99",
+            "MinimumDeploymentTarget": "1.0",
+            "PlatformFamilyDisplayName": "visionOS",
+            "PlatformFamilyName": "xrOS",
+            "RecommendedDeploymentTarget": "1.0",
+            "SwiftConcurrencyMinimumDeploymentTarget": "1.0",
+            "SwiftOSRuntimeMinimumDeploymentTarget": "1.0",
+            "SystemPrefix": "",
+            "ValidDeploymentTargets": [
+                "1.0"
+            ]
+        }
+    },
+    "Version": "1.0",
+    "VersionMap": {
+        "iOS_visionOS": {
+            "17.0": "1.0"
+        },
+        "iOS_xrOS": {
+            "17.0": "1.0"
+        },
+        "visionOS_iOS": {
+            "1.0": "17.0"
+        },
+        "xrOS_iOS": {
+            "1.0": "17.0"
+        }
+    }
+}

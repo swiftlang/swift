@@ -84,7 +84,7 @@ public struct UnsafeMutablePointer<T> {
 public typealias CInt = Int32
 public typealias CChar = Int8
 
-@_silgen_name("putchar")
+@_extern(c, "putchar")
 public func putchar(_: CChar)
 
 public func printHello() {

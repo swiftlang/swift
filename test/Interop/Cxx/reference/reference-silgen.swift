@@ -7,7 +7,7 @@ func getCxxRef() -> UnsafeMutablePointer<CInt> {
 }
 
 // CHECK: sil hidden @$s4main9getCxxRefSpys5Int32VGyF : $@convention(thin) () -> UnsafeMutablePointer<Int32>
-// CHECK: [[REF:%.*]] = function_ref @{{_Z15getStaticIntRefv|\?getStaticIntRef@@YAAEAHXZ}} : $@convention(c) () -> UnsafeMutablePointer<Int32>
+// CHECK: [[REF:%.*]] = function_ref @$sSo15getStaticIntRefSpys5Int32VGyFTo : $@convention(c) () -> UnsafeMutablePointer<Int32>
 // CHECK: apply [[REF]]() : $@convention(c) () -> UnsafeMutablePointer<Int32>
 
 func getConstCxxRef() -> UnsafePointer<CInt> {
@@ -15,7 +15,7 @@ func getConstCxxRef() -> UnsafePointer<CInt> {
 }
 
 // CHECK: sil hidden @$s4main14getConstCxxRefSPys5Int32VGyF : $@convention(thin) () -> UnsafePointer<Int32>
-// CHECK: [[REF:%.*]] = function_ref @{{_Z20getConstStaticIntRefv|\?getConstStaticIntRef@@YAAEBHXZ}} : $@convention(c) () -> UnsafePointer<Int32>
+// CHECK: [[REF:%.*]] = function_ref @$sSo20getConstStaticIntRefSPys5Int32VGyFTo : $@convention(c) () -> UnsafePointer<Int32>
 // CHECK: apply [[REF]]() : $@convention(c) () -> UnsafePointer<Int32>
 
 func getCxxRvalueRef() -> UnsafeMutablePointer<CInt> {
@@ -23,7 +23,7 @@ func getCxxRvalueRef() -> UnsafeMutablePointer<CInt> {
 }
 
 // CHECK: sil hidden @$s4main15getCxxRvalueRefSpys5Int32VGyF : $@convention(thin) () -> UnsafeMutablePointer<Int32>
-// CHECK: [[REF:%.*]] = function_ref @{{_Z21getStaticIntRvalueRefv|\?getStaticIntRvalueRef@@YA\$\$QEAHXZ}} : $@convention(c) () -> UnsafeMutablePointer<Int32>
+// CHECK: [[REF:%.*]] = function_ref @$sSo21getStaticIntRvalueRefSpys5Int32VGyFTo : $@convention(c) () -> UnsafeMutablePointer<Int32>
 // CHECK: apply [[REF]]() : $@convention(c) () -> UnsafeMutablePointer<Int32>
 
 func getConstCxxRvalueRef() -> UnsafePointer<CInt> {
@@ -31,7 +31,7 @@ func getConstCxxRvalueRef() -> UnsafePointer<CInt> {
 }
 
 // CHECK: sil hidden @$s4main20getConstCxxRvalueRefSPys5Int32VGyF : $@convention(thin) () -> UnsafePointer<Int32>
-// CHECK: [[REF:%.*]] = function_ref @{{_Z26getConstStaticIntRvalueRefv|\?getConstStaticIntRvalueRef@@YA\$\$QEBHXZ}} : $@convention(c) () -> UnsafePointer<Int32>
+// CHECK: [[REF:%.*]] = function_ref @$sSo26getConstStaticIntRvalueRefSPys5Int32VGyFTo : $@convention(c) () -> UnsafePointer<Int32>
 // CHECK: apply [[REF]]() : $@convention(c) () -> UnsafePointer<Int32>
 
 func setCxxRef() {
@@ -40,7 +40,7 @@ func setCxxRef() {
 }
 
 // CHECK: sil hidden @$s4main9setCxxRefyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z15setStaticIntRefRi|\?setStaticIntRef@@YAXAEAH@Z}} : $@convention(c) (@inout Int32) -> ()
+// CHECK: [[REF:%.*]] = function_ref @$sSo15setStaticIntRefyys5Int32VzFTo : $@convention(c) (@inout Int32) -> ()
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()
 
 func setCxxConstRef() {
@@ -49,7 +49,7 @@ func setCxxConstRef() {
 }
 
 // CHECK: sil hidden @$s4main14setCxxConstRefyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z20setConstStaticIntRefRKi|\?setConstStaticIntRef@@YAXAEBH@Z}} : $@convention(c) (@in_guaranteed Int32) -> ()
+// CHECK: [[REF:%.*]] = function_ref @$sSo20setConstStaticIntRefyys5Int32VFTo : $@convention(c) (@in_guaranteed Int32) -> ()
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@in_guaranteed Int32) -> ()
 
 func setCxxConstRefTypealias() {
@@ -58,7 +58,7 @@ func setCxxConstRefTypealias() {
 }
 
 // CHECK: sil hidden @$s4main23setCxxConstRefTypealiasyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z29setConstStaticIntRefTypealiasRKi|\?setConstStaticIntRefTypealias@@YAXAEBH@Z}} : $@convention(c) (@in_guaranteed Int32) -> ()
+// CHECK: [[REF:%.*]] = function_ref @$sSo29setConstStaticIntRefTypealiasyys5Int32VFTo : $@convention(c) (@in_guaranteed Int32) -> ()
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@in_guaranteed Int32) -> ()
 
 func setStaticIntRefTypealias() {
@@ -67,5 +67,5 @@ func setStaticIntRefTypealias() {
 }
 
 // CHECK: sil hidden @$s4main24setStaticIntRefTypealiasyyF : $@convention(thin) () -> ()
-// CHECK: [[REF:%.*]] = function_ref @{{_Z24setStaticIntRefTypealiasRi|\?setStaticIntRefTypealias@@YAXAEAH@Z}} : $@convention(c) (@inout Int32) -> ()
+// CHECK: [[REF:%.*]] = function_ref @$sSo24setStaticIntRefTypealiasyys5Int32VzFTo : $@convention(c) (@inout Int32) -> ()
 // CHECK: apply [[REF]](%{{[0-9]+}}) : $@convention(c) (@inout Int32) -> ()

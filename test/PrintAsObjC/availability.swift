@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/availability.swiftmodule -typecheck -emit-objc-header-path %t/availability.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/availability.swiftmodule -typecheck -verify -emit-objc-header-path %t/availability.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/availability.h
 // RUN: %check-in-clang %t/availability.h
 
@@ -16,7 +16,7 @@
 // CHECK-NEXT: - (void)alwaysDeprecatedTwo SWIFT_DEPRECATED_MSG("it's old");
 // CHECK-NEXT: - (void)alwaysDeprecatedThree SWIFT_DEPRECATED_MSG("", "qux");
 // CHECK-NEXT: - (void)alwaysDeprecatedFour SWIFT_DEPRECATED_MSG("use something else", "quux");
-// CHECK-NEXT: - (void)escapeMessage SWIFT_DEPRECATED_MSG("one\ntwo\tthree\x0Dfour\\ \"five\"");
+// CHECK-NEXT: - (void)escapeMessage SWIFT_DEPRECATED_MSG("one\ntwo\tthree\rfour\\ \"five\"{U+0000}six");
 // CHECK-NEXT: - (void)unicodeMessage SWIFT_DEPRECATED_MSG("über");
 // CHECK-NEXT: - (void)singlePlatShorthand SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: - (void)multiPlatShorthand
@@ -275,7 +275,7 @@
     @available(*, deprecated, message: "use something else", renamed: "quux")
     @objc func alwaysDeprecatedFour() {}
 
-    @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"")
+    @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"\0six")
     @objc func escapeMessage() {}
     @available(*, deprecated, message: "über")
     @objc func unicodeMessage() {}

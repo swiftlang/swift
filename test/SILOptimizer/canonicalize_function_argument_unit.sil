@@ -1,0 +1,79 @@
+// RUN: %target-sil-opt \
+// RUN:     -test-runner \
+// RUN:     -module-name Swift \
+// RUN:     %s \
+// RUN:     -o /dev/null \
+// RUN: 2>&1 | %FileCheck %s
+
+import Builtin
+
+@_marker protocol Copyable {}
+
+class C {}
+struct NC : ~Copyable {
+  var c: C
+}
+
+// CHECK-LABEL: begin running test {{.*}} on consume_move_only
+// CHECK-LABEL: sil [ossa] @consume_move_only : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+//                Necessary copy.
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[NC:%[^,]+]] = struct $NC ([[COPY]]
+// CHECK:         apply undef([[NC]])
+// CHECK-LABEL: } // end sil function 'consume_move_only'
+// CHECK-LABEL: end running test {{.*}} on consume_move_only
+sil [ossa] @consume_move_only : $@convention(thin) (@guaranteed C) -> () {
+bb0(%c : @guaranteed $C):
+  specify_test "canonicalize_function_argument @argument"
+  %copy = copy_value %c
+  %nc = struct $NC (%copy)
+  apply undef(%nc) : $@convention(thin) (@owned NC) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: begin running test {{.*}} on borrow_move_only
+// CHECK-LABEL: sil [ossa] @borrow_move_only : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+//                No copy!
+// CHECK:         [[NC:%[^,]+]] = struct $NC ([[C]]
+// CHECK:         apply undef([[NC]])
+// CHECK-LABEL: } // end sil function 'borrow_move_only'
+// CHECK-LABEL: end running test {{.*}} on borrow_move_only
+sil [ossa] @borrow_move_only : $@convention(thin) (@guaranteed C) -> () {
+bb0(%c : @guaranteed $C):
+  specify_test "canonicalize_function_argument @argument"
+  %copy = copy_value %c
+  %nc = struct $NC (%copy)
+  apply undef(%nc) : $@convention(thin) (@guaranteed NC) -> ()
+  destroy_value %nc
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: begin running test {{.*}} on consume_and_borrow_move_only
+// CHECK-LABEL: sil [ossa] @consume_and_borrow_move_only : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+//                No copy!
+// CHECK:         [[NC1:%[^,]+]] = struct $NC ([[C]]
+// CHECK:         apply undef([[NC1]])
+//                Necessary copy.
+// CHECK:         [[COPY2:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[NC2:%[^,]+]] = struct $NC ([[COPY2]]
+// CHECK:         apply undef([[NC2]])
+// CHECK-LABEL: } // end sil function 'consume_and_borrow_move_only'
+// CHECK-LABEL: end running test {{.*}} on consume_and_borrow_move_only
+sil [ossa] @consume_and_borrow_move_only : $@convention(thin) (@guaranteed C) -> () {
+bb0(%c : @guaranteed $C):
+  specify_test "canonicalize_function_argument @argument"
+  %copy1 = copy_value %c
+  %nc1 = struct $NC (%copy1)
+  apply undef(%nc1) : $@convention(thin) (@guaranteed NC) -> ()
+  destroy_value %nc1
+  %copy2 = copy_value %c
+  %nc2 = struct $NC (%copy2)
+  apply undef(%nc2) : $@convention(thin) (@owned NC) -> ()
+  %retval = tuple ()
+  return %retval
+}

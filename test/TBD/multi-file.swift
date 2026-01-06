@@ -7,7 +7,7 @@
 
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift
-// RUN: diff %t/TBD-wmo.tbd %t/TBD-incremental.tbd
+// RUN: %llvm-readtapi --compare %t/TBD-wmo.tbd %t/TBD-incremental.tbd
 
 // -O, non-resilient
 
@@ -16,7 +16,7 @@
 
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -O
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -O
-// RUN: diff %t/TBD-wmo.tbd %t/TBD-incremental.tbd
+// RUN: %llvm-readtapi --compare %t/TBD-wmo.tbd %t/TBD-incremental.tbd
 
 // -Onone, resilient
 
@@ -25,7 +25,7 @@
 
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -enable-library-evolution
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -enable-library-evolution
-// RUN: diff %t/TBD-wmo.tbd %t/TBD-incremental.tbd
+// RUN: %llvm-readtapi --compare %t/TBD-wmo.tbd %t/TBD-incremental.tbd
 
 // -O, resilient
 
@@ -34,7 +34,7 @@
 
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -O -enable-library-evolution
 // RUN: %target-build-swift -swift-version 4 -module-name multifile -Xfrontend -tbd-install_name -Xfrontend multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -O -enable-library-evolution
-// RUN: diff %t/TBD-wmo.tbd %t/TBD-incremental.tbd
+// RUN: %llvm-readtapi --compare %t/TBD-wmo.tbd %t/TBD-incremental.tbd
 
 // REQUIRES: objc_interop
 

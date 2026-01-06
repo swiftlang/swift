@@ -214,7 +214,7 @@ extension IndexingIterator: Sendable
 /// takes a range expression.
 ///
 ///     if let firstSpace = text.firstIndex(of: " ") {
-///         print(text[..<firstSpace]
+///         print(text[..<firstSpace])
 ///         // Prints "Buffalo"
 ///     }
 ///
@@ -1213,9 +1213,11 @@ extension Collection {
     return Array(result)
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$sSlsE3mapySayqd__Gqd__7ElementQzKXEKlF")
   func __rethrows_map<T>(
@@ -1223,6 +1225,7 @@ extension Collection {
   ) throws -> [T] {
     try map(transform)
   }
+#endif
 
   /// Returns a subsequence containing all but the given number of initial
   /// elements.

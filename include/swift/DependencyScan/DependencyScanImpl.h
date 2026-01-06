@@ -21,7 +21,7 @@
 namespace swift {
 namespace dependencies {
 class DependencyScanningTool;
-}
+} // namespace dependencies
 } // namespace swift
 
 struct swiftscan_dependency_graph_s {
@@ -43,7 +43,6 @@ struct swiftscan_dependency_info_s {
   /// "swiftInterface"
   /// "swiftSource"
   /// "swiftBinary"
-  /// "swiftPlaceholder"
   /// "clang""
   swiftscan_string_ref_t module_name;
 
@@ -60,8 +59,36 @@ struct swiftscan_dependency_info_s {
    */
   swiftscan_string_set_t *direct_dependencies;
 
+  /// The list of link libraries for this module.
+  swiftscan_link_library_set_t *link_libraries;
+
+  /// The list of source import infos.
+  swiftscan_import_info_set_t *imports;
+
+  /// The list of source optional import infos.
+  swiftscan_import_info_set_t *optional_imports;
+
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
+};
+
+struct swiftscan_link_library_info_s {
+  swiftscan_string_ref_t name;
+  bool isStatic;
+  bool isFramework;
+  bool forceLoad;
+};
+
+struct swiftscan_import_info_s {
+  swiftscan_string_ref_t import_identifier;
+  swiftscan_source_location_set_t *source_locations;
+  swiftscan_access_level_t access_level;
+};
+
+struct swiftscan_macro_dependency_s {
+  swiftscan_string_ref_t module_name;
+  swiftscan_string_ref_t library_path;
+  swiftscan_string_ref_t executable_path;
 };
 
 /// Swift modules to be built from a module interface, may have a bridging
@@ -86,22 +113,23 @@ typedef struct {
   /// Clang module dependencies
   swiftscan_string_set_t *swift_overlay_module_dependencies;
 
+  /// Directly-imported in source module dependencies
+  swiftscan_string_set_t *source_import_module_dependencies;
+
   /// Options to the compile command required to build this module interface
   swiftscan_string_set_t *command_line;
 
   /// Options to the compile command required to build bridging header.
   swiftscan_string_set_t *bridging_pch_command_line;
 
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  swiftscan_string_set_t *extra_pcm_args;
-
   /// The hash value that will be used for the generated module
   swiftscan_string_ref_t context_hash;
 
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
+
+  /// A flag that indicates this dependency is associated with a static archive
+  bool is_static;
 
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t cas_fs_root_id;
@@ -111,6 +139,19 @@ typedef struct {
 
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
+
+  /// Macro dependecies.
+  swiftscan_macro_dependency_set_t *macro_dependencies;
+
+  /// User module version
+  swiftscan_string_ref_t user_module_version;
+
+  /// Chained bridging header path.
+  swiftscan_string_ref_t chained_bridging_header_path;
+
+  /// Chained bridging header content.
+  swiftscan_string_ref_t chained_bridging_header_content;
+
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.
@@ -140,22 +181,18 @@ typedef struct {
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
 
+  /// A flag that indicates this dependency is associated with a static archive
+  bool is_static;
+
+  /// Macro dependecies.
+  swiftscan_macro_dependency_set_t *macro_dependencies;
+
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
+
+  /// User module version
+  swiftscan_string_ref_t user_module_version;
 } swiftscan_swift_binary_details_t;
-
-/// Swift placeholder modules carry additional details that specify their
-/// module doc path and source info paths.
-typedef struct {
-  /// The path to the pre-compiled binary module
-  swiftscan_string_ref_t compiled_module_path;
-
-  /// The path to the .swiftModuleDoc file.
-  swiftscan_string_ref_t module_doc_path;
-
-  /// The path to the .swiftSourceInfo file.
-  swiftscan_string_ref_t module_source_info_path;
-} swiftscan_swift_placeholder_details_t;
 
 /// Clang modules are built from a module map file.
 typedef struct {
@@ -167,9 +204,6 @@ typedef struct {
 
   /// Options to the compile command required to build this clang modulemap
   swiftscan_string_set_t *command_line;
-
-  /// The swift-specific PCM arguments captured by this dependencies object
-  swiftscan_string_set_t *captured_pcm_args;
 
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t cas_fs_root_id;
@@ -186,15 +220,8 @@ struct swiftscan_module_details_s {
   union {
     swiftscan_swift_textual_details_t swift_textual_details;
     swiftscan_swift_binary_details_t swift_binary_details;
-    swiftscan_swift_placeholder_details_t swift_placeholder_details;
     swiftscan_clang_details_t clang_details;
   };
-};
-
-struct swiftscan_batch_scan_entry_s {
-  swiftscan_string_ref_t module_name;
-  swiftscan_string_ref_t arguments;
-  bool is_swift;
 };
 
 struct swiftscan_import_set_s {
@@ -212,7 +239,13 @@ struct swiftscan_scan_invocation_s {
 struct swiftscan_diagnostic_info_s {
   swiftscan_string_ref_t message;
   swiftscan_diagnostic_severity_t severity;
-  // TODO: SourceLoc
+  swiftscan_source_location_t source_location;
+};
+
+struct swiftscan_source_location_s {
+  swiftscan_string_ref_t buffer_identifier;
+  uint32_t line_number;
+  uint32_t column_number;
 };
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

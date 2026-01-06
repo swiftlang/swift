@@ -8,7 +8,7 @@ import _Concurrency
 // short-term source compatibility)
 @available(SwiftStdlib 5.1, *)
 extension PartialAsyncTask {
-  // expected-warning@-1 {{'PartialAsyncTask' is deprecated: renamed to 'UnownedJob'}}
+  // expected-warning@-1 {{'PartialAsyncTask' is deprecated: renamed to 'UnownedJob'}}{{documentation-file=deprecated-declaration}}
   // expected-note@-2 {{use 'UnownedJob' instead}}
 }
 @available(SwiftStdlib 5.1, *)

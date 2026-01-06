@@ -15,8 +15,8 @@
 #else
 #include "swift/Runtime/Debug.h"
 #endif
-#include "swift/shims/UnicodeData.h"
-#include <limits>
+#include "UnicodeData.h"
+#include <stdint.h>
 
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -60,15 +60,15 @@ __swift_uint8_t _swift_stdlib_getGraphemeBreakProperty(__swift_uint32_t scalar) 
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_bool _swift_stdlib_isLinkingConsonant(__swift_uint32_t scalar) {
+__swift_bool _swift_stdlib_isInCB_Consonant(__swift_uint32_t scalar) {
 #if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
   swift::swift_abortDisabledUnicodeSupport();
 #else
   auto idx = _swift_stdlib_getScalarBitArrayIdx(scalar,
-                                          _swift_stdlib_linkingConsonant,
-                                          _swift_stdlib_linkingConsonant_ranks);
+                                          _swift_stdlib_InCB_Consonant,
+                                          _swift_stdlib_InCB_Consonant_ranks);
 
-  if (idx == std::numeric_limits<__swift_intptr_t>::max()) {
+  if (idx == INTPTR_MAX) {
     return false;
   }
 

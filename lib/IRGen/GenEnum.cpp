@@ -104,10 +104,12 @@
 #include "GenEnum.h"
 
 #include "swift/AST/Types.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/CFG.h"
@@ -187,7 +189,7 @@ void EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   if (TIK >= Loadable)
     return initialize(IGF, params, dest, isOutlined);
   Address src = TI->getAddressForPointer(params.claimNext());
-  TI->initializeWithTake(IGF, dest, src, T, isOutlined);
+  TI->initializeWithTake(IGF, dest, src, T, isOutlined, /*zeroizeIfSensitive=*/ true);
 }
 
 bool EnumImplStrategy::isReflectable() const { return true; }
@@ -229,9 +231,9 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto argTy = elt->getParentEnum()->mapTypeIntoContext(
-      elt->getArgumentInterfaceType());
-    return IGF.getTypeInfoForUnlowered(argTy)
+    auto payloadTy = elt->getParentEnum()->mapTypeIntoEnvironment(
+      elt->getPayloadInterfaceType());
+    return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
   }
 
@@ -252,9 +254,9 @@ const {
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
-    auto argTy = Case->getParentEnum()->mapTypeIntoContext(
-      Case->getArgumentInterfaceType());
-    return IGF.getTypeInfoForUnlowered(argTy)
+    auto payloadTy = Case->getParentEnum()->mapTypeIntoEnvironment(
+      Case->getPayloadInterfaceType());
+    return IGF.getTypeInfoForUnlowered(payloadTy)
       .getUndefAddress();
   }
 
@@ -322,13 +324,13 @@ EnumImplStrategy::emitOutlinedGetEnumTag(IRGenFunction &IGF, SILType T,
                             .getAddress());
 
   auto outlinedFn = [T, &IGF] () -> llvm::Constant* {
-    IRGenMangler mangler;
+    IRGenMangler mangler(T.getASTContext());
     auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
     auto funcName = mangler.mangleOutlinedEnumGetTag(manglingBits.first,
                                                      manglingBits.second);
 
     const TypeInfo &ti = IGF.getTypeInfo(T);
-    auto ptrTy = ti.getStorageType()->getPointerTo();
+    auto *ptrTy = IGF.IGM.PtrTy;
     llvm::SmallVector<llvm::Type *, 4> paramTys;
     paramTys.push_back(ptrTy);
 
@@ -619,7 +621,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
@@ -627,7 +630,7 @@ namespace {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->initializeWithTake(
-            IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
+            IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined, zeroizeIfSensitive);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
       }
@@ -660,6 +663,13 @@ namespace {
         return;
       }
 
+      if (!ElementsAreABIAccessible) {
+        auto temporary = TI->allocateStack(IGF, T, "deinit.arg").getAddress();
+        cast<LoadableTypeInfo>(TI)->initialize(IGF, src, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
       if (getLoadableSingleton())
         getLoadableSingleton()->consume(IGF, src, atomicity,
                                         getSingletonType(IGF.IGM, T));
@@ -674,7 +684,7 @@ namespace {
       if (tryEmitDestroyUsingDeinit(IGF, addr, T)) {
         return;
       }
-                 
+
       if (getSingleton() &&
           !getSingleton()->isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         if (!ElementsAreABIAccessible) {
@@ -726,8 +736,8 @@ namespace {
 
       // Pre swift-5.1 runtimes were missing the initialization of the
       // the extraInhabitantCount field. Do it here instead.
-      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
-          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadRef =
+          IGF.Builder.CreateBitOrPointerCast(payloadLayout, IGM.PtrTy);
       auto payloadExtraInhabitantCount =
           IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
               Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
@@ -764,8 +774,8 @@ namespace {
       // Pre swift-5.1 runtimes were missing the initialization of the
       // the extraInhabitantCount field. Do it here instead.
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
-      auto payloadRef = IGF.Builder.CreateBitOrPointerCast(
-          payloadLayout, IGF.IGM.TypeLayoutTy->getPointerTo());
+      auto payloadRef =
+          IGF.Builder.CreateBitOrPointerCast(payloadLayout, IGM.PtrTy);
       auto payloadExtraInhabitantCount =
           IGF.Builder.CreateLoad(IGF.Builder.CreateStructGEP(
               Address(payloadRef, IGF.IGM.TypeLayoutTy, Alignment(1)), 3,
@@ -1110,7 +1120,8 @@ namespace {
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {}
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       // No-payload enums are always POD, so we can always initialize by
       // primitive copy.
       llvm::Value *val = IGF.Builder.CreateLoad(src);
@@ -1419,10 +1430,7 @@ namespace {
   // types other than i1 or power-of-two-byte sizes like i8, i16, etc. inhibit
   // FastISel and expose backend bugs.
   static unsigned getIntegerBitSizeForTag(unsigned tagBits) {
-    // i1 is used to represent bool in C so is fairly well supported.
-    if (tagBits == 1)
-      return 1;
-    // Otherwise, round the physical size in bytes up to the next power of two.
+    // Round the physical size in bytes up to the next power of two.
     unsigned tagBytes = (tagBits + 7U)/8U;
     if (!llvm::isPowerOf2_32(tagBytes))
       tagBytes = llvm::NextPowerOf2(tagBytes);
@@ -1685,11 +1693,22 @@ namespace {
       auto payload = EnumPayload::load(IGF, projectPayload(IGF, addr),
                                        PayloadSchema);
       if (ExtraTagBitCount > 0) {
-        extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
         if (maskExtraTagBits) {
-          auto maskBits = llvm::NextPowerOf2(NumExtraTagValues) - 1;
+          auto projectedBits = projectExtraTagBits(IGF, addr);
+          // LLVM assumes that loads of fractional byte sizes have been stored
+          // with the same type, so all unused bits would be 0. Since we are
+          // re-using spare bits for tag storage, that assumption is wrong here.
+          // In CVW we have to mask the extra bits, which requires us to make
+          // this cast here, otherwise LLVM would optimize away the bit mask.
+          if (projectedBits.getElementType()->getIntegerBitWidth() < 8) {
+            projectedBits = IGF.Builder.CreateElementBitCast(projectedBits, IGM.Int8Ty);
+          }
+          extraTag = IGF.Builder.CreateLoad(projectedBits);
+          auto maskBits = (1 << ExtraTagBitCount) - 1;
           auto mask = llvm::ConstantInt::get(extraTag->getType(), maskBits);
           extraTag = IGF.Builder.CreateAnd(extraTag, mask);
+        } else {
+          extraTag = IGF.Builder.CreateLoad(projectExtraTagBits(IGF, addr));
         }
       }
       return {std::move(payload), extraTag};
@@ -1806,11 +1825,6 @@ namespace {
       return cast<LoadableTypeInfo>(*ElementsWithPayload[0].ti);
     }
 
-    llvm::Value *emitPayloadMetadataForLayout(IRGenFunction &IGF,
-                                     SILType T) const {
-      return IGF.emitTypeMetadataRefForLayout(getPayloadType(IGF.IGM, T));
-    }
-
     /// More efficient value semantics implementations for certain enum layouts.
     enum CopyDestroyStrategy {
       /// No special behavior.
@@ -1842,7 +1856,7 @@ namespace {
 
     llvm::Function *
     emitCopyEnumFunction(IRGenModule &IGM, SILType theEnumType) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
@@ -1900,7 +1914,7 @@ namespace {
     llvm::Function *
     emitConsumeEnumFunction(IRGenModule &IGM, SILType theEnumType,
                             OutliningMetadataCollector &collector) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
       std::string name =
@@ -1971,6 +1985,7 @@ namespace {
 
       // If the payload is TriviallyDestroyable, then we can use TriviallyDestroyable value semantics.
       auto &payloadTI = *ElementsWithPayload[0].ti;
+
       if (!payloadTI.isABIAccessible()) {
         CopyDestroyKind = ABIInaccessible;
       } else if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
@@ -2051,8 +2066,7 @@ namespace {
       auto PayloadT = getPayloadType(IGF.IGM, T);
 
       auto &fixedTI = getFixedPayloadTypeInfo();
-      auto addr = IGF.Builder.CreateBitCast(
-          enumAddr.getAddress(), fixedTI.getStorageType()->getPointerTo());
+      auto addr = IGF.Builder.CreateBitCast(enumAddr.getAddress(), IGM.PtrTy);
       return fixedTI.getEnumTagSinglePayload(IGF, numEmptyCases,
                                              fixedTI.getAddressForPointer(addr),
                                              PayloadT, /*isOutlined*/ false);
@@ -2198,15 +2212,9 @@ namespace {
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
       if (tagBits) {
-        if (ExtraTagBitCount == 1) {
-          if (extraTag == 1)
-            tagResult = tagBits;
-          else
-            tagResult = IGF.Builder.CreateNot(tagBits);
-        } else {
-          tagResult = IGF.Builder.CreateICmpEQ(tagBits,
-                    llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
-        }
+        tagResult = IGF.Builder.CreateICmpEQ(
+            tagBits,
+            llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
       }
       
       if (tagResult && payloadResult)
@@ -2288,7 +2296,9 @@ namespace {
             oneDest = llvm::BasicBlock::Create(C);
             tagBitBlocks.push_back(oneDest);
           }
-          IGF.Builder.CreateCondBr(tagBits, oneDest, zeroDest);
+          auto isOne = IGF.Builder.CreateICmpEQ(
+              tagBits, llvm::ConstantInt::get(tagBits->getType(), 1));
+          IGF.Builder.CreateCondBr(isOne, oneDest, zeroDest);
         } else {
           auto swi = SwitchBuilder::create(IGF, tagBits,
                            SwitchDefaultDest(unreachableBB, IsUnreachable),
@@ -2564,14 +2574,9 @@ namespace {
       // If we have extra tag bits, they will be zero if we contain a payload.
       if (ExtraTagBitCount > 0) {
         assert(extraBits);
-        llvm::Value *isNonzero;
-        if (ExtraTagBitCount == 1) {
-          isNonzero = extraBits;
-        } else {
-          llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
-          isNonzero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
-                                         extraBits, zero);
-        }
+        llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
+        llvm::Value *isNonzero =
+            IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE, extraBits, zero);
 
         auto *zeroBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
         IGF.Builder.CreateCondBr(isNonzero, nonzeroBB, zeroBB);
@@ -2666,7 +2671,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongRetain(IGF, e, IGF.getDefaultAtomicity());
+          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRetain(
+              IGF, e, /*needsNullCheck*/ true);
           return;
         }
 
@@ -2702,7 +2708,8 @@ namespace {
         if (Refcounting == ReferenceCounting::Custom) {
           Explosion e;
           e.add(ptr);
-          getPayloadTypeInfo().as<ClassTypeInfo>().strongRelease(IGF, e, IGF.getDefaultAtomicity());
+          getPayloadTypeInfo().as<ClassTypeInfo>().strongCustomRelease(
+              IGF, e, /*needsNullCheck*/ true);
           return;
         }
 
@@ -2834,6 +2841,14 @@ namespace {
       if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
+
+      if (!ElementsAreABIAccessible) {
+        auto temporary = TI->allocateStack(IGF, T, "deinit.arg").getAddress();
+        cast<LoadableTypeInfo>(TI)->initialize(IGF, src, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
       assert(TIK >= Loadable);
 
       switch (CopyDestroyKind) {
@@ -3277,7 +3292,16 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      if (TI->isBitwiseTakable(ResilienceExpansion::Maximal)) {
+        IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
+        return;
+      }
+
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -3757,7 +3781,7 @@ namespace {
     }
 
     llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
@@ -3789,7 +3813,7 @@ namespace {
     llvm::Function *
     emitConsumeEnumFunction(IRGenModule &IGM, SILType type,
                             OutliningMetadataCollector &collector) const {
-      IRGenMangler Mangler;
+      IRGenMangler Mangler(IGM.Context);
       auto manglingBits =
         getTypeAndGenericSignatureForManglingOutlineFunction(type);
       std::string name =
@@ -3893,8 +3917,8 @@ namespace {
       } else if (allSingleRefcount
                  && ElementsWithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedRefcounted;
-      } else if (this->EnumImplStrategy::BitwiseTakable == IsBitwiseTakable &&
-                 Copyable == IsCopyable) {
+      } else if (this->EnumImplStrategy::BitwiseTakable == IsBitwiseTakableAndBorrowable
+                 && Copyable == IsCopyable) {
         CopyDestroyKind = BitwiseTakable;
       }
     }
@@ -4864,6 +4888,14 @@ namespace {
       if (tryEmitConsumeUsingDeinit(IGF, src, T)) {
         return;
       }
+
+      if (!ElementsAreABIAccessible) {
+        auto temporary = TI->allocateStack(IGF, T, "deinit.arg").getAddress();
+        cast<LoadableTypeInfo>(TI)->initialize(IGF, src, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
       assert(TIK >= Loadable);
       switch (CopyDestroyKind) {
       case TriviallyDestroyable:
@@ -5109,7 +5141,7 @@ namespace {
 
           if (isTake)
             payloadTI.initializeWithTake(IGF, destData, srcData, PayloadT,
-                                         isOutlined);
+                                         isOutlined, /*zeroizeIfSensitive=*/ true);
           else
             payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT,
                                          isOutlined);
@@ -5183,7 +5215,16 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      if (TI->isBitwiseTakable(ResilienceExpansion::Maximal)) {
+        IGF.Builder.CreateMemCpy(
+          dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
+          src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
+          TI->getSize(IGF, T));
+        return;
+      }
+
       if (!ElementsAreABIAccessible) {
         emitInitializeWithTakeCall(IGF, T, dest, src);
       } else if (isOutlined || T.hasParameterizedExistential()) {
@@ -6121,7 +6162,8 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
       emitInitializeWithTakeCall(IGF, T,
                                  dest, src);
     }
@@ -6352,7 +6394,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
-  auto bitwiseTakable = IsBitwiseTakable; // FIXME: will there be check here?
+  auto bitwiseTakable = IsBitwiseTakableAndBorrowable; // FIXME: will there be check here?
   bool allowFixedLayoutOptimizations = true;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
@@ -6364,7 +6406,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
     copyable = copyable & payloadTI.isCopyable(ResilienceExpansion::Maximal);
     bitwiseTakable = bitwiseTakable &
-      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+      payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal);
   };
 
   if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
@@ -6387,7 +6429,6 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   // fixed-size from this resilience scope.
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
-
   for (auto elt : theEnum->getAllElements()) {
     ++numElements;
 
@@ -6420,10 +6461,10 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // strategy. If the abstract layout of the enum is dependent on generic
     // parameters, then we additionally need to constrain any layout
     // optimizations we perform to things that are reproducible by the runtime.
-    Type origArgType = elt->getArgumentInterfaceType();
-    origArgType = theEnum->mapTypeIntoContext(origArgType);
+    Type origPayloadType = elt->getPayloadInterfaceType();
+    origPayloadType = theEnum->mapTypeIntoEnvironment(origPayloadType);
 
-    auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
+    auto origArgLoweredTy = TC.IGM.getLoweredType(origPayloadType);
     auto *origArgTI = &TC.getCompleteTypeInfo(origArgLoweredTy.getASTType());
 
     // If the unsubstituted argument contains a generic parameter type, or
@@ -6490,8 +6531,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
-  // Enums imported from Clang or marked with @objc use C-compatible layout.
-  if (theEnum->hasClangNode() || theEnum->isObjC()) {
+  // Enums imported from Clang or marked with @objc or @c use a
+  // C-compatible layout.
+  if (theEnum->hasClangNode() || theEnum->isCCompatibleEnum()) {
     assert(elementsWithPayload.empty() && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
@@ -6571,8 +6613,10 @@ namespace {
       return Strategy.initializeWithCopy(IGF, dest, src, T, isOutlined);
     }
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      return Strategy.initializeWithTake(IGF, dest, src, T, isOutlined);
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      return Strategy.initializeWithTake(IGF, dest, src, T, isOutlined,
+                                         zeroizeIfSensitive);
     }
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {
@@ -6671,10 +6715,11 @@ namespace {
                       IsTriviallyDestroyable_t isTriviallyDestroyable,
                       IsBitwiseTakable_t isBT,
                       IsCopyable_t copyable,
-                      IsFixedSize_t alwaysFixedSize)
+                      IsFixedSize_t alwaysFixedSize,
+                      IsABIAccessible_t isABIAccessible)
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, isBT, copyable,
-                              alwaysFixedSize) {}
+                              alwaysFixedSize, isABIAccessible) {}
   };
 
   /// TypeInfo for loadable enum types.
@@ -6686,10 +6731,11 @@ namespace {
                          Alignment A,
                          IsTriviallyDestroyable_t isTriviallyDestroyable,
                          IsCopyable_t copyable,
-                         IsFixedSize_t alwaysFixedSize)
+                         IsFixedSize_t alwaysFixedSize,
+                         IsABIAccessible_t isABIAccessible)
       : FixedEnumTypeInfoBase(strategy, T, S, std::move(SB), A,
                               isTriviallyDestroyable, copyable,
-                              alwaysFixedSize) {}
+                              alwaysFixedSize, isABIAccessible) {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
@@ -6775,6 +6821,14 @@ namespace {
                           IsABIAccessible_t abiAccessible)
       : EnumTypeInfoBase(strategy, irTy, copyable, abiAccessible) {}
   };
+
+  class BitwiseCopyableEnumTypeInfo
+      : public EnumTypeInfoBase<BitwiseCopyableTypeInfo> {
+  public:
+    BitwiseCopyableEnumTypeInfo(EnumImplStrategy &strategy, llvm::Type *irTy,
+                                IsABIAccessible_t abiAccessible)
+        : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
+  };
 } // end anonymous namespace
 
 const EnumImplStrategy &
@@ -6799,7 +6853,8 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                        Alignment A,
                                        IsTriviallyDestroyable_t isTriviallyDestroyable,
                                        IsBitwiseTakable_t isBT,
-                                       IsCopyable_t isCopyable) {
+                                       IsCopyable_t isCopyable,
+                                       IsABIAccessible_t abiAccessible) {
   TypeInfo *mutableTI;
   switch (TIK) {
   case Opaque:
@@ -6809,14 +6864,17 @@ EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                       isTriviallyDestroyable,
                                       isBT,
                                       isCopyable,
-                                      AlwaysFixedSize);
+                                      AlwaysFixedSize,
+                                      abiAccessible);
     break;
   case Loadable:
-    assert(isBT && "loadable enum not bitwise takable?!");
+    assert(isBT == IsBitwiseTakableAndBorrowable
+           && "loadable enum not bitwise takable?!");
     mutableTI = new LoadableEnumTypeInfo(*this, T, S, std::move(SB), A,
                                          isTriviallyDestroyable,
                                          isCopyable,
-                                         AlwaysFixedSize);
+                                         AlwaysFixedSize,
+                                         abiAccessible);
     break;
   }
   TI = mutableTI;
@@ -6837,7 +6895,8 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                  alignment,
                  TriviallyDestroyable,
                  Copyable,
-                 AlwaysFixedSize));
+                 AlwaysFixedSize,
+                 IsABIAccessible));
   } else {
     const TypeInfo &eltTI = *getSingleton();
 
@@ -6864,13 +6923,16 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto alignment = fixedEltTI.getFixedAlignment();
       applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
+      auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
+                                                            Type.getASTType());
       return getFixedEnumTypeInfo(enumTy,
         fixedEltTI.getFixedSize(),
         fixedEltTI.getSpareBits(),
         alignment,
         TriviallyDestroyable,
         BitwiseTakable,
-        Copyable);
+        Copyable,
+        isABIAccessible);
     }
   }
 }
@@ -6905,7 +6967,8 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                               alignment,
                               TriviallyDestroyable,
                               Copyable,
-                              AlwaysFixedSize));
+                              AlwaysFixedSize,
+                              IsABIAccessible));
 }
 
 TypeInfo *
@@ -6915,7 +6978,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                     llvm::StructType *enumTy){
   // The type should have come from Clang or be @objc,
   // and should have a raw type.
-  assert((theEnum->hasClangNode() || theEnum->isObjC())
+  assert((theEnum->hasClangNode() || theEnum->isCCompatibleEnum())
          && "c-compatible enum didn't come from clang!");
   assert(theEnum->hasRawType()
          && "c-compatible enum doesn't have raw type!");
@@ -6954,7 +7017,8 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                alignment,
                                                IsTriviallyDestroyable,
                                                IsCopyable,
-                                               IsFixedSize));
+                                               IsFixedSize,
+                                               IsABIAccessible));
 }
 
 TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
@@ -7022,11 +7086,15 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
+
+  auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
+                                                        Type.getASTType());
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-      payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
-      copyable);
+      payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
+      copyable, isABIAccessible);
+
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
     loweredType = Type;
@@ -7060,7 +7128,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
          deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
-         payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+         payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
          copyable,
          enumAccessible));
 }
@@ -7095,7 +7163,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     ? IsNotCopyable : IsCopyable;
   auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  IsBitwiseTakable_t isBT = IsBitwiseTakable;
+  IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
   PayloadSize = 0;
   for (auto &elt : ElementsWithPayload) {
     auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti);
@@ -7103,8 +7171,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
       worstAlignment = fixedPayloadTI.getFixedAlignment();
     if (!fixedPayloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
       isTriviallyDestroyable = IsNotTriviallyDestroyable;
-    if (!fixedPayloadTI.isBitwiseTakable(ResilienceExpansion::Maximal))
-      isBT = IsNotBitwiseTakable;
+    isBT &= fixedPayloadTI.getBitwiseTakable(ResilienceExpansion::Maximal);
 
     unsigned payloadBytes = fixedPayloadTI.getFixedSize().getValue();
     unsigned payloadBits = fixedPayloadTI.getFixedSize().getValueInBits();
@@ -7233,9 +7300,12 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/ true, worstAlignment);
 
+  auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
+                                                        Type.getASTType());
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isTriviallyDestroyable, isBT,
-                       isCopyable);
+                       isCopyable, isABIAccessible);
+
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
@@ -7261,12 +7331,12 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   Alignment alignment(1);
   auto td = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto bt = IsBitwiseTakable;
+  auto bt = IsBitwiseTakableAndBorrowable;
   for (auto &element : ElementsWithPayload) {
     auto &payloadTI = *element.ti;
     alignment = std::max(alignment, payloadTI.getBestKnownAlignment());
     td &= payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
-    bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
+    bt &= payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/false, alignment);
@@ -7296,17 +7366,19 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
+  auto cp = !theEnum->canBeCopyable()
+    ? IsNotCopyable : IsCopyable;
   auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   auto *bitwiseCopyableProtocol =
       IGM.getSwiftModule()->getASTContext().getProtocol(
           KnownProtocolKind::BitwiseCopyable);
   if (bitwiseCopyableProtocol &&
-      IGM.getSwiftModule()->lookupConformance(
-          theEnum->getDeclaredInterfaceType(), bitwiseCopyableProtocol)) {
-    return BitwiseCopyableTypeInfo::create(enumTy, abiAccessible);
+      checkConformance(Type.getASTType(), bitwiseCopyableProtocol)) {
+    return registerEnumTypeInfo(
+        new BitwiseCopyableEnumTypeInfo(*this, enumTy, abiAccessible));
   }
   return registerEnumTypeInfo(
-                       new ResilientEnumTypeInfo(*this, enumTy, Copyable,
+                       new ResilientEnumTypeInfo(*this, enumTy, cp,
                                                  abiAccessible));
 }
 
@@ -7471,16 +7543,15 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestructiveProjectDataForLoad(
                               SILType T, const TypeInfo &ti,
                               EnumElementDecl *theCase,
                               unsigned caseIdx) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName =
     mangler.mangleOutlinedEnumProjectDataForLoadFunction(manglingBits.first,
                                                          manglingBits.second,
                                                          caseIdx);
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
 
   return getOrCreateHelperFunction(funcName, PtrTy, paramTys,
       [&](IRGenFunction &IGF) {
@@ -7547,15 +7618,14 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedEnumTagStoreFunction(
                               SILType T, const TypeInfo &ti,
                               EnumElementDecl *theCase,
                               unsigned caseIdx) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto manglingBits = getTypeAndGenericSignatureForManglingOutlineFunction(T);
   auto funcName = mangler.mangleOutlinedEnumTagStoreFunction(manglingBits.first,
                                                              manglingBits.second,
                                                              caseIdx);
 
-  auto ptrTy = ti.getStorageType()->getPointerTo();
   llvm::SmallVector<llvm::Type *, 4> paramTys;
-  paramTys.push_back(ptrTy);
+  paramTys.push_back(PtrTy);
 
   return getOrCreateHelperFunction(funcName, VoidTy, paramTys,
       [&](IRGenFunction &IGF) {

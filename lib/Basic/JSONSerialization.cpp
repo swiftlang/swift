@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Format.h"
@@ -139,6 +140,7 @@ bool Output::bitSetMatch(const char *Str, bool Matches) {
     }
     llvm::StringRef StrRef(Str);
     scalarString(StrRef, true);
+    NeedBitValueComma = true;
   }
   return false;
 }

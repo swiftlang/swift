@@ -1,10 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift
 
 
 
 protocol RegularProto {}
-protocol NCProto: RegularProto // expected-error{{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
-  where Self: ~Copyable {
+protocol NCProto: RegularProto
+  where Self: ~Copyable { // expected-error{{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
   func checkIfCopyableSelf(_ s: Self)
 }
 

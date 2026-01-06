@@ -15,8 +15,12 @@
 
 #include "OutputLanguageMode.h"
 
+#include "PrintClangFunction.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
+#include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -54,6 +58,7 @@ public:
 private:
   class Implementation;
   friend class Implementation;
+  friend class DeclAndTypeClangFunctionPrinter;
 
   ModuleDecl &M;
   raw_ostream &os;
@@ -67,6 +72,7 @@ private:
   bool requiresExposedAttribute;
   llvm::StringSet<> &exposedModules;
   OutputLanguageMode outputLang;
+  llvm::DenseMap<Type, std::optional<ClangRepresentation>> typeRepresentations;
 
   /// The name 'CFTypeRef'.
   ///
@@ -78,7 +84,7 @@ private:
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
                      raw_ostream &outOfLineDefinitionsOS,
-                     DelayedMemberSet &delayed,
+                     const DelayedMemberSet &delayed,
                      CxxDeclEmissionScope &topLevelEmissionScope,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
@@ -101,6 +107,13 @@ public:
     return *cxxDeclEmissionScope;
   }
 
+  DeclAndTypePrinter withOutputStream(raw_ostream &s) {
+    return DeclAndTypePrinter(
+        M, s, prologueOS, outOfLineDefinitionsOS, objcDelayedMembers,
+        *cxxDeclEmissionScope, typeMapping, interopContext, minRequiredAccess,
+        requiresExposedAttribute, exposedModules, outputLang);
+  }
+
   void setCxxDeclEmissionScope(CxxDeclEmissionScope &scope) {
     cxxDeclEmissionScope = &scope;
   }
@@ -109,12 +122,18 @@ public:
   /// the options the printer was constructed with.
   bool shouldInclude(const ValueDecl *VD);
 
+  bool isZeroSized(const NominalTypeDecl *decl);
+
   /// Returns true if \p vd is visible given the current access level and thus
   /// can be included in the generated header.
   bool isVisible(const ValueDecl *vd) const;
 
   void print(const Decl *D);
-  void print(Type ty);
+  void print(Type ty, std::optional<OptionalTypeKind> overrideOptionalTypeKind =
+                          std::nullopt);
+
+  /// Prints the name of the type including generic arguments.
+  void printTypeName(raw_ostream &os, Type ty, const ModuleDecl *moduleContext);
 
   void printAvailability(raw_ostream &os, const Decl *D);
 
@@ -142,6 +161,10 @@ public:
   static std::pair<Type, OptionalTypeKind>
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty);
 };
+
+bool isStringNestedType(const ValueDecl *VD, StringRef Typename);
+
+bool hasExposeNotCxxAttr(const ValueDecl *VD);
 
 } // end namespace swift
 

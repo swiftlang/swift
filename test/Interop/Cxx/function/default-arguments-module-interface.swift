@@ -1,3 +1,4 @@
+// RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
@@ -64,6 +65,8 @@
 // CHECK: func ambiguous(_ a: Int32) -> Int32
 
 // CHECK: func nonTrailing(_ a: Int32 = cxxDefaultArg, _ b: Int32 = cxxDefaultArg) -> Int32
+
+// CHECK: func takesUnnamedParam(_: Int32 = cxxDefaultArg) -> Int32
 
 // CHECK: struct InvalidStruct<NoDefinition> {
 // CHECK:   func invalidDefaultExprMethod(_ x: Base<NoDefinition>)

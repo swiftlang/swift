@@ -1,23 +1,4 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_UNRESOLVED | %FileCheck %s -check-prefix=METATYPE_UNRESOLVED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_UNRESOLVED_BRACKET | %FileCheck %s -check-prefix=METATYPE_UNRESOLVED_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_INT | %FileCheck %s -check-prefix=METATYPE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_INT_BRACKET | %FileCheck %s -check-prefix=METATYPE_INT_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_INT | %FileCheck %s -check-prefix=INSTANCE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_INT_BRACKET | %FileCheck %s -check-prefix=INSTANCE_INT_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_ARCHETYPE | %FileCheck %s -check-prefix=METATYPE_ARCHETYPE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_ARCHETYPE_BRACKET | %FileCheck %s -check-prefix=METATYPE_ARCHETYPE_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_ARCHETYPE | %FileCheck %s -check-prefix=INSTANCE_ARCHETYPE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_ARCHETYPE_BRACKET | %FileCheck %s -check-prefix=INSTANCE_ARCHETYPE_BRACKET
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_LABEL | %FileCheck %s -check-prefix=METATYPE_LABEL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSTANCE_LABEL | %FileCheck %s -check-prefix=INSTANCE_LABEL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SELF_IN_INSTANCEMETHOD | %FileCheck %s -check-prefix=SELF_IN_INSTANCEMETHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_IN_INSTANCEMETHOD | %FileCheck %s -check-prefix=SUPER_IN_INSTANCEMETHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SELF_IN_STATICMETHOD | %FileCheck %s -check-prefix=SELF_IN_STATICMETHOD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_IN_STATICMETHOD | %FileCheck %s -check-prefix=SUPER_IN_STATICMETHOD
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABELED_SUBSCRIPT | %FileCheck %s -check-prefix=LABELED_SUBSCRIPT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLE | %FileCheck %s -check-prefix=TUPLE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SETTABLE_SUBSCRIPT | %FileCheck %s -check-prefix=SETTABLE_SUBSCRIPT
+// RUN: %batch-code-completion
 
 struct MyStruct<T> {
   static subscript(x: Int, static defValue: T) -> MyStruct<T> {
@@ -31,10 +12,10 @@ struct MyStruct<T> {
 func test1() {
   let _ = MyStruct #^METATYPE_UNRESOLVED^#
 // METATYPE_UNRESOLVED: Begin completions, 4 items
-// METATYPE_UNRESOLVED-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}, {#static: _#}][#MyStruct<_>#];
-// METATYPE_UNRESOLVED-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#MyStruct<_>#];
-// METATYPE_UNRESOLVED-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct<_>.Type#];
-// METATYPE_UNRESOLVED-DAG: Keyword/CurrNominal:                .Type[#MyStruct<_>.Type#];
+// METATYPE_UNRESOLVED-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}, {#static: T#}][#MyStruct<T>#];
+// METATYPE_UNRESOLVED-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#MyStruct<T>#];
+// METATYPE_UNRESOLVED-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct<T>.Type#];
+// METATYPE_UNRESOLVED-DAG: Keyword/CurrNominal:                .Type[#MyStruct<T>.Type#];
 
   let _ = MyStruct[#^METATYPE_UNRESOLVED_BRACKET^#
 // METATYPE_UNRESOLVED_BRACKET-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#(x): Int#}, {#static: T#}[']'][#MyStruct<T>#];
@@ -129,7 +110,7 @@ func testSubscriptCallSig<T>(val: MyStruct1<T>) {
   val[#^LABELED_SUBSCRIPT^#
 // LABELED_SUBSCRIPT: Begin completions, 2 items
 // LABELED_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]:        ['[']{#idx1: Int#}, {#idx2: Comparable#}[']'][#Int!#];
-// LABELED_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]:                ['[']{#keyPath: KeyPath<MyStruct1<T>, Value>#}[']'][#Value#];
+// LABELED_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]:                ['[']{#keyPath: KeyPath<MyStruct1<Comparable>, Value>#}[']'][#Value#];
 }
 
 func testSubcscriptTuple(val: (x: Int, String)) {
@@ -150,5 +131,12 @@ func testSettableSub(x: inout HasSettableSub) {
     x[#^SETTABLE_SUBSCRIPT^#] = 32
 }
 // SETTABLE_SUBSCRIPT-DAG: Pattern/CurrNominal/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<HasSettableSub, Value>#}[']'][#Value#];
-// SETTABLE_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]/TypeRelation[Convertible]: ['[']{#(a): String#}[']'][#@lvalue Int#];
+// SETTABLE_SUBSCRIPT-DAG: Decl[Subscript]/CurrNominal/Flair[ArgLabels]: ['[']{#(a): String#}[']'][#@lvalue Int#];
 // SETTABLE_SUBSCRIPT-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: local[#String#]; name=local
+
+// rdar://139333904 - Make sure we don't hit an assertion.
+func testFnKeyPathSubscript() {
+  // The keyPath: subscript is supported on all non-nominal types, including functions.
+  test1[#^FN_KEYPATH_SUBSCRIPT^#]
+  // FN_KEYPATH_SUBSCRIPT: Pattern/None/Flair[ArgLabels]: ['[']{#keyPath: KeyPath<() -> (), Value>#}[']'][#Value#]; name=keyPath:
+}

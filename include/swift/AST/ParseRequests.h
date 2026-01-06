@@ -25,6 +25,7 @@
 namespace swift {
 
 struct ASTNode;
+class AvailabilityMacroMap;
 
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
@@ -88,7 +89,7 @@ public:
 struct SourceFileParsingResult {
   ArrayRef<ASTNode> TopLevelItems;
   std::optional<ArrayRef<Token>> CollectedTokens;
-  std::optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> Fingerprint;
 };
 
 /// Parse the top-level items of a SourceFile.
@@ -174,6 +175,48 @@ public:
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
 };
+
+class EvaluateIfConditionRequest
+    : public SimpleRequest<EvaluateIfConditionRequest,
+          std::pair<bool, bool>(SourceFile *, SourceRange conditionRange,
+                                bool shouldEvaluate),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::pair<bool, bool> evaluate(
+      Evaluator &evaluator, SourceFile *SF, SourceRange conditionRange,
+      bool shouldEvaluate) const;
+};
+
+/// Parse the '-define-availability' arguments.
+class AvailabilityMacroArgumentsRequest
+    : public SimpleRequest<AvailabilityMacroArgumentsRequest,
+                           const AvailabilityMacroMap *(ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  const AvailabilityMacroMap *evaluate(Evaluator &evaluator,
+                                       ASTContext *ctx) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+
+  // Source location.
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
+void simple_display(llvm::raw_ostream &out, const ASTContext *state);
 
 /// The zone number for the parser.
 #define SWIFT_TYPEID_ZONE Parse

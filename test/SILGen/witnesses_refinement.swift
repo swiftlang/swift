@@ -37,7 +37,7 @@ struct ConformsToP: P { }
 // CHECK-LABEL: sil_witness_table hidden ConformsToP3: P3
 // CHECK:         base_protocol P1
 // CHECK-NEXT:    base_protocol P2
-// CHECK-NEXT:    associated_type_protocol (A: P)
+// CHECK-NEXT:    associated_conformance (A: P)
 // CHECK-NEXT:   }
 struct ConformsToP3: P3 {
   typealias A = ConformsToP

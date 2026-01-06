@@ -38,16 +38,27 @@ protected:
 private:
   file_types::ID getOutputFileType(llvm::StringRef Path) const;
 
+  /// Return true if the file type is stored into CAS Backend directly.
+  static bool isStoredDirectly(file_types::ID Kind);
+
 public:
   SwiftCASOutputBackend(llvm::cas::ObjectStore &CAS,
                         llvm::cas::ActionCache &Cache,
                         llvm::cas::ObjectRef BaseKey,
                         const FrontendInputsAndOutputs &InputsAndOutputs,
+                        const FrontendOptions &Opts,
                         FrontendOptions::ActionType Action);
   ~SwiftCASOutputBackend();
 
   llvm::Error storeCachedDiagnostics(unsigned InputIndex,
                                      llvm::StringRef Bytes);
+
+  llvm::Error storeMakeDependenciesFile(StringRef OutputFilename,
+                                        llvm::StringRef Bytes);
+
+  /// Store the MCCAS CASID \p ID as the object file output for the input
+  /// that corresponds to the \p OutputFilename
+  llvm::Error storeMCCASObjectID(StringRef OutputFilename, llvm::cas::CASID ID);
 
 private:
   class Implementation;

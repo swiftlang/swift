@@ -19,7 +19,7 @@ protocol BaseProto {}
 
 protocol ProtoRefinesClass where Self : Generic<Int>, Self : BaseProto {
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias)
-  // expected-note@-1 {{protocol requires function 'requirementUsesClassTypes' with type '(Generic<Int>.ConcreteAlias, Generic<Int>.GenericAlias) -> ()' (aka '(String, (Int, Int)) -> ()'); add a stub for conformance}}
+  // expected-note@-1 {{protocol requires function 'requirementUsesClassTypes' with type '(Generic<Int>.ConcreteAlias, Generic<Int>.GenericAlias) -> ()' (aka '(String, (Int, Int)) -> ()')}}
 }
 
 func duplicateOverload<T : ProtoRefinesClass>(_: T) {}
@@ -112,6 +112,7 @@ class BadConformingClass2 : Generic<String>, ProtoRefinesClass {
   // expected-error@-1 {{'ProtoRefinesClass' requires that 'BadConformingClass2' inherit from 'Generic<Int>'}}
   // expected-note@-2 {{requirement specified as 'Self' : 'Generic<Int>' [with Self = BadConformingClass2]}}
   // expected-error@-3 {{type 'BadConformingClass2' does not conform to protocol 'ProtoRefinesClass'}}
+  // expected-note@-4 {{add stubs for conformance}}
 
   // expected-note@+1 {{candidate has non-matching type '(BadConformingClass2.ConcreteAlias, BadConformingClass2.GenericAlias) -> ()' (aka '(String, (String, String)) -> ()')}}
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias) {

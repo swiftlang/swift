@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-verify-all=false -enable-sil-verify-all=false -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck '--implicit-check-not=Begin Error' %s
 
 // REQUIRES: asserts
 
@@ -19,7 +19,10 @@ sil @alloc_pack_metadata_before_tuple : $@convention(thin) () -> () {
 }
 
 // CHECK-LABEL: Begin Error in function dealloc_pack_metadata_with_bad_operand
-// CHECK:       SIL verification failed: stack dealloc does not match most recent stack alloc:
+// CHECK:       SIL verification failed: deallocating allocation that is not the top of the stack
+// CHECK-LABEL: End Error in function dealloc_pack_metadata_with_bad_operand
+// CHECK-LABEL: Begin Error in function dealloc_pack_metadata_with_bad_operand
+// CHECK:       SIL verification failed: return with stack allocs that haven't been deallocated
 // CHECK-LABEL: End Error in function dealloc_pack_metadata_with_bad_operand
 // CHECK-LABEL: Begin Error in function dealloc_pack_metadata_with_bad_operand
 // CHECK:       SIL verification failed: Must have alloc_pack_metadata operand

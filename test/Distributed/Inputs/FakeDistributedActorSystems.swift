@@ -14,6 +14,20 @@
 
 import Distributed
 
+// ==== Example Distributed Actors ----------------------------------------------
+
+@available(SwiftStdlib 5.7, *)
+public distributed actor FakeRoundtripActorSystemDistributedActor {
+  public typealias ActorSystem = FakeRoundtripActorSystem
+}
+
+
+@available(SwiftStdlib 5.7, *)
+@_transparent
+public func takeIsolatedDistributedActorReturnAsLocalActor<T: DistributedActor>(_ t: isolated T) -> any Actor {
+  return t.asLocalActor
+}
+
 // ==== Fake Address -----------------------------------------------------------
 
 public struct ActorAddress: Hashable, Sendable, Codable {
@@ -68,6 +82,80 @@ public struct NotLoadableActorAddress: Hashable, Sendable, Codable {
 
 @available(SwiftStdlib 5.7, *)
 public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
+  public typealias ActorID = ActorAddress
+  public typealias InvocationDecoder = FakeInvocationDecoder
+  public typealias InvocationEncoder = FakeInvocationEncoder
+  public typealias SerializationRequirement = Codable
+  public typealias ResultHandler = FakeRoundtripResultHandler
+
+  // just so that the struct does not become "trivial"
+  let someValue: String = ""
+  let someValue2: String = ""
+  let someValue3: String = ""
+  let someValue4: String = ""
+
+  public init() {
+    print("Initialized new FakeActorSystem")
+  }
+
+  public func resolve<Act>(id: ActorID, as actorType: Act.Type) throws -> Act?
+      where Act: DistributedActor,
+      Act.ID == ActorID  {
+    nil
+  }
+
+  public func assignID<Act>(_ actorType: Act.Type) -> ActorID
+      where Act: DistributedActor,
+      Act.ID == ActorID {
+    ActorAddress(parse: "xxx")
+  }
+
+  public func actorReady<Act>(_ actor: Act)
+      where Act: DistributedActor,
+            Act.ID == ActorID {
+  }
+
+  public func resignID(_ id: ActorID) {
+  }
+
+  public func makeInvocationEncoder() -> InvocationEncoder {
+    .init()
+  }
+
+  public func remoteCall<Act, Err, Res>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation invocationEncoder: inout InvocationEncoder,
+      throwing: Err.Type,
+      returning: Res.Type
+  ) async throws -> Res
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error,
+          Res: SerializationRequirement {
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
+  }
+
+  public func remoteCallVoid<Act, Err>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder,
+    throwing: Err.Type
+  ) async throws
+    where Act: DistributedActor,
+          Act.ID == ActorID,
+          Err: Error {
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
+  }
+
+  public nonisolated var description: Swift.String {
+    "\(Self.self)()"
+  }
+}
+
+@available(SwiftStdlib 5.7, *)
+//@_spi(FakeDistributedActorSystems)
+public struct FakeActorSystemWithSPI: DistributedActorSystem, CustomStringConvertible {
   public typealias ActorID = ActorAddress
   public typealias InvocationDecoder = FakeInvocationDecoder
   public typealias InvocationEncoder = FakeInvocationEncoder
@@ -445,7 +533,7 @@ public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
 
   var argumentIndex: Int = 0
 
-  fileprivate init(
+  public init(
     args: [Any],
     substitutions: [Any.Type] = [],
     returnType: Any.Type? = nil,
@@ -534,7 +622,7 @@ extension ActorAddress {
     return bytes
   }
   func fromBytes(_ bytes: [UInt8]) throws -> ActorAddress {
-    let address = String(cString: bytes)
+    let address = String(decoding: bytes, as: UTF8.self)
     return Self.init(parse: address)
   }
 }

@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -94,10 +95,6 @@ public:
     return visitFunction(function, perfConstr, /*parentLoc*/ nullptr);
   }
 
-  bool visitFunctionEmbeddedSwift(SILFunction *function) {
-    return visitFunctionEmbeddedSwift(function, /*parentLoc*/ nullptr);
-  }
-
   /// Check functions _without_ performance annotations.
   ///
   /// This is need to check closure arguments of called performance-annotated
@@ -107,9 +104,6 @@ public:
 private:
   bool visitFunction(SILFunction *function, PerformanceConstraints perfConstr,
                         LocWithParent *parentLoc);
-
-  bool visitFunctionEmbeddedSwift(SILFunction *function,
-                                  LocWithParent *parentLoc);
 
   bool visitInst(SILInstruction *inst, PerformanceConstraints perfConstr,
                     LocWithParent *parentLoc);
@@ -157,75 +151,6 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
   }
 }
 
-/// Prints Embedded Swift specific performance diagnostics (no existentials,
-/// no metatypes, optionally no allocations) for \p function.
-bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
-    SILFunction *function, LocWithParent *parentLoc) {
-  // Don't check generic functions in embedded Swift, they're about to be
-  // removed anyway.
-  if (function->getLoweredFunctionType()->getSubstGenericSignature())
-    return false;
-
-  if (!function->isDefinition())
-    return false;
-
-  if (visitedFuncs.contains(function))
-    return false;
-  visitedFuncs[function] = PerformanceConstraints::None;
-
-  NonErrorHandlingBlocks neBlocks(function);
-
-  for (SILBasicBlock &block : *function) {
-    for (SILInstruction &inst : block) {
-      if (visitInst(&inst, PerformanceConstraints::None, parentLoc)) {
-        if (inst.getLoc().getSourceLoc().isInvalid()) {
-          auto demangledName = Demangle::demangleSymbolAsString(
-              inst.getFunction()->getName(),
-              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-          llvm::errs() << "in function " << demangledName << "\n";
-        }
-        LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
-        return true;
-      }
-
-      if (auto as = FullApplySite::isa(&inst)) {
-        LocWithParent asLoc(inst.getLoc().getSourceLoc(), parentLoc);
-        LocWithParent *loc = &asLoc;
-        if (parentLoc &&
-            asLoc.loc == inst.getFunction()->getLocation().getSourceLoc())
-          loc = parentLoc;
-
-        for (SILFunction *callee : bca->getCalleeList(as)) {
-          if (visitFunctionEmbeddedSwift(callee, loc))
-            return true;
-        }
-      } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
-        PrettyStackTracePerformanceDiagnostics stackTrace(
-            "visitFunction::BuiltinInst (once, once with context)", &inst);
-
-        switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::Once:
-        case BuiltinValueKind::OnceWithContext:
-          if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
-            LocWithParent asLoc(bi->getLoc().getSourceLoc(), parentLoc);
-            LocWithParent *loc = &asLoc;
-            if (parentLoc &&
-                asLoc.loc == bi->getFunction()->getLocation().getSourceLoc())
-              loc = parentLoc;
-
-            if (visitFunctionEmbeddedSwift(fri->getReferencedFunction(), loc))
-              return true;
-          }
-          break;
-        default:
-          break;
-        }
-      }
-    }
-  }
-  return false;
-}
-
 /// Prints performance diagnostics for \p function.
 bool PerformanceDiagnostics::visitFunction(SILFunction *function,
                                               PerformanceConstraints perfConstr,
@@ -233,26 +158,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
-      continue;
-
-    // TODO: it's not yet clear how to deal with error existentials.
-    // Ignore them for now. If we have typed throws we could ban error existentials
-    // because typed throws would provide and alternative.
-    if (isa<ThrowInst>(block.getTerminator()))
-      continue;
-
-    // If a function has multiple throws, all throw-path branch to the single throw-block.
-    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
-      if (isa<ThrowInst>(succ->getTerminator()))
-        continue;
-    }
-
-    if (!neBlocks.isNonErrorHandling(&block))
       continue;
 
     for (SILInstruction &inst : block) {
@@ -300,7 +208,7 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
             if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
               if (visitCallee(bi, fri->getReferencedFunction(), perfConstr, parentLoc))
                 return true;
-            } else {
+            } else if (perfConstr != PerformanceConstraints::ManualOwnership) {
               LocWithParent loc(inst.getLoc().getSourceLoc(), parentLoc);
               diagnose(loc, diag::performance_unknown_callees);
               return true;
@@ -342,6 +250,12 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
                                             SILInstruction *callInst,
                                             PerformanceConstraints perfConstr,
                                             LocWithParent *parentLoc) {
+  // Closures within a function are pre-annotated with [manual_ownership]
+  // within SILGen, if they're visible to users for annotation at all.
+  // So no recursive closure checking is needed here.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   // Walk through the definition of the closure until we find the "underlying"
   // function_ref instruction.
   while (!isa<FunctionRefInst>(closure)) {
@@ -386,6 +300,11 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
                                          CalleeList callees,
                                          PerformanceConstraints perfConstr,
                                          LocWithParent *parentLoc) {
+  // Manual Ownership is not checked recursively within callees of the function,
+  // it's a local, non-viral performance annotation.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   LocWithParent asLoc(callInst->getLoc().getSourceLoc(), parentLoc);
   LocWithParent *loc = &asLoc;
   if (parentLoc && asLoc.loc == callInst->getFunction()->getLocation().getSourceLoc())
@@ -446,30 +365,13 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
       if (auto *callee = apply->getReferencedFunctionOrNull()) {
         // Exclude `Swift._diagnoseUnexpectedEnumCaseValue<A, B>(type: A.Type, rawValue: B) -> Swift.Never`
         // It's a fatal error function, used for imported C enums.
-        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF" &&
-            !mt->getModule().getOptions().EmbeddedSwift) {
+        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF") {
           continue;
         }
       }
     }
     return false;
   }
-  return true;
-}
-
-static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
-  // Only diagnose metatype and value_metatype instructions, for now.
-  if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
-    auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
-    if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
-      Type instTy = metaTy->getInstanceType();
-      if (auto selfType = instTy->getAs<DynamicSelfType>())
-        instTy = selfType->getSelfType();
-      // Class metadata are supported in embedded Swift
-      return instTy->getClassOrBoundGenericClass() ? true : false;
-    }
-  }
-
   return true;
 }
 
@@ -480,8 +382,162 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
+  if (perfConstr == PerformanceConstraints::ManualOwnership) {
+    if (impact & RuntimeEffect::RefCounting) {
+      bool shouldDiagnose = false;
+      switch (inst->getKind()) {
+      case SILInstructionKind::PartialApplyInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::StoreInst:
+        break; // These modify reference counts, but aren't copies.
+      case SILInstructionKind::ExplicitCopyAddrInst:
+      case SILInstructionKind::ExplicitCopyValueInst:
+        break; // Explicitly acknowledged copies are OK.
+      case SILInstructionKind::CopyAddrInst: {
+        if (!cast<CopyAddrInst>(inst)->isTakeOfSrc())
+          shouldDiagnose = true; // If it isn't a [take], it's a copy.
+        break;
+      }
+      case SILInstructionKind::LoadInst: {
+        // FIXME: we don't have an `explicit_load` and transparent functions can
+        //   end up bringing in a `load [copy]`. A better approach is needed to
+        //   handle transparent functions, in general, as rewriting them during
+        //   inlining of transparent functions is also not so great, as it
+        //   may hide a copy that semantically is there, but we happened to
+        //   tuck away in a transparent synthesized function, like those
+        //   synthesized getters!
+        //
+        // For now look to see if the load copy's only non-destroying users are
+        // explicit_copy's, as that would indicate the user has acknowledged it:
+        //
+        //  %y = load [copy] %x
+        //  %z = explicit_copy_value %y
+        //  destroy_value %y
+        //
+        // In all other cases, it's safer to diagnose.
+        //
+        auto load = cast<LoadInst>(inst);
+        if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
+          break;
+
+        for (auto *use : load->getUsers()) {
+          if (!isa<ExplicitCopyAddrInst, ExplicitCopyValueInst,
+                   DestroyAddrInst, DestroyValueInst>(use)) {
+            shouldDiagnose = true;
+            break;
+          }
+        }
+        break;
+      }
+      default:
+        shouldDiagnose = true;
+        break;
+      }
+      if (shouldDiagnose) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "function " << inst->getFunction()->getName()
+                   << "\n has unexpected copying instruction: " << *inst);
+
+        // Try to come up with a useful diagnostic.
+
+        // First, identify what is being copied.
+        SILValue copied;
+        if (auto svi = dyn_cast<SingleValueInstruction>(inst)) {
+          copied = svi;
+        } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+          copied = cai->getSrc();
+        }
+
+        // Find a name for that copied thing.
+        std::optional<Identifier> name;
+        if (copied)
+          name = VariableNameInferrer::inferName(copied);
+
+        if (!name) {
+          // Emit a rudimentary diagnostic.
+          diagnose(loc, diag::manualownership_copy);
+          return false;
+        }
+
+        // Try to tailor the diagnostic based on usages.
+
+        // Simplistic check for whether this is a closure capture.
+        for (auto user : copied->getUsers()) {
+          if (isa<PartialApplyInst>(user)) {
+            LLVM_DEBUG(llvm::dbgs() << "captured by "<< *user);
+            diagnose(loc, diag::manualownership_copy_captured, name->get());
+            return false;
+          }
+        }
+
+        // There's no hope of borrowing access if there's a consuming use.
+        for (auto op : copied->getUses()) {
+          auto useKind = op->getOperandOwnership();
+
+          // Only some DestroyingConsume's, like 'store', are interesting.
+          if (useKind == OperandOwnership::ForwardingConsume
+              || isa<StoreInst>(op->getUser())) {
+            LLVM_DEBUG(llvm::dbgs() << "demanded by "<< *(op->getUser()));
+            diagnose(loc, diag::manualownership_copy_demanded, *name);
+            return false;
+          }
+        }
+
+        // Catch-all diagnostic for when we at least have the name.
+        diagnose(loc, diag::manualownership_copy_happened, *name);
+        return false;
+      }
+    }
+    if (impact & RuntimeEffect::ExclusivityChecking) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::BeginUnpairedAccessInst:
+      case SILInstructionKind::EndUnpairedAccessInst:
+        // These instructions are quite unusual; they seem to only ever created
+        // explicitly by calling functions from the Builtin module, see:
+        //   - emitBuiltinPerformInstantaneousReadAccess
+        //   - emitBuiltinEndUnpairedAccess
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break; // We'll already diagnose the begin access.
+      case SILInstructionKind::BeginAccessInst: {
+        auto bai = cast<BeginAccessInst>(inst);
+        auto info = VariableNameInferrer::inferNameAndRoot(bai->getSource());
+
+        if (!info) {
+          LLVM_DEBUG(llvm::dbgs() << "exclusivity (no name?): " << *inst);
+          diagnose(loc, diag::manualownership_exclusivity);
+          return false;
+        }
+        Identifier name = info->first;
+        SILValue root = info->second;
+        StringRef advice = "";
+
+        // Try to classify the root to give advice.
+        if (isa<GlobalAddrInst>(root)) {
+          advice = ", because it involves a global variable";
+        } else if (root->getType().isAnyClassReferenceType()) {
+          advice = ", because it's a member of a reference type";
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "exclusivity: " << *inst);
+        LLVM_DEBUG(llvm::dbgs() << "with root: " << root);
+
+        diagnose(loc, diag::manualownership_exclusivity_named, name, advice);
+        break;
+      }
+      default:
+        LLVM_DEBUG(llvm::dbgs() << "UNKNOWN EXCLUSIVITY INST: " << *inst);
+        diagnose(loc, diag::manualownership_exclusivity);
+        return false;
+      }
+    }
+    return false;
+  }
+
   if (perfConstr == PerformanceConstraints::NoExistentials &&
-      (impact & RuntimeEffect::Existential)) {
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     if (impactType) {
       diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
@@ -500,51 +556,6 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 
     diagnose(loc, diag::performance_objectivec);
     return true;
-  }
-
-  if (module.getOptions().EmbeddedSwift) {
-    if (impact & RuntimeEffect::Existential) {
-      PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
-      if (impactType) {
-        diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
-      } else {
-        diagnose(loc, diag::embedded_swift_existential);
-      }
-      return true;
-    }
-
-    if (impact & RuntimeEffect::MetaData) {
-      if (isa<ReleaseValueInst>(inst)) {
-        // Move-only value types for which the deinit is not de-virtualized.
-        diagnose(loc, diag::embedded_swift_value_deinit, impactType.getASTType());
-        return true;
-      }
-      if (isa<KeyPathInst>(inst)) {
-        diagnose(loc, diag::embedded_swift_keypath);
-        return true;
-      }
-      if (!allowedMetadataUseInEmbeddedSwift(inst)) {
-        PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
-        if (impactType) {
-          diagnose(loc, diag::embedded_swift_metatype_type, impactType.getASTType());
-        } else {
-          diagnose(loc, diag::embedded_swift_metatype);
-        }
-        return true;
-      }
-    }
-
-    if (module.getOptions().NoAllocations) {
-      if (impact & RuntimeEffect::Allocating) {
-        PrettyStackTracePerformanceDiagnostics stackTrace("allocation", inst);
-        if (impactType) {
-          diagnose(loc, diag::embedded_swift_allocating_type, impactType.getASTType());
-        } else {
-          diagnose(loc, diag::embedded_swift_allocating);
-        }
-        return true;
-      }
-    }
   }
 
   if (perfConstr == PerformanceConstraints::None ||
@@ -748,19 +759,24 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
-    // Check that @_section, @_silgen_name is only on constant globals
+    // Check that @section, @_silgen_name is only on constant globals
     for (SILGlobalVariable &g : module->getSILGlobals()) {
       if (!g.getStaticInitializerValue() && g.mustBeInitializedStatically()) {
         PrettyStackTraceSILGlobal stackTrace(
             "global inst", &g);
 
         auto *decl = g.getDecl();
-        if (g.getSectionAttr()) {
+        if (!g.section().empty()) {
           module->getASTContext().Diags.diagnose(
             g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
-            "@_section");
+            "@section");
         } else if (decl && g.isDefinition() &&
                    decl->getAttrs().hasAttribute<SILGenNameAttr>()) {
           module->getASTContext().Diags.diagnose(
@@ -787,7 +803,7 @@ private:
       }
     }
 
-    if (!annotatedFunctionsFound && !getModule()->getOptions().EmbeddedSwift)
+    if (!annotatedFunctionsFound)
       return;
 
     for (SILFunction &function : *module) {
@@ -799,50 +815,6 @@ private:
         diagnoser.checkNonAnnotatedFunction(&function);
       }
     }
-
-    if (getModule()->getOptions().EmbeddedSwift) {
-      // Run embedded Swift SIL checks for metatype/existential use, and
-      // allocation use (under -no-allocations mode). Try to start with public
-      // and exported functions to get better call tree information.
-      SmallVector<SILFunction *, 8> externallyVisibleFunctions;
-      SmallVector<SILFunction *, 8> vtableMembers;
-      SmallVector<SILFunction *, 8> others;
-      SmallVector<SILFunction *, 8> constructorsAndDestructors;
-
-      for (SILFunction &function : *module) {
-        auto func = function.getLocation().getAsASTNode<AbstractFunctionDecl>();
-        if (func) {
-          if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func)) {
-            constructorsAndDestructors.push_back(&function);
-            continue;
-          }
-          if (getMethodDispatch(func) == MethodDispatch::Class) {
-            vtableMembers.push_back(&function);
-            continue;
-          }
-        }
-
-        if (function.isPossiblyUsedExternally()) {
-          externallyVisibleFunctions.push_back(&function);
-          continue;
-        }
-
-        others.push_back(&function);
-      }
-
-      for (SILFunction *function : externallyVisibleFunctions) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-      for (SILFunction *function : vtableMembers) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-      for (SILFunction *function : others) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-      for (SILFunction *function : constructorsAndDestructors) {
-        diagnoser.visitFunctionEmbeddedSwift(function);
-      }
-    }    
   }
 };
 

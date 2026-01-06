@@ -45,7 +45,9 @@ public func singleNonAsciiChar() -> Character {
 //
 // CHECK-LABEL: define {{.*}}singleNonSmolChar
 // CHECK-NEXT: entry:
-// CHECK:   ret { i64, ptr } { i64 1152921504606847001, ptr {{.*}}@".str.25.\F0\9F\91\A9\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A6\E2\80\8D\F0\9F\91\A6" {{.*}}i64 {{-9223372036854775808|36028797018963968}}
+// CHECK-DAG:   1152921504606847001
+// CHECK-DAG:   @".str.25.\F0\9F\91\A9\E2\80\8D\F0\9F\91\A9\E2\80\8D\F0\9F\91\A6\E2\80\8D\F0\9F\91\A6"
+// CHECK-DAG:   {{-9223372036854775808|36028797018963968}}
 public func singleNonSmolChar() -> Character {
   return "👩‍👩‍👦‍👦"
 }

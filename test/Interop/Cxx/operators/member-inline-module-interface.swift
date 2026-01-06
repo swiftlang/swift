@@ -1,5 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-5.9 -Xcc -std=c++23 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 -Xcc -std=c++23 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift -Xcc -std=c++23 | %FileCheck %s
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   func successor() -> LoadableIntWrapper
@@ -57,6 +58,21 @@
 // CHECK:   }
 // CHECK: }
 
+// CHECK: struct NullarySubscript {
+// CHECK:   subscript() -> Int32
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   func __operatorSubscriptConst() -> Int32
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript() -> UnsafeMutablePointer<Int32>
+// CHECK: }
+
+// CHECK: struct BinarySubscript {
+// CHECK:   subscript(x: Int32, y: Int32) -> Int32
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   func __operatorSubscriptConst(_ x: Int32, _ y: Int32) -> Int32
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript(_: Int32, _: Int32) -> UnsafeMutablePointer<Int32>
+// CHECK: }
 
 // CHECK: struct ReadOnlyIntArray {
 // CHECK:   subscript(x: Int32) -> Int32 { get }
@@ -210,6 +226,13 @@
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
 // CHECK: }
 
+// CHECK: struct SubscriptUnnamedParameter {
+// CHECK:   subscript(__index0: Int32) -> Int32 { get }
+// CHECK: }
+// CHECK: struct SubscriptUnnamedParameterReadWrite {
+// CHECK:   subscript(__index0: Int32) -> Int32
+// CHECK: }
+
 // CHECK: struct Iterator {
 // CHECK:   var pointee: Int32 { mutating get set }
 // CHECK:   @available(*, unavailable, message: "use .pointee property")
@@ -235,6 +258,7 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
 // CHECK: struct AmbiguousOperatorStar2 {
@@ -246,6 +270,7 @@
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
 // CHECK: struct DerivedFromConstIterator {
@@ -253,14 +278,14 @@
 // TODO:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // TODO: `var pointee` should be printed here
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: struct DerivedFromConstIteratorPrivatelyWithUsingDecl {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   var pointee: Int32 { get }
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl {
 // CHECK-NEXT:   init()
@@ -269,7 +294,7 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT: }
+// CHECK: }
 
 // CHECK: struct DerivedFromLoadableIntWrapperWithUsingDecl {
 // CHECK-NEXT:   init()
@@ -281,8 +306,25 @@
 // CHECK-NEXT:   mutating func __operatorPlusEqual(_ rhs: LoadableIntWrapper)
 // CHECK-NEXT:   func getValue() -> Int32
 // CHECK-NEXT:   mutating func setValue(_ v: Int32)
-// CHECK-NEXT: }
+// CHECK:      }
 
 // CHECK: struct HasOperatorCallWithDefaultArg {
 // CHECK:   func callAsFunction(_ x: Int32 = cxxDefaultArg) -> Int32
 // CHECK: }
+
+// CHECK: struct HasStaticOperatorCallBase {
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallDerived {
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallWithConstOperator {
+// CHECK:   func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
+// CHECK:   func callAsFunction(_ x: Int32) -> Int32
+// CHECK: }
+
+// CHECK: struct HasStaticOperatorCallWithUnimportableCxxType {
+// CHECK-NEXT:  init()
+// CHECK-NEXT: }

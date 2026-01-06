@@ -42,8 +42,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::sys;
 
-void SwiftASTConsumer::failed(StringRef Error) { }
-
 //===----------------------------------------------------------------------===//
 // SwiftInvocation
 //===----------------------------------------------------------------------===//
@@ -174,13 +172,13 @@ namespace SourceKit {
   void ASTUnit::Implementation::consumeAsync(SwiftASTConsumerRef ConsumerRef,
                                              ASTUnitRef ASTRef) {
 #if defined(_WIN32)
-	// Windows uses more up for stack space (why?) than macOS/Linux which
-	// causes stack overflows in a dispatch thread with 64k stack. Passing
-	// useDeepStack=true means it's given a _beginthreadex thread with an 8MB
-	// stack.
-	bool useDeepStack = true;
+    // Windows uses more up for stack space (why?) than macOS/Linux which
+    // causes stack overflows in a dispatch thread with 64k stack. Passing
+    // useDeepStack=true means it's given a _beginthreadex thread with an 8MB
+    // stack.
+    bool useDeepStack = true;
 #else
-	bool useDeepStack = false;
+    bool useDeepStack = ConsumerRef->requiresDeepStack();
 #endif
     Queue.dispatch([ASTRef, ConsumerRef]{
       SwiftASTConsumer &ASTConsumer = *ConsumerRef;
@@ -315,7 +313,7 @@ class ASTBuildOperation
   const std::vector<FileContent> FileContents;
 
   /// Guards \c DependencyStamps. This prevents reading from \c DependencyStamps
-  /// while it is being modified. It does not provide any ordering gurantees
+  /// while it is being modified. It does not provide any ordering guarantees
   /// that \c DependencyStamps have been computed in \c buildASTUnit before they
   /// are accessed in \c matchesSourceState but that's fine (see comment on
   /// \c DependencyStamps).
@@ -451,6 +449,9 @@ public:
   /// consumer, removes it from the \c Consumers severed by this build operation
   /// and, if no consumers are left, cancels the AST build of this operation.
   void requestConsumerCancellation(SwiftASTConsumerRef Consumer);
+
+  /// Cancels all consumers for the given operation.
+  void cancelAllConsumers();
 };
 
 using ASTBuildOperationRef = std::shared_ptr<ASTBuildOperation>;
@@ -517,6 +518,9 @@ public:
                        IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
                        SwiftASTManagerRef Mgr);
 
+  /// Cancel all currently running build operations.
+  void cancelAllBuilds();
+
   size_t getMemoryCost() const {
     size_t Cost = sizeof(*this);
     for (auto &BuildOp : BuildOperations) {
@@ -560,12 +564,11 @@ struct SwiftASTManager::Implementation {
       std::shared_ptr<SwiftStatistics> Stats,
       std::shared_ptr<RequestTracker> ReqTracker,
       std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
-      StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
+      StringRef RuntimeResourcePath)
       : EditorDocs(EditorDocs), Config(Config), Stats(Stats),
         ReqTracker(ReqTracker), Plugins(Plugins),
         SwiftExecutablePath(SwiftExecutablePath),
         RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath),
         SessionTimestamp(llvm::sys::toTimeT(std::chrono::system_clock::now())) {
   }
 
@@ -578,7 +581,6 @@ struct SwiftASTManager::Implementation {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
-  std::string DiagnosticDocumentationPath;
   SourceManager SourceMgr;
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
@@ -631,7 +633,16 @@ struct SwiftASTManager::Implementation {
     });
   }
 
-  ASTProducerRef getASTProducer(SwiftInvocationRef InvokRef);
+  /// Retrieve the ASTProducer for a given invocation, creating one if needed.
+  ASTProducerRef getOrCreateASTProducer(SwiftInvocationRef InvokRef);
+
+  /// Retrieve the ASTProducer for a given invocation, returning \c nullopt if
+  /// not present.
+  std::optional<ASTProducerRef> getASTProducer(SwiftInvocationRef Invok);
+
+  /// Updates the cache entry to account for any changes to the ASTProducer
+  /// for the given invocation.
+  void updateASTProducer(SwiftInvocationRef Invok);
 
   FileContent
   getFileContent(StringRef FilePath, bool IsPrimary,
@@ -655,10 +666,9 @@ SwiftASTManager::SwiftASTManager(
     std::shared_ptr<SwiftStatistics> Stats,
     std::shared_ptr<RequestTracker> ReqTracker,
     std::shared_ptr<PluginRegistry> Plugins, StringRef SwiftExecutablePath,
-    StringRef RuntimeResourcePath, StringRef DiagnosticDocumentationPath)
+    StringRef RuntimeResourcePath)
     : Impl(*new Implementation(EditorDocs, Config, Stats, ReqTracker, Plugins,
-                               SwiftExecutablePath, RuntimeResourcePath,
-                               DiagnosticDocumentationPath)) {}
+                               SwiftExecutablePath, RuntimeResourcePath)) {}
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
@@ -697,8 +707,8 @@ bool SwiftASTManager::initCompilerInvocation(
     std::string &Error) {
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Action, Diags, UnresolvedPrimaryFile, FileSystem,
-      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath,
-      Impl.DiagnosticDocumentationPath, Impl.SessionTimestamp, Error);
+      Impl.SwiftExecutablePath, Impl.RuntimeResourcePath, Impl.SessionTimestamp,
+      Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(
@@ -780,7 +790,7 @@ void SwiftASTManager::processASTAsync(
     const void *OncePerASTToken, SourceKitCancellationToken CancellationToken,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem) {
   assert(fileSystem);
-  ASTProducerRef Producer = Impl.getASTProducer(InvokRef);
+  ASTProducerRef Producer = Impl.getOrCreateASTProducer(InvokRef);
 
   Impl.cleanDeletedConsumers();
   {
@@ -816,12 +826,39 @@ void SwiftASTManager::processASTAsync(
       });
 }
 
+std::optional<ASTProducerRef>
+SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef Invok) {
+  llvm::sys::ScopedLock L(CacheMtx);
+  return ASTCache.get(Invok->Impl.Key);
+}
+
+void SwiftASTManager::Implementation::updateASTProducer(
+    SwiftInvocationRef Invok) {
+  llvm::sys::ScopedLock L(CacheMtx);
+
+  // Get and set the producer to update its cost in the cache. If we don't
+  // have a value, then this is a race where we've removed the cached AST, but
+  // still have a build waiting to complete after cancellation, we don't need
+  // to do anything in that case.
+  if (auto Producer = ASTCache.get(Invok->Impl.Key))
+    ASTCache.set(Invok->Impl.Key, *Producer);
+}
+
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
+  llvm::sys::ScopedLock L(Impl.CacheMtx);
   Impl.ASTCache.remove(Invok->Impl.Key);
 }
 
-ASTProducerRef
-SwiftASTManager::Implementation::getASTProducer(SwiftInvocationRef InvokRef) {
+void SwiftASTManager::cancelBuildsForCachedAST(SwiftInvocationRef Invok) {
+  auto Result = Impl.getASTProducer(Invok);
+  if (!Result)
+    return;
+
+  (*Result)->cancelAllBuilds();
+}
+
+ASTProducerRef SwiftASTManager::Implementation::getOrCreateASTProducer(
+    SwiftInvocationRef InvokRef) {
   llvm::sys::ScopedLock L(CacheMtx);
   std::optional<ASTProducerRef> OptProducer = ASTCache.get(InvokRef->Impl.Key);
   if (OptProducer.has_value())
@@ -978,14 +1015,30 @@ void ASTBuildOperation::requestConsumerCancellation(
   });
 }
 
+void ASTBuildOperation::cancelAllConsumers() {
+  if (isFinished())
+    return;
+
+  llvm::sys::ScopedLock L(ConsumersAndResultMtx);
+  CancellationFlag->store(true, std::memory_order_relaxed);
+
+  // Take the consumers, and notify them of the cancellation.
+  decltype(this->Consumers) Consumers;
+  std::swap(Consumers, this->Consumers);
+
+  ASTManager->Impl.ConsumerNotificationQueue.dispatch(
+      [Consumers = std::move(Consumers)] {
+        for (auto &Consumer : Consumers)
+          Consumer->cancelled();
+      });
+}
+
 static void collectModuleDependencies(ModuleDecl *TopMod,
     llvm::SmallPtrSetImpl<ModuleDecl *> &Visited,
     SmallVectorImpl<std::string> &Filenames) {
 
   if (!TopMod)
     return;
-
-  auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
 
   ModuleDecl::ImportFilter ImportFilter = {
       ModuleDecl::ImportFilterKind::Exported,
@@ -1003,8 +1056,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
-    if (ClangModuleLoader &&
-        Mod == ClangModuleLoader->getImportedHeaderModule())
+    if (Mod->isClangHeaderImportModule())
       continue;
     bool NewVisit = Visited.insert(Mod).second;
     if (!NewVisit)
@@ -1159,6 +1211,10 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       // flag and might thus fail, which SILGen cannot handle.
       llvm::SaveAndRestore<std::shared_ptr<std::atomic<bool>>> DisableCancellationDuringSILGen(CompIns.getASTContext().CancellationFlag, nullptr);
       SILOptions SILOpts = Invocation.getSILOptions();
+
+      // Disable diagnostics that require WMO (as SourceKit disables it).
+      SILOpts.EnableWMORequiredDiagnostics = false;
+
       auto &TC = CompIns.getSILTypes();
       std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
       if (CancellationFlag->load(std::memory_order_relaxed)) {
@@ -1302,6 +1358,15 @@ ASTBuildOperationRef ASTProducer::getBuildOperationForConsumer(
   return LatestUsableOp;
 }
 
+void ASTProducer::cancelAllBuilds() {
+  // Cancel all build operations, cleanup will happen when each operation
+  // terminates.
+  BuildOperationsQueue.dispatch([This = shared_from_this()] {
+    for (auto &BuildOp : This->BuildOperations)
+      BuildOp->cancelAllConsumers();
+  });
+}
+
 void ASTProducer::enqueueConsumer(
     SwiftASTConsumerRef Consumer,
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -1342,7 +1407,7 @@ void ASTProducer::enqueueConsumer(
               [This]() { This->cleanBuildOperations(); });
           // Re-register the object with the cache to update its memory
           // cost.
-          Mgr->Impl.ASTCache.set(This->InvokRef->Impl.Key, This);
+          Mgr->Impl.updateASTProducer(This->InvokRef);
         }
       };
 

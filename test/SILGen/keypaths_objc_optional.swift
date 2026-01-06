@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s | %FileCheck  %s --check-prefix=CHECK --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s | %FileCheck  %s --check-prefix=CHECK --check-prefix=CHECK-%target-os-%target-cpu
 // RUN: %target-swift-emit-ir -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s
 
 // REQUIRES: objc_interop
@@ -66,4 +66,4 @@ func testKeyPathAccessorsForOptionalStorageComponents() {
   _ = \ObjCProtocol.flag
 }
 
-// CHECK-macosx-x86_64: sil [transparent] [serialized] @$s10ObjectiveC22_convertObjCBoolToBoolySbAA0cD0VF : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-macosx-x86_64: sil [transparent] [serialized] {{.*}}@$s10ObjectiveC22_convertObjCBoolToBoolySbAA0cD0VF : $@convention(thin) (ObjCBool) -> Bool

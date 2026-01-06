@@ -59,6 +59,9 @@ public:
 
   Symbol back() const;
 
+  bool hasShape() const;
+  MutableTerm termWithoutShape() const;
+
   Symbol operator[](size_t index) const;
 
   /// Returns an opaque pointer that uniquely identifies this term.
@@ -76,7 +79,7 @@ public:
     return begin()->getRootProtocol();
   }
 
-  bool containsUnresolvedSymbols() const;
+  bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -133,6 +136,10 @@ public:
     Symbols.push_back(symbol);
   }
 
+  void prepend(Symbol symbol) {
+    Symbols.insert(Symbols.begin(), symbol);
+  }
+
   void append(Term other) {
     Symbols.append(other.begin(), other.end());
   }
@@ -167,6 +174,10 @@ public:
 
   std::reverse_iterator<Symbol *> rbegin() { return Symbols.rbegin(); }
   std::reverse_iterator<Symbol *> rend() { return Symbols.rend(); }
+  
+  Symbol front() const {
+    return Symbols.front();
+  }
 
   Symbol back() const {
     return Symbols.back();
@@ -175,6 +186,9 @@ public:
   Symbol &back() {
     return Symbols.back();
   }
+
+  bool hasShape() const;
+  void removeShape();
 
   Symbol operator[](size_t index) const {
     return Symbols[index];

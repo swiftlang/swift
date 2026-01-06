@@ -11,7 +11,7 @@ func callCondFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
 }
 
 // CHECK: define hidden swiftcc void @"$s13DoubleInlines12callCondFail3arg3msgyBi1__BptF"{{.*}} !dbg ![[FUNC:.*]] {
-// CHECK: tail call void asm sideeffect "", "n"(i32 0) #3, !dbg ![[SCOPEONE:.*]]
+// CHECK: tail call void asm sideeffect "", "n"(i32 0) #{{[0-9]+}}, !dbg ![[SCOPEONE:.*]]
 // CHECK: tail call void @llvm.trap(), !dbg ![[LOCTRAP:.*]]
 
 // CHECK: ![[FUNCSCOPEOTHER:.*]] = distinct !DISubprogram(name: "condFail",{{.*}}

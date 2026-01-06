@@ -11,8 +11,8 @@
   let y: String
 
   // CHECK: nonisolated public static func == (a: Library.X1, b: Library.X1) -> Swift.Bool
-  // CHECK: nonisolated public func hash(into hasher: inout Swift.Hasher)
   // CHECK: nonisolated public func encode(to encoder: any Swift.Encoder) throws
+  // CHECK: nonisolated public func hash(into hasher: inout Swift.Hasher)
   // CHECK: nonisolated public var hashValue: Swift.Int
   // CHECK: nonisolated public init(from decoder: any Swift.Decoder) throws
 }

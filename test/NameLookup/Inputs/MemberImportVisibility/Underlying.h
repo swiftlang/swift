@@ -1,0 +1,4 @@
+
+struct UnderlyingStruct {
+  int a;
+};

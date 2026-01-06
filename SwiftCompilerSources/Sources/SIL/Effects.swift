@@ -161,12 +161,7 @@ extension Function {
       break
     }
     if isProgramTerminationPoint {
-      // We can ignore any memory writes in a program termination point, because it's not relevant
-      // for the caller. But we need to consider memory reads, otherwise preceeding memory writes
-      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
-      // for error strings which are printed by the program termination point.
-      // Regarding ownership: a program termination point must not touch any reference counted objects.
-      return SideEffects.GlobalEffects(memory: SideEffects.Memory(read: true))
+      return SideEffects.GlobalEffects.worstEffects.forProgramTerminationPoints
     }
     var result = SideEffects.GlobalEffects.worstEffects
     switch effectAttribute {
@@ -394,7 +389,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns the effects of an argument.
   ///
-  /// In constrast to using `arguments` directly, it's valid to have an `argumentIndex`
+  /// In contrast to using `arguments` directly, it's valid to have an `argumentIndex`
   /// which is larger than the number of elements in `arguments`.
   public func getArgumentEffects(for argumentIndex: Int) -> ArgumentEffects {
     if argumentIndex < arguments.count {
@@ -430,7 +425,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   
   /// Side-effects of a specific function argument.
   ///
-  /// The paths describe what (projeted) values of an argument are affected.
+  /// The paths describe what (projected) values of an argument are affected.
   /// If a path is nil, than there is no such effect on the argument.
   ///
   /// A path can contain any projection or wildcards, as long as there is no load involved.
@@ -510,6 +505,14 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     /// This is true when the function (or a callee, transitively) contains a
     /// deinit barrier instruction.
     public var isDeinitBarrier: Bool
+    
+    public static var noEffects: GlobalEffects {
+      return GlobalEffects(memory: .noEffects, ownership: .noEffects, allocates: false, isDeinitBarrier: false)
+    }
+    
+    public var isOnlyReading: Bool {
+      return !memory.write && ownership == .noEffects && !allocates && !isDeinitBarrier
+    }
 
     /// When called with default arguments, it creates an "effect-free" GlobalEffects.
     public init(memory: Memory = Memory(read: false, write: false),
@@ -539,7 +542,8 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       }
       switch convention {
       case .indirectIn, .packOwned:
-        result.memory.write = false
+        // indirect-in arguments are consumed by the caller and that not only counts as read but also as a write.
+        break
       case .indirectInGuaranteed, .packGuaranteed:
         result.memory.write = false
         result.ownership.destroy = false
@@ -561,10 +565,22 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
           result.memory = SideEffects.Memory()
         }
 
-      case .indirectInout, .indirectInoutAliasable:
+      case .indirectInout, .indirectInoutAliasable, .indirectInCXX:
         break
       }
       return result
+    }
+
+    /// Effects with all effects removed which are not relevant for program termination points (like `fatalError`).
+    public var forProgramTerminationPoints: GlobalEffects {
+      // We can ignore any memory writes in a program termination point, because it's not relevant
+      // for the caller. But we need to consider memory reads, otherwise preceding memory writes
+      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
+      // for error strings which are printed by the program termination point.
+      // Regarding ownership: a program termination point must not touch any reference counted objects.
+      // Also, the deinit-barrier effect is not relevant because functions like `fatalError` and `exit` are
+      // not accessing objects (except strings).
+      return GlobalEffects(memory: Memory(read: memory.read))
     }
 
     public static var worstEffects: GlobalEffects {
@@ -603,6 +619,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       write = write || other.write
     }
 
+    public static var noEffects: Memory {
+      Memory(read: false, write: false)
+    }
+
     public static var worstEffects: Memory {
       Memory(read: true, write: true)
     }
@@ -630,6 +650,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     public mutating func merge(with other: Ownership) {
       copy = copy || other.copy
       destroy = destroy || other.destroy
+    }
+    
+    public static var noEffects: Ownership {
+      return Ownership(copy: false, destroy: false)
     }
 
     public static var worstEffects: Ownership {
@@ -685,10 +709,10 @@ extension StringParser {
   private mutating func parseArgumentIndexFromSource(for function: Function,
                                              params: Dictionary<String, Int>) throws -> Int {
     if consume("self") {
-      if !function.hasSelfArgument {
+      guard let selfArgIdx = function.selfArgumentIndex else {
         try throwError("function does not have a self argument")
       }
-      return function.selfArgumentIndex
+      return selfArgIdx
     }
     if let name = consumeIdentifier() {
       guard let idx = params[name] else {

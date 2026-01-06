@@ -13,10 +13,13 @@
 #include "IRGenMangler.h"
 #include "ExtendedExistential.h"
 #include "GenClass.h"
+#include "IRGenModule.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
@@ -70,7 +73,8 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   if (FuncName.empty()) {
     beginMangling();
   } else {
-    if (FuncName.starts_with(MANGLING_PREFIX_STR)) {
+    if (FuncName.starts_with(MANGLING_PREFIX_STR) ||
+        FuncName.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
       Buffer << FuncName;
     } else {
       beginMangling();
@@ -160,10 +164,24 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   ASTContext &ctx = Ty->getASTContext();
   llvm::SaveAndRestore<bool> savedConcurrencyStandardSubstitutions(
       AllowConcurrencyStandardSubstitutions);
+  llvm::SaveAndRestore<bool> savedIsolatedAny(AllowIsolatedAny);
+  llvm::SaveAndRestore<bool> savedTypedThrows(AllowTypedThrows);
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           ctx.LangOpts.Target)) {
+
     if (*runtimeCompatVersion < llvm::VersionTuple(5, 5))
       AllowConcurrencyStandardSubstitutions = false;
+
+    // Suppress @isolated(any) and typed throws if we're mangling for pre-6.0
+    // runtimes.
+    // This is unprincipled but, because of the restrictions in e.g.
+    // mangledNameIsUnknownToDeployTarget, should only happen when
+    // mangling for certain reflective uses where we have to hope that
+    // the exact type identity is generally unimportant.
+    if (*runtimeCompatVersion < llvm::VersionTuple(6, 0)) {
+      AllowIsolatedAny = false;
+      AllowTypedThrows = false;
+    }
   }
 
   llvm::SaveAndRestore<bool> savedAllowStandardSubstitutions(
@@ -185,6 +203,9 @@ IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
   // just don't allow actual symbolic references anywhere in the
   // mangled name.
   configureForSymbolicMangling();
+
+  llvm::SaveAndRestore<bool> savedAllowMarkerProtocols(
+      AllowMarkerProtocols, false);
 
   // We don't make the substitution adjustments above because they're
   // target-specific and so would break the goal of getting a unique
@@ -395,15 +416,44 @@ std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
 std::string IRGenMangler::mangleSymbolNameForMangledMetadataAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
-                                           CanType type) {
+                                           CanType type,
+                                           MangledTypeRefRole role) {
   beginManglingWithoutPrefix();
   Buffer << kind << " ";
 
-  if (genericSig)
+  if (genericSig) {
     appendGenericSignature(genericSig);
+  }
 
-  if (type)
+  if (type) {
     appendType(type, genericSig);
+  }
+
+  // Noncopyable types get additional runtime capability checks before we reveal
+  // their metadata to reflection APIs, while core metadata queries always provide
+  // the metadata. So we need a separate symbol mangling for the two variants in
+  // this case.
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+  case MangledTypeRefRole::FlatUnique:
+  case MangledTypeRefRole::Metadata:
+    // Core metadata, never conditionalized.
+    break;
+
+  case MangledTypeRefRole::Reflection:
+  case MangledTypeRefRole::FieldMetadata: {
+    // Reflection metadata is conditionalized for noncopyable types.
+    CanType contextType = type;
+    if (genericSig) {
+      contextType = genericSig.getGenericEnvironment()->mapTypeIntoEnvironment(contextType)
+        ->getReducedType(genericSig);
+    }
+    if (contextType->isNoncopyable()) {
+      Buffer << " noncopyable";
+    }
+  }
+  }
+  
   return finalize();
 }
 

@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking %s -o %t/main
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple %s -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: concurrency_runtime
 
 // rdar://124277662
 // XFAIL: freestanding

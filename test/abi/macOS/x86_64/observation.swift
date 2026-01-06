@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/x86_64/libswiftObservation.dylib > %t/symbols
+// RUN: %llvm-nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftObservation.dylib > %t/symbols
 // RUN: %abi-symbol-checker %s %t/symbols
-// RUN: diff -u %S/../../Inputs/macOS/x86_64/observation/baseline %t/symbols
+// RUN: diff -u %S/../../Inputs/macOS/arm64/observation/baseline %t/symbols
 
 // REQUIRES: swift_stdlib_no_asserts
-// REQUIRES: STDLIB_VARIANT=macosx-x86_64
+// REQUIRES: STDLIB_VARIANT=macosx-arm64
+// REQUIRES: observation
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
@@ -41,3 +42,48 @@ Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvg
 
 // property descriptor for Observation.ObservationTracking.changed : Swift.AnyKeyPath?
 Added: _$s11Observation0A8TrackingV7changeds10AnyKeyPathCSgvpMV
+
+// static Observation.Observations.untilFinished(@isolated(any) @Sendable () throws(B) -> Observation.Observations<A, B>.Iteration) -> Observation.Observations<A, B>
+Added: _$s11Observation12ObservationsV13untilFinishedyACyxq_GAC9IterationOyxq__GyYbq_YKYAcFZ
+
+// Observation.Observations.makeAsyncIterator() -> Observation.Observations<A, B>.Iterator
+Added: _$s11Observation12ObservationsV17makeAsyncIteratorAC0E0Vyxq__GyF
+
+// Observation.Observations.Iterator.next(isolation: isolated Swift.Actor?) async throws(B) -> A?
+Added: _$s11Observation12ObservationsV8IteratorV4next9isolationxSgScA_pSgYi_tYaq_YKF
+
+// async function pointer to Observation.Observations.Iterator.next(isolation: isolated Swift.Actor?) async throws(B) -> A?
+Added: _$s11Observation12ObservationsV8IteratorV4next9isolationxSgScA_pSgYi_tYaq_YKFTu
+
+// type metadata accessor for Observation.Observations.Iterator
+Added: _$s11Observation12ObservationsV8IteratorVMa
+
+// nominal type descriptor for Observation.Observations.Iterator
+Added: _$s11Observation12ObservationsV8IteratorVMn
+
+// protocol conformance descriptor for Observation.Observations<A, B>.Iterator : Swift.AsyncIteratorProtocol in Observation
+Added: _$s11Observation12ObservationsV8IteratorVyxq__GScIAAMc
+
+// enum case for Observation.Observations.Iteration.next<A, B where A: Swift.Sendable, B: Swift.Error>(Observation.Observations<A, B>.Iteration.Type) -> (A) -> Observation.Observations<A, B>.Iteration
+Added: _$s11Observation12ObservationsV9IterationO4nextyAEyxq__GxcAGms8SendableRzs5ErrorR_r0_lFWC
+
+// enum case for Observation.Observations.Iteration.finish<A, B where A: Swift.Sendable, B: Swift.Error>(Observation.Observations<A, B>.Iteration.Type) -> Observation.Observations<A, B>.Iteration
+Added: _$s11Observation12ObservationsV9IterationO6finishyAEyxq__GAGms8SendableRzs5ErrorR_r0_lFWC
+
+// type metadata accessor for Observation.Observations.Iteration
+Added: _$s11Observation12ObservationsV9IterationOMa
+
+// nominal type descriptor for Observation.Observations.Iteration
+Added: _$s11Observation12ObservationsV9IterationOMn
+
+// type metadata accessor for Observation.Observations
+Added: _$s11Observation12ObservationsVMa
+
+// nominal type descriptor for Observation.Observations
+Added: _$s11Observation12ObservationsVMn
+
+// Observation.Observations.init(@isolated(any) @Sendable () throws(B) -> A) -> Observation.Observations<A, B>
+Added: _$s11Observation12ObservationsVyACyxq_GxyYbq_YKYAccfC
+
+// protocol conformance descriptor for Observation.Observations<A, B> : Swift.AsyncSequence in Observation
+Added: _$s11Observation12ObservationsVyxq_GSciAAMc

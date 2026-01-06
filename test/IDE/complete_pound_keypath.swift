@@ -49,19 +49,19 @@ func completeInKeyPath2() {
 func completeInKeyPath3() {
    _ = #keyPath(ObjCClass.prop1.#^IN_KEYPATH_3^#
 }
-func completeInKeyPath3() {
+func completeInKeyPath4() {
      _ = #keyPath(String.#^IN_KEYPATH_4^#
 }
 
-func completeInKeyPath4() {
+func completeInKeyPath5() {
   _ = #keyPath(ObjCClass.prop2.#^IN_KEYPATH_5^#
 }
 
-func completeInKeyPath5() {
+func completeInKeyPath6() {
   _ = #keyPath(ObjCClass.prop3.#^IN_KEYPATH_6^#
 }
 
-func completeInKeyPath6() {
+func completeInKeyPath7() {
   _ = #keyPath(ObjCClass.prop4.anythingHere.#^IN_KEYPATH_7^#
 }
 
@@ -72,7 +72,7 @@ func completeInKeyPath6() {
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop2[#ObjCClass?#]; name=prop2
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop3[#[ObjCClass]?#]; name=prop3
-// CHECK-IN_KEYPATH: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue
+// CHECK-IN_KEYPATH: Decl[InstanceVar]/Super/IsSystem:   hashValue[#Int#]; name=hashValue
 
 // Make sure we unwrap optionals (members of Optional itself are invalid in this context)
 //

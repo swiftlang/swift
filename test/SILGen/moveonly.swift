@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -8,19 +8,16 @@ public final class CopyableKlass {
     var fd = FD()
 }
 
-@_moveOnly
-public struct FD {
+public struct FD: ~Copyable {
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
+public struct NonTrivialStruct2: ~Copyable {
     var fd = FD()
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var fd = FD()
     var nonTrivialStruct2 = NonTrivialStruct2()
     var copyableKlass = CopyableKlass()
@@ -37,8 +34,7 @@ public struct NonTrivialCopyableStruct {
     var nonTrivialCopyableStruct2 = NonTrivialCopyableStruct2()
 }
 
-@_moveOnly
-public enum NonTrivialEnum {
+public enum NonTrivialEnum: ~Copyable {
     case first
     case second(CopyableKlass)
     case third(NonTrivialStruct)
@@ -52,8 +48,7 @@ public protocol P {
 }
 extension CopyableKlass : P {}
 
-@_moveOnly
-public struct AddressOnlyProtocol {
+public struct AddressOnlyProtocol: ~Copyable {
     var t: P = CopyableKlass()
 
     func nonMutatingFunc() {}
@@ -124,10 +119,6 @@ public func useNonTrivialOwnedStruct(_ s: __owned NonTrivialStruct) {
 }
 
 // CHECK-LABEL: sil [ossa] @$s8moveonly17useNonTrivialEnumyyAA0cdE0OF : $@convention(thin) (@guaranteed NonTrivialEnum) -> () {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $NonTrivialEnum):
-// CHECK:   [[COPIED_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPIED_ARG]]
-// CHECK: } // end sil function '$s8moveonly17useNonTrivialEnumyyAA0cdE0OF'
 public func useNonTrivialEnum(_ s: borrowing NonTrivialEnum) {
     borrowVal(s)
     let s2 = s
@@ -140,12 +131,6 @@ public func useNonTrivialEnum(_ s: borrowing NonTrivialEnum) {
 }
 
 // CHECK-LABEL: sil [ossa] @$s8moveonly22useNonTrivialOwnedEnumyyAA0cdF0OnF : $@convention(thin) (@owned NonTrivialEnum) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $NonTrivialEnum):
-// CHECK:   [[BOX:%.*]] = alloc_box
-// CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
-// CHECK:   store [[ARG]] to [init] [[PROJECT]]
-// CHECK:   mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
-// CHECK: } // end sil function '$s8moveonly22useNonTrivialOwnedEnumyyAA0cdF0OnF'
 public func useNonTrivialOwnedEnum(_ s: __owned NonTrivialEnum) {
     borrowVal(s)
     let s2 = s
@@ -682,14 +667,12 @@ func assignCopyableKlass(_ x: CopyableKlass) {
 ///////////////////////
 
 enum EnumSwitchTests {
-    @_moveOnly
-    enum E2 {
+    enum E2: ~Copyable {
         case lhs(CopyableKlass)
         case rhs(FD)
     }
 
-    @_moveOnly
-    enum E {
+    enum E: ~Copyable {
         case first(NonTrivialStruct2)
         case second(NonTrivialStruct)
         case third(CopyableKlass)
@@ -703,69 +686,6 @@ var booleanGuard: Bool { false }
 var booleanGuard2: Bool { false }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOF : $@convention(thin) (@guaranteed EnumSwitchTests.E) -> () {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed
-// CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// CHECK:   [[ARG_MARKED_VALUE:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY_ARG]]
-//             -- code corresponding to the consume x --
-// CHECK:   [[BORROW_ARG_MARKED_VALUE:%.*]] = begin_borrow [[ARG_MARKED_VALUE]]
-// CHECK:   [[COPY_COPY_ARG:%.*]] = copy_value [[BORROW_ARG_MARKED_VALUE]]
-// CHECK:   [[MOVE_COPY_COPY_ARG:%.*]] = move_value [allows_diagnostics] [[COPY_COPY_ARG]]
-// CHECK:   [[MARKED_VALUE:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[MOVE_COPY_COPY_ARG]]
-//           -- now switching on the `consume x` --
-// CHECK:   [[BORROWED_VALUE:%.*]] = begin_borrow [[MARKED_VALUE]]
-// CHECK:   switch_enum [[BORROWED_VALUE]] : $EnumSwitchTests.E, case #EnumSwitchTests.E.first!enumelt: [[BB_E_1:bb[0-9]+]], case #EnumSwitchTests.E.second!enumelt: [[BB_E_2:bb[0-9]+]], case #EnumSwitchTests.E.third!enumelt: [[BB_E_3:bb[0-9]+]], case #EnumSwitchTests.E.fourth!enumelt: [[BB_E_4:bb[0-9]+]]
-//
-// CHECK: [[BB_E_1]]([[BBARG:%.*]] : @guaranteed
-// CHECK:   end_borrow [[BORROWED_VALUE]]
-// CHECK:   br [[BB_CONT:bb[0-9]+]]
-//
-// CHECK: [[BB_E_2]]([[BBARG:%.*]] : @guaranteed
-// CHECK:   [[NEW_BOX:%.*]] = alloc_box
-// CHECK:   [[NEW_BOX_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[NEW_BOX]]
-// CHECK:   [[NEW_BOX_PROJECT:%.*]] = project_box [[NEW_BOX_BORROW]]
-// CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   store [[BBARG_COPY]] to [init] [[NEW_BOX_PROJECT]]
-// CHECK:   end_borrow [[BORROWED_VALUE]]
-// CHECK:   br [[BB_CONT]]
-//
-// This case is copyable
-// CHECK: [[BB_E_3]]([[BBARG:%.*]] : @guaranteed
-// CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   move_value [lexical] [var_decl] [[BBARG_COPY]]
-// CHECK:   end_borrow [[BORROWED_VALUE]]
-// CHECK:   br [[BB_CONT]]
-//
-// This is a guard case.
-// CHECK: [[BB_E_4]]([[BBARG:%.*]] : @guaranteed
-// CHECK:   cond_br {{%.*}}, [[BB_GUARD_1:bb[0-9]+]], [[BB_GUARD_2:bb[0-9]+]]
-//
-// CHECK: [[BB_GUARD_1]]:
-// CHECK:   end_borrow [[BORROWED_VALUE]]
-// CHECK:   br [[BB_CONT]]
-//
-// CHECK: [[BB_GUARD_2]]:
-// CHECK:   switch_enum [[BBARG]] : $EnumSwitchTests.E2, case #EnumSwitchTests.E2.lhs!enumelt: [[BB_E2_LHS:bb[0-9]+]], case #EnumSwitchTests.E2.rhs!enumelt: [[BB_E2_RHS:bb[0-9]+]]
-//
-// Copyable case
-// CHECK: [[BB_E2_LHS]]([[BBARG:%.*]] : @guaranteed
-// CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   move_value [lexical] [var_decl] [[BBARG_COPY]]
-// CHECK:   end_borrow [[BORROWED_VALUE]]
-// CHECK:   br [[BB_CONT]]
-//
-// Move only case.
-// CHECK: [[BB_E2_RHS]]([[BBARG:%.*]] : @guaranteed
-// CHECK:   [[NEW_BOX:%.*]] = alloc_box
-// CHECK:   [[NEW_BOX_BORROW:%.*]] = begin_borrow [lexical] [var_decl] [[NEW_BOX]]
-// CHECK:   [[NEW_BOX_PROJECT:%.*]] = project_box [[NEW_BOX_BORROW]]
-// CHECK:   [[BBARG_COPY:%.*]] = copy_value [[BBARG]]
-// CHECK:   store [[BBARG_COPY]] to [init] [[NEW_BOX_PROJECT]]
-// CHECK:   end_borrow [[BORROWED_VALUE]]
-// CHECK:   br [[BB_CONT]]
-//
-// CHECK: [[BB_CONT]]:
-// CHECK:   destroy_value [[ARG_MARKED_VALUE]]
-// CHECK: } // end sil function '$s8moveonly15enumSwitchTest1yyAA04EnumC5TestsO1EOF'
 func enumSwitchTest1(_ e: borrowing EnumSwitchTests.E) {
     switch consume e {
     case .first:
@@ -926,8 +846,7 @@ func checkMarkUnresolvedNonCopyableValueInstOnCaptured(x: __owned FD) {
 // Empty Struct //
 //////////////////
 
-@_moveOnly
-struct EmptyStruct {
+struct EmptyStruct: ~Copyable {
   // Make sure we explicitly initialize empty struct as appropriate despite the
   // fact we do not have any fields.
   //
@@ -1047,7 +966,7 @@ public struct LoadableSubscriptGetOnlyTester : ~Copyable {
 // The get call
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[MARK]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[LOAD_BORROW]])
@@ -1062,10 +981,14 @@ public struct LoadableSubscriptGetOnlyTester : ~Copyable {
 // CHECK: [[M2_PROJECT:%.*]] = project_box [[M2_BORROW]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD:%.*]] = load_borrow [[MARK]]
-// CHECK: apply {{%.*}}([[M2_PROJECT]], {{%.*}}, [[LOAD]])
+// CHECK: [[LOAD:%.*]] = load_borrow [unchecked] [[MARK]]
+// CHECK: [[STACK_ALLOC:%.*]] = alloc_stack $AddressOnlyProtocol
+// CHECK: [[M_STACK_ALLOC:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK_ALLOC]]
+// CHECK: apply {{%.*}}([[M_STACK_ALLOC]], {{%.*}}, [[LOAD]])
 // CHECK: end_borrow [[LOAD]]
 // CHECK: end_access [[ACCESS]]
+// CHECK: copy_addr [take] [[M_STACK_ALLOC]] to [init] [[M2_PROJECT]]
+// CHECK: dealloc_stack [[STACK_ALLOC]]
 // CHECK: [[M2_MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[M2_PROJECT]]
 // CHECK: end_borrow [[M2_BORROW]]
 // CHECK: destroy_value [[M2_BOX]]
@@ -1103,7 +1026,7 @@ public func testSubscriptGetOnly_BaseLoadable_ResultAddressOnly_Let() {
 // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARK]]
-// CHECK:   [[LOAD_BORROW:%.*]] = load_borrow [[ACCESS]]
+// CHECK:   [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[ACCESS]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK:   [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK:   apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[LOAD_BORROW]])
@@ -1122,7 +1045,7 @@ public func testSubscriptGetOnly_BaseLoadable_ResultAddressOnly_InOut(m: inout L
 // The get call
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[MARK]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[LOAD_BORROW]])
@@ -1151,7 +1074,7 @@ public struct LoadableSubscriptGetOnlyTesterNonCopyableStructParent : ~Copyable 
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[MARK]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[GEP]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[GEP]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK: [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK: apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[LOAD_BORROW]])
@@ -1163,7 +1086,7 @@ public struct LoadableSubscriptGetOnlyTesterNonCopyableStructParent : ~Copyable 
 // The second get call.
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
 //
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
@@ -1210,7 +1133,7 @@ public func testSubscriptGetOnlyThroughNonCopyableParentStruct_BaseLoadable_Resu
 //
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[MARK]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[ACCESS]]
-// CHECK:   [[LOAD:%.*]] = load_borrow [[GEP]]
+// CHECK:   [[LOAD:%.*]] = load_borrow [unchecked] [[GEP]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK:   [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK:   apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[LOAD]])
@@ -1228,7 +1151,7 @@ public func testSubscriptGetOnlyThroughNonCopyableParentStruct_BaseLoadable_Resu
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
 // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[MARK]]
-// CHECK:   [[LOAD:%.*]] = load_borrow [[GEP]]
+// CHECK:   [[LOAD:%.*]] = load_borrow [unchecked] [[GEP]]
 // CHECK:   [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
 // CHECK:   [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP]]
 // CHECK:   apply {{%.*}}([[TEMP_MARK]], {{%.*}}, [[LOAD]])
@@ -1265,7 +1188,7 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: [[TEMP:%.*]] = alloc_stack $LoadableSubscriptGetOnlyTester
 // CHECK: [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[TEMP]]
 // CHECK: [[TEMP_MARK_BORROW:%.*]] = store_borrow [[CORO_RESULT]] to [[TEMP_MARK]]
-// CHECK: [[LOAD:%.*]] = load_borrow [[TEMP_MARK_BORROW]]
+// CHECK: [[LOAD:%.*]] = load_borrow [unchecked] [[TEMP_MARK_BORROW]]
 // CHECK: [[TEMP2:%.*]] = alloc_stack $
 // CHECK: [[TEMP2_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP2]]
 // CHECK: apply {{%.*}}([[TEMP2_MARK]], {{%.*}}, [[LOAD]])
@@ -1287,7 +1210,7 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // CHECK: [[TEMP_MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[TEMP]]
 // CHECK: [[TEMP_MARK_BORROW:%.*]] = store_borrow [[CORO_RESULT]] to [[TEMP_MARK]]
 // CHECK: [[GEP:%.*]] = struct_element_addr [[TEMP_MARK_BORROW]]
-// CHECK: [[LOAD:%.*]] = load_borrow [[GEP]]
+// CHECK: [[LOAD:%.*]] = load_borrow [unchecked] [[GEP]]
 // CHECK: [[TEMP2:%.*]] = alloc_stack $
 // CHECK: [[TEMP2_MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TEMP2]]
 // CHECK: apply {{%.*}}([[TEMP2_MARK]], {{%.*}}, [[LOAD]])
@@ -1299,7 +1222,7 @@ public class LoadableSubscriptGetOnlyTesterClassParent {
 // Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[LOAD:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[LOAD:%.*]] = load_borrow [unchecked] [[ACCESS]]
 // CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[LOAD]])
 // CHECK: [[CORO_RESULT_CP:%.*]] = copy_value [[CORO_RESULT_ORIG]]
 // CHECK: [[CORO_RESULT_MK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[CORO_RESULT_CP]]
@@ -1528,7 +1451,7 @@ public struct LoadableSubscriptGetSetTesterNonCopyableStructParent : ~Copyable {
 // The second get call.
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
@@ -1725,7 +1648,7 @@ public class LoadableSubscriptGetSetTesterClassParent {
 // Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[CLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[CLASS:%.*]] = load_borrow [unchecked] [[ACCESS]]
 // CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[CLASS]])
 // CHECK: [[CORO_RESULT_CP:%.*]] = copy_value [[CORO_RESULT_ORIG]]
 // CHECK: [[CORO_RESULT_MK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[CORO_RESULT_CP]]
@@ -1984,7 +1907,7 @@ public struct LoadableSubscriptReadModifyTesterNonCopyableStructParent : ~Copyab
 // The second get call.
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}({{%.*}}, [[BORROWED_VALUE]])
@@ -2165,7 +2088,7 @@ public class LoadableSubscriptReadModifyTesterClassParent {
 // Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[CLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[CLASS:%.*]] = load_borrow [unchecked] [[ACCESS]]
 // CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[CLASS]])
 // CHECK: [[CORO_RESULT_CP:%.*]] = copy_value [[CORO_RESULT_ORIG]]
 // CHECK: [[CORO_RESULT_MK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[CORO_RESULT_CP]]
@@ -2421,7 +2344,7 @@ public struct LoadableSubscriptGetModifyTesterNonCopyableStructParent : ~Copyabl
 // The second get call.
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
-// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [[MARK]]
+// CHECK: [[LOAD_BORROW:%.*]] = load_borrow [unchecked] [[MARK]]
 // CHECK: [[VALUE:%.*]] = apply {{%.*}}([[LOAD_BORROW]])
 // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $AddressOnlyProtocol
@@ -2575,7 +2498,7 @@ public class LoadableSubscriptGetModifyTesterClassParent {
 // Third read.
 //
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
-// CHECK: [[CLASS:%.*]] = load_borrow [[ACCESS]]
+// CHECK: [[CLASS:%.*]] = load_borrow [unchecked] [[ACCESS]]
 // CHECK: ([[CORO_RESULT_ORIG:%.*]], [[CORO_TOKEN:%.*]]) = begin_apply {{%.*}}([[CLASS]])
 // CHECK: [[CORO_RESULT_CP:%.*]] = copy_value [[CORO_RESULT_ORIG]]
 // CHECK: [[CORO_RESULT_MK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[CORO_RESULT_CP]]

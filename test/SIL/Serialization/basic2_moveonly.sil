@@ -1,14 +1,16 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name basic2
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name basic2
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
 
 // Once move only is no longer behind a feature flag, merge this into basic2.
 
 sil_stage raw
 
+import Swift
+
 class Klass {}
-@_moveOnly struct MoveOnlyPair {
+struct MoveOnlyPair: ~Copyable {
   var lhs: Klass
   var rhs: Klass
 }

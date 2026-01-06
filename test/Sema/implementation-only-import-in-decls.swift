@@ -4,21 +4,21 @@
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
 // RUN:  -enable-library-evolution -swift-version 5
 
-// RUN: %target-typecheck-verify-swift -I %t \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t \
 // RUN:  -enable-library-evolution -swift-version 5
 
 import NormalLibrary
 @_implementationOnly import BADLibrary
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
-public struct TestConformance: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+public struct TestConformance: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
 
-@usableFromInline struct TestConformanceUFI: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+@usableFromInline struct TestConformanceUFI: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
 
 struct TestConformanceOkay: BadProto {} // ok
 
-public class TestConformanceClass: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
-public enum TestConformanceEnum: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
-
+public class TestConformanceClass: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
+public enum TestConformanceEnum: BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
 
 public struct TestGenericParams<T: BadProto> {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
@@ -30,8 +30,8 @@ public struct TestGenericParamsWithOuter<T> {
 }
 
 public enum TestCase {
-  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  case x(BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; 'BADLibrary' has been imported as implementation-only}}
+  case y(Int, BadStruct) // expected-error {{cannot use struct 'BadStruct' in an associated value of a public or '@usableFromInline' enum; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public func testGenericParams<T: BadProto>(_: T) {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
@@ -56,6 +56,7 @@ public struct TestInit {
 
 public struct TestPropertyWrapper {
   @BadWrapper public var BadProperty: Int // expected-error {{cannot use struct 'BadWrapper' as property wrapper here; 'BADLibrary' has been imported as implementation-only}}
+  // expected-error@-1 {{cannot use property 'wrappedValue' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public protocol TestInherited: BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
@@ -74,11 +75,11 @@ public protocol TestAssocTypeWhereClause {
   associatedtype Assoc: Collection where Assoc.Element: BadProto // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' here; 'BADLibrary' has been imported as implementation-only}}
+public enum TestRawType: IntLike { // expected-error {{cannot use struct 'IntLike' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
   case x = 1
 }
 
-public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' here; 'BADLibrary' has been imported as implementation-only}}
+public class TestSubclass: BadClass { // expected-error {{cannot use class 'BadClass' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public typealias TestUnderlying = BadStruct // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
@@ -86,16 +87,16 @@ public typealias TestGenericParamsAliasWhereClause<T> = T where T: BadProto // e
 
 public typealias TestGenericParamsAlias<T: BadProto> = T // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
 
-public var testBadType: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-public var testBadTypeInferred = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-public var testBadTypePartiallyInferred: Optional = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+public var testBadType: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+public var testBadTypeInferred = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+public var testBadTypePartiallyInferred: Optional = Optional<BadStruct>.none // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
 public var (testBadTypeTuple1, testBadTypeTuple2): (BadStruct?, BadClass?) = (nil, nil)
-// expected-error@-1 {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-// expected-error@-2 {{cannot use class 'BadClass' here; 'BADLibrary' has been imported as implementation-only}}
-public var (testBadTypeTuplePartlyInferred1, testBadTypeTuplePartlyInferred2): (Optional, Optional) = (Optional<Int>.none, Optional<BadStruct>.none) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (Optional, Optional) = (Optional<BadStruct>.none, Optional<Int>.none) // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+// expected-error@-1 {{cannot use class 'BadClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+// expected-error@-2 {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+public var (testBadTypeTuplePartlyInferred1, testBadTypeTuplePartlyInferred2): (Optional, Optional) = (Optional<Int>.none, Optional<BadStruct>.none) // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+public var (testBadTypeTuplePartlyInferred3, testBadTypeTuplePartlyInferred4): (Optional, Optional) = (Optional<BadStruct>.none, Optional<Int>.none) // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+public var testMultipleBindings1: Int? = nil, testMultipleBindings2: BadStruct? = nil // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+public var testMultipleBindings3: BadStruct? = nil, testMultipleBindings4: Int? = nil // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
 
 extension BadStruct { // expected-error {{cannot use struct 'BadStruct' in an extension with public or '@usableFromInline' members; 'BADLibrary' has been imported as implementation-only}}
   public func testExtensionOfBadType() {}
@@ -120,7 +121,7 @@ extension Array where Element == BadStruct {
   subscript(okay _: Int) -> Int { 0 } // okay
 }
 
-extension Int: @retroactive BadProto {} // expected-error {{cannot use protocol 'BadProto' here; 'BADLibrary' has been imported as implementation-only}}
+extension Int: @retroactive BadProto {} // expected-error {{cannot use protocol 'BadProto' in a public or '@usableFromInline' conformance; 'BADLibrary' has been imported as implementation-only}}
 struct TestExtensionConformanceOkay {}
 extension TestExtensionConformanceOkay: BadProto {} // okay
 
@@ -139,39 +140,39 @@ precedencegroup TestHigherThan {
 }
 
 @frozen public struct PublicStructStoredProperties {
-  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
   // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because 'BADLibrary' was imported implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
 }
 
 @frozen @usableFromInline internal struct UFIStructStoredProperties {
-  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
   // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because 'BADLibrary' was imported implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
 }
 
 @_fixed_layout public class PublicClassStoredProperties {
-  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
-  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar = [BadStruct]() // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
   // expected-error@-1 {{struct 'BadStruct' cannot be used in a property initializer in a '@frozen' type because 'BADLibrary' was imported implementation-only}}
 
   private var computedIsOkay: BadStruct? { return nil } // okay
   private static var staticIsOkay: BadStruct? // okay
-  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'BADLibrary' has been imported as implementation-only}}
 }
 
 public typealias NormalProtoAssoc<T: NormalProto> = T.Assoc

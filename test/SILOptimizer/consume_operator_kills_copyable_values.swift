@@ -6,6 +6,10 @@ public class Klass {}
 public class SubKlass1 : Klass {}
 public class SubKlass2 : Klass {}
 
+struct A {
+    var prop = ""
+}
+
 //////////////////
 // Declarations //
 //////////////////
@@ -13,6 +17,14 @@ public class SubKlass2 : Klass {}
 func consumingUse(_ k: __owned Klass) {}
 var booleanValue: Bool { false }
 func nonConsumingUse(_ k: Klass) {}
+
+func consumeValue<V>(_ v: consuming V) {}
+func borrowValue<V>(_ v: borrowing V) {}
+func useValue<V>(_ v: V) {}
+
+func consumeA(_ a: consuming A) {}
+func borrowA(_ a: borrowing A) {}
+func useA(_ a: A) {}
 
 ///////////
 // Tests //
@@ -423,4 +435,38 @@ public func deferTest(_ x: __owned Klass) { // expected-error {{'x' used after c
         nonConsumingUse(x)
     }
     print("do Something")
+}
+
+
+/////////////////////////
+// Local Binding Tests //
+/////////////////////////
+
+func testLocalBindingUseAfterConsumeGenerics() {
+    let a = A()         // expected-error {{'a' used after consume}}
+    _ = consume a       // expected-note {{consumed here}}
+    consumeValue(a)     // expected-note {{used here}}
+    borrowValue(a)      // expected-note {{used here}}
+    useValue(a)         // expected-note {{used here}}
+}
+
+func testLocalBindingUseAfterConsumeNoGenericFuncs() {
+    let a = A()     // expected-error {{'a' used after consume}}
+    _ = consume a   // expected-note {{consumed here}}
+
+    consumeA(a) // expected-note {{used here}}
+    borrowA(a)  // expected-note {{used here}}
+    useA(a)     // expected-note {{used here}}
+}
+
+// https://github.com/swiftlang/swift/issues/83277
+func test_83277() {
+    let values = [1, 2, 3]  // expected-error {{'values' used after consume}}
+    var newValues = consume values // expected-note {{consumed here}}
+    newValues.append(4)
+
+    _ = values.count    // expected-note {{used here}}
+    _ = values[0]       // expected-note {{used here}}
+    _ = values.first    // expected-note {{used here}}
+    _ = values.last     // expected-note {{used here}}
 }

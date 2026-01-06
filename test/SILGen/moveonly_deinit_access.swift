@@ -4,8 +4,7 @@
 // This test makes sure that in various situations (ignoring errors), we
 // properly handle deinits with move only types.
 
-@_moveOnly
-public struct FD {
+public struct FD: ~Copyable {
     var i = 5
 }
 

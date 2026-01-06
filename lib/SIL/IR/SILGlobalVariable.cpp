@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -22,7 +23,7 @@ using namespace swift;
 SwiftMetatype SILGlobalVariable::registeredMetatype;
 
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
-                                             IsSerialized_t isSerialized,
+                                             SerializedKind_t serializedKind,
                                              StringRef name,
                                              SILType loweredType,
                                              std::optional<SILLocation> loc,
@@ -35,24 +36,63 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
   assert(!entry->getValue() && "global variable already exists");
   name = entry->getKey();
 
-  auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
+  auto var = new (M) SILGlobalVariable(M, linkage, serializedKind, name,
                                        loweredType, loc, Decl);
 
   if (entry) entry->setValue(var);
   return var;
 }
 
+ModuleDecl *SILGlobalVariable::getParentModule() const {
+  if (auto parentModule = DeclCtxOrParentModule.dyn_cast<ModuleDecl *>())
+    return parentModule;
+
+  if (auto declContext = DeclCtxOrParentModule.dyn_cast<DeclContext *>())
+    return declContext->getParentModule();
+
+  return getModule().getSwiftModule();
+}
+
+DeclContext *SILGlobalVariable::getDeclContext() const {
+  if (auto var = getDecl())
+    return var->getDeclContext();
+
+  if (auto declContext = DeclCtxOrParentModule.dyn_cast<DeclContext *>())
+    return declContext;
+
+  return nullptr;
+}
+
+static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
+  if (!decl)
+    return false;
+
+  if (!decl->isLet())
+    return false;
+
+  // Raw-layout storage may be mutated even for let-variables. Therefore don't
+  // treat such variables as `let` in SIL.
+  auto teCtxt = TypeExpansionContext::maximal(mod.getSwiftModule(),
+                                              mod.isWholeModule());
+  auto typeProps = mod.Types.getTypeProperties(type, teCtxt);
+  if (typeProps.isOrContainsRawLayout())
+    return false;
+
+  return true;
+}
+
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
-                                     IsSerialized_t isSerialized,
+                                     SerializedKind_t serializedKind,
                                      StringRef Name, SILType LoweredType,
                                      std::optional<SILLocation> Loc,
                                      VarDecl *Decl)
     : SwiftObjectHeader(registeredMetatype), Module(Module), Name(Name),
       LoweredType(LoweredType), Location(Loc.value_or(SILLocation::invalid())),
       Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), VDecl(Decl) {
-  setSerialized(isSerialized);
+  setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
-  setLet(Decl ? Decl->isLet() : false);
+  setLet(isGlobalLet(Module, Decl, LoweredType));
+  setMarkedAsUsed(Decl && Decl->getAttrs().hasAttribute<UsedAttr>());
   Module.silGlobals.push_back(this);
 }
 
@@ -60,17 +100,72 @@ SILGlobalVariable::~SILGlobalVariable() {
   clear();
 }
 
+void SILGlobalVariable::setAsmName(StringRef value) {
+  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
+  AsmName = value;
+
+  if (!value.empty()) {
+    // Update the variable-by-asm-name-table.
+    getModule().GlobalVariableByAsmNameMap.insert({AsmName, this});
+  }
+}
+
 bool SILGlobalVariable::isPossiblyUsedExternally() const {
+  if (shouldBePreservedForDebugger())
+    return true;
+
+  if (markedAsUsed())
+    return true;
+
+  if (!section().empty())
+    return true;
+
   SILLinkage linkage = getLinkage();
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
-/// Get this global variable's fragile attribute.
-IsSerialized_t SILGlobalVariable::isSerialized() const {
-  return Serialized ? IsSerialized : IsNotSerialized;
+bool SILGlobalVariable::hasNonUniqueDefinition() const {
+  // Non-uniqueness is a property of the Embedded linkage model.
+  auto &ctx = getModule().getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // If this is for a declaration, ask it.
+  if (auto decl = getDecl()) {
+    return SILDeclRef::declHasNonUniqueDefinition(decl);
+  }
+
+  // If this variable is from a different module than the one we are emitting
+  // code for, then it must have a non-unique definition.
+  if (getParentModule() != getModule().getSwiftModule())
+    return true;
+
+  return false;
 }
-void SILGlobalVariable::setSerialized(IsSerialized_t isSerialized) {
-  Serialized = isSerialized ? 1 : 0;
+
+bool SILGlobalVariable::shouldBePreservedForDebugger() const {
+  if (getModule().getOptions().OptMode != OptimizationMode::NoOptimization)
+    return false;
+  // Keep any language-level global variables for the debugger.
+  return VDecl != nullptr;
+}
+
+bool SILGlobalVariable::isSerialized() const {
+  return SerializedKind_t(Serialized) == IsSerialized;
+}
+
+bool SILGlobalVariable::isAnySerialized() const {
+  return SerializedKind_t(Serialized) == IsSerialized ||
+         SerializedKind_t(Serialized) == IsSerializedForPackage;
+}
+
+/// Get this global variable's fragile attribute.
+SerializedKind_t SILGlobalVariable::getSerializedKind() const {
+  return SerializedKind_t(Serialized);
+}
+
+void SILGlobalVariable::setSerializedKind(SerializedKind_t serializedKind) {
+  Serialized = unsigned(serializedKind);
 }
 
 /// Return the value that is written into the global variable.
@@ -82,11 +177,17 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
 }
 
 bool SILGlobalVariable::mustBeInitializedStatically() const {
-  if (getSectionAttr())
+  if (!section().empty())
     return true;
 
-  auto *decl = getDecl();
+  auto *decl = getDecl();  
   if (decl && isDefinition() && decl->getAttrs().hasAttribute<SILGenNameAttr>())
+    return true;
+
+  if (decl && isDefinition() && decl->getAttrs().hasAttribute<ConstValAttr>())
+    return true;
+
+  if (decl && isDefinition() && decl->getAttrs().hasAttribute<ConstInitializedAttr>())
     return true;
 
   return false;

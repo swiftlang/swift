@@ -5735,8 +5735,10 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Unique") {
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: false
     ) { keys, values in
-      let k = keys.baseAddress!
-      let v = values.baseAddress!
+      guard let k = keys.baseAddress, let v = values.baseAddress else {
+        return 0
+      }
+
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i))
         (v + i).initialize(to: TestEquatableValueTy(i))
@@ -5762,8 +5764,10 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
       _unsafeUninitializedCapacity: c,
       allowingDuplicates: true
     ) { keys, values in
-      let k = keys.baseAddress!
-      let v = values.baseAddress!
+      guard let k = keys.baseAddress, let v = values.baseAddress else {
+        return 0
+      }
+
       for i in 0 ..< c {
         (k + i).initialize(to: TestKeyTy(i / 2))
         (v + i).initialize(to: TestEquatableValueTy(i / 2))
@@ -5783,6 +5787,21 @@ DictionaryTestSuite.test("BulkLoadingInitializer.Nonunique") {
     }
     expectEqual(d2, d1)
   }
+}
+
+DictionaryTestSuite.test("Identical") {
+  let d1: Dictionary = ["a": 1, "b": 2, "c": 3]
+  expectTrue(d1.isTriviallyIdentical(to: d1))
+
+  let d2: Dictionary = d1
+  expectTrue(d1.isTriviallyIdentical(to: d2))
+
+  var d3: Dictionary = d2
+  d3.reserveCapacity(0)
+  expectFalse(d1.isTriviallyIdentical(to: d3))
+
+  let d4: Dictionary = ["a": 1, "b": 2, "c": 3]
+  expectFalse(d1.isTriviallyIdentical(to: d4))
 }
 
 DictionaryTestSuite.setUp {

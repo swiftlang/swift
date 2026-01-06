@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name property_abstraction %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name property_abstraction %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}

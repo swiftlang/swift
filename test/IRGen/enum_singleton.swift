@@ -41,7 +41,7 @@ public enum SingletonEnum {
 // CHECK-OPT:   ret void
 // CHECK: }
 
-// CHECK: define internal i32 @"$s14enum_singleton13SingletonEnumOwug"
+// CHECK: define internal{{.*}} i32 @"$s14enum_singleton13SingletonEnumOwug"
 // CHECK:   ret i32 0
 // CHECK: }
 

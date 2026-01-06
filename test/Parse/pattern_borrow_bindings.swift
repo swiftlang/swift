@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BorrowingSwitch -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 struct Payload: ~Copyable {
     var x: Int
@@ -23,7 +23,7 @@ struct SourceBreakTest {
     func callAsFunction() -> Bar { fatalError() }
 }
 
-let _borrowing = SourceBreakTest()
+let borrowing = SourceBreakTest()
 
 func ~=(_: borrowing Bar, _: borrowing Bar) -> Bool { fatalError() }
 
@@ -33,19 +33,25 @@ func useBorrowPayload(_: borrowing Payload) { fatalError() }
 
 func testBorrowingPatterns(bar: borrowing Bar) {
     switch bar {
-    case _borrowing .foo(): // parses as `_borrowing.foo()` as before
+    case borrowing .foo(): // parses as `borrowing.foo()` as before
         break
-    case _borrowing (): // parses as `_borrowing()` as before
+    case borrowing (): // parses as `borrowing()` as before
         break
 
-    case _borrowing x: 
+    case borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
         useBorrowBar(x)
 
-    case .payload(_borrowing x):
+    case .payload(borrowing x): // expected-warning{{'borrowing' in pattern matches is deprecated}} {{19-28=let}}
         useBorrowFoo(x)
 
-    case _borrowing x.member: // expected-error{{'_borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
+    case borrowing x.member: // expected-warning{{deprecated}} expected-error{{'borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
         break
+
+    case borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
+        useBorrowBar(x)
+
+    case _borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-20=let}}
+        useBorrowBar(x)
 
     default:
         break

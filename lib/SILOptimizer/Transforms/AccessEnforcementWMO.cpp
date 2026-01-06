@@ -55,6 +55,7 @@
 
 #define DEBUG_TYPE "access-enforcement-wmo"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -106,7 +107,7 @@ static bool isVisibleExternally(DisjointAccessLocationKey key, SILModule *mod) {
   if (auto *decl = key.dyn_cast<const VarDecl *>())
     return mod->isVisibleExternally(decl);
 
-  auto *global = key.get<const SILGlobalVariable *>();
+  auto *global = cast<const SILGlobalVariable *>(key);
   return isPossiblyUsedExternally(global->getLinkage(), mod->isWholeModule());
 }
 
@@ -114,7 +115,7 @@ static StringRef getName(DisjointAccessLocationKey key) {
   if (auto *decl = key.dyn_cast<const VarDecl *>())
     return decl->getNameStr();
 
-  return key.get<const SILGlobalVariable *>()->getName();
+  return cast<const SILGlobalVariable *>(key)->getName();
 }
 
 namespace {
@@ -229,6 +230,7 @@ bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty:
+      case KeyPathPatternComponent::Kind::Method:
       case KeyPathPatternComponent::Kind::OptionalChain:
       case KeyPathPatternComponent::Kind::OptionalForce:
       case KeyPathPatternComponent::Kind::OptionalWrap:

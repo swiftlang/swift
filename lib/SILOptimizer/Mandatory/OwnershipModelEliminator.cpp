@@ -22,8 +22,11 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "swift/SIL/SILValue.h"
 #define DEBUG_TYPE "sil-ownership-model-eliminator"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
@@ -136,9 +139,30 @@ struct OwnershipModelEliminatorVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitExplicitCopyValueInst(ExplicitCopyValueInst *cvi);
   bool visitExplicitCopyAddrInst(ExplicitCopyAddrInst *cai);
+  bool visitApplyInst(ApplyInst *ai);
+
+  bool visitIgnoredUseInst(IgnoredUseInst *iui) {
+    eraseInstruction(iui);
+    return true;
+  }
 
   void splitDestroy(DestroyValueInst *destroy);
+  bool peepholeTupleConstructorUser(DestructureTupleInst *dti);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
+  bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
+    if (!dbi->isDeadEnd())
+      return false;
+
+    // dead_end instructions are required for complete OSSA lifetimes but should
+    // not exist post-OSSA.
+    eraseInstruction(dbi);
+    return true;
+  }
+  bool visitMergeIsolationRegionInst(MergeIsolationRegionInst *mir) {
+    eraseInstruction(mir);
+    return true;
+  }
+
   bool visitLoadBorrowInst(LoadBorrowInst *lbi);
   bool visitMoveValueInst(MoveValueInst *mvi) {
     eraseInstructionAndRAUW(mvi, mvi->getOperand());
@@ -152,6 +176,10 @@ struct OwnershipModelEliminatorVisitor
     eraseInstructionAndRAUW(bbi, bbi->getOperand());
     return true;
   }
+  bool visitBorrowedFromInst(BorrowedFromInst *bfi) {
+    eraseInstructionAndRAUW(bfi, bfi->getBorrowedValue());
+    return true;
+  }
   bool visitEndBorrowInst(EndBorrowInst *ebi) {
     eraseInstruction(ebi);
     return true;
@@ -160,6 +188,19 @@ struct OwnershipModelEliminatorVisitor
     eraseInstruction(eli);
     return true;
   }
+  bool visitExtendLifetimeInst(ExtendLifetimeInst *eli) {
+    eraseInstruction(eli);
+    return true;
+  }
+
+  bool visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    return withBuilder<bool>(rbi, [&](SILBuilder &b, SILLocation loc) {
+      b.createReturn(loc, rbi->getReturnValue());
+      eraseInstruction(rbi);
+      return true;
+    });
+  }
+
   bool visitUncheckedOwnershipConversionInst(
       UncheckedOwnershipConversionInst *uoci) {
     eraseInstructionAndRAUW(uoci, uoci->getOperand());
@@ -220,6 +261,7 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(DifferentiableFunctionExtract)
   HANDLE_FORWARDING_INST(MarkUninitialized)
   HANDLE_FORWARDING_INST(FunctionExtractIsolation)
+  HANDLE_FORWARDING_INST(ImplicitActorToOpaqueIsolationCast)
 #undef HANDLE_FORWARDING_INST
 };
 
@@ -351,6 +393,46 @@ bool OwnershipModelEliminatorVisitor::visitExplicitCopyAddrInst(
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::visitApplyInst(ApplyInst *ai) {
+  auto callee = ai->getCallee();
+
+  if (!callee)
+    return false;
+
+  // Insert destroy_addr for @in_cxx arguments.
+  auto fnTy = callee->getType().castTo<SILFunctionType>();
+  SILFunctionConventions fnConv(fnTy, ai->getModule());
+  bool changed = false;
+
+  for (int i = fnConv.getSILArgIndexOfFirstParam(),
+           e = i + fnConv.getNumParameters();
+       i < e; ++i) {
+    auto paramInfo = fnConv.getParamInfoForSILArg(i);
+    if (!paramInfo.isIndirectInCXX())
+      continue;
+    auto arg = ai->getArgument(i);
+    SILBuilderWithScope builder(ai->getNextInstruction(), builderCtx);
+    builder.createDestroyAddr(ai->getLoc(), arg);
+    changed = true;
+  }
+
+  // Insert a retain for unowned results.
+  SILBuilderWithScope builder(ai->getNextInstruction(), builderCtx);
+  auto resultIt = fnConv.getDirectSILResults().begin();
+  auto copyValue = [&](unsigned idx, SILValue v) {
+    auto result = *resultIt;
+    if (result.getConvention() == ResultConvention::Unowned)
+      builder.emitCopyValueOperation(ai->getLoc(), v);
+    ++resultIt;
+  };
+  if (fnConv.getNumDirectSILResults() == 1)
+    copyValue(0, ai);
+  else
+    builder.emitDestructureValueOperation(ai->getLoc(), ai, copyValue);
+
+  return changed;
+}
+
 bool OwnershipModelEliminatorVisitor::visitUnmanagedRetainValueInst(
     UnmanagedRetainValueInst *urvi) {
   // Now that we have set the unqualified ownership flag, destroy value
@@ -419,8 +501,8 @@ static void injectDebugPoison(DestroyValueInst *destroy) {
     // This debug location is obviously inconsistent with surrounding code, but
     // IRGen is responsible for fixing this.
     builder.setCurrentDebugScope(scope);
-    auto *newDebugVal = builder.createDebugValue(loc, destroyedValue, *varInfo,
-                                                 /*poisonRefs*/ true);
+    auto *newDebugVal =
+        builder.createDebugValue(loc, destroyedValue, *varInfo, PoisonRefs);
     assert(*(newDebugVal->getVarInfo()) == *varInfo && "lost in translation");
     (void)newDebugVal;
   }
@@ -494,7 +576,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto operandTy = operand->getType();
   NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
 
-  if (auto *sd = dyn_cast<StructDecl>(nominalDecl)) {
+  if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {
       llvm::SmallVector<Projection, 8> projections;
       Projection::getFirstLevelProjections(
@@ -535,6 +617,13 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
 
 bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
     DestroyValueInst *dvi) {
+  if (dvi->isDeadEnd()) {
+    // dead_end instructions are required for complete OSSA lifetimes but should
+    // not exist post-OSSA.
+    eraseInstruction(dvi);
+    return true;
+  }
+
   // Nonescaping closures are represented ultimately as trivial pointers to
   // their context, but we use ownership to do borrow checking of their captures
   // in OSSA. Now that we're eliminating ownership, fold away destroys.
@@ -660,8 +749,50 @@ bool OwnershipModelEliminatorVisitor::visitDestructureStructInst(
   return true;
 }
 
+bool OwnershipModelEliminatorVisitor::peepholeTupleConstructorUser(DestructureTupleInst *dti) {
+  auto destructureResults = dti->getResults();
+  TupleInst *ti = nullptr;
+  for (unsigned index : indices(destructureResults)) {
+    SILValue result = destructureResults[index];
+    // We must have a single use of the destructure value.
+    auto *use = result->getSingleUse();
+    if (!use) {
+      ti = nullptr;
+      break;
+    }
+    // The user must be a single tuple constructor.
+    auto *tupleUsr = dyn_cast<TupleInst>(use->getUser());
+    if (!tupleUsr || (ti && ti != tupleUsr)) {
+      ti = nullptr;
+      break;
+    }
+    // Indices of destructure and tuple must match.
+    if (use->getOperandNumber() != index) {
+      ti = nullptr;
+      break;
+    }
+    ti = tupleUsr;
+  }
+  if (!ti)
+    return false;
+
+  if (ti->getType() != dti->getOperand()->getType())
+    return false;
+
+  ti->replaceAllUsesWith(dti->getOperand());
+  eraseInstruction(ti);
+  eraseInstruction(dti);
+  return true;
+}
+
 bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
     DestructureTupleInst *dti) {
+
+  // (tuple (destructure)) -> (id)
+  if (peepholeTupleConstructorUser(dti)) {
+    return true;
+  }
+
   splitDestructure(dti, dti->getOperand());
   return true;
 }
@@ -766,17 +897,6 @@ static bool stripOwnership(SILFunction &func) {
   return madeChange;
 }
 
-static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
-                                                            SILFunction *f) {
-  if (!f->hasOwnership() || f->isTransparent())
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "After deserialization, stripping ownership in:"
-                          << f->getName() << "\n");
-
-  stripOwnership(*f);
-}
-
 static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
   if (!f->hasOwnership())
     return;
@@ -790,11 +910,7 @@ static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *f) {
 namespace {
 
 struct OwnershipModelEliminator : SILFunctionTransform {
-  bool skipTransparent;
-  bool skipStdlibModule;
-
-  OwnershipModelEliminator(bool skipTransparent, bool skipStdlibModule)
-      : skipTransparent(skipTransparent), skipStdlibModule(skipStdlibModule) {}
+  OwnershipModelEliminator() {}
 
   void run() override {
     if (DumpBefore.size()) {
@@ -804,18 +920,7 @@ struct OwnershipModelEliminator : SILFunctionTransform {
     auto *f = getFunction();
     auto &mod = getFunction()->getModule();
 
-    // If we are supposed to skip the stdlib module and we are in the stdlib
-    // module bail.
-    if (skipStdlibModule && mod.isStdlibModule()) {
-      return;
-    }
-
     if (!f->hasOwnership())
-      return;
-
-    // If we were asked to not strip ownership from transparent functions in
-    // /our/ module, return.
-    if (skipTransparent && f->isTransparent())
       return;
 
     // Verify here to make sure ownership is correct before we strip.
@@ -845,25 +950,14 @@ struct OwnershipModelEliminator : SILFunctionTransform {
       invalidateAnalysis(InvalidKind);
     }
 
-    // If we were asked to strip transparent, we are at the beginning of the
-    // performance pipeline. In such a case, we register a handler so that all
-    // future things we deserialize have ownership stripped.
+    // Register a handler so that all future things we deserialize have ownership stripped.
     using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
-    if (skipTransparent) {
-      if (!mod.hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME()) {
-        ptr.reset(new NotificationHandlerTy(
-            prepareNonTransparentSILFunctionForOptimization));
-        mod.registerDeserializationNotificationHandler(std::move(ptr));
-        mod.setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME();
-      }
-    } else {
-      if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
-        ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
-        mod.registerDeserializationNotificationHandler(std::move(ptr));
-        mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
-      }
+    if (!mod.hasRegisteredDeserializationNotificationHandlerForAllFuncOME()) {
+      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+      mod.registerDeserializationNotificationHandler(std::move(ptr));
+      mod.setRegisteredDeserializationNotificationHandlerForAllFuncOME();
     }
   }
 };
@@ -871,11 +965,5 @@ struct OwnershipModelEliminator : SILFunctionTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(false /*skip transparent*/,
-                                      false /*ignore stdlib*/);
-}
-
-SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/,
-                                      false /*ignore stdlib*/);
+  return new OwnershipModelEliminator();
 }

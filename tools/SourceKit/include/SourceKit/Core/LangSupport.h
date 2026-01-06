@@ -35,6 +35,12 @@ namespace llvm {
   class MemoryBuffer;
 }
 
+namespace swift {
+namespace ide {
+struct FormattedSignatureHelp;
+} // namespace ide
+} // namespace swift
+
 namespace SourceKit {
 class GlobalConfig;
 using swift::ide::CancellableResult;
@@ -213,7 +219,8 @@ struct FilterRule {
 
 enum class DiagnosticSeverityKind {
   Warning,
-  Error
+  Error,
+  Remark
 };
 
 enum class DiagnosticCategory {
@@ -390,6 +397,9 @@ public:
 
   virtual void handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
+
+  virtual void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                                 StringRef USR) = 0;
 
   virtual void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                          UIdent Kind, UIdent AccessLevel,
@@ -919,6 +929,7 @@ struct IndexStoreOptions {
   bool IgnoreStdlib = false;
   bool DisableImplicitModules = false;
   bool IncludeLocals = false;
+  bool Compress = false;
 };
 
 struct IndexStoreInfo{};
@@ -1007,6 +1018,19 @@ public:
   virtual void cancelled() = 0;
 };
 
+class SignatureHelpConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~SignatureHelpConsumer() {}
+
+  virtual void
+  handleResult(const swift::ide::FormattedSignatureHelp &Result) = 0;
+  virtual void setReusingASTContext(bool flag) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+  virtual void cancelled() = 0;
+};
+
 struct CompilationResult {
   unsigned int ResultStatus;
   llvm::ArrayRef<DiagnosticEntryInfo> Diagnostics;
@@ -1020,6 +1044,8 @@ public:
   const static std::string SynthesizedUSRSeparator;
 
   virtual ~LangSupport() { }
+
+  virtual void *getOpaqueSwiftIDEInspectionInstance() { return nullptr; }
 
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
@@ -1102,10 +1128,12 @@ public:
   virtual void
   editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
                                  ArrayRef<const char *> Args,
+                                 bool CancelOnSubsequentRequest,
                                  SourceKitCancellationToken CancellationToken,
                                  std::shared_ptr<EditorConsumer> Consumer) = 0;
 
-  virtual void editorClose(StringRef Name, bool RemoveCache) = 0;
+  virtual void editorClose(StringRef Name, bool CancelBuilds,
+                           bool RemoveCache) = 0;
 
   virtual void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                  unsigned Offset, unsigned Length,
@@ -1210,12 +1238,14 @@ public:
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                         unsigned Length, ArrayRef<const char *> Args,
+                        bool CancelOnSubsequentRequest,
                         SourceKitCancellationToken CancellationToken,
                         CategorizedRenameRangesReceiver Receiver) = 0;
 
   virtual void semanticRefactoring(StringRef PrimaryFilePath,
                                    SemanticRefactoringInfo Info,
                                    ArrayRef<const char *> Args,
+                                   bool CancelOnSubsequentRequest,
                                    SourceKitCancellationToken CancellationToken,
                                    CategorizedEditsReceiver Receiver) = 0;
 
@@ -1234,6 +1264,7 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<unsigned> Offset,
       std::optional<unsigned> Length, bool FullyQualified,
+      bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;
@@ -1255,6 +1286,12 @@ public:
       SourceKitCancellationToken CancellationToken,
       ConformingMethodListConsumer &Consumer,
       std::optional<VFSOptions> vfsOptions) = 0;
+
+  virtual void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                                ArrayRef<const char *> Args,
+                                SourceKitCancellationToken CancellationToken,
+                                SignatureHelpConsumer &Consumer,
+                                std::optional<VFSOptions> vfsOptions) = 0;
 
   virtual void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                         ArrayRef<const char *> args,

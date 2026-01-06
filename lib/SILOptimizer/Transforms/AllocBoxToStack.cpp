@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/ApplySite.h"
@@ -24,6 +25,8 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -354,7 +357,8 @@ static bool isOptimizableApplySite(ApplySite Apply) {
     return false;
 
   // Do not optimize always_inlinable functions.
-  if (callee->getInlineStrategy() == Inline_t::AlwaysInline)
+  if (callee->getInlineStrategy() == Inline_t::HeuristicAlwaysInline ||
+      callee->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
   if (callee->getLinkage() != SILLinkage::Private)
@@ -600,7 +604,9 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
 
 /// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
 /// new alloc_stack, but do not delete the alloc_box yet.
-static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
+static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
+                                        DeadEndBlocksAnalysis &deba,
+                                        SILLoopAnalysis &la) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   SILValue HeapBox = ABI;
@@ -692,9 +698,31 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
                          ABI->getBoxType(), ABI->getModule().Types, 0));
   auto Loc = CleanupLocation(ABI->getLoc());
 
+  auto *deb = deba.get(ABI->getFunction());
   for (auto LastRelease : FinalReleases) {
+    auto *dbi = dyn_cast<DeallocBoxInst>(LastRelease);
+    if (!dbi && deb->isDeadEnd(LastRelease->getParent()) &&
+        !la.get(ABI->getFunction())->getLoopFor(LastRelease->getParent())) {
+      // "Last" releases in dead-end regions may not actually destroy the box
+      // and consequently may not actually release the stored value.  That's
+      // because values (including boxes) may be leaked along paths into
+      // dead-end regions.  Thus it is invalid to lower such final releases of
+      // the box to destroy_addr's/dealloc_box's of the stack-promoted storage.
+      //
+      // There is one exception: if the alloc_box is in a dead-end loop.  In
+      // that case SIL invariants require that the final releases actually
+      // destroy the box; otherwise, a box would leak once per loop.  To check
+      // for this, it is sufficient check that the LastRelease is in a dead-end
+      // loop: if the alloc_box is not in that loop, then the entire loop is in
+      // the live range, so no release within the loop would be a "final
+      // release".
+      //
+      // None of this applies to dealloc_box instructions which always destroy
+      // the box.
+      continue;
+    }
     SILBuilderWithScope Builder(LastRelease);
-    if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
+    if (!dbi && !Lowering.isTrivial()) {
       // If we have a mark_unresolved_non_copyable_value use of our stack box,
       // we want to destroy that.
       SILValue valueToDestroy = StackBox;
@@ -707,6 +735,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
       Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
+    }
+    if (dbi && dbi->isDeadEnd()) {
+      // Don't bother to create dealloc_stack instructions in dead-ends.
+      continue;
     }
     Builder.createDeallocStack(Loc, ASI);
   }
@@ -761,7 +793,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
 
 public:
   PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
-                      IsSerialized_t Serialized,
+                      SerializedKind_t Serialized,
                       ArgIndexList &PromotedArgIndices, StringRef ClonedName);
 
   void populateCloned();
@@ -770,7 +802,7 @@ public:
 
 private:
   static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
-                                 SILFunction *Orig, IsSerialized_t Serialized,
+                                 SILFunction *Orig, SerializedKind_t Serialized,
                                  ArgIndexList &PromotedArgIndices,
                                  StringRef ClonedName);
 
@@ -789,7 +821,7 @@ private:
 
 PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
                                          SILFunction *Orig,
-                                         IsSerialized_t Serialized,
+                                         SerializedKind_t Serialized,
                                          ArgIndexList &PromotedArgIndices,
                                          StringRef ClonedName)
     : SILClonerWithScopes<PromotedParamCloner>(*initCloned(
@@ -800,10 +832,10 @@ PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
          getCloned()->getDebugScope()->getParentFunction());
 }
 
-static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
+static std::string getClonedName(SILFunction *F, SerializedKind_t Serialized,
                                  ArgIndexList &PromotedArgIndices) {
   auto P = Demangle::SpecializationPass::AllocBoxToStack;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(), P, Serialized, F);
   for (unsigned i : PromotedArgIndices) {
     Mangler.setArgumentBoxToStack(i);
   }
@@ -815,7 +847,7 @@ static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
 /// parameters (which are specified by PromotedArgIndices).
 SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
                                              SILFunction *Orig,
-                                             IsSerialized_t Serialized,
+                                             SerializedKind_t Serialized,
                                              ArgIndexList &PromotedArgIndices,
                                              StringRef ClonedName) {
   SILModule &M = Orig->getModule();
@@ -1041,22 +1073,19 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  IsSerialized_t Serialized = IsNotSerialized;
-  if (Apply.getFunction()->isSerialized())
-    Serialized = IsSerialized;
-
+  SerializedKind_t serializedKind = Apply.getFunction()->getSerializedKind();
   std::string ClonedName =
-    getClonedName(F, Serialized, PromotedCalleeArgIndices);
+    getClonedName(F, serializedKind, PromotedCalleeArgIndices);
 
   auto &M = Apply.getModule();
 
   SILFunction *ClonedFn;
   if (auto *PrevFn = M.lookUpFunction(ClonedName)) {
-    assert(PrevFn->isSerialized() == Serialized);
+    assert(PrevFn->getSerializedKind() == serializedKind);
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing ApplySite references.
-    PromotedParamCloner Cloner(FuncBuilder, F, Serialized,
+    PromotedParamCloner Cloner(FuncBuilder, F, serializedKind,
                                PromotedCalleeArgIndices,
                                ClonedName);
     Cloner.populateCloned();
@@ -1262,7 +1291,9 @@ static void rewriteApplySites(AllocBoxToStackState &pass) {
 
 /// Clone closure bodies and rewrite partial applies. Returns the number of
 /// alloc_box allocations promoted.
-static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
+static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass,
+                                     DeadEndBlocksAnalysis &deba,
+                                     SILLoopAnalysis &la) {
   // First we'll rewrite any ApplySite that we can to remove
   // the box container pointer from the operands.
   rewriteApplySites(pass);
@@ -1271,7 +1302,7 @@ static unsigned rewritePromotedBoxes(AllocBoxToStackState &pass) {
   auto rend = pass.Promotable.rend();
   for (auto I = pass.Promotable.rbegin(); I != rend; ++I) {
     auto *ABI = *I;
-    if (rewriteAllocBoxAsAllocStack(ABI)) {
+    if (rewriteAllocBoxAsAllocStack(ABI, deba, la)) {
       ++Count;
       ABI->eraseFromParent();
     }
@@ -1296,7 +1327,9 @@ class AllocBoxToStack : public SILFunctionTransform {
     }
 
     if (!pass.Promotable.empty()) {
-      auto Count = rewritePromotedBoxes(pass);
+      auto *deba = getAnalysis<DeadEndBlocksAnalysis>();
+      auto *la = getAnalysis<SILLoopAnalysis>();
+      auto Count = rewritePromotedBoxes(pass, *deba, *la);
       NumStackPromoted += Count;
       if (Count) {
         if (StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG)
@@ -1312,6 +1345,6 @@ class AllocBoxToStack : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILTransform *swift::createAllocBoxToStack() {
+SILTransform *swift::createLegacyAllocBoxToStack() {
   return new AllocBoxToStack();
 }

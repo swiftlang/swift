@@ -11,6 +11,8 @@
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin
 
 // RUN: %lldb-moduleimport-test -verbose -dump-module %t/a.out | %FileCheck %s
+
+// REQUIRES: swift_feature_Macros
 // CHECK: - Plugin Search Options:
 // CHECK:     -plugin-path {{.*}}plugins
 // CHECK:     -external-plugin-path {{.*}}plugins#{{.*}}swift-plugin-server

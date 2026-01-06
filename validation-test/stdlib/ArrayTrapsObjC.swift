@@ -7,6 +7,9 @@
 // Temporarily disable for backdeployment (rdar://89821303)
 // UNSUPPORTED: use_os_stdlib
 
+// rdar://121343746
+// UNSUPPORTED: OS=xros
+
 import StdlibUnittest
 import Foundation
 

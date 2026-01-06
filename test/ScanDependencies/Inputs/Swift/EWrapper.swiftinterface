@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
 // swift-module-flags: -module-name EWrapper
 import Swift
-import E
+@_exported import E
 public func funcEWrapper() { }

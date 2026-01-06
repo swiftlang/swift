@@ -35,10 +35,7 @@ class NominalTypeDecl;
 /******************************************************************************/
 
 // Diagnose an error if the Distributed module is not loaded.
-bool ensureDistributedModuleLoaded(Decl *decl);
-
-/// Check for illegal property declarations (e.g. re-declaring transport or id)
-void checkDistributedActorProperties(const NominalTypeDecl *decl);
+bool ensureDistributedModuleLoaded(const ValueDecl *decl);
 
 /// Type-check additional ad-hoc protocol requirements.
 /// Ad-hoc requirements are protocol requirements currently not expressible

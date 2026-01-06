@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s
+// RUN: %target-swift-frontend -typecheck %s %import-libdispatch
 
 // REQUIRES: libdispatch
 // UNSUPPORTED: OS=linux-gnu
@@ -27,14 +27,22 @@ if #available(OSX 10.10, iOS 8.0, *) {
 // dispatch/source.h
 _ = DispatchSource.makeUserDataAddSource()
 _ = DispatchSource.makeUserDataOrSource()
+#if !os(FreeBSD)
 _ = DispatchSource.makeMachSendSource(port: mach_port_t(0), eventMask: [])
 _ = DispatchSource.makeMachReceiveSource(port: mach_port_t(0))
 _ = DispatchSource.makeMemoryPressureSource(eventMask: [])
+#endif
 _ = DispatchSource.makeProcessSource(identifier: 0, eventMask: [])
 _ = DispatchSource.makeReadSource(fileDescriptor: 0)
+#if os(FreeBSD)
+_ = DispatchSource.makeSignalSource(signal: 2)
+#else
 _ = DispatchSource.makeSignalSource(signal: SIGINT)
+#endif
 _ = DispatchSource.makeTimerSource()
+#if !os(FreeBSD)
 _ = DispatchSource.makeFileSystemObjectSource(fileDescriptor: 0, eventMask: [])
+#endif
 _ = DispatchSource.makeWriteSource(fileDescriptor: 0)
 
 // dispatch/time.h

@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_CLASSMETADATAVISITOR_H
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -67,12 +68,17 @@ protected:
     : super(IGM), Target(target), VTable(vtable) {}
 
 public:
+  bool isPureObjC() const {
+    return Target->getObjCImplementationDecl();
+  }
 
   // Layout in embedded mode while considering the class type.
   // This is important for adding the right superclass pointer.
   // The regular `layout` method can be used for layout tasks for which the
   // actual superclass pointer is not relevant.
   void layoutEmbedded(CanType classTy) {
+    if (IGM.isEmbeddedWithExistentials())
+      asImpl().addValueWitnessTable();
     asImpl().noteAddressPoint();
     asImpl().addEmbeddedSuperclass(classTy);
     asImpl().addDestructorFunction();
@@ -85,11 +91,23 @@ public:
                   "Adjustment index must be synchronized with this layout");
 
     if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (IGM.isEmbeddedWithExistentials())
+        asImpl().addValueWitnessTable();
       asImpl().noteAddressPoint();
       asImpl().addSuperclass();
       asImpl().addDestructorFunction();
       asImpl().addIVarDestroyer();
       addEmbeddedClassMembers(Target);
+      return;
+    }
+
+    if (isPureObjC()) {
+      assert(IGM.ObjCInterop);
+      asImpl().noteAddressPoint();
+      asImpl().addMetadataFlags();
+      asImpl().addSuperclass();
+      asImpl().addClassCacheData();
+      asImpl().addClassDataPointer();
       return;
     }
 
@@ -196,7 +214,8 @@ private:
     // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
     forEachField(IGM, theClass, [&](Field field) {
-      asImpl().addFieldEntries(field);
+      if (isExportableField(field))
+        asImpl().addFieldEntries(field);
     });
     asImpl().noteEndOfFieldOffsets(theClass);
 

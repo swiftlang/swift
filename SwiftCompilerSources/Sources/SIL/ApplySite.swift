@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 /// Argument conventions indexed on an apply's operand.
@@ -71,6 +72,22 @@ public struct ApplyOperandConventions : Collection {
       calleeArgumentIndex(ofOperandIndex: operandIndex)!]
   }
 
+  // If the specified parameter is a dependency target, return its dependency sources.
+  public subscript(parameterDependencies operandIndex: Int)
+    -> FunctionConvention.LifetimeDependencies? {
+    return calleeArgumentConventions[parameterDependencies:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  public func parameterDependence(targetOperandIndex: Int, sourceOperandIndex: Int) -> LifetimeDependenceConvention? {
+    guard let targetArgIdx = calleeArgumentIndex(ofOperandIndex: targetOperandIndex),
+          let sourceArgIdx = calleeArgumentIndex(ofOperandIndex: sourceOperandIndex) else {
+      return nil
+    }
+    return calleeArgumentConventions.parameterDependence(targetArgumentIndex: targetArgIdx,
+                                                         sourceArgumentIndex: sourceArgIdx)
+  }
+
   public var firstParameterOperandIndex: Int {
     return ApplyOperandConventions.firstArgumentIndex +
       calleeArgumentConventions.firstParameterIndex
@@ -105,8 +122,28 @@ public protocol ApplySite : Instruction {
   var unappliedArgumentCount: Int { get }
 }
 
+// lattice: no -> lifetime -> value
+public enum IsFullyAssigned {
+  case no
+  case lifetime
+  case value
+
+  var reassignsLifetime: Bool {
+    switch self {
+    case .no:
+      false
+    case .lifetime, .value:
+      true
+    }
+  }
+}
+
 extension ApplySite {
   public var callee: Value { operands[ApplyOperandConventions.calleeIndex].value }
+
+  public var hasSubstitutions: Bool {
+    return substitutionMap.hasAnySubstitutableParams
+  }
 
   public var isAsync: Bool {
     return callee.type.isAsyncFunction
@@ -126,7 +163,15 @@ extension ApplySite {
     return false
   }
 
-  /// Returns the subset of operands that are argument operands.
+  public var isCalleeNoReturn: Bool {
+    bridged.ApplySite_isCalleeNoReturn()  
+  }
+
+  public var isCalleeTrapNoReturn: Bool {
+    referencedFunction?.isTrapNoReturn ?? false
+  }
+
+  /// Returns the subset of operands which are argument operands.
   ///
   /// This does not include the callee function operand.
   public var argumentOperands: OperandArray {
@@ -164,7 +209,7 @@ extension ApplySite {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
+    SubstitutionMap(bridged: bridged.ApplySite_getSubstitutionMap())
   }
 
   public var calleeArgumentConventions: ArgumentConventions {
@@ -210,6 +255,55 @@ extension ApplySite {
     functionConvention.resultDependencies != nil
   }
 
+  public func isAddressable(operand: Operand) -> Bool {
+    for targetOperand in argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = parameterDependence(target: targetOperand, source: operand), dep.isAddressable(for: operand.value) {
+        return true
+      }
+    }
+    if let dep = resultDependence(on: operand) {
+      return dep.isAddressable(for: operand.value)
+    }
+    return false
+  }
+
+  public var hasLifetimeDependence: Bool {
+    functionConvention.hasLifetimeDependencies()
+  }
+
+  public func parameterDependencies(target operand: Operand) -> FunctionConvention.LifetimeDependencies? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[parameterDependencies: idx]
+  }
+
+  public func parameterDependence(target: Operand, source: Operand) -> LifetimeDependenceConvention? {
+    return operandConventions.parameterDependence(targetOperandIndex: target.index, sourceOperandIndex: source.index)
+  }
+
+  /// Returns .value if this apply fully assigns 'operand' (via @out).
+  ///
+  /// Returns .lifetime if this 'operand' is a non-Escapable inout argument and its lifetime is not propagated by the
+  /// call ('@lifetime(param: copy param)' is not present).
+  public func fullyAssigns(operand: Operand) -> IsFullyAssigned {
+    switch convention(of: operand) {
+    case .indirectOut:
+      return .value
+    case .indirectInout:
+      if let argIdx = calleeArgumentIndex(of: operand),
+         calleeArgumentConventions.parameterDependence(targetArgumentIndex: argIdx, sourceArgumentIndex: argIdx) == nil
+      {
+        return .lifetime
+      }
+      return .no
+    default:
+      return .no
+    }
+  }
+
   public var yieldConventions: YieldConventions {
     YieldConventions(convention: functionConvention)
   }
@@ -241,29 +335,46 @@ extension ApplySite {
     return argumentOperands[callerArgIdx]
   }
 
+  /// Returns the argument of `operand` in a callee function.
+  ///
+  /// Returns nil if `operand` is not an argument operand. This is the case if
+  /// it's the callee function operand.
+  public func calleeArgument(of operand: Operand, in callee: Function) -> FunctionArgument? {
+    if let argIdx = calleeArgumentIndex(of: operand) {
+      return callee.arguments[argIdx]
+    }
+    return nil
+  }
+
   /// Returns the argument index of an operand.
   ///
-  /// Returns nil if 'operand' is not an argument operand. This is the case if
+  /// Returns nil if `operand` is not an argument operand. This is the case if
   /// it's the callee function operand.
   ///
-  /// Warning: the returned integer can be misused as an index into
-  /// the wrong collection. Replace uses of this API with safer APIs.
-  ///
-  /// TODO: delete this API and rewrite the users. 
+  /// Warning: the returned integer can be misused as an index into the wrong collection.
+  /// Use `calleeArgument(of:,in:)` if possible.
   public func calleeArgumentIndex(of operand: Operand) -> Int? {
     operandConventions.calleeArgumentIndex(of: operand)
+  }
+
+  public var hasGuaranteedResult: Bool {
+    functionConvention.hasGuaranteedResult
   }
 }
 
 extension ApplySite {
-  private var functionConvention: FunctionConvention {
-    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(),
-                       in: parentFunction)
+  public var functionConvention: FunctionConvention {
+    FunctionConvention(for: substitutedCalleeType, in: parentFunction)
+  }
+
+  public var substitutedCalleeType: CanonicalType {
+    CanonicalType(bridged: bridged.ApplySite_getSubstitutedCalleeType())
   }
 }
 
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+  var singleDirectErrorResult: Value? { get }
 }
 
 extension FullApplySite {
@@ -289,10 +400,22 @@ extension FullApplySite {
       beginApply.yieldedValues.forEach { values.push($0) }
     } else {
       let result = singleDirectResult!
-      if !result.type.isEmpty(in: parentFunction) {
+      if !result.type.isVoid {
         values.push(result)
       }
     }
     return values
   }
+}
+
+let addressableTest = Test("addressable_arguments") {
+  function, arguments, context in
+
+  let operand = arguments.takeOperand()
+  guard let apply = operand.instruction as? ApplySite, let argIdx = apply.calleeArgumentIndex(of: operand) else {
+    fatalError("tested operand must be an apply argument")
+  }
+  let isAddressable = apply.isAddressable(operand: operand)
+  print("Arg Index: \(argIdx) of Apply: \(apply)")
+  print("  isAddressable: \(isAddressable)")
 }

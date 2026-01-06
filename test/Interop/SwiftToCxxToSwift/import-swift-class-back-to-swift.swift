@@ -1,16 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
+// RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -typecheck -verify -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -emit-module -o %t/SwiftMod.swiftmodule -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=SwiftToCxxTest -I %t -source-filename=x -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR | %FileCheck --check-prefix=INTERFACE %s
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -DSECOND_PASS -emit-sil -o - | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -module-name SwiftMod -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -DSECOND_PASS -emit-sil -o - | %FileCheck --check-prefix=SIL %s
 
 // UNSUPPORTED: OS=windows-msvc
-// XFAIL: OS=linux-android, OS=linux-androideabi
 
 //--- header.h
 #ifndef FIRSTPASS
@@ -91,9 +90,9 @@ testSwiftClassInClass()
 #endif
 
 // SIL-LABEL: @$s8SwiftMod04testa14ClassFromCxxInA0yyF : $@convention(thin) () -> ()
-// SIL: function_ref @{{_Z21createSwiftClassInCxxv|"\?createSwiftClassInCxx@@YA?AVExposedToCxx@SwiftMod@@XZ"}} : $@convention(c) () -> @owned ExposedToCxx
+// SIL: function_ref @$sSo21createSwiftClassInCxx0B3Mod09ExposedToE0CyFTo : $@convention(c) () -> @owned ExposedToCxx
 // SIL: apply {{.*}} : $@convention(c) () -> @owned ExposedToCxx
-// SIL: function_ref @{{_Z19passSwiftClassToCxxN8SwiftMod12ExposedToCxxE|"\?passSwiftClassToCxx@@YAXVExposedToCxx@SwiftMod@@@Z"}} : $@convention(c) (@in_guaranteed ExposedToCxx) -> ()
+// SIL: function_ref @$sSo19passSwiftClassToCxxyy0B3Mod07ExposeddE0CFTo : $@convention(c) (@in_guaranteed ExposedToCxx) -> ()
 // SIL: apply {{.*}} : $@convention(c) (@in_guaranteed ExposedToCxx) -> ()
 
 // SIL-LABEL: @$s8SwiftMod04testa7ClassInD0yyF : $@convention(thin) () -> () {

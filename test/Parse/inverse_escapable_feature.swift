@@ -1,5 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -enable-experimental-feature LifetimeDependence
 
+// REQUIRES: swift_feature_LifetimeDependence
 
+struct S: ~Escapable {}
 
-struct S: ~Escapable {} // expected-error {{type '~Escapable' requires -enable-experimental-feature NonescapableTypes}}
+func hello(_ t: some Escapable, _ u: any Escapable) {}
+
+protocol Whatever: Escapable {}

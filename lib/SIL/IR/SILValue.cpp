@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -152,6 +153,13 @@ bool ValueBase::isLexical() const {
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
+
+  // TODO: This is only a workaround. Optimizations should look through such instructions to
+  // get the isLexical state, instead of doing it here.
+  // rdar://143577158
+  if (auto *eilr = dyn_cast<EndInitLetRefInst>(this))
+    return eilr->getOperand()->isLexical();
+
   return false;
 }
 
@@ -161,7 +169,7 @@ namespace swift::test {
 // Dumps:
 // - value
 // - whether it's lexical
-static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
+static FunctionTest IsLexicalTest("is_lexical", [](auto &function,
                                                    auto &arguments,
                                                    auto &test) {
   auto value = arguments.takeValue();
@@ -184,11 +192,31 @@ bool ValueBase::isGuaranteedForwarding() const {
   }
   // If not a phi, return false
   auto *phi = dyn_cast<SILPhiArgument>(this);
-  if (!phi || !phi->isPhi()) {
-    return false;
+  if (phi && phi->isPhi()) {
+    return phi->isGuaranteedForwarding();
   }
 
-  return phi->isGuaranteedForwarding();
+  return isBorrowAccessorResult();
+}
+
+bool ValueBase::isBeginApplyToken() const {
+  auto *result = isaResultOf<BeginApplyInst>(this);
+  if (!result)
+    return false;
+  return result->isBeginApplyToken();
+}
+
+bool ValueBase::isBorrowAccessorResult() const {
+  auto *apply = dyn_cast_or_null<ApplyInst>(getDefiningInstruction());
+  if (!apply)
+    return false;
+  if (apply->getSubstCalleeConv().funcTy->getNumResults() != 1) {
+    return false;
+  }
+  auto resultConvention =
+      apply->getSubstCalleeConv().funcTy->getSingleResult().getConvention();
+  return resultConvention == ResultConvention::Guaranteed ||
+         resultConvention == ResultConvention::GuaranteedAddress;
 }
 
 bool ValueBase::hasDebugTrace() const {
@@ -197,6 +225,16 @@ bool ValueBase::hasDebugTrace() const {
       if (debugValue->hasTrace())
         return true;
     }
+  }
+  return false;
+}
+
+bool ValueBase::isFromVarDecl() {
+  if (auto *mvi = dyn_cast<MoveValueInst>(this)) {
+    return mvi->isFromVarDecl();
+  }
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(this)) {
+    return bbi->isFromVarDecl();
   }
   return false;
 }
@@ -299,6 +337,7 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   }
 
   switch (Convention) {
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In_Guaranteed:
     value = moduleConventions.isTypeIndirectForIndirectParamConvention(
                 Type.getASTType())
@@ -422,6 +461,18 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 //                                  Operand
 //===----------------------------------------------------------------------===//
 
+void Operand::updateReborrowFlags() {
+  if (isa<EndBorrowInst>(getUser())) {
+    swift::updateReborrowFlags(get());
+  }
+}
+
+void Operand::verify() const {
+  if (isa<BorrowedFromInst>(getUser()) && getOperandNumber() == 0) {
+    assert(isa<SILArgument>(get()) || isa<SILUndef>(get()));
+  }
+}
+
 SILBasicBlock *Operand::getParentBlock() const {
   auto *self = const_cast<Operand *>(this);
   return self->getUser()->getParent();
@@ -526,6 +577,8 @@ StringRef OperandOwnership::asString() const {
     return "forwarding-consume";
   case OperandOwnership::InteriorPointer:
     return "interior-pointer";
+  case OperandOwnership::AnyInteriorPointer:
+    return "any-interior-pointer";
   case OperandOwnership::GuaranteedForwarding:
     return "guaranteed-forwarding";
   case OperandOwnership::EndBorrow:

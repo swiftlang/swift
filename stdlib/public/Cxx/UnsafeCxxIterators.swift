@@ -34,9 +34,9 @@ public protocol UnsafeCxxInputIterator: Equatable {
   func successor() -> Self
 }
 
-extension UnsafePointer: UnsafeCxxInputIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxInputIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator {}
 
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
@@ -79,11 +79,23 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: UnsafeCxxRandomAccessIterator {}
+extension UnsafePointer: @unsafe UnsafeCxxRandomAccessIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator {}
+extension UnsafeMutablePointer: @unsafe UnsafeCxxRandomAccessIterator {}
 
 public protocol UnsafeCxxMutableRandomAccessIterator:
 UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
 extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
+
+/// Bridged C++ iterator that allows traversing elements of a random access
+/// collection that are stored in contiguous memory segments.
+///
+/// Mostly useful for optimizing operations with containers that conform to
+/// `CxxRandomAccessCollection` and should not generally be used directly.
+///
+/// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/ContiguousIterator
+public protocol UnsafeCxxContiguousIterator: UnsafeCxxRandomAccessIterator {}
+
+public protocol UnsafeCxxMutableContiguousIterator:
+UnsafeCxxContiguousIterator, UnsafeCxxMutableRandomAccessIterator {}

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -19,9 +20,9 @@ import OptimizerBridging
 /// but it doesn't provide any APIs to modify functions.
 /// In order to modify a function, a module pass must use `transform(function:)`.
 struct ModulePassContext : Context, CustomStringConvertible {
-  let _bridged: BridgedPassContext
+  let _bridged: BridgedContext
 
-  public var description: String {
+  var description: String {
     return String(taking: _bridged.getModuleDescription())
   }
 
@@ -54,14 +55,14 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   struct VTableArray : BridgedRandomAccessCollection {
-    fileprivate let bridged: BridgedPassContext.VTableArray
+    fileprivate let bridgedCtxt: BridgedPassContext
 
     var startIndex: Int { return 0 }
-    var endIndex: Int { return bridged.count }
+    var endIndex: Int { return bridgedCtxt.getNumVTables() }
 
     subscript(_ index: Int) -> VTable {
       assert(index >= startIndex && index < endIndex)
-      return VTable(bridged: BridgedVTable(vTable: bridged.base![index]))
+      return VTable(bridged: bridgedCtxt.getVTable(index))
     }
   }
 
@@ -94,23 +95,21 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   var functions: FunctionList {
-    FunctionList(first: _bridged.getFirstFunctionInModule().function)
+    FunctionList(first: bridgedPassContext.getFirstFunctionInModule().function)
   }
   
   var globalVariables: GlobalVariableList {
-    GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
+    GlobalVariableList(first: bridgedPassContext.getFirstGlobalInModule().globalVar)
   }
 
-  var vTables: VTableArray {
-    VTableArray(bridged: _bridged.getVTables())
-  }
+  var vTables: VTableArray { VTableArray(bridgedCtxt: bridgedPassContext) }
   
   var witnessTables: WitnessTableList {
-    WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
+    WitnessTableList(first: bridgedPassContext.getFirstWitnessTableInModule().witnessTable)
   }
 
   var defaultWitnessTables: DefaultWitnessTableList {
-    DefaultWitnessTableList(first: _bridged.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
+    DefaultWitnessTableList(first: bridgedPassContext.getFirstDefaultWitnessTableInModule().defaultWitnessTable)
   }
 
   /// Run a closure with a `PassContext` for a function, which allows to modify that function.
@@ -118,9 +117,10 @@ struct ModulePassContext : Context, CustomStringConvertible {
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
   func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
-    _bridged.beginTransformFunction(function.bridged)
-    runOnFunction(FunctionPassContext(_bridged: _bridged))
-    _bridged.endTransformFunction();
+    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(function.bridged)
+    let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
+    runOnFunction(nestedContext)
+    bridgedPassContext.deinitializedNestedPassContext()
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
@@ -129,6 +129,57 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
     _bridged.loadFunction(function.bridged, loadCalleesRecursively)
     return function.isDefinition
+  }
+
+  func specialize(function: Function,
+                  for substitutions: SubstitutionMap,
+                  convertIndirectToDirect: Bool,
+                  isMandatory: Bool
+  ) -> Function? {
+    return bridgedPassContext.specializeFunction(function.bridged, substitutions.bridged,
+                                                 convertIndirectToDirect, isMandatory).function
+  }
+
+  enum DeserializationMode {
+    case allFunctions
+    case onlySharedFunctions
+  }
+
+  func deserializeAllCallees(of function: Function, mode: DeserializationMode) {
+    bridgedPassContext.deserializeAllCallees(function.bridged, mode == .allFunctions ? true : false)
+  }
+
+  @discardableResult
+  func createSpecializedWitnessTable(entries: [WitnessTable.Entry],
+                          conformance: Conformance,
+                          linkage: Linkage,
+                          serialized: Bool) -> WitnessTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedWitnessTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createSpecializedWitnessTable(linkage.bridged, serialized, conformance.bridged, $0)
+    }
+    return WitnessTable(bridged: bridgedWitnessTable)
+  }
+
+  @discardableResult
+  func createSpecializedVTable(entries: [VTable.Entry],
+                               for classType: Type,
+                               isSerialized: Bool) -> VTable
+  {
+    let bridgedEntries = entries.map { $0.bridged }
+    let bridgedVTable = bridgedEntries.withBridgedArrayRef {
+      _bridged.createSpecializedVTable(classType.bridged, isSerialized, $0)
+    }
+    return VTable(bridged: bridgedVTable)
+  }
+
+  func replaceVTableEntries(of vTable: VTable, with entries: [VTable.Entry]) {
+    let bridgedEntries = entries.map { $0.bridged }
+    bridgedEntries.withBridgedArrayRef {
+      vTable.bridged.replaceEntries($0)
+    }
+    notifyFunctionTablesChanged()
   }
 
   func createEmptyFunction(
@@ -152,22 +203,36 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   func mangleAsyncRemoved(from function: Function) -> String {
-    return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
+    return String(taking: bridgedPassContext.mangleAsyncRemoved(function.bridged))
   }
 
   func mangle(withDeadArguments: [Int], from function: Function) -> String {
-    withDeadArguments.withUnsafeBufferPointer { bufPtr in
-      bufPtr.withMemoryRebound(to: Int.self) { valPtr in
-        String(taking: _bridged.mangleWithDeadArgs(valPtr.baseAddress,
-                                                   withDeadArguments.count,
-                                                   function.bridged))
-      }
+    withDeadArguments.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: bridgedPassContext.mangleWithDeadArgs(bridgedArgIndices, function.bridged))
     }
+  }
+
+  func erase(function: Function) {
+    bridgedPassContext.eraseFunction(function.bridged)
+  }
+
+  func notifyFunctionTablesChanged() {
+    _bridged.notifyChanges(.FunctionTables)
   }
 }
 
 extension GlobalVariable {
   func setIsLet(to value: Bool, _ context: ModulePassContext) {
     bridged.setLet(value)
+  }
+}
+
+extension Function {
+  func set(linkage: Linkage, _ context: ModulePassContext) {
+    bridged.setLinkage(linkage.bridged)
+  }
+
+  func set(isSerialized: Bool, _ context: ModulePassContext) {
+    bridged.setIsSerialized(isSerialized)
   }
 }

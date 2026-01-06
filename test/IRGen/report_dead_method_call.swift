@@ -2,7 +2,7 @@
 
 // We compile with -O (optimizations) and -disable-access-control (which
 // allows use to "call" methods that are removed by dead code elimination).
-// RUN: %target-build-swift -parse-as-library %S/Inputs/report_dead_method_call/main.swift %s -O -Xfrontend -disable-access-control -Xfrontend -disable-availability-checking -o %t/report_dead_method_call
+// RUN: %target-build-swift -parse-as-library %S/Inputs/report_dead_method_call/main.swift %s -O -Xfrontend -disable-access-control -target %target-swift-5.1-abi-triple -o %t/report_dead_method_call
 
 // The private, unused methods are optimized away. The test calls these
 // methods anyway (since it has overridden the access control), so we

@@ -8,18 +8,13 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
-  BorrowUtils.swift
-  DiagnosticEngine.swift
   Devirtualization.swift
   EscapeUtils.swift
-  ForwardingUtils.swift
   FunctionSignatureTransforms.swift
+  GenericSpecialization.swift
   LifetimeDependenceUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
-  SSAUpdater.swift
-  StaticInitCloner.swift
   Test.swift
-  Verifier.swift
 )

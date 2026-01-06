@@ -3,7 +3,7 @@
 public struct S {}
 
 // CHECK-LABEL: sil{{.*}}@$s4Test15unavailableFuncAA1SVyF
-// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         function_ref @$s4Test1SVACycfC
 // CHECK:       } // end sil function '$s4Test15unavailableFuncAA1SVyF'
@@ -11,6 +11,45 @@ public struct S {}
 public func unavailableFunc() -> S {
   return S()
 }
+
+// CHECK-LABEL: sil{{.*}}@$s4Test33unavailableFuncIntroducedInSwift5yyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:       } // end sil function '$s4Test33unavailableFuncIntroducedInSwift5yyF'
+@available(*, unavailable)
+@available(swift 5)
+public func unavailableFuncIntroducedInSwift5() { }
+
+// CHECK-LABEL: sil{{.*}}@$s4Test025unavailableFuncWithNestedC0yyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:         function_ref @$s4Test025unavailableFuncWithNestedC0yyF6nestedL_SiyF
+// CHECK:       } // end sil function '$s4Test025unavailableFuncWithNestedC0yyF'
+@available(*, unavailable)
+public func unavailableFuncWithNestedFunc() {
+  func nested() -> Int { 1 }
+  _ = nested()
+}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test025unavailableFuncWithNestedC0yyF6nestedL_SiyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:       } // end sil function '$s4Test025unavailableFuncWithNestedC0yyF6nestedL_SiyF'
+
+// CHECK-LABEL: sil{{.*}}@$s4Test033unavailableFuncWithObsoleteNestedC0yyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:       } // end sil function '$s4Test033unavailableFuncWithObsoleteNestedC0yyF'
+@available(*, unavailable)
+public func unavailableFuncWithObsoleteNestedFunc() {
+  @available(swift, obsoleted: 1)
+  func nested() -> Int { 1 }
+}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test033unavailableFuncWithObsoleteNestedC0yyF6nestedL_SiyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:       } // end sil function '$s4Test033unavailableFuncWithObsoleteNestedC0yyF6nestedL_SiyF'
 
 enum SomeError: Error { case generic }
 
@@ -59,3 +98,9 @@ public func obsoletedInSwift1() {}
 // CHECK:       } // end sil function '$s4Test17obsoletedInSwift5yyF'
 @available(swift, obsoleted: 5)
 public func obsoletedInSwift5() {}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test19introducedInSwift99yyF : $@convention(thin) () -> () {
+// CHECK-NOT:     ss36_diagnoseUnavailableCodeReached
+// CHECK:       } // end sil function '$s4Test19introducedInSwift99yyF'
+@available(swift, introduced: 99)
+public func introducedInSwift99() {}

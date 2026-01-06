@@ -16,6 +16,7 @@
 #ifndef SWIFT_IMPORTER_CFTYPEINFO_H
 #define SWIFT_IMPORTER_CFTYPEINFO_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -91,29 +92,22 @@ public:
 
   bool isRecord() const {
     assert(isValid());
-    return !Decl.isNull() && Decl.is<const clang::RecordDecl *>();
+    return !Decl.isNull() && isa<const clang::RecordDecl *>(Decl);
   }
   const clang::RecordDecl *getRecord() const {
     assert(isRecord());
-    return Decl.get<const clang::RecordDecl *>();
+    return cast<const clang::RecordDecl *>(Decl);
   }
 
   bool isTypedef() const {
     assert(isValid());
-    return !Decl.isNull() && Decl.is<const clang::TypedefNameDecl *>();
+    return !Decl.isNull() && isa<const clang::TypedefNameDecl *>(Decl);
   }
   const clang::TypedefNameDecl *getTypedef() const {
     assert(isTypedef());
-    return Decl.get<const clang::TypedefNameDecl *>();
+    return cast<const clang::TypedefNameDecl *>(Decl);
   }
 };
-
-/// Determine whether this typedef is a CF type.
-bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-/// Determine the imported CF type for the given typedef-name, or the empty
-/// string if this is not an imported CF type name.
-llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
 }
 }
 

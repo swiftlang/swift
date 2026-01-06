@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name cast_folding_objc_no_foundation -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name cast_folding_objc_no_foundation -O -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 // TODO: Update optimizer for id-as-Any changes.

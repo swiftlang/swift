@@ -15,6 +15,7 @@
 
 #include "SILParserState.h"
 
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/Parser.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
@@ -33,7 +34,7 @@ struct ParsedSpecAttr {
   SILFunction *target = nullptr;
   Identifier spiGroupID;
   ModuleDecl *spiModule;
-  AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
+  AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
 };
 
 /// The parser for an individual SIL function.
@@ -235,6 +236,11 @@ public:
     return false;
   }
 
+  bool parseASTTypeOrValue(CanType &result,
+                           GenericSignature genericSig = GenericSignature(),
+                           GenericParamList *genericParams = nullptr,
+                           bool forceContextualType = false);
+
   std::optional<StringRef>
   parseOptionalAttribute(ArrayRef<StringRef> expected) {
     // We parse here @ <identifier>.
@@ -388,7 +394,8 @@ public:
       if (*existing.Value == value) {
         P.diagnose(loc, diag::duplicate_attribute, /*modifier*/ 1);
       } else {
-        P.diagnose(loc, diag::mutually_exclusive_attrs, name, existing.Name,
+        P.diagnose(loc, diag::mutually_exclusive_attr_names, name,
+                   existing.Name,
                    /*modifier*/ 1);
       }
       P.diagnose(existing.Loc, diag::previous_attribute, /*modifier*/ 1);
@@ -404,8 +411,11 @@ public:
     if (allowed)
       setEnum(existing, value, name, loc);
     else
-      P.diagnose(loc, diag::unknown_attribute, name);
+      P.diagnose(loc, diag::unknown_attr_name, name);
   }
+  
+  /// Parse into checked cast options, such as [prohibit_isolated_conformances].
+  CheckedCastInstOptions parseCheckedCastInstOptions(bool *isExact);
 };
 
 } // namespace swift

@@ -99,38 +99,56 @@ public:
     HeapTypeInfo::emitScalarRetain(IGF, value, atomicity);
   }
 
+  void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                          bool needsNullCheck) const {
+    assert(getReferenceCounting() == ReferenceCounting::Custom &&
+           "only supported for custom ref-counting");
+
+    llvm::Value *value = e.claimNext();
+    auto retainFn =
+        evaluateOrDefault(
+            getClass()->getASTContext().evaluator,
+            CustomRefCountingOperation(
+                {getClass(), CustomRefCountingOperationKind::retain}),
+            {})
+            .operation;
+    IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value,
+                                                  needsNullCheck);
+  }
+
   // Implement the primary retain/release operations of ReferenceTypeInfo
   // using basic reference counting.
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      llvm::Value *value = e.claimNext();
-      auto retainFn =
-          evaluateOrDefault(
-              getClass()->getASTContext().evaluator,
-              CustomRefCountingOperation(
-                  {getClass(), CustomRefCountingOperationKind::retain}),
-              {})
-              .operation;
-      IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
+      strongCustomRetain(IGF, e, /*needsNullCheck*/ false);
       return;
     }
 
     HeapTypeInfo::strongRetain(IGF, e, atomicity);
   }
 
+  void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                           bool needsNullCheck) const {
+    assert(getReferenceCounting() == ReferenceCounting::Custom &&
+           "only supported for custom ref-counting");
+
+    llvm::Value *value = e.claimNext();
+    auto releaseFn =
+        evaluateOrDefault(
+            getClass()->getASTContext().evaluator,
+            CustomRefCountingOperation(
+                {getClass(), CustomRefCountingOperationKind::release}),
+            {})
+            .operation;
+    IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value,
+                                                  needsNullCheck);
+  }
+
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
-      llvm::Value *value = e.claimNext();
-      auto releaseFn =
-          evaluateOrDefault(
-              getClass()->getASTContext().evaluator,
-              CustomRefCountingOperation(
-                  {getClass(), CustomRefCountingOperationKind::release}),
-              {})
-              .operation;
-      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      strongCustomRelease(IGF, e, /*needsNullCheck*/ false);
       return;
     }
 

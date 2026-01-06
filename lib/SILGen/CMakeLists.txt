@@ -11,7 +11,7 @@ add_swift_host_library(swiftSILGen STATIC
   SwitchEnumBuilder.cpp
   SILGen.cpp
   SILGenApply.cpp
-  SILGenBackDeploy.cpp
+  SILGenAvailability.cpp
   SILGenBridging.cpp
   SILGenBuilder.cpp
   SILGenBuiltin.cpp
@@ -28,6 +28,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenFunction.cpp
   SILGenGlobalVariable.cpp
   SILGenLazyConformance.cpp
+  SILGenLocalArchetype.cpp
   SILGenLValue.cpp
   SILGenPack.cpp
   SILGenPattern.cpp

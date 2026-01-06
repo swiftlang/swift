@@ -14,16 +14,9 @@
 // to a Swift collection.
 
 import TestsUtils
-
-#if SWIFT_PACKAGE
-// FIXME: Needs fix for https://github.com/apple/swift/issues/61547.
-
-public let benchmarks = [BenchmarkInfo]()
-
-#else
-
 import CxxStdlibPerformance
 import Cxx
+import CxxStdlib // FIXME(rdar://128520766): this import should be redundant
 
 public let benchmarks = [
   BenchmarkInfo(
@@ -71,5 +64,3 @@ public func run_CxxSetOfU32_forEach(_ n: Int) {
     }
   }
 }
-
-#endif

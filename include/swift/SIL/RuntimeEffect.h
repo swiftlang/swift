@@ -54,6 +54,9 @@ enum class RuntimeEffect : unsigned {
   
   /// Witness methods, boxing, unboxing, initializing, etc.
   Existential         = 0x80,
+
+  /// Class-bound only existential
+  ExistentialClassBound = 0x200,
   
   /// Not modelled currently.
   Concurrency         = 0x0,

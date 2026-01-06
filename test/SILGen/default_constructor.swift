@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
 
 struct B {
   var i : Int, j : Float
@@ -97,6 +97,7 @@ struct G {
 
 // CHECK-NOT: default_constructor.G.init()
 // CHECK-LABEL: default_constructor.G.init(bar: Swift.Optional<Swift.Int32>)
+// CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [ossa] @$s19default_constructor1GV{{[_0-9a-zA-Z]*}}fC
 // CHECK-NOT: default_constructor.G.init()
 

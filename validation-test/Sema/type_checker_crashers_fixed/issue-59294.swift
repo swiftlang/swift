@@ -111,7 +111,7 @@ class Test {
   static func invalidVar() {
     _ = [0, 1, 2].compactMap {
       @WrapperValue var value: Bool? = $0
-      // expected-error@-1 {{cannot convert value of type 'Int' to specified type 'Bool?'}}
+      // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
       if true {
         $value.printValue()
       }

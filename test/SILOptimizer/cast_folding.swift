@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness
@@ -415,9 +415,10 @@ func test13_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test13_3SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test13_3() -> Bool {
     return cast13(A() as P)
@@ -456,9 +457,10 @@ func test15_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test15_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test15_2() -> Bool {
     return cast15(A() as P)
@@ -476,9 +478,10 @@ func test16_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test16_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test16_2() -> Bool {
     return cast16(A() as P)
@@ -566,9 +569,10 @@ func test21_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test21_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test21_2() -> Bool {
     return cast21(A() as P)
@@ -723,6 +727,19 @@ func test33() -> Bool {
     return cast33(A())
 }
 
+func castArray<T>(from: [T]) -> [Int]? {
+  return from as? [Int]
+}
+
+// CHECK-LABEL: sil @$s12cast_folding13callCastArray1aSaySiGSgAD_tF :
+// CHECK-NOT:     apply
+// CHECK:         [[E:%.*]] = enum $Optional<Array<Int>>, #Optional.some!enumelt, %0
+// CHECK-NOT:     apply
+// CHECK:         return [[E]]
+// CHECK:       } // end sil function '$s12cast_folding13callCastArray1aSaySiGSgAD_tF'
+public func callCastArray(a: [Int]) -> [Int]? {
+  return castArray(from: a)
+}
 
 protocol PP {
   func foo() -> Int

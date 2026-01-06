@@ -75,10 +75,10 @@ EXPERIMENTAL_FREESTANDING_MACRO_ROLE(CodeItem, "codeItem", CodeItemMacros)
 ATTACHED_MACRO_ROLE(Extension, "extension", "e")
 
 /// An attached macro that expands to a preamble to a function.
-EXPERIMENTAL_ATTACHED_MACRO_ROLE(Preamble, "preamble", "q", BodyMacros)
+EXPERIMENTAL_ATTACHED_MACRO_ROLE(Preamble, "preamble", "q", PreambleMacros)
 
 /// An attached macro that expands to a function body.
-EXPERIMENTAL_ATTACHED_MACRO_ROLE(Body, "body", "b", BodyMacros)
+ATTACHED_MACRO_ROLE(Body, "body", "b")
 
 #undef ATTACHED_MACRO_ROLE
 #undef FREESTANDING_MACRO_ROLE

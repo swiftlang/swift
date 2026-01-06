@@ -23,6 +23,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/RemoteInspection/BitMask.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRef.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
@@ -216,6 +217,13 @@ public:
       stream << ")";
       return;
     }
+
+    case TypeInfoKind::Array: {
+      printHeader("array");
+      printBasic(TI);
+      stream << ")";
+      return;
+    }
     }
 
     swift_unreachable("Bad TypeInfo kind");
@@ -229,6 +237,11 @@ void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
   stream << "\n";
 }
 
+BitMask ReferenceTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+  return BitMask(getSize(), mpePointerSpareBits);
+}
+
 BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
                                  BuiltinTypeDescriptorBase &descriptor)
     : TypeInfo(TypeInfoKind::Builtin, descriptor.Size,
@@ -236,6 +249,28 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
                descriptor.NumExtraInhabitants,
                descriptor.IsBitwiseTakable),
       Name(descriptor.getMangledTypeName()) {}
+
+BuiltinTypeInfo::BuiltinTypeInfo(unsigned Size, unsigned Alignment,
+                                 unsigned Stride, unsigned NumExtraInhabitants,
+                                 bool BitwiseTakable)
+    : TypeInfo(TypeInfoKind::Builtin, Size, Alignment, Stride,
+               NumExtraInhabitants, BitwiseTakable) {}
+
+// Builtin.Int<N> is mangled as 'Bi' N '_'
+// Returns 0 if this isn't an Int
+static unsigned intTypeBitSize(std::string name) {
+  llvm::StringRef nameRef(name);
+  if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
+    llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
+    uint8_t natural;
+    if (naturalRef.getAsInteger(10, natural)) {
+      return 0;
+    }
+    return natural;
+  }
+  return 0;
+}
+
 
 bool BuiltinTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
@@ -245,46 +280,40 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
     return true;
   }
   // If it has extra inhabitants, it could be an integer type with extra
-  // inhabitants (a bool) or a pointer.
-  // Check if it's an integer first. The mangling of an integer type is
-  // type ::= 'Bi' NATURAL '_'
-  llvm::StringRef nameRef(Name);
-  if (nameRef.starts_with("Bi") && nameRef.ends_with("_")) {
-    // Drop the front "Bi" and "_" end, check that what we're left with is a
-    // bool.
-    llvm::StringRef naturalRef = nameRef.drop_front(2).drop_back();
-    uint8_t natural;
-    if (naturalRef.getAsInteger(10, natural))
-      return false;
+  // inhabitants (such as a bool) or a pointer.
+  unsigned intSize = intTypeBitSize(Name);
+  if (intSize > 0) {
+    // This is an integer type
 
-    assert(natural == 1 &&
-           "Reading extra inhabitants of integer with more than 1 byte!");
-    if (natural != 1)
-      return false;
-
-    assert(getSize() == 1 && "Reading extra inhabitants of integer but size of "
-                             "type info is different than 1!");
-    if (getSize() != 1)
-      return false;
-
-    assert(getNumExtraInhabitants() == 254 &&
-           "Boolean type info should have 254 extra inhabitants!");
-    if (getNumExtraInhabitants() != 254)
-      return false;
-
-    uint8_t rawValue;
-    if (!reader.readInteger(address, &rawValue))
-      return false;
-
-    // The max valid value, for a bool valid values are 0 or 1, so this would
-    // be 1.
-    auto maxValidValue = 1;
-    // If the raw value falls outside the range of valid values, this is an
-    // extra inhabitant.
-    if (maxValidValue < rawValue)
-      *extraInhabitantIndex = rawValue - maxValidValue - 1;
-    else
+    // If extra inhabitants are impossible, return early...
+    // (assert in debug builds)
+    assert(intSize < getSize() * 8
+	   && "Standard-sized int cannot have extra inhabitants");
+    if (intSize > 64 || getSize() > 8 || intSize >= getSize() * 8) {
       *extraInhabitantIndex = -1;
+      return true;
+    }
+
+    // Compute range of extra inhabitants
+    uint64_t maxValidValue =  (((uint64_t)1) << intSize) - 1;
+    uint64_t maxAvailableValue = (((uint64_t)1) << (getSize() * 8)) - 1;
+    uint64_t computedExtraInhabitants = maxAvailableValue - maxValidValue;
+    if (computedExtraInhabitants > ValueWitnessFlags::MaxNumExtraInhabitants) {
+      computedExtraInhabitants = ValueWitnessFlags::MaxNumExtraInhabitants;
+    }
+    assert(getNumExtraInhabitants() == computedExtraInhabitants &&
+	   "Unexpected number of extra inhabitants in an odd-sized integer");
+
+    // Example:  maxValidValue is 1 for a 1-bit bool, so any larger value
+    // is an extra inhabitant.
+    uint64_t rawValue;
+    if (!reader.readInteger(address, getSize(), &rawValue))
+      return false;
+    if (maxValidValue < rawValue) {
+      *extraInhabitantIndex = rawValue - maxValidValue - 1;
+    } else {
+      *extraInhabitantIndex = -1;
+    }
     return true;
   } else if (Name == "yyXf") {
     // But there are two different conventions, one for function pointers:
@@ -294,6 +323,25 @@ bool BuiltinTypeInfo::readExtraInhabitantIndex(
     // And one for pointers to heap-allocated blocks of memory
     return reader.readHeapObjectExtraInhabitantIndex(address,
                                                      extraInhabitantIndex);
+  }
+}
+
+BitMask BuiltinTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  unsigned intSize = intTypeBitSize(Name);
+  if (intSize > 0) {
+    // Odd-sized integers export spare bits
+    // In particular: bool fields are Int1 and export 7 spare bits
+    auto mask = BitMask::oneMask(getSize());
+    mask.keepOnlyMostSignificantBits(getSize() * 8 - intSize);
+    return mask;
+  } else if (Name == "ypXp" // Any.Type
+  ) {
+    // Builtin types that expose pointer spare bits
+    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+    return BitMask(getSize(), mpePointerSpareBits);
+  } else {
+    // Everything else
+    return BitMask::zeroMask(getSize());
   }
 }
 
@@ -360,13 +408,97 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
       [](const FieldInfo &lhs, const FieldInfo &rhs) {
         return lhs.TI.getNumExtraInhabitants() < rhs.TI.getNumExtraInhabitants();
       });
-    auto fieldAddress = remote::RemoteAddress(address.getAddressData()
-                                              + mostCapaciousField->Offset);
+    auto fieldAddress = address + mostCapaciousField->Offset;
     return mostCapaciousField->TI.readExtraInhabitantIndex(
       reader, fieldAddress, extraInhabitantIndex);
   }
   }
   return false;
+}
+
+BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  // Start with all spare bits; we'll mask them out as we go...
+  auto mask = BitMask::oneMask(getSize());
+  switch (SubKind) {
+  case RecordKind::Invalid:
+    // FIXME: Should invalid have all spare bits?  Or none?  Does it matter?
+    return mask;
+  case RecordKind::Tuple:
+  case RecordKind::Struct:
+    // Regular aggregates inherit spare bits from their fields
+    break;
+  case RecordKind::ThickFunction:
+    // Thick functions have two fields:
+    // * Code pointer that might be signed and/or misaligned
+    // * Context that could be a tagged pointer
+    mask.makeZero(); // No spare bits
+    return mask;
+  case RecordKind::OpaqueExistential: {
+    // Existential storage isn't recorded as a field,
+    // so we handle it specially here...
+    int pointerSize = TC.targetPointerSize();
+    BitMask submask = BitMask::zeroMask(pointerSize * 3);
+    mask.andMask(submask, 0);
+    hasAddrOnly = true;
+    // Mask the rest of the fields as usual...
+    break;
+  }
+  case RecordKind::ClassExistential: {
+    // First pointer in a Class Existential is the class pointer
+    // itself, which can be tagged or have other mysteries on 64-bit, so
+    // it exposes no spare bits from the first word there...
+    auto pointerBytes = TC.targetPointerSize();
+    if (pointerBytes == 8) {
+      auto zeroPointerSizedMask = BitMask::zeroMask(pointerBytes);
+      mask.andMask(zeroPointerSizedMask, 0);
+    }
+    // Otherwise, it's the same as an Existential Metatype
+    SWIFT_FALLTHROUGH;
+  }
+  case RecordKind::ExistentialMetatype: {
+    // All the pointers in an Existential Metatype expose spare bits...
+    auto pointerBytes = TC.targetPointerSize();
+    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
+    auto mpePointerSpareBitMask = BitMask(pointerBytes, mpePointerSpareBits);
+    for (int offset = 0; offset < (int)getSize(); offset += pointerBytes) {
+      mask.andMask(mpePointerSpareBitMask, offset);
+    }
+    return mask;
+  }
+  case RecordKind::ErrorExistential:
+    break;
+  case RecordKind::ClassInstance:
+    break;
+  case RecordKind::ClosureContext:
+    break;
+  }
+  for (auto Field : Fields) {
+    if (Field.TR != 0) {
+      BitMask submask = Field.TI.getSpareBits(TC, hasAddrOnly);
+      mask.andMask(submask, Field.Offset);
+    }
+  }
+  return mask;
+}
+
+ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI)
+    : TypeInfo(TypeInfoKind::Array,
+               /* size */ elementTI->getStride() * size,
+               /* alignment */ elementTI->getAlignment(),
+               /* stride */ elementTI->getStride() * size,
+               /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
+               /* isBitwiseTakable */ elementTI->isBitwiseTakable()),
+      ElementTI(elementTI) {}
+
+bool ArrayTypeInfo::readExtraInhabitantIndex(
+    remote::MemoryReader &reader, remote::RemoteAddress address,
+    int *extraInhabitantIndex) const {
+  return ElementTI->readExtraInhabitantIndex(reader, address,
+                                             extraInhabitantIndex);
+}
+
+BitMask ArrayTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  return ElementTI->getSpareBits(TC, hasAddrOnly);
 }
 
 class UnsupportedEnumTypeInfo: public EnumTypeInfo {
@@ -382,6 +514,10 @@ public:
                        remote::RemoteAddress address,
                        int *index) const override {
     return false;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -408,6 +544,10 @@ public:
                        remote::RemoteAddress address,
                        int *index) const override {
     return false;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -440,6 +580,10 @@ public:
                        int *index) const override {
     *index = -1;
     return true;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    return BitMask::zeroMask(getSize());
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -495,6 +639,12 @@ public:
       *index = tag - getNumCases();
     }
     return true;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    auto mask = BitMask(getSize(), maskForCount(getNumCases()));
+    mask.complement();
+    return mask;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -561,6 +711,20 @@ public:
       }
       return true;
     }
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    FieldInfo PayloadCase = getCases()[0];
+    size_t payloadSize = PayloadCase.TI.getSize();
+    if (getSize() <= payloadSize) {
+      return BitMask::zeroMask(getSize());
+    }
+    size_t tagSize = getSize() - payloadSize;
+    auto mask = BitMask::oneMask(getSize());
+    mask.keepOnlyMostSignificantBits(tagSize * 8); // Clear payload bits
+    auto tagMaskUsedBits = BitMask(getSize(), maskForCount(getNumCases()));
+    mask.andNotMask(tagMaskUsedBits, payloadSize); // Clear used tag bits
+    return mask;
   }
 
   // Think of a single-payload enum as being encoded in "pages".
@@ -718,6 +882,16 @@ public:
     return true;
   }
 
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    // Walk the child cases to set `hasAddrOnly` correctly.
+    for (auto Case : getCases()) {
+      if (Case.TR != 0) {
+	auto submask = Case.TI.getSpareBits(TC, hasAddrOnly);
+      }
+    }
+    return BitMask::zeroMask(getSize());
+  }
+
   bool projectEnumValue(remote::MemoryReader &reader,
                         remote::RemoteAddress address,
                         int *CaseIndex) const override {
@@ -759,294 +933,6 @@ public:
       *CaseIndex = ComputedCase;
     }
     return true;
-  }
-};
-
-// A variable-length bitmap used to track "spare bits" for general multi-payload
-// enums.
-class BitMask {
-  static constexpr unsigned maxSize = 128 * 1024 * 1024; // 128MB
-
-  unsigned size; // Size of mask in bytes
-  uint8_t *mask;
-public:
-  ~BitMask() {
-    free(mask);
-  }
-  // Construct a bitmask of the appropriate number of bytes
-  // initialized to all bits set
-  BitMask(unsigned sizeInBytes): size(sizeInBytes) {
-    // Gracefully fail by constructing an empty mask if we exceed the size
-    // limit.
-    if (size > maxSize) {
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-
-    mask = (uint8_t *)malloc(size);
-
-    if (!mask) {
-      // Malloc might fail if size is large due to some bad data. Assert in
-      // asserts builds, and fail gracefully in non-asserts builds by
-      // constructing an empty BitMask.
-      assert(false && "Failed to allocate BitMask");
-      size = 0;
-      return;
-    }
-
-    memset(mask, 0xff, size);
-  }
-  // Construct a bitmask of the appropriate number of bytes
-  // initialized with bits from the specified buffer
-  BitMask(unsigned sizeInBytes, const uint8_t *initialValue,
-          unsigned initialValueBytes, unsigned offset)
-      : size(sizeInBytes) {
-    // Gracefully fail by constructing an empty mask if we exceed the size
-    // limit.
-    if (size > maxSize) {
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-
-    // Bad data could cause the initial value location to be off the end of our
-    // size. If initialValueBytes + offset is beyond sizeInBytes (or overflows),
-    // assert in asserts builds, and fail gracefully in non-asserts builds by
-    // constructing an empty BitMask.
-    bool overflowed = false;
-    unsigned initialValueEnd =
-        llvm::SaturatingAdd(initialValueBytes, offset, &overflowed);
-    if (overflowed) {
-      assert(false && "initialValueBytes + offset overflowed");
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-    assert(initialValueEnd <= sizeInBytes);
-    if (initialValueEnd > size) {
-      assert(false && "initialValueBytes + offset is greater than size");
-      size = 0;
-      mask = nullptr;
-      return;
-    }
-
-    mask = (uint8_t *)calloc(1, size);
-
-    if (!mask) {
-      // Malloc might fail if size is large due to some bad data. Assert in
-      // asserts builds, and fail gracefully in non-asserts builds by
-      // constructing an empty BitMask.
-      assert(false && "Failed to allocate BitMask");
-      size = 0;
-      return;
-    }
-
-    memcpy(mask + offset, initialValue, initialValueBytes);
-  }
-  // Move constructor moves ownership and zeros the src
-  BitMask(BitMask&& src) noexcept: size(src.size), mask(std::move(src.mask)) {
-    src.size = 0;
-    src.mask = nullptr;
-  }
-  // Copy constructor makes a copy of the mask storage
-  BitMask(const BitMask& src) noexcept: size(src.size), mask(nullptr) {
-    mask = (uint8_t *)malloc(size);
-    memcpy(mask, src.mask, size);
-  }
-
-  std::string str() const {
-    std::ostringstream buff;
-    buff << size << ":0x";
-    for (unsigned i = 0; i < size; i++) {
-      buff << std::hex << ((mask[i] >> 4) & 0x0f) << (mask[i] & 0x0f);
-    }
-    return buff.str();
-  }
-
-  bool operator==(const BitMask& rhs) const {
-    // The two masks may be of different sizes.
-    // The common prefix must be identical.
-    size_t common = std::min(size, rhs.size);
-    if (memcmp(mask, rhs.mask, common) != 0)
-      return false;
-    // The remainder of the longer mask must be
-    // all zero bits.
-    unsigned mustBeZeroSize = std::max(size, rhs.size) - common;
-    uint8_t *mustBeZero;
-    if (size < rhs.size) {
-      mustBeZero = rhs.mask + size;
-    } else if (size > rhs.size) {
-      mustBeZero = mask + rhs.size;
-    }
-    for (unsigned i = 0; i < mustBeZeroSize; ++i) {
-      if (mustBeZero[i] != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool operator!=(const BitMask& rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool isNonZero() const { return !isZero(); }
-
-  bool isZero() const {
-    for (unsigned i = 0; i < size; ++i) {
-      if (mask[i] != 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void makeZero() {
-    memset(mask, 0, size * sizeof(mask[0]));
-  }
-
-  void complement() {
-    for (unsigned i = 0; i < size; ++i) {
-      mask[i] = ~mask[i];
-    }
-  }
-
-  int countSetBits() const {
-    static const int counter[] =
-      {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
-    int bits = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      bits += counter[mask[i] >> 4] + counter[mask[i] & 15];
-    }
-    return bits;
-  }
-
-  int countZeroBits() const {
-    static const int counter[] =
-      {4, 3, 3, 2, 3, 2, 2, 1, 3, 2, 2, 1, 2, 1, 1, 0};
-    int bits = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      bits += counter[mask[i] >> 4] + counter[mask[i] & 15];
-    }
-    return bits;
-  }
-
-  // Treat the provided value as a mask, `and` it with
-  // the part of the mask at the provided byte offset.
-  // Bits outside the specified area are unchanged.
-  template<typename IntegerType>
-  void andMask(IntegerType value, unsigned byteOffset) {
-    andMask((void *)&value, sizeof(value), byteOffset);
-  }
-
-  // As above, but using the provided bitmask instead
-  // of an integer.
-  void andMask(BitMask mask, unsigned offset) {
-    andMask(mask.mask, mask.size, offset);
-  }
-
-  // As above, but using the complement of the
-  // provided mask.
-  void andNotMask(BitMask mask, unsigned offset) {
-    if (offset < size) {
-      andNotMask(mask.mask, mask.size, offset);
-    }
-  }
-
-  // Zero all bits except for the `n` most significant ones.
-  // XXX TODO: Big-endian support?
-  void keepOnlyMostSignificantBits(unsigned n) {
-    unsigned count = 0;
-    if (size < 1) {
-      return;
-    }
-    unsigned i = size;
-    while (i > 0) {
-      i -= 1;
-      if (count < n) {
-        for (int b = 128; b > 0; b >>= 1) {
-          if (count >= n) {
-            mask[i] &= ~b;
-          } else if ((mask[i] & b) != 0) {
-            ++count;
-          }
-        }
-      } else {
-        mask[i] = 0;
-      }
-    }
-  }
-
-  unsigned numBits() const {
-    return size * 8;
-  }
-
-  unsigned numSetBits() const {
-    unsigned count = 0;
-    for (unsigned i = 0; i < size; ++i) {
-      if (mask[i] != 0) {
-        for (unsigned b = 1; b < 256; b <<= 1) {
-          if ((mask[i] & b) != 0) {
-            ++count;
-          }
-        }
-      }
-    }
-    return count;
-  }
-
-  // Read a mask-sized area from the target and collect
-  // the masked bits into a single integer.
-  template<typename IntegerType>
-  bool readMaskedInteger(remote::MemoryReader &reader,
-                         remote::RemoteAddress address,
-                         IntegerType *dest) const {
-    auto data = reader.readBytes(address, size);
-    if (!data) {
-      return false;
-    }
-#if defined(__BIG_ENDIAN__)
-    assert(false && "Big endian not supported for readMaskedInteger");
-#else
-    IntegerType result = 0;
-    IntegerType resultBit = 1; // Start from least-significant bit
-    auto bytes = static_cast<const uint8_t *>(data.get());
-    for (unsigned i = 0; i < size; ++i) {
-      for (unsigned b = 1; b < 256; b <<= 1) {
-        if ((mask[i] & b) != 0) {
-          if ((bytes[i] & b) != 0) {
-            result |= resultBit;
-          }
-          resultBit <<= 1;
-        }
-      }
-    }
-    *dest = result;
-    return true;
-#endif
-  }
-
-private:
-  void andMask(void *maskData, unsigned len, unsigned offset) {
-    if (offset < size) {
-      unsigned common = std::min(len, size - offset);
-      uint8_t *maskBytes = (uint8_t *)maskData;
-      for (unsigned i = 0; i < common; ++i) {
-        mask[i + offset] &= maskBytes[i];
-      }
-    }
-  }
-
-  void andNotMask(void *maskData, unsigned len, unsigned offset) {
-    assert(offset < size);
-    if (offset < size) {
-      unsigned common = std::min(len, size - offset);
-      uint8_t *maskBytes = (uint8_t *)maskData;
-      for (unsigned i = 0; i < common; ++i) {
-        mask[i + offset] &= ~maskBytes[i];
-      }
-    }
   }
 };
 
@@ -1102,8 +988,9 @@ public:
     tag = payloadTagLow;
     tagBits = payloadTagLowBitCount;
 
-    // Read the other spare bits
+    // Read the other spare bits from the payload area
     auto otherSpareBitsMask = spareBitsMask; // copy
+    otherSpareBitsMask.keepOnlyLeastSignificantBytes(getPayloadSize());
     otherSpareBitsMask.andNotMask(payloadTagLowBitsMask, 0);
     auto otherSpareBitsCount = otherSpareBitsMask.countSetBits();
     if (otherSpareBitsCount > 0) {
@@ -1152,6 +1039,13 @@ public:
     uint32_t maxTag = (tagBits >= 32) ? ~0u : (1UL << tagBits) - 1;
     *extraInhabitantIndex = maxTag - tag;
     return true;
+  }
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
+    auto mask = spareBitsMask;
+    // Bits we've used for our tag can't be re-used by a containing enum...
+    mask.andNotMask(getMultiPayloadTagBitsMask(), 0);
+    return mask;
   }
 
   bool projectEnumValue(remote::MemoryReader &reader,
@@ -1221,13 +1115,26 @@ public:
 
   // The case value is stored in three pieces:
   // * A separate "discriminator" tag appended to the payload (if necessary)
-  // * A "payload tag" that uses (a subset of) the spare bits
+  // * A "payload tag" that uses (a subset of) the spare bits in the payload
   // * The remainder of the payload bits (for non-payload cases)
   // This computes the bits used for the payload tag.
   BitMask getMultiPayloadTagBitsMask() const {
     auto payloadTagValues = NumEffectivePayloadCases - 1;
     if (getNumCases() > NumEffectivePayloadCases) {
-      payloadTagValues += 1;
+      // How many payload bits are there?
+      auto payloadBits = spareBitsMask;
+      payloadBits.complement(); // Non-spare bits are payload bits
+      auto numPayloadBits = payloadBits.countSetBits();
+
+      if (numPayloadBits >= 32) {
+	// Lots of payload bits!!  We only need one extra tag value
+	payloadTagValues += 1;
+      } else {
+	// We may need multiple tag values to cover all the non-payload cases
+	auto numNonPayloadCasesPerTag = 1ULL << numPayloadBits;
+	auto numNonPayloadCases = getNumCases() - NumEffectivePayloadCases;
+	payloadTagValues += (numNonPayloadCases + numNonPayloadCasesPerTag - 1) / numNonPayloadCasesPerTag;
+      }
     }
     int payloadTagBits = 0;
     while (payloadTagValues > 0) {
@@ -1235,78 +1142,28 @@ public:
       payloadTagBits += 1;
     }
     BitMask payloadTagBitsMask = spareBitsMask;
+    payloadTagBitsMask.keepOnlyLeastSignificantBytes(getPayloadSize());
     payloadTagBitsMask.keepOnlyMostSignificantBits(payloadTagBits);
     return payloadTagBitsMask;
   }
 };
-
-// Recursively populate the spare bit mask for this single type
-static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits);
-
-// Recursively populate the spare bit mask for this collection of
-// record fields or enum cases.
-static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields, BitMask &mask, uint64_t mpePointerSpareBits) {
-  for (auto Field : Fields) {
-    if (Field.TR != 0) {
-      BitMask submask(Field.TI.getSize());
-      if (!populateSpareBitsMask(&Field.TI, submask, mpePointerSpareBits)) {
-        return false;
-      }
-      mask.andMask(submask, Field.Offset);
-    }
-  }
-  return true;
-}
-
-// General recursive type walk to combine spare bit info from nested structures.
-static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask, uint64_t mpePointerSpareBits) {
-  switch (TI->getKind()) {
-  case TypeInfoKind::Reference: {
-    if (TI->getSize() == 8) {
-      mask.andMask(mpePointerSpareBits, 0);
-    } else /* TI->getSize() == 4 */ {
-      uint32_t pointerMask = (uint32_t)mpePointerSpareBits;
-      mask.andMask(pointerMask, 0);
-    }
-    break;
-  }
-  case TypeInfoKind::Enum: {
-    auto EnumTI = reinterpret_cast<const EnumTypeInfo *>(TI);
-    // Remove bits used by the payloads
-    if (!populateSpareBitsMask(EnumTI->getCases(), mask, mpePointerSpareBits)) {
-      return false;
-    }
-    // TODO: Remove bits needed to discriminate payloads.
-    // Until then, return false for any type with an enum in it so we
-    // won't claim to support something we don't.
-    return false;
-    break;
-  }
-  case TypeInfoKind::Record: {
-    auto RecordTI = dyn_cast<RecordTypeInfo>(TI);
-    if (!populateSpareBitsMask(RecordTI->getFields(), mask, mpePointerSpareBits)) {
-      return false;
-    }
-    break;
-  }
-  default: {
-    mask.makeZero();
-    break;
-  }
-  }
-  return true;
-}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
   std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
+  remote::RemoteAbsolutePointer Shape;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
   unsigned WitnessTableCount;
   bool Invalid;
+
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
+  }
 
   bool isSingleError() const {
     // If we changed representation, it means we added a
@@ -1339,8 +1196,7 @@ class ExistentialTypeInfoBuilder {
       auto *NTD = dyn_cast<NominalTypeRef>(P);
       auto *OP = dyn_cast<ObjCProtocolTypeRef>(P);
       if (!NTD && !OP) {
-        DEBUG_LOG(fprintf(stderr, "Bad protocol: "); P->dump())
-        Invalid = true;
+        markInvalid("bad protocol", P);
         continue;
       }
 
@@ -1352,8 +1208,7 @@ class ExistentialTypeInfoBuilder {
 
       auto FD = TC.getBuilder().getFieldDescriptor(P);
       if (FD == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No field descriptor: "); P->dump())
-        Invalid = true;
+        markInvalid("no field descriptor", P);
         continue;
       }
 
@@ -1372,16 +1227,12 @@ class ExistentialTypeInfoBuilder {
             // layering.
             auto *SuperclassTI = TC.getTypeInfo(Superclass, nullptr);
             if (SuperclassTI == nullptr) {
-              DEBUG_LOG(fprintf(stderr, "No TypeInfo for superclass: ");
-                        Superclass->dump());
-              Invalid = true;
+              markInvalid("no type info for superclass", Superclass);
               continue;
             }
 
             if (!isa<ReferenceTypeInfo>(SuperclassTI)) {
-              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ");
-                        SuperclassTI->dump());
-              Invalid = true;
+              markInvalid("superclass not a reference type", Superclass);
               continue;
             }
 
@@ -1400,7 +1251,7 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::Enum:
         case FieldDescriptorKind::MultiPayloadEnum:
         case FieldDescriptorKind::Class:
-          Invalid = true;
+          markInvalid("unexpected field descriptor kind");
           continue;
       }
     }
@@ -1431,8 +1282,7 @@ public:
       if (!isa<NominalTypeRef>(T) &&
           !isa<BoundGenericTypeRef>(T) &&
           !isa<ObjCClassTypeRef>(T)) {
-        DEBUG_LOG(fprintf(stderr, "Bad existential member: "); T->dump())
-        Invalid = true;
+        markInvalid("bad existential member", T);
         return;
       }
 
@@ -1444,8 +1294,7 @@ public:
 
       const auto &FD = TC.getBuilder().getFieldDescriptor(T);
       if (FD == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No field descriptor: "); T->dump())
-        Invalid = true;
+        markInvalid("no field descriptor", T);
         return;
       }
 
@@ -1461,8 +1310,7 @@ public:
         break;
 
       default:
-        DEBUG_LOG(fprintf(stderr, "Bad existential member: "); T->dump())
-        Invalid = true;
+        markInvalid("bad existential member", T);
         return;
       }
     }
@@ -1472,8 +1320,22 @@ public:
     Representation = ExistentialTypeRepresentation::Class;
   }
 
-  void markInvalid() {
-    Invalid = true;
+  void addShape(const ProtocolCompositionTypeRef *Protocol,
+                ExtendedExistentialTypeShapeFlags Flags) {
+    switch (Flags.getSpecialKind()) {
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Class:
+      Representation = ExistentialTypeRepresentation::Class;
+      break;
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Metatype:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::ExplicitLayout:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::None:
+      Representation = ExistentialTypeRepresentation::Opaque;
+      break;
+    }
+
+    if (Protocol)
+      for (auto *Protocol : Protocol->getProtocols())
+        addProtocol(Protocol);
   }
 
   const TypeInfo *build(remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -1484,7 +1346,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG_LOG(fprintf(stderr, "@objc existential with witness tables\n"));
+        TC.setError("@objc existential with witness tables");
         return nullptr;
       }
 
@@ -1521,7 +1383,7 @@ public:
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef(), ExternalTypeInfo);
       if (TI == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No TypeInfo for RawPointer\n"));
+        TC.setError("no TypeInfo for RawPointer");
         return nullptr;
       }
 
@@ -1555,7 +1417,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG_LOG(fprintf(stderr, "@objc existential with witness tables\n"));
+        markInvalid("@objc existential with witness tables");
         return nullptr;
       }
 
@@ -1628,8 +1490,7 @@ void RecordTypeInfoBuilder::addField(
     remote::TypeInfoProvider *ExternalTypeInfo) {
   const TypeInfo *TI = TC.getTypeInfo(TR, ExternalTypeInfo);
   if (TI == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for field type: "); TR->dump());
-    Invalid = true;
+    markInvalid("no TypeInfo for field type", TR);
     return;
   }
 
@@ -1679,7 +1540,7 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
 
   auto BuiltinTI = Builder.getBuiltinTypeDescriptor(TR);
   if (BuiltinTI == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for reference type: "); TR->dump());
+    setError("no TypeInfo for reference type", TR);
     return nullptr;
   }
 
@@ -1711,6 +1572,23 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
   return TI;
 }
 
+void TypeConverter::setError(const char *msg, const TypeRef *TR) {
+  DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
+  LastError = {msg, TR};
+}
+
+std::string TypeConverter::takeLastError() {
+  if (!LastError.first)
+    return {};
+  std::stringstream s;
+  s << LastError.first << ": ";
+  if (LastError.second)
+    LastError.second->dump(s);
+
+  LastError = {nullptr, nullptr};
+  return s.str();
+}
+
 /// Thin functions consist of a function pointer. We do not use
 /// Builtin.RawPointer here, since the extra inhabitants differ.
 const TypeInfo *
@@ -1721,7 +1599,7 @@ TypeConverter::getThinFunctionTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getThinFunctionTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for function type\n"));
+    setError("no TypeInfo for function type");
     return nullptr;
   }
 
@@ -1756,13 +1634,43 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for metatype type\n"));
+    setError("no TypeInfo for metatype type");
     return nullptr;
   }
 
   AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), *descriptor.get());
 
   return AnyMetatypeTI;
+}
+
+const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
+  if (DefaultActorStorageTI != nullptr)
+    return DefaultActorStorageTI;
+
+  // The default actor storage is an opaque fixed-size buffer. Use the raw
+  // pointer descriptor to find the word size and pointer alignment in the
+  // current platform.
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getRawPointerTypeRef());
+  if (descriptor == nullptr) {
+    setError("no TypeInfo for default actor storage type");
+    return nullptr;
+  }
+
+  auto size = descriptor->Size * NumWords_DefaultActor;
+  auto alignment = 2 * descriptor->Alignment;
+
+  DefaultActorStorageTI = makeTypeInfo<BuiltinTypeInfo>(
+      /*Size=*/size, /*Alignment*/ alignment, /*Stride=*/size,
+      /*NumExtraInhabitants*/ 0, /*BitwiseTakable*/ true);
+
+  return DefaultActorStorageTI;
+}
+
+const TypeInfo *TypeConverter::getRawUnsafeContinuationTypeInfo() {
+  // An UnsafeContinuation is (essentially) a strong pointer to heap data
+  return getReferenceTypeInfo(ReferenceKind::Strong,
+				 ReferenceCounting::Native);
 }
 
 const TypeInfo *TypeConverter::getEmptyTypeInfo() {
@@ -1862,6 +1770,15 @@ public:
     return true;
   }
 
+  bool visitPackTypeRef(const PackTypeRef *P) {
+    return false;
+  }
+
+  bool visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    return false;
+  }
+
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
     return true;
   }
@@ -1882,6 +1799,11 @@ public:
 
   bool
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return true;
+  }
+
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
     return true;
   }
 
@@ -1930,6 +1852,14 @@ public:
 
   bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return false;
+  }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return false;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
   }
 };
 
@@ -1989,6 +1919,20 @@ public:
     return result;
   }
 
+  MetatypeRepresentation visitPackTypeRef(const PackTypeRef *P) {
+    auto result = MetatypeRepresentation::Thin;
+    for (auto Element : P->getElements())
+      result = combineRepresentations(result, visit(Element));
+    return result;
+  }
+
+  MetatypeRepresentation visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    auto result = MetatypeRepresentation::Thin;
+    result = combineRepresentations(result, visit(PE->getPattern()));
+    result = combineRepresentations(result, visit(PE->getCount()));
+    return result;
+  }
+
   MetatypeRepresentation visitFunctionTypeRef(const FunctionTypeRef *F) {
     auto result = visit(F->getResult());
     for (const auto &Param : F->getParameters())
@@ -2003,6 +1947,11 @@ public:
 
   MetatypeRepresentation
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2066,6 +2015,14 @@ public:
   MetatypeRepresentation visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     return MetatypeRepresentation::Unknown;
   }
+
+  MetatypeRepresentation visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
+  }
 };
 
 class EnumTypeInfoBuilder {
@@ -2074,6 +2031,11 @@ class EnumTypeInfoBuilder {
   bool BitwiseTakable;
   std::vector<FieldInfo> Cases;
   bool Invalid;
+
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
+  }
 
   const TypeRef *getCaseTypeRef(FieldTypeInfo Case) {
     // An indirect case is like a payload case with an argument type
@@ -2094,8 +2056,7 @@ class EnumTypeInfoBuilder {
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "No TypeInfo for case type: "); TR->dump());
-      Invalid = true;
+      markInvalid("no type info for case type", TR);
       static TypeInfo emptyTI;
       Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
     } else {
@@ -2124,10 +2085,11 @@ public:
 
     std::vector<FieldTypeInfo> Fields;
     if (!TC.getBuilder().getFieldTypeRefs(TR, FD, ExternalTypeInfo, Fields)) {
-      Invalid = true;
+      markInvalid("cannot not get field types", TR);
       return nullptr;
     }
 
+    // Sort and classify the fields
     for (auto Case : Fields) {
       if (Case.TR == nullptr) {
         ++NonPayloadCases;
@@ -2138,14 +2100,23 @@ public:
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
         if (CaseTI == nullptr) {
           // We don't have typeinfo; something is very broken.
-          Invalid = true;
+          markInvalid("no type info for single enum case", CaseTR);
           return nullptr;
+	} else if (Case.Indirect) {
+	  // An indirect case is non-empty (it stores a pointer)
+	  // and acts like a non-generic (because the pointer has spare bits)
+	  ++NonGenericNonEmptyPayloadCases;
+          LastPayloadCaseTR = CaseTR;
         } else if (Case.Generic) {
+	  // Otherwise, we never consider spare bits from generic cases
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (CaseTI->getSize() == 0) {
+	  // Needed to distinguish a "single-payload enum"
+	  // whose only case is empty.
           ++NonGenericEmptyPayloadCases;
         } else {
+	  // Finally, we consider spare bits from regular payloads
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
@@ -2172,6 +2143,15 @@ public:
     case 0: Kind = EnumKind::NoPayloadEnum; break;
     case 1: Kind = EnumKind::SinglePayloadEnum; break;
     default: Kind = EnumKind::MultiPayloadEnum; break;
+    }
+
+    // Sanity:  Ignore any enum that claims to have a size more than 1MiB
+    // This avoids allocating lots of memory for spare bit mask calculations
+    // when clients try to interpret random chunks of memory as type descriptions.
+    if (Size > (1024ULL * 1024)) {
+      unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+      return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
+	Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
     }
 
     if (Cases.size() == 1) {
@@ -2259,11 +2239,10 @@ public:
     //
 
     // Do we have a fixed layout?
-    // TODO: Test whether a missing FixedDescriptor is actually relevant.
     auto FixedDescriptor = TC.getBuilder().getBuiltinTypeDescriptor(TR);
     if (!FixedDescriptor || GenericPayloadCases > 0) {
       // This is a "dynamic multi-payload enum".  For example,
-      // this occurs with:
+      // this occurs with generics such as:
       // ```
       // class ClassWithEnum<T> {
       //   enum E {
@@ -2273,6 +2252,12 @@ public:
       //   var e: E?
       // }
       // ```
+      // and when we have a resilient inner enum, such as:
+      // ```
+      // enum E2 {
+      //   case y(E1_resilient)
+      //   case z(Int)
+      // }
       auto tagCounts = getEnumTagCounts(Size, EffectiveNoPayloadCases,
                                         EffectivePayloadCases);
       Size += tagCounts.numTagBytes;
@@ -2304,82 +2289,30 @@ public:
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
     if (Stride == 0)
       Stride = 1;
-    auto PayloadSize = EnumTypeInfo::getPayloadSizeForCases(Cases);
 
-    // If there's a multi-payload enum descriptor, then we
-    // have spare bits information from the compiler.
-
-    // Uncomment the following line to dump the MPE section every time we come through here...
-    //TC.getBuilder().dumpMultiPayloadEnumSection(std::cerr); // DEBUG helper
-
-    auto MPEDescriptor = TC.getBuilder().getMultiPayloadEnumDescriptor(TR);
-    if (MPEDescriptor && MPEDescriptor->usesPayloadSpareBits()) {
-      auto PayloadSpareBitMaskByteCount = MPEDescriptor->getPayloadSpareBitMaskByteCount();
-      auto PayloadSpareBitMaskByteOffset = MPEDescriptor->getPayloadSpareBitMaskByteOffset();
-      auto SpareBitMask = MPEDescriptor->getPayloadSpareBits();
-      BitMask spareBitsMask(PayloadSize, SpareBitMask,
-                            PayloadSpareBitMaskByteCount, PayloadSpareBitMaskByteOffset);
-      
-      if (spareBitsMask.isZero()) {
-        // If there are no spare bits, use the "simple" tag-only implementation.
-        return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
-          Size, Alignment, Stride, NumExtraInhabitants,
-          BitwiseTakable, Cases, EffectivePayloadCases);
+    // Compute the spare bit mask and determine if we have any address-only fields
+    auto localSpareBitMask = BitMask::oneMask(Size);
+    bool hasAddrOnly = false;
+    for (auto Case : Cases) {
+      if (Case.TR != 0) {
+	auto submask = Case.TI.getSpareBits(TC, hasAddrOnly);
+	localSpareBitMask.andMask(submask, 0);
       }
-
-#if 0  // TODO: This should be !defined(NDEBUG)
-      // DEBUG verification that compiler mask and locally-computed
-      // mask are the same (whenever both are available).
-      BitMask locallyComputedSpareBitsMask(PayloadSize);
-      auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-      auto locallyComputedSpareBitsMaskIsValid
-        = populateSpareBitsMask(Cases, locallyComputedSpareBitsMask, mpePointerSpareBits);
-      // If the local computation were always correct, we could:
-      // assert(locallyComputedSpareBitsMaskIsValid);
-      if (locallyComputedSpareBitsMaskIsValid) {
-        // Whenever the compiler and local computation both produce
-        // data, they should agree.
-        // TODO: Make this true, then change `#if 0` above
-        assert(locallyComputedSpareBitsMask == spareBitsMask);
-      }
-#endif
-
-      // Use compiler-provided spare bit information
-      return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, spareBitsMask,
-        EffectivePayloadCases);
     }
 
-    // Either there was no compiler data or it didn't make sense
-    // (existed but claimed to have no mask).
-    // Try computing the mask ourselves: This is less robust, but necessary to
-    // support images from older compilers.
-    BitMask spareBitsMask(PayloadSize);
-    auto mpePointerSpareBits = TC.getBuilder().getMultiPayloadEnumPointerMask();
-    auto validSpareBitsMask = populateSpareBitsMask(Cases, spareBitsMask, mpePointerSpareBits);
-    // For DEBUGGING, disable fallback to local computation to
-    // make missing compiler data more obvious:
-    // validSpareBitsMask = false;
-    if (!validSpareBitsMask) {
-      // If we couldn't correctly determine the spare bits mask,
-      // return a TI that will always fail when asked for XIs or value.
-      return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, EnumKind::MultiPayloadEnum, Cases);
-    } else if (spareBitsMask.isZero()) {
-      // Simple case that does not use spare bits
-      // This is correct as long as our local spare bits calculation
-      // above only returns an empty mask when the mask is really empty,
+    if (localSpareBitMask.isZero() || hasAddrOnly) {
+      // Simple tag-only layout does not use spare bits.
+      // Either:
+      // * There are no spare bits, or
+      // * We can't copy it to strip spare bits.
       return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
         BitwiseTakable, Cases, EffectivePayloadCases);
     } else {
       // General case can mix spare bits and extra discriminator
-      // It obviously relies on having an accurate spare bit mask.
       return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, spareBitsMask,
+        BitwiseTakable, Cases, localSpareBitMask,
         EffectivePayloadCases);
     }
   }
@@ -2389,6 +2322,35 @@ class LowerType
   : public TypeRefVisitor<LowerType, const TypeInfo *> {
   TypeConverter &TC;
   remote::TypeInfoProvider *ExternalTypeInfo;
+
+  const TypeInfo *CFRefTypeInfo(const TypeRef *TR) {
+    if (auto N = dyn_cast<NominalTypeRef>(TR)) {
+      Demangler Dem;
+      auto Node = N->getDemangling(Dem);
+      if (Node && Node->getKind() == Node::Kind::Type &&
+          Node->getNumChildren() == 1) {
+        auto Alias = Node->getChild(0);
+	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
+	  auto Module = Alias->getChild(0);
+	  auto Name = Alias->getChild(1);
+	  if (Module->getKind() == Node::Kind::Module
+	      && Module->hasText()
+	      && Module->getText() == "__C"
+	      && Name->getKind() == Node::Kind::Identifier
+	      && Name->hasText()) {
+	    auto CName = Name->getText();
+	    // Heuristic: Hopefully good enough.
+	    if (CName.starts_with("CF") && CName.ends_with("Ref")) {
+	      // A CF reference is essentially the same as a Strong ObjC reference
+	      return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+					     ReferenceCounting::Unknown);
+	    }
+	  }
+	}
+      }
+    }
+    return nullptr;
+  }
 
 public:
   using TypeRefVisitor<LowerType, const TypeInfo *>::visit;
@@ -2406,13 +2368,17 @@ public:
     } else if (B->getMangledName() == "BO") {
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                      ReferenceCounting::Unknown);
+    } else if (B->getMangledName() == "BD") {
+      return TC.getDefaultActorStorageTypeInfo();
+    } else if (B->getMangledName() == "Bc") {
+      return TC.getRawUnsafeContinuationTypeInfo();
     }
 
     /// Otherwise, get the fixed layout information from reflection
     /// metadata.
     auto descriptor = TC.getBuilder().getBuiltinTypeDescriptor(B);
     if (descriptor == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "No TypeInfo for builtin type: "); B->dump());
+      TC.setError("no TypeInfo for builtin type", B);
       return nullptr;
     }
     return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), *descriptor.get());
@@ -2455,8 +2421,13 @@ public:
         if (auto External = QueryExternalTypeInfoProvider())
           return External;
 
+	// CoreFoundation types require some special handling
+	if (auto CFTypeInfo = CFRefTypeInfo(TR))
+	  return CFTypeInfo;
+
+
         // If the external provider also fails we're out of luck.
-        DEBUG_LOG(fprintf(stderr, "No TypeInfo for nominal type: "); TR->dump());
+        TC.setError("no TypeInfo for nominal type", TR);
         return nullptr;
       }
     }
@@ -2491,7 +2462,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      DEBUG_LOG(fprintf(stderr, "Invalid field descriptor: "); TR->dump());
+      TC.setError("Invalid field descriptor", TR);
       return nullptr;
     }
 
@@ -2512,6 +2483,16 @@ public:
       // The label is not going to be relevant/harmful for looking up type info.
       builder.addField("", Element, ExternalTypeInfo);
     return builder.build();
+  }
+
+  const TypeInfo *visitPackTypeRef(const PackTypeRef *P) {
+    TC.setError("cannot have pack type here", P);
+    return nullptr;
+  }
+
+  const TypeInfo *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    TC.setError("cannot have pack expansion type here", PE);
+    return nullptr;
   }
 
   const TypeInfo *visitFunctionTypeRef(const FunctionTypeRef *F) {
@@ -2545,7 +2526,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
-      DEBUG_LOG(fprintf(stderr, "Unknown metatype representation: "); M->dump());
+      TC.setError("unknown metatype representation", M);
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -2564,22 +2545,29 @@ public:
     if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
     } else {
-      DEBUG_LOG(fprintf(stderr, "Invalid existential metatype: "); EM->dump());
+      TC.setError("invalid existential metatype", EM);
       return nullptr;
     }
 
     return builder.buildMetatype(ExternalTypeInfo);
   }
 
+  const TypeInfo *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    ExistentialTypeInfoBuilder builder(TC);
+    builder.addShape(SEET->getProtocol(), SEET->getFlags());
+    return builder.build(ExternalTypeInfo);
+  }
+
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); GTP->dump());
+    TC.setError("unresolved generic TypeRef", GTP);
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); DM->dump());
+    TC.setError("unresolved generic TypeRef", DM);
     return nullptr;
   }
 
@@ -2605,7 +2593,7 @@ public:
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
     if (TI == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "Invalid reference type"));
+      TC.setError("invalid reference type");
       return nullptr;
     }
 
@@ -2651,7 +2639,7 @@ public:
     }
 
     // Anything else -- give up
-    DEBUG_LOG(fprintf(stderr, "Invalid reference type"));
+    TC.setError("invalid reference type");
     return nullptr;
   }
 
@@ -2679,15 +2667,27 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    DEBUG_LOG(fprintf(stderr, "Can't lower opaque TypeRef"));
+    TC.setError("can't lower opaque TypeRef", O);
     return nullptr;
   }
 
   const TypeInfo *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     // TODO: Provide a hook for the client to try to resolve the opaque archetype
     // with additional information?
-    DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
+    TC.setError("can't lower unresolved opaque archetype TypeRef", O);
     return nullptr;
+  }
+
+  const TypeInfo *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    TC.setError("can't lower integer TypeRef", I);
+    return nullptr;
+  }
+
+  const TypeInfo *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto elementTI = visit(BA->getElementType());
+    auto size = cast<IntegerTypeRef>(BA->getSizeType())->getValue();
+
+    return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
   }
 };
 
@@ -2695,7 +2695,7 @@ const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
   if (!TR) {
-    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    setError("null TypeRef");
     return nullptr;
   }
 
@@ -2703,19 +2703,27 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
       ExternalTypeInfo ? ExternalTypeInfo->getId() : 0;
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfoId});
-  if (found != Cache.end())
+  if (found != Cache.end()) {
+    if (!found->second && ErrorCache)
+      LastError = ErrorCache->lookup({TR, ExternalTypeInfoId});
     return found->second;
+  }
 
   // Detect invalid recursive value types (IRGen should not emit
   // them in the first place, but there might be bugs)
   if (!RecursionCheck.insert(TR).second) {
-    DEBUG_LOG(fprintf(stderr, "TypeRef recursion detected"));
+    setError("TypeRef recursion detected");
     return nullptr;
   }
 
   // Compute the result and cache it
   auto *TI = LowerType(*this, ExternalTypeInfo).visit(TR);
   Cache.insert({{TR, ExternalTypeInfoId}, TI});
+  if (!TI && ErrorCache) {
+    if (!LastError.first)
+      LastError = {"cannot decode or find", TR};
+    ErrorCache->insert({{TR, ExternalTypeInfoId}, LastError});
+  }
 
   RecursionCheck.erase(TR);
 
@@ -2727,7 +2735,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     remote::TypeInfoProvider *ExternalTypeInfo) {
   auto FD = getBuilder().getFieldDescriptor(TR);
   if (FD == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No field descriptor: "); TR->dump());
+    setError("no field descriptor", TR);
     return nullptr;
   }
 
@@ -2739,8 +2747,11 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
     std::vector<FieldTypeInfo> Fields;
-    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo, Fields))
+    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo,
+                                       Fields)) {
+      setError("cannot get fields", TR);
       return nullptr;
+    }
 
     // Start layout from the given instance start offset. This should
     // be the superclass instance size.
@@ -2760,7 +2771,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
-    DEBUG_LOG(fprintf(stderr, "Invalid field descriptor: "); TR->dump());
+    setError("invalid field descriptor", TR);
     return nullptr;
   }
 

@@ -24,8 +24,8 @@
 /// The version constants for the SwiftDependencyScan C API.
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
-#define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 8
+#define SWIFTSCAN_VERSION_MAJOR 2
+#define SWIFTSCAN_VERSION_MINOR 2
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -36,7 +36,6 @@ typedef enum {
   // SwiftInterface and SwiftSource.
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL = 0,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY = 1,
-  SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER = 2,
   SWIFTSCAN_DEPENDENCY_INFO_CLANG = 3
 } swiftscan_dependency_info_kind_t;
 
@@ -45,6 +44,15 @@ typedef struct swiftscan_module_details_s *swiftscan_module_details_t;
 
 /// Opaque container to a dependency info of a given module.
 typedef struct swiftscan_dependency_info_s *swiftscan_dependency_info_t;
+
+/// Opaque container to a link library info.
+typedef struct swiftscan_link_library_info_s *swiftscan_link_library_info_t;
+
+/// Opaque container to an import info.
+typedef struct swiftscan_import_info_s *swiftscan_import_info_t;
+
+/// Opaque container to a macro dependency.
+typedef struct swiftscan_macro_dependency_s *swiftscan_macro_dependency_t;
 
 /// Opaque container to an overall result of a dependency scan.
 typedef struct swiftscan_dependency_graph_s *swiftscan_dependency_graph_t;
@@ -55,11 +63,38 @@ typedef struct swiftscan_import_set_s *swiftscan_import_set_t;
 /// Opaque container to contain the info of a diagnostics emitted by the scanner.
 typedef struct swiftscan_diagnostic_info_s *swiftscan_diagnostic_info_t;
 
+/// Opaque container to contain the info of a source location.
+typedef struct swiftscan_source_location_s *swiftscan_source_location_t;
+
 /// Full Dependency Graph (Result)
 typedef struct {
   swiftscan_dependency_info_t *modules;
   size_t count;
 } swiftscan_dependency_set_t;
+
+/// Set of linked libraries
+typedef struct {
+  swiftscan_link_library_info_t *link_libraries;
+  size_t count;
+} swiftscan_link_library_set_t;
+
+/// Set of details about source imports
+typedef struct {
+  swiftscan_import_info_t *imports;
+  size_t count;
+} swiftscan_import_info_set_t;
+
+/// Set of source location infos
+typedef struct {
+  swiftscan_source_location_t *source_locations;
+  size_t count;
+} swiftscan_source_location_set_t;
+
+/// Set of macro dependency
+typedef struct {
+  swiftscan_macro_dependency_t *macro_dependencies;
+  size_t count;
+} swiftscan_macro_dependency_set_t;
 
 typedef enum {
   SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR = 0,
@@ -68,25 +103,34 @@ typedef enum {
   SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK = 3
 } swiftscan_diagnostic_severity_t;
 
+// Must maintain consistency with swift::AccessLevel
+typedef enum {
+  SWIFTSCAN_ACCESS_LEVEL_PRIVATE = 0,
+  SWIFTSCAN_ACCESS_LEVEL_FILEPRIVATE = 1,
+  SWIFTSCAN_ACCESS_LEVEL_INTERNAL = 2,
+  SWIFTSCAN_ACCESS_LEVEL_PACKAGE = 3,
+  SWIFTSCAN_ACCESS_LEVEL_PUBLIC = 4
+} swiftscan_access_level_t;
+
 typedef struct {
   swiftscan_diagnostic_info_t *diagnostics;
   size_t count;
 } swiftscan_diagnostic_set_t;
 
-//=== Batch Scan Input Specification --------------------------------------===//
+//=== Batch Scan Input Specification -------DEPRECATED--------------------===//
 
-/// Opaque container to a container of batch scan entry information.
-typedef struct swiftscan_batch_scan_entry_s *swiftscan_batch_scan_entry_t;
+ /// Opaque container to a container of batch scan entry information.
+ typedef struct swiftscan_batch_scan_entry_s *swiftscan_batch_scan_entry_t;
 
-typedef struct {
-  swiftscan_batch_scan_entry_t *modules;
-  size_t count;
-} swiftscan_batch_scan_input_t;
+ typedef struct {
+   swiftscan_batch_scan_entry_t *modules;
+   size_t count;
+ } swiftscan_batch_scan_input_t;
 
-typedef struct {
-  swiftscan_dependency_graph_t *results;
-  size_t count;
-} swiftscan_batch_scan_result_t;
+ typedef struct {
+   swiftscan_dependency_graph_t *results;
+   size_t count;
+ } swiftscan_batch_scan_result_t;
 
 //=== Scanner Invocation Specification ------------------------------------===//
 
@@ -124,8 +168,35 @@ swiftscan_module_info_get_source_files(swiftscan_dependency_info_t info);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_module_info_get_direct_dependencies(swiftscan_dependency_info_t info);
 
+SWIFTSCAN_PUBLIC swiftscan_link_library_set_t *
+swiftscan_module_info_get_link_libraries(swiftscan_dependency_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_import_info_set_t *
+swiftscan_module_info_get_imports(swiftscan_dependency_info_t info);
+
 SWIFTSCAN_PUBLIC swiftscan_module_details_t
 swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
+
+//=== Import Details Functions -------------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_source_location_set_t *
+swiftscan_import_info_get_source_locations(swiftscan_import_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_import_info_get_identifier(swiftscan_import_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_access_level_t
+swiftscan_import_info_get_access_level(swiftscan_import_info_t info);
+
+//=== Link Library Info Functions ----------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_link_library_info_get_link_name(
+    swiftscan_link_library_info_t info);
+SWIFTSCAN_PUBLIC bool
+swiftscan_link_library_info_get_is_static(swiftscan_link_library_info_t info);
+SWIFTSCAN_PUBLIC bool swiftscan_link_library_info_get_is_framework(
+    swiftscan_link_library_info_t info);
+SWIFTSCAN_PUBLIC bool swiftscan_link_library_info_get_should_force_load(
+    swiftscan_link_library_info_t info);
 
 //=== Dependency Module Info Details Functions ----------------------------===//
 
@@ -161,9 +232,10 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_textual_detail_get_bridging_pch_command_line(
     swiftscan_module_details_t details);
 
+// DEPRECATED
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
-swiftscan_swift_textual_detail_get_extra_pcm_args(
-    swiftscan_module_details_t details);
+ swiftscan_swift_textual_detail_get_extra_pcm_args(
+     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_context_hash(
@@ -176,12 +248,28 @@ SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_textual_detail_get_swift_overlay_dependencies(
     swiftscan_module_details_t details);
 
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_textual_detail_get_swift_source_import_module_dependencies(
+swiftscan_module_details_t details);
+
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_cas_fs_root_id(
     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_module_cache_key(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_user_module_version(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_path(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_content(
     swiftscan_module_details_t details);
 
 //=== Swift Binary Module Details query APIs ------------------------------===//
@@ -218,7 +306,11 @@ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_cache_key(
     swiftscan_module_details_t details);
 
-//=== Swift Placeholder Module Details query APIs -------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_binary_detail_get_user_module_version(
+    swiftscan_module_details_t details);
+
+//=== Swift Placeholder Module Details query APIs - DEPRECATED -----------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_compiled_module_path(
@@ -243,6 +335,7 @@ swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details);
 
+// DEPRECATED
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details);
 
@@ -252,47 +345,39 @@ swiftscan_clang_detail_get_cas_fs_root_id(swiftscan_module_details_t details);
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_clang_detail_get_module_cache_key(swiftscan_module_details_t details);
 
-//=== Batch Scan Input Functions ------------------------------------------===//
-
-/// Create an \c swiftscan_batch_scan_input_t instance.
-/// The returned \c swiftscan_batch_scan_input_t is owned by the caller and must be disposed
-/// of using \c swiftscan_batch_scan_input_dispose .
-SWIFTSCAN_PUBLIC swiftscan_batch_scan_input_t *
-swiftscan_batch_scan_input_create();
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_input_set_modules(swiftscan_batch_scan_input_t *input,
-                                       int count,
-                                       swiftscan_batch_scan_entry_t *modules);
-
-//=== Batch Scan Entry Functions ------------------------------------------===//
-
-/// Create an \c swiftscan_batch_scan_entry_t instance.
-/// The returned \c swiftscan_batch_scan_entry_t is owned by the caller and must be disposed
-/// of using \c swiftscan_batch_scan_entry_dispose .
-SWIFTSCAN_PUBLIC swiftscan_batch_scan_entry_t
-swiftscan_batch_scan_entry_create();
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_set_module_name(swiftscan_batch_scan_entry_t entry,
-                                           const char *name);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_set_arguments(swiftscan_batch_scan_entry_t entry,
-                                         const char *arguments);
-
-SWIFTSCAN_PUBLIC void
-swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
-                                        bool is_swift);
-
-SWIFTSCAN_PUBLIC swiftscan_string_ref_t
-swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry);
-
-SWIFTSCAN_PUBLIC swiftscan_string_ref_t
-swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry);
-
-SWIFTSCAN_PUBLIC bool
-swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
+//=== Batch Scan Input Functions ------DEPRECATED---------------------------===//
+ /// Deprecated
+ SWIFTSCAN_PUBLIC swiftscan_batch_scan_input_t *
+ swiftscan_batch_scan_input_create();
+ /// Deprecated
+ SWIFTSCAN_PUBLIC void
+ swiftscan_batch_scan_input_set_modules(swiftscan_batch_scan_input_t *input,
+                                        int count,
+                                        swiftscan_batch_scan_entry_t *modules);
+ /// Deprecated
+ SWIFTSCAN_PUBLIC swiftscan_batch_scan_entry_t
+ swiftscan_batch_scan_entry_create();
+ /// Deprecated
+ SWIFTSCAN_PUBLIC void
+ swiftscan_batch_scan_entry_set_module_name(swiftscan_batch_scan_entry_t entry,
+                                            const char *name);
+ /// Deprecated
+ SWIFTSCAN_PUBLIC void
+ swiftscan_batch_scan_entry_set_arguments(swiftscan_batch_scan_entry_t entry,
+                                          const char *arguments);
+ /// Deprecated
+ SWIFTSCAN_PUBLIC void
+ swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
+                                         bool is_swift);
+ /// Deprecated
+ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+ swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry);
+ /// Deprecated
+ SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+ swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry);
+ /// Deprecated
+ SWIFTSCAN_PUBLIC bool
+ swiftscan_batch_scan_entry_get_is_swift(swiftscan_batch_scan_entry_t entry);
 
 //=== Prescan Result Functions --------------------------------------------===//
 
@@ -342,15 +427,16 @@ swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result);
 SWIFTSCAN_PUBLIC void
 swiftscan_import_set_dispose(swiftscan_import_set_t result);
 
+/// Deprecated
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry);
-
+/// Deprecated
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input);
-
+/// Deprecated
 SWIFTSCAN_PUBLIC void
 swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result);
-
+/// Deprecated
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
 
@@ -387,15 +473,6 @@ SWIFTSCAN_PUBLIC void swiftscan_scanner_dispose(swiftscan_scanner_t);
 SWIFTSCAN_PUBLIC swiftscan_dependency_graph_t swiftscan_dependency_graph_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
-/// Invoke the scan for an input batch of modules specified in the
-/// \c swiftscan_batch_scan_input_t argument. The returned
-/// \c swiftscan_batch_scan_result_t is owned by the caller and must be disposed
-/// of using \c swiftscan_batch_scan_result_dispose .
-SWIFTSCAN_PUBLIC swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
-                                   swiftscan_batch_scan_input_t *batch_input,
-                                   swiftscan_scan_invocation_t invocation);
-
 /// Invoke the import prescan using arguments specified in the \c
 /// swiftscan_scan_invocation_t argument. The returned \c swiftscan_import_set_t
 /// is owned by the caller and must be disposed of using \c
@@ -403,6 +480,11 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
 SWIFTSCAN_PUBLIC swiftscan_import_set_t swiftscan_import_set_create(
     swiftscan_scanner_t scanner, swiftscan_scan_invocation_t invocation);
 
+/// Deprecated
+SWIFTSCAN_PUBLIC swiftscan_batch_scan_result_t *
+swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
+                                   swiftscan_batch_scan_input_t *batch_input,
+                                   swiftscan_scan_invocation_t invocation);
 
 //=== Scanner Diagnostics -------------------------------------------------===//
 /// For the specified \c scanner instance, query all insofar emitted diagnostics
@@ -419,25 +501,27 @@ swiftscan_diagnostic_get_message(swiftscan_diagnostic_info_t diagnostic);
 SWIFTSCAN_PUBLIC swiftscan_diagnostic_severity_t
 swiftscan_diagnostic_get_severity(swiftscan_diagnostic_info_t diagnostic);
 
+SWIFTSCAN_PUBLIC swiftscan_source_location_t
+swiftscan_diagnostic_get_source_location(swiftscan_diagnostic_info_t diagnostic);
+
 SWIFTSCAN_PUBLIC void
 swiftscan_diagnostics_set_dispose(swiftscan_diagnostic_set_t* diagnostics);
+
+//=== Source Location -----------------------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_source_location_get_buffer_identifier(swiftscan_source_location_t source_location);
+
+SWIFTSCAN_PUBLIC int64_t
+swiftscan_source_location_get_line_number(swiftscan_source_location_t source_location);
+
+SWIFTSCAN_PUBLIC int64_t
+swiftscan_source_location_get_column_number(swiftscan_source_location_t source_location);
 
 //=== Scanner Cache Operations --------------------------------------------===//
 // The following operations expose an implementation detail of the dependency
 // scanner: its module dependencies cache. This is done in order
 // to allow clients to perform incremental dependency scans by having the
 // scanner's state be serializable and re-usable.
-
-/// For the specified \c scanner instance, serialize its state to the specified file-system \c path .
-SWIFTSCAN_PUBLIC void
-swiftscan_scanner_cache_serialize(swiftscan_scanner_t scanner,
-                                  const char * path);
-
-/// For the specified \c scanner instance, load in scanner state from a file at
-/// the specified file-system \c path .
-SWIFTSCAN_PUBLIC bool
-swiftscan_scanner_cache_load(swiftscan_scanner_t scanner,
-                             const char * path);
 
 /// For the specified \c scanner instance, reset its internal state, ensuring subsequent
 /// scanning queries are done "from-scratch".

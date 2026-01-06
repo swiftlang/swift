@@ -25,11 +25,11 @@
 namespace swift {
 namespace ide {
 
-class CodeCompletionResultBuilder;
+class CodeCompletionStringBuilder;
 
 namespace detail {
 class CodeCompletionStringChunk {
-  friend class swift::ide::CodeCompletionResultBuilder;
+  friend class swift::ide::CodeCompletionStringBuilder;
 
 public:
   enum class ChunkKind {
@@ -329,7 +329,6 @@ public:
 class alignas(detail::CodeCompletionStringChunk) CodeCompletionString final
     : private llvm::TrailingObjects<CodeCompletionString,
                                     detail::CodeCompletionStringChunk> {
-  friend class CodeCompletionResultBuilder;
   friend TrailingObjects;
 
 public:
@@ -348,9 +347,7 @@ public:
   static CodeCompletionString *create(llvm::BumpPtrAllocator &Allocator,
                                       ArrayRef<Chunk> Chunks);
 
-  ArrayRef<Chunk> getChunks() const {
-    return {getTrailingObjects<Chunk>(), NumChunks};
-  }
+  ArrayRef<Chunk> getChunks() const { return getTrailingObjects(NumChunks); }
 
   StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
   std::optional<unsigned>

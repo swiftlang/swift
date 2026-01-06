@@ -59,4 +59,10 @@ Added: _$ss20__StaticArrayStorageCfd
 Added: _OBJC_CLASS_$__TtCs20__StaticArrayStorage
 Added: _OBJC_METACLASS_$__TtCs20__StaticArrayStorage
 
+Added: _$ss24_RuntimeFunctionCountersV03numabC0SivpZMV
+Added: _$ss24_RuntimeFunctionCountersV07runtimeB11NameToIndexSDySSSiGvpZMV
+Added: _$ss24_RuntimeFunctionCountersV07runtimeB5NamesSaySSGvpZMV
+Added: _$ss24_RuntimeFunctionCountersV07runtimebC7OffsetsSPys6UInt16VGvpZMV
+
 // Runtime Symbols
+Added: _swift_clearSensitive

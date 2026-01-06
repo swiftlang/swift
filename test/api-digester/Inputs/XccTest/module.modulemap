@@ -1,0 +1,4 @@
+module XccTest {
+  header "XccTest.h"
+  export *
+}

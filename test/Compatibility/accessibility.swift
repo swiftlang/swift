@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -swift-version 4.2
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 4.2
 
 public protocol PublicProto {
   func publicReq()
@@ -662,7 +662,7 @@ fileprivate struct EquatablishOuter2 {
 }
 
 fileprivate struct EquatablishOuterProblem {
-  internal struct Inner : Equatablish { // expected-error {{type 'EquatablishOuterProblem.Inner' does not conform to protocol 'Equatablish'}}
+  internal struct Inner : Equatablish { // expected-error {{type 'EquatablishOuterProblem.Inner' does not conform to protocol 'Equatablish'}} expected-note {{add stubs for conformance}}
     private static func ==(lhs: Inner, rhs: Inner) {}
   }
 }

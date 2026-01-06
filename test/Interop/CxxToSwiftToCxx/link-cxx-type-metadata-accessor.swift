@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend %t/use-cxx-types.swift -module-name UseCxx -typecheck -verify -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
 // Use the 'DEBUG' flug to force llvm used
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o -DDEBUG
@@ -13,6 +13,14 @@ struct CxxStruct {
     inline CxxStruct(int x) : x(x) {}
     inline CxxStruct(const CxxStruct &other) : x(other.x) {}
     inline ~CxxStruct() {}
+
+    int x;
+};
+
+struct CxxStruct2 {
+    inline CxxStruct2(int x) : x(x) {}
+    inline CxxStruct2(const CxxStruct &other) : x(other.x) {}
+    inline ~CxxStruct2() {}
 
     int x;
 };
@@ -30,6 +38,12 @@ public func retCxxStruct() -> CxxStruct {
     return CxxStruct(2)
 }
 
+#if !os(Windows)
+public func retCxxStruct2() -> CxxStruct2? {
+    return CxxStruct2(2)
+}
+#endif
+
 //--- use-swift-cxx-types.cpp
 
 #include "header.h"
@@ -38,5 +52,8 @@ public func retCxxStruct() -> CxxStruct {
 
 int main() {
   auto x = UseCxx::retCxxStruct();
+#ifndef _WIN32
+  auto y = UseCxx::retCxxStruct2();
+#endif
   return 0;
 }

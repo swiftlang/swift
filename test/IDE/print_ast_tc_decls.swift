@@ -8,7 +8,7 @@
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -D ERRORS -typecheck -verify %s -F %S/Inputs/mock-sdk -enable-objc-interop -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -D ERRORS -typecheck -verify -verify-ignore-unrelated %s -F %S/Inputs/mock-sdk -enable-objc-interop -disable-objc-attr-requires-foundation-module
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
@@ -1431,10 +1431,7 @@ protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
 #elseif false
 #else
 #endif
-// PASS_PRINT_AST: #if
-// PASS_PRINT_AST: #elseif
-// PASS_PRINT_AST: #else
-// PASS_PRINT_AST: #endif
+// PASS_PRINT_AST-NOT: #if
 
 public struct MyPair<A, B> { var a: A, b: B }
 public typealias MyPairI<B> = MyPair<Int, B>

@@ -23,6 +23,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
@@ -75,7 +76,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
     auto fromParam = fromParameters[index];
     auto toParam = toParameters[index];
     // To convert guaranteed argument to be owned, create a copy.
-    if (fromParam.isConsumed() && !toParam.isConsumed()) {
+    if (fromParam.isConsumedInCaller() && !toParam.isConsumedInCallee()) {
       // If the argument has an object type, create a `copy_value`.
       if (arg->getType().isObject()) {
         auto argCopy = builder.emitCopyValueOperation(loc, arg);
@@ -91,7 +92,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
       continue;
     }
     // To convert owned argument to be guaranteed, borrow the argument.
-    if (fromParam.isGuaranteed() && !toParam.isGuaranteed()) {
+    if (fromParam.isGuaranteedInCaller() && !toParam.isGuaranteedInCaller()) {
       auto bbi = builder.emitBeginBorrowOperation(loc, arg);
       forwardedArgs.push_back(bbi);
       valuesToCleanup.push_back(bbi);
@@ -120,10 +121,10 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   auto thunkDeclType =
       thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
 
-  auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
+  auto fromInterfaceType = fromType->mapTypeOutOfEnvironment()->getCanonicalType();
+  auto toInterfaceType = toType->mapTypeOutOfEnvironment()->getCanonicalType();
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(module.getASTContext());
   std::string name = mangler.mangleReabstractionThunkHelper(
       thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
       module.getSwiftModule());
@@ -206,7 +207,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       auto paramTy = fromConv.getSILType(fromType->getParameters()[paramIdx],
                                          builder.getTypeExpansionContext());
       if (!paramTy.hasArchetype())
-        paramTy = thunk->mapTypeIntoContext(paramTy);
+        paramTy = thunk->mapTypeIntoEnvironment(paramTy);
       assert(paramTy.isAddress());
       auto toArg = *toArgIter++;
       auto *buf = createAllocStack(toArg->getType());
@@ -414,9 +415,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
                                   /*withoutActuallyEscaping*/ true,
                                   DifferentiationThunkKind::Reabstraction);
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(parentThunk->getASTContext());
   auto fromInterfaceType =
-      linearMapType->mapTypeOutOfContext()->getCanonicalType();
+      linearMapType->mapTypeOutOfEnvironment()->getCanonicalType();
 
   auto thunkName = mangler.mangleLinearMapSubsetParametersThunk(
       fromInterfaceType, kind.getLinearMapKind(),
@@ -454,9 +455,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto zeroSILType = zeroSILParameter.getSILStorageInterfaceType();
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
-    auto *swiftMod = parentThunk->getModule().getSwiftModule();
     auto tangentSpace =
-        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule(swiftMod));
+        zeroType->getAutoDiffTangentSpace(LookUpConformanceInModule());
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
     case TangentSpace::Kind::TangentVector: {
@@ -465,14 +465,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
       builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
         arguments.push_back(buf);
-        if (zeroSILParameter.isGuaranteed()) {
+        if (zeroSILParameter.isGuaranteedInCaller()) {
           valuesToCleanup.push_back(buf);
         }
       } else {
         auto arg = builder.emitLoadValueOperation(loc, buf,
                                                   LoadOwnershipQualifier::Take);
         arguments.push_back(arg);
-        if (zeroSILParameter.isGuaranteed()) {
+        if (zeroSILParameter.isGuaranteedInCaller()) {
           valuesToCleanup.push_back(arg);
         }
       }
@@ -621,22 +621,33 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result (if it is desired).
+  // TODO: Unify with VJP code below
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     SmallVector<SILValue, 8> differentialDirectResults;
     extractAllElements(ai, builder, differentialDirectResults);
     SmallVector<SILValue, 8> allResults;
     collectAllActualResultsInTypeOrder(ai, differentialDirectResults, allResults);
-    unsigned numResults = thunk->getConventions().getNumDirectSILResults() +
-     thunk->getConventions().getNumDirectSILResults();
     SmallVector<SILValue, 8> results;
-    for (unsigned idx : *actualConfig.resultIndices) {
-      if (idx >= numResults)
-        break;
 
-      auto result = allResults[idx];
-      if (desiredConfig.isWrtResult(idx))
-        results.push_back(result);
-      else {
+    unsigned firstSemanticParamResultIdx = origFnType->getNumResults();
+    for (unsigned resultIndex : *actualConfig.resultIndices) {
+      SILValue result;
+      if (resultIndex >= firstSemanticParamResultIdx) {
+        auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
+        result =
+          *std::next(ai->getAutoDiffSemanticResultArguments().begin(),
+                     semanticResultArgIdx);
+      } else
+        result = allResults[resultIndex];
+
+      // If result is desired:
+      // - Do nothing if result is indirect.
+      //   (It was already forwarded to the `apply` instruction).
+      // - Push it to `results` if result is direct.
+      if (desiredConfig.isWrtResult(resultIndex)) {
+        if (result->getType().isObject())
+          results.push_back(result);
+      } else { // Otherwise, cleanup the unused results.
         if (result->getType().isAddress())
           builder.emitDestroyAddrAndFold(loc, result);
         else
@@ -715,7 +726,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = fb.getModule();
-  auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+  auto lookupConformance = LookUpConformanceInModule();
 
   // Compute target type for thunking.
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
@@ -725,7 +736,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType =
-        caller->mapTypeIntoContext(targetType->mapTypeOutOfContext())
+        caller->mapTypeIntoEnvironment(targetType->mapTypeOutOfEnvironment())
             ->getCanonicalType();
     targetType = SILType::getPrimitiveObjectType(substTargetType)
                      .castTo<SILFunctionType>();
@@ -757,17 +768,17 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                    ->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(adContext.getASTContext());
   auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
-      origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
+      origName, targetType->mapTypeOutOfEnvironment()->getCanonicalType(),
       kind, actualConfig.parameterIndices, actualConfig.resultIndices,
       desiredConfig.parameterIndices);
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
-      ProfileCounter(), IsThunk, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible);
+      loc, thunkName, thunkType, IsBare, IsTransparent,
+      caller->getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible);
 
   if (!thunk->empty())
     return {thunk, interfaceSubs};
@@ -795,7 +806,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
     assocRef = builder.createWitnessMethod(
         loc, assocMethodInst->getLookupType(),
         assocMethodInst->getConformance(), assocMethodInst->getMember(),
-        thunk->mapTypeIntoContext(assocMethodInst->getType()));
+        thunk->mapTypeIntoEnvironment(assocMethodInst->getType()));
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<ClassMethodInst>(
                      derivativeFn)) {
@@ -806,7 +817,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
 #endif
     assocRef = builder.createClassMethod(
         loc, classOperand, assocMethodInst->getMember(),
-        thunk->mapTypeIntoContext(assocMethodInst->getType()));
+        thunk->mapTypeIntoEnvironment(assocMethodInst->getType()));
   } else if (auto *diffWitFn = peerThroughFunctionConversions<
                  DifferentiabilityWitnessFunctionInst>(derivativeFn)) {
     assocRef = builder.createDifferentiabilityWitnessFunction(

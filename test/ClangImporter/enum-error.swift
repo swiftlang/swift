@@ -14,7 +14,7 @@
 // RUN: echo '#include "enum-error.h"' > %t.m
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
 // RUN: %FileCheck -check-prefix=HEADER %s < %t.txt
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h --skip-private-stdlib-decls -skip-underscored-stdlib-protocols --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t2.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/enum-error.h -import-objc-header %S/Inputs/enum-error.h --skip-private-system-decls -skip-underscored-system-protocols --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t2.txt
 // RUN: %FileCheck -check-prefix=HEADER-NO-PRIVATE %s < %t2.txt
 
 import Foundation
@@ -118,7 +118,7 @@ func testError() {
 
 #if ERRORS
 class ObjCTest {
-  @objc func foo() -> TestError {} // expected-error {{method cannot be marked @objc because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
+  @objc func foo() -> TestError {} // expected-error {{method cannot be marked '@objc' because its result type cannot be represented in Objective-C}} expected-note {{Swift structs cannot be represented in Objective-C}}
   @objc func bar() -> TestError.Code {} // okay
 }
 #endif

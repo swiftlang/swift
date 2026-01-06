@@ -61,20 +61,20 @@ func consume<Input, Output>(derived: MyWeakMutableInstanceMethodBox<Input,  Outp
 }
 
 func doit() {
-    // CHECK: [[SUPERCLASS_METADATA_INT_BOOL_ADDRESS:[0-9a-f]+]] WeakMutableInstanceMethodBox<Int, Bool> @ 65
+    // CHECK: [[SUPERCLASS_METADATA_INT_BOOL_ADDRESS:[0-9a-f]+]] WeakMutableInstanceMethodBox<Int, Bool> @ [[@LINE+1]]
     consume(WeakMutableInstanceMethodBox<Int, Bool>())
-    // CHECK: [[SUPERCLASS_METADATA_INT_BOOL_ADDRESS]] WeakMutableInstanceMethodBox<Int, Bool> @ 67
+    // CHECK: [[SUPERCLASS_METADATA_INT_BOOL_ADDRESS]] WeakMutableInstanceMethodBox<Int, Bool> @ [[@LINE+1]]
     consume(base: WeakMutableInstanceMethodBox<Int, Bool>())
-    // CHECK: [[SUPERCLASS_METADATA_DOUBLE_FLOAT_ADDRESS:[0-9a-f]+]] WeakMutableInstanceMethodBox<Double, Float> @ 69
+    // CHECK: [[SUPERCLASS_METADATA_DOUBLE_FLOAT_ADDRESS:[0-9a-f]+]] WeakMutableInstanceMethodBox<Double, Float> @ [[@LINE+1]]
     consume(WeakMutableInstanceMethodBox<Double, Float>())
-    // CHECK: [[SUPERCLASS_METADATA_DOUBLE_FLOAT_ADDRESS]] WeakMutableInstanceMethodBox<Double, Float> @ 71
+    // CHECK: [[SUPERCLASS_METADATA_DOUBLE_FLOAT_ADDRESS]] WeakMutableInstanceMethodBox<Double, Float> @ [[@LINE+1]]
     consume(base: WeakMutableInstanceMethodBox<Double, Float>())
 
-    // CHECK: [[SUBCLASS_METADATA_INT_BOOL_ADDRESS:[0-9a-f]+]] MyWeakMutableInstanceMethodBox<Int, Bool> @ 74
+    // CHECK: [[SUBCLASS_METADATA_INT_BOOL_ADDRESS:[0-9a-f]+]] MyWeakMutableInstanceMethodBox<Int, Bool> @ [[@LINE+1]]
     consume(MyWeakMutableInstanceMethodBox<Int, Bool>())
-    // CHECK: [[SUPERCLASS_METADATA_INT_BOOL_ADDRESS]] MyWeakMutableInstanceMethodBox<Int, Bool> @ 76
+    // CHECK: [[SUPERCLASS_METADATA_INT_BOOL_ADDRESS]] MyWeakMutableInstanceMethodBox<Int, Bool> @ [[@LINE+1]]
     consume(base: MyWeakMutableInstanceMethodBox<Int, Bool>())
-    // CHECK: [[SUBCLASS_METADATA_INT_BOOL_ADDRESS]] MyWeakMutableInstanceMethodBox<Int, Bool> @ 78
+    // CHECK: [[SUBCLASS_METADATA_INT_BOOL_ADDRESS]] MyWeakMutableInstanceMethodBox<Int, Bool> @ [[@LINE+1]]
     consume(derived: MyWeakMutableInstanceMethodBox<Int, Bool>())
 
     // CHECK: [[SUBCLASS_METADATA_DOUBLE_FLOAT_ADDRESS:[0-9a-f]+]] MyWeakMutableInstanceMethodBox<Double, Float>

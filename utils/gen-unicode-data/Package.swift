@@ -25,6 +25,18 @@ let package = Package(
     .executableTarget(
       name: "GenWordBreak",
       dependencies: ["GenUtils"]
+    ),
+    .executableTarget(
+      name: "GenCaseFolding",
+      dependencies: ["GenUtils"]
+    ),
+    .executableTarget(
+      name: "GenScripts",
+      dependencies: ["GenUtils"]
+    ),
+    .executableTarget(
+      name: "GenEmoji",
+      dependencies: ["GenUtils"]
     )
   ]
 )

@@ -114,12 +114,12 @@ static inline void _swift_win32_withDbgHelpLibrary(
 /// their old value before returning. \a body can also call \c SymSetOptions()
 /// if needed.
 template <
-  typename F,
-  typename R = typename std::result_of_t<F&(HANDLE /*hProcess*/)>,
-  typename = typename std::enable_if_t<!std::is_same<void, R>::value>
+  typename Callable,
+  typename ResultType = std::invoke_result_t<Callable&, HANDLE>,
+  typename = std::enable_if_t<!std::is_same_v<void, ResultType>>
 >
-static inline R _swift_win32_withDbgHelpLibrary(const F& body) {
-  R result;
+static inline ResultType _swift_win32_withDbgHelpLibrary(const Callable& body) {
+  ResultType result;
 
   _swift_win32_withDbgHelpLibrary([&body, &result] (HANDLE hProcess) {
     result = body(hProcess);

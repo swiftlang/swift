@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name downcast_reabstraction %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name downcast_reabstraction %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s22downcast_reabstraction19condFunctionFromAnyyyypF
 // CHECK:         checked_cast_addr_br take_always Any in [[IN:%.*]] : $*Any to () -> () in [[OUT:%.*]] : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]

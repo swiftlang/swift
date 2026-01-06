@@ -1,15 +1,15 @@
 // RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
-// CHECK: begin running test 1 of {{[^,]+}} on last_uses_merge_points: dump-function
+// CHECK: begin running test 1 of {{[^,]+}} on last_uses_merge_points: dump_function
 // CHECK: [[REGISTER_3:%[^,]+]] = tuple ()
 // CHECK: return [[REGISTER_3]]
-// CHECK: end running test 1 of {{[^,]+}} on last_uses_merge_points: dump-function
+// CHECK: end running test 1 of {{[^,]+}} on last_uses_merge_points: dump_function
 // CHECK: begin running test 2 of {{[^,]+}} on last_uses_merge_points: pruned_liveness_boundary_with_list_of_last_users_insertion_points
 // CHECK: [[REGISTER_3]] = tuple ()
 // CHECK: end running test 2 of {{[^,]+}} on last_uses_merge_points: pruned_liveness_boundary_with_list_of_last_users_insertion_points
 sil [ossa] @last_uses_merge_points : $@convention(thin) () -> () {
 entry:
-  specify_test "dump-function"
+  specify_test "dump_function"
   specify_test "pruned_liveness_boundary_with_list_of_last_users_insertion_points @block[1].instruction[0] @block[2].instruction[0]"
   cond_br undef, left, right
 left:

@@ -51,13 +51,13 @@ func twoFns(_ f: (Int) -> Int, _ g: @escaping (Int) -> Int) {
   takesAny(f) // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}
   takesAny(g)
   var h = g
-  h = f // expected-error {{assigning non-escaping parameter 'f' to an @escaping closure}}
+  h = f // expected-error {{assigning non-escaping parameter 'f' to an '@escaping' closure}}
 }
 
 takesAny(consumeNoEscape)
 takesAny(consumeEscaping)
 
-var noEscapeParam: ((Int) -> Int) -> () = consumeNoEscape // expected-note {{add explicit @escaping to function parameter}}{{21-21=@escaping }}
+var noEscapeParam: ((Int) -> Int) -> () = consumeNoEscape // expected-note {{add explicit '@escaping' to function parameter}}{{21-21=@escaping }}
 var escapingParam: (@escaping (Int) -> Int) -> () = consumeEscaping
 noEscapeParam = escapingParam // expected-error {{cannot assign value of type '(@escaping (Int) -> Int) -> ()' to type '((Int) -> Int) -> ()'}}
 // expected-note@-1{{parameter #0 expects escaping value of type '(Int) -> Int'}}
@@ -67,7 +67,7 @@ noEscapeParam = takesAny // expected-error {{converting non-escaping value to 'A
 
 // rdar://problem/59773317 - Improve type error message when returning (or escaping) a function-typed value as an optional of that type
 func rdar_59773317(x: () -> Int) -> (() -> Int)? { // expected-note {{parameter 'x' is implicitly non-escaping}}
-  return x // expected-error {{using non-escaping parameter 'x' in a context expecting an @escaping closure}}
+  return x // expected-error {{using non-escaping parameter 'x' in a context expecting an '@escaping' closure}}
 }
 
 // rdar://problem/59703585 - Wrong error message when signature of a C function type and Swift implementation mismatch
@@ -79,7 +79,7 @@ func rdar_59703585() {
   var cb: Fn? = nil
 
   cb = swiftCallback
-  // expected-error@-1 {{cannot assign value of type '(UnsafePointer<Int8>, UnsafeMutableRawPointer?) -> ()' to type 'Fn?' (aka 'Optional<@convention(c) (Optional<UnsafePointer<Int8>>, Optional<UnsafeMutableRawPointer>) -> ()>')}}
+  // expected-error@-1 {{cannot assign value of type '(UnsafePointer<Int8>, UnsafeMutableRawPointer?) -> ()' to type 'Fn' (aka '@convention(c) (Optional<UnsafePointer<Int8>>, Optional<UnsafeMutableRawPointer>) -> ()')}}
 }
 
 // https://github.com/apple/swift/issues/57216

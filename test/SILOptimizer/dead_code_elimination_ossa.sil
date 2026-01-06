@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -dce %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -dce %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -12,15 +12,29 @@ public struct S {
 typealias Int1 = Builtin.Int1
 
 class C {}
+class D: C {}
+
+sil @getC : $@convention(thin) () -> @owned C
+sil @barrier : $@convention(thin) () -> ()
+sil @initC : $@convention(thin) (Builtin.Word) -> (@owned C, Builtin.RawPointer)
+sil [readnone] @finalC : $@convention(thin) (@owned C) -> @owned C
 
 struct CAndBit {
     var c: C
     var bit: Int1
 }
 
-@_moveOnly
-struct MO {
-    deinit
+struct Bool {
+  var _value: Builtin.Int1
+}
+
+struct MO: ~Copyable {
+  var x: Int
+  deinit
+}
+
+struct Outer : ~Copyable {
+  var x: MO
 }
 
 sil @dummy : $@convention(thin) () -> ()
@@ -277,11 +291,10 @@ bb3:
   br bb1
 }
 
-// Check that DCE eliminates dead access instructions.
+// Dead accesses must not be removed
 // CHECK-LABEL: sil [ossa] @dead_access :
-// CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK:         begin_access
+// CHECK:         begin_access
 // CHECK-LABEL: } // end sil function 'dead_access'
 sil [ossa] @dead_access : $@convention(thin) (@in Container) -> () {
 bb0(%0 : $*Container):
@@ -298,7 +311,8 @@ bb0(%0 : $*Container):
 // CHECK-LABEL: sil [ossa] @nested_destructure_tuple :
 // CHECK:      bb0(%0 : @owned $(String, (Int, Int, String))):
 // CHECK-NEXT:   (%1, %2) = destructure_tuple %0 : $(String, (Int, Int, String))
-// CHECK-NEXT:   destroy_value %2
+// CHECK-NEXT:   (%3, %4, %5) = destructure_tuple %2
+// CHECK-NEXT:   destroy_value %5
 // CHECK-NEXT:   return %1
 // CHECK:      } // end sil function 'nested_destructure_tuple'
 sil [ossa] @nested_destructure_tuple : $@convention(thin) (@owned (String, (Int, Int, String))) -> @owned String {
@@ -433,12 +447,8 @@ bb0(%0 : @owned $MO):
   return %63 : $()
 }
 
-// The InstructionDeleter will delete the `load [take]` and insert a
-// `destroy_addr`.  Observe the creation of the new destroy_addr instruction
-// that occurs when deleting the `load [take]` and mark it live.  Prevents a
-// leak.
 // CHECK-LABEL: sil [ossa] @keep_new_destroy_addr : {{.*}} {
-// CHECK:         destroy_addr
+// CHECK:         load [take]
 // CHECK-LABEL: } // end sil function 'keep_new_destroy_addr'
 sil [ossa] @keep_new_destroy_addr : $@convention(thin) () -> () {
 bb0:
@@ -468,3 +478,89 @@ bb3:
   %22 = tuple ()
   return %22 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_delete_move_value_lexical : {{.*}} {
+// CHECK:         [[LEXICAL:%[^,]+]] = move_value [lexical]
+// CHECK:         [[DUMMY:%[^,]+]] = function_ref @dummy
+// CHECK:         apply [[DUMMY]]()
+// CHECK:         destroy_value [[LEXICAL]]
+// CHECK-LABEL: } // end sil function 'dont_delete_move_value_lexical'
+sil [ossa] @dont_delete_move_value_lexical : $@convention(thin) () -> () {
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %c = apply %getC() : $@convention(thin) () -> @owned C
+  %m = move_value [lexical] %c : $C
+  %dummy = function_ref @dummy : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  destroy_value %m : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_addr_end_lifetime :
+// CHECK:         end_lifetime
+// CHECK-LABEL: } // end sil function 'dont_remove_addr_end_lifetime'
+sil [ossa] @dont_remove_addr_end_lifetime : $@convention(thin) (@owned Outer) -> () {
+bb0(%0 : @owned $Outer):
+  %1 = alloc_stack $Outer
+  store %0 to [init] %1 : $*Outer 
+  %3 = struct_element_addr %1 : $*Outer, #Outer.x
+  end_lifetime %3 : $*MO
+  dealloc_stack %1 : $*Outer
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_lifetime_end_of_escaping_value
+// CHECK:         [[FINALIZE:%[^,]+]] = function_ref @finalC
+// CHECK:         apply [[FINALIZE]]
+// CHECK-LABEL: } // end sil function 'dont_remove_lifetime_end_of_escaping_value'
+sil [ossa] @dont_remove_lifetime_end_of_escaping_value : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = function_ref @initC : $@convention(thin) (Builtin.Word) -> (@owned C, Builtin.RawPointer)
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Word) -> (@owned C, Builtin.RawPointer)
+  (%4, %5) = destructure_tuple %3
+  %6 = mark_dependence %5 on %4
+  %7 = pointer_to_address %6 to [strict] $*Bool
+  store %0 to [trivial] %7
+  br bb1
+
+bb1:
+  %13 = function_ref @finalC : $@convention(thin) (@owned C) -> @owned C
+  %14 = apply %13(%4) : $@convention(thin) (@owned C) -> @owned C
+  destroy_value %14
+  br bb2
+
+bb2:
+  %17 = tuple ()
+  return %17
+}
+
+// CHECK-LABEL: sil [ossa] @dont_insert_destroy_for_uninitialized_object :
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dont_insert_destroy_for_uninitialized_object'
+sil [ossa] @dont_insert_destroy_for_uninitialized_object : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $D      // D might not be initialized due to dead-end loop -> will lead to crash if it is destroyed here
+  %1 = upcast %0 to $C
+  br bb1
+
+bb1:
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_insert_arg_destroy_for_uninitialized_object :
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'dont_insert_arg_destroy_for_uninitialized_object'
+sil [ossa] @dont_insert_arg_destroy_for_uninitialized_object : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $D      // D might not be initialized due to dead-end loop -> will lead to crash if it is destroyed here
+  br bb1(%0)
+
+bb1(%2 : @owned $D):
+  br bb2
+
+bb2:
+  br bb2
+}
+

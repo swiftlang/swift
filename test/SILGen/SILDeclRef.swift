@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil %s | %FileCheck %s
-// RUN: %target-swift-emit-sil %s | %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s | %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all -module-name="SILDeclRef"  - | %FileCheck %s
 
 // Check that all SILDeclRefs are represented in the text form with a signature.
 // This allows to avoid ambiguities which sometimes arise e.g. when a

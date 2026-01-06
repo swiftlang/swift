@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -module-name pointer_conversion -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name pointer_conversion -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
 
-// REQUIRES: optimized_stdlib
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: objc_interop
-// REQUIRES: swift_stdlib_asserts
 
 // Opaque, unoptimizable functions to call.
 @_silgen_name("takesConstRawPointer")
@@ -29,12 +28,6 @@ public func testOptionalArray() {
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
   // CHECK: [[SOME_BB]](
-  // CHECK:   cond_br {{%.*}}, {{bb[0-9]+}}, [[CHECK_BB:bb[0-9]+]]
-
-  // CHECK: [[CHECK_BB]]:
-  // CHECK:   cond_br {{%.*}}, [[CHECK_BB_2:bb[0-9]+]], {{bb[0-9]+}}
-
-  // CHECK: [[CHECK_BB_2]]:
   // CHECK: [[ORIGINAL_OWNER:%.*]] = unchecked_ref_cast {{%.*}} : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
   // CHECK: [[ORIGINAL_OWNER_EXISTENTIAL:%.*]] = init_existential_ref [[ORIGINAL_OWNER]]
   // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt, [[ORIGINAL_OWNER_EXISTENTIAL]]

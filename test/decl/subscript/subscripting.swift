@@ -226,7 +226,7 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{missing return in subscript expected to return 'Int'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int {
@@ -320,7 +320,7 @@ struct MutableComputedGetter {
 struct MutableSubscriptInGetter {
   var value: Int
   subscript(index: Int) -> Int {
-    get { // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+    get { // expected-note {{mark getter 'mutating' to make 'self' mutable}}
       value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
       return 5
     }

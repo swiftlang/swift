@@ -1,4 +1,4 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.9
 
 import PackageDescription
 import Foundation
@@ -127,9 +127,8 @@ targets.append(
     dependencies: swiftBenchDeps,
     path: "utils",
     sources: ["main.swift"],
-    swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-experimental-cxx-interop",
-                                  "-I",
+    swiftSettings: [.interoperabilityMode(.Cxx),
+                    .unsafeFlags(["-I",
                                   "utils/CxxTests"])]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -166,9 +165,8 @@ targets += cxxSingleSourceLibraries.map { name in
     dependencies: singleSourceDeps,
     path: "cxx-source",
     sources: ["\(name).swift"],
-    swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-experimental-cxx-interop",
-                                  "-I",
+    swiftSettings: [.interoperabilityMode(.Cxx),
+                    .unsafeFlags(["-I",
                                   "utils/CxxTests",
                                   // FIXME: https://github.com/apple/swift/issues/61453
                                   "-Xfrontend", "-validate-tbd-against-ir=none"])])
@@ -180,16 +178,22 @@ targets += multiSourceLibraries.map { lib in
     dependencies: [
       .target(name: "TestsUtils")
     ],
-    path: lib.parentSubDir)
+    path: "\(lib.parentSubDir)/\(lib.name)")
 }
 
 //===---
 // Top Level Definition
 //
 
-let p = Package(
+var p = Package(
   name: "swiftbench",
   products: products,
   targets: targets,
-  swiftLanguageVersions: [.v4]
+  swiftLanguageVersions: [.v4],
+  cxxLanguageStandard: .cxx20
 )
+
+// Let's build for Swift 5.5-aligned runtimes.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+p.platforms = [.macOS(.v12), .iOS(.v15), .watchOS(.v8), .tvOS(.v15)]
+#endif

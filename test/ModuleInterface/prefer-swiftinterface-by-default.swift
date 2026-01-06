@@ -78,8 +78,7 @@ import SDKModuleAtUnusualPath
 import HostResourceDirModule // expected-remark {{rebuilding module 'HostResourceDirModule' from interface}}
 // expected-note @-1 {{was ignored because it's a compiler host module}}
 import LocalModule
-import BlocklistedModule // expected-remark {{rebuilding module 'BlocklistedModule' from interface}}
-// expected-note @-1 {{was ignored because it belongs to a framework in the SDK}}
+import BlocklistedModule
 
 //--- blocklistDisabled.yml
 ---

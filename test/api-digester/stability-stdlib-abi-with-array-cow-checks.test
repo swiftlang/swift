@@ -58,8 +58,8 @@
 
 // Note: normally you'll need to add new entries to
 // `stability-stdlib-abi-without-asserts.test`, not this file.
-Func _COWChecksEnabled() is a new API without @available attribute
-Func _swift_isImmutableCOWBuffer(_:) is a new API without @available attribute
-Func _swift_setImmutableCOWBuffer(_:_:) is a new API without @available attribute
+Func _COWChecksEnabled() is a new API without '@available'
+Func _swift_isImmutableCOWBuffer(_:) is a new API without '@available'
+Func _swift_setImmutableCOWBuffer(_:_:) is a new API without '@available'
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

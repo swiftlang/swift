@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-variable-name-inference"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/Test.h"
@@ -259,7 +260,7 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
     }
 
     TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
-      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+      if (isa<StoreBorrowInst>(use->getUser()))
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }
@@ -280,8 +281,11 @@ SILValue VariableNameInferrer::getRootValueForTemporaryAllocation(
 
 SILValue
 VariableNameInferrer::findDebugInfoProvidingValue(SILValue searchValue) {
+  // NOTE: This should only return a non-empty SILValue if we actually have a
+  // full path (including base name) in the variable name path.
   if (!searchValue)
     return SILValue();
+
   LLVM_DEBUG(llvm::dbgs() << "Searching for debug info providing value for: "
                           << searchValue);
   ValueSet valueSet(searchValue->getFunction());
@@ -320,6 +324,33 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
   return SILValue();
 }
 
+static BeginBorrowInst *hasOnlyBorrowingNonDestroyUse(SILValue searchValue) {
+  BeginBorrowInst *result = nullptr;
+  for (auto *use : searchValue->getUses()) {
+    if (isIncidentalUse(use->getUser()))
+      continue;
+    if (use->isConsuming()) {
+      if (!isa<DestroyValueInst>(use->getUser()))
+        return nullptr;
+      continue;
+    }
+
+    auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser());
+    if (!bbi || !bbi->isFromVarDecl())
+      return nullptr;
+    if (result)
+      return nullptr;
+    result = bbi;
+  }
+  return result;
+}
+
+namespace {
+
+constexpr StringLiteral UnknownDeclString = "<unknown decl>";
+
+} // namespace
+
 SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
@@ -334,6 +365,56 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       return SILValue();
 
     LLVM_DEBUG(llvm::dbgs() << "Value: " << *searchValue);
+
+    // Before we do anything, lets see if we have an explicit match due to a
+    // debug_value use.
+    if (auto *use = getAnyDebugUse(searchValue)) {
+      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
+        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+        variableNamePath.push_back(debugVar.getName());
+
+        // We return the value, not the debug_info.
+        return searchValue;
+      }
+    }
+
+    // If we are in Ownership SSA, see if we have an owned value that has one
+    // use, a move_value [var decl]. In such a case, check the move_value [var
+    // decl] for a debug_value.
+    //
+    // This pattern comes up if we are asked to get a name for an apply that is
+    // used to initialize a value. The name will not yet be associated with the
+    // value so we have to compensate.
+    //
+    // NOTE: This is a heuristic. Feel free to tweak accordingly.
+    if (auto *singleUse = searchValue->getSingleUse()) {
+      if (auto *mvi = dyn_cast<MoveValueInst>(singleUse->getUser())) {
+        if (mvi->isFromVarDecl()) {
+          if (auto *debugUse = getAnyDebugUse(mvi)) {
+            if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
+              assert(debugVar.getKind() ==
+                     DebugVarCarryingInst::Kind::DebugValue);
+              variableNamePath.push_back(debugVar.getName());
+
+              // We return the value, not the debug_info.
+              return searchValue;
+            }
+          }
+        }
+      }
+    }
+
+    if (auto *bbi = hasOnlyBorrowingNonDestroyUse(searchValue)) {
+      if (auto *debugUse = getAnyDebugUse(bbi)) {
+        if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
+          assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
+          variableNamePath.push_back(debugVar.getName());
+
+          // We return the value, not the debug_info.
+          return searchValue;
+        }
+      }
+    }
 
     if (auto *allocInst = dyn_cast<AllocationInst>(searchValue)) {
       // If the instruction itself doesn't carry any variable info, see
@@ -354,8 +435,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         return SILValue();
       }
 
-      variableNamePath.push_back(allocInst);
+      variableNamePath.push_back(DebugVarCarryingInst(allocInst).getName());
       return allocInst;
+    }
+
+    if (auto *abi = dyn_cast<AllocBoxInst>(searchValue)) {
+      variableNamePath.push_back(DebugVarCarryingInst(abi).getName());
+      return abi;
     }
 
     // If we have a store_borrow, always look at the dest. We are going to see
@@ -366,7 +452,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
-      variableNamePath.push_back(globalAddrInst);
+      variableNamePath.push_back(VarDeclCarryingInst(globalAddrInst).getName());
       return globalAddrInst;
     }
 
@@ -376,44 +462,44 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(rei);
+      variableNamePath.push_back(VarDeclCarryingInst(rei).getName());
       searchValue = rei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructExtractInst>(searchValue)) {
-      variableNamePath.push_back(sei);
+      variableNamePath.push_back(getNameFromDecl(sei->getField()));
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(searchValue)) {
-      variableNamePath.push_back(uedi);
+      variableNamePath.push_back(getNameFromDecl(uedi->getElement()));
       searchValue = uedi->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleExtractInst>(searchValue)) {
-      variableNamePath.push_back(tei);
+      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
       searchValue = tei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(sei);
+      variableNamePath.push_back(getNameFromDecl(sei->getField()));
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(tei);
+      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
       searchValue = tei->getOperand();
       continue;
     }
 
-    if (auto *e = dyn_cast<UncheckedTakeEnumDataAddrInst>(searchValue)) {
-      variableNamePath.push_back(e);
-      searchValue = e->getOperand();
+    if (auto *utedai = dyn_cast<UncheckedTakeEnumDataAddrInst>(searchValue)) {
+      variableNamePath.push_back(getNameFromDecl(utedai->getElement()));
+      searchValue = utedai->getOperand();
       continue;
     }
 
@@ -422,7 +508,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     // them and add the case to the variableNamePath.
     if (auto *e = dyn_cast<EnumInst>(searchValue)) {
       if (e->hasOperand()) {
-        variableNamePath.push_back(e);
+        variableNamePath.push_back(getNameFromDecl(e->getElement()));
         searchValue = e->getOperand();
         continue;
       }
@@ -430,23 +516,24 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
     if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
             searchValue->getDefiningInstruction())) {
-      // Append searchValue, so we can find the specific tuple index.
-      variableNamePath.push_back(searchValue);
+      variableNamePath.push_back(
+          getStringRefForIndex(*dti->getIndexOfResult(searchValue)));
       searchValue = dti->getOperand();
       continue;
     }
 
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
             searchValue->getDefiningInstruction())) {
-      // Append searchValue, so we can find the specific struct field.
-      variableNamePath.push_back(searchValue);
+      unsigned index = *dsi->getIndexOfResult(searchValue);
+      variableNamePath.push_back(
+          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]));
       searchValue = dsi->getOperand();
       continue;
     }
 
     if (auto *fArg = dyn_cast<SILFunctionArgument>(searchValue)) {
-      if (fArg->getDecl()) {
-        variableNamePath.push_back({fArg});
+      if (auto *decl = fArg->getDecl()) {
+        variableNamePath.push_back(decl->getBaseName().userFacingName());
         return fArg;
       }
     }
@@ -474,15 +561,19 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
     auto getNamePathComponentFromCallee = [&](FullApplySite call) -> SILValue {
       // Use the name of the property being accessed if we can get to it.
-      if (isa<FunctionRefBaseInst>(call.getCallee()) ||
-          isa<MethodInst>(call.getCallee())) {
-        if (call.getSubstCalleeType()->hasSelfParam()) {
-          variableNamePath.push_back(
-              call.getCallee()->getDefiningInstruction());
-          return call.getSelfArgument();
+      if (call.getSubstCalleeType()->hasSelfParam()) {
+        if (auto *f = dyn_cast<FunctionRefBaseInst>(call.getCallee())) {
+          if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
+            variableNamePath.push_back(getNameFromDecl(dc->getAsDecl()));
+            return call.getSelfArgument();
+          }
         }
 
-        return SILValue();
+        if (auto *mi = dyn_cast<MethodInst>(call.getCallee())) {
+          variableNamePath.push_back(
+              getNameFromDecl(mi->getMember().getDecl()));
+          return call.getSelfArgument();
+        }
       }
 
       return SILValue();
@@ -504,6 +595,17 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
             searchValue = selfParam;
             continue;
           }
+        }
+      }
+    }
+
+    // Borrow/mutate accessor
+    if (searchValue->isBorrowAccessorResult()) {
+      if (auto fas =
+              FullApplySite::isa(searchValue->getDefiningInstruction())) {
+        if (auto selfParam = getNamePathComponentFromCallee(fas)) {
+          searchValue = selfParam;
+          continue;
         }
       }
     }
@@ -543,30 +645,23 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
-    // If we do not do an exact match, see if we can find a debug_var inst. If
-    // we do, we always break since we have a root value.
-    if (auto *use = getAnyDebugUse(searchValue)) {
-      if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
-        assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(use->getUser());
-
-        // We return the value, not the debug_info.
-        return searchValue;
-      }
-    }
-
     // Otherwise, try to see if we have a single value instruction we can look
     // through.
     if (isa<BeginBorrowInst>(searchValue) || isa<LoadInst>(searchValue) ||
         isa<LoadBorrowInst>(searchValue) || isa<BeginAccessInst>(searchValue) ||
         isa<MarkUnresolvedNonCopyableValueInst>(searchValue) ||
         isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue) ||
+        isa<ExplicitCopyValueInst>(searchValue) ||
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
+        isa<MarkDependenceInst>(searchValue) ||
         isa<CopyableToMoveOnlyWrapperAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableAddrInst>(searchValue) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(searchValue) ||
-        isa<CopyableToMoveOnlyWrapperValueInst>(searchValue)) {
+        isa<CopyableToMoveOnlyWrapperValueInst>(searchValue) ||
+        isa<EndInitLetRefInst>(searchValue) ||
+        isa<ConvertEscapeToNoEscapeInst>(searchValue) ||
+        isa<ConvertFunctionInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
@@ -577,7 +672,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
   }
 }
 
-static StringRef getNameFromDecl(Decl *d) {
+StringRef VariableNameInferrer::getNameFromDecl(Decl *d) {
   if (d) {
     if (auto accessor = dyn_cast<AccessorDecl>(d)) {
       return accessor->getStorage()->getBaseName().userFacingName();
@@ -587,101 +682,7 @@ static StringRef getNameFromDecl(Decl *d) {
     }
   }
 
-  return "<unknown decl>";
-}
-
-void VariableNameInferrer::popSingleVariableName() {
-  auto next = variableNamePath.pop_back_val();
-
-  if (auto *inst = next.dyn_cast<SILInstruction *>()) {
-    if (auto i = DebugVarCarryingInst(inst)) {
-      resultingString += i.getName();
-      return;
-    }
-
-    if (auto i = VarDeclCarryingInst(inst)) {
-      resultingString += i.getName();
-      return;
-    }
-
-    if (auto f = dyn_cast<FunctionRefBaseInst>(inst)) {
-      if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
-        resultingString += getNameFromDecl(dc->getAsDecl());
-        return;
-      }
-
-      resultingString += "<unknown decl>";
-      return;
-    }
-
-    if (auto m = dyn_cast<MethodInst>(inst)) {
-      resultingString += getNameFromDecl(m->getMember().getDecl());
-      return;
-    }
-
-    if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
-      resultingString += getNameFromDecl(sei->getField());
-      return;
-    }
-
-    if (auto *tei = dyn_cast<TupleExtractInst>(inst)) {
-      llvm::raw_svector_ostream stream(resultingString);
-      stream << tei->getFieldIndex();
-      return;
-    }
-
-    if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
-      resultingString += getNameFromDecl(uedi->getElement());
-      return;
-    }
-
-    if (auto *sei = dyn_cast<StructElementAddrInst>(inst)) {
-      resultingString += getNameFromDecl(sei->getField());
-      return;
-    }
-
-    if (auto *tei = dyn_cast<TupleElementAddrInst>(inst)) {
-      llvm::raw_svector_ostream stream(resultingString);
-      stream << tei->getFieldIndex();
-      return;
-    }
-
-    if (auto *uedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
-      resultingString += getNameFromDecl(uedi->getElement());
-      return;
-    }
-
-    if (auto *ei = dyn_cast<EnumInst>(inst)) {
-      resultingString += getNameFromDecl(ei->getElement());
-      return;
-    }
-
-    resultingString += "<unknown decl>";
-    return;
-  }
-
-  auto value = next.get<SILValue>();
-  if (auto *fArg = dyn_cast<SILFunctionArgument>(value)) {
-    resultingString += fArg->getDecl()->getBaseName().userFacingName();
-    return;
-  }
-
-  if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
-          value->getDefiningInstruction())) {
-    llvm::raw_svector_ostream stream(resultingString);
-    stream << *dti->getIndexOfResult(value);
-    return;
-  }
-
-  if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
-          value->getDefiningInstruction())) {
-    unsigned index = *dsi->getIndexOfResult(value);
-    resultingString +=
-        getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]);
-    return;
-  }
-
-  resultingString += "<unknown decl>";
+  return UnknownDeclString;
 }
 
 void VariableNameInferrer::drainVariableNamePath() {
@@ -690,13 +691,41 @@ void VariableNameInferrer::drainVariableNamePath() {
 
   // Walk backwards, constructing our string.
   while (true) {
-    popSingleVariableName();
+    resultingString += variableNamePath.pop_back_val();
 
     if (variableNamePath.empty())
       return;
 
     resultingString += '.';
   }
+}
+
+std::optional<Identifier> VariableNameInferrer::inferName(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  if (!inferrer.inferByWalkingUsesToDefsReturningRoot(value))
+    return {};
+  return fn->getASTContext().getIdentifier(resultingName);
+}
+
+std::optional<std::pair<Identifier, SILValue>>
+VariableNameInferrer::inferNameAndRoot(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  SILValue rootValue = inferrer.inferByWalkingUsesToDefsReturningRoot(value);
+  if (!rootValue)
+    return {};
+  return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
 }
 
 //===----------------------------------------------------------------------===//
@@ -711,7 +740,7 @@ namespace swift::test {
 // - The inferred name
 // - The inferred value.
 static FunctionTest VariableNameInferrerTests(
-    "variable-name-inference", [](auto &function, auto &arguments, auto &test) {
+    "variable_name_inference", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       SmallString<64> finalString;
       VariableNameInferrer::Options options;

@@ -30,6 +30,13 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
   return unsafeBitCast(result, to: T.self)
 }
 
+private func objcClass<T>(_ name: String) -> T? {
+  guard let result = objc_getClass(name) as? AnyClass else {
+    return nil
+  }
+  return unsafeBitCast(result, to: T.self)
+}
+
 enum Sym {
   static let pidFromHint: @convention(c) (AnyObject) -> pid_t =
     symbol(symbolicationHandle, "pidFromHint")
@@ -96,6 +103,16 @@ let kCSNow = CSMachineTime(Int64.max) + 1
 typealias CSSymbolicatorRef = CSTypeRef
 typealias CSSymbolRef = CSTypeRef
 typealias CSSymbolOwnerRef = CSTypeRef
+
+// Declare just enough of VMUProcInfo for our purposes. It does not actually
+// conform to this protocol, but ObjC protocol method dispatch is based entirely
+// around msgSend and the presence of the method on the class, not conformance.
+@objc protocol VMUProcInfo {
+  @objc(initWithTask:)
+  init(task: task_read_t)
+
+  var shouldAnalyzeWithCorpse: Bool { get }
+}
 
 func pidFromHint(_ hint: String) -> pid_t? {
   let result = Sym.pidFromHint(hint as NSString)
@@ -229,6 +246,10 @@ func machErrStr(_ kr: kern_return_t) -> String {
   let errStr = String(cString: mach_error_string(kr))
   let errHex = String(kr, radix: 16)
   return "\(errStr) (0x\(errHex))"
+}
+
+func getVMUProcInfoClass() -> VMUProcInfo.Type? {
+  return objcClass("VMUProcInfo")
 }
 
 #endif

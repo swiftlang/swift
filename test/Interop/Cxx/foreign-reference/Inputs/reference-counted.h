@@ -2,7 +2,10 @@
 #define TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_REFERENCE_COUNTED_H
 
 #include <stdlib.h>
+
+#ifdef __cplusplus
 #include <new>
+#endif
 
 #include "visibility.h"
 
@@ -10,11 +13,13 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 static int finalLocalRefCount = 100;
 
+#ifdef __cplusplus
+
 namespace NS {
 
 struct __attribute__((swift_attr("import_as_ref")))
 __attribute__((swift_attr("retain:LCRetain")))
-__attribute__((swift_attr("release:LCRelease"))) LocalCount {
+__attribute__((swift_attr("release:LCRelease"))) LocalCount final {
   int value = 0;
 
   static LocalCount *create() {
@@ -27,7 +32,10 @@ __attribute__((swift_attr("release:LCRelease"))) LocalCount {
 
 }
 
-inline void LCRetain(NS::LocalCount *x) { x->value++; }
+inline void LCRetain(NS::LocalCount *x) {
+  x->value++;
+  finalLocalRefCount = x->value;
+}
 inline void LCRelease(NS::LocalCount *x) {
   x->value--;
   finalLocalRefCount = x->value;
@@ -45,6 +53,60 @@ __attribute__((swift_attr("release:GCRelease"))) GlobalCount {
 
 inline void GCRetain(GlobalCount *x) { globalCount++; }
 inline void GCRelease(GlobalCount *x) { globalCount--; }
+
+struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:GCRetainNullableInit")))
+__attribute__((swift_attr("release:GCReleaseNullableInit")))
+GlobalCountNullableInit {
+  static GlobalCountNullableInit *_Nullable create(bool wantNullptr) {
+    if (wantNullptr)
+      return nullptr;
+    return new (malloc(sizeof(GlobalCountNullableInit)))
+        GlobalCountNullableInit();
+  }
+};
+
+inline void GCRetainNullableInit(GlobalCountNullableInit *x) { globalCount++; }
+inline void GCReleaseNullableInit(GlobalCountNullableInit *x) { globalCount--; }
+
+struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:RCRetain")))
+__attribute__((swift_attr("release:RCRelease"))) HasOpsReturningRefCount final {
+  int refCount = 0;
+
+  static HasOpsReturningRefCount *create() {
+    return new (malloc(sizeof(HasOpsReturningRefCount)))
+        HasOpsReturningRefCount();
+  }
+};
+
+inline unsigned RCRetain(HasOpsReturningRefCount *x) { return ++x->refCount; }
+inline unsigned RCRelease(HasOpsReturningRefCount *x) { return --x->refCount; }
+
+#endif
+
+typedef struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:INRetain")))
+__attribute__((swift_attr("release:INRelease"))) IncompleteImpl *Incomplete;
+
+typedef struct OpaqueRefImpl *OpaqueRef;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+Incomplete Incomplete_create(double weight) __attribute__((swift_attr("returns_retained"))) __attribute__((swift_name("IncompleteImpl.init(weight:)")));
+void INRetain(Incomplete i);
+void INRelease(Incomplete i);
+double Incomplete_getWeight(Incomplete i) __attribute__((swift_name("getter:IncompleteImpl.weight(self:)")));
+
+OpaqueRef Opaque_create(void);
+void OPRetain(OpaqueRef i);
+void OPRelease(OpaqueRef i);
+
+#ifdef __cplusplus
+}
+#endif
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

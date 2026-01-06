@@ -1,11 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/reasync.swiftmodule %S/Inputs/reasync.swift -enable-experimental-concurrency -disable-availability-checking
+// RUN: %target-swift-frontend -emit-module-path %t/reasync.swiftmodule %S/Inputs/reasync.swift -enable-experimental-concurrency -target %target-swift-5.1-abi-triple
 // RUN: %target-build-swift %s -I %t -o %t/main -module-name main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+
+// rdar://76038845
+// REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 import reasync

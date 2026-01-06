@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 //===--- Helper types used in this file.
 
@@ -82,6 +82,8 @@ func missingControllingExprInIf() {
   if { // expected-error {{missing condition in 'if' statement}}
   } // expected-error {{expected '{' after 'if' condition}}
   // expected-error@-2 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
+  // expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  // expected-error@-4 {{'if' must have an unconditional 'else' to be used as expression}}
 
   if // expected-error {{missing condition in 'if' statement}}
   {
@@ -145,17 +147,17 @@ func missingWhileInRepeat() {
 func acceptsClosure<T>(t: T) -> Bool { return true }
 
 func missingControllingExprInFor() {
-  for ; { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for ; { // expected-error {{C-style for statement was removed in Swift 3}}
   }
 
-  for ; // expected-error {{C-style for statement has been removed in Swift 3}}
+  for ; // expected-error {{C-style for statement was removed in Swift 3}}
   { 
   }
 
-  for ; true { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for ; true { // expected-error {{C-style for statement was removed in Swift 3}}
   }
 
-  for var i = 0; true { // expected-error {{C-style for statement has been removed in Swift 3}}
+  for var i = 0; true { // expected-error {{C-style for statement was removed in Swift 3}}
     i += 1
   }
 }
@@ -208,8 +210,10 @@ func missingControllingExprInForEach() {
 // The #if block is used to provide a scope for the for stmt to force it to end
 // where necessary to provoke the crash.
 #if true  // <rdar://problem/21679557> compiler crashes on "for{{"
-  // expected-error @+2 {{expected pattern}}
-  // expected-error @+1 {{expected Sequence expression for for-each loop}}
+  // expected-error @+4 {{expected pattern}}
+  // expected-error @+3 {{expected Sequence expression for for-each loop}}
+  // expected-error @+2 {{closure expression is unused}}
+  // expected-note @+1 {{did you mean to use a 'do' statement?}}
   for{{ // expected-note 2 {{to match this opening '{'}}
 #endif  // expected-error {{expected '}' at end of closure}} expected-error {{expected '}' at end of brace statement}}
 
@@ -239,6 +243,7 @@ func missingControllingExprInSwitch() {
 
   switch { // expected-error {{expected expression in 'switch' statement}}
   } // expected-error {{expected '{' after 'switch' subject expression}}
+  // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   switch // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
   {
@@ -543,17 +548,10 @@ func exprPostfix2() {
 
 //===--- Recovery for expr-super.
 
-class Base {}
-
-class ExprSuper1 {
+class ExprSuper {
   init() {
-    super // expected-error {{expected '.' or '[' after 'super'}}
-  }
-}
-
-class ExprSuper2 {
-  init() {
-    super. // expected-error {{expected member name following '.'}} 
+    super. // expected-error {{expected member name following '.'}}
+    // expected-error@-1 {{'super' cannot be used in class 'ExprSuper' because it has no superclass}}
   }
 }
 
@@ -623,6 +621,8 @@ class WrongInheritanceClause6(Int {}
 
 // expected-error@+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} 
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
+
+class Base {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
 Base=1 as Base=1 // expected-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
@@ -765,7 +765,7 @@ let ￼tryx  = 123        // expected-error {{invalid character in source file}}
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
-enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Ace = 1
   case Two = 2.1  // expected-error {{cannot convert value of type 'Double' to raw type 'Int'}}
 }

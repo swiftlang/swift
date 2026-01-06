@@ -7,6 +7,7 @@ set(swift_stubs_sources
     ThreadLocalStorage.cpp
     MathStubs.cpp
     Unicode/UnicodeData.cpp
+    Unicode/UnicodeEmoji.cpp
     Unicode/UnicodeGrapheme.cpp
     Unicode/UnicodeNormalization.cpp
     Unicode/UnicodeScalarProps.cpp
@@ -49,3 +50,5 @@ if("${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
                APPEND_STRING PROPERTY COMPILE_FLAGS
                  "-fobjc-arc")
 endif()
+
+add_subdirectory(Unicode)

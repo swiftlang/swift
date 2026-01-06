@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -parse-as-library -o %t -module-name=ModuleA %S/Inputs/diag_non_ephemeral_module1.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -parse-as-library -o %t -module-name=ModuleB %S/Inputs/diag_non_ephemeral_module2.swift
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/main.swift %S/Inputs/diag_non_ephemeral_globals.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t %t/main.swift %S/Inputs/diag_non_ephemeral_globals.swift
 
 import ModuleA
 import ModuleB
@@ -198,8 +198,9 @@ takesMutableRaw(&ResilientStruct.staticStoredProperty, 5) // expected-warning {{
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-// FIXME: This should also produce a warning.
-takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5)
+takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5) // expected-warning {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
+// expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Resilient struct or class bases
 
@@ -221,8 +222,9 @@ takesRaw(&topLevelP.property) // expected-warning {{cannot use inout expression 
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-// FIXME: This should also produce a warning.
-takesRaw(&type(of: topLevelP).staticProperty)
+takesRaw(&type(of: topLevelP).staticProperty) // expected-warning {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
+// expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 takesRaw(&topLevelP[]) // expected-warning {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesRaw'}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}

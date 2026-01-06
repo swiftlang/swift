@@ -26,6 +26,6 @@ Jordan
 
 P.S. Anyone is allowed to think this is not a worthwhile trade! But part of the purpose of this story is to show that [at the time of SE-0111] we [were] already 90% of the way towards making tuples and function arguments completely separate, even if they have similar syntax. This proposal gets us to maybe 95%.
 
-[SE-0111]: https://github.com/apple/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md
+[SE-0111]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md
 [original message]: https://forums.swift.org/t/review-se-0111-remove-type-system-significance-of-function-argument-labels/3209/41
 [Swift 3 naming conventions]: https://swift.org/documentation/api-design-guidelines

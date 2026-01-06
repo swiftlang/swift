@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-module-interface(%t/OpaqueResultTypes.swiftinterface) %s -module-name OpaqueResultTypes
 // RUN: %target-swift-typecheck-module-from-interface(%t/OpaqueResultTypes.swiftinterface) -module-name OpaqueResultTypes
 // RUN: %FileCheck %s < %t/OpaqueResultTypes.swiftinterface
-// RUN: %target-swift-frontend -I %t -typecheck -verify %S/Inputs/opaque-result-types-client.swift
+// RUN: %target-swift-frontend -I %t -typecheck -verify -verify-ignore-unrelated %S/Inputs/opaque-result-types-client.swift
 
 public protocol Foo {}
 extension Int: Foo {}
@@ -24,6 +24,20 @@ public func foo(_: Int) -> some Foo {
 public func foo<T: Foo>(_ x: T) -> some Foo {
   return x
 }
+
+// CHECK-LABEL: public var globalComputedVar: some OpaqueResultTypes.Foo {
+// CHECK-NEXT:    get
+// CHECK-NEXT:  }
+@available(SwiftStdlib 5.1, *)
+public var globalComputedVar: some Foo { 123 }
+
+// CHECK-LABEL: public var globalVar: some OpaqueResultTypes.Foo{{$}}
+@available(SwiftStdlib 5.1, *)
+public var globalVar: some Foo = 123
+
+// CHECK-LABEL: public var globalVarTuple: (some OpaqueResultTypes.Foo, some OpaqueResultTypes.Foo){{$}}
+@available(SwiftStdlib 5.1, *)
+public var globalVarTuple: (some Foo, some Foo) = (123, foo(123))
 
 public protocol AssocTypeInference {
   associatedtype Assoc: Foo

@@ -94,6 +94,7 @@
 // CHECK-NEXT:  #if __has_feature(objc_modules)
 
 // CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-EMPTY:
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if __has_attribute(external_source_symbol)
 // CHECK-NEXT:  # pragma clang attribute pop

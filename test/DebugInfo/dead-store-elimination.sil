@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -sil-print-types %s -dead-store-elimination -enable-sil-verify-all | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// We should be able to replace the local store with a debug_value.
+// The dead store elimination pass is written in Swift, and should call
+// salvage debug info when removing the store.
+
+// CHECK-LABEL: @trivial_local_dead_store
+// CHECK: debug_value %{{[0-9]+}} : $Int64, var, name "a"
+// CHECK: return
+sil hidden @trivial_local_dead_store : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int64, var, name "a"
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  store %2 to %0 : $*Int64
+  %4 = tuple ()
+  dealloc_stack %0 : $*Int64
+  return %4 : $()
+}

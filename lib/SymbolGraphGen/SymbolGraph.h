@@ -13,15 +13,14 @@
 #ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPH_H
 #define SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPH_H
 
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/VersionTuple.h"
+#include "Edge.h"
+#include "Symbol.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "Edge.h"
-#include "JSON.h"
-#include "Symbol.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -67,12 +66,12 @@ struct SymbolGraph {
   /**
    The symbols in a module: the nodes in the graph.
    */
-  llvm::DenseSet<Symbol> Nodes;
+  llvm::SetVector<Symbol> Nodes;
 
   /**
    The relationships between symbols: the edges in the graph.
    */
-  llvm::DenseSet<Edge> Edges;
+  llvm::SetVector<Edge> Edges;
 
   /**
    True if this graph is for a single symbol, rather than an entire module.
@@ -220,10 +219,12 @@ struct SymbolGraph {
   /// implicitly internal/private, such as underscore prefixes,
   /// and checking every named parent context as well.
   ///
-  /// \param IgnoreContext If `true`, don't consider
-  /// the context of the declaration to determine whether it is implicitly private.
-  bool isImplicitlyPrivate(const Decl *D,
-                           bool IgnoreContext = false) const;
+  /// \param IgnoreContext A function ref that receives the parent decl
+  /// and returns whether or not the context should be ignored when determining
+  /// privacy.
+  bool isImplicitlyPrivate(
+      const Decl *D,
+      llvm::function_ref<bool(const Decl *)> IgnoreContext = nullptr) const;
 
   /// Returns `true` if the declaration has an availability attribute
   /// that marks it as unconditionally unavailable on all platforms (i.e., where
@@ -232,7 +233,11 @@ struct SymbolGraph {
 
   /// Returns `true` if the declaration should be included as a node
   /// in the graph.
-  bool canIncludeDeclAsNode(const Decl *D) const;
+  ///
+  /// If `PublicAncestorDecl` is set and is an ancestor of `D`, that declaration
+  /// is considered to be public, regardless of its surrounding context.
+  bool canIncludeDeclAsNode(const Decl *D,
+                            const Decl *PublicAncestorDecl = nullptr) const;
 
   /// Returns `true` if the declaration is a requirement of a protocol
   /// or is a default implementation of a protocol

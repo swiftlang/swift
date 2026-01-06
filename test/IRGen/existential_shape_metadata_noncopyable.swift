@@ -1,9 +1,10 @@
 // RUN: %target-swift-frontend \
 // RUN:    -emit-ir %s -swift-version 5 \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:   -module-name existential_shape_metadata | %IRGenFileCheck %s
+
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // NOTE: Once noncopyable generics are enabled by default, merge this back into existential_shape_metadata.swift
 

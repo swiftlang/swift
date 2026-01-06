@@ -192,7 +192,8 @@ bb1:
 bb2:
   %borrow2 = begin_borrow %0 : $C
   br bb3(%borrow2 : $C, %0 : $C)
-bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
+bb3(%11 : @guaranteed $C, %copy3 : @owned $C):
+  %borrow3 = borrowed %11 from (%copy3)
   end_borrow %borrow3 : $C
   destroy_value %copy3 : $C
   %result = tuple ()

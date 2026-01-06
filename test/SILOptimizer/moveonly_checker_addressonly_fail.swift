@@ -8,7 +8,7 @@ struct GenericAggregate<T> {
 }
 
 func test1<T>(_ x: T) {
-    @_noImplicitCopy let x2 = x // expected-error {{@_noImplicitCopy can not be used on a generic or existential typed binding or a nominal type containing such typed things}}
+    @_noImplicitCopy let x2 = x // expected-error {{'@_noImplicitCopy' can not be used on a generic or existential typed binding or a nominal type containing such typed things}}
 
     // These fail b/c we use an unchecked_addr_cast to convert addresses from
     // @moveOnly to non-@moveOnly. We should change moveonly_to_copyable to

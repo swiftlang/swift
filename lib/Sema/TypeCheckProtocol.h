@@ -30,7 +30,7 @@
 namespace swift {
 
 class AssociatedTypeDecl;
-class AvailabilityContext;
+class AvailabilityRange;
 class DeclContext;
 class FuncDecl;
 class NormalProtocolConformance;
@@ -53,7 +53,7 @@ SmallVector<ValueDecl *, 4> lookupValueWitnesses(DeclContext *DC,
                                                  ValueDecl *req,
                                                  bool *ignoringNames);
 
-struct RequirementCheck;
+class RequirementCheck;
 
 class WitnessChecker {
 public:
@@ -87,10 +87,6 @@ protected:
                        unsigned &numViable,
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
-
-  bool checkWitnessAvailability(ValueDecl *requirement,
-                                ValueDecl *witness,
-                                AvailabilityContext *requirementInfo);
 
   RequirementCheck checkWitness(ValueDecl *requirement,
                                 const RequirementMatch &match);
@@ -127,11 +123,15 @@ public:
 
   /// Check that the witness and requirement have compatible actor contexts.
   ///
+  /// \param usesPreconcurrency Will be set true if the conformance is
+  /// @preconcurrency and we made use of that fact.
+  ///
   /// \returns the isolation that needs to be enforced to invoke the witness
   /// from the requirement, used when entering an actor-isolated synchronous
   /// witness from an asynchronous requirement.
   std::optional<ActorIsolation> checkActorIsolation(ValueDecl *requirement,
-                                                    ValueDecl *witness);
+                                                    ValueDecl *witness,
+                                                    bool &usesPreconcurrency);
 
   /// Enforce restrictions on non-final classes witnessing requirements
   /// involving the protocol 'Self' type.
@@ -176,7 +176,7 @@ public:
 RequirementMatch matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<
-        std::tuple<std::optional<RequirementMatch>, Type, Type>(void)>
+        std::tuple<std::optional<RequirementMatch>, Type, Type, Type, Type>(void)>
         setup,
     llvm::function_ref<std::optional<RequirementMatch>(Type, Type)> matchTypes,
     llvm::function_ref<RequirementMatch(bool, ArrayRef<OptionalAdjustment>)>
@@ -232,6 +232,44 @@ bool witnessHasImplementsAttrForRequiredName(ValueDecl *witness,
 /// and protocol match that of the requirement exactly.
 bool witnessHasImplementsAttrForExactRequirement(ValueDecl *witness,
                                                  ValueDecl *requirement);
+
+using VisitedConformances = llvm::SmallPtrSet<void *, 16>;
+
+/// Visit each conformance within the given type.
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    Type type, llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
+/// Visit each conformance within the given conformance (including the given
+/// one).
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    ProtocolConformanceRef conformance,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
+/// Visit each conformance within the given substitution map.
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    SubstitutionMap subs,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
+
+/// Visit each conformance within the given declaration reference.
+///
+/// If `body` returns true for any conformance, this function stops the
+/// traversal and returns true.
+bool forEachConformance(
+    ConcreteDeclRef declRef,
+    llvm::function_ref<bool(ProtocolConformanceRef)> body,
+    VisitedConformances *visitedConformances = nullptr);
 
 }
 

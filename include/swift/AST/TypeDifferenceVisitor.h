@@ -129,6 +129,34 @@ public:
       return asImpl().visitDifferentTypeStructure(type1, type2);
     return asImpl().visit(type1.getElementType(), type2.getElementType());
   }
+  
+  bool visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type1,
+                                      CanBuiltinUnboundGenericType type2) {
+    return asImpl().visitDifferentTypeStructure(type1, type2);
+  }
+
+  bool visitBuiltinGenericType(CanBuiltinGenericType type1,
+                               CanBuiltinGenericType type2) {
+    if (type1->getBuiltinTypeKind() != type2->getBuiltinTypeKind()) {
+      return true;
+    }
+
+    auto subs1 = type1->getSubstitutions();
+    auto subs2 = type2->getSubstitutions();
+
+    for (unsigned i : indices(subs1.getReplacementTypes())) {
+      if (asImpl().visit(CanType(subs1.getReplacementTypes()[i]),
+                         CanType(subs2.getReplacementTypes()[i]))) {
+        return true;
+      }
+    }
+    for (unsigned i : indices(subs1.getConformances())) {
+      if (subs1.getConformances()[i] != subs2.getConformances()[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   bool visitPackType(CanPackType type1, CanPackType type2) {
     return visitComponentArray(type1, type2,
@@ -382,6 +410,10 @@ public:
 
   bool visitErrorType(CanErrorType type1, CanErrorType type2) {
     return false;
+  }
+
+  bool visitIntegerType(CanIntegerType type1, CanIntegerType type2) {
+    return asImpl().visitDifferentTypeStructure(type1, type2);
   }
 
   bool visitOptSubstitutionMap(CanType type1, CanType type2,

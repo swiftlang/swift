@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-silgen -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name inlinable_attribute -emit-verbose-sil -warnings-as-errors -target %target-swift-5.1-abi-triple %s | %FileCheck %s
+
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @inlinable public func fragileFunction() {
@@ -38,7 +39,9 @@ public class MyCls {
 }
 
 public actor MyAct {
+  // CHECK-NOT: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfZ : $@convention(thin) (@owned MyAct) -> ()
   // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfD : $@convention(method) (@owned MyAct) -> ()
+  // CHECK-NOT: sil [serialized] [ossa] @$s19inlinable_attribute5MyActCfZ : $@convention(thin) (@owned MyAct) -> ()
   @inlinable deinit {}
 
   /// whether delegating or not, the initializers for an actor are not serialized unless marked inlinable.
@@ -61,6 +64,13 @@ public actor MyAct {
   @inlinable public init(inlinableConvenienceInit: ()) {
     self.init(designatedInit: ())
   }
+}
+
+@available(SwiftStdlib 6.1, *)
+public actor MyActIsolatedDeinit {
+  // CHECK: sil [serialized] [[AVAILABILITY:.*]][ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfZ : $@convention(thin) (@owned MyActIsolatedDeinit) -> ()
+  // CHECK: sil [serialized] [[AVAILABILITY:.*]][ossa] @$s19inlinable_attribute19MyActIsolatedDeinitCfD : $@convention(method) (@owned MyActIsolatedDeinit) -> ()
+  @inlinable isolated deinit {}
 }
 
 // Make sure enum case constructors for public and versioned enums are

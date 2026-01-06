@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir  -disable-availability-checking %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type %s
+// RUN: %target-swift-frontend -emit-ir  -target %target-swift-5.1-abi-triple %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type %s
 // REQUIRES: concurrency
 
 // UNSUPPORTED: CPU=arm64e

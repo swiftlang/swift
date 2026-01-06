@@ -28,6 +28,7 @@
 #include "IRGen.h"
 #include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace llvm {
@@ -101,7 +102,7 @@ protected:
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+3+1+1,
+                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+1+3+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -113,6 +114,9 @@ protected:
       
       /// Whether this type is known to be bitwise-takable.
       BitwiseTakable : 1,
+
+      /// Whether this type is known to be bitwise-borrowable.
+      BitwiseBorrowable : 1,
 
       /// Whether this type is known to be copyable.
       Copyable : 1,
@@ -160,7 +164,9 @@ protected:
     Bits.TypeInfo.Kind = unsigned(stik);
     Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
     Bits.TypeInfo.TriviallyDestroyable = pod;
-    Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
+    Bits.TypeInfo.BitwiseTakable = bitwiseTakable >= IsBitwiseTakableOnly;
+    Bits.TypeInfo.BitwiseBorrowable =
+      bitwiseTakable == IsBitwiseTakableAndBorrowable;
     Bits.TypeInfo.Copyable = copyable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
@@ -208,9 +214,12 @@ public:
   /// actually possible to do ABI operations on it from this current SILModule.
   /// See SILModule::isTypeABIAccessible.
   ///
-  /// All fixed-size types are currently ABI-accessible, although this would
+  /// Almost all fixed-size types are currently ABI-accessible, although this would
   /// not be difficult to change (e.g. if we had an archetype size constraint
   /// that didn't say anything about triviality).
+  /// The exception to this is non-copyable types, which need to be able to call
+  /// the metadata to get to the deinit and so their type metadata
+  /// needs to be accessible.
   IsABIAccessible_t isABIAccessible() const {
     return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
   }
@@ -228,11 +237,25 @@ public:
   }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
-  /// is equivalent to a memcpy.
-  IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
-    return IsBitwiseTakable_t(Bits.TypeInfo.BitwiseTakable);
+  /// is equivalent to a memcpy, and possibly bitwise-borrowable, i.e.,
+  /// a borrowed argument can be passed by value rather than by reference.
+  IsBitwiseTakable_t getBitwiseTakable(ResilienceExpansion expansion) const {
+    return IsBitwiseTakable_t(
+      Bits.TypeInfo.BitwiseTakable | (Bits.TypeInfo.BitwiseBorrowable << 1));
   }
   
+  /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
+  /// is equivalent to a memcpy
+  bool isBitwiseTakable(ResilienceExpansion expansion) const {
+    return Bits.TypeInfo.BitwiseTakable;
+  }
+  
+  /// Whether this type is known to be bitwise-borrowable, i.e.,
+  /// a borrowed argument can be passed by value rather than by reference.
+  bool isBitwiseBorrowable(ResilienceExpansion expansion) const {
+    return Bits.TypeInfo.BitwiseBorrowable;
+  }
+
   /// Returns the type of special interface followed by this TypeInfo.
   /// It is important for our design that this depends only on
   /// immediate type structure and not on, say, properties that can
@@ -332,15 +355,14 @@ public:
                         bool useStructLayouts) const = 0;
 
   /// Allocate a variable of this type on the stack.
-  virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                     const llvm::Twine &name) const = 0;
+  virtual StackAddress allocateStack(
+      IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+      StackAllocationIsNested_t isNested = StackAllocationIsNested) const = 0;
 
-  virtual StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                                      llvm::Value *capacity,
-                                      const Twine &name) const = 0;
   /// Deallocate a variable of this type.
-  virtual void deallocateStack(IRGenFunction &IGF, StackAddress addr,
-                               SILType T) const = 0;
+  virtual void deallocateStack(
+      IRGenFunction &IGF, StackAddress addr, SILType T,
+      StackAllocationIsNested_t isNested = StackAllocationIsNested) const = 0;
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.
@@ -375,7 +397,8 @@ public:
   /// the old object is actually no longer permitted to be destroyed.
   virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T,
-                                  bool isOutlined) const = 0;
+                                  bool isOutlined,
+                                  bool zeroizeIfSensitive) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,

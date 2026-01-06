@@ -51,7 +51,7 @@ entry(%0 : @owned $C, %1 : @owned $C):
   return %void : $()
 }
 
-// In opaque SIL values mode, handle the tuple_pack_extract forwaded operand.
+// In opaque SIL values mode, handle the tuple_pack_extract forwarded operand.
 //
 // CHECK-LABEL: begin running test 1 of 2 on tuplePackExtractTest: forwarding_def_use_test with: %tuple
 // CHECK: USE: operand #0 of   end_borrow %1 : $(repeat each T)
@@ -79,7 +79,7 @@ entry(%tuple_addr : $*(repeat each T)):
   return %retval : $()
 }
 
-// Handle forwaded guaranteed values.
+// Handle forwarded guaranteed values.
 //
 // CHECK-LABEL: begin running test 1 of 2 on forwardingGuaranteedTest: forwarding_def_use_test with: %0
 // CHECK: USE: dead value:   %5 = tuple (%3 : $C, %4 : $C)
@@ -211,7 +211,7 @@ bbExit:
   return %void : $()
 }
 
-// Chain of owned values. Needs to resolve in a resonable amount of time.
+// Chain of owned values. Needs to resolve in a reasonable amount of time.
 //
 // CHECK-LABEL: begin running test 1 of 2 on forwardingTuplesTest: forwarding_def_use_test with: %0
 // CHECK: USE: operand #0 of   destroy_value %{{.*}} : $(C, C)

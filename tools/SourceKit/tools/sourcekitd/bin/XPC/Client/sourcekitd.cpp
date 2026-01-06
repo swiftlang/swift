@@ -15,12 +15,15 @@
 #include "SourceKit/Support/UIdent.h"
 
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/Path.h"
+
+#include <Block.h>
 #include <chrono>
 #include <xpc/xpc.h>
 #include <dispatch/dispatch.h>
-
-#include <Block.h>
+#include <dlfcn.h>
 
 using namespace SourceKit;
 using namespace sourcekitd;
@@ -130,10 +133,10 @@ sourcekitd_response_t sourcekitd_send_request_sync(sourcekitd_object_t req) {
   }
 
   xpc_connection_t Conn = getGlobalConnection();
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_append_value(contents, req);
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyMsg, contents);
   xpc_release(contents);
 
@@ -179,10 +182,10 @@ void sourcekitd_send_request(sourcekitd_object_t req,
   }
 
   xpc_connection_t Conn = getGlobalConnection();
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_append_value(contents, req);
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyMsg, contents);
   if (request_handle) {
     xpc_dictionary_set_uint64(msg, xpc::KeyCancelToken,
@@ -218,7 +221,7 @@ void sourcekitd_send_request(sourcekitd_object_t req,
 
 void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {
   xpc_connection_t conn = getGlobalConnection();
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_uint64(msg, xpc::KeyCancelRequest,
                             reinterpret_cast<uint64_t>(handle));
 
@@ -229,7 +232,7 @@ void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {
 
 void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle) {
   xpc_connection_t conn = getGlobalConnection();
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_uint64(msg, xpc::KeyDisposeRequestHandle,
                             reinterpret_cast<uint64_t>(handle));
 
@@ -237,6 +240,9 @@ void sourcekitd_request_handle_dispose(sourcekitd_request_handle_t handle) {
 
   xpc_release(msg);
 }
+
+static std::vector<std::string> registeredClientPlugins;
+static std::vector<std::string> registeredServicePlugins;
 
 /// To avoid repeated crashes, used to notify the service to delay typechecking
 /// in the editor for a certain amount of seconds.
@@ -246,6 +252,14 @@ static void handleInternalInitRequest(xpc_object_t reply) {
   size_t Delay = SemanticEditorDelaySecondsNum;
   if (Delay != 0)
     xpc_dictionary_set_uint64(reply, xpc::KeySemaEditorDelay, Delay);
+
+  if (!registeredServicePlugins.empty()) {
+    auto plugins = xpc_array_create(nullptr, 0);
+    for (const auto &plugin : registeredServicePlugins)
+      xpc_array_set_string(plugins, XPC_ARRAY_APPEND, plugin.c_str());
+    xpc_dictionary_set_value(reply, xpc::KeyPlugins, plugins);
+    xpc_release(plugins);
+  }
 }
 
 static void handleInternalUIDRequest(xpc_object_t XVal,
@@ -274,9 +288,31 @@ static void handleInternalUIDRequest(xpc_object_t XVal,
 
 static void handleInterruptedConnection(xpc_object_t event, xpc_connection_t conn);
 
+extern "C" const char __dso_handle[];
+
 static void initializeXPCClient() {
   assert(!GlobalConn);
-  GlobalConn = xpc_connection_create(SOURCEKIT_XPCSERVICE_IDENTIFIER, nullptr);
+
+  Dl_info dlinfo;
+  dladdr(__dso_handle, &dlinfo);
+
+  // '.../usr/lib/sourcekitd.framework/sourcekitd'
+  llvm::SmallString<128> serviceNamePath(dlinfo.dli_fname);
+  if (serviceNamePath.empty()) {
+    llvm::report_fatal_error("Unable to find service name path");
+  }
+
+  llvm::sys::path::remove_filename(serviceNamePath);
+  // '.../usr/lib/sourcekitd.framework/Resources/xpc_service_name.txt'
+  llvm::sys::path::append(serviceNamePath, "Resources", "xpc_service_name.txt");
+
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(serviceNamePath);
+  if (!bufferOrErr) {
+    llvm::report_fatal_error("Unable to find service name");
+  }
+
+  std::string serviceName = (*bufferOrErr)->getBuffer().trim().str();
+  GlobalConn = xpc_connection_create(serviceName.c_str(), nullptr);
 
   xpc_connection_set_event_handler(GlobalConn, ^(xpc_object_t event) {
     xpc_type_t type = xpc_get_type(event);
@@ -343,10 +379,21 @@ static void initializeXPCClient() {
   xpc_connection_resume(GlobalConn);
 }
 
+void sourcekitd_load_client_plugins(void) {
+  static std::once_flag flag;
+  std::call_once(flag, [] {
+    sourcekitd::PluginInitParams pluginParams(
+        /*isClientOnly=*/true, /*registerRequestHandler=*/nullptr,
+        /*registerCancellationHandler=*/nullptr);
+    loadPlugins(registeredClientPlugins, pluginParams);
+  });
+}
+
 void sourcekitd_initialize(void) {
   if (sourcekitd::initializeClient()) {
     LOG_INFO_FUNC(High, "initializing");
     initializeXPCClient();
+    sourcekitd_load_client_plugins();
   }
 }
 
@@ -358,8 +405,19 @@ void sourcekitd_shutdown(void) {
   }
 }
 
+void sourcekitd_register_plugin_path(const char *clientPlugin,
+                                     const char *servicePlugin) {
+  assert(!GlobalConn && "plugin registered after sourcekitd_initialize");
+  if (clientPlugin)
+    registeredClientPlugins.push_back(clientPlugin);
+  if (servicePlugin)
+    registeredServicePlugins.push_back(servicePlugin);
+}
+
 static xpc_connection_t getGlobalConnection() {
-  assert(GlobalConn);
+  if (!GlobalConn) {
+    llvm::report_fatal_error("Service is invalid");
+  }
   return GlobalConn;
 }
 
@@ -367,7 +425,7 @@ static xpc_connection_t getGlobalConnection() {
 static void pingService(xpc_connection_t ping_conn) {
   LOG_WARN_FUNC("pinging service");
 
-  xpc_object_t ping_msg = xpc_dictionary_create(nullptr, nullptr, 0);
+  xpc_object_t ping_msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_bool(ping_msg, "ping", true);
 
   dispatch_queue_t queue

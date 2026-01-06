@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
 
 sil_stage canonical
 
@@ -30,6 +30,11 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
 
 class C {}
 
+enum FakeOptional<T> {
+  case none
+  case some(T)
+}
+
 // CHECK-LABEL: sil [ossa] @foo
 // CHECK: begin_borrow {{%[^,]+}}
 // CHECK: begin_borrow [lexical] {{%[^,]+}}
@@ -48,9 +53,28 @@ sil [ossa] @foo : $@convention(thin) () -> () {
   return %res : $()
 }
 
+struct Wrapper {
+  var _k: C
+}
+
+// CHECK-LABEL: sil [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed C {
+// CHECK: bb0(%0 : $*Wrapper):
+// CHECK:   %1 = struct_element_addr %0 : $*Wrapper, #Wrapper._k
+// CHECK:   %2 = load_borrow %1 : $*C
+// CHECK:   return_borrow %2 : $C from_scopes (%2 : $C)
+// CHECK: }
+sil [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed C {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper._k
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+
 // CHECK-LABEL: sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
-// CHECK: bb3([[ARG:%.*]] : @reborrow @guaranteed $C):
-// CHECK: } // end sil function 'reborrowTest'
+// CHECK:       bb3([[ARG:%.*]] : @reborrow $C):
+// CHECK-NEXT:    {{%.*}} = borrowed [[ARG]] : $C from (%0 : $C)
+// CHECK:       } // end sil function 'reborrowTest'
 sil [ossa] @reborrowTest : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
   cond_br undef, bb1, bb2
@@ -63,10 +87,26 @@ bb2:
   %b2 = begin_borrow %0 : $C
   br bb3(%b2 : $C)
 
-bb3(%r : @reborrow @guaranteed $C):
-  end_borrow %r : $C
+bb3(%r : @reborrow $C):
+  %f = borrowed %r : $C from (%0 : $C)
+  end_borrow %f : $C
   destroy_value %0 : $C
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @reborrowNone :
+// CHECK:       bb1([[ARG:%.*]] : @guaranteed $FakeOptional<C>):
+// CHECK-NEXT:    {{%.*}} = borrowed [[ARG]] : $FakeOptional<C> from ()
+// CHECK:       } // end sil function 'reborrowNone'
+sil [ossa] @reborrowNone : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $FakeOptional<C>, #FakeOptional.none!enumelt
+  br bb1(%0 : $FakeOptional<C>)
+
+bb1(%2 : @guaranteed $FakeOptional<C>):
+  %3 = borrowed %2 : $FakeOptional<C> from ()
+  %4 = tuple ()
+  return %4 : $()
 }
 

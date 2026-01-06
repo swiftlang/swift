@@ -11,199 +11,115 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
-#include "swift/AST/Expr.h"
-#include "swift/SIL/ApplySite.h"
-#include "llvm/Support/CommandLine.h"
+
+// We only use this so we can implement print on our type erased errors.
+#include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
 using namespace swift;
 using namespace swift::PartitionPrimitives;
 
 //===----------------------------------------------------------------------===//
-//                               MARK: Logging
+//                           MARK: PartitionOpError
 //===----------------------------------------------------------------------===//
 
-#ifndef NDEBUG
-
-bool swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
-
-static llvm::cl::opt<bool, true> // The parser
-    RegionBasedIsolationVerboseLog(
-        "sil-regionbasedisolation-verbose-log",
-        llvm::cl::desc("Enable verbose logging for SIL region based isolation "
-                       "diagnostics"),
-        llvm::cl::Hidden,
-        llvm::cl::location(swift::PartitionPrimitives::
-                               REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING));
-
-#endif
-
-//===----------------------------------------------------------------------===//
-//                           MARK: SILIsolationInfo
-//===----------------------------------------------------------------------===//
-
-SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
-  if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
-    if (auto crossing = apply->getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isActorIsolated())
-        return SILIsolationInfo::getActorIsolated(
-            SILValue(), crossing->getCalleeIsolation());
-    }
-  }
-
-  if (auto fas = FullApplySite::isa(inst)) {
-    if (auto crossing = fas.getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isActorIsolated()) {
-        return SILIsolationInfo::getActorIsolated(
-            SILValue(), crossing->getCalleeIsolation());
-      }
-    }
-
-    if (fas.hasSelfArgument()) {
-      auto &self = fas.getSelfArgumentOperand();
-      if (fas.getArgumentParameterInfo(self).hasOption(
-              SILParameterInfo::Isolated)) {
-        if (auto *nomDecl =
-                self.get()->getType().getNominalOrBoundGenericNominal()) {
-          // TODO: We should be doing this off of the instance... what if we
-          // have two instances of the same class?
-          return SILIsolationInfo::getActorIsolated(SILValue(), nomDecl);
-        }
-      }
-    }
-  }
-
-  if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
-    if (auto *ace = pai->getLoc().getAsASTNode<AbstractClosureExpr>()) {
-      auto actorIsolation = ace->getActorIsolation();
-      if (actorIsolation.isActorIsolated()) {
-        return SILIsolationInfo::getActorIsolated(pai, actorIsolation);
-      }
-    }
-  }
-
-  // We assume that any instruction that does not correspond to an ApplyExpr
-  // cannot cross an isolation domain.
-  return SILIsolationInfo();
+void PartitionOpError::UnknownCodePatternError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: Unknown Code Pattern Error\n"
+     << "        Inst: " << *op->getSourceInst();
 }
 
-SILIsolationInfo SILIsolationInfo::get(SILFunctionArgument *arg) {
-  // If we have self and our function is actor isolated, all of our arguments
-  // should be marked as actor isolated.
-  if (auto *self = arg->getFunction()->maybeGetSelfArgument()) {
-    if (auto functionIsolation = arg->getFunction()->getActorIsolation()) {
-      if (functionIsolation.isActorIsolated()) {
-        if (auto *nomDecl = self->getType().getNominalOrBoundGenericNominal()) {
-          return SILIsolationInfo::getActorIsolated(arg, nomDecl);
-        }
-      }
-    }
-  }
-
-  if (auto *decl = arg->getDecl()) {
-    auto isolation = swift::getActorIsolation(const_cast<ValueDecl *>(decl));
-    if (!bool(isolation)) {
-      if (auto *dc = decl->getDeclContext()) {
-        isolation = swift::getActorIsolationOfContext(dc);
-      }
-    }
-
-    if (isolation.isActorIsolated()) {
-      return SILIsolationInfo::getActorIsolated(arg, isolation);
-    }
-  }
-
-  return SILIsolationInfo::getTaskIsolated(arg);
+void PartitionOpError::LocalUseAfterSendError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: Use After Send\n"
+     << "        Sending Inst: " << *sendingOp->getUser()
+     << "        Sending Op Value: " << sendingOp->get()
+     << "        Require Inst: " << *op->getSourceInst() << "        ID:  %%"
+     << sentElement << "\n"
+     << "        Rep: " << valueMap.getRepresentativeValue(sentElement)
+     << "        Sending Op Num: " << sendingOp->getOperandNumber() << '\n';
 }
 
-void SILIsolationInfo::print(llvm::raw_ostream &os) const {
-  switch (Kind(*this)) {
-  case Unknown:
-    os << "unknown";
-    return;
-  case Disconnected:
-    os << "disconnected";
-    return;
-  case Actor:
-    os << "actor";
-    return;
-  case Task:
-    os << "task";
-    return;
-  }
+void PartitionOpError::SentNeverSendableError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &info) const {
+  os << "    Emitting Error. Kind: Sent Non Sendable\n"
+     << "        ID:  %%" << sentElement << "\n"
+     << "        Rep: " << *info.getRepresentative(sentElement)
+     << "        Dynamic Isolation Region: ";
+  isolationRegionInfo.printForOneLineLogging(info.getFunction(), os);
+  os << '\n';
+  if (auto isolatedValue = isolationRegionInfo->maybeGetIsolatedValue()) {
+    os << "        Isolated Value: " << isolatedValue;
+    auto name = VariableNameInferrer::inferName(isolatedValue);
+    os << "        Isolated Value Name: "
+       << (name.has_value() ? name->get() : "none") << '\n';
+  } else {
+    os << "        Isolated Value: none\n";
+  };
 }
 
-SILIsolationInfo SILIsolationInfo::merge(SILIsolationInfo other) const {
-  // If we are greater than the other kind, then we are further along the
-  // lattice. We ignore the change.
-  if (unsigned(other.kind) < unsigned(kind))
-    return *this;
-
-  // TODO: Make this failing mean that we emit an unknown SIL error instead of
-  // asserting.
-  assert((!other.isActorIsolated() || !isActorIsolated() ||
-          hasSameIsolation(other.getActorIsolation())) &&
-         "Actor can only be merged with the same actor");
-
-  // Otherwise, take the other value.
-  return other;
+void PartitionOpError::AssignNeverSendableIntoSendingResultError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: Assign Isolated Into Sending Result!\n"
+     << "        Assign Inst: " << *op->getSourceInst()
+     << "        Dest Value: " << *destValue
+     << "        Dest Element: " << destElement << '\n'
+     << "        Src Value: " << srcValue
+     << "        Src Element: " << srcElement << '\n'
+     << "        Src Rep: " << valueMap.getRepresentativeValue(srcElement)
+     << "        Src Isolation: " << srcIsolationRegionInfo << '\n';
 }
 
-bool SILIsolationInfo::hasSameIsolation(ActorIsolation actorIsolation) const {
-  if (getKind() != Kind::Actor)
-    return false;
-  return getActorIsolation() == actorIsolation;
+void PartitionOpError::InOutSendingNotInitializedAtExitError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOut Not Reinitialized At End Of "
+        "Function\n"
+     << "        Sending Inst: " << *sendingOp->getUser()
+     << "        Sending Op Value: " << sendingOp->get()
+     << "        Require Inst: " << *op->getSourceInst() << "        ID:  %%"
+     << sentElement << "\n"
+     << "        Rep: " << valueMap.getRepresentativeValue(sentElement)
+     << "        Sending Op Num: " << sendingOp->getOperandNumber() << '\n';
 }
 
-bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
-  if (getKind() != other.getKind())
-    return false;
-
-  switch (getKind()) {
-  case Unknown:
-  case Disconnected:
-    return true;
-  case Task:
-    return getIsolatedValue() == other.getIsolatedValue();
-  case Actor:
-    auto lhsIsolation = getActorIsolation();
-    auto rhsIsolation = other.getActorIsolation();
-    return lhsIsolation == rhsIsolation;
-  }
+void PartitionOpError::InOutSendingNotDisconnectedAtExitError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOut Sending ActorIsolated "
+        "at end of "
+        "Function Error!\n"
+     << "        ID:  %%" << inoutSendingElement << "\n"
+     << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
+     << "        Dynamic Isolation Region: ";
+  isolationInfo.printForOneLineLogging(valueMap.getFunction(), os);
+  os << '\n';
 }
 
-bool SILIsolationInfo::isEqual(const SILIsolationInfo &other) const {
-  // First check if the two types have the same isolation.
-  if (!hasSameIsolation(other))
-    return false;
-
-  // Then check if both have the same isolated value state. If they do not
-  // match, bail they cannot equal.
-  if (hasIsolatedValue() != other.hasIsolatedValue())
-    return false;
-
-  // Then actually check if we have an isolated value. If we do not, then both
-  // do not have an isolated value due to our earlier check, so we can just
-  // return true early.
-  if (!hasIsolatedValue())
-    return true;
-
-  // Otherwise, equality is determined by directly comparing the isolated value.
-  return getIsolatedValue() == other.getIsolatedValue();
+void PartitionOpError::NonSendableIsolationCrossingResultError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: NonSendableIsolationCrossingResultError\n"
+        "        Inst: "
+     << *op->getSourceInst() << "        Result ID: %%" << returnValueElement
+     << '\n';
 }
 
-void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
-  id.AddInteger(getKind());
-  switch (getKind()) {
-  case Unknown:
-  case Disconnected:
-    return;
-  case Task:
-    id.AddPointer(getIsolatedValue());
-    return;
-  case Actor:
-    id.AddPointer(getIsolatedValue());
-    getActorIsolation().Profile(id);
-    return;
+void PartitionOpError::InOutSendingReturnedError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingReturnedError!\n"
+     << "        ID:  %%" << inoutSendingElement << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
+     << "        Returned Value ID:  %%" << returnedValue << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(returnedValue);
+}
+
+void PartitionOpError::InOutSendingParametersInSameRegionError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingParametersInSameRegion!\n"
+     << "        First ID:  %%" << firstInoutSendingParam
+     << "        First Rep: "
+     << valueMap.getRepresentativeValue(firstInoutSendingParam);
+  for (auto other : otherInOutSendingParams) {
+    os << "        Other ID:  %%" << other
+       << "        Other Rep: " << valueMap.getRepresentativeValue(other);
   }
 }
 
@@ -212,50 +128,71 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
 //===----------------------------------------------------------------------===//
 
 void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
+  constexpr static char extraSpaceLiteral[10] = "     ";
   switch (opKind) {
   case PartitionOpKind::Assign: {
-    constexpr static char extraSpaceLiteral[10] = "      ";
     os << "assign ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0] << " = %%" << opArgs[1];
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2();
     break;
   }
   case PartitionOpKind::AssignFresh:
-    os << "assign_fresh %%" << opArgs[0];
+    os << "assign_fresh %%" << getOpArg1();
     break;
-  case PartitionOpKind::Transfer: {
-    constexpr static char extraSpaceLiteral[10] = "    ";
-    os << "transfer ";
+  case PartitionOpKind::Send: {
+    os << "send ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   }
-  case PartitionOpKind::UndoTransfer: {
-    constexpr static char extraSpaceLiteral[10] = "    ";
-    os << "undo_transfer ";
+  case PartitionOpKind::UndoSend: {
+    os << "undo_send ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   }
   case PartitionOpKind::Merge: {
-    constexpr static char extraSpaceLiteral[10] = "       ";
     os << "merge ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0] << " with %%" << opArgs[1];
+    os << "%%" << getOpArg1() << " with %%" << getOpArg2();
     break;
   }
   case PartitionOpKind::Require: {
-    constexpr static char extraSpaceLiteral[10] = "     ";
     os << "require ";
+    if (getOptions().containsOnly(
+            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue))
+      os << "[mutable_base_of_sendable_val] ";
     if (extraSpace)
       os << extraSpaceLiteral;
-    os << "%%" << opArgs[0];
+    os << "%%" << getOpArg1();
     break;
   }
+  case PartitionOpKind::UnknownPatternError:
+    os << "unknown pattern error ";
+    os << "%%" << getOpArg1();
+    break;
+  case PartitionOpKind::InOutSendingAtFunctionExit:
+    os << "inout_sending_at_function_exit ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1();
+    break;
+  case PartitionOpKind::NonSendableIsolationCrossingResult:
+    os << "nonsendable_isolationcrossing_result ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1();
+    break;
+  case PartitionOpKind::AssignFreshAssign:
+    os << "assign_fresh_assign ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2();
+    break;
   }
   os << ": " << *getSourceInst();
 }
@@ -272,7 +209,7 @@ Partition Partition::singleRegion(SILLocation loc, ArrayRef<Element> indices,
     // region takes.
     Element repElement = *std::min_element(indices.begin(), indices.end());
     Region repElementRegion = Region(repElement);
-    p.fresh_label = Region(repElementRegion + 1);
+    p.freshLabel = Region(repElementRegion + 1);
 
     // Place all of the operations until end of scope into one history
     // sequence.
@@ -311,20 +248,19 @@ Partition Partition::separateRegions(SILLocation loc, ArrayRef<Element> indices,
     p.pushNewElementRegion(index);
     maxIndex = Element(std::max(maxIndex, index));
   }
-  p.fresh_label = Region(maxIndex + 1);
+  p.freshLabel = Region(maxIndex + 1);
   assert(p.is_canonical_correct());
   return p;
 }
 
-void Partition::markTransferred(Element val,
-                                TransferringOperandSet *transferredOperandSet) {
+void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
   // First see if our val is tracked. If it is not tracked, insert it and mark
-  // its new region as transferred.
+  // its new region as sent.
   if (!isTrackingElement(val)) {
-    elementToRegionMap.insert_or_assign(val, fresh_label);
+    elementToRegionMap.insert_or_assign(val, freshLabel);
     pushNewElementRegion(val);
-    regionToTransferredOpMap.insert({fresh_label, transferredOperandSet});
-    fresh_label = Region(fresh_label + 1);
+    regionToSendingOpMap.insert({freshLabel, sendingOperandSet});
+    freshLabel = Region(freshLabel + 1);
     canonical = false;
     return;
   }
@@ -332,39 +268,38 @@ void Partition::markTransferred(Element val,
   // Otherwise, we already have this value in the map. Try to insert it.
   auto iter1 = elementToRegionMap.find(val);
   assert(iter1 != elementToRegionMap.end());
-  auto iter2 = regionToTransferredOpMap.try_emplace(iter1->second,
-                                                    transferredOperandSet);
+  auto iter2 = regionToSendingOpMap.insert({iter1->second, sendingOperandSet});
 
   // If we did insert, just return. We were not tracking any state.
   if (iter2.second)
     return;
 
   // Otherwise, we need to merge the sets.
-  iter2.first->getSecond() = iter2.first->second->merge(transferredOperandSet);
+  iter2.first->second = iter2.first->second->merge(sendingOperandSet);
 }
 
-bool Partition::undoTransfer(Element val) {
+bool Partition::undoSend(Element val) {
   // First see if our val is tracked. If it is not tracked, insert it.
   if (!isTrackingElement(val)) {
-    elementToRegionMap.insert_or_assign(val, fresh_label);
+    elementToRegionMap.insert_or_assign(val, freshLabel);
     pushNewElementRegion(val);
-    fresh_label = Region(fresh_label + 1);
+    freshLabel = Region(freshLabel + 1);
     canonical = false;
     return true;
   }
 
   // Otherwise, we already have this value in the map. Remove it from the
-  // transferred map.
+  // "sending operand" map.
   auto iter1 = elementToRegionMap.find(val);
   assert(iter1 != elementToRegionMap.end());
-  return regionToTransferredOpMap.erase(iter1->second);
+  return regionToSendingOpMap.erase(iter1->second);
 }
 
 void Partition::trackNewElement(Element newElt, bool updateHistory) {
-  SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
+  SWIFT_DEFER { validateRegionToSendingOpMapRegions(); };
 
   // First try to emplace newElt with fresh_label.
-  auto iter = elementToRegionMap.try_emplace(newElt, fresh_label);
+  auto iter = elementToRegionMap.try_emplace(newElt, freshLabel);
 
   // If we did insert, then we know that the value is completely new. We can
   // just update the fresh_label, set canonical to false, and return.
@@ -375,7 +310,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
       pushNewElementRegion(newElt);
 
     // Increment the fresh label so it remains fresh.
-    fresh_label = Region(fresh_label + 1);
+    freshLabel = Region(freshLabel + 1);
     canonical = false;
     return;
   }
@@ -385,13 +320,13 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
   // 1. We of course need to update iter to point at fresh_label.
   //
   // 2. We need to see if this value was the last element in its current
-  // region. If so, then we need to remove the region from the transferred op
+  // region. If so, then we need to remove the region from the sending op
   // map.
   //
-  // This is important to ensure that every region in the transferredOpMap is
+  // This is important to ensure that every region in the sendingOpMap is
   // also in elementToRegionMap.
   auto oldRegion = iter.first->second;
-  iter.first->second = fresh_label;
+  iter.first->second = freshLabel;
 
   auto getValueFromOtherRegion = [&]() -> std::optional<Element> {
     for (auto pair : elementToRegionMap) {
@@ -405,7 +340,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
     if (updateHistory)
       pushRemoveElementFromRegion(*matchingElt, newElt);
   } else {
-    regionToTransferredOpMap.erase(oldRegion);
+    regionToSendingOpMap.erase(oldRegion);
     if (updateHistory)
       pushRemoveLastElementFromRegion(newElt);
   }
@@ -414,7 +349,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
     pushNewElementRegion(newElt);
 
   // Increment the fresh label so it remains fresh.
-  fresh_label = Region(fresh_label + 1);
+  freshLabel = Region(freshLabel + 1);
   canonical = false;
 }
 
@@ -425,7 +360,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
   if (oldElt == newElt)
     return;
 
-  SWIFT_DEFER { validateRegionToTransferredOpMapRegions(); };
+  SWIFT_DEFER { validateRegionToSendingOpMapRegions(); };
 
   // First try to emplace oldElt with the newRegion.
   auto newRegion = elementToRegionMap.at(newElt);
@@ -454,7 +389,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
 
   // Otherwise, we need to actually assign. In such a case, we need to see if
   // oldElt was the last element in oldRegion. If so, we need to erase the
-  // oldRegion from regionToTransferredOpMap.
+  // oldRegion from regionToSendingOpMap.
   iter.first->second = newRegion;
 
   auto getValueFromOtherRegion = [&]() -> std::optional<Element> {
@@ -469,7 +404,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
     if (updateHistory)
       pushRemoveElementFromRegion(*otherElt, oldElt);
   } else {
-    regionToTransferredOpMap.erase(oldRegion);
+    regionToSendingOpMap.erase(oldRegion);
     if (updateHistory)
       pushRemoveLastElementFromRegion(oldElt);
   }
@@ -514,22 +449,22 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
         // representative element of its region in sndReduced. We need to
         // ensure that in result, that representative and our current
         // value are in the same region. If they are the same value, we can
-        // just reuse sndEltNumber's region in result for the transferring
+        // just reuse sndEltNumber's region in result for the sending
         // check.
         if (sndEltNumber != Element(sndRegionNumber)) {
           // NOTE: History is updated by Partition::merge(...).
           resultRegion = result.merge(sndEltNumber, Element(sndRegionNumber));
         }
 
-        // Then if sndRegionNumber is transferred in sndReduced, make sure
-        // mergedRegion is transferred in result.
-        auto sndIter = snd.regionToTransferredOpMap.find(sndRegionNumber);
-        if (sndIter != snd.regionToTransferredOpMap.end()) {
-          auto resultIter = result.regionToTransferredOpMap.try_emplace(
-              resultRegion, sndIter->second);
+        // Then if sndRegionNumber is sent in sndReduced, make sure mergedRegion
+        // is sent in result.
+        auto sndIter = snd.regionToSendingOpMap.find(sndRegionNumber);
+        if (sndIter != snd.regionToSendingOpMap.end()) {
+          auto resultIter = result.regionToSendingOpMap.insert(
+              {resultRegion, sndIter->second});
           if (!resultIter.second) {
-            resultIter.first->getSecond() =
-                resultIter.first->getSecond()->merge(sndIter->second);
+            resultIter.first->second =
+                resultIter.first->second->merge(sndIter->second);
           }
         }
         continue;
@@ -548,7 +483,7 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
     // be
     // <= our representative.
     //
-    // In this case, we do not need to propagate transfer into resultRegion
+    // In this case, we do not need to propagate 'send' into resultRegion
     // since we would have handled that already when we visited our earlier
     // representative element number.
     {
@@ -558,8 +493,8 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
         result.pushMergeElementRegions(sndEltNumber, Element(sndRegionNumber));
         // We want fresh_label to always be one element larger than our
         // maximum element.
-        if (result.fresh_label <= Region(sndEltNumber))
-          result.fresh_label = Region(sndEltNumber + 1);
+        if (result.freshLabel <= Region(sndEltNumber))
+          result.freshLabel = Region(sndEltNumber + 1);
         continue;
       }
     }
@@ -572,16 +507,15 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
     assert(sndEltNumber == Element(sndRegionNumber));
     result.elementToRegionMap.insert({sndEltNumber, sndRegionNumber});
     result.pushNewElementRegion(sndEltNumber);
-    auto sndIter = snd.regionToTransferredOpMap.find(sndRegionNumber);
-    if (sndIter != snd.regionToTransferredOpMap.end()) {
-      auto fstIter = result.regionToTransferredOpMap.try_emplace(
-          sndRegionNumber, sndIter->second);
+    auto sndIter = snd.regionToSendingOpMap.find(sndRegionNumber);
+    if (sndIter != snd.regionToSendingOpMap.end()) {
+      auto fstIter = result.regionToSendingOpMap.insert(
+          {sndRegionNumber, sndIter->second});
       if (!fstIter.second)
-        fstIter.first->getSecond() =
-            fstIter.first->second->merge(sndIter->second);
+        fstIter.first->second = fstIter.first->second->merge(sndIter->second);
     }
-    if (result.fresh_label <= sndRegionNumber)
-      result.fresh_label = Region(sndEltNumber + 1);
+    if (result.freshLabel <= sndRegionNumber)
+      result.freshLabel = Region(sndEltNumber + 1);
   }
 
   // We should have preserved canonicality during the computation above. It
@@ -595,12 +529,12 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
 bool Partition::popHistory(
     SmallVectorImpl<IsolationHistory> &foundJoinedHistories) {
   // We only allow for history rewinding if we are not tracking any
-  // transferring operands. This is because the history rewinding does not
-  // care about transferring. One can either construct a new Partition from
-  // the current Partition using Partition::removingTransferringInfo or clear
-  // the transferring information using Partition::clearTransferringInfo().
-  assert(regionToTransferredOpMap.empty() &&
-         "Can only rewind history if not tracking any transferring operands");
+  // sending operands. This is because the history rewinding does not
+  // care about sending. One can either construct a new Partition from
+  // the current Partition using Partition::removeSendingOperandSet or clear
+  // the sending information using Partition::clearSendingOperandState().
+  assert(regionToSendingOpMap.empty() &&
+         "Can only rewind history if not tracking any sending operands");
 
   if (!history.getHead())
     return false;
@@ -625,20 +559,10 @@ void Partition::print(llvm::raw_ostream &os) const {
 
   os << "[";
   for (auto [regionNo, elementNumbers] : multimap.getRange()) {
-    auto iter = regionToTransferredOpMap.find(regionNo);
-    bool isTransferred = iter != regionToTransferredOpMap.end();
-    bool isClosureCaptured = false;
-    if (isTransferred) {
-      isClosureCaptured = llvm::any_of(iter->getSecond()->range(),
-                                       [](const TransferringOperand *operand) {
-                                         return operand->isClosureCaptured();
-                                       });
-    }
-
-    if (isTransferred) {
+    auto iter = regionToSendingOpMap.find(regionNo);
+    bool wasSent = iter != regionToSendingOpMap.end();
+    if (wasSent) {
       os << '{';
-      if (isClosureCaptured)
-        os << '*';
     } else {
       os << '(';
     }
@@ -647,9 +571,7 @@ void Partition::print(llvm::raw_ostream &os) const {
     for (Element i : elementNumbers) {
       os << (j++ ? " " : "") << i;
     }
-    if (isTransferred) {
-      if (isClosureCaptured)
-        os << '*';
+    if (wasSent) {
       os << '}';
     } else {
       os << ')';
@@ -667,21 +589,12 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
   multimap.setFrozen();
 
   for (auto [regionNo, elementNumbers] : multimap.getRange()) {
-    auto iter = regionToTransferredOpMap.find(regionNo);
-    bool isTransferred = iter != regionToTransferredOpMap.end();
-    bool isClosureCaptured = false;
-    if (isTransferred) {
-      isClosureCaptured = llvm::any_of(iter->getSecond()->range(),
-                                       [](const TransferringOperand *operand) {
-                                         return operand->isClosureCaptured();
-                                       });
-    }
+    auto iter = regionToSendingOpMap.find(regionNo);
+    bool wasSent = iter != regionToSendingOpMap.end();
 
     os << "Region: " << regionNo << ". ";
-    if (isTransferred) {
+    if (wasSent) {
       os << '{';
-      if (isClosureCaptured)
-        os << '*';
     } else {
       os << '(';
     }
@@ -690,17 +603,15 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
     for (Element i : elementNumbers) {
       os << (j++ ? " " : "") << i;
     }
-    if (isTransferred) {
-      if (isClosureCaptured)
-        os << '*';
+    if (wasSent) {
       os << '}';
     } else {
       os << ')';
     }
     os << "\n";
-    os << "TransferInsts:\n";
-    if (isTransferred) {
-      for (auto op : iter->getSecond()->data()) {
+    os << "SentInsts:\n";
+    if (wasSent) {
+      for (auto op : iter->second->data()) {
         os << "    ";
         op->print(os);
       }
@@ -769,7 +680,7 @@ bool Partition::is_canonical_correct() const {
 
   for (auto &[eltNo, regionNo] : elementToRegionMap) {
     // Labels should not exceed fresh_label.
-    if (regionNo >= fresh_label)
+    if (regionNo >= freshLabel)
       return fail(eltNo, 0);
 
     // The label of a region should be at most as large as each index in it.
@@ -785,8 +696,8 @@ bool Partition::is_canonical_correct() const {
       return fail(eltNo, 3);
   }
 
-  // Before we do anything, validate region to transferred op map.
-  validateRegionToTransferredOpMapRegions();
+  // Before we do anything, validate region to region to sending op map.
+  validateRegionToSendingOpMapRegions();
 
   return true;
 #endif
@@ -817,11 +728,11 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   // Rename snd and snd's entire region to fst's region.
   SmallVector<Element, 32> mergedElements;
   horizontalUpdate(snd, fstRegion, mergedElements);
-  auto iter = regionToTransferredOpMap.find(sndRegion);
-  if (iter != regionToTransferredOpMap.end()) {
+  auto iter = regionToSendingOpMap.find(sndRegion);
+  if (iter != regionToSendingOpMap.end()) {
     auto operand = iter->second;
-    regionToTransferredOpMap.erase(iter);
-    regionToTransferredOpMap.try_emplace(fstRegion, operand);
+    regionToSendingOpMap.erase(iter);
+    regionToSendingOpMap.insert({fstRegion, operand});
   }
 
   assert(is_canonical_correct());
@@ -838,7 +749,7 @@ void Partition::canonicalize() {
     return;
   canonical = true;
 
-  validateRegionToTransferredOpMapRegions();
+  validateRegionToSendingOpMapRegions();
   std::map<Region, Region> oldRegionToRelabeledMap;
 
   // We rely on in-order traversal of labels to ensure that we always take the
@@ -857,20 +768,19 @@ void Partition::canonicalize() {
 
     // The maximum index iterated over will be used here to appropriately
     // set fresh_label.
-    fresh_label = Region(eltNo + 1);
+    freshLabel = Region(eltNo + 1);
   }
 
-  // Then relabel our regionToTransferredInst map if we need to by swapping
-  // out the old map and updating.
+  // Then relabel our regionToSendingOpMap map if we need to by swapping out the
+  // old map and updating.
   //
   // TODO: If we just used an array for this, we could just rewrite and
   // re-sort and not have to deal with potential allocations.
-  decltype(regionToTransferredOpMap) oldMap =
-      std::move(regionToTransferredOpMap);
+  decltype(regionToSendingOpMap) oldMap = std::move(regionToSendingOpMap);
   for (auto &[oldReg, op] : oldMap) {
     auto iter = oldRegionToRelabeledMap.find(oldReg);
     assert(iter != oldRegionToRelabeledMap.end());
-    regionToTransferredOpMap[iter->second] = op;
+    regionToSendingOpMap[iter->second] = op;
   }
 
   assert(is_canonical_correct());
@@ -914,7 +824,7 @@ bool Partition::popHistoryOnce(
     auto iter = elementToRegionMap.find(head->getFirstArgAsElement());
     assert(iter != elementToRegionMap.end());
     Region oldRegion = iter->second;
-    regionToTransferredOpMap.erase(oldRegion);
+    regionToSendingOpMap.erase(oldRegion);
     elementToRegionMap.erase(iter);
     assert(llvm::none_of(elementToRegionMap,
                          [&](std::pair<Element, Region> pair) {
@@ -999,8 +909,10 @@ void IsolationHistory::pushRemoveLastElementFromRegion(Element element) {
 
 void IsolationHistory::pushRemoveElementFromRegion(
     Element otherElementInOldRegion, Element element) {
-  head = new (factory->allocator) Node(Node::RemoveElementFromRegion, head,
-                                       element, {otherElementInOldRegion});
+  unsigned size = Node::totalSizeToAlloc<Element>(1);
+  void *mem = factory->allocator.Allocate(size, alignof(Node));
+  head = new (mem) Node(Node::RemoveElementFromRegion, head, element,
+                        {otherElementInOldRegion});
 }
 
 void IsolationHistory::pushMergeElementRegions(Element elementToMergeInto,
@@ -1015,7 +927,8 @@ void IsolationHistory::pushMergeElementRegions(Element elementToMergeInto,
 
 // Push that \p other should be merged into this region.
 void IsolationHistory::pushCFGHistoryJoin(Node *otherNode) {
-  if (!otherNode)
+  // If otherNode is nullptr or represents our same history, do not merge.
+  if (!otherNode || otherNode == head)
     return;
 
   // If we do not have any history, just take on the history of otherNode. We
@@ -1027,8 +940,9 @@ void IsolationHistory::pushCFGHistoryJoin(Node *otherNode) {
 
   // Otherwise, create a node that joins our true head and other node as a side
   // path we can follow.
-  head = new (factory->allocator)
-      Node(Node(Node::CFGHistoryJoin, head, otherNode));
+  unsigned size = Node::totalSizeToAlloc<Element>(0);
+  void *mem = factory->allocator.Allocate(size, alignof(Node));
+  head = new (mem) Node(Node(Node::CFGHistoryJoin, head, otherNode));
 }
 
 IsolationHistory::Node *IsolationHistory::pop() {

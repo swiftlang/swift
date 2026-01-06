@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-objc-interop
 
 @objc enum Foo: Int32 {
   case Zim, Zang, Zung
@@ -26,11 +26,11 @@ enum NonObjCEnum: Int {
 
 class Bar {
   @objc func foo(x: Foo) {}
-  @objc func nonObjC(x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @objc func nonObjC(x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 }
 
 // <rdar://problem/23681566> @objc enums with payloads rejected with no source location info
-@objc enum r23681566 : Int32 {  // expected-error {{'r23681566' declares raw type 'Int32', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int32' here}}
+@objc enum r23681566 : Int32 {  // expected-error {{'r23681566' declares raw type 'Int32', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int32' here}} expected-note {{add stubs for conformance}}
   case Foo(progress: Int)     // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 

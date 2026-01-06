@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_StructLetDestructuring
 
 // 1. Build ../stored-properties.swift to a dylib and emit its interface in %t
 

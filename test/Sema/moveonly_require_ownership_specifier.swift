@@ -3,15 +3,13 @@
 // Coverage for check that requires some ownership specifier to be written
 // when a move-only / noncopyable type appears as a parameter of a function.
 
-@_moveOnly
-struct MO {
+struct MO: ~Copyable {
     var x = 0
 }
 
 struct Box<T> { var val: T }
 
-@_moveOnly
-public struct NoncopyableWrapper<T> {
+public struct NoncopyableWrapper<T>: ~Copyable {
   var x: T
 }
 

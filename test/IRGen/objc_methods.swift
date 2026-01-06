@@ -54,6 +54,7 @@ class ObjcDestructible: NSObject {
 // CHECK-ios: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK-tvos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK-watchos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
+// CHECK-xros: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK: @_INSTANCE_METHODS__TtC12objc_methods3Foo = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 10,
@@ -82,6 +83,7 @@ class ObjcDestructible: NSObject {
 // CHECK:     ptr [[FAIL_SIGNATURE]],
 // CHECK-macosx:     ptr @"$s12objc_methods3FooC4failyyKFTo"
 // CHECK-ios:     ptr @"$s12objc_methods3FooC4failyyKFTo"
+// CHECK-xros:     ptr @"$s12objc_methods3FooC4failyyKFTo"
 // CHECK:   }]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 // CHECK: @_INSTANCE_METHODS__TtC12objc_methods16ObjcDestructible = internal constant { {{.*}}] } {

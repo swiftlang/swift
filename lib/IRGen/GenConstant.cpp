@@ -29,8 +29,10 @@
 #include "ConstantBuilder.h"
 #include "DebugTypeInfo.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Support/BLAKE3.h"
 
 using namespace swift;
@@ -64,42 +66,6 @@ llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
   return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
 }
 
-llvm::Constant *irgen::emitConstantZero(IRGenModule &IGM, BuiltinInst *BI) {
-  assert(IGM.getSILModule().getBuiltinInfo(BI->getName()).ID ==
-         BuiltinValueKind::ZeroInitializer);
-
-  auto helper = [&](CanType astType) -> llvm::Constant * {
-    if (auto type = astType->getAs<BuiltinIntegerType>()) {
-      APInt zero(type->getWidth().getLeastWidth(), 0);
-      return llvm::ConstantInt::get(IGM.getLLVMContext(), zero);
-    }
-
-    if (auto type = astType->getAs<BuiltinFloatType>()) {
-      const llvm::fltSemantics *sema = nullptr;
-      switch (type->getFPKind()) {
-      case BuiltinFloatType::IEEE16: sema = &APFloat::IEEEhalf(); break;
-      case BuiltinFloatType::IEEE32: sema = &APFloat::IEEEsingle(); break;
-      case BuiltinFloatType::IEEE64: sema = &APFloat::IEEEdouble(); break;
-      case BuiltinFloatType::IEEE80: sema = &APFloat::x87DoubleExtended(); break;
-      case BuiltinFloatType::IEEE128: sema = &APFloat::IEEEquad(); break;
-      case BuiltinFloatType::PPC128: sema = &APFloat::PPCDoubleDouble(); break;
-      }
-      auto zero = APFloat::getZero(*sema);
-      return llvm::ConstantFP::get(IGM.getLLVMContext(), zero);
-    }
-
-    llvm_unreachable("SIL allowed an unknown type?");
-  };
-
-  if (auto vector = BI->getType().getAs<BuiltinVectorType>()) {
-    auto zero = helper(vector.getElementType());
-    auto count = llvm::ElementCount::getFixed(vector->getNumElements());
-    return llvm::ConstantVector::getSplat(count, zero);
-  }
-
-  return helper(BI->getType().getASTType());
-}
-
 llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
   return llvm::ConstantFP::get(IGM.getLLVMContext(), FLI->getValue());
 }
@@ -113,7 +79,9 @@ llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
   case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
   case StringLiteralInst::Encoding::UTF8_OSLOG:
-    return IGM.getAddrOfGlobalString(SLI->getValue(), false, useOSLogEncoding);
+    return IGM.getAddrOfGlobalString(
+        SLI->getValue(), useOSLogEncoding ? CStringSectionType::OSLogString
+                                          : CStringSectionType::Default);
 
   case StringLiteralInst::Encoding::ObjCSelector:
     llvm_unreachable("cannot get the address of an Objective-C selector");
@@ -301,6 +269,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     strategy.emitValueInjection(IGM, builder, ei->getElement(), data, out);
     return replaceUnalignedIntegerValues(IGM, std::move(out));
   } else if (auto *ILI = dyn_cast<IntegerLiteralInst>(operand)) {
+    if (ILI->getType().is<BuiltinIntegerLiteralType>()) {
+      auto pair = emitConstantIntegerLiteral(IGM, ILI);
+      Explosion e;
+      e.add(pair.Data);
+      e.add(pair.Flags);
+      return e;
+    }
     return emitConstantInt(IGM, ILI);
   } else if (auto *FLI = dyn_cast<FloatLiteralInst>(operand)) {
     return emitConstantFP(IGM, FLI);
@@ -309,8 +284,15 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
     auto args = BI->getArguments();
     switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
-      case BuiltinValueKind::ZeroInitializer:
-        return emitConstantZero(IGM, BI);
+      case BuiltinValueKind::ZeroInitializer: {
+        auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(BI->getType()));
+        auto schema = resultTI.getSchema();
+        Explosion out;
+        for (auto &elt : schema) {
+          out.add(llvm::Constant::getNullValue(elt.getScalarType()));
+        }
+        return out;
+      }
       case BuiltinValueKind::PtrToInt: {
         auto *ptr = emitConstantValue(IGM, args[0]).claimNextConstant();
         return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
@@ -321,8 +303,16 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
       }
       case BuiltinValueKind::ZExtOrBitCast: {
         auto *val = emitConstantValue(IGM, args[0]).claimNextConstant();
-        return llvm::ConstantExpr::getZExtOrBitCast(val,
-                                                    IGM.getStorageType(BI->getType()));
+        auto storageTy = IGM.getStorageType(BI->getType());
+
+        if (val->getType() == storageTy)
+          return val;
+
+        auto *result = llvm::ConstantFoldCastOperand(
+            llvm::Instruction::ZExt, val, storageTy, IGM.DataLayout);
+        ASSERT(result != nullptr &&
+               "couldn't constant fold initializer expression");
+        return result;
       }
       case BuiltinValueKind::StringObjectOr: {
         // It is a requirement that the or'd bits in the left argument are
@@ -355,6 +345,12 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand)) {
     return emitConstantValue(IGM, CFI->getOperand(), flatten);
 
+  } else if (auto *URCI = dyn_cast<UncheckedRefCastInst>(operand)) {
+    return emitConstantValue(IGM, URCI->getOperand(), flatten);
+
+  } else if (auto *UCI = dyn_cast<UpcastInst>(operand)) {
+    return emitConstantValue(IGM, UCI->getOperand(), flatten);
+
   } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
     SILType type = operand->getType();
     auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
@@ -380,16 +376,19 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
     CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
 
-    if (irgen::classifyFunctionPointerKind(fn).isAsyncFunctionPointer()) {
+    auto fpKind = irgen::classifyFunctionPointerKind(fn);
+    if (fpKind.isAsyncFunctionPointer()) {
       llvm::Constant *asyncFnPtr = IGM.getAddrOfAsyncFunctionPointer(fn);
       fnPtr = llvm::ConstantExpr::getBitCast(asyncFnPtr, fnPtr->getType());
+    } else if (fpKind.isCoroFunctionPointer()) {
+      llvm::Constant *coroFnPtr = IGM.getAddrOfCoroFunctionPointer(fn);
+      fnPtr = llvm::ConstantExpr::getBitCast(coroFnPtr, fnPtr->getType());
     }
 
     auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
     if (authInfo.isSigned()) {
       auto constantDiscriminator =
-          cast<llvm::Constant>(authInfo.getDiscriminator());
-      assert(!constantDiscriminator->getType()->isPointerTy());
+          cast<llvm::ConstantInt>(authInfo.getDiscriminator());
       fnPtr = IGM.getConstantSignedPointer(fnPtr, authInfo.getKey(), nullptr,
         constantDiscriminator);
     }
@@ -407,9 +406,35 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
 
     Address addr = IGM.getAddrOfSILGlobalVariable(var, ti, NotForDefinition);
     return addr.getAddress();
+  } else if (auto *gVal = dyn_cast<GlobalValueInst>(operand)) {
+    assert(IGM.canMakeStaticObjectReadOnly(gVal->getType()));
+    SILGlobalVariable *var = gVal->getReferencedGlobal();
+    auto &ti = IGM.getTypeInfo(var->getLoweredType());
+    auto expansion = IGM.getResilienceExpansionForLayout(var);
+    assert(ti.isFixedSize(expansion));
+    Address addr = IGM.getAddrOfSILGlobalVariable(var, ti, NotForDefinition);
+    return addr.getAddress();
   } else if (auto *atp = dyn_cast<AddressToPointerInst>(operand)) {
     auto *val = emitConstantValue(IGM, atp->getOperand()).claimNextConstant();
     return val;
+  } else if (auto *vector = dyn_cast<VectorInst>(operand)) {
+    if (flatten) {
+      Explosion out;
+      for (SILValue element : vector->getElements()) {
+        Explosion e = emitConstantValue(IGM, element, flatten);
+        out.add(e.claimAll());
+      }
+      return out;
+    }
+    llvm::SmallVector<llvm::Constant *, 8> elementValues;
+    for (SILValue element : vector->getElements()) {
+      auto &ti = cast<FixedTypeInfo>(IGM.getTypeInfo(element->getType()));
+      Size paddingBytes = ti.getFixedStride() - ti.getFixedSize();
+      Explosion e = emitConstantValue(IGM, element, flatten);
+      elementValues.push_back(IGM.getConstantValue(std::move(e), paddingBytes.getValue()));
+    }
+    auto *arrTy = llvm::ArrayType::get(elementValues[0]->getType(), elementValues.size());
+    return llvm::ConstantArray::get(arrTy, elementValues);
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }
@@ -442,22 +467,38 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
 
   if (IGM.canMakeStaticObjectReadOnly(OI->getType())) {
     if (!IGM.swiftImmortalRefCount) {
-      auto *var = new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
-                                        /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
-                                        /*initializer*/ nullptr, "_swiftImmortalRefCount");
-      IGM.swiftImmortalRefCount = var;
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+        // 0xffff_ffff on 32-bit, 0xffff_ffff_ffff_ffff on 64-bit
+        IGM.swiftImmortalRefCount = llvm::ConstantInt::get(IGM.IntPtrTy, -1);
+      } else {
+        IGM.swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(
+            new llvm::GlobalVariable(IGM.Module, IGM.Int8Ty,
+              /*constant*/ true, llvm::GlobalValue::ExternalLinkage,
+              /*initializer*/ nullptr, "_swiftImmortalRefCount"),
+            IGM.IntPtrTy);
+      }
     }
     if (!IGM.swiftStaticArrayMetadata) {
       auto *classDecl = IGM.getStaticArrayStorageDecl();
       assert(classDecl && "no __StaticArrayStorage in stdlib");
       CanType classTy = CanType(ClassType::get(classDecl, Type(), IGM.Context));
-      LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
-      auto *metatype = IGM.getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
-      IGM.swiftStaticArrayMetadata = cast<llvm::GlobalVariable>(metatype);
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint,
+                                                        /*forceShared=*/ true);
+        // In embedded swift, the metadata for the array buffer class only needs to be very minimal:
+        // No vtable needed, because the object is never destructed. It only contains the null super-
+        // class pointer.
+        llvm::Constant *superClass = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+        IGM.swiftStaticArrayMetadata = IGM.getAddrOfLLVMVariable(entity, superClass, DebugTypeInfo());
+      } else {
+        LinkEntity entity = LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
+        IGM.swiftStaticArrayMetadata = IGM.getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
+      }
     }
     elements[0].add(llvm::ConstantStruct::get(ObjectHeaderTy, {
       IGM.swiftStaticArrayMetadata,
-      llvm::ConstantExpr::getPtrToInt(IGM.swiftImmortalRefCount, IGM.IntPtrTy)}));
+      IGM.swiftImmortalRefCount }));
   } else {
     elements[0].add(llvm::Constant::getNullValue(ObjectHeaderTy));
   }

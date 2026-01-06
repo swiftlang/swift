@@ -12,13 +12,14 @@
 
 #if !$Embedded
 
-/// A unique identifier for a class instance or metatype.
+/// A unique identifier for a class instance, actor instance, or metatype.
 ///
-/// This unique identifier is only valid for comparisons during the lifetime
+/// This unique identifier is valid for comparisons only during the lifetime
 /// of the instance.
 ///
-/// In Swift, only class instances and metatypes have unique identities. There
-/// is no notion of identity for structs, enums, functions, or tuples.
+/// In Swift, only instances of classes, instances of actors, and metatypes
+/// have unique identities. There's no notion of identity for structures,
+/// enumerations, functions, or tuples.
 @frozen // trivial-implementation
 public struct ObjectIdentifier: Sendable {
   @usableFromInline // trivial-implementation
@@ -59,10 +60,18 @@ public struct ObjectIdentifier: Sendable {
 
   /// Creates an instance that uniquely identifies the given metatype.
   ///
-  /// - Parameter: A metatype.
-  @inlinable // trivial-implementation
+  /// - Parameters:
+  ///   - x: A metatype.
+  @_alwaysEmitIntoClient
+  public init(_ x: any (~Copyable & ~Escapable).Type) {
+    self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
+
+  @inlinable
   public init(_ x: Any.Type) {
-    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
+    // FIXME: This ought to be obsoleted in favor of the generalized overload
+    // above. Unfortunately, that one sometimes causes a runtime hang.
+    self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
 
@@ -79,8 +88,8 @@ public struct ObjectIdentifier: Sendable {
   }
 
   @inlinable // trivial-implementation
-  public init<Object>(_ x: Object.Type) {
-    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
+  public init<T: ~Copyable & ~Escapable>(_ x: T.Type) {
+    self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
 

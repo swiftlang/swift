@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -43,9 +44,12 @@ struct swift::BlockListStore::Implementation {
     }
     return std::string();
   }
+
+  Implementation(SourceManager &SM) : SM(SM.getFileSystem()) {}
 };
 
-swift::BlockListStore::BlockListStore(): Impl(*new Implementation()) {}
+swift::BlockListStore::BlockListStore(swift::SourceManager &SM)
+    : Impl(*new Implementation(SM)) {}
 
 swift::BlockListStore::~BlockListStore() { delete &Impl; }
 
@@ -111,8 +115,10 @@ void swift::BlockListStore::Implementation::addConfigureFilePath(StringRef path)
                       SM.getLLVMSourceMgr());
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
     assert(DI != Stream.end() && "Failed to read a document");
-    yaml::Node *N = DI->getRoot();
-    for (auto &pair: *dyn_cast<yaml::MappingNode>(N)) {
+    auto *MapNode = dyn_cast<yaml::MappingNode>(DI->getRoot());
+    if (!MapNode)
+      continue;
+    for (auto &pair: *MapNode) {
       std::string key = getScalaString(pair.getKey());
       auto action = llvm::StringSwitch<BlockListAction>(key)
 #define BLOCKLIST_ACTION(X) .Case(#X, BlockListAction::X)

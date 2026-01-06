@@ -21,7 +21,7 @@
 /// locations of all the negative values in `numbers`:
 ///
 ///     var numbers = [10, 12, -5, 14, -3, -9, 15]
-///     let negativeSubranges = numbers.subranges(where: { $0 < 0 })
+///     let negativeSubranges = numbers.indices(where: { $0 < 0 })
 ///     // numbers[negativeSubranges].count == 3
 ///
 ///     numbers.moveSubranges(negativeSubranges, to: 0)
@@ -251,10 +251,11 @@ extension RangeSet {
   /// Adds the contents of the given range set to this range set.
   ///
   /// - Parameter other: A range set to merge with this one.
+  ///
+  /// - Complexity: O(*m* + *n*), where *m* and *n* are the number of ranges in
+  ///   this and the other range set.
   public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
-    for range in other._ranges {
-      insert(contentsOf: range)
-    }
+    self = self.union(other)
   }
   
   /// Removes the contents of this range set that aren't also in the given
@@ -293,9 +294,7 @@ extension RangeSet {
   public __consuming func union(
     _ other: __owned RangeSet<Bound>
   ) -> RangeSet<Bound> {
-    var result = self
-    result.formUnion(other)
-    return result
+    return RangeSet(_ranges: _ranges._union(other._ranges))
   }
   
   /// Returns a new range set containing the contents of both this set and the
@@ -399,6 +398,7 @@ extension RangeSet {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension RangeSet: CustomStringConvertible {
   public var description: String {
     return _ranges.description

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 // Ensure that a protocol with async requirements can be conformed to by
 // non-async requirements, and that overloading works.

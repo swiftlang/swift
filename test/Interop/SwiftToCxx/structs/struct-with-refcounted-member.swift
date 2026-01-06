@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 class RefCountedClass {
     init() {
@@ -58,10 +58,4 @@ public func printBreak(_ x: Int) {
 // CHECK-NEXT:     vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:   return *this;
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember &operator =(StructWithRefcountedMember &&other) = delete;
-// CHECK-NEXT:   SWIFT_INLINE_PRIVATE_HELPER StructWithRefcountedMember(StructWithRefcountedMember &&) noexcept {
-// CHECK-NEXT:  swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_supported_yet();
-// CHECK-NEXT:  swift::_impl::_swift_stdlib_reportFatalError("swift", 5, "C++ does not support moving a Swift value yet", 45, 0);
-// CHECK-NEXT:  abort();
-// CHECK-NEXT: }
 // CHECK-NEXT: private:

@@ -34,6 +34,12 @@ public protocol Proto<Assoc> {
   associatedtype Assoc
 }
 
+struct HasValueGenericParam<let Param: Int> {
+  func foo() {
+    _ = Param
+  }
+}
+
 // RUN: %sourcekitd-test -req=cursor -pos=1:10 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: <Declaration>func testGenerics&lt;T&gt;(x: <Type usr="s:15cursor_generics12testGenerics1xyx_tlF1TL_xmfp">T</Type>)</Declaration>
 
@@ -69,3 +75,7 @@ public protocol Proto<Assoc> {
 // CHECK_ASSOC_COMMON-NEXT: source.refactoring.kind.rename.global
 // CHECK_ASSOC_COMMON-NEXT: Global Rename
 // CHECK_ASSOC_COMMON-NEXT: ACTIONS END
+
+// RUN: %sourcekitd-test -req=cursor -pos=39:9 %s -- %s | %FileCheck -check-prefix=CHECK_VALUE_GENERIC %s
+// CHECK_VALUE_GENERIC: source.lang.swift.ref.generic_type_param (37:33-37:38)
+// CHECK_VALUE_GENERIC: <Declaration>let Param : <Type usr="s:Si">Int</Type></Declaration>

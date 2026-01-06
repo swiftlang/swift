@@ -11,8 +11,13 @@ project(swift-stdlib LANGUAGES C CXX)
 # being built on Windows.  Since we know that we only support `clang-cl` as the
 # compiler for the runtime due to the use of the Swift calling convention, we
 # simply override the CMake behaviour unconditionally.
-set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-Isystem")
-set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-Isystem")
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-imsvc ")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-imsvc ")
+else()
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-Isystem")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-Isystem")
+endif()
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
@@ -227,12 +232,6 @@ swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 # Create the libexec targets
 swift_create_stdlib_targets("swift-libexec" "" TRUE)
 swift_create_stdlib_targets("swift-test-libexec" "" FALSE)
-
-# Check whether the Swift compiler we're using supports
-# -disable-implicit-backtracing-module-import
-include(SwiftImplicitImport)
-
-swift_supports_implicit_module("backtracing" SWIFT_COMPILER_SUPPORTS_BACKTRACING)
 
 # FIXME: Include the toolchain directory before the public directory. Otherwise
 # the clang resource directory symlink stops installing correctly.

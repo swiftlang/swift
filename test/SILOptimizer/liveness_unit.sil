@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 sil_stage canonical
 
 import Builtin
@@ -80,7 +82,7 @@ bb3:
 // CHECK-LABEL: testReborrow: multidef_liveness
 // CHECK: MultiDef lifetime analysis:
 // CHECK:   def value:   [[B:%.*]] = begin_borrow %0 : $C
-// CHECK:   def value:   [[RB:%.*]] = argument of bb3 : $C
+// CHECK:   def value:   [[RB:%.*]] = borrowed {{.*}} from (%0 : $C)
 // CHECK-NEXT: bb2: LiveWithin
 // CHECK-NEXT: bb3: LiveWithin
 // CHECK-NEXT: lifetime-ending user:   br bb3([[B]] : $C)
@@ -101,7 +103,8 @@ bb2:
   debug_value [trace] %borrow2 : $C
   br bb3(%borrow2 : $C)
 
-bb3(%reborrow : @guaranteed $C):
+bb3(%8 : @guaranteed $C):
+  %reborrow = borrowed %8 from (%0)
   debug_value [trace] %reborrow : $C
   end_borrow %reborrow : $C
   br bb4
@@ -225,11 +228,11 @@ bb4(%phi : @owned $C):
 // CHECK-LABEL: testSSADeadRefElementAddr: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: bb0: LiveOut
-// CHECK-NEXT: bb2: LiveOut
 // CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
 // CHECK-NEXT: bb1: LiveOut
-// CHECK: ref_element_addr %6 : $D, #D.object
-// CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa_liveness
+// CHECK: ref_element_addr %7 : $D, #D.object
+// CHECK: end running test 1 of 1 on testSSADeadRefElementAddr: ssa_liveness
 sil [ossa] @testSSADeadRefElementAddr : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   specify_test "ssa_liveness @argument[0]"
@@ -243,7 +246,8 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%phi : @guaranteed $D):
+bb3(%7 : @guaranteed $D):
+  %phi = borrowed %7 from (%0)
   %f = ref_element_addr %phi : $D, #D.object  
   %99 = tuple()
   return %99 : $()
@@ -254,9 +258,11 @@ bb3(%phi : @guaranteed $D):
 // CHECK-LABEL: testSSAInnerReborrowedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
-// CHECK-NEXT: bb0: LiveWithin
-// CHECK-NEXT: regular user: br bb1(
-// CHECK-NEXT: last user: br bb1(
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $C, %{{.*}} : $PairC)
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
 // CHECK-NEXT: end running
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -265,7 +271,9 @@ bb0(%0 : @guaranteed $C):
   %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
   br bb1(%borrow0 : $C, %aggregate : $PairC)
 
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+bb1(%5 : @guaranteed $C, %6 : @guaranteed $PairC):
+  %phi = borrowed %6 from (%5)
+  %reborrow = borrowed %5 from (%0)
   %first = struct_extract %phi : $PairC, #PairC.first
   %d = unchecked_ref_cast %first : $C to $D
   %f = ref_element_addr %d : $D, #D.object  
@@ -285,12 +293,11 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // CHECK-LABEL: testSSADeadGuaranteedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: bb0: LiveOut
-// CHECK-NEXT: bb2: LiveWithin
-// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
 // CHECK-NEXT: regular user
-// CHECK: last user:
-// CHECK-SAME: br bb3
-// CHECK-NEXT: last user:   br bb3
+// CHECK: last user:   %7 = borrowed %6 : $D from (%0 : $C)
 // CHECK-NEXT: end running
 sil [ossa] @testSSADeadGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
@@ -305,7 +312,8 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%deadPhi : @guaranteed $D):
+bb3(%7 : @guaranteed $D):
+  %deadPhi = borrowed %7 from (%0)
   %99 = tuple()
   return %99 : $()
 }
@@ -315,9 +323,10 @@ bb3(%deadPhi : @guaranteed $D):
 // CHECK-LABEL: testSSADominatedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: bb0: LiveOut
-// CHECK-NEXT: bb2: LiveOut
 // CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
 // CHECK-NEXT: bb1: LiveOut
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %6 : $D from (%0 : $C)
 // CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
 // CHECK-NEXT: regular user:   br bb3
 // CHECK-NEXT: regular user:   %{{.*}} = load
@@ -338,7 +347,8 @@ bb2:
   %d2 = unchecked_ref_cast %0 : $C to $D
   br bb3(%d2 : $D)
 
-bb3(%phi : @guaranteed $D):
+bb3(%7 : @guaranteed $D):
+  %phi = borrowed %7 from (%0)
   %f = ref_element_addr %phi : $D, #D.object  
   %o = load [copy] %f : $*C
   destroy_value %o : $C
@@ -357,19 +367,21 @@ bb3(%phi : @guaranteed $D):
 sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
 bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
   specify_test "ssa_liveness @argument[0]"
-  %borrow1 = begin_borrow %1 : $C
-  %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
-  br bb1(%borrow1 : $C, %aggregate : $PairC)
+  %3 = begin_borrow %1
+  %4 = struct $PairC (%0, %3)
+  br bb1(%3, %4)
 
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
-  %first = struct_extract %phi : $PairC, #PairC.first
-  %d = unchecked_ref_cast %first : $C to $D
-  %f = ref_element_addr %d : $D, #D.object  
-  %o = load [copy] %f : $*C
-  destroy_value %o : $C
-  end_borrow %reborrow : $C
-  %99 = tuple()
-  return %99 : $()
+bb1(%6 : @reborrow $C, %7 : @guaranteed $PairC):
+  %8 = borrowed %7 from (%6, %0)
+  %9 = borrowed %6 from (%1)
+  %10 = struct_extract %8, #PairC.first
+  %11 = unchecked_ref_cast %10 to $D
+  %12 = ref_element_addr %11, #D.object
+  %13 = load [copy] %12
+  destroy_value %13
+  end_borrow %9
+  %16 = tuple ()
+  return %16
 }
 
 // The phi is protected by an outer adjacent reborrow. It is not part
@@ -378,7 +390,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // CHECK-LABEL: testSSAReborrowedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = begin_borrow
 // CHECK-NEXT: bb0: LiveWithin
-// CHECK-NEXT: regular user: br bb1
+// CHECK-NEXT: lifetime-ending user: br bb1
 // CHECK-NEXT: regular user: %{{.*}} = struct
 // CHECK-NEXT: last user: br bb1
 // CHECK-NEXT: end running
@@ -390,7 +402,9 @@ bb0(%0 : @guaranteed $C):
   %aggregate = struct $PairC(%borrow : $C, %borrow : $C)
   br bb1(%borrow : $C, %aggregate : $PairC)
 
-bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
+bb1(%6 : @guaranteed $C, %7 : @guaranteed $PairC):
+  %phi = borrowed %7 from (%6)
+  %reborrow = borrowed %6 from (%0)
   %first = struct_extract %phi : $PairC, #PairC.first
   %d = unchecked_ref_cast %first : $C to $D
   %f = ref_element_addr %d : $D, #D.object  

@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "fso-owned-to-guaranteed-transform"
 #include "FunctionSignatureOpts.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "llvm/Support/CommandLine.h"
@@ -79,7 +80,23 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
     if (!A.canOptimizeLiveArg()) {
       continue;
     }
+    if (A.Arg->getType().isMoveOnly()) {
+      // We must not do this transformation for non-copyable types, because it's
+      // not safe to insert a compensating release_value at the call site. This
+      // release_value calls the deinit which might have been already de-
+      // virtualized in the callee.
+      continue;
+    }
 
+    // Make sure that an @in argument is not mutated otherwise than destroyed,
+    // because an @in_guaranteed argument must not be mutated.
+    if (A.hasConvention(SILArgumentConvention::Indirect_In) &&
+        // With opaque values, @in arguments can have non-address types.
+        A.Arg->getType().isAddress() &&
+        isIndirectArgumentMutated(A.Arg, /*ignoreDestroys=*/ true, /*defaultIsMutating=*/true)) {
+      continue;
+    }
+  
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     // See if we can find a destroy_addr at the end of this function if our

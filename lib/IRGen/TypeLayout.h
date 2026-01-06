@@ -33,6 +33,7 @@ enum class TypeLayoutEntryKind : uint8_t {
   Resilient,
   Enum,
   TypeInfoBased,
+  Array,
 };
 
 enum class ScalarKind : uint8_t {
@@ -722,6 +723,73 @@ public:
 #endif
 };
 
+class ArrayLayoutEntry : public TypeLayoutEntry, public llvm::FoldingSetNode {
+public:
+  TypeLayoutEntry *elementLayout;
+  SILType elementType;
+  CanType countType;
+
+  ArrayLayoutEntry(TypeLayoutEntry *elementLayout, SILType elementType,
+                   CanType countType)
+      : TypeLayoutEntry(TypeLayoutEntryKind::Array),
+        elementLayout(elementLayout), elementType(elementType),
+        countType(countType) {}
+
+  ~ArrayLayoutEntry();
+
+  void computeProperties() override;
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const;
+  static void Profile(llvm::FoldingSetNodeID &ID, TypeLayoutEntry *elementLayout,
+                      SILType elementType, CanType countType);
+
+  llvm::Value *alignmentMask(IRGenFunction &IGF) const override;
+  llvm::Value *size(IRGenFunction &IGF) const override;
+  llvm::Value *extraInhabitantCount(IRGenFunction &IGF) const override;
+  bool isTriviallyDestroyable() const override;
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override;
+  bool isSingleRetainablePointer() const override;
+  std::optional<Size> fixedSize(IRGenModule &IGM) const override;
+  bool isFixedSize(IRGenModule &IGM) const override;
+  std::optional<Alignment> fixedAlignment(IRGenModule &IGM) const override;
+  std::optional<uint32_t> fixedXICount(IRGenModule &IGM) const override;
+  llvm::Value *isBitwiseTakable(IRGenFunction &IGF) const override;
+  llvm::Type *getStorageType(IRGenFunction &IGF) const;
+
+  void destroy(IRGenFunction &IGF, Address addr) const override;
+
+  void assignWithCopy(IRGenFunction &IGF, Address dest,
+                      Address src) const override;
+  void assignWithTake(IRGenFunction &IGF, Address dest,
+                      Address src) const override;
+
+  void initWithCopy(IRGenFunction &IGF, Address dest,
+                    Address src) const override;
+  void initWithTake(IRGenFunction &IGF, Address dest,
+                    Address src) const override;
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address addr) const override;
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *tag,
+                                 llvm::Value *numEmptyCases,
+                                 Address enumAddr) const override;
+
+  llvm::Constant *layoutString(IRGenModule &IGM,
+                               GenericSignature genericSig) const override;
+  bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
+                      GenericSignature genericSig) const override;
+
+  std::optional<const FixedTypeInfo *> getFixedTypeInfo() const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void dump() const override;
+#endif
+};
+
 class TypeLayoutCache {
   llvm::BumpPtrAllocator bumpAllocator;
 
@@ -731,6 +799,7 @@ class TypeLayoutCache {
   llvm::FoldingSet<EnumTypeLayoutEntry> enumEntries;
   llvm::FoldingSet<ResilientTypeLayoutEntry> resilientEntries;
   llvm::FoldingSet<TypeInfoBasedTypeLayoutEntry> typeInfoBasedEntries;
+  llvm::FoldingSet<ArrayLayoutEntry> arrayEntries;
 
   TypeLayoutEntry emptyEntry;
 public:
@@ -755,6 +824,10 @@ public:
   getOrCreateTypeInfoBasedEntry(const TypeInfo &ti, SILType representative);
 
   ResilientTypeLayoutEntry *getOrCreateResilientEntry(SILType ty);
+
+  ArrayLayoutEntry *getOrCreateArrayEntry(TypeLayoutEntry *elementLayout,
+                                          SILType elementType,
+                                          CanType countType);
 
   TypeLayoutEntry *getEmptyEntry();
 };

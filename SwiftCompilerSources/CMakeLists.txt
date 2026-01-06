@@ -6,6 +6,8 @@
 # See http://swift.org/LICENSE.txt for license information
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
+include(SwiftUtils)
+
 # Following function are needed as a workaround until it's possible to compile
 # swift code with cmake's builtin swift support.
 
@@ -98,21 +100,24 @@ function(add_swift_compiler_modules_library name)
                         "DEPENDS"
                         ${ARGN})
 
-  # Prior to 5.9, we have to use the experimental flag for C++ interop.
-  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-    set(cxx_interop_flag "-enable-experimental-cxx-interop")
-  else()
-    set(cxx_interop_flag "-cxx-interoperability-mode=default")
-  endif()
-
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "${cxx_interop_flag}"
+      "-cxx-interoperability-mode=default"
       "-Xfrontend" "-disable-target-os-checking"
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
+  # Pass the declared C++ stdlib for swift's internal clang.
+  set(swift_compile_cxx_flags ${CMAKE_CXX_FLAGS})
+  separate_arguments(swift_compile_cxx_flags)
+  foreach(cxx_flag ${swift_compile_cxx_flags})
+    if (cxx_flag MATCHES "^-stdlib=")
+      list(APPEND swift_compile_options "-Xcc" ${cxx_flag})
+      break()
+    endif()
+  endforeach()
 
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
@@ -121,15 +126,31 @@ function(add_swift_compiler_modules_library name)
         "-Xfrontend" "${SWIFT_MIN_RUNTIME_VERSION}")
     endif()
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
+
+    # We cannot use Unsafe*Pointer when importing C++ move-only types until the
+    # host libraries are updated to Swift 6.0, because that importing strategy
+    # requires _Pointer have its Pointee: ~Copyable. (rdar://128013193)
+    list(APPEND swift_compile_options "-Xfrontend" "-cxx-interop-use-opaque-pointer-for-moveonly")
   endif()
 
-  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  is_build_type_with_debuginfo("${CMAKE_BUILD_TYPE}" debug)
+  if (debug)
     list(APPEND swift_compile_options "-g")
-  else()
-    list(APPEND swift_compile_options "-O" "-cross-module-optimization")
   endif()
 
-  if(NOT LLVM_ENABLE_ASSERTIONS)
+  is_build_type_optimized("${CMAKE_BUILD_TYPE}" optimized)
+  if (optimized)
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+      list(APPEND swift_compile_options "-Osize")
+    else()
+      list(APPEND swift_compile_options "-O")
+    endif()
+    list(APPEND swift_compile_options "-cross-module-optimization")
+  endif()
+
+  if(LLVM_ENABLE_ASSERTIONS)
+    list(APPEND swift_compile_options "-Xcc" "-UNDEBUG")
+  else()
     list(APPEND swift_compile_options "-Xcc" "-DNDEBUG")
   endif()
 
@@ -166,7 +187,50 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-  list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND swift_compile_options "-static")
+    list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+    # For "swift/shims/*.h".
+    list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib")
+
+    # Workaround a crash in the LoadableByAddress pass
+    # https://github.com/apple/swift/issues/73254
+    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
+
+    # MSVC 14.40 (VS 17.10, MSVC_VERSION 1940) added a requirement for Clang 17 or higher.
+    # Swift 6.0 is the first version to include Clang 17.
+    # MSVC 14.43 (VS 17.13, MSVC_VERSION 1943) added a requirement for Clang 18 or higher.
+    # Swift 6.1 is the first version to include Clang 18.
+    # These requirements can be found in `include/yvals_core.h` in the MSVC headers.
+    # Bootstrapping generally uses toolchains with older versions of Clang, so if we are on Windows
+    # and using an earlier toolchain, we need to relax this requirement by setting
+    # `_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH`.
+    if((CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0 AND MSVC_VERSION VERSION_GREATER_EQUAL 1940) OR
+       (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.1 AND MSVC_VERSION VERSION_GREATER_EQUAL 1943))
+      list(APPEND swift_compile_options "-Xcc" "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
+    endif()
+
+    # Make 'offsetof()' a const value.
+    list(APPEND swift_compile_options "-Xcc" "-D_CRT_USE_BUILTIN_OFFSETOF")
+
+    # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+    list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
+
+  elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
+    # Detect and handle swiftly-managed hosts.
+    execute_process(COMMAND swiftly use --print-location
+      OUTPUT_VARIABLE swiftly_dir
+      ERROR_VARIABLE err)
+    if(err)
+      message(SEND_ERROR "Failed to find swiftly Swift compiler")
+    endif()
+    string(STRIP "${swiftly_dir}" swiftly_dir)
+
+    list(APPEND sdk_option "-I" "${swiftly_dir}/usr/lib" "-I" "${swiftly_dir}/usr/lib")
+  else()
+    list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+  endif()
 
   set(all_obj_files)
   set(all_module_targets)
@@ -192,11 +256,20 @@ function(add_swift_compiler_modules_library name)
       endforeach()
     endif()
 
-    set(module_obj_file "${build_dir}/${module}.o")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      # swift-driver when non-optimizing in not Mach-O  platforms adds an extra
+      # job wrapmodule that uses the {module-name}.o as output, which clashes
+      # with the name chosen here. Use a different name in those cases.
+      set(module_obj_file "${build_dir}/${module}.object.o")
+      set(output_obj_files "${module_obj_file}" "${build_dir}/${module}.o")
+    else()
+      set(module_obj_file "${build_dir}/${module}.o")
+      set(output_obj_files "${module_obj_file}")
+    endif()
     set(module_file "${build_dir}/${module}.swiftmodule")
     list(APPEND all_module_files ${module_file})
 
-    set(all_obj_files ${all_obj_files} ${module_obj_file})
+    list(APPEND all_obj_files ${output_obj_files})
     set(c_include_paths
       # LLVM modules and headers.
       "${LLVM_MAIN_INCLUDE_DIR}"
@@ -225,7 +298,7 @@ function(add_swift_compiler_modules_library name)
         ${c_include_paths_args}
         # Generated swift modules.
         "-I" "${build_dir}"
-      OUTPUT ${module_obj_file}
+      OUTPUT ${output_obj_files}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
         importedHeaderDependencies
@@ -239,15 +312,12 @@ function(add_swift_compiler_modules_library name)
   endforeach()
 
   # Create a static library containing all module object files.
-  if (XCODE)
-    # Xcode does not compile libraries that contain only object files.
-    # Therefore, it fails to create the static library. As a workaround,
-    # we add an empty source file force_lib.c to the target.
-    set(all_obj_files force_lib.c ${all_obj_files})
-  endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   # Downstream linking should include the swiftmodule in debug builds to allow lldb to
   # work correctly. Only do this on Darwin since neither gold (currently used by default
@@ -291,7 +361,7 @@ else()
         message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
       endif()
 
-      set(min_supported_swift_version 5.8)
+      set(min_supported_swift_version 5.9)
       if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
         message(FATAL_ERROR
             "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "
@@ -304,7 +374,7 @@ else()
 
   elseif(BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
 
-    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0)
+    set(b0_deps swift-frontend-bootstrapping0 symlink-headers-bootstrapping0 copy-legacy-layouts)
     set(b1_deps swift-frontend-bootstrapping1 symlink-headers-bootstrapping1)
     if(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       list(APPEND b0_deps swiftCore-bootstrapping0)

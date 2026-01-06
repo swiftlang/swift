@@ -1,0 +1,110 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+// CHECK-LABEL: begin running test {{.*}} on with_trap: dead_end_blocks
+// CHECK-LABEL: sil @with_trap : {{.*}} {
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'with_trap'
+// CHECK:       [[DIE]]
+// CHECK-LABEL: end running test {{.*}} on with_trap: dead_end_blocks
+sil @with_trap : $@convention(thin) () -> () {
+entry:
+  specify_test "dead_end_blocks"
+  cond_br undef, die, exit
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on with_infinite_loop: dead_end_blocks
+// CHECK-LABEL: sil @with_infinite_loop : $@convention(thin) () -> () {
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         br [[LOOP]]
+// CHECK-LABEL: } // end sil function 'with_infinite_loop'
+// CHECK:       [[HEADER]]
+// CHECK:       [[LOOP]]
+// CHECK-LABEL: end running test {{.*}} on with_infinite_loop: dead_end_blocks
+sil @with_infinite_loop : $@convention(thin) () -> () {
+entry:
+  specify_test "dead_end_blocks"
+  cond_br undef, exit, header
+header:
+  br loop
+loop:
+  br loop
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// no dead ends - simple return
+// CHECK-LABEL: begin running test {{.*}} on simple_function: has_any_dead_ends
+// CHECK:         no dead ends
+// CHECK-LABEL: end running test {{.*}} on simple_function: has_any_dead_ends
+sil @simple_function : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// dead ends - unreachable blocks
+// CHECK-LABEL: begin running test {{.*}} on function_with_dead_ends: has_any_dead_ends
+// CHECK:         has dead ends
+// CHECK-LABEL: end running test {{.*}} on function_with_dead_ends: has_any_dead_ends
+sil @function_with_dead_ends : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  cond_br undef, die, exit
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// dead ends – infinite loop
+// CHECK-LABEL: begin running test {{.*}} on function_with_loop: has_any_dead_ends
+// CHECK:         has dead ends
+// CHECK-LABEL: end running test {{.*}} on function_with_loop: has_any_dead_ends
+sil @function_with_loop : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  cond_br undef, exit, loop
+
+loop:
+  br loop
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// no dead ends – conditional branches but all paths return
+// CHECK-LABEL: begin running test {{.*}} on branching_no_dead_ends: has_any_dead_ends
+// CHECK:         no dead ends
+// CHECK-LABEL: end running test {{.*}} on branching_no_dead_ends: has_any_dead_ends
+sil @branching_no_dead_ends : $@convention(thin) () -> () {
+entry:
+  specify_test "has_any_dead_ends"
+  cond_br undef, then, else
+
+then:
+  br else
+
+else:
+  %retval2 = tuple ()
+  return %retval2 : $()
+}

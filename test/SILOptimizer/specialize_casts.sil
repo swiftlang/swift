@@ -1,0 +1,62 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import Foundation
+
+public enum ResultType : Equatable {
+  case object(NSObject)
+  case undefined
+  internal init<T>(metatypeOf value: T)
+}
+
+// CHECK-LABEL: // specialized callee_anyobject
+// CHECK-LABEL: sil shared [ossa] @$s16callee_anyobjectyXl_Tt0g5 :
+// CHECK: checked_cast_addr_br 
+// CHECK-LABEL: } // end sil function '$s16callee_anyobjectyXl_Tt0g5'
+sil hidden [ossa] @callee_anyobject : $@convention(method) <T> (@in T, @thin ResultType.Type) -> @owned ResultType {
+bb0(%0 : $*T, %1 : $@thin ResultType.Type):
+  %3 = alloc_stack $T
+  copy_addr %0 to [init] %3
+  %5 = alloc_stack $NSObject
+  checked_cast_addr_br copy_on_success T in %3 to NSObject in %5, bb1, bb2
+
+bb1:
+  destroy_addr %0
+  %8 = enum $ResultType, #ResultType.undefined!enumelt
+  destroy_addr %5
+  dealloc_stack %5
+  br bb5(%8)
+
+bb2:
+  destroy_addr %0
+  dealloc_stack %5
+  %28 = enum $ResultType, #ResultType.undefined!enumelt
+  br bb5(%28)
+
+bb5(%30 : @owned $ResultType):
+  destroy_addr %3
+  dealloc_stack %3
+  %34 = move_value [lexical] %30
+  return %34
+}
+
+sil hidden [ossa] @caller_anyobject : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = metatype $@thin ResultType.Type
+  %2 = alloc_stack $AnyObject
+  store %0 to [init] %2
+  %4 = function_ref @callee_anyobject : $@convention(method) <τ_0_0> (@in τ_0_0, @thin ResultType.Type) -> @owned ResultType
+  %5 = apply %4<AnyObject>(%2, %1) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin ResultType.Type) -> @owned ResultType
+  dealloc_stack %2
+  destroy_value %5
+  %8 = tuple ()
+  return %8
+}
+

@@ -41,8 +41,10 @@ class ObjCReason {
 public:
   // The kind of reason.
   enum Kind {
-    /// Has the '@cdecl' attribute.
+    /// Has the '@c' attribute.
     ExplicitlyCDecl,
+    /// Has the '@_cdecl' attribute.
+    ExplicitlyUnderscoreCDecl,
     /// Has the 'dynamic' modifier.
     ExplicitlyDynamic,
     /// Has an explicit '@objc' attribute.
@@ -71,7 +73,7 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
-    /// Is it a member of an \@\_objcImplementation extension.
+    /// Is it a member of an \@objc \@implementation extension.
     MemberOfObjCImplementationExtension,
     /// Has an explicit '@objc' attribute added by an access note, rather than
     /// written in source code.
@@ -101,6 +103,7 @@ private:
   static bool requiresAttr(Kind kind) {
     switch (kind) {
     case ExplicitlyCDecl:
+    case ExplicitlyUnderscoreCDecl:
     case ExplicitlyDynamic:
     case ExplicitlyObjC:
     case ExplicitlyObjCMembers:
@@ -153,13 +156,20 @@ public:
   /// requirement, retrieve the requirement.
   ValueDecl *getObjCRequirement() const {
     assert(kind == WitnessToObjC);
-    return declOrAttr.get<ValueDecl *>();
+    return cast<ValueDecl *>(declOrAttr);
   }
 
   DeclAttribute *getAttr() const {
     if (!requiresAttr(kind))
       return nullptr;
-    return declOrAttr.get<DeclAttribute *>();
+    return cast<DeclAttribute *>(declOrAttr);
+  }
+
+  // The foreign language targeted by the context.
+  ForeignLanguage getForeignLanguage() const {
+    if (kind == ExplicitlyCDecl)
+      return ForeignLanguage::C;
+    return ForeignLanguage::ObjectiveC;
   }
 
   void setAttrInvalid() const;
@@ -183,7 +193,7 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 
 /// Determine whether the given function can be represented in Objective-C,
 /// and figure out its foreign error convention (if any).
-bool isRepresentableInObjC(
+bool isRepresentableInLanguage(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention);
@@ -212,9 +222,8 @@ bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 ///
 /// For properties, the selector should be a zero-parameter selector of the
 /// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
-                            std::optional<ObjCSelector> nameOpt,
-                            std::optional<ObjCSelector> targetNameOpt,
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, const Decl *decl,
+                            ObjCSelector name, ObjCSelector targetName,
                             bool ignoreImpliedName = false);
 
 } // end namespace swift

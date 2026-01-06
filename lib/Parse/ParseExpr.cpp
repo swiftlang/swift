@@ -16,8 +16,10 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Basic/StringExtras.h"
@@ -33,6 +35,10 @@
 
 using namespace swift;
 
+bool Token::isEditorPlaceholder() const {
+  return is(tok::identifier) && Identifier::isEditorPlaceholder(getRawText());
+}
+
 /// parseExpr
 ///
 ///   expr:
@@ -40,10 +46,6 @@ using namespace swift;
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen)
-    return parseExprFromSyntaxTree();
-#endif
   // If we are parsing a refutable pattern, check to see if this is the start
   // of a let/var/is pattern.  If so, parse it as an UnresolvedPatternExpr and
   // let pattern type checking determine its final form.
@@ -383,6 +385,7 @@ done:
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
+///     'unsafe' expr-sequence-element(Mode)
 ///     '_move' expr-sequence-element(Mode)
 ///     'borrow' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
@@ -417,7 +420,28 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
     }
 
-   return sub;
+    return sub;
+  }
+
+  if (Tok.isContextualKeyword("unsafe") &&
+      !(peekToken().isAtStartOfLine() ||
+        peekToken().isAny(tok::r_paren, tok::r_brace, tok::r_square, tok::equal,
+                          tok::colon, tok::comma, tok::eof) ||
+        (isExprBasic && peekToken().is(tok::l_brace)) ||
+        peekToken().is(tok::period) ||
+        (peekToken().isAny(tok::l_paren, tok::l_square) &&
+         peekToken().getRange().getStart() == Tok.getRange().getEnd()) ||
+        peekToken().isBinaryOperatorLike() ||
+        peekToken().isPostfixOperatorLike())) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc unsafeLoc = consumeToken();
+    ParserResult<Expr> sub =
+      parseExprSequenceElement(diag::expected_expr_after_unsafe, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) UnsafeExpr(unsafeLoc, sub.get()));
+    }
+
+    return sub;
   }
 
   if (Tok.isContextualKeyword("consume")
@@ -483,6 +507,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
        peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {
     ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
     auto *typeExpr = new (Context) TypeExpr(ty.get());
     return makeParserResult(typeExpr);
   }
@@ -524,8 +551,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse '@' sign, 'inout' or 'nonisolated' as a attributed typerepr.
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      Tok.isContextualKeyword("nonisolated")) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);
@@ -730,13 +758,11 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     }
 
     auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
-    bool unusedHasBindOptional = false;
 
     // Inside a keypath's path, the period always behaves normally: the key path
     // behavior is only the separation between type and path.
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
-                                        /*periodHasKeyPathBehavior=*/false,
-                                        unusedHasBindOptional);
+                                        /*periodHasKeyPathBehavior=*/false);
     parseStatus |= pathResult;
   }
 
@@ -801,7 +827,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   ParserStatus status;
   SourceLoc LastDotLoc;
   DeclNameOptions flags = DeclNameFlag::AllowCompoundNames |
-                          DeclNameFlag::AllowLowercaseAndUppercaseSelf;
+                          DeclNameFlag::AllowLowercaseAndUppercaseSelf |
+                          DeclNameFlag::ModuleSelectorUnsupported;
   while (true) {
     // Handle code completion.
     if (Tok.is(tok::code_complete))
@@ -817,8 +844,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     }
 
     // Record the name we parsed.
-    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
-                                                      nameLoc.getBaseNameLoc());
+    auto component = KeyPathExpr::Component::forUnresolvedMember(
+        name, FunctionRefInfo::unappliedBaseName(), nameLoc.getBaseNameLoc());
     components.push_back(component);
 
     // After the first component, we can start parsing keywords.
@@ -1031,27 +1058,10 @@ void Parser::tryLexRegexLiteral(bool forUnappliedOperator) {
 /// parseExprSuper
 ///
 ///   expr-super:
-///     expr-super-member
-///     expr-super-init
-///     expr-super-subscript
-///   expr-super-member:
-///     'super' '.' identifier
-///   expr-super-init:
-///     'super' '.' 'init'
-///   expr-super-subscript:
-///     'super' '[' expr ']'
+///     'super'
 ParserResult<Expr> Parser::parseExprSuper() {
   // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
-
-  // 'super.' must be followed by a member ref, explicit initializer ref, or
-  // subscript call.
-  if (!Tok.isAny(tok::period, tok::period_prefix, tok::code_complete) &&
-      !Tok.isFollowingLSquare()) {
-    if (!consumeIf(tok::unknown))
-      diagnose(Tok, diag::expected_dot_or_subscript_after_super);
-    return nullptr;
-  }
 
   return makeParserResult(new (Context) SuperRefExpr(/*selfDecl=*/nullptr,
                                                      superLoc,
@@ -1117,6 +1127,10 @@ bool Parser::isStartOfGetSetAccessor() {
 
   // Eat the "{".
   consumeToken(tok::l_brace);
+
+  // '@_accessorBlock' is a builtin disambiguation marker.
+  if (peekToken().isContextualKeyword("_accessorBlock"))
+    return true;
 
   // Eat attributes, if present.
   while (consumeIf(tok::at_sign)) {
@@ -1228,10 +1242,7 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
 
 ParserResult<Expr>
 Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
-                               bool periodHasKeyPathBehavior,
-                               bool &hasBindOptional) {
-  hasBindOptional = false;
-
+                               bool periodHasKeyPathBehavior) {
   // Handle suffix expressions.
   while (1) {
     // FIXME: Better recovery.
@@ -1292,7 +1303,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       }
 
       // Handle "x.self" expr.
-      if (Tok.is(tok::kw_self)) {
+      if (Tok.is(tok::kw_self) && !peekToken().is(tok::colon_colon)) {
         Result = makeParserResult(
             Result,
             new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
@@ -1317,9 +1328,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // In this case, we want to consume the trailing closure because
         // otherwise it will get parsed as a get-set clause on a variable
         // declared by `baseExpr.<complete>` which is clearly wrong.
-        bool hasBindOptional = false;
         parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
-                               periodHasKeyPathBehavior, hasBindOptional);
+                               periodHasKeyPathBehavior);
 
         return makeParserCodeCompletionResult(CCExpr);
       }
@@ -1409,7 +1419,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::question_postfix)) {
       Result = makeParserResult(Result, new (Context) BindOptionalExpr(
                                             Result.get(), TokLoc, /*depth*/ 0));
-      hasBindOptional = true;
       continue;
     }
 
@@ -1477,46 +1486,40 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           .fixItInsert(getEndOfPreviousLoc(), "\n");
       }
 
-      llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
-      auto ICD =
-          parseIfConfig([&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
+      llvm::TinyPtrVector<ASTNode> activeElements;
+      auto ICD = parseIfConfig(
+          IfConfigContext::PostfixExpr,
+          [&](bool isActive) {
             // Although we know the '#if' body starts with period,
             // '#elseif'/'#else' bodies might start with invalid tokens.
             if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
-              bool exprHasBindOptional = false;
               auto expr = parseExprPostfixSuffix(Result, isExprBasic,
-                                                 periodHasKeyPathBehavior,
-                                                 exprHasBindOptional);
-              if (exprHasBindOptional)
-                exprsWithBindOptional.insert(expr.get());
-              elements.push_back(expr.get());
-            }
+                                                 periodHasKeyPathBehavior);
 
-            // Don't allow any character other than the postfix expression.
-            if (!Tok.isAny(tok::pound_elseif, tok::pound_else, tok::pound_endif,
-                           tok::eof)) {
-              diagnose(Tok, diag::expr_postfix_ifconfig_unexpectedtoken);
-              skipUntilConditionalBlockClose();
+              if (isActive)
+                activeElements.push_back(expr.get());
             }
           });
-      if (ICD.isNull())
+      if (ICD.isErrorOrHasCompletion())
         break;
 
-      auto activeElements = ICD.get()->getActiveClauseElements();
       if (activeElements.empty())
         // There's no active clause, or it was empty. Keep the current result.
         continue;
 
       // Extract the parsed expression as the result.
-      assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
-      auto expr = activeElements[0].get<Expr *>();
+      assert(activeElements.size() == 1 ||
+             SF.getParsingOptions().contains(
+                 SourceFile::ParsingFlags::PoundIfAllActive));
+      // FIXME: 'PoundIfAllActive' mode should keep all the parsed AST nodes.
+      assert(isa<Expr *>(activeElements[0]));
+      auto *expr = cast<Expr *>(activeElements[0]);
       ParserStatus status(ICD);
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(
           SourceMgr, expr->getSourceRange());
       if (SourceMgr.rangeContainsIDEInspectionTarget(charRange) &&
           L->isCodeCompletion())
         status.setHasCodeCompletion();
-      hasBindOptional |= exprsWithBindOptional.contains(expr);
       Result = makeParserResult(status, expr);
       continue;
     }
@@ -1612,20 +1615,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   if (Result.isNull())
     return Result;
 
-  bool hasBindOptional = false;
-  Result = parseExprPostfixSuffix(Result, isExprBasic,
-                                  /*periodHasKeyPathBehavior=*/InSwiftKeyPath,
-                                  hasBindOptional);
-  if (Result.isParseErrorOrHasCompletion() || Result.hasCodeCompletion())
-    return Result;
-
-  // If we had a ? suffix expression, bind the entire postfix chain
-  // within an OptionalEvaluationExpr.
-  if (hasBindOptional) {
-    Result = makeParserResult(new (Context) OptionalEvaluationExpr(Result.get()));
-  }
-
-  return Result;
+  return parseExprPostfixSuffix(Result, isExprBasic,
+                                /*periodHasKeyPathBehavior=*/InSwiftKeyPath);
 }
 
 /// parseExprPrimary
@@ -1732,7 +1723,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       // If we have a generic argument list, this is something like
       // "case let E<Int>.e(y)", and 'E' should be parsed as a normal name, not
       // a binding.
-      if (peekToken().isAnyOperator() && peekToken().getText().equals("<")) {
+      if (peekToken().isAnyOperator() && peekToken().getText() == "<") {
         BacktrackingScope S(*this);
         consumeToken();
         return !canParseAsGenericArgumentList();
@@ -1758,10 +1749,13 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     LLVM_FALLTHROUGH;
   }
   case tok::kw_init:
-  case tok::kw_Self:     // Self
+  case tok::kw_Self:         // Self
+  case tok::colon_colon:     // module selector with missing module name
     return parseExprIdentifier(/*allowKeyword=*/true);
 
   case tok::kw_Any: { // Any
+    if (peekToken().is(tok::colon_colon))
+      return parseExprIdentifier(/*allowKeyword=*/true);
     auto TyR = parseAnyType();
     return makeParserResult(new (Context) TypeExpr(TyR.get()));
   }
@@ -1770,6 +1764,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return makeParserResult(parseExprAnonClosureArg());
 
   case tok::kw__: // _
+    if (peekToken().is(tok::colon_colon))
+      return parseExprIdentifier(/*allowKeyword=*/true);
     return makeParserResult(
       new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
 
@@ -1833,6 +1829,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::kw_super: // 'super'
+    if (peekToken().is(tok::colon_colon))
+      return parseExprIdentifier(/*allowKeyword=*/true);
     return parseExprSuper();
 
   case tok::l_paren:
@@ -1991,7 +1989,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         new (Context) UnresolvedDotExpr(InterpolationVarRef,
                                         /*dotloc=*/SourceLoc(),
                                         appendLiteral,
-                                        /*nameloc=*/DeclNameLoc(), 
+                                        /*nameloc=*/DeclNameLoc(TokenLoc),
                                         /*Implicit=*/true);
       auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {Literal});
       auto AppendLiteralCall =
@@ -2156,9 +2154,15 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       AppendingExpr));
 }
 
-void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
+void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
+                                        bool isAttr, bool splittingColonColon) {
+  auto colonColon = splittingColonColon ? tok::colon_colon : tok::NUM_TOKENS;
+  /// A token that has the same meaning as colon, but is deprecated, if one exists for this call.
+  auto altColon = isAttr ? tok::equal : tok::NUM_TOKENS;
+
   // Check to see if there is an argument label.
-  if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+  if (Tok.canBeArgumentLabel() && peekToken().isAny(tok::colon, colonColon,
+                                                    altColon)) {
     auto text = Tok.getText();
 
     // If this was an escaped identifier that need not have been escaped, say
@@ -2167,7 +2171,8 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
     // the syntax for referring to the function pointer (foo(_:)),
     auto escaped = Tok.isEscapedIdentifier();
     auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
-    if (escaped && !underscore && canBeArgumentLabel(text)) {
+    if (escaped && !underscore && canBeArgumentLabel(text) &&
+        Lexer::isIdentifier(text)) {
       SourceLoc start = Tok.getLoc();
       SourceLoc end = start.getAdvancedLoc(Tok.getLength());
       diagnose(Tok, diag::escaped_parameter_name, text)
@@ -2176,11 +2181,24 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
     }
 
     loc = consumeArgumentLabel(name, /*diagnoseDollarPrefix=*/false);
-    consumeToken(tok::colon);
-  } else if (Tok.is(tok::colon)) {
-    diagnose(Tok, diag::expected_label_before_colon);
-    consumeToken(tok::colon);
+  } else if (Tok.isAny(tok::colon, colonColon, altColon)) {
+    // Found only the colon.
+    diagnose(Tok, diag::expected_label_before_colon)
+      .fixItInsert(Tok.getLoc(), "<#label#>");
+  } else {
+    // No label here.
+    return;
   }
+
+  // If we get here, we ought to be on the colon.
+  if (consumeIfColonSplittingDoubles())
+    return;
+
+  ASSERT(Tok.is(altColon));
+
+  diagnose(Tok, diag::replace_equal_with_colon_for_value)
+    .fixItReplace(Tok.getLoc(), ": ");
+  consumeToken();
 }
 
 static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
@@ -2204,9 +2222,12 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
       flags.contains(Parser::DeclNameFlag::AllowZeroArgCompoundNames) &&
       next.is(tok::r_paren);
   // An argument label.
-  bool nextIsArgLabel = next.canBeArgumentLabel() || next.is(tok::colon);
+  // We allow `tok::colon_colon` so that e.g. `fn(::)` gets diagnosed as a
+  // malformed version of `fn(_:_:)`.
+  bool nextIsArgLabel = next.canBeArgumentLabel()
+                          || next.isAny(tok::colon, tok::colon_colon);
   // An editor placeholder.
-  bool nextIsPlaceholder = Identifier::isEditorPlaceholder(next.getText());
+  bool nextIsPlaceholder = next.isEditorPlaceholder();
 
   if (!(nextIsRParen || nextIsArgLabel || nextIsPlaceholder))
     return false;
@@ -2217,16 +2238,17 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
   lparenLoc = P.consumeToken(tok::l_paren);
   while (P.Tok.isNot(tok::r_paren)) {
     // If we see a ':', the user forgot the '_';
-    if (P.Tok.is(tok::colon)) {
-      P.diagnose(P.Tok, diag::empty_arg_label_underscore)
-          .fixItInsert(P.Tok.getLoc(), "_");
+    if (P.consumeIfColonSplittingDoubles()) {
+      P.diagnose(P.PreviousLoc, diag::empty_arg_label_underscore)
+          .fixItInsert(P.PreviousLoc, "_");
       argumentLabels.push_back(Identifier());
-      argumentLabelLocs.push_back(P.consumeToken(tok::colon));
+      argumentLabelLocs.push_back(P.PreviousLoc);
     }
 
     Identifier argName;
     SourceLoc argLoc;
-    P.parseOptionalArgumentLabel(argName, argLoc);
+    P.parseOptionalArgumentLabel(argName, argLoc, /*isAttr=*/false,
+                                 /*splittingColonColon=*/true);
     if (argLoc.isValid()) {
       argumentLabels.push_back(argName);
       argumentLabelLocs.push_back(argLoc);
@@ -2247,13 +2269,94 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
   return true;
 }
 
+unsigned Parser::isAtModuleSelector() {
+  // Also allow the current token to be colon_colon, for diagnostics.
+  if (Tok.is(tok::colon_colon))
+    return 1;
+
+  if (peekToken().isNot(tok::colon_colon))
+    return 0;
+
+  // Allow the module name to also be one of several invalid but
+  // identifier-like tokens.
+  return Tok.isAny(tok::identifier, tok::kw__, tok::kw_Any, tok::kw_self,
+                   tok::kw_Self, tok::kw_super) ? 2 : 0;
+}
+
+std::optional<Located<Identifier>> Parser::parseModuleSelector() {
+  if (!isAtModuleSelector())
+    return std::nullopt;
+
+  // We will parse the selector whether or not it's allowed, then early return
+  // if it's disallowed, then diagnose any other errors in what we parsed. This
+  // will make sure we always consume the module selector's tokens, but don't
+  // complain about a malformed selector when it's not supposed to be there at
+  // all.
+
+  SourceLoc nameLoc;
+  Identifier moduleName;
+
+  // Consume an identifier (or one of our selected keywords with a diagnostic).
+  if (parseAnyIdentifier(moduleName, nameLoc,
+                         diag::expected_identifier_in_module_selector,
+                         /*diagnoseDollarPrefix=*/true)) {
+    if (Tok.is(tok::colon_colon)) {
+      nameLoc = Tok.getLoc();
+    } else {
+      moduleName = Context.getIdentifier(Tok.getText());
+      nameLoc = consumeToken();
+    }
+  }
+
+  consumeToken(tok::colon_colon);
+
+  // Foo::Bar::baz is an invalid attempt to address a submodule; diagnose it.
+  SourceLoc submoduleStartLoc = Tok.getLoc();
+  while (!Tok.isAtStartOfLine() && isAtModuleSelector()) {
+    if (Tok.isNot(tok::colon_colon))
+      consumeToken();
+    consumeToken(tok::colon_colon);
+  }
+
+  if (submoduleStartLoc != Tok.getLoc()) {
+    diagnose(submoduleStartLoc, diag::module_selector_submodule_not_allowed)
+      .highlightChars(submoduleStartLoc, getEndOfPreviousLoc())
+      .fixItRemoveChars(submoduleStartLoc, getEndOfPreviousLoc());
+  }
+
+  return Located<Identifier>(moduleName, nameLoc);
+}
+
 DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                      DiagRef diag,
                                      DeclNameOptions flags) {
+  // Consume the module name, if present.
+  SourceLoc moduleSelectorLoc;
+  Identifier moduleSelector;
+  bool hasModuleSelector = false;
+  if (!flags.contains(DeclNameFlag::ModuleSelectorUnsupported)) {
+    if (auto locatedModule = parseModuleSelector()) {
+      hasModuleSelector = true;
+      moduleSelectorLoc = locatedModule->Loc;
+      moduleSelector = locatedModule->Item;
+    }
+  }
+
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
-  if (Tok.is(tok::identifier) ||
+  if (hasModuleSelector && Tok.isAtStartOfLine()) {
+    // Newline is not allowed between module selector and following token.
+    diagnose(getEndOfPreviousLoc(),
+             diag::expected_identifier_after_module_selector);
+    if (Tok.isIdentifierOrUnderscore() || Tok.isKeyword()) {
+      diagnose(getEndOfPreviousLoc(), diag::extra_whitespace_module_selector)
+        .fixItRemoveChars(getEndOfPreviousLoc(), Tok.getLoc());
+    }
+    // This is recoverable.
+    baseName = DeclBaseName();
+    baseNameLoc = PreviousLoc;
+  } else if (Tok.is(tok::identifier) ||
       (flags.contains(DeclNameFlag::AllowLowercaseAndUppercaseSelf) &&
        Tok.isAny(tok::kw_Self, tok::kw_self))) {
     Identifier baseNameId;
@@ -2263,7 +2366,8 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
              Tok.isAnyOperator()) {
     baseName = Context.getIdentifier(Tok.getText());
     baseNameLoc = consumeToken();
-  } else if (flags.contains(DeclNameFlag::AllowKeywords) && Tok.isKeyword()) {
+  } else if ((flags.contains(DeclNameFlag::AllowKeywords)
+                || hasModuleSelector) && Tok.isKeyword()) {
     bool specialDeinitAndSubscript =
         flags.contains(DeclNameFlag::AllowKeywordsUsingSpecialNames);
 
@@ -2281,8 +2385,17 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
     baseNameLoc = consumeToken();
   } else {
     checkForInputIncomplete();
-    diagnose(Tok, diag);
-    return DeclNameRef();
+
+    // If we already parsed a module selector, diagnose that it has no base name
+    // and recover. Otherwise, use the caller-specified diagnostic and bail.
+    if (hasModuleSelector) {
+      diagnose(Tok, diag::expected_identifier_after_module_selector);
+      baseName = DeclBaseName();
+      baseNameLoc = PreviousLoc;
+    } else {
+      diagnose(Tok, diag);
+      return DeclNameRef();
+    }
   }
 
   // Parse an argument list, if the flags allow it and it's present.
@@ -2296,15 +2409,15 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                          rparenLoc);
 
   if (argumentLabelLocs.empty() || !hadArgList)
-    loc = DeclNameLoc(baseNameLoc);
+    loc = DeclNameLoc(Context, moduleSelectorLoc, baseNameLoc);
   else
-    loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
-                      rparenLoc);
+    loc = DeclNameLoc(Context, moduleSelectorLoc, baseNameLoc,
+                      lparenLoc, argumentLabelLocs, rparenLoc);
 
   if (!hadArgList)
-    return DeclNameRef(baseName);
+    return DeclNameRef(Context, moduleSelector, baseName);
 
-  return DeclNameRef({ Context, baseName, argumentLabels });
+  return DeclNameRef(Context, moduleSelector, baseName, argumentLabels);
 }
 
 ParserStatus Parser::parseFreestandingMacroExpansion(
@@ -2323,7 +2436,8 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
   bool hasWhitespaceBeforeName = poundEndLoc != Tok.getLoc();
 
-  macroNameRef = parseDeclNameRef(macroNameLoc, diag, DeclNameFlag::AllowKeywords);
+  macroNameRef = parseDeclNameRef(macroNameLoc, diag,
+                                  DeclNameFlag::AllowKeywords);
   if (!macroNameRef)
     return makeParserError();
 
@@ -2367,9 +2481,11 @@ ParserStatus Parser::parseFreestandingMacroExpansion(
 
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
-ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
+ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword,
+                                               bool allowModuleSelector) {
   ParserStatus status;
-  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self) ||
+  assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self,
+                   tok::colon_colon) ||
          (allowKeyword && Tok.isKeyword()));
   Token IdentTok = Tok;
 
@@ -2377,6 +2493,9 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
                        DeclNameFlag::AllowLowercaseAndUppercaseSelf;
   if (allowKeyword) {
     declNameFlags |= DeclNameFlag::AllowKeywords;
+  }
+  if (!allowModuleSelector) {
+    declNameFlags |= DeclNameFlag::ModuleSelectorUnsupported;
   }
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
@@ -2402,14 +2521,18 @@ ParserResult<Expr> Parser::parseExprIdentifier(bool allowKeyword) {
     hasGenericArgumentList = true;
   }
   
-  if (name.getBaseName().isEditorPlaceholder()) {
+  if (IdentTok.isEditorPlaceholder()) {
     return makeParserResult(
         status, parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier()));
   }
 
   auto refKind = DeclRefKind::Ordinary;
-  Expr *E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-  
+  Expr *E;
+  if (name.getBaseName().empty())
+    E = new (Context) ErrorExpr(loc.getSourceRange());
+  else
+    E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
+
   if (hasGenericArgumentList) {
     E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
                                          RAngleLoc);
@@ -2542,7 +2665,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         skipSingle();
     }
   };
-
+  
+  bool sawTopLevelArrowInLookahead = false;
+  
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
   if (Tok.isAny(
@@ -2584,6 +2709,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
         // Parse the func-signature-result, if present.
         if (consumeIf(tok::arrow)) {
+          sawTopLevelArrowInLookahead = true;
           if (!canParseType())
             return makeParserSuccess();
 
@@ -2608,17 +2734,23 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
+        sawTopLevelArrowInLookahead = true;
         if (!canParseType())
           return makeParserSuccess();
-
+        
         consumeEffectsSpecifiers();
       }
     }
 
     // Parse the 'in' at the end.
-    if (Tok.isNot(tok::kw_in))
-      return makeParserSuccess();
+    if (Tok.isNot(tok::kw_in)) {
+      // Even if 'in' is missing, the presence of '->' makes this look
+      // like a closure signature. There's no other valid syntax that
+      // could legally contain '->' at this position.
+      if (!sawTopLevelArrowInLookahead)
+        return makeParserSuccess();
 
+    }
     // Okay, we have a closure signature.
   } else {
     // No closure signature.
@@ -2694,7 +2826,8 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // the expression to capture.
         if (!Tok.is(tok::code_complete)) {
           name = Context.getIdentifier(Tok.getText());
-          auto initializerResult = parseExprIdentifier(/*allowKeyword=*/false);
+          auto initializerResult = parseExprIdentifier(/*allowKeyword=*/false,
+                                                 /*allowModuleSelector=*/false);
           status |= initializerResult;
           initializer = initializerResult.get();
         } else {
@@ -2745,37 +2878,19 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         initializer = ExprResult.get();
       }
 
-      // Create the VarDecl and the PatternBindingDecl for the captured
-      // expression.  This uses the parent declcontext (not the closure) since
-      // the initializer expression is evaluated before the closure is formed.
-      auto introducer = (ownershipKind != ReferenceOwnership::Weak
-                         ? VarDecl::Introducer::Let
-                         : VarDecl::Introducer::Var);
-      auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
-                                       nameLoc, name, CurDeclContext);
-        
+      // Create the capture list entry using the parent DeclContext (not the
+      // closure) since the initializer expression is evaluated before the
+      // closure is formed.
+      auto CLE = CaptureListEntry::createParsed(
+          Context, ownershipKind, {ownershipLocStart, ownershipLocEnd}, name,
+          nameLoc, equalLoc, initializer, CurDeclContext);
+
       // If we captured something under the name "self", remember that.
       if (name == Context.Id_self)
-        capturedSelfDecl = VD;
-
-      // Attributes.
-      if (ownershipKind != ReferenceOwnership::Strong)
-        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
-          SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
-
-      auto pattern = NamedPattern::createImplicit(Context, VD);
-
-      auto *PBD = PatternBindingDecl::create(
-          Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-          /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
-          CurDeclContext);
-
-      auto CLE = CaptureListEntry(PBD);
-      if (CLE.isSimpleSelfCapture())
-        VD->setIsSelfParamCapture();
+        capturedSelfDecl = CLE.getVar();
 
       captureList.push_back(CLE);
-    } while (HasNext);
+    } while (HasNext && !Tok.is(tok::r_square));
 
     // The capture list needs to be closed off with a ']'.
     SourceLoc rBracketLoc = Tok.getLoc();
@@ -2902,7 +3017,6 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         diagnose(Tok, diag::expected_closure_in)
           .fixItInsert(Tok.getLoc(), "in ");
       }
-      inLoc = Tok.getLoc();
     }
   }
 
@@ -3115,9 +3229,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
-    SmallVector<char, 4> StrBuf;
-    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
-    Identifier ident = Context.getIdentifier(varName);
+    Identifier ident = Context.getDollarIdentifier(nextIdx);
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
         ParamDecl(SourceLoc(), SourceLoc(),
@@ -3207,19 +3319,26 @@ Parser::parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
   return makeParserResult(status, argList);
 }
 
+/// See if we have an operator decl ref '(<op>)'. The operator token in
+/// this case lexes as a binary operator because it neither leads nor
+/// follows a proper subexpression.
+bool listElementIsBinaryOperator(Parser &P, tok rightTok) {
+  // Look past a module selector, if present.
+  if (auto selectorTokens = P.isAtModuleSelector()) {
+    return P.lookahead(selectorTokens, [&](auto &scope) {
+      return listElementIsBinaryOperator(P, rightTok);
+    });
+  }
+
+  return P.Tok.isBinaryOperator() && P.peekToken().isAny(rightTok, tok::comma);
+}
+
 ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts) {
   Identifier FieldName;
   SourceLoc FieldNameLoc;
   parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
-  // See if we have an operator decl ref '(<op>)'. The operator token in
-  // this case lexes as a binary operator because it neither leads nor
-  // follows a proper subexpression.
-  auto isUnappliedOperator = [&]() {
-    return Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma);
-  };
-
-  if (isUnappliedOperator()) {
+  if (listElementIsBinaryOperator(*this, rightTok)) {
     // Check to see if we have the start of a regex literal `/.../`. We need
     // to do this for an unapplied operator reference, as e.g `(/, /)` might
     // be a regex literal.
@@ -3228,7 +3347,7 @@ ParserStatus Parser::parseExprListElement(tok rightTok, bool isArgumentList, Sou
 
   ParserStatus Status;
   Expr *SubExpr = nullptr;
-  if (isUnappliedOperator()) {
+  if (listElementIsBinaryOperator(*this, rightTok)) {
     DeclNameLoc Loc;
     auto OperName =
         parseDeclNameRef(Loc, diag::expected_operator_ref,
@@ -3295,12 +3414,13 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
   StructureMarkerRAII ParsingExprList(*this, Tok);
   
   leftLoc = consumeToken(leftTok);
-  return parseList(rightTok, leftLoc, rightLoc, /*AllowSepAfterLast=*/false,
+  return parseList(rightTok, leftLoc, rightLoc, /*AllowSepAfterLast=*/true,
                    rightTok == tok::r_paren ? diag::expected_rparen_expr_list
                                             : diag::expected_rsquare_expr_list,
-                   [&] () -> ParserStatus {
-    return parseExprListElement(rightTok, isArgumentList, leftLoc, elts);
-  });
+                   [&]() -> ParserStatus {
+                     return parseExprListElement(rightTok, isArgumentList,
+                                                 leftLoc, elts);
+                   });
 }
 
 static bool isStartOfLabelledTrailingClosure(Parser &P) {
@@ -3320,8 +3440,7 @@ static bool isStartOfLabelledTrailingClosure(Parser &P) {
     return true;
   // Parse editor placeholder as trailing closure so SourceKit can expand it to
   // closure literal.
-  if (P.peekToken().is(tok::identifier) &&
-      Identifier::isEditorPlaceholder(P.peekToken().getText()))
+  if (P.peekToken().isEditorPlaceholder())
     return true;
   // Consider `label: <complete>` that the user is trying to write a closure.
   if (P.peekToken().is(tok::code_complete) && !P.peekToken().isAtStartOfLine())
@@ -3337,8 +3456,10 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
   // Record the line numbers for the diagnostics below.
   // Note that *do not* move this to after 'parseExprClosure()' it slows down
   // 'getLineNumber()' call because of cache in SourceMgr.
-  auto origLine = SourceMgr.getLineAndColumnInBuffer(calleeRange.End).first;
-  auto braceLine = SourceMgr.getLineAndColumnInBuffer(braceLoc).first;
+  auto origLine = calleeRange.End.isInvalid() ? 0
+                    : SourceMgr.getLineAndColumnInBuffer(calleeRange.End).first;
+  auto braceLine = braceLoc.isInvalid() ? 0
+                    : SourceMgr.getLineAndColumnInBuffer(braceLoc).first;
 
   ParserStatus result;
 
@@ -3354,7 +3475,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
   // Warn if the trailing closure is separated from its callee by more than
   // one line. A single-line separation is acceptable for a trailing closure
   // call, and will be diagnosed later only if the call fails to typecheck.
-  if (braceLine > origLine + 1) {
+  if (origLine != 0 && braceLine != 0 && braceLine > origLine + 1) {
     diagnose(braceLoc, diag::trailing_closure_after_newlines);
     diagnose(calleeRange.Start, diag::trailing_closure_callee_here);
 
@@ -3379,8 +3500,8 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
       closure = parseExprClosure();
     } else if (Tok.is(tok::identifier)) {
       // Parse editor placeholder as a closure literal.
-      assert(Identifier::isEditorPlaceholder(Tok.getText()));
-      Identifier name = Context.getIdentifier(Tok.getText());
+      assert(Tok.isEditorPlaceholder());
+      Identifier name = Context.getIdentifier(Tok.getRawText());
       closure = makeParserResult(parseExprEditorPlaceholder(Tok, name));
       consumeToken(tok::identifier);
     } else if (Tok.is(tok::code_complete)) {
@@ -3480,10 +3601,26 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   if (!macroNameRef)
     return status;
 
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  // If we don't have swift-syntax and therefore have no support for macros,
+  // recognize #isolation as special and route it through
+  // CurrentContextIsolationExpr.
+  if (macroNameRef.getBaseName().userFacingName() == "isolation" &&
+      genericArgs.empty() &&
+      (!argList || argList->empty())) {
+    return makeParserResult(
+      status,
+      new (Context) CurrentContextIsolationExpr(
+          macroNameLoc.getStartLoc(), Type()));
+  }
+#endif
+
   return makeParserResult(
       status,
       MacroExpansionExpr::create(
-          CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+          CurDeclContext, poundLoc,
+          /*module name=*/DeclNameRef(), /*module name loc=*/DeclNameLoc(),
+          macroNameRef, macroNameLoc, leftAngleLoc,
           Context.AllocateCopy(genericArgs), rightAngleLoc, argList,
           CurDeclContext->isTypeContext() ? MacroRole::Declaration
                                           : getFreestandingMacroRoles()));
@@ -3507,6 +3644,15 @@ ParserResult<Expr> Parser::parseExprCollection() {
   Parser::StructureMarkerRAII ParsingCollection(
                                 *this, LSquareLoc,
                                 StructureMarkerKind::OpenSquare);
+
+  // Check to see if we can parse an InlineArray type.
+  if (isStartOfInlineArrayTypeBody()) {
+    auto result = parseTypeInlineArray(LSquareLoc);
+    if (result.isNull() || result.isParseErrorOrHasCompletion())
+      return ParserStatus(result);
+
+    return makeParserResult(new (Context) TypeExpr(result.get()));
+  }
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
@@ -3636,7 +3782,7 @@ Parser::parseExprCollectionElement(std::optional<bool> &isDictionary) {
   } else {
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     Value = makeParserResult(makeParserError(),
-                             new (Context) ErrorExpr(SourceRange()));
+                             new (Context) ErrorExpr(PreviousLoc));
   }
 
   // Make a tuple of Key Value pair.
@@ -3682,8 +3828,6 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
   }
 }
 
-
-
 /// Parse availability query specification.
 ///
 ///  availability-spec:
@@ -3696,55 +3840,9 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
     SourceLoc StarLoc = Tok.getLoc();
     consumeToken();
 
-    return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
-  }
-  if (Tok.isIdentifierOrUnderscore() &&
-       (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))
-      return parsePlatformAgnosticVersionConstraintSpec();
-
-  return parsePlatformVersionConstraintSpec();
-}
-
-/// Parse platform-agnostic version constraint specification.
-///
-///  language-version-constraint-spec:
-///     "swift" version-tuple
-///  package-description-version-constraint-spec:
-///     "_PackageDescription" version-tuple
-ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
-Parser::parsePlatformAgnosticVersionConstraintSpec() {
-  SourceLoc PlatformAgnosticNameLoc;
-  llvm::VersionTuple Version;
-  std::optional<AvailabilitySpecKind> Kind;
-  SourceRange VersionRange;
-
-  if (Tok.isIdentifierOrUnderscore()) {
-    if (Tok.getText() == "swift")
-      Kind = AvailabilitySpecKind::LanguageVersionConstraint;
-    else if (Tok.getText() == "_PackageDescription")
-      Kind = AvailabilitySpecKind::PackageDescriptionVersionConstraint;
+    return makeParserResult(AvailabilitySpec::createWildcard(Context, StarLoc));
   }
 
-  if (!Kind.has_value())
-    return nullptr;
-
-  PlatformAgnosticNameLoc = Tok.getLoc();
-  consumeToken();
-  if (parseVersionTuple(Version, VersionRange,
-                        diag::avail_query_expected_version_number)) {
-    return nullptr;
-  }
-  return makeParserResult(new (Context)
-                          PlatformAgnosticVersionConstraintAvailabilitySpec(
-                            Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
-}
-
-/// Parse platform-version constraint specification.
-///
-///  platform-version-constraint-spec:
-///     identifier version-comparison version-tuple
-ParserResult<PlatformVersionConstraintAvailabilitySpec>
-Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3770,35 +3868,13 @@ Parser::parsePlatformVersionConstraintSpec() {
   llvm::VersionTuple Version;
   SourceRange VersionRange;
 
-  if (parseVersionTuple(Version, VersionRange,
-                        diag::avail_query_expected_version_number)) {
-    return nullptr;
-  }
-
-  std::optional<PlatformKind> Platform =
-      platformFromString(PlatformIdentifier.str());
-
-  if (!Platform.has_value() || Platform.value() == PlatformKind::none) {
-    if (auto CorrectedPlatform =
-            closestCorrectedPlatformString(PlatformIdentifier.str())) {
-      diagnose(PlatformLoc, diag::avail_query_suggest_platform_name,
-               PlatformIdentifier, *CorrectedPlatform)
-          .fixItReplace(PlatformLoc, *CorrectedPlatform);
-    } else {
-      diagnose(PlatformLoc, diag::avail_query_unrecognized_platform_name,
-               PlatformIdentifier);
+  if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
+    if (parseVersionTuple(Version, VersionRange,
+                          diag::avail_query_expected_version_number)) {
+      return nullptr;
     }
-    Platform = PlatformKind::none;
   }
 
-  // Register the platform name as a keyword token.
-  TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
-
-  // Keep the original version around for run-time checks to support
-  // macOS Big Sur betas that report 10.16 at
-  // run time.
-  llvm::VersionTuple RuntimeVersion = Version;
-  Version = canonicalizePlatformVersion(*Platform, Version);
-  return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
-      Platform.value(), PlatformLoc, Version, RuntimeVersion, VersionRange));
+  return makeParserResult(AvailabilitySpec::createForDomainIdentifier(
+      Context, PlatformIdentifier, PlatformLoc, Version, VersionRange));
 }

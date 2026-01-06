@@ -11,9 +11,9 @@ protocol Foo: class { }
 // CHECK-objc:    [[INSTANCE:%.*]] = inttoptr i64 %1 to ptr
 // CHECK-native:  [[INSTANCE:%.*]] = inttoptr i64 %1 to ptr
 // CHECK:         [[WTABLE:%.*]] = inttoptr i64 %2 to ptr
-// CHECK:         [[WTABLE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 1
+// CHECK:         [[WTABLE_SLOT:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
 // CHECK:         store ptr [[WTABLE]], ptr [[WTABLE_SLOT]], align 8
-// CHECK:         [[INSTANCE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 0
+// CHECK:         [[INSTANCE_SLOT:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0
 // CHECK-objc:    call ptr @swift_unknownObjectWeakAssign(ptr returned [[INSTANCE_SLOT]], ptr [[INSTANCE]]) {{#[0-9]+}}
 // CHECK-native:  call ptr @swift_weakAssign(ptr returned [[INSTANCE_SLOT]], ptr [[INSTANCE]]) {{#[0-9]+}}
 // CHECK:         ret void

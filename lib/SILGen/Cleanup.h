@@ -17,6 +17,9 @@
 #ifndef SWIFT_SILGEN_CLEANUP_H
 #define SWIFT_SILGEN_CLEANUP_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
@@ -73,6 +76,10 @@ enum class CleanupState {
   PersistentlyActive
 };
 
+inline bool isActiveCleanupState(CleanupState state) {
+  return state >= CleanupState::Active;
+}
+
 llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
 
 class LLVM_LIBRARY_VISIBILITY Cleanup {
@@ -108,7 +115,7 @@ public:
   virtual void setState(SILGenFunction &SGF, CleanupState newState) {
     state = newState;
   }
-  bool isActive() const { return state >= CleanupState::Active; }
+  bool isActive() const { return isActiveCleanupState(state); }
   bool isDead() const { return state == CleanupState::Dead; }
 
   virtual void emit(SILGenFunction &SGF, CleanupLocation loc,
@@ -219,6 +226,15 @@ public:
   /// \param args       Arguments to pass to the destination block.
   void emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
                              ArrayRef<SILValue> args = {},
+                             ForUnwind_t forUnwind = NotForUnwind);
+
+  /// Emit the cleanups necessary before branching to
+  /// the given jump destination. This does not pop the cleanup stack, nor does
+  /// it emit the actual branch.
+  ///
+  /// \param dest       The destination scope and block.
+  /// \param forUnwind  Whether the cleanups for this dest is for unwinding.
+  void emitCleanupsBeforeBranch(JumpDest dest,
                              ForUnwind_t forUnwind = NotForUnwind);
 
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a

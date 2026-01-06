@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -disable-objc-attr-requires-foundation-module -o %t %S/Inputs/objc_method_decls.swift
 // RUN: llvm-bcanalyzer %t/objc_method_decls.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -disable-objc-attr-requires-foundation-module -I %t %s -verify
+// RUN: %target-swift-frontend -typecheck -disable-objc-attr-requires-foundation-module -I %t %s -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 

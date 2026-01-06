@@ -1,0 +1,197 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// CHECK-LABEL: begin running test {{.*}} on all_exit: dead_end_edges
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on all_exit: dead_end_edges
+sil @all_exit : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on one_dead: dead_end_edges
+// CHECK-NEXT:  bb0 -> bb2 (region 0; last edge)
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on one_dead: dead_end_edges
+sil @one_dead : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on one_dead_loop: dead_end_edges
+// CHECK-NEXT:  bb0 -> bb2 (region 0; last edge)
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on one_dead_loop: dead_end_edges
+sil @one_dead_loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb2
+
+bb3:
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on one_dead_loop_with_branch: dead_end_edges
+// CHECK-NEXT:  bb0 -> bb2 (region 1; last edge)
+// CHECK-NEXT:  bb3 -> bb4 (region 0; last edge)
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on one_dead_loop_with_branch: dead_end_edges
+sil @one_dead_loop_with_branch : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb2, bb4
+
+bb4:
+  unreachable
+
+bb5:
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on complicated_one: dead_end_edges
+// CHECK-NEXT:  bb0 -> bb2 (region 2; last edge)
+// CHECK-NEXT:  bb2 -> bb3 (region 1; last edge)
+// CHECK-NEXT:  bb3 -> bb8 (region 0; more edges remain)
+// CHECK-NEXT:  bb5 -> bb8 (region 0; more edges remain)
+// CHECK-NEXT:  bb6 -> bb8 (region 0; more edges remain)
+// CHECK-NEXT:  bb9 -> bb8 (region 0; more edges remain)
+// CHECK-NEXT:  bb11 -> bb8 (region 0; last edge)
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on complicated_one: dead_end_edges
+sil @complicated_one : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb9
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  cond_br undef, bb8, bb3
+
+bb6:
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb3
+
+bb8:
+  unreachable
+
+bb9:
+  cond_br undef, bb8, bb10
+
+bb10:
+  cond_br undef, bb11, bb12
+
+bb11:
+  cond_br undef, bb9, bb8
+
+bb12:
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on trivial_dead_end: dead_end_edges
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on trivial_dead_end: dead_end_edges
+sil @trivial_dead_end : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on all_dead: dead_end_edges
+// CHECK-NEXT:  bb0 -> bb1 (region 1; last edge)
+// CHECK-NEXT:  bb0 -> bb2 (region 2; last edge)
+// CHECK-NEXT:  bb1 -> bb3 (region 0; more edges remain)
+// CHECK-NEXT:  bb2 -> bb3 (region 0; last edge)
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on all_dead: dead_end_edges
+sil @all_dead : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on parallel_into_loop: dead_end_edges
+// CHECK-NEXT:  bb0 -> bb1 (region 1; last edge)
+// CHECK-NEXT:  bb0 -> bb2 (region 2; last edge)
+// CHECK-NEXT:  bb1 -> bb3 (region 0; more edges remain)
+// CHECK-NEXT:  bb2 -> bb4 (region 0; last edge)
+// CHECK-NEXT:  visited all edges
+// CHECK-NEXT:  end running test {{.*}} on parallel_into_loop: dead_end_edges
+sil @parallel_into_loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "dead_end_edges"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  br bb3
+}
+

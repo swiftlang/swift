@@ -1,0 +1,61 @@
+module CountedByClang {
+    header "counted-by.h"
+    export *
+}
+module CountedByNoEscapeClang {
+    header "counted-by-noescape.h"
+    export *
+}
+module SizedByClang {
+    header "sized-by.h"
+    export *
+}
+module SizedByNoEscapeClang {
+    header "sized-by-noescape.h"
+    export *
+}
+module SizedByLifetimeboundClang {
+    header "sized-by-lifetimebound.h"
+    export *
+}
+module CountedByLifetimeboundClang {
+    header "counted-by-lifetimebound.h"
+    export *
+}
+module CommentsClang {
+    header "comments.h"
+    export *
+}
+module ClangIncludesModule {
+    header "clang-includes.h"
+    export *
+}
+module ClangIncludesNoExportModule {
+    header "clang-includes.h"
+}
+
+// TransitiveModules/
+module ModuleA {
+    header "TransitiveModules/module-a.h"
+    export *
+}
+module ModuleB {
+    header "TransitiveModules/module-b.h"
+}
+module ModuleOuter {
+    module ModuleC {
+        header "TransitiveModules/module-c.h"
+        export *
+    }
+    explicit module ModuleD {
+         header "TransitiveModules/module-d.h"
+         export *
+    }
+}
+module ModuleDeep {
+    module ModuleDeepNested {
+        module ModuleDeepNestedNested {
+            header "TransitiveModules/module-e.h"
+        }
+    }
+}

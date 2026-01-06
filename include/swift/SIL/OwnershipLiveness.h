@@ -206,9 +206,19 @@ class LinearLiveness : public OSSALiveness {
   friend LinearLivenessVisitor;
 
 public:
-  LinearLiveness(SILValue def);
+  /// Whether extend_lifetime instructions should be added to the boundary.
+  /// Used to verify extend_lifetime instructions.
+  enum IncludeExtensions_t {
+    DoNotIncludeExtensions = false,
+    IncludeExtensions = true,
+  };
+  LinearLiveness(SILValue def,
+                 IncludeExtensions_t includeExtensions = IncludeExtensions);
 
   void compute();
+
+private:
+  const IncludeExtensions_t includeExtensions;
 };
 
 // Internal implementation
@@ -231,16 +241,12 @@ class InteriorLiveness : public OSSALiveness {
 public:
   // Summarize address uses
   AddressUseKind addressUseKind = AddressUseKind::Unknown;
-
-  // Record any guaranteed phi uses that are not already enclosed by an outer
-  // adjacent phi.
-  SmallVector<SILValue, 8> unenclosedPhis;
+  Operand *escapingUse = nullptr;
 
 public:
   InteriorLiveness(SILValue def): OSSALiveness(def) {}
 
-  void compute(const DominanceInfo *domInfo,
-               InnerScopeHandlerRef handleInnerScope = InnerScopeHandlerRef());
+  void compute(InnerScopeHandlerRef handleInnerScope = InnerScopeHandlerRef());
 
   /// Compute the boundary from the blocks discovered during liveness analysis.
   void computeBoundary(PrunedLivenessBoundary &boundary) const {
@@ -248,8 +254,6 @@ public:
   }
 
   AddressUseKind getAddressUseKind() const { return addressUseKind; }
-
-  ArrayRef<SILValue> getUnenclosedPhis() const { return unenclosedPhis; }
 
   void print(llvm::raw_ostream &OS) const;
   void dump() const;

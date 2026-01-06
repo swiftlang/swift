@@ -19,6 +19,7 @@
 
 #include "swift/SILOptimizer/Utils/KeyPathProjector.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/InstructionUtils.h"
 
@@ -135,16 +136,7 @@ public:
         while (Ref->getType().getClassOrBoundGenericClass() !=
                storedProperty->getDeclContext()) {
           SILType superCl = Ref->getType().getSuperclass();
-          if (!superCl) {
-            // This should never happen, because the property should be in the
-            // decl or in a superclass of it. Just handle this to be on the safe
-            // side.
-            callback(SILValue());
-            if (Borrow) {
-              builder.createEndBorrow(loc, Borrow);
-            }
-            return;
-          }
+          ASSERT(superCl && "the property should be in the decl or in a superclass of it");
           Ref = builder.createUpcast(loc, Ref, superCl);
         }
         
@@ -229,10 +221,10 @@ public:
            component.getKind() ==
            KeyPathPatternComponent::Kind::SettableProperty);
     assert(accessType == AccessType::Get && "property is not settable");
-    
+
     parent->project(accessType, [&](SILValue parentValue) {
-      auto getter = component.getComputedPropertyGetter();
-      
+      auto getter = component.getComputedPropertyForGettable();
+
       // The callback expects a memory address it can read from,
       // so allocate a buffer.
       auto &function = builder.getFunction();
@@ -256,7 +248,6 @@ public:
       builder.createDestroyAddr(loc, addr);
       builder.createDeallocStack(loc, addr);
     });
-    
   }
 protected:
   KeyPathInst *keyPath;
@@ -264,7 +255,7 @@ protected:
   BeginAccessInst *&beginAccess;
   
   void assertHasNoContext() {
-    assert(component.getSubscriptIndices().empty() &&
+    assert(component.getArguments().empty() &&
            component.getExternalSubstitutions().empty() &&
            "cannot yet optimize key path component with external context; "
            "we should have checked for this before trying to project");
@@ -306,11 +297,11 @@ public:
         } else {
             parentAccessType = AccessType::Get;
         }
-        
+
         parent->project(parentAccessType, [&](SILValue parentValue) {
-          auto getter = component.getComputedPropertyGetter();
-          auto setter = component.getComputedPropertySetter();
-          
+          auto getter = component.getComputedPropertyForGettable();
+          auto setter = component.getComputedPropertyForSettable();
+
           // The callback expects a memory address it can write to,
           // so allocate a writeback buffer.
           auto &function = builder.getFunction();
@@ -650,6 +641,7 @@ private:
             (comp, std::move(parent), loc, builder);
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::Method:
         projector = std::make_unique<GettablePropertyProjector>
             (keyPath, comp, std::move(parent), keyPath->getSubstitutions(),
              beginAccess, loc, builder);
@@ -682,8 +674,8 @@ private:
 
 KeyPathInst *
 KeyPathProjector::getLiteralKeyPath(SILValue keyPath) {
-  while (auto *upCast = dyn_cast<UpcastInst>(keyPath)) {
-    keyPath = lookThroughOwnershipInsts(upCast->getOperand());
+  while (isa<UpcastInst>(keyPath) || isa<OpenExistentialRefInst>(keyPath)) {
+    keyPath = lookThroughOwnershipInsts(cast<SingleValueInstruction>(keyPath)->getOperand(0));
   }
 
   return dyn_cast<KeyPathInst>(keyPath);
@@ -700,15 +692,28 @@ KeyPathProjector::create(SILValue keyPath, SILValue root,
   // Check if the keypath only contains patterns which we support.
   auto components = kpInst->getPattern()->getComponents();
   for (const KeyPathPatternComponent &comp : components) {
-    if (comp.getKind() == KeyPathPatternComponent::Kind::GettableProperty ||
-        comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty) {
-      if (!comp.getExternalSubstitutions().empty() ||
-          !comp.getSubscriptIndices().empty()) {
-        // TODO: right now we can't optimize computed properties that require
-        // additional context for subscript indices or generic environment
-        // See https://github.com/apple/swift/pull/28799#issuecomment-570299845
-        return nullptr;
+    switch (comp.getKind()) {
+      case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::SettableProperty:
+        if (!comp.getExternalSubstitutions().empty() ||
+            !comp.getArguments().empty()) {
+          // TODO: right now we can't optimize computed properties that require
+          // additional context for subscript indices or generic environment
+          // See https://github.com/apple/swift/pull/28799#issuecomment-570299845
+          return nullptr;
+        }
+        break;
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto *declCtxt = comp.getStoredPropertyDecl()->getDeclContext();
+        if (!isa<StructDecl>(declCtxt) && !isa<ClassDecl>(declCtxt)) {
+          // This can happen, e.g. for ObjectiveC class properties, which are
+          // defined in an extension.
+          return nullptr;
+        }
+        break;
       }
+      default:
+        break;
     }
   }
 

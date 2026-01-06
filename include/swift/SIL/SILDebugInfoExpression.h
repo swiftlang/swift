@@ -296,6 +296,16 @@ public:
     return Elements.size() &&
            Elements[0].getAsOperator() == SILDIExprOperator::Dereference;
   }
+
+  /// Return the part of this SILDebugInfoExpression corresponding to fragments
+  SILDebugInfoExpression getFragmentPart() const {
+    for (auto it = element_begin(), end = element_end(); it != end; ++it) {
+      if (it->getAsOperator() == SILDIExprOperator::Fragment
+          || it->getAsOperator() == SILDIExprOperator::TupleFragment)
+        return SILDebugInfoExpression(ArrayRef(it, element_end()));
+    }
+    return {};
+  }
 };
 
 /// Returns the hashcode for the di expr element.

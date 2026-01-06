@@ -44,7 +44,6 @@ NOMINALTYPEMETADATAKIND(Class, 0)
 NOMINALTYPEMETADATAKIND(Struct, 0 | MetadataKindIsNonHeap)
 
 /// An enum type.
-/// If we add reference enums, that needs to go here.
 NOMINALTYPEMETADATAKIND(Enum, 1 | MetadataKindIsNonHeap)
 
 /// An optional type.
@@ -79,6 +78,10 @@ METADATAKIND(ExistentialMetatype, 6 | MetadataKindIsRuntimePrivate | MetadataKin
 
 /// An extended existential type.
 METADATAKIND(ExtendedExistential, 7 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
+
+/// A `Builtin.FixedArray`.
+METADATAKIND(FixedArray, 8 | MetadataKindIsRuntimePrivate | MetadataKindIsNonHeap)
+
 
 /// A heap-allocated local variable using statically-generated metadata.
 METADATAKIND(HeapLocalVariable, 0 | MetadataKindIsNonType)

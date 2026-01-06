@@ -12,14 +12,18 @@
 
 import SIL
 
-extension KeyPathInst : OnoneSimplifyable {
+extension KeyPathInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if allUsesRemovable(instruction: self) {
       if parentFunction.hasOwnership {
         let builder = Builder(after: self, context)
         for operand in self.operands {
           if !operand.value.type.isTrivial(in: parentFunction) {
-            builder.createDestroyValue(operand: operand.value)
+            if operand.value.type.isAddress {
+              builder.createDestroyAddr(address: operand.value)
+            } else {
+              builder.createDestroyValue(operand: operand.value)
+            }
           }
         }
       }
@@ -31,10 +35,20 @@ extension KeyPathInst : OnoneSimplifyable {
 fileprivate func allUsesRemovable(instruction: Instruction) -> Bool {
   for result in instruction.results {
     for use in result.uses {
-      if !(use.instruction is UpcastInst || use.instruction is DestroyValueInst || use.instruction is BeginBorrowInst || use.instruction is EndBorrowInst) {
-        return false
-      }
-      if !allUsesRemovable(instruction: use.instruction) {
+      switch use.instruction {
+      case is UpcastInst,
+           is DestroyValueInst,
+           is StrongReleaseInst,
+           is BeginBorrowInst,
+           is EndBorrowInst,
+           is MoveValueInst,
+           is CopyValueInst:
+        // This is a removable instruction type, continue descending into uses
+        if !allUsesRemovable(instruction: use.instruction) {
+          return false
+        }
+
+      default:
         return false
       }
     }

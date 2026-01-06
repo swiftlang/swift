@@ -95,7 +95,7 @@ public:
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
       StringRef filename) {
-    return filename.equals("<stdin>") ? "-" : filename;
+    return filename == "<stdin>" ? "-" : filename;
   }
 
   /// Retrieves the name of the output file corresponding to this input.
@@ -132,6 +132,9 @@ public:
   }
   StringRef getLoadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
+  }
+  StringRef getFineModuleTracePath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.FineModuleTracePath;
   }
   StringRef getSerializedDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs

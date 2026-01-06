@@ -32,10 +32,10 @@ class PartialSpecializationMangler : public SpecializationMangler {
   bool isReAbstracted;
   
 public:
-  PartialSpecializationMangler(SILFunction *F,
+  PartialSpecializationMangler(ASTContext &Ctx, SILFunction *F,
                                CanSILFunctionType SpecializedFnTy,
-                               IsSerialized_t Serialized, bool isReAbstracted)
-      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+                               swift::SerializedKind_t Serialized, bool isReAbstracted)
+      : SpecializationMangler(Ctx, SpecializationPass::GenericSpecializer,
                               Serialized, F),
         SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
@@ -68,6 +68,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     BoxToValue = 3,
     BoxToStack = 4,
     InOutToOut = 5,
+    ClosurePropPreviousArg = 6, // the same closure as a previous `ClosureProp` argument
 
     First_Option = 0,
     Last_Option = 31,
@@ -82,8 +83,20 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     LastOptionSetEntry = 32768,
   };
 
-  using ArgInfo = std::pair<ArgumentModifierIntBase,
-                            NullablePtr<SILInstruction>>;
+  struct ArgInfo {
+    ArgumentModifier kind;
+    union {
+      SILInstruction *inst;
+      unsigned otherArgIdx; // only for `ClosurePropPreviousArg`
+    };
+
+    ArgInfo(ArgumentModifier kind) : kind(kind), inst(nullptr) {}
+
+    void append(ArgumentModifier modifier) {
+      kind = ArgumentModifier(ArgumentModifierIntBase(kind) | ArgumentModifierIntBase(modifier));
+    }
+  };
+
   // Information for each SIL argument in the original function before
   // specialization. This includes SIL indirect result argument required for
   // the original function type at the current stage of compilation.
@@ -91,17 +104,18 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
   ReturnValueModifierIntBase ReturnValue;
 
+  bool changedRepresentation = false;
+
 public:
-  FunctionSignatureSpecializationMangler(SpecializationPass Pass,
-                                         IsSerialized_t Serialized,
+  FunctionSignatureSpecializationMangler(ASTContext &Ctx, SpecializationPass Pass,
+                                         swift::SerializedKind_t Serialized,
                                          SILFunction *F);
   // For arguments / return values
   void setArgumentConstantProp(unsigned OrigArgIdx, SILInstruction *constInst);
   void appendStringAsIdentifier(StringRef str);
 
-  void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
-  void setArgumentClosureProp(unsigned OrigArgIdx,
-                              ThinToThickFunctionInst *TTTFI);
+  void setArgumentClosureProp(unsigned OrigArgIdx, SILInstruction *closure);
+  void setArgumentClosurePropPreviousArg(unsigned OrigArgIdx, unsigned otherArgIdx);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
   void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
@@ -111,6 +125,7 @@ public:
   void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setArgumentInOutToOut(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
+  void setChangedRepresentation() { changedRepresentation = true; }
 
   // For effects
   void setRemovedEffect(EffectKind effect);
@@ -120,8 +135,7 @@ public:
 private:
   void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);
-  void mangleArgument(ArgumentModifierIntBase ArgMod,
-                      NullablePtr<SILInstruction> Inst);
+  void mangleArgument(ArgInfo argInfo);
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
 

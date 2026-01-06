@@ -8,6 +8,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_Embedded
 
 import Darwin
 

@@ -4,11 +4,11 @@
 // FIXME: we should add -sil-verify-all to the below. rdar://109477976 (moveonly_escaping_closure.swift fails with -sil-verify-all)
 // RUN: %target-swift-emit-sil -O -enable-experimental-feature NoImplicitCopy -module-name moveonly_closure -verify %s
 
-@_moveOnly
-struct Empty {}
+// REQUIRES: swift_feature_NoImplicitCopy
 
-@_moveOnly
-struct SingleElt {
+struct Empty: ~Copyable {}
+
+struct SingleElt: ~Copyable {
     var e = Empty()
 }
 
@@ -143,7 +143,7 @@ func testLocalLetClosureCaptureVar() {
         consumeVal(x) // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
         borrowConsumeVal(x, x)
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
+        // expected-error @-1 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
         // expected-note @-3 {{used here}}
         // expected-note @-4 {{used here}}
@@ -975,7 +975,7 @@ func testLocalLetClosureCaptureConsuming(_ x: consuming SingleElt) {
         consumeVal(x) // expected-note {{consumed here}}
         // expected-note @-1 {{consumed again here}}
         borrowConsumeVal(x, x) // expected-note {{used here}}
-        // expected-error @-1 {{overlapping accesses, but deinitialization requires exclusive access}}
+        // expected-error @-1 {{overlapping accesses to 'x', but deinitialization requires exclusive access}}
         // expected-note @-2 {{conflicting access is here}}
         // expected-note @-3 {{consumed here}}
         // expected-note @-4 {{used here}}

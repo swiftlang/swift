@@ -14,10 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if SWIFT_STDLIB_CONCURRENCY_TRACING
+#if SWIFT_STDLIB_TRACING
 
 #include "TracingSignpost.h"
-#include "swift/Runtime/TracingCommon.h"
 #include <stdio.h>
 
 #define SWIFT_LOG_CONCURRENCY_SUBSYSTEM "com.apple.swift.concurrency"

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks
 import APINotesTest
 import APINotesFrameworkTest
 

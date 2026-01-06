@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
 // REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 
@@ -52,7 +52,6 @@ do {
   _=/0/
   // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   // expected-error@-2 {{cannot find operator '=/' in scope}}
-  // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
 // No closing '/' so a prefix operator.
@@ -262,7 +261,7 @@ default:
 }
 
 do {} catch /x/ {}
-// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'Never'}}
+// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
 // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {
@@ -302,7 +301,7 @@ do {
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 } // expected-error {{expected expression after operator}}
 
-_ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}
+_ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
 
 /x/ = 0 // expected-error {{cannot assign to value: literals are not mutable}}
 /x/() // expected-error {{cannot call value of non-function type 'Regex<Substring>'}}
@@ -408,7 +407,7 @@ _ = /\()/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
 // expected-error@-3 {{invalid component of Swift key path}}
-
+  
 do {
   let _: Regex = (/whatever\)/
   // expected-note@-1 {{to match this opening '('}}
@@ -446,7 +445,7 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
-// expected-error@-3 {{expected custom character class members}}
+// expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
 

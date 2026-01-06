@@ -36,7 +36,7 @@ class SILProperty : public llvm::ilist_node<SILProperty>,
 {
 private:
   /// True if serialized.
-  bool Serialized;
+  unsigned Serialized : 2;
   
   /// The declaration the descriptor represents.
   AbstractStorageDecl *Decl;
@@ -44,17 +44,23 @@ private:
   /// The key path component that represents its implementation.
   std::optional<KeyPathPatternComponent> Component;
 
-  SILProperty(bool Serialized, AbstractStorageDecl *Decl,
+  SILProperty(unsigned Serialized, AbstractStorageDecl *Decl,
               std::optional<KeyPathPatternComponent> Component)
       : Serialized(Serialized), Decl(Decl), Component(Component) {}
 
 public:
-  static SILProperty *create(SILModule &M, bool Serialized,
+  static SILProperty *create(SILModule &M, unsigned Serialized,
                              AbstractStorageDecl *Decl,
                              std::optional<KeyPathPatternComponent> Component);
 
-  bool isSerialized() const { return Serialized; }
-  
+  bool isAnySerialized() const {
+    return SerializedKind_t(Serialized) == IsSerialized ||
+           SerializedKind_t(Serialized) == IsSerializedForPackage;
+  }
+  SerializedKind_t getSerializedKind() const {
+    return SerializedKind_t(Serialized);
+  }
+
   AbstractStorageDecl *getDecl() const { return Decl; }
   
   bool isTrivial() const {
@@ -64,6 +70,8 @@ public:
   const std::optional<KeyPathPatternComponent> &getComponent() const {
     return Component;
   }
+
+  CanType getBaseType() const;
 
   void print(SILPrintContext &Ctx) const;
   void dump() const;

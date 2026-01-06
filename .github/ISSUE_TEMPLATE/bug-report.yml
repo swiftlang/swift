@@ -33,10 +33,12 @@ body:
     attributes:
       label: Reproduction
       description: >
-        Provide a test case, preferably in a Markdown codeblock, and explain
-        how to build or run it to reproduce the problem. If the problem is a
-        poor or unexpected error, warning, fix-it, or output, please show
-        them. Consider reducing the test case to the smallest amount of code
+        Provide a test case, preferably in a Markdown code block, and explain
+        how to build or run it to reproduce the problem.
+        If the problem is a poor or unexpected diagnostic, fix-it, or other
+        output, please show this output as is.
+        For example, paste it from the terminal.
+        Consider reducing the test case to the smallest amount of code
         possible — a smaller test case is easier to reason about and more
         appealing to contributors.
       value: |

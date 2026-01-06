@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 /// Shrink borrow scopes by hoisting end_borrows up to deinit barriers.  After
-/// this is done, CanonicalizeOSSALifetime is free to hoist the destroys of the
+/// this is done, OSSACanonicalizeOwned is free to hoist the destroys of the
 /// owned value up to the end_borrow.  In this way, the lexical lifetime of
 /// guaranteed values is preserved.
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Builtins.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -25,9 +26,9 @@
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "llvm/ADT/STLExtras.h"
 
 #define DEBUG_TYPE "copy-propagation"
@@ -295,8 +296,8 @@ Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
 }
 
 /// Finds end_access instructions which are barriers to hoisting because the
-/// access scopes they contain barriers to hoisting.  Hoisting end_borrows into
-/// such access scopes could introduce exclusivity violations.
+/// access scopes they end contain barriers to hoisting.  Hoisting end_borrows
+/// into such access scopes could introduce exclusivity violations.
 ///
 /// Implements BarrierAccessScopeFinder::Visitor
 class BarrierAccessScopeFinder final {
@@ -500,14 +501,11 @@ bool swift::shrinkBorrowScope(
 namespace swift::test {
 // Arguments:
 // - BeginBorrowInst - the introducer for the scope to shrink
-// - bool - the expected return value of shrinkBorrowScope
-// - variadic list of values consisting of the copies expected to be rewritten
 // Dumps:
 // - DELETED:  <<instruction deleted>>
 static FunctionTest ShrinkBorrowScopeTest(
-    "shrink-borrow-scope", [](auto &function, auto &arguments, auto &test) {
+    "shrink_borrow_scope", [](auto &function, auto &arguments, auto &test) {
       auto instruction = arguments.takeValue();
-      auto expected = arguments.takeBool();
       auto *bbi = cast<BeginBorrowInst>(instruction);
       auto *analysis = test.template getAnalysis<BasicCalleeAnalysis>();
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
@@ -515,20 +513,16 @@ static FunctionTest ShrinkBorrowScopeTest(
           InstModCallbacks().onDelete([&](auto *instruction) {
             llvm::outs() << "DELETED:\n";
             instruction->print(llvm::outs());
+            instruction->eraseFromParent();
+
           }));
       auto shrunk =
           shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
-      unsigned index = 0;
+      auto *shrunkString = shrunk ? "shrunk" : "did not shrink";
+      llvm::outs() << "Result: " << shrunkString << "\n";
+      llvm::outs() << "Rewrote the following copies:\n";
       for (auto *cvi : modifiedCopyValueInsts) {
-        auto expectedCopy = arguments.takeValue();
-        llvm::outs() << "rewritten copy " << index << ":\n";
-        llvm::outs() << "expected:\n";
-        expectedCopy->print(llvm::outs());
-        llvm::outs() << "got:\n";
         cvi->print(llvm::outs());
-        assert(cvi == expectedCopy);
-        ++index;
       }
-      assert(expected == shrunk && "didn't shrink expectedly!?");
     });
 } // namespace swift::test

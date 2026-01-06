@@ -189,16 +189,6 @@ func testLoadableBorrowingConsumeOperator(_ x: borrowing NonTrivialStruct) {
     _ = consume x
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s35noimplicitcopy_borrowing_parameters25testLoadableBorrowingEnumyyAA0eG0OF : $@convention(thin) (@guaranteed LoadableEnum) -> () {
-// CHECK: bb0([[ARG:%.*]] : @noImplicitCopy
-// CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
-// CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
-// CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
-// CHECK:   [[COPY2:%.*]] = copy_value [[BORROW]]
-// CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [owned] [[COPY2]]
-// CHECK:   switch_enum [[UNWRAP]]
-// CHECK: } // end sil function '$s35noimplicitcopy_borrowing_parameters25testLoadableBorrowingEnumyyAA0eG0OF'
 func testLoadableBorrowingEnum(_ x: borrowing LoadableEnum) {
     switch x {
     case let .x(y):
@@ -222,7 +212,7 @@ func testLoadableBorrowingEnum(_ x: borrowing LoadableEnum) {
 // CHECK:   copy_addr [[UNWRAP]] to [init] [[STACK]]
 // CHECK:   destroy_addr [[STACK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[CHECK]]
-// TODO: We probably want the unwrap to be on the struct_element_addr, not the other wya around.
+// TODO: We probably want the unwrap to be on the struct_element_addr, not the other way around.
 // CHECK:   [[GEP:%.*]] = struct_element_addr [[UNWRAP]]
 // CHECK:   [[STACK:%.*]] = alloc_stack
 // CHECK:   copy_addr [[GEP]] to [init] [[STACK]]

@@ -43,6 +43,7 @@ public:
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
@@ -79,8 +80,8 @@ protected:
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
-  static BindingSet inferBindings(ConstraintSystem &cs,
-                                  TypeVariableType *typeVar);
+  static const BindingSet &inferBindings(ConstraintSystem &cs,
+                                         TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

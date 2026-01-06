@@ -14,6 +14,7 @@
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/IDEBridging.h"
@@ -194,21 +195,13 @@ swift::ide::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
 }
 
 class RenameRangeCollector : public IndexDataConsumer {
-  StringRef usr;
+  const ValueDecl *declToRename;
   std::unique_ptr<StringScratchSpace> stringStorage;
   std::vector<RenameLoc> locations;
 
 public:
-  RenameRangeCollector(StringRef usr)
-      : usr(usr), stringStorage(new StringScratchSpace()) {}
-
-  RenameRangeCollector(const ValueDecl *D)
-      : stringStorage(new StringScratchSpace()) {
-    SmallString<64> SS;
-    llvm::raw_svector_ostream OS(SS);
-    printValueDeclUSR(D, OS);
-    usr = stringStorage->copyString(SS.str());
-  }
+  RenameRangeCollector(const ValueDecl *declToRename)
+      : declToRename(declToRename), stringStorage(new StringScratchSpace()) {}
 
   RenameRangeCollector(RenameRangeCollector &&collector) = default;
 
@@ -228,7 +221,7 @@ private:
   bool finishDependency(bool isClangModule) override { return true; }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (symbol.USR != usr) {
+    if (symbol.decl != declToRename && symbol.originalDecl != declToRename) {
       return IndexDataConsumer::Continue;
     }
     auto loc = indexSymbolToRenameLoc(symbol);

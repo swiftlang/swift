@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Volatile) | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: volatile
+// REQUIRES: swift_feature_Volatile
 
 import _Volatile
 

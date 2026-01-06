@@ -36,7 +36,7 @@ namespace swift {
 /// subclasses. Used to break a circular dependency from SIL <=>
 /// SILOptimizer that would be caused by us needing to use
 /// SILOptFunctionBuilder here.
-template<typename ImplClass, typename FunctionBuilderTy>
+template<typename ImplClass>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
@@ -143,13 +143,12 @@ public:
   using SILClonerWithScopes<ImplClass>::getBuilder;
   using SILClonerWithScopes<ImplClass>::getOpLocation;
   using SILClonerWithScopes<ImplClass>::getOpValue;
-  using SILClonerWithScopes<ImplClass>::getASTTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpASTType;
-  using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
   using SILClonerWithScopes<ImplClass>::recordFoldedValue;
+  using SILClonerWithScopes<ImplClass>::Functor;
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
@@ -161,53 +160,28 @@ public:
       SubsMap(ApplySubs),
       Original(From),
       Inlining(Inlining) {
+    Functor.SubsMap = ApplySubs;
+
+#ifndef NDEBUG
+    for (auto substConf : ApplySubs.getConformances()) {
+      if (substConf.isInvalid()) {
+        llvm::errs() << "Invalid conformance in SIL cloner:\n";
+        ApplySubs.dump(llvm::errs());
+        abort();
+      }
+    }
+#endif
+
   }
 
 protected:
+  bool shouldSubstOpaqueArchetypes() const { return true; }
+
   SILType remapType(SILType Ty) {
     SILType &Sty = TypeCache[Ty];
-    if (!Sty) {
-      Sty = Ty.subst(Original.getModule(), SubsMap);
-      if (!Sty.getASTType()->hasOpaqueArchetype() ||
-          !getBuilder()
-               .getTypeExpansionContext()
-               .shouldLookThroughOpaqueTypeArchetypes())
-        return Sty;
-      // Remap types containing opaque result types in the current context.
-      Sty = getBuilder().getTypeLowering(Sty).getLoweredType().getCategoryType(
-          Sty.getCategory());
-    }
+    if (!Sty)
+      Sty = SILClonerWithScopes<ImplClass>::remapType(Ty);
     return Sty;
-  }
-
-  CanType remapASTType(CanType ty) {
-    auto substTy = ty.subst(SubsMap)->getCanonicalType();
-    if (!substTy->hasOpaqueArchetype() ||
-        !getBuilder().getTypeExpansionContext()
-            .shouldLookThroughOpaqueTypeArchetypes())
-      return substTy;
-    // Remap types containing opaque result types in the current context.
-    return substOpaqueTypesWithUnderlyingTypes(
-        substTy,
-        TypeExpansionContext(getBuilder().getFunction()),
-        /*allowLoweredTypes=*/false);
-  }
-
-  ProtocolConformanceRef remapConformance(Type ty,
-                                          ProtocolConformanceRef conf) {
-    auto conformance = conf.subst(ty, SubsMap);
-    auto substTy = ty.subst(SubsMap)->getCanonicalType();
-    auto context = getBuilder().getTypeExpansionContext();
-    if (substTy->hasOpaqueArchetype() &&
-        context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conformance =
-          substOpaqueTypesWithUnderlyingTypes(conformance, substTy, context);
-    }
-    return conformance;
-  }
-
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    return Subs.subst(SubsMap);
   }
 
   void visitApplyInst(ApplyInst *Inst) {
@@ -270,16 +244,20 @@ protected:
     auto FalseCount = inst->getFalseBBCount();
 
     // Try to use the scalar cast instruction.
-    if (canSILUseScalarCheckedCastInstructions(B.getModule(),
-                                               sourceType, targetType)) {
+    if (canOptimizeToScalarCheckedCastInstructions(
+            &B.getFunction(), sourceType, targetType,
+            inst->getConsumptionKind())) {
       emitIndirectConditionalCastWithScalar(
-          B, SwiftMod, loc, inst->getConsumptionKind(), src, sourceType, dest,
+          B, SwiftMod, loc, inst->getCheckedCastOptions(),
+          inst->getConsumptionKind(), src, sourceType, dest,
           targetType, succBB, failBB, TrueCount, FalseCount);
       return;
     }
 
     // Otherwise, use the indirect cast.
-    B.createCheckedCastAddrBranch(loc, inst->getConsumptionKind(),
+    B.createCheckedCastAddrBranch(loc,
+                                  inst->getCheckedCastOptions(),
+                                  inst->getConsumptionKind(),
                                   src, sourceType,
                                   dest, targetType,
                                   succBB, failBB);
@@ -307,6 +285,16 @@ protected:
     super::visitCopyValueInst(Copy);
   }
 
+  void visitExplicitCopyValueInst(ExplicitCopyValueInst *Copy) {
+    // If the substituted type is trivial, ignore the copy.
+    SILType copyTy = getOpType(Copy->getType());
+    if (copyTy.isTrivial(*Copy->getFunction())) {
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
+      return;
+    }
+    super::visitExplicitCopyValueInst(Copy);
+  }
+
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
@@ -314,6 +302,24 @@ protected:
       return;
     }
     super::visitDestroyValueInst(Destroy);
+  }
+
+  void visitEndLifetimeInst(EndLifetimeInst *endLifetime) {
+    // If the substituted type is trivial, ignore the end_lifetime.
+    SILType ty = getOpType(endLifetime->getOperand()->getType());
+    if (ty.isTrivial(*endLifetime->getFunction())) {
+      return;
+    }
+    super::visitEndLifetimeInst(endLifetime);
+  }
+
+  void visitExtendLifetimeInst(ExtendLifetimeInst *extendLifetime) {
+    // If the substituted type is trivial, ignore the extend_lifetime.
+    SILType ty = getOpType(extendLifetime->getOperand()->getType());
+    if (ty.isTrivial(*extendLifetime->getFunction())) {
+      return;
+    }
+    super::visitExtendLifetimeInst(extendLifetime);
   }
 
   void visitDifferentiableFunctionExtractInst(
@@ -357,7 +363,7 @@ protected:
                 remappedOrigFnType->getDifferentiabilityResultIndices(),
                 dfei->getDerivativeFunctionKind(),
                 getBuilder().getModule().Types,
-                LookUpConformanceInModule(SwiftMod))
+                LookUpConformanceInModule())
             ->getWithoutDifferentiability();
     SILType remappedDerivativeFnType = getOpType(dfei->getType());
     // If remapped derivative type and derivative remapped type are equal, do
@@ -375,65 +381,63 @@ protected:
             getOpValue(dfei->getOperand()), remappedDerivativeFnType));
   }
 
-  /// One abstract function in the debug info can only have one set of variables
-  /// and types. This function determines whether applying the substitutions in
-  /// \p SubsMap on the generic signature \p Sig will change the generic type
-  /// parameters in the signature. This is used to decide whether it's necessary
-  /// to clone a unique copy of the function declaration with the substitutions
-  /// applied for the debug info.
-  static bool substitutionsChangeGenericTypeParameters(SubstitutionMap SubsMap,
-                                                       GenericSignature Sig) {
-
-    // If there are no substitutions, just reuse
-    // the original decl.
-    if (SubsMap.empty())
-      return false;
-
-    bool Result = false;
-    Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
-      if (!Canonical)
-        return;
-      if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
-        Result = true;
-    });
-
-    return Result;
-  }
-
   enum { ForInlining = true };
   /// Helper function to clone the parent function of a SILDebugScope if
   /// necessary when inlining said function into a new generic context.
-  /// \param SubsMap - the substitutions of the inlining/specialization process.
-  /// \param RemappedSig - the generic signature.
+  /// \param SubsMap - the substitutions for the call to the callee.
+  /// \param CalleeSig - the callee generic signature.
+  template<typename FunctionBuilderTy>
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
                                           SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
-                                          GenericSignature RemappedSig,
+                                          GenericSignature CalleeSig,
                                           bool ForInlining = false) {
     // If the original, non-inlined version of the function had no generic
     // environment, there is no need to remap it.
-    auto *OriginalEnvironment = ParentFunction->getGenericEnvironment();
-    if (!RemappedSig || !OriginalEnvironment)
+    auto *CalleeEnv = ParentFunction->getGenericEnvironment();
+    if (!CalleeSig || !CalleeEnv)
       return ParentFunction;
 
-    if (SubsMap.hasArchetypes())
-      SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+    // FIXME: Pass the CallerSig down directly instead of doing this.
+    GenericSignature CallerSig;
+    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype()) {
+      for (auto ReplacementType : SubsMap.getReplacementTypes()) {
+        ReplacementType.visit([&](Type t) {
+          if (t->is<PrimaryArchetypeType>() || t->is<PackArchetypeType>()) {
+            auto sig =
+              t->castTo<ArchetypeType>()->getGenericEnvironment()
+                ->getGenericSignature();
+            if (!CallerSig)
+              CallerSig = sig;
+            else
+              ASSERT(CallerSig.getPointer() == sig.getPointer());
+          }
+        });
+      }
 
-    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
+      SubsMap = SubsMap.mapReplacementTypesOutOfEnvironment();
+    }
+
+    // One abstract function in the debug info can only have one set of variables
+    // and types. We check if the function is called with non-identity substitutions
+    // to decide whether it's necessary to clone a unique copy of the function
+    // declaration with the substitutions applied for the debug info.
+    if (SubsMap.isIdentity() &&
+        !SubsMap.getRecursiveProperties().hasTypeParameter())
       return ParentFunction;
 
-    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // Note that mapReplacementTypesOutOfEnvironment() can't do anything for
     // opened existentials, and since archetypes can't be mangled, ignore
     // this case for now.
-    if (SubsMap.hasArchetypes())
-      return ParentFunction;
+    if (SubsMap.getRecursiveProperties().hasLocalArchetype())
+      SubsMap = {};
 
     // Clone the function with the substituted type for the debug info.
-    Mangle::GenericSpecializationMangler Mangler(ParentFunction,
+    Mangle::GenericSpecializationMangler Mangler(M.getASTContext(), ParentFunction,
                                                  IsNotSerialized);
     std::string MangledName =
-      Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);
+      Mangler.mangleForDebugInfo(CalleeSig, SubsMap, CallerSig, ForInlining);
 
     if (ParentFunction->getName() == MangledName)
       return ParentFunction;
@@ -446,7 +450,7 @@ protected:
       ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
           ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
-          ParentFunction->isTransparent(), ParentFunction->isSerialized(),
+          ParentFunction->isTransparent(), ParentFunction->getSerializedKind(),
           IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, 0,
           ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());
       // Increment the ref count for the inlined function, so it doesn't
@@ -457,7 +461,7 @@ protected:
         // undead.
         if (ParentFunction->empty()) {
           FuncBuilder.eraseFunction(ParentFunction);
-          ParentFunction->setGenericEnvironment(OriginalEnvironment);
+          ParentFunction->setGenericEnvironment(CalleeEnv);
         }
       }
     }

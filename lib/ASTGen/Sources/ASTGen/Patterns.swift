@@ -45,10 +45,6 @@ extension ASTGenVisitor {
       return self.generate(valueBindingPattern: node).asPattern
     case .wildcardPattern(let node):
       return self.generate(wildcardPattern: node).asPattern
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   }
 
@@ -81,7 +77,8 @@ extension ASTGenVisitor {
   }
 
   func generate(missingPattern node: MissingPatternSyntax) -> BridgedPattern {
-    fatalError("unimplemented")
+    // Recover by creating implicit '_' pattern.
+    return BridgedAnyPattern.createImplicit(self.ctx).asPattern
   }
 
   func generate(tuplePattern node: TuplePatternSyntax) -> BridgedPattern {

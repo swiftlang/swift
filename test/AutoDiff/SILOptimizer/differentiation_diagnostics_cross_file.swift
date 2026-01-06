@@ -21,6 +21,12 @@ func crossFileDerivativeAttr<T: Protocol>(
   return input.identityDerivativeAttr()
 }
 
+@differentiable(reverse)
+func crossFileDerivativeAttr(_ input: Struct) -> Struct {
+  // No error expected
+  return input.identityDerivativeAttr()
+}
+
 // TF-1234: Test `@differentiable` propagation from protocol requirement storage
 // declarations to their accessors in other file.
 @differentiable(reverse)

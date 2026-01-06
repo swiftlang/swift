@@ -22,7 +22,7 @@ var a: String? = nil
 // CHECK: overload set choice binding $T0 := {{.*}}
 // CHECK-NEXT: (considering: ({{.*}}) -> {{.*}} applicable fn {{.*}}
 // CHECK: increasing 'sync-in-asynchronous' score by 1
-// CHECK: solution is worse than the best solution
+// CHECK: solution {{.*}} is worse than the best solution {{.*}}
 
 filter_async {
   Obj()

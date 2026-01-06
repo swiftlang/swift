@@ -3,11 +3,11 @@
 class C { }
 
 protocol P {
-  associatedtype AssocP : C // expected-note{{protocol requires nested type 'AssocP'; add nested type 'AssocP' for conformance}}
-  associatedtype AssocA : AnyObject // expected-note{{protocol requires nested type 'AssocA'; add nested type 'AssocA' for conformance}}
+  associatedtype AssocP : C // expected-note{{protocol requires nested type 'AssocP'}}
+  associatedtype AssocA : AnyObject // expected-note{{protocol requires nested type 'AssocA'}}
 }
 
-struct X : P { // expected-error{{type 'X' does not conform to protocol 'P'}}
+struct X : P { // expected-error{{type 'X' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   typealias AssocP = Int // expected-note{{possibly intended match 'X.AssocP' (aka 'Int') does not inherit from 'C'}}
   typealias AssocA = Int // expected-note{{possibly intended match 'X.AssocA' (aka 'Int') does not conform to 'AnyObject'}}
 }
@@ -78,9 +78,9 @@ struct X1d : P1 {
 }
 
 protocol P2 {
-  func f(_: (Int) -> Int) // expected-note{{expected sendability to match requirement here}} expected-note 2{{protocol requires function 'f' with type '((Int) -> Int) -> ()'; add a stub for conformance}}
+  func f(_: (Int) -> Int) // expected-note{{expected sendability to match requirement here}} expected-note 2{{protocol requires function 'f' with type '((Int) -> Int) -> ()'}}
   func g(_: @escaping (Int) -> Int) // expected-note 2 {{expected sendability to match requirement here}}
-  func h(_: @Sendable (Int) -> Int) // expected-note 2 {{protocol requires function 'h' with type '(@Sendable (Int) -> Int) -> ()'; add a stub for conformance}}
+  func h(_: @Sendable (Int) -> Int) // expected-note 2 {{protocol requires function 'h' with type '(@Sendable (Int) -> Int) -> ()'}}
   func i(_: @escaping @Sendable (Int) -> Int)
 }
 
@@ -91,7 +91,7 @@ struct X2a : P2 {
   func i(_: (Int) -> Int) { }
 }
 
-struct X2b : P2 { // expected-error{{type 'X2b' does not conform to protocol 'P2'}}
+struct X2b : P2 { // expected-error{{type 'X2b' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
   func f(_: @escaping (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping (Int) -> Int) -> ()'}}
   func g(_: @escaping (Int) -> Int) { }
   func h(_: @escaping (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping (Int) -> Int) -> ()'}}
@@ -105,7 +105,7 @@ struct X2c : P2 {
   func i(_: @Sendable (Int) -> Int) { }
 }
 
-struct X2d : P2 { // expected-error{{type 'X2d' does not conform to protocol 'P2'}}
+struct X2d : P2 { // expected-error{{type 'X2d' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
   func f(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}
   func g(_: @escaping @Sendable (Int) -> Int) { } // expected-warning{{sendability of function types in instance method 'g' does not match requirement in protocol 'P2'}}
   func h(_: @escaping @Sendable (Int) -> Int) { } // expected-note{{candidate has non-matching type '(@escaping @Sendable (Int) -> Int) -> ()'}}

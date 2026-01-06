@@ -19,6 +19,7 @@
 #include "SwiftTargetInfo.h"
 
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
@@ -42,7 +43,7 @@ using llvm::coverage::CovMapVersion;
 /// cannot pin our version, as it must remain in sync with the version Clang is
 /// using.
 /// Do not bump without at least filing a bug and pinging a coverage maintainer.
-static_assert(CovMapVersion::CurrentVersion == CovMapVersion::Version6,
+static_assert(CovMapVersion::CurrentVersion == CovMapVersion::Version7,
               "Coverage mapping emission needs updating");
 
 static std::string getInstrProfSection(IRGenModule &IGM,

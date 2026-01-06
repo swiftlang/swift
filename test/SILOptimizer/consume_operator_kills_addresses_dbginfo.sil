@@ -19,11 +19,6 @@ public protocol P {
 sil @forceSplit : $@convention(thin) @async () -> ()
 sil @genericUse : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
-enum Optional<T> {
-case some(T)
-case none
-}
-
 ///////////
 // Tests //
 ///////////

@@ -7,11 +7,11 @@ class C {
     // There should not be a local weak variable "self" shadowing the
     // implicit self argument.
     // let self
-    // CHECK: call void @llvm.dbg
+    // CHECK: #dbg_
     // let s
-    // CHECK: call void @llvm.dbg
+    // CHECK: #dbg_
     // var weak self
-    // CHECK-NOT: call void @llvm.dbg
+    // CHECK-NOT: #dbg_
     // CHECK-LABEL: ret void
     withClosure { [weak self] in
       guard let s = self else { return }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5
 
 ////
 // Members of structs
@@ -825,4 +825,25 @@ do {
     let _ = fn()?.op().value
     // expected-error@-1 {{value of type 'any BinaryInteger' has no member 'op'}}
   }
+}
+
+do {
+  func test<T>(_: T) -> T? { nil }
+  func test<U>(_: U) -> Int { 0 }
+
+  func compute(x: Any) {
+    test(x)!.unknown()
+    // expected-error@-1 {{value of type 'Any' has no member 'unknown'}}
+    // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+  }
+}
+
+func testCompoundLeadingDot() {
+  struct S {
+    static func foo(x: Int) -> Self { .init() }
+  }
+
+  // Make sure we correctly strip the argument label.
+  let _: S = .foo(x:)(0)
+  let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
 }

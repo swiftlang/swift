@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,7 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -87,76 +88,42 @@ struct QueryTypeSubstitutionMap {
   Type operator()(SubstitutableType *type) const;
 };
 
-/// A function object suitable for use as a \c TypeSubstitutionFn that
-/// queries an underlying \c TypeSubstitutionMap, or returns the original type
-/// if no match was found.
-struct QueryTypeSubstitutionMapOrIdentity {
-  const TypeSubstitutionMap &substitutions;
-  
-  Type operator()(SubstitutableType *type) const;
-};
-
 /// Function used to resolve conformances.
-using GenericFunction = auto(CanType dependentType,
-                             Type conformingReplacementType,
-                             ProtocolDecl *conformedProtocol)
+using GenericFunction = auto(InFlightSubstitution &IFS,
+                             Type dependentType,
+                             ProtocolDecl *proto)
                             -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
 /// conformance through a module.
 class LookUpConformanceInModule {
-  ModuleDecl *M;
 public:
-  explicit LookUpConformanceInModule(ModuleDecl *M)
-    : M(M) {}
+  explicit LookUpConformanceInModule() {}
 
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
-};
-
-/// Functor class suitable for use as a \c LookupConformanceFn that provides
-/// only abstract conformances for generic types. Asserts that the replacement
-/// type is an opaque generic type.
-class MakeAbstractConformanceForGenericType {
-public:
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
-};
-
-/// Functor class suitable for use as a \c LookupConformanceFn that fetches
-/// conformances from a generic signature.
-class LookUpConformanceInSignature {
-  const GenericSignatureImpl *Sig;
-public:
-  LookUpConformanceInSignature(const GenericSignatureImpl *Sig)
-    : Sig(Sig) {
-      assert(Sig && "Cannot lookup conformance in null signature!");
-    }
-
-    ProtocolConformanceRef operator()(CanType dependentType,
-                                      Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// Allow substitutions to recurse into SILFunctionTypes.
-  /// Normally, SILType::subst() should be used for lowered
-  /// types, however in special cases where the substitution
-  /// is just changing between contextual and interface type
-  /// representations, using Type::subst() is allowed.
-  AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
-  DesugarMemberTypes = 0x02,
-  /// Substitute types involving opaque type archetypes.
+  DesugarMemberTypes = 0x01,
+  /// Allow primary archetypes to themselves be the subject of substitution.
+  /// Otherwise, we map them out of context first.
+  SubstitutePrimaryArchetypes = 0x02,
+  /// Allow opaque archetypes to themselves be the subject of substitution,
+  /// used when erasing them to their underlying types. Otherwise, we
+  /// recursively substitute their substitutions, instead, preserving the
+  /// opaque archetype.
   SubstituteOpaqueArchetypes = 0x04,
+  /// Allow local archetypes to themselves be the subject of substitution.
+  SubstituteLocalArchetypes = 0x08,
   /// Don't increase pack expansion level for free pack references.
   /// Do not introduce new usages of this flag.
   /// FIXME: Remove this.
-  PreservePackExpansionLevel = 0x08,
+  PreservePackExpansionLevel = 0x10,
 };
 
 /// Options for performing substitutions into a type.
@@ -185,7 +152,7 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
 
 /// Enumeration describing foreign languages to which Swift may be
 /// bridged.
-enum class ForeignLanguage {
+enum class ForeignLanguage : uint8_t {
   C,
   ObjectiveC,
 };
@@ -214,7 +181,13 @@ enum class ForeignRepresentableKind : uint8_t {
 /// therefore, the result type is in covariant position relative to the function
 /// type.
 struct TypePosition final {
-  enum : uint8_t { Covariant, Contravariant, Invariant, Shape };
+  enum : uint8_t {
+    Covariant = 1 << 0,
+    Contravariant = 1 << 1,
+    Invariant = 1 << 2,
+    Shape = 1 << 3,
+    Last_Position = Shape,
+  };
 
 private:
   decltype(Covariant) kind;
@@ -236,6 +209,10 @@ public:
   }
 
   operator decltype(kind)() const { return kind; }
+};
+enum : unsigned {
+  NumTypePositions =
+      countBitsUsed(static_cast<unsigned>(TypePosition::Last_Position))
 };
 
 /// Type - This is a simple value object that contains a pointer to a type
@@ -275,16 +252,6 @@ public:
   /// \returns true if the predicate returns true for the given type or any of
   /// its children.
   bool findIf(llvm::function_ref<bool(Type)> pred) const;
-
-  /// Transform the given type by recursively applying the user-provided
-  /// function to each node.
-  ///
-  /// \param fn A function object with the signature \c Type(Type) , which
-  /// accepts a type and returns either a transformed type or a null type
-  /// (which will propagate out the null type).
-  ///
-  /// \returns the result of transforming the type.
-  Type transform(llvm::function_ref<Type(Type)> fn) const;
 
   /// Transform the given type by recursively applying the user-provided
   /// function to each node.
@@ -364,16 +331,21 @@ public:
   /// subsystem.
   Type subst(InFlightSubstitution &subs) const;
 
-  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  /// Whether this type is from a system module and should be considered
+  /// implicitly private.
+  bool isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions(),
+             NonRecursivePrintOptions OPO = std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO,
+             NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
-  std::string getString(const PrintOptions &PO = PrintOptions()) const;
+  std::string getString(const PrintOptions &PO = PrintOptions(),
+                        NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
@@ -382,7 +354,8 @@ public:
   /// the type would make it appear that it's appended to "Float" as
   /// opposed to the entire type.
   std::string
-  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+  getStringAsComponent(const PrintOptions &PO = PrintOptions(),
+                       NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Computes the join between two types.
   ///
@@ -622,17 +595,6 @@ template <> struct CanTypeWrapperTraits<TYPE> {                     \
 BEGIN_CAN_TYPE_WRAPPER(TYPE, BASE)                                  \
 END_CAN_TYPE_WRAPPER(TYPE, BASE)
 
-// Disallow direct uses of isa/cast/dyn_cast on Type to eliminate a
-// certain class of bugs.
-template <class X> inline bool
-isa(const Type&) = delete; // Use TypeBase::is instead.
-template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
-cast(const Type&) = delete; // Use TypeBase::castTo instead.
-template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
-dyn_cast(const Type&) = delete; // Use TypeBase::getAs instead.
-template <class X> inline typename llvm::cast_retty<X, Type>::ret_type
-dyn_cast_or_null(const Type&) = delete;
-
 // Permit direct uses of isa/cast/dyn_cast on CanType and preserve
 // canonicality.
 template <class X> inline bool isa(CanType type) {
@@ -683,16 +645,6 @@ namespace llvm {
     return OS;
   }
 
-  // A Type casts like a TypeBase*.
-  template<> struct simplify_type<const ::swift::Type> {
-    typedef ::swift::TypeBase *SimpleType;
-    static SimpleType getSimplifiedValue(const ::swift::Type &Val) {
-      return Val.getPointer();
-    }
-  };
-  template<> struct simplify_type< ::swift::Type>
-    : public simplify_type<const ::swift::Type> {};
-  
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
     static swift::Type getEmptyKey() {
@@ -742,5 +694,38 @@ namespace llvm {
     }
   };
 } // end namespace llvm
+
+/// Disallow uses of `isa`/`cast`/`dyn_cast` directly on `Type` to eliminate a
+/// certain class of bugs.
+namespace llvm {
+
+template <class To>
+struct CastInfo<To, const swift::Type> {
+  // FIXME: Without this 'false' indirection, clang from 5.9 toolchain
+  // triggers the static assert directly on the template. Try removing once
+  // Linux CI is updated to 6.0.
+  static constexpr bool False() { return false; }
+  static_assert(
+      False(), "don't use isa/cast/dyn_cast directly on a 'Type' value; "
+               "instead, use 'isa/cast/dyn_cast<X>(type.getPointer())' to "
+               "cast the exact type, or use 'type->is/getAs/castTo<X>()' "
+               "to cast the desugared type, which is usually the right choice");
+};
+template <class To>
+struct CastInfo<To, swift::Type> : public CastInfo<To, const swift::Type> {};
+
+/// These specializations exist to avoid unhelpful instantiation errors in
+/// addition to the above static assertion.
+template <>
+struct simplify_type<const swift::Type> {
+  typedef ::swift::TypeBase *SimpleType;
+  static SimpleType getSimplifiedValue(const swift::Type &Val) {
+    return Val.getPointer();
+  }
+};
+template <>
+struct simplify_type<swift::Type> : public simplify_type<const swift::Type> {};
+
+} // namespace llvm
 
 #endif

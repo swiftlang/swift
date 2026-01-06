@@ -1,0 +1,5 @@
+module StdSpan {
+  header "std-span.h"
+  requires cplusplus
+  export *
+}

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -161,8 +161,8 @@ func test_outside(
 
   _ = local.name // ok, special case that let constants are okey
   let _: String = local.mutable // ok, special case that let constants are okey
-  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a non-isolated context}}
-  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can not be accessed from a non-isolated context}}
+  _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can not be accessed from a nonisolated context}}
+  _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can not be accessed from a nonisolated context}}
 
   // ==== special properties (nonisolated, implicitly replicated)
   // the distributed actor's special fields may always be referred to

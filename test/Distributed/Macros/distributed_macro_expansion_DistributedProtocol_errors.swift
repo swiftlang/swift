@@ -7,27 +7,50 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -plugin-path %swift-plugin-dir -parse-as-library -I %t %S/../Inputs/FakeDistributedActorSystems.swift -dump-macro-expansions %s 2>&1
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.0-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -parse-as-library -I %t %S/../Inputs/FakeDistributedActorSystems.swift -dump-macro-expansions %s 2>&1
 
 import Distributed
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'struct' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'struct' (from macro 'Resolvable')}}
 struct Struct {}
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'class' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'class' (from macro 'Resolvable')}}
 class Clazz {}
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'actor' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'actor' (from macro 'Resolvable')}}
 actor Act {}
 
-@_DistributedProtocol // expected-error{{'@DistributedProtocol' can only be applied to 'protocol', but was attached to 'actor' (from macro '_DistributedProtocol')}}
+@Resolvable // expected-error{{'@Resolvable' can only be applied to 'protocol', but was attached to 'actor' (from macro 'Resolvable')}}
 distributed actor Caplin {
   typealias ActorSystem = FakeActorSystem
 }
 
-@_DistributedProtocol // expected-error{{Distributed protocol must declare actor system with SerializationRequirement}}
+@Resolvable // expected-note 5{{in expansion of macro 'Resolvable' on protocol 'Fail' here}}
 protocol Fail: DistributedActor {
   distributed func method() -> String
 }
+/*
+expected-expansion@-2:2{{
+  expected-error@1:19{{distributed actor '$Fail' does not declare ActorSystem it can be used with}}
+  expected-note@1:13{{you can provide a module-wide default actor system by declaring:}}
+  expected-error@1:19{{type '$Fail' does not conform to protocol 'DistributedActor'}}
+  expected-note@1:19{{add stubs for conformance}}
+  expected-error@1:19{{type '$Fail' does not conform to protocol 'Identifiable'}}
+}}
+*/
 
+@Resolvable // expected-note2{{in expansion of macro 'Resolvable' on protocol 'SomeRoot' here}}
+public protocol SomeRoot: DistributedActor, Sendable
+  where ActorSystem: DistributedActorSystem<any Codable> {
+
+  associatedtype AssociatedSomething: Sendable // expected-note{{protocol requires nested type 'AssociatedSomething'}}
+  static var staticValue: String { get }
+  var value: String { get }
+}
+/*
+expected-expansion@-2:2{{
+  expected-error@1:27{{type '$SomeRoot<ActorSystem>' does not conform to protocol 'SomeRoot'}}
+  expected-note@1:27{{add stubs for conformance}}
+}}
+*/

@@ -18,13 +18,17 @@
 #define SWIFT_MODULE_H
 
 #include "swift/AST/AccessNotes.h"
+#include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicSourceInfo.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/OptionSet.h"
@@ -39,6 +43,7 @@
 #include "llvm/Support/MD5.h"
 #include <optional>
 #include <set>
+#include <unordered_map>
 
 namespace clang {
   class Module;
@@ -48,17 +53,15 @@ namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
   class ASTWalker;
-  class BraceStmt;
+  class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
   class TypeDecl;
   enum class DeclKind : uint8_t;
-  class ExtensionDecl;
   class DebuggerClient;
   class DeclName;
   class FileUnit;
   class FuncDecl;
-  class InfixOperatorDecl;
   enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
@@ -68,21 +71,11 @@ namespace swift {
   class PostfixOperatorDecl;
   class PrefixOperatorDecl;
   class ProtocolConformance;
-  class ProtocolDecl;
   struct PrintOptions;
-  class Token;
-  class TupleType;
-  class Type;
-  class TypeRefinementContext;
-  class ValueDecl;
-  class VarDecl;
-  class VisibleDeclConsumer;
-  class ASTScope;
   class SourceLookupCache;
-
-namespace ast_scope {
-class ASTSourceFileScope;
-}
+  class Type;
+  class ValueDecl;
+  class VisibleDeclConsumer;
 
 /// Discriminator for file-units.
 enum class FileUnitKind {
@@ -141,6 +134,19 @@ struct SourceFilePathInfo {
   }
 };
 
+/// This is used to idenfity an external macro definition.
+struct ExternalMacroPlugin {
+  std::string ModuleName;
+
+  enum Access {
+    Internal = 0,
+    Package,
+    Public,
+  };
+
+  Access MacroAccess;
+};
+
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
@@ -157,10 +163,6 @@ enum class ResilienceStrategy : unsigned {
 };
 
 class OverlayFile;
-
-/// A mapping used to find the source file that contains a particular source
-/// location.
-class ModuleSourceFileLocationMap;
 
 /// A unit that allows grouping of modules by a package name.
 ///
@@ -227,6 +229,7 @@ class ModuleDecl
     : public DeclContext, public TypeDecl, public ASTAllocated<ModuleDecl> {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
+  friend class CustomDerivativesRequest;
 
   /// The ABI name of the module, if it differs from the module name.
   mutable Identifier ModuleABIName;
@@ -238,6 +241,12 @@ class ModuleDecl
 
   /// Module name to use when referenced in clients module interfaces.
   mutable Identifier ExportAsName;
+
+  mutable Identifier PublicModuleName;
+
+  /// Indicates a version of the Swift compiler used to generate 
+  /// .swiftinterface file that this module was produced from (if any).
+  mutable version::Version InterfaceCompilerVersion;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -294,14 +303,9 @@ private:
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
 
-  SmallVector<FileUnit *, 2> Files;
-
-  /// Mapping used to find the source file associated with a given source
-  /// location.
-  ModuleSourceFileLocationMap *sourceFileLocationMap = nullptr;
-
-  /// The set of auxiliary source files build as part of this module.
-  SmallVector<SourceFile *, 2> AuxiliaryFiles;
+  /// The list of files in the module. This is guaranteed to be set once module
+  /// construction has completed. It must not be mutated afterwards.
+  std::optional<SmallVector<FileUnit *, 2>> Files;
 
   llvm::SmallDenseMap<Identifier, SmallVector<OverlayFile *, 1>>
     declaredCrossImports;
@@ -341,29 +345,62 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  AccessNotesFile accessNotes;
-
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
-  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
+  using AvailabilityDomainMap =
+      llvm::SmallDenseMap<Identifier, const CustomAvailabilityDomain *>;
+  AvailabilityDomainMap AvailabilityDomains;
+
+public:
+  using PopulateFilesFn = llvm::function_ref<void(
+      ModuleDecl *, llvm::function_ref<void(FileUnit *)>)>;
+
+private:
+  ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo,
+             PopulateFilesFn populateFiles, bool isMainModule);
 
 public:
   /// Creates a new module with a given \p name.
   ///
   /// \param importInfo Information about which modules should be implicitly
   /// imported by each file of this module.
-  static ModuleDecl *
-  create(Identifier name, ASTContext &ctx,
-         ImplicitImportInfo importInfo = ImplicitImportInfo()) {
-    return new (ctx) ModuleDecl(name, ctx, importInfo);
+  /// \param populateFiles A function which populates the files for the module.
+  /// Once called, the module's list of files may not change.
+  static ModuleDecl *create(Identifier name, ASTContext &ctx,
+                            ImplicitImportInfo importInfo,
+                            PopulateFilesFn populateFiles) {
+    return new (ctx) ModuleDecl(name, ctx, importInfo, populateFiles,
+                                /*isMainModule*/ false);
   }
 
+  /// Creates a new module with a given \p name.
+  ///
+  /// \param populateFiles A function which populates the files for the module.
+  /// Once called, the module's list of files may not change.
+  static ModuleDecl *create(Identifier name, ASTContext &ctx,
+                            PopulateFilesFn populateFiles) {
+    return new (ctx) ModuleDecl(name, ctx, ImplicitImportInfo(), populateFiles,
+                                /*isMainModule*/ false);
+  }
+
+  /// Creates a new main module with a given \p name. The main module is the
+  /// module being built by the compiler, containing the primary source files.
+  ///
+  /// \param importInfo Information about which modules should be implicitly
+  /// imported by each file of this module.
+  /// \param populateFiles A function which populates the files for the module.
+  /// Once called, the module's list of files may not change.
   static ModuleDecl *createMainModule(ASTContext &ctx, Identifier name,
-                                      ImplicitImportInfo iinfo) {
-    auto *Mod = ModuleDecl::create(name, ctx, iinfo);
-    Mod->Bits.ModuleDecl.IsMainModule = true;
-    return Mod;
+                                      ImplicitImportInfo iinfo,
+                                      PopulateFilesFn populateFiles) {
+    return new (ctx) ModuleDecl(name, ctx, iinfo, populateFiles,
+                                /*isMainModule*/ true);
+  }
+
+  /// Creates an empty module with a given \p name.
+  static ModuleDecl *createEmpty(Identifier name, ASTContext &ctx) {
+    return create(name, ctx, ImplicitImportInfo(), [](auto, auto) {});
   }
 
   using Decl::getASTContext;
@@ -376,8 +413,9 @@ public:
   /// imports.
   ImplicitImportList getImplicitImports() const;
 
-  AccessNotesFile &getAccessNotes() { return accessNotes; }
-  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
+  /// Retrieve the access notes to apply for the module, or \c nullptr if there
+  /// are no access notes.
+  const AccessNotesFile *getAccessNotes() const;
 
   /// Return whether the module was imported with resilience disabled. The
   /// debugger does this to access private fields.
@@ -385,36 +423,15 @@ public:
   /// Only to be called by MemoryBufferSerializedModuleLoader.
   void setBypassResilience() { BypassResilience = true; }
 
-  ArrayRef<FileUnit *> getFiles() {
-    assert(!Files.empty() || failedToLoad());
-    return Files;
+  ArrayRef<FileUnit *> getFiles() const {
+    ASSERT(Files.has_value() &&
+           "Attempting to query files before setting them");
+    return *Files;
   }
-  ArrayRef<const FileUnit *> getFiles() const {
-    return { Files.begin(), Files.size() };
-  }
-
-  /// Add the given file to this module.
-  ///
-  /// FIXME: Remove this function from public view. Modules never need to add
-  /// files once they are created.
-  ///
-  /// \warning There are very few safe points to call this function once a
-  /// \c ModuleDecl has been created. If you find yourself needing to insert
-  /// a file in the middle of e.g. semantic analysis, use a \c
-  /// SynthesizedFileUnit instead.
-  void addFile(FileUnit &newFile);
-
-  /// Add an auxiliary source file, introduced as part of the translation.
-  void addAuxiliaryFile(SourceFile &sourceFile);
 
   /// Produces the source file that contains the given source location, or
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
-
-  // Retrieve the buffer ID and source location of the outermost location that
-  // caused the generation of the buffer containing \p loc. \p loc and its
-  // buffer if it isn't in a generated buffer or has no original location.
-  std::pair<unsigned, SourceLoc> getOriginalLocation(SourceLoc loc) const;
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
@@ -464,14 +481,17 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Returns the name that should be used for this module in a module
+  /// selector. For separately-imported overlays, this will be the declaring
+  /// module's name.
+  Identifier getNameForModuleSelector();
+
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
   Identifier getABIName() const;
 
   /// Set the ABI name of the module;
-  void setABIName(Identifier name) {
-    ModuleABIName = name;
-  }
+  void setABIName(Identifier name);
 
   /// Get the package name of this module
   /// FIXME: remove this and bump module version rdar://104723918
@@ -500,11 +520,35 @@ public:
     ExportAsName = name;
   }
 
+  /// Public facing name for this module in diagnostics and documentation.
+  ///
+  /// This always returns a valid name as it defaults to the module name if
+  /// no public module name is set.
+  ///
+  /// If `onlyIfImported`, return the normal module name when the module
+  /// corresponding to the public module name isn't imported. Users working
+  /// in between both modules will then see the normal module name,
+  /// this may be more useful for diagnostics at that level.
+  Identifier getPublicModuleName(bool onlyIfImported) const;
+
+  void setPublicModuleName(Identifier name) {
+    PublicModuleName = name;
+  }
+
+  /// See \c InterfaceCompilerVersion
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return InterfaceCompilerVersion;
+  }
+
+  void setSwiftInterfaceCompilerVersion(version::Version version) {
+    InterfaceCompilerVersion = version;
+  }
+
   /// Retrieve the actual module name of an alias used for this module (if any).
   ///
-  /// For example, if '-module-alias Foo=Bar' is passed in when building the main module,
-  /// and this module is (a) not the main module and (b) is named Foo, then it returns
-  /// the real (physically on-disk) module name Bar.
+  /// For example, if '-module-alias Foo=Bar' is passed in when building the
+  /// main module, and this module is (a) not the main module and (b) is named
+  /// Foo, then it returns the real (physically on-disk) module name Bar.
   ///
   /// If no module aliasing is set, it will return getName(), i.e. Foo.
   Identifier getRealName() const;
@@ -536,14 +580,16 @@ private:
   std::optional<std::pair<ModuleDecl *, Identifier>>
       declaringModuleAndBystander;
 
+  /// A cache of this module's visible Clang modules
+  /// parameterized by the Swift interface print mode.
+  using VisibleClangModuleSet = llvm::DenseMap<const clang::Module *, ModuleDecl *>;
+  std::unordered_map<PrintOptions::InterfaceMode, VisibleClangModuleSet> CachedVisibleClangModuleSet;
+
   /// If this module is an underscored cross import overlay, gets the underlying
   /// module that declared it (which may itself be a cross-import overlay),
   /// along with the name of the required bystander module. Used by tooling to
   /// present overlays as if they were part of their underlying module.
   std::pair<ModuleDecl *, Identifier> getDeclaringModuleAndBystander();
-
-  /// Update the source-file location map to make it current.
-  void updateSourceFileLocationMap();
 
 public:
   ///  If this is a traditional (non-cross-import) overlay, get its underlying
@@ -551,7 +597,7 @@ public:
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
 
   /// Returns true if this module is the Clang overlay of \p other.
-  bool isClangOverlayOf(ModuleDecl *other);
+  bool isClangOverlayOf(ModuleDecl *other) const;
 
   /// Returns true if this module is the same module or either module is a clang
   /// overlay of the other.
@@ -577,6 +623,14 @@ public:
   bool getRequiredBystandersIfCrossImportOverlay(
       ModuleDecl *declaring, SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Computes all Clang modules that are visible from this moule.
+  /// This includes any modules that are imported transitively through public
+  /// (`@_exported`) imports.
+  ///
+  /// The computed map associates each visible Clang module with the
+  /// corresponding Swift module.
+  const VisibleClangModuleSet &
+  getVisibleClangModules(PrintOptions::InterfaceMode contentMode);
 
   /// Walks and loads the declared, underscored cross-import overlays of this
   /// module and its underlying clang module, transitively, to find all cross
@@ -585,6 +639,9 @@ public:
   /// This is used by tooling to present these overlays as part of this module.
   void findDeclaredCrossImportOverlaysTransitive(
       SmallVectorImpl<ModuleDecl *> &overlays);
+
+  /// Returns true if this module is the Clang header import module.
+  bool isClangHeaderImportModule() const;
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -689,6 +746,13 @@ public:
     Bits.ModuleDecl.HasCxxInteroperability = enabled;
   }
 
+  CXXStdlibKind getCXXStdlibKind() const {
+    return static_cast<CXXStdlibKind>(Bits.ModuleDecl.CXXStdlibKind);
+  }
+  void setCXXStdlibKind(CXXStdlibKind kind) {
+    Bits.ModuleDecl.CXXStdlibKind = static_cast<uint8_t>(kind);
+  }
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const {
@@ -711,7 +775,7 @@ public:
     Bits.ModuleDecl.IsBuiltFromInterface = flag;
   }
 
-  /// Returns true if -experimental-allow-non-resilient-access was passed
+  /// Returns true if -allow-non-resilient-access was passed
   /// and the module is built from source.
   bool allowNonResilientAccess() const {
     return Bits.ModuleDecl.AllowNonResilientAccess &&
@@ -719,6 +783,17 @@ public:
   }
   void setAllowNonResilientAccess(bool flag = true) {
     Bits.ModuleDecl.AllowNonResilientAccess = flag;
+  }
+
+  /// Returns true if -package-cmo was passed, which
+  /// enables serialization of package, public, and inlinable decls in a
+  /// package. This requires -allow-non-resilient-access.
+  bool serializePackageEnabled() const {
+    return Bits.ModuleDecl.SerializePackageEnabled &&
+           allowNonResilientAccess();
+  }
+  void setSerializePackageEnabled(bool flag = true) {
+    Bits.ModuleDecl.SerializePackageEnabled = flag;
   }
 
   /// Returns true if this module is a non-Swift module that was imported into
@@ -747,6 +822,24 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
+  /// Whether this module has enabled strict memory safety checking.
+  bool strictMemorySafety() const {
+    return Bits.ModuleDecl.StrictMemorySafety;
+  }
+
+  void setStrictMemorySafety(bool value = true) {
+    Bits.ModuleDecl.StrictMemorySafety = value;
+  }
+
+  /// Whether this module uses deferred code generation.
+  bool deferredCodeGen() const {
+    return Bits.ModuleDecl.DeferredCodeGen;
+  }
+
+  void setDeferredCodeGen(bool value = true) {
+    Bits.ModuleDecl.DeferredCodeGen = value;
+  }
+
   bool isObjCNameLookupCachePopulated() const {
     return Bits.ModuleDecl.ObjCNameLookupCachePopulated;
   }
@@ -764,8 +857,30 @@ public:
   /// returns the module \c Foo.
   ModuleDecl *getTopLevelModule(bool overlay = false);
 
+  /// Returns whether or not this module is a submodule of the given module.
+  /// If `this == M`, this returns false. If this is a submodule such as
+  /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
+  /// returns true.
+  bool isSubmoduleOf(const ModuleDecl *M) const;
+
+private:
+  std::string CacheKey;
+
+public:
+  void setCacheKey(const std::string &key) { CacheKey = key; }
+  StringRef getCacheKey() const { return CacheKey; }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
+  }
+
+  /// True if this module is resilient AND also does _not_ allow
+  /// non-resilient access; the module can allow such access if
+  /// package optimization is enabled so its client modules within
+  /// the same package can have a direct access to decls in this
+  /// module even if it's built resiliently.
+  bool isStrictlyResilient() const {
+    return isResilient() && !allowNonResilientAccess();
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope
@@ -840,74 +955,6 @@ public:
                          DeclName name,
                          SmallVectorImpl<ValueDecl*> &results) const;
 
-  /// Global conformance lookup, does not check conditional requirements.
-  ///
-  /// \param type The type for which we are computing conformance.
-  ///
-  /// \param protocol The protocol to which we are computing conformance.
-  ///
-  /// \param allowMissing When \c true, the resulting conformance reference
-  /// might include "missing" conformances, which are synthesized for some
-  /// protocols as an error recovery mechanism.
-  ///
-  /// \returns An invalid conformance if the search failed, otherwise an
-  /// abstract, concrete or pack conformance, depending on the lookup type.
-  ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *protocol,
-                                           bool allowMissing = false);
-
-  /// Global conformance lookup, checks conditional requirements.
-  /// Requires a contextualized type.
-  ///
-  /// \param type The type for which we are computing conformance. Must not
-  /// contain type parameters.
-  ///
-  /// \param protocol The protocol to which we are computing conformance.
-  ///
-  /// \param allowMissing When \c true, the resulting conformance reference
-  /// might include "missing" conformances, which are synthesized for some
-  /// protocols as an error recovery mechanism.
-  ///
-  /// \returns An invalid conformance if the search failed, otherwise an
-  /// abstract, concrete or pack conformance, depending on the lookup type.
-  ProtocolConformanceRef checkConformance(Type type, ProtocolDecl *protocol,
-                              // Note: different default from lookupConformance
-                              bool allowMissing = true);
-
-  /// Global conformance lookup, checks conditional requirements.
-  /// Accepts interface types without context. If the conformance cannot be
-  /// definitively established without the missing context, returns \c nullopt.
-  ///
-  /// \param type The type for which we are computing conformance. Must not
-  /// contain type parameters.
-  ///
-  /// \param protocol The protocol to which we are computing conformance.
-  ///
-  /// \param allowMissing When \c true, the resulting conformance reference
-  /// might include "missing" conformances, which are synthesized for some
-  /// protocols as an error recovery mechanism.
-  ///
-  /// \returns An invalid conformance if the search definitively failed. An
-  /// abstract, concrete or pack conformance, depending on the lookup type,
-  /// if the search succeeded. `std::nullopt` if the type could have
-  /// conditionally conformed depending on the context of the interface types.
-  std::optional<ProtocolConformanceRef>
-  checkConformanceWithoutContext(Type type,
-                                 ProtocolDecl *protocol,
-                                 // Note: different default from lookupConformance
-                                 bool allowMissing = true);
-
-
-  /// Look for the conformance of the given existential type to the given
-  /// protocol.
-  ProtocolConformanceRef lookupExistentialConformance(Type type,
-                                                      ProtocolDecl *protocol);
-
-  /// Collect the conformances of \c fromType to each of the protocols of an
-  /// existential type's layout.
-  ArrayRef<ProtocolConformanceRef>
-  collectExistentialConformances(CanType fromType, CanType existential,
-                                 bool allowMissing = false);
-
   /// Find a member named \p name in \p container that was declared in this
   /// module.
   ///
@@ -930,8 +977,18 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  bool isModuleImportedPreconcurrency(const ModuleDecl *importedModule) const;
+
+  /// Finds the custom availability domain defined by this module with the
+  /// given identifier and if one exists adds it to results.
+  void
+  lookupAvailabilityDomains(Identifier identifier,
+                            SmallVectorImpl<AvailabilityDomain> &results) const;
+
   // Is \p attr accessible as an explicitly imported SPI from this module?
-  bool isImportedAsSPI(const SpecializeAttr *attr,
+  bool isImportedAsSPI(const AbstractSpecializeAttr *attr,
                        const ValueDecl *targetDecl) const;
 
   // Is \p spiGroup accessible as an explicitly imported SPI from this module?
@@ -944,16 +1001,13 @@ public:
   enum class ImportFilterKind {
     /// Include imports declared with `@_exported`.
     Exported = 1 << 0,
-    /// Include "regular" imports with an access-level of `public`.
+    /// Include "regular" imports with an effective access level of `public`.
     Default = 1 << 1,
     /// Include imports declared with `@_implementationOnly`.
     ImplementationOnly = 1 << 2,
-    /// Include imports declared with `package import`.
+    /// Include imports declared with an access level of `package`.
     PackageOnly = 1 << 3,
-    /// Include imports marked `internal` or lower. These differs form
-    /// implementation-only imports by stricter type-checking and loading
-    /// policies. At this moment, we can group them under the same category
-    /// as they have the same loading behavior.
+    /// Include imports with an effective access level of `internal` or lower.
     InternalOrBelow = 1 << 4,
     /// Include imports declared with `@_spiOnly`.
     SPIOnly = 1 << 5,
@@ -993,11 +1047,14 @@ public:
   /// \p filter controls whether public, private, or any imports are included
   /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          ImportFilter filter = ImportFilterKind::Exported) const;
+                          ImportFilter filter) const;
+
+  /// Looks up which external macros are defined by this file.
+  void getExternalMacros(SmallVectorImpl<ExternalMacroPlugin> &macros) const;
 
   /// Lists modules that are not imported from a file and used in API.
-  void
-  getMissingImportedModules(SmallVectorImpl<ImportedModule> &imports) const;
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const;
 
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
@@ -1007,16 +1064,15 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Has \p module been imported via an '@_implementationOnly' import
-  /// instead of another kind of import?
+  /// Has \p module been imported via an '@_implementationOnly' import and
+  /// not by anything more visible?
   ///
-  /// This assumes that \p module was imported.
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
-
-  /// Returns true if decl context or its content can be serialized by
-  /// cross-module-optimization.
-  /// The \p ctxt can e.g. be a NominalType or the context of a function.
-  bool canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const;
+  /// If \p assumeImported, assume that \p module was imported and avoid the
+  /// work to confirm it is imported at all. Transitive modules not reexported
+  /// are not considered imported here and may lead to false positive without
+  /// this setting.
+  bool isImportedImplementationOnly(const ModuleDecl *module,
+      bool assumeImported = true) const;
 
   /// Finds all top-level decls of this module.
   ///
@@ -1062,15 +1118,6 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
 
-  /// Determines whether this module should be recursed into when calling
-  /// \c getDisplayDecls.
-  ///
-  /// Some modules should not call \c getDisplayDecls, due to assertions
-  /// in their implementation. These are usually implicit imports that would be
-  /// recursed into for parsed modules. This function provides a guard against
-  /// recusing into modules that should not have decls collected.
-  bool shouldCollectDisplayDecls() const;
-
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
   ///
@@ -1083,6 +1130,24 @@ public:
   /// should be printed to be added; use \c swift::getTopLevelDeclsForDisplay()
   /// for that.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
+
+  struct ImportCollector {
+    SmallPtrSet<const ModuleDecl *, 4> imports;
+    llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
+        qualifiedImports;
+    AccessLevel minimumDocVisibility = AccessLevel::Private;
+    llvm::function_ref<bool(const ModuleDecl *)> importFilter = nullptr;
+
+    void collect(const ImportedModule &importedModule);
+
+    ImportCollector() = default;
+    ImportCollector(AccessLevel minimumDocVisibility)
+        : minimumDocVisibility(minimumDocVisibility) {}
+  };
+
+  void
+  getDisplayDeclsRecursivelyAndImports(SmallVectorImpl<Decl *> &results,
+                                       ImportCollector &importCollector) const;
 
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
@@ -1107,6 +1172,12 @@ public:
 
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
+
+  /// \returns true if this module is the "Cxx" module.
+  bool isCxxModule() const;
+
+  /// \returns true if this module is the "_Concurrency" standard library module.
+  bool isConcurrencyModule() const;
 
   /// \returns true if this module has standard substitutions for mangling.
   bool hasStandardSubstitutions() const;
@@ -1190,6 +1261,10 @@ public:
   /// An empty `Version` is returned if the information is not available.
   version::Version getLanguageVersionBuiltWith() const;
 
+  void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
+    AvailabilityDomains = std::move(map);
+  }
+
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())
       return classof(D);
@@ -1262,12 +1337,6 @@ inline bool DeclContext::isPackageContext() const {
 inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
   return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
-
-/// Collects modules that this module imports via `@_exported import`.
-void collectParsedExportedImports(const ModuleDecl *M,
-                                  SmallPtrSetImpl<ModuleDecl *> &Imports,
-                                  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> &QualifiedImports,
-                                  llvm::function_ref<bool(AttributedImport<ImportedModule>)> includeImport = nullptr);
 
 } // end namespace swift
 

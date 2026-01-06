@@ -1,0 +1,17 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface -module-name Test %s
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface) -module-name Test
+
+// RUN: %FileCheck %s --check-prefix INTERFACE --input-file %t/Test.swiftinterface
+
+@frozen public struct Struct {
+    public var values: [Int] = .init() {
+        willSet {}
+    }
+}
+// INTERFACE: @frozen public struct Struct {
+// INTERFACE-LABEL: @_hasStorage public var values: [Swift.Int] = .init() { @_accessorBlock
+// INTERFACE-NEXT:     @_transparent get
+// INTERFACE-NEXT:     set
+// INTERFACE-NEXT:   }
+// INTERFACE: }

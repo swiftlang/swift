@@ -76,6 +76,8 @@ namespace irgen {
                                          llvm::FunctionType *ctorFnType,
                                          llvm::Constant *ctorAddress,
                                          llvm::ArrayRef<llvm::Value *> args);
+
+  bool hasValidSignatureForEmbedded(SILFunction *f);
 }
 }
 

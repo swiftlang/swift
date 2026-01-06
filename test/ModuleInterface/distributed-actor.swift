@@ -67,7 +67,7 @@ public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSys
 // CHECK:   get
 // CHECK: }
 // CHECK: public init(actorSystem system: ActorSystem)
-// CHECK: @available(iOS 9999, tvOS 9999, watchOS 9999, macOS 9999, *)
+// CHECK: @available(iOS 18.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, macOS 15.0, *)
 // CHECK: @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
 // CHECK:   get
 // CHECK: }
@@ -75,17 +75,10 @@ public distributed actor DAG<ActorSystem> where ActorSystem: DistributedActorSys
 
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
 // CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
-// CHECK-NEXT:extension Library.DA : Distributed.DistributedActor {}
-// CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
 // CHECK-NEXT:extension Library.DA : Swift.Encodable {}
 // CHECK-NOT: #if compiler(>=5.3) && $Actors
 // CHECK:     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
 // CHECK-NEXT:extension Library.DA : Swift.Decodable {}
-
-// CHECK-NOT: #if compiler(>=5.3) && $Actors
-// CHECK: @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-// CHECK-NEXT: extension Library.DAG : Distributed.DistributedActor {}
 
 //--- Client.swift
 

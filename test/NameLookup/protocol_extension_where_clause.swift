@@ -29,3 +29,25 @@ extension P1 where Self: A {
 extension P1 where Self: A, B: Hashable {
   func h(_: Set<B>) {}
 }
+
+// This is also terrible and we should ban it
+public protocol P3 {
+  associatedtype A
+}
+
+public protocol P4: P3 where A == B {}
+
+extension P4 {
+  public typealias B = String
+}
+
+// This is additionally terrible
+public protocol K3: ~Copyable {
+  associatedtype A
+}
+
+public protocol K4: K3 where A == B, Self: ~Copyable {}
+
+extension K4 where Self: ~Copyable {
+  public typealias B = String
+}

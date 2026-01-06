@@ -21,6 +21,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
@@ -45,12 +46,12 @@ void anchorForGetMainExecutable() {}
 using namespace llvm::MachO;
 
 static bool validateModule(
-    llvm::StringRef data, bool Verbose, bool requiresOSSAModules,
+    llvm::StringRef data, bool Verbose,
     swift::serialization::ValidationInfo &info,
     swift::serialization::ExtendedValidationInfo &extendedInfo,
     llvm::SmallVectorImpl<swift::serialization::SearchPath> &searchPaths) {
   info = swift::serialization::validateSerializedAST(
-      data, requiresOSSAModules,
+      data,
       /*requiredSDK*/ StringRef(), &extendedInfo, /* dependencies*/ nullptr,
       &searchPaths);
   if (info.status != swift::serialization::Status::Valid) {
@@ -104,6 +105,9 @@ static bool validateModule(
         break;
       case swift::PluginSearchOption::Kind::LoadPluginExecutable:
         optStr = "-load-plugin-executable";
+        break;
+      case swift::PluginSearchOption::Kind::ResolvedPluginConfig:
+        optStr = "-load-resolved-plugin";
         break;
       }
       llvm::outs() << "    " << optStr << " " << opt.second << "\n";
@@ -236,6 +240,7 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  initializeSwiftModules();
 
   // Command line handling.
   using namespace llvm::cl;
@@ -250,7 +255,7 @@ int main(int argc, char **argv) {
       desc("Dump the imported module after checking it imports just fine"),
       cat(Visible));
 
-  opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
+  opt<bool> Verbose("verbose", desc("Dump information on the loaded module"),
                     cat(Visible));
 
   opt<std::string> Filter("filter", desc("triple for filtering modules"),
@@ -278,9 +283,6 @@ int main(int argc, char **argv) {
 
   opt<bool> QualifyTypes("qualify-types", desc("Qualify dumped types"),
                          cat(Visible));
-
-  opt<bool> EnableOSSAModules("enable-ossa-modules", init(false),
-                              desc("Serialize modules in OSSA"), cat(Visible));
 
   ParseCommandLineOptions(argc, argv);
 
@@ -326,7 +328,6 @@ int main(int argc, char **argv) {
     info = {};
     extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose,
-                        EnableOSSAModules,
                         info, extendedInfo, searchPaths)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
@@ -350,7 +351,6 @@ int main(int argc, char **argv) {
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
-  Invocation.getSILOptions().EnableOSSAModules = EnableOSSAModules;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);

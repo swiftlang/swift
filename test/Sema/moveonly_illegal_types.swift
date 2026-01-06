@@ -14,11 +14,11 @@ class Klass {}
 let asdf: any Hashable & Klass
 
 // a concrete move-only type
-@_moveOnly struct MO {
+struct MO: ~Copyable {
   var x: Int?
 }
 
-@_moveOnly struct GenericMO<T> {
+struct GenericMO<T>: ~Copyable {
   var t: T
 }
 
@@ -52,11 +52,11 @@ func basic_vararg(_ va: MO...) {} // expected-error {{noncopyable type 'MO' cann
 func illegalTypes<T>(_ t: T) {
   let _: Array<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   let _: Maybe<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-  let _: Dictionary<MO, String> // expected-error {{type 'MO' does not conform to protocol 'Hashable'}}
+  let _: Dictionary<MO, String> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   let _: [MO] // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   let _: [String : MO] // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-  let _: [MO : MO] // expected-error {{type 'MO' does not conform to protocol 'Hashable'}}
-  let _: [MO : T] // expected-error {{type 'MO' does not conform to protocol 'Hashable'}}
+  let _: [MO : MO] // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: [MO : T] // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 
   _ = t as! ValBox<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 

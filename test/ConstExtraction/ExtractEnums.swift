@@ -40,6 +40,20 @@ public struct Enums: MyProto {
 // CHECK-NEXT:      "Swift.Hashable",
 // CHECK-NEXT:      "ExtractEnums.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.Equatable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.Hashable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractEnums.MyProto",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
 // CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
@@ -48,7 +62,17 @@ public struct Enums: MyProto {
 // CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
-// CHECK-NEXT:        "valueKind": "Runtime"
+// CHECK-NEXT:        "valueKind": "FunctionCall",
+// CHECK-NEXT:        "value": {
+// CHECK-NEXT:          "name": "_hashValue",
+// CHECK-NEXT:          "arguments": [
+// CHECK-NEXT:            {
+// CHECK-NEXT:              "label": "for",
+// CHECK-NEXT:              "type": "ExtractEnums.SimpleEnum",
+// CHECK-NEXT:              "valueKind": "Runtime"
+// CHECK-NEXT:            }
+// CHECK-NEXT:          ]
+// CHECK-NEXT:        }
 // CHECK-NEXT:      }
 // CHECK-NEXT:    ],
 // CHECK-NEXT:    "cases": [
@@ -72,6 +96,24 @@ public struct Enums: MyProto {
 // CHECK-NEXT:      "Swift.RawRepresentable",
 // CHECK-NEXT:      "ExtractEnums.MyProto"
 // CHECK-NEXT:    ],
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.Equatable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.Hashable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "Swift.RawRepresentable",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       },
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractEnums.MyProto",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
 // CHECK-NEXT:    "associatedTypeAliases": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "typeAliasName": "RawValue",
@@ -113,7 +155,13 @@ public struct Enums: MyProto {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractEnums.MyProto"
 // CHECK-NEXT:    ],
-// CHECK-NEXT:    "associatedTypeAliases": [],    
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractEnums.MyProto",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [],
 // CHECK-NEXT:    "cases": [
 // CHECK-NEXT:      {
@@ -148,7 +196,13 @@ public struct Enums: MyProto {
 // CHECK-NEXT:    "conformances": [
 // CHECK-NEXT:      "ExtractEnums.MyProto"
 // CHECK-NEXT:    ],
-// CHECK-NEXT:    "associatedTypeAliases": [],    
+// CHECK-NEXT:     "allConformances": [
+// CHECK-NEXT:       {
+// CHECK-NEXT:         "protocolName": "ExtractEnums.MyProto",
+// CHECK-NEXT:         "conformanceDefiningModule": "ExtractEnums"
+// CHECK-NEXT:       }
+// CHECK-NEXT:     ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "enum1",

@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt \
+// RUN:     -devirtualizer \
+// RUN:     -enable-callee-allocated-coro-abi\
+// RUN:     %s \
+// RUN:     -enable-sil-verify-all \
+// RUN:     -enable-experimental-feature CoroutineAccessors \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_CoroutineAccessors
+
+import Builtin
+
+struct Int {
+  var _value: Builtin.Word
+}
+
+class Base {
+  var x : Int { read }
+}
+
+class Derived : Base {
+  override var x : Int { read }
+}
+
+// CHECK-LABEL: sil [ossa] @utilize_begin_apply : {{.*}} {
+// CHECK-NOT:     class_method
+// CHECK-LABEL: } // end sil function 'utilize_begin_apply'
+sil [ossa] @utilize_begin_apply : $@convention(thin) () -> () {
+bb0:
+  %derived = alloc_ref $Derived
+  %base = upcast %derived : $Derived to $Base
+  %reader = class_method %base : $Base, #Base.x!read2 : (Base) -> () -> (), $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+  (%value, %token, %allocation) = begin_apply %reader(%base) : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  destroy_value %base : $Base
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @Base_x_read2 : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+
+sil [ossa] @Derived_x_read2 : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+
+sil_vtable Base {
+  #Base.x!read2: @Base_x_read2
+}
+
+sil_vtable Derived {
+  #Base.x!read2: @Derived_x_read2 [override]
+}

@@ -61,8 +61,7 @@ namespace irgen {
 
   /// Emit "embedded Swift" class metadata (a simple vtable) for the given class
   /// declaration.
-  void emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
-                                 const ClassLayout &fragileLayout);
+  void emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *theClass);
 
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.
@@ -86,6 +85,7 @@ namespace irgen {
   void emitLazyClassMetadata(IRGenModule &IGM, CanType classType);
 
   void emitLazySpecializedClassMetadata(IRGenModule &IGM, CanType classType);
+  void emitLazySpecializedValueMetadata(IRGenModule &IGM, CanType valueTy);
 
   void emitLazyCanonicalSpecializedMetadataAccessor(IRGenModule &IGM,
                                                     CanType theType);
@@ -109,6 +109,12 @@ namespace irgen {
   /// Emit the metadata associated with a given instantiation of a generic enum.
   void emitSpecializedGenericEnumMetadata(IRGenModule &IGM, CanType type,
                                           EnumDecl &decl);
+
+  /// Emit the metadata associated with a given tuple type.
+  void emitLazyTupleMetadata(IRGenModule &IGM, CanType type);
+
+  /// Emit the metadata associated with a given function type.
+  void emitLazyFunctionMetadata(IRGenModule &IGM, CanType funTy);
 
   /// Emit the metadata associated with a given instantiation of a generic
   // class.
@@ -166,6 +172,15 @@ namespace irgen {
                                         unsigned reqtIndex,
                                         llvm::Value *metadata);
 
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to the value for the nth argument metadata.
+  /// The type must have generic arguments.
+  llvm::Value *emitValueGenericRef(IRGenFunction &IGF,
+                                   NominalTypeDecl *theDecl,
+                                   const GenericTypeRequirements &reqts,
+                                   unsigned reqtIndex,
+                                   llvm::Value *metadata);
+
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
                                         llvm::Value *metatypeMetadata);
@@ -185,6 +200,12 @@ namespace irgen {
       // Class metadata has two words of head-allocated data: the destructor
       // and the value witness table.
       Class = 3,
+
+      // In Embedded with existentials all metadata is a record with a value
+      // witness prepended.
+      //   -1: vwt
+      //    0: metadata flags (unused)
+      EmbeddedWithExistentials = 1,
       
       // Struct and enum metadata have one word of head-allocated data:
       // the value witness table.
@@ -217,6 +238,12 @@ namespace irgen {
       : Kind(kind), Index(index), ReducedShape(reducedShape) {}
   };
 
+  struct GenericValueArgument {
+    CanType Type;
+
+    GenericValueArgument(CanType valueType) : Type(valueType) {}
+  };
+
   /// Description of the metadata emitted by adding generic requirements.
   struct GenericArgumentMetadata {
     unsigned NumParams = 0;
@@ -225,6 +252,7 @@ namespace irgen {
     unsigned NumGenericKeyArguments = 0;
     SmallVector<CanType, 1> ShapeClasses;
     SmallVector<GenericPackArgument, 1> GenericPackArguments;
+    SmallVector<GenericValueArgument, 1> GenericValueArguments;
   };
 
   /// Add generic parameters to the given constant struct builder.
@@ -270,10 +298,22 @@ namespace irgen {
                                       ArrayRef<CanType> shapes,
                                       ArrayRef<GenericPackArgument> packArgs);
 
+  /// Add the generic value descriptors to the given constant struct builder.
+  ///
+  /// These appear in generic type metadata.
+  void addGenericValueDescriptors(IRGenModule &IGM,
+                                  ConstantStructBuilder &B,
+                                  ArrayRef<GenericValueArgument> values);
+
   llvm::GlobalValue *emitAsyncFunctionPointer(IRGenModule &IGM,
                                               llvm::Function *function,
                                               LinkEntity entity,
                                               Size size);
+
+  llvm::GlobalValue *emitCoroFunctionPointer(IRGenModule &IGM,
+                                             llvm::Function *function,
+                                             LinkEntity entity,
+                                             Size size = Size(0));
 
   /// Determine whether the given opaque type requires a witness table for the
   /// given requirement.

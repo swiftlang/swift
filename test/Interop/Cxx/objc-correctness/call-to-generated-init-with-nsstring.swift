@@ -29,19 +29,19 @@ func testSdump() {
 
 testSdump()
 
-// SIL-TRIVIAL:   function_ref @_ZNK1S4dumpEv : $@convention(cxx_method) (@in_guaranteed S) -> ()
+// SIL-TRIVIAL:   function_ref @$sSo1SV4dumpyyFTo : $@convention(cxx_method) (@in_guaranteed S) -> ()
 // SIL-TRIVIAL-NEXT:   apply %{{.*}}(%{{.*}}) : $@convention(cxx_method) (@in_guaranteed S) -> ()
 // SIL-TRIVIAL:      $@convention(objc_method) (@owned S, ClassWithNonTrivialDestructorIvar) -> ()
 // SIL-TRIVIAL-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(objc_method) (@owned S, ClassWithNonTrivialDestructorIvar) -> ()
-// SIL-TRIVIAL: function_ref @_Z9takeSFunc1S : $@convention(c) (@owned S) -> ()
+// SIL-TRIVIAL: function_ref @$sSo9takeSFuncyySo1SVFTo : $@convention(c) (@owned S) -> ()
 // SIL-TRIVIAL-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(c) (@owned S) -> ()
 
-// SIL-NONTRIVIAL:   function_ref @_ZNK1S4dumpEv : $@convention(cxx_method) (@in_guaranteed S) -> ()
+// SIL-NONTRIVIAL:   function_ref @$sSo1SV4dumpyyFTo : $@convention(cxx_method) (@in_guaranteed S) -> ()
 // SIL-NONTRIVIAL-NEXT:   apply %{{.*}}(%{{.*}}) : $@convention(cxx_method) (@in_guaranteed S) -> ()
-// SIL-NONTRIVIAL:      $@convention(objc_method) (@in S, ClassWithNonTrivialDestructorIvar) -> ()
-// SIL-NONTRIVIAL-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(objc_method) (@in S, ClassWithNonTrivialDestructorIvar) -> ()
-// SIL-NONTRIVIAL: function_ref @_Z9takeSFunc1S : $@convention(c) (@in S) -> ()
-// SIL-NONTRIVIAL-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(c) (@in S) -> ()
+// SIL-NONTRIVIAL:      $@convention(objc_method) (@in_cxx S, ClassWithNonTrivialDestructorIvar) -> ()
+// SIL-NONTRIVIAL-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(objc_method) (@in_cxx S, ClassWithNonTrivialDestructorIvar) -> ()
+// SIL-NONTRIVIAL: function_ref @$sSo9takeSFuncyySo1SVFTo : $@convention(c) (@in_cxx S) -> ()
+// SIL-NONTRIVIAL-NEXT: apply %{{.*}}(%{{.*}}) : $@convention(c) (@in_cxx S) -> ()
 
 
 // IR-TRIVIAL-LABEL: define {{.*}} swiftcc void @"$s4main9testSdumpyyF"()
@@ -56,6 +56,6 @@ testSdump()
 // IR-TRIVIAL: }
 
 // IR-NONTRIVIAL-LABEL: define {{.*}} swiftcc void @"$s4main9testSdumpyyF"()
-// IR-NONTRIVIAL: call {{.*}} @_ZN1SC1ERKS_
 // IR-NONTRIVIAL: call {{.*}} @_ZNK1S4dumpEv
+// IR-NONTRIVIAL: call {{.*}} @_ZN1SC1ERKS_
 // IR-NONTRIVIAL: call {{.*}} @_ZN1SD1Ev

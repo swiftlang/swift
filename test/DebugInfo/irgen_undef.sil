@@ -1,0 +1,48 @@
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -O -g -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: define {{.*}} @just_undef
+sil @just_undef : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+// CHECK: #dbg_value(i64 undef, ![[JUST_UNDEF_VAR:[0-9]+]], !DIExpression()
+debug_value undef : $Builtin.Int64, var, name "optimizedout"
+return %0 : $Builtin.Int64
+}
+
+// CHECK-LABEL: define {{.*}} @arithmetic
+sil @arithmetic : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+// CHECK: #dbg_value(i64 %0, ![[CURRENT_VAR:[0-9]+]], !DIExpression()
+debug_value %0 : $Builtin.Int64, var, name "current", type $Int64, expr op_fragment:#Int64._value
+// FIXME: It should work with the fragment, as it should be noop.
+// CHECK: #dbg_value(i64 %0, ![[PREVIOUS_VAR:[0-9]+]], !DIExpression(DW_OP_consts, 1, DW_OP_minus, DW_OP_stack_value)
+debug_value %0 : $Builtin.Int64, var, name "previous", type $Int64, expr op_consts:1:op_minus //:op_fragment:#Int64._value
+// CHECK: #dbg_value(i64 %0, ![[NEXT_VAR:[0-9]+]], !DIExpression(DW_OP_plus_uconst, 12, DW_OP_stack_value)
+debug_value %0 : $Builtin.Int64, var, name "next", type $Int64, expr op_constu:12:op_plus //:op_fragment:#Int64._value
+return %0 : $Builtin.Int64
+}
+
+// CHECK-LABEL: define {{.*}} @constant
+sil @constant : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+// CHECK: #dbg_value(i64 42, ![[CONST_VAR:[0-9]+]], !DIExpression(DW_OP_stack_value)
+debug_value undef : $Builtin.Int64, var, name "const", expr op_consts:42
+// CHECK: #dbg_value(i64 3645, ![[CONSTINT_VAR:[0-9]+]], !DIExpression(DW_OP_stack_value)
+debug_value undef : $Builtin.Int64, var, name "constint", type $Int64, expr op_constu:3645:op_fragment:#Int64._value
+// CHECK: #dbg_value(i64 6, ![[CONSTUPLE_VAR:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+debug_value undef : $Builtin.Int64, var, name "constuple", type $(Int64, Int64), expr op_consts:6:op_tuple_fragment:$(Int64, Int64):0:op_fragment:#Int64._value
+
+return %0 : $Builtin.Int64
+}
+
+
+// CHECK: ![[JUST_UNDEF_VAR]] = !DILocalVariable(name: "optimizedout"
+// CHECK: ![[CURRENT_VAR]] = !DILocalVariable(name: "current"
+// CHECK: ![[PREVIOUS_VAR]] = !DILocalVariable(name: "previous"
+// CHECK: ![[NEXT_VAR]] = !DILocalVariable(name: "next"
+// CHECK: ![[CONST_VAR]] = !DILocalVariable(name: "const"
+// CHECK: ![[CONSTINT_VAR]] = !DILocalVariable(name: "constint"
+// CHECK: ![[CONSTUPLE_VAR]] = !DILocalVariable(name: "constuple"

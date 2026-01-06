@@ -1,0 +1,87 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule \
+// RUN:     -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple \
+// RUN:     %S/../Inputs/FakeDistributedActorSystems.swift
+
+// RUN: %target-build-swift -module-name main -enable-upcoming-feature NonisolatedNonsendingByDefault \
+// RUN:     -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s \
+// RUN:     %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s --enable-var-scope
+
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
+
+// REQUIRES: executable_test
+// REQUIRES: concurrency
+// REQUIRES: distributed
+
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
+// FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
+// UNSUPPORTED: OS=windows-msvc
+
+import Distributed
+import FakeDistributedActorSystems
+
+typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
+
+distributed actor Greeter: CustomStringConvertible {
+  distributed func echo(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
+  }
+
+  nonisolated var description: String {
+    "\(Self.self)(\(id))"
+  }
+}
+
+extension Greeter {
+  distributed func echoInExtension(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
+  }
+}
+
+nonisolated extension Greeter {
+  distributed func echoInNonisolatedExtension(name: String) -> String {
+    return "Echo: \(name) (impl on: \(self.id))"
+  }
+}
+
+struct SomeError: Error {}
+
+// ==== Test -------------------------------------------------------------------
+
+func test() async throws {
+  let system = DefaultDistributedActorSystem()
+
+  let local = Greeter(actorSystem: system)
+  let ref = try Greeter.resolve(id: local.id, using: system)
+
+  let reply = try await ref.echo(name: "Caplin")
+  // CHECK: > encode argument name:name, value: Caplin
+  // CHECK-NOT: > encode error type
+  // CHECK: > encode return type: Swift.String
+  // CHECK: > done recording
+  // CHECK: >> remoteCall
+  // CHECK: > decode return type: Swift.String
+  // CHECK: > decode argument: Caplin
+  // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
+
+  print("got: \(reply)")
+  // CHECK: got: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
+
+  // just double check there's no surprises with distributed thunks in extensions
+  _ = try await ref.echoInExtension(name: "Bob")
+  _ = try await ref.echoInNonisolatedExtension(name: "Alice")
+
+  print("OK") // CHECK: OK
+}
+
+@main struct Main {
+  static func main() async {
+    try! await test()
+  }
+}

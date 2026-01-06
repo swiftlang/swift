@@ -143,6 +143,9 @@ typedef enum swift_layout_kind {
   // swift_reflection_infoForTypeRef().
   SWIFT_CLASS_INSTANCE,
   SWIFT_CLOSURE_CONTEXT,
+
+  // A contiguous list of N Ts, typically for Builtin.FixedArray<N, T>.
+  SWIFT_ARRAY,
 } swift_layout_kind_t;
 
 struct swift_childinfo;
@@ -240,6 +243,7 @@ typedef struct swift_async_task_info {
   bool IsFuture;
   bool IsGroupChildTask;
   bool IsAsyncLetTask;
+  bool IsSynchronousStartTask;
 
   unsigned MaxPriority;
   bool IsCancelled;

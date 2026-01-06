@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 // REQUIRES: swift_in_compiler

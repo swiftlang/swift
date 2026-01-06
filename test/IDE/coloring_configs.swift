@@ -3,11 +3,11 @@
 // CHECK: <kw>var</kw> f : <type>Int</type>
 var f : Int
 
-// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>macOS</#id>)
+// CHECK: <#kw>#if</#kw> os(macOS)
 #if os(macOS)
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> x : <type>Int</type>
   var x : Int
@@ -18,14 +18,14 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> x2 : <type>Int</type>
   var x2 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> x3 : <type>Int</type>
   var x3 : Int
@@ -36,18 +36,18 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> x4 : <type>Int</type>
   var x4 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> y1 : <type>Int</type>
   var y1 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>BAZ</#id>
+// CHECK: <#kw>#elseif</#kw> BAZ
 #elseif BAZ
   // CHECK: <kw>var</kw> y1 : <type>String</type>
   var y1 : String
@@ -58,11 +58,11 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> y2 : <type>Int</type>
   var y2 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>BAZ</#id>
+// CHECK: <#kw>#elseif</#kw> BAZ
 #elseif BAZ
   // CHECK: <kw>var</kw> y2 : <type>String</type>
   var y2 : String
@@ -73,11 +73,11 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> y3 : <type>Int</type>
   var y3 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#elseif</#kw> CONF
 #elseif CONF
   // CHECK: <kw>var</kw> y3 : <type>String</type>
   var y3 : String
@@ -96,7 +96,7 @@ class C1 {
   // CHECK: <kw>var</kw> f : <type>Int</type>
   var f : Int
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> x : <type>Int</type>
   var x : Int
@@ -107,14 +107,14 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> x2 : <type>Int</type>
   var x2 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> x3 : <type>Int</type>
   var x3 : Int
@@ -125,18 +125,18 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> x4 : <type>Int</type>
   var x4 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> y1 : <type>Int</type>
   var y1 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>BAZ</#id>
+// CHECK: <#kw>#elseif</#kw> BAZ
 #elseif BAZ
   // CHECK: <kw>var</kw> y1 : <type>String</type>
   var y1 : String
@@ -147,11 +147,11 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> y2 : <type>Int</type>
   var y2 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>BAZ</#id>
+// CHECK: <#kw>#elseif</#kw> BAZ
 #elseif BAZ
   // CHECK: <kw>var</kw> y2 : <type>String</type>
   var y2 : String
@@ -162,11 +162,11 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> y3 : <type>Int</type>
   var y3 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#elseif</#kw> CONF
 #elseif CONF
   // CHECK: <kw>var</kw> y3 : <type>String</type>
   var y3 : String
@@ -186,7 +186,7 @@ func test1() {
   // CHECK: <kw>var</kw> f : <type>Int</type>
   var f : Int
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> x : <type>Int</type>
   var x : Int
@@ -197,14 +197,14 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> x2 : <type>Int</type>
   var x2 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> x3 : <type>Int</type>
   var x3 : Int
@@ -215,18 +215,18 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> x4 : <type>Int</type>
   var x4 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> CONF
 #if CONF
   // CHECK: <kw>var</kw> y1 : <type>Int</type>
   var y1 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>BAZ</#id>
+// CHECK: <#kw>#elseif</#kw> BAZ
 #elseif BAZ
   // CHECK: <kw>var</kw> y1 : <type>String</type>
   var y1 : String
@@ -237,11 +237,11 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> y2 : <type>Int</type>
   var y2 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>BAZ</#id>
+// CHECK: <#kw>#elseif</#kw> BAZ
 #elseif BAZ
   // CHECK: <kw>var</kw> y2 : <type>String</type>
   var y2 : String
@@ -252,11 +252,11 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
+// CHECK: <#kw>#if</#kw> !CONF
 #if !CONF
   // CHECK: <kw>var</kw> y3 : <type>Int</type>
   var y3 : Int
-// CHECK: <#kw>#elseif</#kw> <#id>CONF</#id>
+// CHECK: <#kw>#elseif</#kw> CONF
 #elseif CONF
   // CHECK: <kw>var</kw> y3 : <type>String</type>
   var y3 : String
@@ -273,7 +273,7 @@ func test1() {
 
 // CHECK: <kw>class</kw> C2 {
 class C2 {
-  // CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>iOS</#id>)
+  // CHECK: <#kw>#if</#kw> os(iOS)
   #if os(iOS)
   // CHECK: <kw>func</kw> foo() {}
   func foo() {}
@@ -285,15 +285,15 @@ class NestedPoundIf {
     func foo1() {
 // CHECK: <kw>func</kw> foo1() {
         #if os(macOS)
-// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>macOS</#id>)
+// CHECK: <#kw>#if</#kw> os(macOS)
           var a = 1
 // CHECK: <kw>var</kw> a = <int>1</int>
             #if USE_METAL
-// CHECK: <#kw>#if</#kw> <#id>USE_METAL</#id>
+// CHECK: <#kw>#if</#kw> USE_METAL
               var b = 2
 // CHECK: <kw>var</kw> b = <int>2</int>
               #if os(iOS)
-// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>iOS</#id>)
+// CHECK: <#kw>#if</#kw> os(iOS)
                 var c = 3
 // CHECK: <kw>var</kw> c = <int>3</int>
               #else
@@ -331,14 +331,14 @@ class NestedPoundIf {
 #line 17 "abc.swift"
 
 @available(iOS 8.0, OSX 10.10, *)
-// CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <float>8.0</float>, <kw>OSX</kw> <float>10.10</float>, *)
+// CHECK: <attr-builtin>@available</attr-builtin>(iOS <float>8.0</float>, OSX <float>10.10</float>, *)
 func foo() {
-// CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> <float>10.10</float>, <kw>iOS</kw> <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
+// CHECK: <kw>if</kw> <kw>#available</kw> (OSX <float>10.10</float>, iOS <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
   if #available (OSX 10.10, iOS 8.01, *) {let _ = "iOS"}
 }
 
 class AvailableWithOverride {
-  // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <float>8.01</float>, <kw>OSX</kw> <float>10.10</float>, *)
+  // CHECK: <attr-builtin>@available</attr-builtin>(iOS <float>8.01</float>, OSX <float>10.10</float>, *)
   @available(iOS 8.01, OSX 10.10, *)
   // CHECK: <attr-builtin>public</attr-builtin> <attr-builtin>override</attr-builtin> <kw>var</kw> multiple: <type>Int</type> { <kw>return</kw> <int>24</int> }
   public override var multiple: Int { return 24 }
@@ -346,7 +346,7 @@ class AvailableWithOverride {
 
 // CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
 func test4(inout a: Int) {
-  // CHECK-OLD: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
+  // CHECK-OLD: <kw>if</kw> <kw>#available</kw> (OSX >= <float>10.10</float>, iOS >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   // CHECK-NEW: <kw>if</kw> <kw>#available</kw> (OSX >= <float>10.10</float>, iOS >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
 

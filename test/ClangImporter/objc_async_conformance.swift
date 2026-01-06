@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -disable-availability-checking  %s -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -115,4 +115,37 @@ class C6: C5, ServiceProvider {
 
 extension ImplementsLoadable: @retroactive Loadable {
   public func loadStuff(withOtherIdentifier otherIdentifier: Int, reply: @escaping () -> Void) {}
+}
+
+class ImplementsDictionaryLoader1: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: NSNumber]?) -> Void) {}
+}
+
+// expected-error@+2 {{type 'ImplementsDictionaryLoader2' does not conform to protocol 'DictionaryLoader'}}
+// expected-note@+1 {{add stubs for conformance}}
+class ImplementsDictionaryLoader2: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: Any]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Any]?) -> Void) -> ()'}}
+}
+
+// expected-error@+2 {{type 'ImplementsDictionaryLoader3' does not conform to protocol 'DictionaryLoader'}}
+// expected-note@+1 {{add stubs for conformance}}
+class ImplementsDictionaryLoader3: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: NSNumber?]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : NSNumber?]?) -> Void) -> ()'}}
+}
+
+// expected-error@+2 {{type 'ImplementsDictionaryLoader4' does not conform to protocol 'DictionaryLoader'}}
+// expected-note@+1 {{add stubs for conformance}}
+class ImplementsDictionaryLoader4: DictionaryLoader {
+  func loadDictionary(completionHandler: @escaping ([String: Int]?) -> Void) {} // expected-note {{candidate has non-matching type '(@escaping ([String : Int]?) -> Void) -> ()'}}
+}
+
+class ImplementsFloatLoader: FloatLoader {
+  public func loadFloat(completionHandler: @escaping (Float) -> Void) {}
+}
+
+class ImplementsFloatLoader2: FloatLoader {
+  public func loadFloat(withCompletionHandler completionHandler: @escaping (Float) -> Void) {}
+  // expected-warning@-1 {{instance method 'loadFloat(withCompletionHandler:)' nearly matches optional requirement 'loadFloat(completionHandler:)' of protocol 'FloatLoader'}}
+  // expected-note@-2 {{rename to 'loadFloat(completionHandler:)' to satisfy this requirement}}
+  // expected-note@-3 {{move 'loadFloat(withCompletionHandler:)' to an extension to silence this warning}}
 }

@@ -99,7 +99,7 @@ public struct Foo: Hashable {
     // FROMSOURCE:     print("I am set to \(newValue)")
     // FROMSOURCE-NOT: #else
     // FROMSOURCE-NOT: print("I should not appear")
-    // FROMSOURCE-NOT  #endif
+    // FROMSOURCE-NOT:  #endif
     // FROMSOURCE: }
     set {
       #if true
@@ -328,4 +328,18 @@ public class HasDefaultDeinit {
 
   // CHECK: [[OBJC]]deinit{{$}}
   // CHECK-NEXT: }
+}
+
+// CHECK: public func testInlinableTextRemovesPostfix()
+@inlinable public func testInlinableTextRemovesPostfix() {
+  // FROMSOURCE: "foobar"
+  // FROMSOURCE-NOT: .debugDescription
+  // FROMSOURCE: .description
+  // FROMSOURCE-NEXT: }
+  _ = "foobar"
+  #if DEBUG
+    .debugDescription
+  #else
+    .description
+  #endif
 }

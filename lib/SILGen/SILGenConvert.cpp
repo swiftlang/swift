@@ -19,10 +19,12 @@
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
@@ -188,7 +190,7 @@ ManagedValue
 SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                  ManagedValue optional,
                                                  bool isImplicitUnwrap) {
-  // Generate code to the optional is present, and if not, abort with a message
+  // Generate code to check if the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();
@@ -199,9 +201,8 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   auto someDecl = getASTContext().getOptionalSomeDecl();
   auto noneDecl = getASTContext().getOptionalNoneDecl();
 
-  // If we have an object, make sure the object is at +1. All switch_enum of
-  // objects is done at +1.
   bool isAddress = optional.getType().isAddress();
+  bool isBorrow = !optional.isPlusOneOrTrivial(*this);
   SwitchEnumInst *switchEnum = nullptr;
   if (isAddress) {
     // We forward in the creation routine for
@@ -209,6 +210,12 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     B.createSwitchEnumAddr(loc, optional.getValue(),
                            /*defaultDest*/ nullptr,
                            {{someDecl, contBB}, {noneDecl, failBB}});
+  } else if (isBorrow) {
+    hadCleanup = false;
+    hadLValue = false;
+    switchEnum = B.createSwitchEnum(loc, optional.getValue(),
+                                    /*defaultDest*/ nullptr,
+                                    {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
     optional = optional.ensurePlusOne(*this, loc);
     hadCleanup = true;
@@ -524,18 +531,14 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
     origValue = emitManagedBufferWithCleanup(origBuf);
   }
   // Invoke the conversion intrinsic to convert to the destination type.
-  auto *M = SGM.M.getSwiftModule();
-  auto *proto = getPointerProtocol();
-  auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
-  auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
+  SmallVector<Type, 2> replacementTypes;
+  replacementTypes.push_back(inputType);
+  replacementTypes.push_back(outputType);
 
   auto genericSig = converter->getGenericSignature();
   auto subMap =
-    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
-                                             secondSubMap,
-                                             CombineSubstitutionMaps::AtIndex,
-                                             1, 0,
-                                             genericSig);
+    SubstitutionMap::get(genericSig, replacementTypes,
+                         LookUpConformanceInModule());
   
   return emitApplyOfLibraryIntrinsic(loc, converter, subMap, origValue, C);
 }
@@ -653,9 +656,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
   auto &ctx = getASTContext();
+  auto *nsErrorDecl = ctx.getNSErrorDecl();
   if (ctx.LangOpts.EnableObjCInterop && conformances.size() == 1 &&
-      conformances[0].getRequirement() == ctx.getErrorDecl() &&
-      ctx.getNSErrorDecl()) {
+      conformances[0].getProtocol() == ctx.getErrorDecl() &&
+      nsErrorDecl && referenceAllowed(nsErrorDecl)) {
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
     auto nsErrorType = ctx.getNSErrorType()->getCanonicalType();
@@ -864,8 +868,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
         // The original conformances are no good because they have the wrong
         // (pseudogeneric) subject type.
-        auto *M = SGM.M.getSwiftModule();
-        conformances = M->collectExistentialConformances(
+        conformances = collectExistentialConformances(
             concreteFormalType, anyObjectTy);
         F = eraseToAnyObject;
       }
@@ -1345,10 +1348,9 @@ Conversion::adjustForInitialOptionalInjection() const {
   case BridgeFromObjC:
   case BridgeResultFromObjC:
     return OptionalInjectionConversion::forInjection(
-      getBridging(getKind(), getSourceType().getOptionalObjectType(),
-                  getResultType(), getLoweredResultType(),
-                  isBridgingExplicit())
-    );
+        getBridging(getKind(), getSourceType().getOptionalObjectType(),
+                    getResultType(), getLoweredResultType(),
+                    getBridgingOriginalInputType(), isBridgingExplicit()));
   }
   llvm_unreachable("bad kind");
 }
@@ -1370,9 +1372,9 @@ Conversion::adjustForInitialOptionalConversions(CanType newSourceType) const {
   case BridgeToObjC:
   case BridgeFromObjC:
   case BridgeResultFromObjC:
-    return Conversion::getBridging(getKind(), newSourceType,
-                                   getResultType(), getLoweredResultType(),
-                                   isBridgingExplicit());
+    return Conversion::getBridging(
+        getKind(), newSourceType, getResultType(), getLoweredResultType(),
+        getBridgingOriginalInputType(), isBridgingExplicit());
   }
   llvm_unreachable("bad kind");
 }
@@ -1391,9 +1393,9 @@ std::optional<Conversion> Conversion::adjustForInitialForceValue() const {
 
   case BridgeToObjC: {
     auto sourceOptType = getSourceType().wrapInOptionalType();
-    return Conversion::getBridging(ForceAndBridgeToObjC,
-                                   sourceOptType, getResultType(),
-                                   getLoweredResultType(),
+    return Conversion::getBridging(ForceAndBridgeToObjC, sourceOptType,
+                                   getResultType(), getLoweredResultType(),
+                                   getBridgingOriginalInputType(),
                                    isBridgingExplicit());
   }
   }

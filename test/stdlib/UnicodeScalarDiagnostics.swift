@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // FIXME: The clarity of these diagnostics could be improved.
 // <rdar://problem/29912193>

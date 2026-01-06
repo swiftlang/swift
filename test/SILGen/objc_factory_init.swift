@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -83,7 +83,7 @@ extension SomeClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo12IAMSomeClassC17objc_factory_initE6doubleABSd_tcfC
   // CHECK: bb0([[DOUBLE:%.*]] : $Double,
   // CHECK-NOT: value_metatype
-  // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
+  // CHECK: [[FNREF:%[0-9]+]] = function_ref @$sSo12IAMSomeClassC5valueABSd_tcfCTo : $@convention(c) (Double) -> @autoreleased SomeClass
   // CHECK: apply [[FNREF]]([[DOUBLE]])
   convenience init(double: Double) {
     self.init(value: double)

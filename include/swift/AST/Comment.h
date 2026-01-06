@@ -96,14 +96,6 @@ public:
 DocComment *getSingleDocComment(swift::markup::MarkupContext &Context,
                                 const Decl *D);
 
-/// Get the declaration that actually provides a doc comment for another.
-const Decl *getDocCommentProvidingDecl(const Decl *D);
-
-/// Attempt to get a doc comment from the declaration, or other inherited
-/// sources, like from base classes or protocols.
-DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
-                                   const Decl *D);
-
 /// Extract comments parts from the given Markup node.
 swift::markup::CommentParts
 extractCommentParts(swift::markup::MarkupContext &MC,

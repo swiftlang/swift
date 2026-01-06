@@ -23,6 +23,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
 
 namespace swift {
@@ -41,7 +42,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   for (auto paramType : sig.getGenericParams()) {
     auto *clonedParam = GenericTypeParamDecl::createImplicit(
         dc, paramType->getName(), paramType->getDepth(), paramType->getIndex(),
-        paramType->isParameterPack());
+        paramType->getParamKind());
     clonedParam->setDeclContext(dc);
     clonedParams.push_back(clonedParam);
   }
@@ -66,8 +67,8 @@ LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
 
 SILType LinearMapInfo::remapTypeInDerivative(SILType ty) {
   if (ty.hasArchetype())
-    return derivative->mapTypeIntoContext(ty.mapTypeOutOfContext());
-  return derivative->mapTypeIntoContext(ty);
+    return derivative->mapTypeIntoEnvironment(ty.mapTypeOutOfEnvironment());
+  return derivative->mapTypeIntoEnvironment(ty);
 }
 
 EnumDecl *
@@ -77,7 +78,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto &astCtx = original->getASTContext();
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(astCtx);
   auto config = this->config.withGenericSignature(genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,
@@ -99,8 +100,10 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   case swift::SILLinkage::Public:
   case swift::SILLinkage::PublicNonABI:
     // Branching trace enums shall not be resilient.
-    branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
-    branchingTraceDecl->getAttrs().add(new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
+    branchingTraceDecl->addAttribute(new (astCtx)
+                                         FrozenAttr(/*implicit*/ true));
+    branchingTraceDecl->addAttribute(
+        new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
     LLVM_FALLTHROUGH;
   case swift::SILLinkage::Hidden:
   case swift::SILLinkage::Shared:
@@ -143,14 +146,15 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
       heapAllocatedContext = true;
       decl->setInterfaceType(astCtx.TheRawPointerType);
     } else { // Otherwise the payload is the linear map tuple.
-      auto *linearMapStructTy = getLinearMapTupleType(predBB);
+      auto *linearMapTupleTy = getLinearMapTupleType(predBB);
       // Do not create entries for unreachable predecessors
-      if (!linearMapStructTy)
+      if (!linearMapTupleTy)
         continue;
-      auto canLinearMapStructTy = linearMapStructTy->getCanonicalType();
-      decl->setInterfaceType(
-          canLinearMapStructTy->hasArchetype()
-              ? canLinearMapStructTy->mapTypeOutOfContext() : canLinearMapStructTy);
+
+      auto canLinearMapTupleTy = linearMapTupleTy->getCanonicalType();
+      decl->setInterfaceType(canLinearMapTupleTy->hasArchetype()
+                                 ? canLinearMapTupleTy->mapTypeOutOfEnvironment()
+                                 : canLinearMapTupleTy);
     }
     // Create enum element and enum case declarations.
     auto *paramList = ParameterList::create(astCtx, {decl});
@@ -182,6 +186,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
     return activityInfo.isActive(res, config);
   });
+
   bool hasActiveSemanticResultArgument = false;
   bool hasActiveArguments = false;
   auto numIndirectResults = fai.getNumIndirectSILResults();
@@ -270,8 +275,7 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
       remappedOrigFnSubstTy
           ->getAutoDiffDerivativeFunctionType(
               parameters, results, derivativeFnKind, context.getTypeConverter(),
-              LookUpConformanceInModule(
-                  derivative->getModule().getSwiftModule()))
+              LookUpConformanceInModule())
           ->getUnsubstitutedType(original->getModule());
 
   auto linearMapSILType = derivativeFnType->getAllResultsInterfaceType();
@@ -311,10 +315,12 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
         params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
   }
 
-  if (astFnTy->hasArchetype())
-    return astFnTy->mapTypeOutOfContext();
+  Type resultType =
+      astFnTy->hasArchetype() ? astFnTy->mapTypeOutOfEnvironment() : astFnTy;
+  if (fai.getKind() == FullApplySiteKind::TryApplyInst)
+    resultType = resultType->wrapInOptionalType();
 
-  return astFnTy;
+  return resultType;
 }
 
 void LinearMapInfo::generateDifferentiationDataStructures(

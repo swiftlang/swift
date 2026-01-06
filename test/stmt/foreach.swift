@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // Bad containers and ranges
 struct BadContainer1 {
@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
@@ -339,5 +339,28 @@ do {
       }
       let x = e1 // Ok
     }
+  }
+}
+
+// https://github.com/apple/swift/issues/73207
+do {
+  func test(_ levels: [Range<Int>]) {
+    for (i, leaves): (Int, Range<Int>) in levels[8 ..< 15].enumerated() { // Ok
+      _ = i
+      _ = leaves
+    }
+  }
+}
+
+// Make sure the bodies still type-check okay if the preamble is invalid.
+func testInvalidPreamble() {
+  func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
+
+  for _ in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let a = takesAutoclosure(0) // Fine
+  }
+  for x in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let b: Int = x  // No type error, `x` is invalid.
+    _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   }
 }

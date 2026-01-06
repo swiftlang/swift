@@ -1,0 +1,44 @@
+// RUN: %target-run-simple-swift > %t.out
+// RUN: %FileCheck --input-file %t.out %s
+
+// REQUIRES: executable_test
+
+@c
+enum CDecl8: UInt8 {
+case a
+case b
+}
+
+@c
+enum CDecl16: UInt16 {
+case a
+case b
+}
+
+@c(SomeName)
+enum CDecl32: UInt32 {
+case a
+case b
+}
+
+@objc
+enum ObjCEnum: UInt32 {
+case a
+case b
+}
+
+enum SwiftEnum: Int32 {
+case a
+case b
+}
+
+print("@c enum 8 is \(MemoryLayout<CDecl8>.size) bytes")
+// CHECK: @c enum 8 is 1 bytes
+print("@c enum 16 is \(MemoryLayout<CDecl16>.size) bytes")
+// CHECK: @c enum 16 is 2 bytes
+print("@c enum 32 is \(MemoryLayout<CDecl32>.size) bytes")
+// CHECK: @c enum 32 is 4 bytes
+print("@objc enum is \(MemoryLayout<ObjCEnum>.size) bytes")
+// CHECK: @objc enum is 4 bytes
+print("Swift enum is \(MemoryLayout<SwiftEnum>.size) bytes")
+// CHECK: Swift enum is 1 bytes

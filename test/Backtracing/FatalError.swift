@@ -51,4 +51,4 @@ struct FatalError {
 // CHECK-NEXT: 5 [ra]          0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift:14:3
 // CHECK-NEXT: 6 [ra]          0x{{[0-9a-f]+}} static FatalError.main() + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift:36:5
 // CHECK-NEXT: 7 [ra] [system] 0x{{[0-9a-f]+}} static FatalError.$main() + {{[0-9]+}} in FatalError at {{.*}}/<compiler-generated>
-// CHECK-NEXT: 8 [ra] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift
+// CHECK-NEXT: 8 [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift

@@ -138,7 +138,7 @@ bb0(%0 : $@thick C.Type):
 // YAML:        File:            {{.*}}/devirtualize_ownership.sil
 // YAML:        Line:            128
 // YAML:        Column:          8
-// YAML-NEXT: Function:        'caller(_:)'
+// YAML-NEXT: Function:        _TF4metaP33_7026FC13D35FB9700BACF693F51A99016callerFMCS_P33_7026FC13D35FB9700BACF693F51A99011CT_
 // YAML-NEXT: Args:
 // YAML-NEXT:   - String:          'Devirtualized call to class method '
 // YAML-NEXT:   - Method:          '"static meta.B.foo(_:)"'

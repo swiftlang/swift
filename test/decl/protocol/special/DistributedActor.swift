@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-ignore-unknown -verify-ignore-unrelated
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -55,20 +55,46 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{'dist()' declared here}}
 }
 
+// expected-error@+1{{conformance of 'D5' to distributed protocol 'P1' uses non-distributed operations}}
 distributed actor D5: P1 {
+  // expected-note@-1{{mark all declarations used in the conformance 'distributed'}}
+  
   func dist() -> String { "" }
-  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy actor-isolated protocol requirement}}
-  // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method satisfy the protocol requirement}}{{3-3=distributed }}
+  // expected-note@-1{{non-distributed instance method 'dist()'}}
+}
+
+nonisolated distributed actor D6 {} // expected-error {{'nonisolated' modifier cannot be applied to this declaration}}{{1-13=}}
+
+// Can't define `id` and `actorSystem` in an extension either.
+distributed actor D7 {}
+extension D7 {
+  nonisolated var id: String { fatalError() }
+  // expected-error@-1 {{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+
+  nonisolated var actorSystem: OtherActorIdentity { fatalError() }
+  // expected-error@-1 {{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+}
+
+// FIXME: Unfortunately redeclaration checking is run after conformance checking
+// so we also get a conformace error here.
+distributed actor D8 {} // expected-error {{type 'D8' does not conform to protocol 'DistributedActor'}}
+extension D8 {
+  nonisolated var id: ID { fatalError() }
+  // expected-error@-1 {{property 'id' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-2 {{candidate exactly matches}}
+
+  nonisolated var actorSystem: DefaultDistributedActorSystem { fatalError() }
+  // expected-error@-1 {{property 'actorSystem' cannot be defined explicitly, as it conflicts with distributed actor synthesized stored property}}
+  // expected-note@-2 {{candidate exactly matches}}
 }
 
 // ==== Tests ------------------------------------------------------------------
 
 // Make sure the conformances have been added implicitly.
 func acceptDistributedActor<Act: DistributedActor>(_: Act.Type) { }
-func acceptAnyActor<Act: AnyActor>(_: Act.Type) { }
+func acceptAnyActor<Act: AnyActor>(_: Act.Type) { } // expected-warning {{'AnyActor' is deprecated: Use 'any Actor' with 'DistributedActor.asLocalActor' instead}}
 
 func testConformance() {
   acceptDistributedActor(D1.self)
@@ -78,12 +104,13 @@ func testConformance() {
 // https://github.com/apple/swift/issues/69244
 protocol P {
   func foo() -> Void
-  // expected-note@-1{{mark the protocol requirement 'foo()' 'async throws' to allow actor-isolated conformances}}{{13-13= async throws}}
 }
 
+// expected-error@+1{{conformance of 'A' to protocol 'P' involves isolation mismatches and can cause data races}}
 distributed actor A: P {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   typealias ActorSystem = LocalTestingDistributedActorSystem
   distributed func foo() { }
-  // expected-error@-1{{actor-isolated distributed instance method 'foo()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{actor-isolated distributed instance method 'foo()' cannot satisfy nonisolated requirement}}
 }
 // ---

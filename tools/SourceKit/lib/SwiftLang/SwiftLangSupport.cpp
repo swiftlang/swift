@@ -85,6 +85,8 @@ static UIdent Attr_Setter_Package("source.decl.attribute.setter_access.package")
 static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
 static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
 static UIdent EffectiveAccess_Public("source.decl.effective_access.public");
+static UIdent EffectiveAccess_SPI("source.decl.effective_access.spi");
+static UIdent EffectiveAccess_Package("source.decl.effective_access.package");
 static UIdent EffectiveAccess_Internal("source.decl.effective_access.internal");
 static UIdent EffectiveAccess_FilePrivate("source.decl.effective_access.fileprivate");
 static UIdent EffectiveAccess_LessThanFilePrivate("source.decl.effective_access.less_than_fileprivate");
@@ -208,7 +210,7 @@ namespace {
 /// A simple FileSystemProvider that creates an InMemoryFileSystem for a given
 /// dictionary of file contents and overlays that on top of the real filesystem.
 class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
-  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
+  /// Provides the real filesystem, overlaid with an InMemoryFileSystem that
   /// contains specified files at specified locations.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
   getFileSystem(OptionsDictionary &options, std::string &error) override {
@@ -281,7 +283,6 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
-  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
@@ -290,16 +291,14 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
-      Plugins, SwiftExecutablePath, RuntimeResourcePath,
-      DiagnosticDocumentationPath);
+      Plugins, SwiftExecutablePath, RuntimeResourcePath);
 
   IDEInspectionInst = std::make_shared<IDEInspectionInstance>(Plugins);
   configureIDEInspectionInstance(IDEInspectionInst,
                                  SKCtx.getGlobalConfiguration());
 
   CompileManager = std::make_shared<compile::SessionManager>(
-      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath,
-      Plugins);
+      SwiftExecutablePath, RuntimeResourcePath, Plugins);
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
@@ -371,11 +370,17 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return IsRef ? KindRefAccessorRead : KindDeclAccessorRead;
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
   case AccessorKind::Init:
     return IsRef ? KindRefAccessorInit : KindDeclAccessorInit;
+  case AccessorKind::Borrow:
+    return IsRef ? KindRefAccessorBorrow : KindDeclAccessorBorrow;
+  case AccessorKind::Mutate:
+    return IsRef ? KindRefAccessorMutate : KindDeclAccessorMutate;
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -861,17 +866,32 @@ SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
   return std::nullopt;
 }
 
-UIdent SwiftLangSupport::getUIDForFormalAccessScope(const swift::AccessScope Scope) {
-  if (Scope.isPublic()) {
-    return EffectiveAccess_Public;
-  } else if (Scope.isInternal()) {
-    return EffectiveAccess_Internal;
-  } else if (Scope.isFileScope()) {
-    return EffectiveAccess_FilePrivate;
-  } else if (Scope.isPrivate()) {
+UIdent SwiftLangSupport::getUIDForAccessLevel(
+    const clang::index::SymbolProperty Scope) {
+  switch (Scope) {
+  case clang::index::SymbolProperty::Generic:
+  case clang::index::SymbolProperty::TemplatePartialSpecialization:
+  case clang::index::SymbolProperty::TemplateSpecialization:
+  case clang::index::SymbolProperty::UnitTest:
+  case clang::index::SymbolProperty::IBAnnotated:
+  case clang::index::SymbolProperty::IBOutletCollection:
+  case clang::index::SymbolProperty::GKInspectable:
+  case clang::index::SymbolProperty::Local:
+  case clang::index::SymbolProperty::ProtocolInterface:
+  case clang::index::SymbolProperty::SwiftAsync:
+    llvm_unreachable("Not an access level");
+  case clang::index::SymbolProperty::SwiftAccessControlLessThanFilePrivate:
     return EffectiveAccess_LessThanFilePrivate;
-  } else {
-    llvm_unreachable("Unsupported access scope");
+  case clang::index::SymbolProperty::SwiftAccessControlFilePrivate:
+    return EffectiveAccess_FilePrivate;
+  case clang::index::SymbolProperty::SwiftAccessControlInternal:
+    return EffectiveAccess_Internal;
+  case clang::index::SymbolProperty::SwiftAccessControlPackage:
+    return EffectiveAccess_Package;
+  case clang::index::SymbolProperty::SwiftAccessControlSPI:
+    return EffectiveAccess_SPI;
+  case clang::index::SymbolProperty::SwiftAccessControlPublic:
+    return EffectiveAccess_Public;
   }
 }
 
@@ -892,12 +912,14 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   if (!D->hasName())
     return true;
 
-  OS << D->getName();
+  D->getName().print(OS, /*skipEmptyArgumentNames*/ false,
+                     /*escapeIfNeeded*/ true);
   return false;
 }
 
-bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printValueDeclUSR(D, OS);
+bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS,
+                                bool distinguishSynthesizedDecls) {
+  return ide::printValueDeclUSR(D, OS, distinguishSynthesizedDecls);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
@@ -922,8 +944,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
   OS << VD->getBaseName().userFacingName();
 
   // Parameters.
-  auto *M = VD->getModuleContext();
-  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
+  auto substMap = baseTy->getMemberSubstitutionMap(VD);
   auto printSingleParam = [&](ParamDecl *param) {
     auto paramTy = param->getInterfaceType();
 
@@ -965,7 +986,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     OS << ')';
   };
   if (isa<EnumElementDecl>(VD) || isa<FuncDecl>(VD)) {
-    if (const auto ParamList = getParameterList(const_cast<ValueDecl *>(VD))) {
+    if (const auto ParamList = VD->getParameterList()) {
       printParams(ParamList);
     }
   } else if (isa<VarDecl>(VD)) {

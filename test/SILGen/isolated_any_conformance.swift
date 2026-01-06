@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature IsolatedAny %s -module-name test -swift-version 6 -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 6 -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
@@ -7,7 +7,7 @@
 // introduced a protocol for different task group types.
 
 struct A<T> {
-  func enqueue(operation: @escaping @isolated(any) () async -> T) {}
+  func enqueue(operation: @escaping @isolated(any) @Sendable () async -> T) {}
 }
 
 protocol Enqueuer {

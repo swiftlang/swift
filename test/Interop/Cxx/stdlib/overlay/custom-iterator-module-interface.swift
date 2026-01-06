@@ -66,6 +66,23 @@
 // CHECK:   static func == (lhs: HasCustomRACIteratorTag, other: HasCustomRACIteratorTag) -> Bool
 // CHECK: }
 
+// CHECK: struct HasCustomInheritedRACIteratorTag : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK:   func successor() -> HasCustomInheritedRACIteratorTag
+// CHECK:   var pointee: Int32 { get }
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
+// CHECK:   struct CustomTag0 {
+// CHECK:     init()
+// CHECK:   }
+// CHECK:   typealias CustomTag1 = HasCustomInheritedRACIteratorTag.CustomTag0
+// CHECK:   struct CustomTag2 {
+// CHECK:     init()
+// CHECK:   }
+// CHECK:   typealias CustomTag3 = HasCustomInheritedRACIteratorTag.CustomTag2
+// CHECK:   typealias CustomTag4 = HasCustomInheritedRACIteratorTag.CustomTag3
+// CHECK:   typealias iterator_category = HasCustomInheritedRACIteratorTag.CustomTag4
+// CHECK: }
+
 // CHECK: struct HasCustomIteratorTagInline : UnsafeCxxInputIterator {
 // CHECK:   func successor() -> HasCustomIteratorTagInline
 // CHECK:   var pointee: Int32 { get }
@@ -78,6 +95,13 @@
 // CHECK:   var pointee: Int32 { get }
 // CHECK:   typealias Pointee = Int32
 // CHECK:   static func == (lhs: HasTypedefIteratorTag, other: HasTypedefIteratorTag) -> Bool
+// CHECK: }
+
+// CHECK: struct MutableRACIterator : UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
+// CHECK:   func successor() -> MutableRACIterator
+// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = Int32
+// CHECK:   typealias Distance = Int32
 // CHECK: }
 
 // CHECK-NOT: struct HasNoIteratorCategory : UnsafeCxxInputIterator
@@ -138,11 +162,4 @@
 // CHECK:   func successor() -> InputOutputConstIterator
 // CHECK:   var pointee: Int32 { get nonmutating set }
 // CHECK:   typealias Pointee = Int32
-// CHECK: }
-
-// CHECK: struct MutableRACIterator : UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
-// CHECK:   func successor() -> MutableRACIterator
-// CHECK:   var pointee: Int32
-// CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = Int32
 // CHECK: }

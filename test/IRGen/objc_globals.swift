@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | %FileCheck %s
 //
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=xros
 
 import gadget
 import Foundation

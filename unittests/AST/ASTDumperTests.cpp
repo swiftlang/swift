@@ -26,15 +26,14 @@ TEST(ASTDumper, ArchetypeType) {
   TestContext C;
   auto &ctx = C.Ctx;
 
-  auto *genericParamTy = GenericTypeParamType::get(false, 0, 0, ctx);
-  auto sig = buildGenericSignature(ctx, nullptr, {genericParamTy}, {},
+  auto sig = buildGenericSignature(ctx, nullptr, {ctx.TheSelfType}, {},
                                    /*allowInverses=*/true);
 
   TypeBase *archetype = nullptr;
   {
     llvm::SmallVector<ProtocolDecl *> protocols;
     archetype = PrimaryArchetypeType::getNew(ctx, sig.getGenericEnvironment(),
-                                             genericParamTy, protocols, Type(),
+                                             ctx.TheSelfType, protocols, Type(),
                                              nullptr);
   }
 
@@ -52,6 +51,6 @@ TEST(ASTDumper, ArchetypeType) {
   }
 
   EXPECT_EQ(str,
-            " name=\"\\xCF\\x84_0_0\"\n"
-            "  (interface_type=generic_type_param_type depth=0 index=0))\n");
+            " name=\"τ_0_0\"\n"
+            "  (interface_type=generic_type_param_type depth=0 index=0 param_kind=type))\n");
 }

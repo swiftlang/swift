@@ -28,6 +28,7 @@ namespace llvm {
 
 namespace clang {
   class CXXMethodDecl;
+  class CXXRecordDecl;
   class ObjCMethodDecl;
   class Type;
   class ValueDecl;
@@ -198,6 +199,10 @@ class AbstractionPattern {
     /// non-static member function. OrigType is valid and is a function type.
     /// CXXMethod is valid.
     PartialCurriedCXXMethodType,
+    /// The type of a constructor that initializes a C++ functional type, e.g.
+    /// std::function, with a Swift closure. This constructor is synthesized by
+    /// ClangImporter. ClangType is valid.
+    CXXFunctionalConstructorType,
     /// A Swift function whose parameters and results are opaque. This is
     /// like `AP::Type<T>((T) -> T)`, except that the number of parameters is
     /// unspecified.
@@ -462,6 +467,7 @@ class AbstractionPattern {
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
 
@@ -632,6 +638,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::ObjCCompletionHandlerArgumentsType:
       return true;
     case Kind::Invalid:
@@ -765,6 +772,13 @@ public:
                           Kind::CurriedCXXMethodType, memberStatus);
     return pattern;
   }
+
+  /// Return an abstraction pattern for a constructor of a functional C++ type,
+  /// e.g. std::function, which takes a Swift closure as a single parameter.
+  /// This constructor was synthesized by ClangImporter.
+  static AbstractionPattern
+  getCXXFunctionalConstructor(CanType origType,
+                              const clang::CXXRecordDecl *functionalTypeDecl);
 
   /// For a C-function-as-method pattern,
   /// get the index of the C function parameter that was imported as the
@@ -1014,7 +1028,10 @@ public:
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  bool conformsToKnownProtocol(
+    CanType substTy, KnownProtocolKind protocolKind) const;
   bool isNoncopyable(CanType substTy) const;
+  bool isEscapable(CanType substTy) const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.
@@ -1045,6 +1062,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::Type:
     case Kind::Discard:
       return OrigType;
@@ -1081,6 +1099,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::Type:
     case Kind::Discard:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1128,6 +1147,7 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
@@ -1145,7 +1165,8 @@ public:
   /// Return whether this abstraction pattern represents a Clang type.
   /// If so, it is legal to return getClangType().
   bool isClangType() const {
-    return (getKind() == Kind::ClangType);
+    return getKind() == Kind::ClangType ||
+           getKind() == Kind::CXXFunctionalConstructorType;
   }
 
   const clang::Type *getClangType() const {
@@ -1208,6 +1229,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1240,6 +1262,7 @@ public:
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
@@ -1272,6 +1295,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1303,6 +1327,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return false;
@@ -1331,6 +1356,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       llvm_unreachable("pattern is not a tuple");      
@@ -1411,6 +1437,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1438,6 +1465,7 @@ public:
     case Kind::CXXMethodType:
     case Kind::CurriedCXXMethodType:
     case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXFunctionalConstructorType:
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
     case Kind::ObjCCompletionHandlerArgumentsType:
@@ -1513,6 +1541,10 @@ public:
   /// the abstraction pattern for its self type.
   AbstractionPattern getDynamicSelfSelfType() const;
 
+  /// Given that the value being abstracted is a protocol composition
+  /// type, return the abstraction pattern for one of its member types.
+  AbstractionPattern getProtocolCompositionMemberType(unsigned i) const;
+
   /// Given that the value being abstracted is a parameterized protocol
   /// type, return the abstraction pattern for one of its argument types.
   AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
@@ -1550,6 +1582,18 @@ public:
   /// this is not an opaque abstraction pattern, return the parameter flags
   /// for one of its parameters.
   ParameterTypeFlags getFunctionParamFlags(unsigned index) const;
+
+  /// Given that the value being abstracted is a function type, return whether
+  /// the indicated parameter should be treated as addressable, meaning
+  /// calls should preserve the in-memory address of the argument for as
+  /// long as any dependencies may live.
+  ///
+  /// This may be true either because the type is structurally addressable for
+  /// dependencies, or because it was explicitly marked as `@_addressable`
+  /// in its declaration.
+  bool isFunctionParamAddressable(unsigned index) const;
+  
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
   /// Given that the value being abstracted is a function type, and that
   /// this is not an opaque abstraction pattern, return the number of

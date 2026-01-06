@@ -169,7 +169,7 @@ target_include_directories(cxx-support PUBLIC
 
 add_executable(CxxInterop ./Sources/CxxInterop/main.swift)
 target_compile_options(CxxInterop PRIVATE
-  "SHELL:-cxx-interoperability-mode=default"
+  "SHELL:-cxx-interoperability-mode=default")
 target_link_libraries(CxxInterop PRIVATE cxx-support)
 
 ```
@@ -195,6 +195,6 @@ CxxInterop.main()
 - To generate an Xcode project run `cmake -GXcode`
 - To generate with Ninja run `cmake -GNinja`
 
-- For more information on `cmake` see the  'GettingStarted' documentation: (https://github.com/apple/swift/blob/main/docs/HowToGuides/GettingStarted.md)
+- For more information on `cmake` see the  'GettingStarted' documentation: (https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/GettingStarted.md)
 
 

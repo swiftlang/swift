@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }
@@ -168,7 +168,7 @@ func for_loops2() {
   // CHECK: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown]
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
-  // CHECK-NEXT: apply [[NEXT]]<[MyClass]>
+  // CHECK-NEXT: apply [[NEXT]]<Array<MyClass>>
   let objects = [MyClass(), MyClass() ]
   for obj in objects {
     obj.foo()
@@ -585,14 +585,17 @@ func testRequireExprPattern(_ a : Int) {
 func testRequireOptional1(_ a : Int?) -> Int {
 
   // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
-  // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
-  // CHECK-NEXT:   return [[PAYLOAD]] : $Int
+  // CHECK-NEXT:   [[MV_PAYLOAD:%.*]] = move_value [var_decl] [[PAYLOAD]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_PAYLOAD]] : $Int, let, name "t"
+  // CHECK-NEXT:   extend_lifetime [[MV_PAYLOAD]] : $Int
+  // CHECK-NEXT:   return [[MV_PAYLOAD]] : $Int
   guard let t = a else { abort() }
 
   // CHECK: [[NONE]]:
   // CHECK-NEXT:    // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
+  // CHECK-NEXT:    ignored_use
   // CHECK-NEXT:    unreachable
   return t
 }
@@ -618,6 +621,7 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
+  // CHECK-NEXT:   ignored_use
   // CHECK-NEXT:   unreachable
   return t
 }
@@ -770,8 +774,13 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
   // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $(Int, Int)):
   // CHECK-NEXT:   ([[PAYLOAD_1:%.*]], [[PAYLOAD_2:%.*]]) = destructure_tuple [[PAYLOAD]]
-  // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
-  // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
-  // CHECK-NEXT:   return [[PAYLOAD_1]] : $Int
+  // CHECK-NEXT:   [[MV_1:%.*]] = move_value [var_decl] [[PAYLOAD_1]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_1]] : $Int, let, name "x"
+  // CHECK-NEXT:   [[MV_2:%.*]] = move_value [var_decl] [[PAYLOAD_2]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_2]] : $Int, let, name "y"
+  // CHECK-NEXT:   ignored_use
+  // CHECK-NEXT:   extend_lifetime [[MV_2]] : $Int
+  // CHECK-NEXT:   extend_lifetime [[MV_1]] : $Int
+  // CHECK-NEXT:   return [[MV_1]] : $Int
 }
 
