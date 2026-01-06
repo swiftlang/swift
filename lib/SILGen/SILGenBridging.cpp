@@ -19,7 +19,6 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1034,6 +1033,21 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
       loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
+static ManagedValue emitBridgeSmartPtrToReference(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  ManagedValue v,
+                                                  CanType bridgedTy) {
+  auto decl = bridgedTy->castTo<StructType>()->getDecl();
+  auto results = decl->lookupDirect(
+      DeclName(SGF.getASTContext().getIdentifier("asReference")));
+  ASSERT(results.size() == 1);
+  auto getter = cast<VarDecl>(results.front())->getAccessor(AccessorKind::Get);
+  SILDeclRef c(getter, SILDeclRef::Kind::Func);
+  SILValue bridgingFn = SGF.emitGlobalFunctionRef(loc, c);
+  auto result = SGF.B.createApply(loc, bridgingFn, {}, {v.getValue()});
+  return SGF.emitManagedRValueWithCleanup(result);
+}
+
 static ManagedValue emitCBridgedToNativeValue(
     SILGenFunction &SGF, SILLocation loc, ManagedValue v, CanType bridgedType,
     SILType loweredBridgedTy, CanType nativeType, SILType loweredNativeTy,
@@ -1042,7 +1056,25 @@ static ManagedValue emitCBridgedToNativeValue(
   if (loweredNativeTy == loweredBridgedTy.getObjectType())
     return v;
 
+  auto maybeBridgeSmartPtr = [&](CanType nativeTy) {
+    if (!nativeTy->isForeignReferenceType())
+      return ManagedValue();
+    auto record = dyn_cast_or_null<clang::CXXRecordDecl>(
+        bridgedType->castTo<StructType>()->getDecl()->getClangDecl());
+    if (record && Lowering::getBridgedSmartPtr(AbstractionPattern(
+                      bridgedType, record->getTypeForDecl()))) {
+      return emitBridgeSmartPtrToReference(SGF, loc, v, bridgedType);
+    }
+    return ManagedValue();
+  };
+
   if (auto nativeObjectType = nativeType.getOptionalObjectType()) {
+    // Bridge intrusively reference counted smart pointers. This bridging might
+    // produce optional values, so we need to avoid optional injection before
+    // bridging.
+    auto bridged = maybeBridgeSmartPtr(nativeObjectType);
+    if (bridged.isValid())
+      return bridged;
     auto bridgedObjectType = bridgedType.getOptionalObjectType();
 
     // Optional injection.
@@ -1096,6 +1128,11 @@ static ManagedValue emitCBridgedToNativeValue(
                                          SGF.SGM.getWindowsBoolToBoolFn());
     }
   }
+
+  // Bridge intrusively reference counted smart pointers
+  auto bridged = maybeBridgeSmartPtr(nativeType);
+  if (bridged.isValid())
+    return bridged;
 
   // Bridge Objective-C to thick metatypes.
   if (isa<AnyMetatypeType>(nativeType)) {
