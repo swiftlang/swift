@@ -4473,7 +4473,7 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
-ERROR(derivative_attr_unsupported_accessor_kind,none,
+NOTE(derivative_attr_unsupported_accessor_kind,none,
       "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
 // TODO(https://github.com/apple/swift/issues/55542): Remove this temporary diagnostic.
 ERROR(derivative_attr_class_setter_unsupported,none,

@@ -6157,6 +6157,8 @@ enum class AbstractFunctionDeclLookupErrorKind {
   CandidateWrongTypeContext,
   /// Lookup candidate does not have the requested accessor.
   CandidateMissingAccessor,
+  /// Candidate accessor type is not supported
+  CandidateUnsupportedAccessor,
   /// Lookup candidate is a protocol requirement.
   CandidateProtocolRequirement,
   /// Lookup candidate could be resolved to an `AbstractFunctionDecl`.
@@ -6232,6 +6234,21 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
       // candidate. Otherwise, use the getter by default.
       auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
       candidate = asd->getOpaqueAccessor(accessorKind);
+      // A `.borrow`/`.mutate` specifier also matches a yielding borrow/mutate
+      // If we find a yielding version, patch up the provided funcNameWithLoc
+      if (!candidate) {
+	if (accessorKind == AccessorKind::Borrow) {
+	  candidate = asd->getOpaqueAccessor(AccessorKind::YieldingBorrow);
+	  if (candidate) {
+	    maybeAccessorKind = AccessorKind::YieldingBorrow;
+	  }
+	} else if (accessorKind == AccessorKind::Mutate) {
+	  candidate = asd->getOpaqueAccessor(AccessorKind::YieldingMutate);
+	  if (candidate) {
+	    maybeAccessorKind = AccessorKind::YieldingMutate;
+	  }
+	}
+      }
       // Error if candidate is missing the requested accessor.
       if (!candidate) {
         invalidCandidates.push_back(
@@ -6244,6 +6261,15 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     else if (maybeAccessorKind.has_value()) {
       invalidCandidates.push_back(
           {decl, LookupErrorKind::CandidateMissingAccessor});
+      continue;
+    }
+    // Error if we're looking for an accessor and
+    // the matching accessor isn't a supported kind.
+    if (maybeAccessorKind.has_value() &&
+	maybeAccessorKind != AccessorKind::Get &&
+	maybeAccessorKind != AccessorKind::Set) {
+      invalidCandidates.push_back(
+	  {decl, LookupErrorKind::CandidateUnsupportedAccessor});
       continue;
     }
     // Error if candidate is not a `AbstractFunctionDecl`.
@@ -6312,6 +6338,13 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
                        diag::autodiff_attr_original_decl_missing_accessor,
                        invalidCandidate, accessorDeclKind);
         break;
+      }
+      case AbstractFunctionDeclLookupErrorKind::CandidateUnsupportedAccessor: {
+	auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
+        diags.diagnose(invalidCandidate,
+		       diag::derivative_attr_unsupported_accessor_kind,
+		       getAccessorDescriptiveDeclKind(accessorKind));
+	break;
       }
       case AbstractFunctionDeclLookupErrorKind::CandidateProtocolRequirement:
         diags.diagnose(invalidCandidate,
@@ -7136,19 +7169,6 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   if (!derivativeTypeCtx)
     derivativeTypeCtx = derivative->getParent();
   assert(derivativeTypeCtx);
-
-  // Diagnose unsupported original accessor kinds.
-  // Currently, only getters and setters are supported.
-  if (originalName.AccessorKind.has_value()) {
-    if (*originalName.AccessorKind != AccessorKind::Get &&
-        *originalName.AccessorKind != AccessorKind::Set) {
-      attr->setInvalid();
-      diags.diagnose(
-          originalName.Loc, diag::derivative_attr_unsupported_accessor_kind,
-          getAccessorDescriptiveDeclKind(*originalName.AccessorKind));
-      return true;
-    }
-  }
 
   // Look up original function.
   auto *originalAFD = findAutoDiffOriginalFunctionDecl(

@@ -1535,6 +1535,10 @@ static std::optional<AccessorKind> isAccessorLabel(const Token &token) {
     for (auto accessor : allAccessorKinds())
       if (tokText == getAccessorLabel(accessor))
         return accessor;
+    if (tokText == "yielding borrow")
+      return AccessorKind::YieldingBorrow;
+    if (tokText == "yielding mutate")
+      return AccessorKind::YieldingMutate;
   }
   return std::nullopt;
 }
@@ -1578,12 +1582,6 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   if (P.Tok.is(tok::period)) {
     const Token &nextToken = P.peekToken();
     if (isAccessorLabel(nextToken).has_value())
-      return false;
-    // These are synonyms or parts of compound accessor
-    // labels, so not directly recognized by `isAccessorLabel()`
-    if (nextToken.getText() == "yielding"
-        || nextToken.getText() == "yielding_mutate"
-        || nextToken.getText() == "yielding_borrow")
       return false;
   }
 
@@ -1644,38 +1642,11 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   // Currently, we follow (2) because it's more useful in practice.
   if (P.Tok.is(tok::period)) {
     const Token &nextToken = P.peekToken();
-    auto tokText = nextToken.getText();
-    auto coroutineAccessorsAllowed = P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors);
-    if (tokText == "yielding" && coroutineAccessorsAllowed) {
-      // Support "yielding borrow" and "yielding mutate"
-      auto pos = P.getParserPosition();
+    std::optional<AccessorKind> kind = isAccessorLabel(nextToken);
+    if (kind.has_value()) {
+      original.AccessorKind = kind;
       P.consumeIf(tok::period);
       P.consumeIf(tok::identifier);
-      if (P.Tok.getText() == "borrow") {
-        original.AccessorKind = AccessorKind::YieldingBorrow;
-        P.consumeIf(tok::identifier);
-      } else if (P.Tok.getText() == "mutate") {
-        original.AccessorKind = AccessorKind::YieldingMutate;
-        P.consumeIf(tok::identifier);
-      } else {
-        P.restoreParserPosition(pos);
-      }
-    } else {
-      // Support single-word "yielding_borrow" and "yielding_mutate"
-      // as well as the other single-word accessor forms
-      std::optional<AccessorKind> kind;
-      if (tokText == "yielding_borrow" && coroutineAccessorsAllowed) {
-        kind = AccessorKind::YieldingBorrow;
-      } else if (tokText == "yielding_mutate" && coroutineAccessorsAllowed) {
-        kind = AccessorKind::YieldingMutate;
-      } else {
-        kind = isAccessorLabel(nextToken);
-      }
-      if (kind.has_value()) {
-        original.AccessorKind = kind;
-        P.consumeIf(tok::period);
-        P.consumeIf(tok::identifier);
-      }
     }
   }
 
