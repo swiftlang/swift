@@ -236,7 +236,7 @@ struct ImageSource {
       guard case let .allocated(count) = kind else {
         fatalError("Cannot append to immutable image source storage")
       }
-      guard mutableBytes.count - count <= bytes else {
+      guard self.bytes.count >= count + bytes else {
         fatalError("Buffer overrun detected")
       }
       kind = .allocated(count + bytes)
@@ -433,4 +433,35 @@ struct ImageSourceCursor {
     pos += Size(length)
     return result
   }
+}
+
+// .. Testing ..................................................................
+
+@_spi(ImageSourceTest)
+public func testImageSource() -> Bool {
+  func dumpByteCounts(_ source: ImageSource) {
+    print("count: \(source.count)")
+    print("bytes.count: \(source.bytes.count)")
+    print("mutableBytes.count: \(source.mutableBytes.count)")
+    print("unusedBytes.count: \(source.unusedBytes.count)")
+  }
+
+  let source = ImageSource(capacity: 123, isMappedImage: false)
+  defer {
+    fflush(stdout)
+    extendLifetime(source)
+  }
+  dumpByteCounts(source)
+  print("reserve 120 bytes")
+  source.used(bytes: 120)
+  dumpByteCounts(source)
+  print("reserve 3 bytes")
+  source.used(bytes: 3)
+  dumpByteCounts(source)
+  print("reserve 1 byte")
+  fflush(stdout)
+  source.used(bytes: 1) // should detect overflow here & trap
+  print("count: \(source.count)")
+
+  return true
 }
