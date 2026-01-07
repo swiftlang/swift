@@ -6506,6 +6506,59 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseCxxFunctionCalls(E, DC);
 }
 
+/// Performs a deep recursive search to check if a statement (or any nested scope)
+/// contains a throwing expression or statement.
+static bool doesStmtThrow(const Stmt *S, ASTContext &ctx) {
+  llvm::SmallVector<ASTNode, 16> worklist;
+  worklist.push_back(const_cast<Stmt*>(S));
+
+  while (!worklist.empty()) {
+    ASTNode node = worklist.pop_back_val();
+
+    if (auto *expr = node.dyn_cast<Expr *>()) {
+      // Check for 'try', 'try?', 'try!', and other throwing expressions
+      if (TypeChecker::canThrow(ctx, expr))
+        return true;
+    } else if (auto *stmt = node.dyn_cast<Stmt *>()) {
+      // 1. Explicit Throw
+      if (isa<ThrowStmt>(stmt))
+        return true;
+
+      // 2. Control Flow Recursion
+      if (auto *brace = dyn_cast<BraceStmt>(stmt)) {
+        for (auto elem : brace->getElements())
+          worklist.push_back(elem);
+      } else if (auto *ifStmt = dyn_cast<IfStmt>(stmt)) {
+        worklist.push_back(ifStmt->getThenStmt());
+        if (auto *elseStmt = ifStmt->getElseStmt())
+          worklist.push_back(elseStmt);
+      } else if (auto *guard = dyn_cast<GuardStmt>(stmt)) {
+        worklist.push_back(guard->getBody());
+      } else if (auto *doStmt = dyn_cast<DoStmt>(stmt)) {
+        worklist.push_back(doStmt->getBody());
+      } else if (auto *nestedDoCatch = dyn_cast<DoCatchStmt>(stmt)) {
+        // For nested do-catch, errors in the 'do' are caught by the inner catch.
+        // We only care if the *inner catch* re-throws.
+        for (auto *innerCatch : nestedDoCatch->getCatches()) {
+           worklist.push_back(innerCatch->getBody());
+        }
+      } else if (auto *loop = dyn_cast<ForEachStmt>(stmt)) {
+        worklist.push_back(loop->getBody());
+      } else if (auto *whileStmt = dyn_cast<WhileStmt>(stmt)) {
+        worklist.push_back(whileStmt->getBody());
+      } else if (auto *repeat = dyn_cast<RepeatWhileStmt>(stmt)) {
+        worklist.push_back(repeat->getBody());
+      } else if (auto *switchStmt = dyn_cast<SwitchStmt>(stmt)) {
+        for (auto *caseStmt : switchStmt->getCases()) {
+          worklist.push_back(caseStmt);
+        }
+      } else if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
+        worklist.push_back(caseStmt->getBody());
+      }
+    }
+  }
+  return false;
+}
 
 /// Diagnose an empty catch block that silently ignores errors.
 ///
@@ -6557,73 +6610,7 @@ static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx
   if (!pattern->isImplicit())
     return;
 
-  bool bodyThrows = false;
-  llvm::SmallVector<ASTNode, 16> worklist;
-
-  worklist.push_back(doCatchStmt->getBody());
-
-  while (!worklist.empty()) {
-    ASTNode node = worklist.pop_back_val();
-
-    if (auto *expr = node.dyn_cast<Expr *>()) {
-      if (TypeChecker::canThrow(ctx, expr)) {
-        bodyThrows = true;
-        break;
-      }
-    } else if (auto *stmt = node.dyn_cast<Stmt *>()) {
-      if (auto *brace = dyn_cast<BraceStmt>(stmt)) {
-        // BraceStmt: The most common container. Push all elements.
-        for (auto elem : brace->getElements()) {
-          worklist.push_back(elem);
-        }
-      }
-      else if (isa<ThrowStmt>(stmt)) {
-        bodyThrows = true;
-        break;
-      }
-      else if (auto *ifStmt = dyn_cast<IfStmt>(stmt)) {
-        // IfStmt: Check 'then' block and optional 'else' block
-        worklist.push_back(ifStmt->getThenStmt());
-        if (auto *elseStmt = ifStmt->getElseStmt()) {
-          worklist.push_back(elseStmt);
-        }
-      }
-      else if (auto *guard = dyn_cast<GuardStmt>(stmt)) {
-        // GuardStmt: Check the body (the 'else' block of the guard)
-        worklist.push_back(guard->getBody());
-      }
-      else if (auto *doStmt = dyn_cast<DoStmt>(stmt)) {
-        // DoStmt: Check the body
-        worklist.push_back(doStmt->getBody());
-      }
-      else if (auto *nestedDoCatch = dyn_cast<DoCatchStmt>(stmt)) {
-        // Nested Do-Catch: Check the body.
-        // Note: We do NOT check the 'catch' clauses, as those catch errors
-        // inside the nested do, they don't propagate out unless re-thrown.
-        worklist.push_back(nestedDoCatch->getBody());
-      }
-      else if (auto *loop = dyn_cast<ForEachStmt>(stmt)) {
-        worklist.push_back(loop->getBody());
-      }
-      else if (auto *whileStmt = dyn_cast<WhileStmt>(stmt)) {
-        worklist.push_back(whileStmt->getBody());
-      }
-      else if (auto *repeat = dyn_cast<RepeatWhileStmt>(stmt)) {
-        worklist.push_back(repeat->getBody());
-      }
-      else if (auto *switchStmt = dyn_cast<SwitchStmt>(stmt)) {
-        // SwitchStmt: Check all cases
-        for (auto *caseStmt : switchStmt->getCases()) {
-          worklist.push_back(caseStmt);
-        }
-      }
-      else if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
-        worklist.push_back(caseStmt->getBody());
-      }
-    }
-  }
-
-  if (!bodyThrows)
+  if (!doesStmtThrow(doCatchStmt->getBody(), ctx))
     return;
 
   if (auto *body = catchStmt->getBody()) {
