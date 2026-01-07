@@ -495,8 +495,11 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   }
 
   // Next, look for a member type declaration with this name.
-  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes |
-                          NL_ProtocolMembers | NL_IncludeAttributeImplements);
+  NLOptions subOptions = (NL_QualifiedDefault |
+                          NL_RemoveAssociatedTypes |
+                          NL_OnlyTypes |
+                          NL_ProtocolMembers |
+                          NL_IncludeAttributeImplements);
 
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
@@ -516,20 +519,16 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   SmallPtrSet<CanType, 4> viableTypes;
 
   for (auto candidate : candidates) {
-    auto *typeDecl = cast<TypeDecl>(candidate);
-
-    // Skip other associated types.
-    if (isa<AssociatedTypeDecl>(typeDecl))
-      continue;
+    auto *genericDecl = cast<GenericTypeDecl>(candidate);
 
     // If the name doesn't match and there's no appropriate @_implements
     // attribute, skip this candidate.
     //
     // Also skip candidates in protocol extensions, because they tend to cause
     // request cycles. We'll look at those during associated type inference.
-    if (assocType->getName() != typeDecl->getName() &&
-        !(witnessHasImplementsAttrForExactRequirement(typeDecl, assocType) &&
-          !typeDecl->getDeclContext()->getSelfProtocolDecl()))
+    if (assocType->getName() != genericDecl->getName() &&
+        !(witnessHasImplementsAttrForExactRequirement(genericDecl, assocType) &&
+          !genericDecl->getDeclContext()->getSelfProtocolDecl()))
       continue;
 
     // Prior to Swift 6, ignore a member named Failure when matching
@@ -537,10 +536,8 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // instead.
     if (isAsyncSequenceFailure(assocType) &&
         !ctx.isLanguageModeAtLeast(6) &&
-        assocType->getName() == typeDecl->getName())
-      continue;;
-
-    auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
+        assocType->getName() == genericDecl->getName())
+      continue;
 
     // If the declaration has generic parameters, it cannot witness an
     // associated type.
@@ -548,14 +545,14 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
       continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl))
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl))
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
     // Skip dependent protocol typealiases.
     //
     // FIXME: This should not be necessary.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl)) {
       if (isa<ProtocolDecl>(typeAliasDecl->getDeclContext()) &&
           typeAliasDecl->getUnderlyingType()->getCanonicalType()
             ->hasTypeParameter()) {
@@ -572,7 +569,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     }
 
     auto memberType = TypeChecker::substMemberTypeWithBase(
-        typeDecl, dc->getSelfInterfaceType());
+        genericDecl, dc->getSelfInterfaceType());
 
     // Type witnesses that resolve to constraint types are always
     // existential types. This can only happen when the type witness
@@ -595,9 +592,9 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // Check this type against the protocol requirements.
     if (auto checkResult =
             checkTypeWitness(memberTypeInContext, assocType, conformance)) {
-      nonViable.push_back({typeDecl, checkResult});
+      nonViable.push_back({genericDecl, checkResult});
     } else {
-      viable.push_back({typeDecl, memberType, nullptr});
+      viable.push_back({genericDecl, memberType, nullptr});
     }
   }
 
@@ -2093,25 +2090,22 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     defaultName = DeclNameRef(getASTContext().getIdentifier(defaultNameStr));
   }
 
-  NLOptions subOptions = (NL_QualifiedDefault |
-                          NL_OnlyTypes |
+  NLOptions subOptions = (NL_OnlyTypes |
+                          NL_RemoveAssociatedTypes |
                           NL_ProtocolMembers |
                           NL_IncludeAttributeImplements);
 
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
-  SmallVector<ValueDecl *, 4> lookupResults;
+  SmallVector<ValueDecl *, 4> candidates;
   dc->lookupQualified(dc->getSelfNominalTypeDecl(), defaultName,
                       isa<ExtensionDecl>(dc)
                       ? cast<ExtensionDecl>(dc)->getStartLoc()
                       : cast<NominalTypeDecl>(dc)->getStartLoc(),
-                      subOptions, lookupResults);
+                      subOptions, candidates);
 
-  for (auto decl : lookupResults) {
-    // We want type declarations.
-    auto typeDecl = dyn_cast<TypeDecl>(decl);
-    if (!typeDecl || isa<AssociatedTypeDecl>(typeDecl))
-      continue;
+  for (auto decl : candidates) {
+    auto typeDecl = cast<TypeDecl>(decl);
 
     // We only find these within a protocol extension.
     auto defaultProto = typeDecl->getDeclContext()->getSelfProtocolDecl();

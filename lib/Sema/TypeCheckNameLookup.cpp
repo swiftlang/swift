@@ -140,7 +140,6 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          // HERE, need to look up base decl
           Result.add(LookupResultEntry(baseDC, baseDecl, result), isOuter);
           if (isOuter)
             FoundOuterDecls.push_back(result);
