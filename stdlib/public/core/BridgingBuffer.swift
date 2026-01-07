@@ -45,7 +45,7 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
     }
     @inline(__always)
     set {
-      return header.count = newValue
+      header.count = newValue
     }
   }
 
