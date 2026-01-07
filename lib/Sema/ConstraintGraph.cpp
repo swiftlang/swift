@@ -31,6 +31,51 @@ using namespace constraints;
 
 #define DEBUG_TYPE "ConstraintGraph"
 
+namespace {
+
+static void
+notifyDirect(ConstraintGraph &CG, const ConstraintGraphNode &node,
+             ChainDirection direction,
+             llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+  auto *typeVar = node.getTypeVariable();
+
+  if (typeVar->getImpl().getFixedType(/*trail=*/nullptr))
+    return;
+
+  if (!node.forRepresentativeVar()) {
+    notifyDirect(CG,
+                 CG[typeVar->getImpl().getRepresentative(/*trail=*/nullptr)],
+                 direction, notification);
+    return;
+  }
+
+  SmallPtrSet<TypeVariableType *, 2> notified({typeVar});
+  for (auto *eqMember : node.getEquivalenceClass()) {
+    ArrayRef<TypeVariableType *> chain;
+    switch (direction) {
+    case ChainDirection::Subtypes:
+      chain = CG[eqMember].supertypeOf();
+      break;
+    case ChainDirection::Supertypes:
+      chain = CG[eqMember].subtypeOf();
+      break;
+    }
+
+    for (auto *member : chain) {
+      auto *repr = member->getImpl().getRepresentative(/*trail=*/nullptr);
+
+      // If member is bound, it represents a cut in the chain.
+      if (repr->getImpl().getFixedType(/*trail=*/nullptr))
+        continue;
+
+      if (notified.insert(repr).second)
+        notification(CG[repr]);
+    }
+  }
+}
+
+} // end namespace
+
 #pragma mark Graph construction/destruction
 
 ConstraintGraph::ConstraintGraph(ConstraintSystem &cs) : CS(cs) { }
@@ -139,9 +184,12 @@ static bool isUsefulForReferencedVars(Constraint *constraint) {
   }
 }
 
-static bool isTransferrableSupertypeBinding(const PotentialBinding &binding) {
+static bool isTransferrable(const PotentialBinding &binding,
+                            ChainDirection direction) {
   if (!(binding.Kind == AllowedBindingKind::Exact ||
-        binding.Kind == AllowedBindingKind::Supertypes))
+        binding.Kind == (direction == ChainDirection::Supertypes
+                             ? AllowedBindingKind::Supertypes
+                             : AllowedBindingKind::Subtypes)))
     return false;
 
   if (binding.BindingType->isPlaceholder())
@@ -185,7 +233,7 @@ void ConstraintGraphNode::updateTypeVariableAssociations(Constraint *constraint,
     SmallPtrSet<TypeVariableType *, 2> typeVars({of});
     collectBindingProducingSubtypesOf(CG, CG[of], typeVars);
     CG[from->getImpl().getRepresentative(/*trail=*/nullptr)]
-        .retractTransitiveBindingsFrom(typeVars);
+        .retractTransitiveBindingsFrom(typeVars, ChainDirection::Supertypes);
   };
 
   if (constraint->getFirstType()->isEqual(TypeVar)) {
@@ -230,7 +278,7 @@ void ConstraintGraphNode::updateTypeVariableAssociations(Constraint *constraint,
           // Transfer all of the existing viable bindings of this type variable,
           // both direct and transitive, over to its new supertype.
           for (const auto &binding : CG[subtypeRepr].Potential.Bindings) {
-            if (!isTransferrableSupertypeBinding(binding))
+            if (!isTransferrable(binding, ChainDirection::Supertypes))
               continue;
 
             auto transitive =
@@ -239,7 +287,8 @@ void ConstraintGraphNode::updateTypeVariableAssociations(Constraint *constraint,
                     : binding.withKind(AllowedBindingKind::Supertypes)
                           .asTransitiveFrom(subtypeRepr);
 
-            CG[supertypeRepr].introduceTransitiveSupertype(transitive);
+            CG[supertypeRepr].introduceTransitive(transitive,
+                                                  ChainDirection::Supertypes);
           }
         }
       }
@@ -281,7 +330,8 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
     if (constraint->getClassification() ==
         ConstraintClassification::Relational) {
       notifyDirectSupertypes([&constraint](ConstraintGraphNode &node) {
-        node.retractTransitiveBindingsFrom(constraint);
+        node.retractTransitiveBindingsFrom(constraint,
+                                           ChainDirection::Supertypes);
       });
     }
   }
@@ -376,53 +426,6 @@ void ConstraintGraphNode::notifyReferencedVars(
   }
 }
 
-namespace {
-
-enum class ChainDirection : uint8_t { Subtypes, Supertypes };
-
-static void
-notifyDirect(ConstraintGraph &CG, const ConstraintGraphNode &node,
-             ChainDirection direction,
-             llvm::function_ref<void(ConstraintGraphNode &)> notification) {
-  auto *typeVar = node.getTypeVariable();
-
-  if (typeVar->getImpl().getFixedType(/*trail=*/nullptr))
-    return;
-
-  if (!node.forRepresentativeVar()) {
-    notifyDirect(CG,
-                 CG[typeVar->getImpl().getRepresentative(/*trail=*/nullptr)],
-                 direction, notification);
-    return;
-  }
-
-  SmallPtrSet<TypeVariableType *, 2> notified({typeVar});
-  for (auto *eqMember : node.getEquivalenceClass()) {
-    ArrayRef<TypeVariableType *> chain;
-    switch (direction) {
-    case ChainDirection::Subtypes:
-      chain = CG[eqMember].supertypeOf();
-      break;
-    case ChainDirection::Supertypes:
-      chain = CG[eqMember].subtypeOf();
-      break;
-    }
-
-    for (auto *member : chain) {
-      auto *repr = member->getImpl().getRepresentative(/*trail=*/nullptr);
-
-      // If member is bound, it represents a cut in the chain.
-      if (repr->getImpl().getFixedType(/*trail=*/nullptr))
-        continue;
-
-      if (notified.insert(repr).second)
-        notification(CG[repr]);
-    }
-  }
-}
-
-} // end namespace
-
 void ConstraintGraphNode::notifyDirectSubtypes(
     llvm::function_ref<void(ConstraintGraphNode &)> notification) const {
   notifyDirect(CG, *this, ChainDirection::Subtypes, notification);
@@ -497,32 +500,39 @@ void ConstraintGraphNode::retractFromInference() {
   notifyReferencingVars([&](ConstraintGraphNode &node, Constraint *constraint) {
     node.getPotentialBindings().retract(constraint);
     if (CG.supportsTransitiveInference())
-      node.retractTransitiveBindingsFrom(constraint);
+      node.retractTransitiveBindingsFrom(constraint,
+                                         ChainDirection::Supertypes);
   });
 
   if (CG.supportsTransitiveInference()) {
     SmallPtrSet<TypeVariableType *, 2> typeVars({TypeVar});
     collectBindingProducingSubtypesOf(CG, *this, typeVars);
-    retractTransitiveBindingsFrom(typeVars);
+    retractTransitiveBindingsFrom(typeVars, ChainDirection::Supertypes);
   }
 }
 
 void ConstraintGraphNode::retractTransitiveBindingsFrom(
-    Constraint *constraint) {
-  retractTransitiveBindings([&constraint](const auto &binding) {
-    return binding.BindingSource.getOpaqueValue() == constraint;
-  });
+    Constraint *constraint, ChainDirection direction) {
+  retractTransitiveBindings(
+      [&constraint](const auto &binding) {
+        return binding.BindingSource.getOpaqueValue() == constraint;
+      },
+      direction);
 }
 
 void ConstraintGraphNode::retractTransitiveBindingsFrom(
-    llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars) {
-  retractTransitiveBindings([&typeVars](const auto &binding) {
-    return typeVars.count(binding.Originator);
-  });
+    llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars,
+    ChainDirection direction) {
+  retractTransitiveBindings(
+      [&typeVars](const auto &binding) {
+        return typeVars.count(binding.Originator);
+      },
+      direction);
 }
 
 void ConstraintGraphNode::retractTransitiveBindings(
-    llvm::function_ref<bool(const PotentialBinding &binding)> matching) {
+    llvm::function_ref<bool(const PotentialBinding &binding)> matching,
+    ChainDirection direction) {
   auto &cs = CG.getConstraintSystem();
   Potential.Bindings.erase(
       llvm::remove_if(
@@ -538,9 +548,10 @@ void ConstraintGraphNode::retractTransitiveBindings(
           }),
       Potential.Bindings.end());
 
-  notifyDirectSupertypes([&matching](ConstraintGraphNode &node) {
-    node.retractTransitiveBindings(matching);
-  });
+  notifyDirect(CG, *this, direction,
+               [&matching, direction](ConstraintGraphNode &node) {
+                 node.retractTransitiveBindings(matching, direction);
+               });
 }
 
 void ConstraintGraphNode::introduceToInference(Constraint *constraint) {
@@ -549,16 +560,17 @@ void ConstraintGraphNode::introduceToInference(Constraint *constraint) {
     return;
 
   if (CG.supportsTransitiveInference()) {
-    if (!isTransferrableSupertypeBinding(*newBinding))
-      return;
+    if (isTransferrable(*newBinding, ChainDirection::Supertypes)) {
+      auto transitiveBinding =
+          newBinding->withKind(AllowedBindingKind::Supertypes)
+              .asTransitiveFrom(TypeVar);
 
-    auto transitiveBinding =
-        newBinding->withKind(AllowedBindingKind::Supertypes)
-            .asTransitiveFrom(TypeVar);
-    notifyDirectSupertypes(
-        [&transitiveBinding](ConstraintGraphNode &supertype) {
-          supertype.introduceTransitiveSupertype(transitiveBinding);
-        });
+      notifyDirectSupertypes(
+          [&transitiveBinding](ConstraintGraphNode &supertype) {
+            supertype.introduceTransitive(transitiveBinding,
+                                          ChainDirection::Supertypes);
+          });
+    }
   }
 }
 
@@ -596,8 +608,8 @@ void ConstraintGraphNode::introduceToInference(Type fixedType) {
   }
 }
 
-void ConstraintGraphNode::introduceTransitiveSupertype(
-    PotentialBinding binding) {
+void ConstraintGraphNode::introduceTransitive(PotentialBinding binding,
+                                              ChainDirection direction) {
   ASSERT(binding.isTransitive());
 
   if (ConstraintSystem::typeVarOccursInType(TypeVar, binding.BindingType))
@@ -605,8 +617,8 @@ void ConstraintGraphNode::introduceTransitiveSupertype(
 
   getPotentialBindings().addPotentialBinding(binding);
 
-  notifyDirectSupertypes([&](ConstraintGraphNode &node) {
-    node.introduceTransitiveSupertype(binding);
+  notifyDirect(CG, *this, direction, [&](ConstraintGraphNode &node) {
+    node.introduceTransitive(binding, direction);
   });
 }
 
@@ -725,7 +737,7 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *repr,
   if (supportsTransitiveInference()) {
     for (const auto &binding : nonRepNode.Potential.Bindings) {
       if (binding.isTransitiveSupertype())
-        (*this)[repr].introduceTransitiveSupertype(binding);
+        (*this)[repr].introduceTransitive(binding, ChainDirection::Supertypes);
     }
   }
 
@@ -739,13 +751,13 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *repr,
   // of the representative to the supertype chain of the new member.
   if (supportsTransitiveInference()) {
     for (const auto &binding : (*this)[repr].Potential.Bindings) {
-      if (isTransferrableSupertypeBinding(binding)) {
-        nonRepNode.notifyDirectSupertypes(
-            [&binding, repr](ConstraintGraphNode &supertype) {
-              supertype.introduceTransitiveSupertype(
-                  binding.isTransitive() ? binding
-                                         : binding.asTransitiveFrom(repr));
-            });
+      if (isTransferrable(binding, ChainDirection::Supertypes)) {
+        nonRepNode.notifyDirectSupertypes([&binding, repr](
+                                              ConstraintGraphNode &supertype) {
+          supertype.introduceTransitive(
+              binding.isTransitive() ? binding : binding.asTransitiveFrom(repr),
+              ChainDirection::Supertypes);
+        });
       }
     }
   }
