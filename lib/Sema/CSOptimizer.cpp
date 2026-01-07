@@ -1947,10 +1947,11 @@ ConstraintSystem::selectDisjunction() {
         if (auto preference = isPreferable(*this, first, second))
           return preference.value();
 
-        auto &[firstScore, firstFavoredChoices, isFirstSpeculative] =
-            favorings[first];
-        auto &[secondScore, secondFavoredChoices, isSecondSpeculative] =
-            favorings[second];
+        const auto &firstFavorings = favorings[first];
+        const auto &secondFavorings = favorings[second];
+
+        auto firstScore = firstFavorings.Score;
+        auto secondScore = secondFavorings.Score;
 
         bool isFirstOperator = isOperatorDisjunction(first);
         bool isSecondOperator = isOperatorDisjunction(second);
@@ -1970,10 +1971,10 @@ ConstraintSystem::selectDisjunction() {
         // when nothing concrete is known about them, let's reset the score
         // and compare purely based on number of choices.
         if (isFirstOperator != isSecondOperator) {
-          if (isFirstOperator && isFirstSpeculative)
+          if (isFirstOperator && firstFavorings.IsSpeculative)
             firstScore = 0;
 
-          if (isSecondOperator && isSecondSpeculative)
+          if (isSecondOperator && secondFavorings.IsSpeculative)
             secondScore = 0;
         }
 
@@ -1999,17 +2000,17 @@ ConstraintSystem::selectDisjunction() {
           // because it would fail and prune the other overload if parameter
           // type (aka contextual type) is `Int`.
           if (isFirstOperator && isSecondOperator &&
-              isFirstSpeculative != isSecondSpeculative)
-            return isSecondSpeculative;
+              firstFavorings.IsSpeculative != secondFavorings.IsSpeculative)
+            return secondFavorings.IsSpeculative;
         }
 
         // Use favored choices only if disjunction score is higher
         // than zero. This means that we can maintain favoring
         // choices without impacting selection decisions.
         unsigned numFirstFavored =
-            firstScore.value_or(0) ? firstFavoredChoices.size() : 0;
+            firstScore.value_or(0) ? firstFavorings.FavoredChoices.size() : 0;
         unsigned numSecondFavored =
-            secondScore.value_or(0) ? secondFavoredChoices.size() : 0;
+            secondScore.value_or(0) ? secondFavorings.FavoredChoices.size() : 0;
 
         if (numFirstFavored == numSecondFavored) {
           if (firstActive != secondActive)
