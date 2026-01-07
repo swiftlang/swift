@@ -525,6 +525,11 @@ bool TypeBase::canBeIsolatedTo() {
   // Optional<Builtin.ImplicitActor> since we shouldn't ever see that.
   if (auto ty = getOptionalObjectType())
     return ty->isAnyActorType();
+
+  // TODO: remove debugging stuff
+  if (true)
+    return getReferenceStorageReferent()->isAnyActorType();
+
   return isAnyActorType();
 }
 
@@ -2364,6 +2369,10 @@ bool TypeBase::mayHaveSuperclass() {
   if (auto archetype = getAs<ArchetypeType>())
     return (bool)archetype->requiresClass();
 
+  // TODO: remove debugging stuff
+//  if (true)
+//    return getReferenceStorageReferent()->mayHaveSuperclass();
+
   return is<DynamicSelfType>();
 }
 
@@ -2941,6 +2950,12 @@ static bool isBridgeableObjectType(CanType type) {
   } else if (auto fnType = dyn_cast<SILFunctionType>(type)) {
     return fnType->getRepresentation()
       == SILFunctionType::Representation::Block;
+  }
+
+  if (false) {
+    type->getReferenceStorageReferent()
+      ->getCanonicalType()
+      ->isBridgeableObjectType();
   }
 
   return false;

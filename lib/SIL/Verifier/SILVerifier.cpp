@@ -7811,8 +7811,8 @@ public:
         auto *distributedProtocol =
             ctx.getProtocol(KnownProtocolKind::DistributedActor);
         require(argType->canBeIsolatedTo() ||
-                    genericSig->requiresProtocol(argType, actorProtocol) ||
-                    genericSig->requiresProtocol(argType, distributedProtocol),
+                    (genericSig && genericSig->requiresProtocol(argType, actorProtocol)) ||
+                    (genericSig && genericSig->requiresProtocol(argType, distributedProtocol)),
                 "Only any actor types can be isolated");
         require(!foundIsolatedParameter, "Two isolated parameters");
         foundIsolatedParameter = true;

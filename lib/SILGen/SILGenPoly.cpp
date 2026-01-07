@@ -291,6 +291,14 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
                                      toInstanceType,
                                      /*allowMissing=*/true);
 
+//  if (input.getOwnershipKind() == OwnershipKind::Unowned) {
+//    auto *UTRI = getBuilder().createUnownedToRef(loc, input.getValue(), input.getType().getReferenceStorageReferentType());
+//    input = ManagedValue::forUnownedObjectValue(UTRI);
+//
+//    input = ManagedValue::forUnownedObjectValue(input.getValue());
+//    inputType = inputType->getReferenceStorageReferent()->getCanonicalType();
+//  }
+
   // Build result existential
   AbstractionPattern opaque = AbstractionPattern::getOpaque();
   const TypeLowering &concreteTL = getTypeLowering(opaque, inputType);

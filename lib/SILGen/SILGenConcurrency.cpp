@@ -437,6 +437,28 @@ emitNonOptionalActorInstanceIsolation(SILGenFunction &SGF, SILLocation loc,
     return emitDistributedActorIsolation(SGF, loc, actor, actorType);
   }
 
+//  llvm::dbgs() << "JQ: actor ownership: " << actor.getOwnershipKind() << "\n";
+//  llvm::dbgs() << actor.getType().getReferenceStorageOwnership() << "\n";
+//   if (false && actor.getType().getReferenceStorageOwnership() == ReferenceOwnership::Unowned) {
+// //  if (true && actor.getOwnershipKind() == OwnershipKind::Unowned) {
+//     llvm::dbgs() << "JQ: unowned conversion\n";
+//     auto *UTRI = SGF.getBuilder().createUnownedToRef(loc, actor.getValue(), actor.getType().getReferenceStorageReferentType());
+//     UTRI->dump();
+//     actor = ManagedValue::forUnownedObjectValue(UTRI).ensurePlusOne(SGF, loc);
+
+//     // auto ogTy = actorType;
+//     auto newTy = actorType->getReferenceStorageReferent()->getCanonicalType();
+// //    actorType = actorType->getReferenceStorageReferent()->getCanonicalType();
+
+//     auto transformed = actor.forUnownedObjectValue(actor.getValue())
+//           .ensurePlusOne(SGF, loc);
+// //    emitTransformedValue(loc, actor,
+// //                             ogTy,
+// //                             newTy);
+//     actor = transformed;
+//     actorType = newTy;
+//   }
+
   return SGF.emitTransformExistential(loc, actor, actorType, anyActorType);
 }
 
@@ -634,7 +656,19 @@ static ManagedValue emitLoadOfCaptureIsolation(SILGenFunction &SGF,
                                  TC.getCaptureTypeExpansionContext(constant))
              == CaptureKind::Constant);
 
-    auto value = captureArgs[i].copy(SGF, loc);
+    ManagedValue value;
+    if (true && isa<UnownedStorageType>(isolatedVarType)) {
+      auto isolatedArg = captureArgs[i];
+      // convert from sil_unowned
+      auto *UTRI = SGF.getBuilder().createUnownedToRef(loc, isolatedArg.getValue(), isolatedArg.getType().getReferenceStorageReferentType());
+      value = ManagedValue::forUnownedObjectValue(UTRI).ensurePlusOne(SGF, loc);
+//      value = SGF.getBuilder().createStrongCopyUnownedValue(loc, captureArgs[i]);
+      isolatedVarType = isolatedVarType->getReferenceStorageReferent()->getCanonicalType();
+    } else {
+      value = captureArgs[i].copy(SGF, loc);
+    }
+
+//    auto value = captureArgs[i].copy(SGF, loc);
     return SGF.emitActorInstanceIsolation(loc, value, isolatedVarType);
   }
 
