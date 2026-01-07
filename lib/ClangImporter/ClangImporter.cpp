@@ -1845,6 +1845,10 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
+  if (adapter->isNonSwiftModule()) {
+    // bridging header has already been imported by main module
+    return true;
+  }
   if (isPCHFilenameExtension(header)) {
     return bindBridgingHeader(adapter, diagLoc);
   }
