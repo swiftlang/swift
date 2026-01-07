@@ -1732,10 +1732,19 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   DeclName name(ctx, DeclBaseName::createSubscript(), bodyParams);
   auto dc = getterImpl->getDeclContext();
 
-  SubscriptDecl *subscript = SubscriptDecl::createImported(
-      ctx, name, getterImpl->getLoc(), bodyParams, getterImpl->getLoc(),
-      elementTy, dc, getterImpl->getGenericParams(),
-      getterImpl->getClangNode());
+  SubscriptDecl *subscript;
+  if (auto ClangN = getterImpl->getClangNode()) {
+    subscript = SubscriptDecl::createImported(
+        ctx, name, getterImpl->getLoc(), bodyParams, getterImpl->getLoc(),
+        elementTy, dc, getterImpl->getGenericParams(), ClangN);
+  } else {
+    // getterImpl may lack an associated ClangNode if it is synthesized,
+    // e.g., if it is a cloned from a base class member due to inheritance.
+    subscript = SubscriptDecl::create(
+        ctx, name, SourceLoc(), StaticSpellingKind::None, getterImpl->getLoc(),
+        bodyParams, getterImpl->getLoc(), elementTy, dc,
+        getterImpl->getGenericParams());
+  }
   subscript->copyFormalAccessFrom(getterImpl);
 
   AccessorDecl *getterDecl =

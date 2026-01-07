@@ -60,7 +60,7 @@ UsingBaseTestSuite.test("OperatorBasePrivateInheritance") {
   // expectTrue(Bool(fromCxx: p))
   // expectTrue(Bool(fromCxx: !p))
   expectEqual(456, p.pointee)
-  // expectEqual(789, p[789])   // FIXME: operator[] is currently broken
+  expectEqual(789, p[789])
 }
 
 runAllTests()

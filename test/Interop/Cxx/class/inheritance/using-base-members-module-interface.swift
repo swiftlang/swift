@@ -70,6 +70,7 @@
 
 // CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
+// CHECK-NEXT:   public subscript(x: Int32) -> Int32 { get }
 // CHECK-NEXT:   public var pointee: Int32 { get }
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
@@ -77,4 +78,6 @@
 // CHECK-NEXT:   prefix public static func ! (lhs: OperatorBasePrivateInheritance) -> OperatorBase
 // CHECK-NEXT:   @available(*, unavailable, message: "use ! instead")
 // CHECK-NEXT:   public func __operatorExclaim() -> OperatorBase
+// CHECK-NEXT:   @available(*, unavailable, message: "use subscript")
+// CHECK-NEXT:   public func __operatorSubscriptConst(_ x: Int32) -> Int32
 // CHECK-NEXT: }
