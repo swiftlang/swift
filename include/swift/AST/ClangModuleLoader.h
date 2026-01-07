@@ -338,6 +338,10 @@ public:
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
 
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
   virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
 
   virtual DeclName

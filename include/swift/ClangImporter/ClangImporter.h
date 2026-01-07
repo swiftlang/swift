@@ -491,7 +491,13 @@ public:
   bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
 
   bool runPreprocessor(StringRef inputPath, StringRef outputPath);
+
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
   const clang::Module *getClangOwningModule(ClangNode Node) const override;
+
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
