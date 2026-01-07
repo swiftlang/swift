@@ -201,15 +201,14 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
   return EXIT_SUCCESS;
 }
 
-static int action_scan_dependency(std::vector<const char *> &Args,
+static int action_scan_dependency(swiftscan_scanner_t scanner,
+                                  std::vector<const char *> &Args,
                                   StringRef WorkingDirectory,
                                   bool PrintChainedBridgingHeader) {
-  auto scanner = swiftscan_scanner_create();
   auto invocation = swiftscan_scan_invocation_create();
   auto error = [&](StringRef msg) {
     llvm::errs() << msg << "\n";
     swiftscan_scan_invocation_dispose(invocation);
-    swiftscan_scanner_dispose(scanner);
     return EXIT_FAILURE;
   };
 
@@ -259,7 +258,6 @@ static int action_scan_dependency(std::vector<const char *> &Args,
     swift::dependencies::writeJSON(llvm::outs(), graph);
 
   swiftscan_scan_invocation_dispose(invocation);
-  swiftscan_scanner_dispose(scanner);
   return EXIT_SUCCESS;
 }
 
@@ -311,6 +309,14 @@ int main(int argc, char *argv[]) {
   llvm::StringSaver Saver(Alloc);
   auto Args = createArgs(SwiftCommands, Saver, Action);
 
+  swiftscan_scanner_t scanner = nullptr;
+  if (Action == scan_dependency || Action == get_chained_bridging_header)
+    scanner = swiftscan_scanner_create();
+  SWIFT_DEFER {
+    if (scanner)
+      swiftscan_scanner_dispose(scanner);
+  };
+
   std::atomic<int> Ret = 0;
   llvm::StdThreadPool Pool(llvm::hardware_concurrency(Threads));
   for (unsigned i = 0; i < Threads; ++i) {
@@ -330,7 +336,7 @@ int main(int argc, char *argv[]) {
         break;
       case scan_dependency:
       case get_chained_bridging_header:
-        Ret += action_scan_dependency(Args, WorkingDirectory,
+        Ret += action_scan_dependency(scanner, Args, WorkingDirectory,
                                       Action == get_chained_bridging_header);
       }
     });
