@@ -45,6 +45,11 @@ class ConstraintGraph;
 class ConstraintSystem;
 class TypeVariableBinding;
 
+/// Sets a traversal direction for subtype/supertype chains.
+/// Primarily used in conjunction with the transitive binding
+/// inference.
+enum class ChainDirection : uint8_t { Subtypes, Supertypes };
+
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
@@ -159,20 +164,24 @@ private:
   void retractFromInference();
 
   /// Remove the potential transitive bindings matching the given source
-  /// constraint from the current node and all of its supertypes.
-  void retractTransitiveBindingsFrom(Constraint *constraint);
+  /// constraint from the current node and all of its subtypes or supertypes
+  /// depending on the given `direction`.
+  void retractTransitiveBindingsFrom(Constraint *constraint,
+                                     ChainDirection direction);
 
   /// Remove the potential transitive bindings matching the given
   /// originator type variable from the current node and all of its
-  /// supertypes.
+  /// subtypes or supertypes depending on the given `direction`.
   void retractTransitiveBindingsFrom(
-      llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars);
+      llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars,
+      ChainDirection direction);
 
   /// Remove the potential transitive bindings matching the given predicate
   /// from the current node and all of its supertypes.
   void retractTransitiveBindings(
       llvm::function_ref<bool(const inference::PotentialBinding &binding)>
-          matching);
+          matching,
+      ChainDirection direction);
 
   /// Attempt to infer bindings from the constraint. The inferred bindings
   /// would have to be removed once the constraint gets retracted from the
@@ -189,9 +198,11 @@ private:
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
 
-  /// Add the potential binding that was transitively inferred from
-  /// one the current node's subtypes and propagate it up the supertype chain.
-  void introduceTransitiveSupertype(inference::PotentialBinding binding);
+  /// Record the potential binding that was transitively inferred from
+  /// one of the chain members and propagate it up or down depending on
+  /// the `direction` parameter.
+  void introduceTransitive(inference::PotentialBinding binding,
+                           ChainDirection direction);
 
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
