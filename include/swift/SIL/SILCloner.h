@@ -1060,9 +1060,19 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
     VarInfo = std::nullopt;
   }
   remapDebugVariable(VarInfo);
+  SILType clonedType = getOpType(Inst->getElementType());
+  HasDynamicLifetime_t dynamicLifetime = Inst->hasDynamicLifetime();
+  if (Inst->getElementType().hasAnyPack() && !clonedType.hasAnyPack()) {
+    // If a pack allocation is specialized for a single concrete type, the
+    // memory-lifetime is not statically verifiable anymore:
+    // At runtime the generated pack-loops are executed for a single iteration.
+    // However, the loop is still there in the control flow, suggesting that
+    // the single element is taken or initialized every loop iteration.
+    dynamicLifetime = HasDynamicLifetime;
+  }
   auto *NewInst = getBuilder().createAllocStack(
-      Loc, getOpType(Inst->getElementType()), VarInfo,
-      Inst->hasDynamicLifetime(), Inst->isLexical(), Inst->isFromVarDecl(),
+      Loc, clonedType, VarInfo,
+      dynamicLifetime, Inst->isLexical(), Inst->isFromVarDecl(),
       Inst->usesMoveableValueDebugInfo()
 #ifndef NDEBUG
           ,
