@@ -421,6 +421,25 @@ bb3(%4 : @owned $C):
   return %10
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_dead_end :
+// CHECK:       bb3([[PHI:%.*]] : @owned $C):
+// CHECK-NEXT:    destroy_value [dead_end] [[PHI]]
+// CHECK:       } // end sil function 'dont_hoist_dead_end'
+sil [ossa] @dont_hoist_dead_end : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%4 : @owned $C):
+  destroy_value [dead_end] %4
+  unreachable
+}
+
 // CHECK-LABEL: sil [ossa] @dont_hoist_destroy_in_different_block :
 // CHECK-NOT:     destroy_value
 // CHECK:       bb4:
