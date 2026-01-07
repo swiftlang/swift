@@ -1667,3 +1667,4 @@ final class HasInitAccessors {
     ints.append(0)
   }
 }
+
