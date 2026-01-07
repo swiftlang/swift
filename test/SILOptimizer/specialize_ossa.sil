@@ -1684,3 +1684,38 @@ bb0:
   %5 = tuple ()
   return %5 : $()
 }
+
+// CHECK-LABEL: sil shared [ossa] @$s19alloc_stack_of_packSS_QP_Tg5 :
+// CHECK:         %1 = alloc_stack [dynamic_lifetime] $String
+// CHECK:       } // end sil function '$s19alloc_stack_of_packSS_QP_Tg5'
+sil [ossa] @alloc_stack_of_pack : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
+bb0(%0 : $*Pack{repeat each T}):
+  %1 = alloc_stack $(repeat each T)
+  dealloc_stack %1
+  %3 = tuple ()
+  return %3
+}
+
+sil [ossa] @call_alloc_stack_of_pack : $@convention(thin) (@guaranteed String) -> () {
+bb0(%0 : @guaranteed $String):
+  %2 = alloc_pack $Pack{String}
+  %3 = alloc_stack $String
+  %4 = copy_value %0
+  store %4 to [init] %3
+  %6 = scalar_pack_index 0 of $Pack{String}
+  pack_element_set %3 into %6 of %2
+  %8 = function_ref @alloc_stack_of_pack : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+  %9 = apply %8<Pack{String}>(%2) : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat each τ_0_0}) -> ()
+  destroy_addr %3
+  dealloc_stack %3
+  dealloc_pack %2
+  %13 = tuple ()
+  return %13
+}
+
+
+
+
+
+
+
