@@ -610,7 +610,7 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
 
 SIMPLE_DECL_ATTR(_owned, Owned,
   OnVar | OnSubscript,
-  UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   111)
 
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,

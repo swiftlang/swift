@@ -38,3 +38,8 @@ public class Holder {
     }
   }
 }
+
+#if hasAttribute(_owned)
+#else
+#error("hasAttribute should be true!")
+#endif
