@@ -1292,7 +1292,7 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
     out << "dynamic member lookup root " << getBaseType()->getString(PO)
-        << " name='" << getName();
+        << " name='" << getName() << "'";
     break;
 
   case OverloadChoiceKind::TupleIndex:
