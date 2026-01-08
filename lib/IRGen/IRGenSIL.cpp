@@ -4555,6 +4555,13 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   auto funcResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
       conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
+  SILType funcErrorType;
+  if (fnType->hasErrorResult() && conv.isTypedError() &&
+      !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
+    funcErrorType = IGF.CurSILFn->mapTypeIntoEnvironment(
+        conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+  }
+
   if (IGF.isAsync()) {
     // If we're generating an async function, store the result into the buffer.
     auto asyncLayout = getAsyncContextLayout(IGF);
@@ -4563,20 +4570,15 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       error.add(getNullErrorValue());
     }
 
-    emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result, error);
+    emitAsyncReturn(IGF, asyncLayout, funcResultType,
+                    fnType, result, error, funcErrorType);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
     assert(swiftCCReturn ||
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
-    SILType errorType;
-    if (fnType->hasErrorResult() && conv.isTypedError() &&
-        !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
-      errorType = IGF.CurSILFn->mapTypeIntoEnvironment(
-          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-    }
-    IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn, false,
-                         mayPeepholeLoad, errorType);
+    IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn,
+                         /*isOutlined=*/false, mayPeepholeLoad, funcErrorType);
   }
 }
 
@@ -4693,15 +4695,14 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
     auto layout = getAsyncContextLayout(*this);
     auto funcResultType = CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+    SILType funcErrorType;
 
     if (conv.isTypedError()) {
-      auto silErrorTy = CurSILFn->mapTypeIntoEnvironment(
+      funcErrorType = CurSILFn->mapTypeIntoEnvironment(
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
-      auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
+      auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(funcErrorType));
 
-      auto silResultTy = CurSILFn->mapTypeIntoEnvironment(
-          conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
-      auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
+      auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(funcResultType));
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
       auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
 
@@ -4716,7 +4717,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         Explosion nativeAgg;
         auto combined =
             combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
-        buildDirectError(*this, combined, errorSchema, silErrorTy, exn,
+        buildDirectError(*this, combined, errorSchema, funcErrorType, exn,
                          /*forAsync*/ true, nativeAgg);
         assert(exn.empty() && "Unclaimed typed error results");
 
@@ -4740,7 +4741,8 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
 
     Explosion empty;
     emitAsyncReturn(*this, layout, funcResultType,
-                    i->getFunction()->getLoweredFunctionType(), empty, exn);
+                    i->getFunction()->getLoweredFunctionType(), empty,
+                    exn, funcErrorType);
   }
 }
 
@@ -4769,6 +4771,8 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
     auto layout = getAsyncContextLayout(*this);
     auto funcResultType = CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+    auto funcErrorType = CurSILFn->mapTypeIntoEnvironment(
+        conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
 
     llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
     flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
@@ -4778,7 +4782,8 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
 
     Explosion empty;
     emitAsyncReturn(*this, layout, funcResultType,
-                    i->getFunction()->getLoweredFunctionType(), empty, exn);
+                    i->getFunction()->getLoweredFunctionType(), empty,
+                    exn, funcErrorType);
   }
 }
 
