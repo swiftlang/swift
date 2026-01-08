@@ -449,13 +449,6 @@ RelabelArguments::create(ConstraintSystem &cs,
   return new (mem) RelabelArguments(cs, correctLabels, locator);
 }
 
-static bool isExistentialOrWrappedInOptional(Type type) {
-    if (!type)
-      return false;
-    return type->lookThroughAllOptionalTypes()->isExistentialType();
-}
-
-
 bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
 
@@ -463,8 +456,11 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
   if (locator) {
     auto *anchor = locator->getAnchor().dyn_cast<Expr *>();
 
+    Type nonConforming = getNonConformingType();
+
     if (anchor &&
-        isExistentialOrWrappedInOptional(getNonConformingType()) &&
+        nonConforming &&
+        nonConforming->lookThroughAllOptionalTypes()->isExistentialType() &&
         getProtocolType()->is<ProtocolType>()) {
 
       bool sawOpenedGeneric = false;
