@@ -77,6 +77,23 @@ nonisolated public class NoinsolatedClassTest {
   public func test() async {}
 }
 
+// CHECK: public typealias F = nonisolated(nonsending) () async -> Swift.Void
+public typealias F = () async -> Void
+// CHECK: public typealias G<T> = nonisolated(nonsending) () async -> T
+public typealias G<T> = () async -> T
+
+// CHECK: public func testTypeAlias(_: @escaping A.F)
+public func testTypeAlias(_: @escaping F) {}
+
+// CHECK: public struct TestGenericTypeAlias {
+// CHECK:   public subscript<U>(_: nonisolated(nonsending) () async -> U) -> Swift.Bool {
+// CHECK:     get
+// CHECK:   }
+// CHECK: }
+public struct TestGenericTypeAlias {
+  public subscript<U>(_: G<U>) -> Bool { false }
+}
+
 //--- Client.swift
 import A
 
@@ -140,4 +157,27 @@ func testWitnessWithNonisolated(t: WitnessTest) async {
 // CHECK: } // end sil function '$s6Client20testNonisolatedClass1ty1A011NoinsolatedD4TestC_tYaF'
 func testNonisolatedClass(t: NoinsolatedClassTest) async {
   await t.test()
+}
+
+// CHECK-LABEL: sil hidden @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tF : $@convention(thin) (@in_guaranteed TestGenericTypeAlias) -> ()
+// CHECK: [[CLOSURE:%.*]] = function_ref @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] to $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK: [[TEST_TYPEALIAS:%.*]] = function_ref @$s1A13testTypeAliasyyyyYaYCcF : $@convention(thin) (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK: apply [[TEST_TYPEALIAS]]([[THICK_CLOSURE]]) : $@convention(thin) (@guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> ()
+// CHECK: [[CLOSURE_2:%.*]] = convert_function {{.*}} to $@noescape @async @callee_guaranteed @substituted <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @out τ_0_0 for <Int>
+// CHECK: [[SUBSCRIPT:%.*]] = function_ref @$s1A20TestGenericTypeAliasVySbxyYaYCXEcluig : $@convention(method) <τ_0_0> (@guaranteed @noescape @async @callee_guaranteed @substituted <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @out τ_0_0 for <τ_0_0>, @in_guaranteed TestGenericTypeAlias) -> Bool
+// CHECK: apply [[SUBSCRIPT]]<Int>([[CLOSURE_2]], {{.*}}) : $@convention(method) <τ_0_0> (@guaranteed @noescape @async @callee_guaranteed @substituted <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @out τ_0_0 for <τ_0_0>, @in_guaranteed TestGenericTypeAlias) -> Bool
+// CHECK: } // end sil function '$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tF'
+func testTypeAliasParam(t: TestGenericTypeAlias) {
+  // CHECK: closure #1 in testTypeAliasParam(t:)
+  // CHECK: Isolation: caller_isolation_inheriting
+  // CHECK-LABEL: sil private @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // CHECK: } // end sil function '$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFyyYaYCcfU_'
+  testTypeAlias { }
+
+  // CHECK: // closure #2 in testTypeAliasParam(t:)
+  // CHECK: // Isolation: caller_isolation_inheriting
+  // CHECK-LABEL: sil private @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFSiyYaYCXEfU0_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int
+  // CHECK: } // end sil function '$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFSiyYaYCXEfU0_'
+  _ = t[{ 42 }]
 }
