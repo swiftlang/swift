@@ -304,7 +304,14 @@ private func collectMovableInstructions(
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !analyzedInstructions.sideEffectsMayWrite(to: loadInst.address, context.aliasAnalysis) {
+           !analyzedInstructions.sideEffectsMayWrite(to: loadInst.address, context.aliasAnalysis),
+
+           // Usually `load [take]` is not hoisted anyway, because there must be another instruction in the
+           // loop which re-initializes the loaded memory location.
+           // However, this is not necessarily true for alloc_stack locations with dynamic lifetime, e.g. a
+           // pack-loop which is specialized for a single pack element (at runtime the loop is only executed once).
+           loadInst.loadOwnership != .take
+        {
           movableInstructions.hoistUp.append(loadInst)
         }
         
