@@ -553,7 +553,15 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      return importer::findCopyConstructor(cxxRecordDecl);
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted() &&
+            !ctor->isIneligibleOrNotSelected())
+          return ctor;
+      }
+      return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
@@ -611,7 +619,7 @@ namespace {
           /*invocation subs*/ SubstitutionMap(), IGF.IGM.Context);
     }
 
-    void emitCopyWithCopyOrMoveConstructor(
+    void emitCopyWithCopyConstructor(
         IRGenFunction &IGF, SILType T,
         const clang::CXXConstructorDecl *copyConstructor, llvm::Value *src,
         llvm::Value *dest) const {
@@ -621,27 +629,7 @@ namespace {
 
       auto &ctx = IGF.IGM.Context;
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-
-      if (copyConstructor->isDefaulted() &&
-          copyConstructor->getAccess() == clang::AS_public &&
-          !copyConstructor->isDeleted() &&
-          !copyConstructor->isIneligibleOrNotSelected() &&
-          // Note: we use "doesThisDeclarationHaveABody" here because
-          // that's what "DefineImplicitCopyConstructor" checks.
-          !copyConstructor->doesThisDeclarationHaveABody()) {
-        assert(!copyConstructor->getParent()->isAnonymousStructOrUnion() &&
-               "Cannot do codegen of special member functions of anonymous "
-               "structs/unions");
-        if (copyConstructor->isCopyConstructor())
-          importer->getClangSema().DefineImplicitCopyConstructor(
-              clang::SourceLocation(),
-              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
-        else
-          importer->getClangSema().DefineImplicitMoveConstructor(
-              clang::SourceLocation(),
-              const_cast<clang::CXXConstructorDecl *>(copyConstructor));
-      }
-
+      
       auto &diagEngine = importer->getClangSema().getDiagnostics();
       clang::DiagnosticErrorTrap trap(diagEngine);
       auto clangFnAddr =
@@ -821,9 +809,9 @@ namespace {
                             Address srcAddr, SILType T,
                             bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
-        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
-                                          srcAddr.getAddress(),
-                                          destAddr.getAddress());
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    srcAddr.getAddress(),
+                                    destAddr.getAddress());
         return;
       }
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
@@ -836,9 +824,9 @@ namespace {
                         SILType T, bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, destAddr, T, isOutlined);
-        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
-                                          srcAddr.getAddress(),
-                                          destAddr.getAddress());
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    srcAddr.getAddress(),
+                                    destAddr.getAddress());
         return;
       }
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
@@ -850,15 +838,17 @@ namespace {
                             SILType T, bool isOutlined,
                             bool zeroizeIfSensitive) const override {
       if (auto moveConstructor = findMoveConstructor()) {
-        emitCopyWithCopyOrMoveConstructor(IGF, T, moveConstructor,
-                                          src.getAddress(), dest.getAddress());
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
 
       if (auto copyConstructor = findCopyConstructor()) {
-        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
-                                          src.getAddress(), dest.getAddress());
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
@@ -872,16 +862,18 @@ namespace {
                         bool isOutlined) const override {
       if (auto moveConstructor = findMoveConstructor()) {
         destroy(IGF, dest, T, isOutlined);
-        emitCopyWithCopyOrMoveConstructor(IGF, T, moveConstructor,
-                                          src.getAddress(), dest.getAddress());
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }
 
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, dest, T, isOutlined);
-        emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
-                                          src.getAddress(), dest.getAddress());
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
         destroy(IGF, src, T, isOutlined);
         return;
       }

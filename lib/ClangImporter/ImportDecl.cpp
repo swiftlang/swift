@@ -3219,13 +3219,15 @@ namespace {
         // instantiate its copy constructor.
         bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
 
+        clang::CXXConstructorDecl *copyCtor = nullptr;
+        clang::CXXConstructorDecl *moveCtor = nullptr;
         clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor() && !isExplicitlyNonCopyable) {
-          clangSema.DeclareImplicitCopyConstructor(
+          copyCtor = clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         }
         if (decl->needsImplicitMoveConstructor()) {
-          clangSema.DeclareImplicitMoveConstructor(
+          moveCtor = clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
         }
         if (decl->needsImplicitDefaultConstructor()) {
@@ -3242,12 +3244,27 @@ namespace {
                 // Note: we use "doesThisDeclarationHaveABody" here because
                 // that's what "DefineImplicitCopyConstructor" checks.
                 !declCtor->doesThisDeclarationHaveABody()) {
-              if (declCtor->isDefaultConstructor()) {
+              if (declCtor->isCopyConstructor()) {
+                if (!copyCtor && !isExplicitlyNonCopyable)
+                  copyCtor = declCtor;
+              } else if (declCtor->isMoveConstructor()) {
+                if (!moveCtor)
+                  moveCtor = declCtor;
+              } else if (declCtor->isDefaultConstructor()) {
                 if (!defaultCtor)
                   defaultCtor = declCtor;
               }
             }
           }
+        }
+        if (copyCtor && !isExplicitlyNonCopyable &&
+            !decl->isAnonymousStructOrUnion()) {
+          clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
+                                                  copyCtor);
+        }
+        if (moveCtor && !decl->isAnonymousStructOrUnion()) {
+          clangSema.DefineImplicitMoveConstructor(clang::SourceLocation(),
+                                                  moveCtor);
         }
         if (defaultCtor) {
           clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
@@ -3257,8 +3274,7 @@ namespace {
         if (decl->needsImplicitDestructor()) {
           auto dtor = clangSema.DeclareImplicitDestructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-          if (!dtor->isDeleted() && !dtor->isIneligibleOrNotSelected())
-            clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
+          clangSema.DefineImplicitDestructor(clang::SourceLocation(), dtor);
         }
       }
 

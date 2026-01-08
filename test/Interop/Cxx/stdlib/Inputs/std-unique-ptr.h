@@ -89,9 +89,4 @@ struct CountCopies {
 
 inline std::unique_ptr<CountCopies> getCopyCountedUniquePtr() { return std::make_unique<CountCopies>(); }
 
-struct HasUniqueIntVector {
-  HasUniqueIntVector() = default;
-  std::vector<std::unique_ptr<int>> x;
-};
-
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_UNIQUE_PTR_H

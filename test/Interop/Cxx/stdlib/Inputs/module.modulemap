@@ -99,9 +99,3 @@ module CustomSmartPtr {
   requires cplusplus
   export *
 }
-
-module StdExpected {
-  header "std-expected.h"
-  requires cplusplus
-  export *
-}
