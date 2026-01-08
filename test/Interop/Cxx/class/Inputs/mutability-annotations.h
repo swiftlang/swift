@@ -25,16 +25,11 @@ struct HasMutableProperty {
 
   int noAnnotation() const { return b; }
 
-  // expected-error@+3 {{multiple conflicting annotations found on 'contradictingAnnotations'}}
-  // expected-note@+2 {{'nonmutating' annotation found here}}
-  // expected-note@+1 {{SWIFT_MUTATING annotation found here}}
+  // expected-warning@+1 {{attribute 'mutating' is ignored when combined with attribute 'nonmutating'}}
   int contradictingAnnotations() const __attribute__((__swift_attr__("nonmutating"))) __attribute__((__swift_attr__("mutating"))) {
     return b;
   }
 
-  // expected-error@+3 {{multiple 'nonmutating' annotations found on 'duplicateAnnotations'}}
-  // expected-note@+2 {{'nonmutating' annotation found here}}
-  // expected-note@+1 {{'nonmutating' annotation found here}}
   int duplicateAnnotations() const __attribute__((__swift_attr__("nonmutating"))) __attribute__((__swift_attr__("nonmutating"))) {
     return b;
   }

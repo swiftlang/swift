@@ -2367,7 +2367,6 @@ namespace {
       if (alreadyImportedResult != Impl.ImportedDecls.end())
         return alreadyImportedResult->second;
 
-      Impl.validateSwiftAttributes(decl);
       auto loc = Impl.importSourceLoc(decl->getLocation());
       if (recordHasReferenceSemantics(decl))
         result = Impl.createDeclWithClangNode<ClassDecl>(
@@ -2871,8 +2870,7 @@ namespace {
         Impl.diagnose(HeaderLoc(decl->getLocation()),
                       diag::private_fileid_attr_repeated, decl->getName());
         for (auto ann : anns)
-          Impl.diagnose(HeaderLoc(ann.second), diag::annotation_here,
-                        "SWIFT_PRIVATE_FILEID");
+          Impl.diagnose(HeaderLoc(ann.second), diag::private_fileid_attr_here);
       } else if (anns.size() == 1) {
         auto ann = anns[0];
         if (!SourceFile::FileIDStr::parse(ann.first)) {
@@ -3148,8 +3146,8 @@ namespace {
                         diag::private_fileid_attr_on_incomplete_type,
                         decl->getName());
           for (auto attr : attrs)
-            Impl.diagnose(HeaderLoc(attr.second), diag::annotation_here,
-                          "SWIFT_PRIVATE_FILEID");
+            Impl.diagnose(HeaderLoc(attr.second),
+                          diag::private_fileid_attr_here);
         }
 
         forwardDeclaration = true;
@@ -3670,7 +3668,6 @@ namespace {
       }
 
       checkBridgingAttrs(decl);
-      Impl.validateSwiftAttributes(decl);
 
       return importFunctionDecl(decl, importedName, correctSwiftName,
                                 std::nullopt);
@@ -9028,6 +9025,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       ClangDecl = cast<clang::NamedDecl>(maybeDefinition.value());
 
   std::optional<const clang::SwiftAttrAttr *> seenMainActorAttr;
+  const clang::SwiftAttrAttr *seenMutabilityAttr = nullptr;
   llvm::SmallSet<ProtocolDecl *, 4> conformancesSeen;
   const clang::SwiftAttrAttr *seenSendableSuppressionAttr = nullptr;
 
@@ -9078,6 +9076,19 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
             }
           }
         }
+
+        // Check for contradicting mutability attr
+        if (seenMutabilityAttr) {
+          StringRef previous = seenMutabilityAttr->getAttribute();
+
+          if (previous != attr) {
+            diagnose(HeaderLoc(swiftAttr->getLocation()),
+                     diag::contradicting_mutation_attrs, attr, previous);
+            continue;
+          }
+        }
+
+        seenMutabilityAttr = swiftAttr;
       }
 
       // Hard-code @actorIndependent, until Objective-C clients start
