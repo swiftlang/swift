@@ -1728,8 +1728,9 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
   auto FS = ScanASTContext.SourceMgr.getFileSystem();
 
   auto chainBridgingHeader = [&](StringRef moduleName, StringRef headerPath,
-                                 StringRef binaryModulePath) -> llvm::Error {
-    if (useImportHeader) {
+                                 StringRef binaryModulePath,
+                                 bool useHeader) -> llvm::Error {
+    if (useHeader) {
       if (auto buffer = FS->getBufferForFile(headerPath)) {
         outOS << "#include \"" << headerPath << "\"\n";
         return llvm::Error::success();
@@ -1770,9 +1771,9 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
       if (binaryMod->headerImport.empty())
         continue;
 
-      if (auto E =
-              chainBridgingHeader(moduleID.ModuleName, binaryMod->headerImport,
-                                  binaryMod->compiledModulePath))
+      if (auto E = chainBridgingHeader(
+              moduleID.ModuleName, binaryMod->headerImport,
+              binaryMod->compiledModulePath, useImportHeader))
         return E;
     }
   }
@@ -1802,7 +1803,8 @@ llvm::Error ModuleDependencyScanner::performBridgingHeaderChaining(
     if (mainModule->textualModuleDetails.bridgingHeaderFile) {
       if (auto E = chainBridgingHeader(
               rootModuleID.ModuleName,
-              *mainModule->textualModuleDetails.bridgingHeaderFile, ""))
+              *mainModule->textualModuleDetails.bridgingHeaderFile, "",
+              /*useHeader=*/true))
         return E;
     }
 
