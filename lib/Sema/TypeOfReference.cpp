@@ -2447,11 +2447,62 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     auto memberTy = createTypeVariable(keyPathLoc, TVO_CanBindToLValue |
                                                        TVO_CanBindToNoEscape);
 
+    bool isSubscriptRef = locator->isSubscriptMemberRef();
+    auto addMemberConstraint = [&]() {
+      // Attempt to lookup a member with a give name in the root type and
+      // assign result to the leaf type of the keypath.
+      DeclNameRef memberName =
+          isSubscriptRef ? DeclNameRef::createSubscript()
+                         // FIXME: Should propagate name-as-written through.
+                         : DeclNameRef(choice.getName());
+
+      // Check the current depth of applied dynamic member lookups, if we've
+      // exceeded the limit then record a fix and set a hole for the member.
+      unsigned lookupDepth = [&]() {
+        auto path = keyPathLoc->getPath();
+        auto iter = path.begin();
+        (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
+        return path.end() - iter;
+      }();
+      if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
+        (void)recordFix(TooManyDynamicMemberLookups::create(
+            *this, DeclNameRef(choice.getName()), locator));
+        recordTypeVariablesAsHoles(memberTy);
+      } else {
+        addValueMemberConstraint(
+            LValueType::get(rootTy), memberName, memberTy, useDC,
+            isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
+                           : FunctionRefInfo::unappliedBaseName(),
+            /*outerAlternatives=*/{}, keyPathLoc);
+      }
+    };
+
+    // If we're doing a subscript lookup and have a dynamic member base we need
+    // to add the applicable function first since solving the member constraint
+    // requires the constraint to be available for recursive cases since it may
+    // retire it. We can't yet do this in the general case since the simplifying
+    // of the applicable fn in CSGen is currently load-bearing for existential
+    // opening.
+    // FIXME: Once existential opening is no longer sensitive to solving
+    // order, we ought to be able to just always record the applicable fn as
+    // an unsolved constraint before the member.
+    auto delayMemberConstraint =
+        isSubscriptRef && simplifyType(rootTy)
+                              ->getRValueType()
+                              ->getMetatypeInstanceType()
+                              ->eraseDynamicSelfType()
+                              ->hasDynamicMemberLookupAttribute();
+    if (!delayMemberConstraint)
+      addMemberConstraint();
+    SWIFT_DEFER {
+      if (delayMemberConstraint)
+        addMemberConstraint();
+    };
+
     // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
     // associated with index expression and re-bind it to match "member type"
     // looked up by dynamically.
-    bool isSubscriptRef = locator->isSubscriptMemberRef();
     if (isSubscriptRef) {
       // Make sure that regular subscript declarations (if any) are
       // preferred over key path dynamic member lookup.
@@ -2527,35 +2578,6 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
       addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);
-    }
-
-    // Attempt to lookup a member with a give name in the root type and
-    // assign result to the leaf type of the keypath. Note we need to do this
-    // after handling the applicable function constraint in the subscript case
-    // to ensure it's available for recursive cases.
-    DeclNameRef memberName = isSubscriptRef
-                           ? DeclNameRef::createSubscript()
-                           // FIXME: Should propagate name-as-written through.
-                           : DeclNameRef(choice.getName());
-
-    // Check the current depth of applied dynamic member lookups, if we've
-    // exceeded the limit then record a fix and set a hole for the member.
-    unsigned lookupDepth = [&]() {
-      auto path = keyPathLoc->getPath();
-      auto iter = path.begin();
-      (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
-      return path.end() - iter;
-    }();
-    if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
-      (void)recordFix(TooManyDynamicMemberLookups::create(
-          *this, DeclNameRef(choice.getName()), locator));
-      recordTypeVariablesAsHoles(memberTy);
-    } else {
-      addValueMemberConstraint(
-          LValueType::get(rootTy), memberName, memberTy, useDC,
-          isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
-                         : FunctionRefInfo::unappliedBaseName(),
-          /*outerAlternatives=*/{}, keyPathLoc);
     }
     return;
   }
