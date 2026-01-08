@@ -57,13 +57,15 @@ extension Box where Value: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript() -> Value {
     @_transparent
-    unsafeAddress {
-      unsafe UnsafePointer<Value>(pointer)
+    @_unsafeSelfDependentResult
+    borrow {
+      unsafe pointer.pointee
     }
 
     @_transparent
-    unsafeMutableAddress {
-      unsafe pointer
+    @_unsafeSelfDependentResult
+    mutate {
+      &(unsafe pointer).pointee
     }
   }
 }
