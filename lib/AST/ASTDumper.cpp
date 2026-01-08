@@ -5106,6 +5106,7 @@ public:
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
+  TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
   TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
