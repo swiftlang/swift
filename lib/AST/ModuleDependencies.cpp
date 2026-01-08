@@ -514,7 +514,8 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
   }
 }
 
-SwiftDependencyScanningService::SwiftDependencyScanningService() {
+SwiftDependencyScanningService::SwiftDependencyScanningService()
+    : Alloc(), Saver(Alloc) {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       clang::tooling::dependencies::ScanningOutputFormat::FullTree,
@@ -662,6 +663,11 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       clang::tooling::dependencies::ScanningOptimizations::All);
 
   return false;
+}
+
+StringRef SwiftDependencyScanningService::save(StringRef str) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  return Saver.save(str);
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(

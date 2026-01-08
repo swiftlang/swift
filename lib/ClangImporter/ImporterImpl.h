@@ -491,10 +491,13 @@ public:
 
   const Version CurrentVersion;
 
-  constexpr static const char * const moduleImportBufferName =
-    "<swift-imported-modules>";
-  constexpr static const char * const bridgingHeaderBufferName =
-    "<bridging-header-import>";
+  constexpr static const char *const moduleImportBufferName =
+      "<swift-imported-modules>";
+  constexpr static const char *const bridgingHeaderBufferName =
+      "<bridging-header-import>";
+  /// The name of system vfsoverlay.
+  constexpr static const char *const clangSystemVFSOverlayName =
+      "<clang-system-vfs-overlay>";
 
 private:
   DiagnosticWalker Walker;
@@ -2017,6 +2020,7 @@ void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx,
                                   bool requiresBuiltinHeadersInSystemModules,
+                                  bool needSystemVFSOverlay,
                                   bool ignoreClangTarget);
 
 /// Finds a particular kind of nominal by looking through typealiases.
