@@ -499,6 +499,133 @@ bool TypeTransformContext::isPrintingSynthesizedExtension() const {
   return !Decl.isNull();
 }
 
+/// Get a string representation of the parameter at params[index]. This will be
+/// the label or internal label of a normal parameter, if it has one, or "self"
+/// for the self parameter, which is at the end of the list if present.
+static std::optional<std::string>
+getLifetimeDependenceIdentifier(unsigned index,
+                                ArrayRef<AnyFunctionType::Param> params,
+                                bool hasUncurriedSelf) {
+  if (hasUncurriedSelf && index == params.size() - 1) {
+    return "self";
+  }
+  if (index < params.size()) {
+    if (!params[index].hasInternalLabel())
+      return std::nullopt;
+    return params[index].getInternalLabel().get();
+  }
+  return std::nullopt;
+}
+
+/// Get a string representation for the list of sources of the given
+/// LifetimeDependenceInfo, if they can be printed.
+///
+/// See getLifetimeDependenceIdentifier.
+static std::optional<std::string> getLifetimeDependenceInfoSourceListString(
+    LifetimeDependenceInfo const &info, bool hasUncurriedSelf,
+    ArrayRef<AnyFunctionType::Param> params) {
+
+  std::string lifetimeDependenceString = "";
+  auto addressable = info.getAddressableIndices();
+  auto condAddressable = info.getConditionallyAddressableIndices();
+
+  auto getSourceString = [&](IndexSubset *bitvector,
+                             StringRef kind) -> std::optional<std::string> {
+    std::string result;
+    bool isFirstSetBit = true;
+    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
+      if (bitvector->contains(i)) {
+        if (!isFirstSetBit) {
+          result += ", ";
+        }
+        result += kind;
+        if (addressable && addressable->contains(i)) {
+          result += "address ";
+        } else if (condAddressable && condAddressable->contains(i)) {
+          result += "address_for_deps ";
+        }
+        // Print source labels for explicit lifetime annotations. Otherwise,
+        // print the index. Indices should never be used in Swift lifetime
+        // annotations.
+        if (auto identifier =
+                getLifetimeDependenceIdentifier(i, params, hasUncurriedSelf)) {
+          result += *identifier;
+        } else {
+          return std::nullopt;
+        }
+        isFirstSetBit = false;
+      }
+    }
+    return result;
+  };
+  auto inheritLifetimeParamIndices = info.getInheritIndices();
+  if (inheritLifetimeParamIndices) {
+    assert(!inheritLifetimeParamIndices->isEmpty());
+    if (auto sourceString =
+            getSourceString(inheritLifetimeParamIndices, "copy ")) {
+      lifetimeDependenceString += *sourceString;
+    } else {
+      return std::nullopt;
+    }
+  }
+  if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
+    assert(!scopeLifetimeParamIndices->isEmpty());
+    if (inheritLifetimeParamIndices) {
+      lifetimeDependenceString += ", ";
+    }
+    if (auto sourceString =
+            getSourceString(scopeLifetimeParamIndices, "borrow ")) {
+      lifetimeDependenceString += *sourceString;
+    } else {
+      return std::nullopt;
+    }
+  }
+  if (info.isImmortal()) {
+    lifetimeDependenceString += "immortal";
+  }
+  return lifetimeDependenceString;
+}
+
+/// Get a string representation for this dependence info as a Swift lifetime
+/// attribute (for a type or decl). The target and sources are referred to by
+/// their labels (see getLifetimeDependenceIdentifier).
+static std::optional<std::string>
+getLifetimeDependenceInfoSwiftString(LifetimeDependenceInfo const &info,
+                                     ArrayRef<AnyFunctionType::Param> params,
+                                     bool hasUncurriedSelf) {
+  std::string lifetimeDependenceString = "@_lifetime(";
+  // Only print the target if it is a parameter or self.
+  auto targetIndex = info.getTargetIndex();
+  if (targetIndex != params.size()) {
+    // Non-result target
+    if (auto targetIdentifier = getLifetimeDependenceIdentifier(
+            targetIndex, params, hasUncurriedSelf)) {
+      lifetimeDependenceString += *targetIdentifier + ": ";
+    } else {
+      return std::nullopt;
+    }
+  }
+
+  if (auto sourceListString = getLifetimeDependenceInfoSourceListString(
+          info, hasUncurriedSelf, params)) {
+    lifetimeDependenceString += *sourceListString;
+  } else {
+    return std::nullopt;
+  }
+  lifetimeDependenceString += ") ";
+  return lifetimeDependenceString;
+}
+
+void ASTPrinter::tryPrintSwiftLifetimeDependence(
+    LifetimeDependenceInfo const &lifetimeDependence,
+    ArrayRef<AnyFunctionType::Param> params, bool hasUncurriedSelf) {
+
+  if (auto dependenceString = getLifetimeDependenceInfoSwiftString(
+          lifetimeDependence, params, hasUncurriedSelf)) {
+    *this << *dependenceString;
+  }
+}
+
 void ASTPrinter::anchor() {}
 
 void ASTPrinter::printIndent() {
@@ -6713,6 +6840,30 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    // Get the uncurried parameter list.
+    //
+    // AST interface types for methods are curried:
+    //
+    //   (Self) -> (Params...) -> Result
+    //
+    // In LifetimeDependenceInfo, this implicit self parameter is represented
+    // with index sizeof(Params...) + 1, so we compute the uncurried parameter
+    // list with Self at the end:
+    //
+    //   (Params..., Self)
+    //
+    SmallVector<AnyFunctionType::Param> params;
+    fnType->getSubsetParameters(
+        IndexSubset::getDefault(ctx, /*capacity=*/fnType->getNumParams() + 1,
+                                /*includeAll=*/true),
+        /*results=*/params,
+        /*reverseCurryLevels=*/true);
+    bool hasUncurriedSelf = params.size() > fnType->getNumParams();
+
+    for (auto const &lifetimeDependence : info.getLifetimeDependencies()) {
+      Printer.tryPrintSwiftLifetimeDependence(lifetimeDependence, params, hasUncurriedSelf);
+    }
+
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
@@ -6898,9 +7049,9 @@ public:
     }
   }
 
-  void visitAnyFunctionTypeParams(
-      ArrayRef<AnyFunctionType::Param> Params, bool printLabels,
-      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
+  void visitAnyFunctionTypeParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  bool printLabels, bool printInternalLabels,
+                                  ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
     Printer << "(";
 
     for (unsigned i = 0, e = Params.size(); i != e; ++i) {
@@ -6913,16 +7064,23 @@ public:
         Printer.printStructurePost(PrintStructureKind::FunctionParameter);
       };
 
+      bool hasValidInternalLabel = Param.hasInternalLabel() &&
+                                   !Param.getInternalLabel().hasDollarPrefix();
+
       if ((Options.AlwaysTryPrintParameterLabels || printLabels) &&
           Param.hasLabel()) {
         // Label printing was requested and we have an external label. Print it
         // and omit the internal label.
         Printer.printName(Param.getLabel(),
                           PrintNameContext::FunctionParameterExternal);
+        if (printInternalLabels && hasValidInternalLabel) {
+          Printer << ' ';
+          Printer.printName(Param.getInternalLabel());
+        }
         Printer << ": ";
-      } else if (Options.AlwaysTryPrintParameterLabels &&
-                 Param.hasInternalLabel() &&
-                 !Param.getInternalLabel().hasDollarPrefix()) {
+      } else if ((Options.AlwaysTryPrintParameterLabels ||
+                  printInternalLabels) &&
+                 hasValidInternalLabel) {
         // We didn't have an external parameter label but were requested to
         // always try and print parameter labels.
         // If the internal label is a valid internal parameter label (does not
@@ -6934,7 +7092,9 @@ public:
         Printer << ": ";
       }
 
-      Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
+      if (Options.PrintForSIL) {
+        Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
+      }
 
       auto type = Param.getPlainType();
       if (Param.isVariadic()) {
@@ -6950,6 +7110,14 @@ public:
     Printer << ")";
   }
 
+  bool
+  shouldPrintInternalLabelsForLifetimeAttributes(AnyFunctionType const *T) {
+    // If the type has explicit lifetime dependencies, print the internal
+    // labels, because explicit lifetimes use them to describe their sources and
+    // targets.
+    return T->hasLifetimeDependencies();
+  }
+
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
@@ -6960,8 +7128,12 @@ public:
     printFunctionExtInfo(T, nrOptions);
 
     // If we're stripping argument labels from types, do it when printing.
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ false,
-                               T->getLifetimeDependencies());
+    visitAnyFunctionTypeParams(
+        T->getParams(),
+        /*printLabels*/ false,
+        /*printInternalLabels*/
+        shouldPrintInternalLabelsForLifetimeAttributes(T),
+        T->getLifetimeDependencies());
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
@@ -6986,7 +7158,10 @@ public:
       Printer.printKeyword("sending ", Options);
     }
 
-    Printer.printLifetimeDependence(T->getLifetimeDependenceForResult());
+    if (Options.PrintForSIL) {
+      Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
+                                        T->getParams().size());
+    }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
@@ -7021,8 +7196,10 @@ public:
                           PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true,
-                               T->getLifetimeDependencies());
+    visitAnyFunctionTypeParams(
+        T->getParams(), /*printLabels*/ true, /*printInternalLabels*/
+        shouldPrintInternalLabelsForLifetimeAttributes(T),
+        T->getLifetimeDependencies());
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
@@ -7043,8 +7220,10 @@ public:
 
     Printer << " -> ";
 
-    Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
-                                      T->getParams().size());
+    if (Options.PrintForSIL) {
+      Printer.printLifetimeDependenceAt(T->getLifetimeDependencies(),
+                                        T->getParams().size());
+    }
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
@@ -7149,7 +7328,7 @@ public:
       }
       Printer << ") -> ";
 
-      Printer.printLifetimeDependence(T->getLifetimeDependenceForResult());
+      Printer.printSILLifetimeDependence(T->getLifetimeDependenceForResult());
 
       bool parenthesizeResults = mustParenthesizeResults(T);
       if (parenthesizeResults)
@@ -7793,12 +7972,12 @@ void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
   printParams(Params, Printer, PO);
 }
 void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
-                                  ASTPrinter &Printer,
-                                  const PrintOptions &PO) {
-  // TODO: Handle lifetime dependence printing here
+                                  ASTPrinter &Printer, const PrintOptions &PO) {
+  // Function type lifetimes are printed as part of the ExtInfo, not the parameter list.
   TypePrinter(Printer, PO)
       .visitAnyFunctionTypeParams(Params,
-                                  /*printLabels*/ true, {});
+                                  /*printLabels*/ true,
+                                  /*printInternalLabels*/ false, {});
 }
 
 std::string
@@ -7987,7 +8166,7 @@ void SILParameterInfo::print(
   }
 
   if (lifetimeDependence) {
-    Printer.printLifetimeDependence(*lifetimeDependence);
+    Printer.printSILLifetimeDependence(*lifetimeDependence);
   }
 
   if (options.contains(SILParameterInfo::ImplicitLeading)) {
