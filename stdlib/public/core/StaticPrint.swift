@@ -863,7 +863,7 @@ public func print(_ message: ConstantVPrintFMessage) {
   let formatString = message.interpolation.formatString
   let argumentClosures = message.interpolation.arguments.argumentClosures
   if Bool(_builtinBooleanLiteral: Builtin.ifdef_SWIFT_STDLIB_PRINT_DISABLED()) { return }
-  let formatStringPointer = _getGlobalStringTablePointer(formatString)
+  let formatStringPointer = unsafe _getGlobalStringTablePointer(formatString)
   unsafe constant_vprintf_backend(
     fmt: formatStringPointer,
     argumentClosures: argumentClosures
