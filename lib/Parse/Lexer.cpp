@@ -297,6 +297,11 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 }
 
 void Lexer::formEscapedIdentifierToken(const char *TokStart) {
+  // Recover from malformed escaped identifiers (e.g. ``).
+  if (CurPtr - TokStart < 3) {
+    formToken(tok::unknown, TokStart);
+    return;
+  }
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
