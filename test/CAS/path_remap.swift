@@ -83,4 +83,8 @@ version: 1
 modules:
   - name: _B_A
 //--- sdk/SDKSettings.json
-{}
+{"Version":"26.1", "CanonicalName": "macosx26.1", "MaximumDeploymentTarget": "26.1.99",
+ "SupportedTargets": {
+   "macosx": {"Archs": ["x86_64", "x86_64h", "arm64", "arm64e"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "macos", "LLVMTargetTripleEnvironment": "", "SystemPrefix": "\/System\/macOSSupport"},
+   "iosmac": {"Archs": ["x86_64", "x86_64h", "arm64", "arm64e"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "macabi", "SystemPrefix": "\/System\/iOSSupport"}
+}}

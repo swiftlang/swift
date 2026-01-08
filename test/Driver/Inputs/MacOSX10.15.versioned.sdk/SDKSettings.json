@@ -1,6 +1,20 @@
 {
   "Version":"10.15",
   "CanonicalName": "macosx10.15",
+  "SupportedTargets": {
+      "macosx": {
+          "Archs": ["x86_64"],
+          "LLVMTargetTripleVendor": "apple",
+          "LLVMTargetTripleSys": "macosx",
+          "LLVMTargetTripleEnvironment": ""
+      },
+      "iosmac": {
+          "Archs": ["x86_64"],
+          "LLVMTargetTripleVendor": "apple",
+          "LLVMTargetTripleSys": "ios",
+          "LLVMTargetTripleEnvironment": "macabi"
+      }
+  },
   "VersionMap" : {
       "macOS_iOSMac" : {
           "10.15" : "13.1",
