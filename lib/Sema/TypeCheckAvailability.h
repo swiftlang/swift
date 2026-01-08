@@ -202,9 +202,10 @@ public:
   /// because it is the function body context of an inlinable function.
   bool mustOnlyReferenceExportedDecls() const;
 
-  /// If true, the context reference a dependency of \p originKind  without
-  /// restriction.
-  bool canReferenceOrigin(DisallowedOriginKind originKind) const;
+  /// Level of restriction to references from the context to an \p originKind.
+  /// This check is shared by different diagnostics.
+  DiagnosticBehavior
+  behaviorForReferenceToOrigin(DisallowedOriginKind originKind) const;
 
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.

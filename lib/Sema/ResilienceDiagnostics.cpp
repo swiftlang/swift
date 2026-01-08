@@ -175,7 +175,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
       getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
-  if (where.canReferenceOrigin(originKind))
+  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
   // As an exception, if the import of the module that defines the desugared
@@ -197,7 +198,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6);
+        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .limitBehaviorIfMorePermissive(commonBehavior);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -205,7 +207,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6);
+        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .limitBehaviorIfMorePermissive(commonBehavior);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
@@ -301,7 +304,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
-  if (where.canReferenceOrigin(originKind))
+  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
   auto fragileKind = where.getFragileFunctionKind();
@@ -353,14 +357,6 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
       return false;
   }
 
-  // Exportability checking for non-library-evolution was introduced late,
-  // downgrade errors to warnings by default.
-  if (where.getExportedLevel() == ExportedLevel::ImplicitlyExported &&
-      originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
-      !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-      !ctx.isLanguageModeAtLeast(7))
-    downgradeToWarning = DowngradeToWarning::Yes;
-
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
@@ -369,7 +365,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        static_cast<unsigned>(*reason),
                        definingModule->getName(),
                        static_cast<unsigned>(originKind))
-        .limitBehavior(limit);
+        .limitBehavior(limit.merge(commonBehavior));
 
     D->diagnose(diag::kind_declared_here, D->getDescriptiveKind());
   } else {
@@ -377,7 +373,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))
         .warnUntilLanguageModeIf(downgradeToWarning == DowngradeToWarning::Yes,
-                                 6);
+                                 6)
+        .limitBehaviorIfMorePermissive(commonBehavior);
 
     if (originKind == DisallowedOriginKind::MissingImport &&
         downgradeToWarning == DowngradeToWarning::Yes)
@@ -449,7 +446,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
-  if (where.canReferenceOrigin(originKind))
+  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
   auto reason = where.getExportabilityReason();
@@ -465,8 +463,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
           (warnIfConformanceUnavailablePreSwift6 &&
            originKind != DisallowedOriginKind::SPIOnly &&
            originKind != DisallowedOriginKind::NonPublicImport) ||
-              originKind == DisallowedOriginKind::MissingImport,
-          6);
+          originKind == DisallowedOriginKind::MissingImport,
+          6)
+      .limitBehaviorIfMorePermissive(commonBehavior);
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
       originKind == DisallowedOriginKind::MissingImport &&

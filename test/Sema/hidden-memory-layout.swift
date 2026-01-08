@@ -12,12 +12,12 @@
 
 /// Default diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
-// RUN:   -swift-version 5 \
+// RUN:   -swift-version 6 \
 // RUN:   -verify-additional-prefix not-opt-in-
 
 /// Opt-in diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
-// RUN:   -swift-version 5 \
+// RUN:   -swift-version 6 \
 // RUN:   -verify-additional-prefix opt-in- \
 // RUN:   -enable-experimental-feature CheckImplementationOnly
 
@@ -36,14 +36,14 @@
 
 /// Default diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -swift-version 6 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -verify-additional-prefix embedded- \
 // RUN:   -verify-additional-prefix not-opt-in-
 
 /// Opt-in diags
 // RUN: %target-swift-frontend -emit-module -verify -verify-ignore-unrelated %s -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -swift-version 6 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -verify-additional-prefix opt-in- \
 // RUN:   -verify-additional-prefix embedded-opt-in- \
@@ -52,7 +52,7 @@
 
 /// Same diags with CheckImplementationOnlyStrict
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %s -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -swift-version 6 -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -verify-additional-prefix opt-in- \
 // RUN:   -verify-additional-prefix embedded-opt-in- \
@@ -287,9 +287,15 @@ internal func explicitNonInliableInternal() {
 
 /// Struct use sites
 
+typealias TA = StructFromDirect // expected-note 3 {{type declared here}}
+
 @frozen
 public struct ExposedLayoutFrozenUser: ProtocolFromDirect {
 // expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
+
+  private var ta: TA
+  // expected-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration marked public or in a '@frozen' or '@usableFromInline' context because 'directs' has been imported as implementation-only}}
+  // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
 
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
@@ -347,6 +353,10 @@ public struct ExposedLayoutFrozenUser: ProtocolFromDirect {
 public struct ExposedLayoutPublicUser: ProtocolFromDirect {
 // expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
+  private var ta: TA
+  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
@@ -393,6 +403,10 @@ internal struct ExposedLayoutInternalUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 // expected-not-opt-in-warning @-2 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
+  private var ta: TA
+// expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+// expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+
   private var privateField: StructFromDirect
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
   // expected-not-opt-in-warning @-2 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
@@ -432,6 +446,10 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
 // expected-opt-in-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 // expected-not-opt-in-warning @-2 {{cannot use protocol 'ProtocolFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 
+  private var ta: TA
+  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+
   private var privateField: StructFromDirect
   // expected-opt-in-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
   // expected-not-opt-in-warning @-2 {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
@@ -469,6 +487,8 @@ private struct ExposedLayoutPrivateUser: ProtocolFromDirect {
 
 @_implementationOnly
 private struct HiddenLayoutUser {
+  private var ta: TA
+
   public var publicField: StructFromDirect
   private var privateField: StructFromDirect
   private var a: ExposedLayoutPublic
@@ -523,6 +543,9 @@ public enum PublicEnumUser: ProtocolFromDirect {
     case h(ExposedProtocolPrivate) // expected-error {{enum case in a public enum uses a private type}}
     case i(HiddenProtocol) // expected-error {{cannot use protocol 'HiddenProtocol' in an associated value of a public or '@usableFromInline' enum; 'HiddenProtocol' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in a public enum uses a private type}}
+
+    case ta(TA) // expected-error {{aliases 'directs.StructFromDirect' and cannot be used in an associated value of a public or '@usableFromInline' enum because 'directs' has been imported as implementation-only}}
+    // expected-error @-1 {{enum case in a public enum uses an internal type}}
 }
 
 internal enum InternalEnumUser: ProtocolFromDirect {
@@ -548,6 +571,10 @@ internal enum InternalEnumUser: ProtocolFromDirect {
     case h(ExposedProtocolPrivate) // expected-error {{enum case in an internal enum uses a private type}}
     case i(HiddenProtocol) // expected-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
+
+    case ta(TA)
+    // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+    // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
 }
 
 private enum PrivateEnumUser: ProtocolFromDirect {
@@ -570,6 +597,10 @@ private enum PrivateEnumUser: ProtocolFromDirect {
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate)
     case i(HiddenProtocol) // expected-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+
+    case ta(TA)
+    // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+    // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
 }
 
 internal enum InternalEnumWithRawType : RawTypeFromDirect { // expected-opt-in-error {{cannot use struct 'RawTypeFromDirect' in a conformance on a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
@@ -641,6 +672,10 @@ open class OpenClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  private var ta: TA
+  // expected-opt-in-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+  // expected-not-opt-in-warning @-2 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because 'directs' has been imported as implementation-only}}
+
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
@@ -673,6 +708,10 @@ public class FixedClassUser: ProtocolFromDirect {
 // expected-error @-1 {{cannot use protocol 'ProtocolFromDirect' in a public or '@usableFromInline' conformance; 'directs' has been imported as implementation-only}}
 
   public init() { fatalError() }
+
+  private var ta: TA
+  // expected-error @-1 {{'TA' aliases 'directs.StructFromDirect' and cannot be used in a property declaration marked public or in a '@frozen' or '@usableFromInline' context because 'directs' has been imported as implementation-only}}
+  // expected-error @-2 {{type referenced from a stored property in a '@frozen' struct must be '@usableFromInline' or public}}
 
   public var publicField: StructFromDirect
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
@@ -714,6 +753,8 @@ internal class InternalClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  private var ta: TA
+
   public var publicField: StructFromDirect
   private var privateField: StructFromDirect
 
@@ -740,6 +781,8 @@ private class PrivateClassUser: ProtocolFromDirect {
 
   public init() { fatalError() }
 
+  private var ta: TA
+
   public var publicField: StructFromDirect
   private var privateField: StructFromDirect
 
@@ -763,6 +806,8 @@ private class PrivateClassUser: ProtocolFromDirect {
 @_implementationOnly
 internal class HiddenClassUser: ProtocolFromDirect {
   public init() { fatalError() }
+
+  private var ta: TA
 
   public var publicField: StructFromDirect
   private var privateField: StructFromDirect
