@@ -8296,8 +8296,11 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     bool isCopyable = !isExplicitlyNonCopyable;
     if (!isExplicitlyNonCopyable) {
       auto copyCtor = findCopyConstructor(cxxRecordDecl);
-      isCopyable = copyCtor || cxxRecordDecl->needsImplicitCopyConstructor();
+      isCopyable = copyCtor || 
+                   cxxRecordDecl->hasSimpleCopyConstructor() ||
+                   cxxRecordDecl->needsImplicitCopyConstructor();
       if ((copyCtor && copyCtor->isDefaulted()) ||
+          cxxRecordDecl->hasSimpleCopyConstructor() ||
           cxxRecordDecl->needsImplicitCopyConstructor()) {
         // If the copy constructor is implicit/defaulted, we ask Clang to
         // generate its definition. The implicitly-defined copy constructor
