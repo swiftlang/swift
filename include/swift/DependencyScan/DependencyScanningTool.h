@@ -21,6 +21,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/StringSaver.h"
 
 namespace swift {
 namespace dependencies {
@@ -145,6 +146,8 @@ private:
 
   /// Shared state mutual-exclusivity lock
   llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver;
 };
 
 swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(

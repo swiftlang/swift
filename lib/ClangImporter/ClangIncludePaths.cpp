@@ -202,7 +202,8 @@ ClangImporter::createClangArgs(const ClangImporterOptions &ClangImporterOpts,
 }
 
 static SmallVector<std::pair<std::string, std::string>, 2>
-getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
+getLibcFileMapping(const ClangInvocationFileMappingContext &ctx,
+                   StringRef modulemapFileName,
                    std::optional<ArrayRef<StringRef>> maybeHeaderFileNames,
                    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
                    bool suppressDiagnostic) {
@@ -269,7 +270,8 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
 }
 
 static void getLibStdCxxFileMapping(
-    ClangInvocationFileMapping &fileMapping, const ASTContext &ctx,
+    ClangInvocationFileMapping &fileMapping,
+    const ClangInvocationFileMappingContext &ctx,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs,
     bool suppressDiagnostic) {
   assert(ctx.LangOpts.EnableCXXInterop &&
@@ -448,26 +450,26 @@ static void getLibStdCxxFileMapping(
     includeHeaderInModuleMap(additionalFile);
   os << contents.substr(headerInjectionPoint);
 
-  fileMapping.overridenFiles.emplace_back(llvm::MemoryBuffer::getMemBufferCopy(
-      additionalHeaderDirectives, injectedModuleMapPath));
+  fileMapping.overridenFiles.push_back(
+      {std::string(injectedModuleMapPath), std::move(os.str())});
 }
 
 namespace {
-std::string GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
-                                     llvm::vfs::FileSystem &VFS,
-                                     const SearchPathOptions &Options) {
+std::string
+GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
+                         const SearchPathOptions &Options) {
   StringRef SDKPath = Options.getSDKPath();
   if (!SDKPath.empty()) {
     llvm::SmallString<261> path{SDKPath};
     llvm::sys::path::append(path, "usr", "share", File);
-    if (VFS.exists(path))
+    if (llvm::sys::fs::exists(path))
       return path.str().str();
   }
 
   if (!Options.RuntimeResourcePath.empty()) {
     llvm::SmallString<261> path{Options.RuntimeResourcePath};
     llvm::sys::path::append(path, Platform, File);
-    if (VFS.exists(path))
+    if (llvm::sys::fs::exists(path))
       return path.str().str();
   }
 
@@ -475,7 +477,8 @@ std::string GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
 }
 
 void GetWindowsFileMappings(
-    ClangInvocationFileMapping &fileMapping, const ASTContext &Context,
+    ClangInvocationFileMapping &fileMapping,
+    const ClangInvocationFileMappingContext &Context,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
     bool &requiresBuiltinHeadersInSystemModules) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
@@ -511,7 +514,7 @@ void GetWindowsFileMappings(
     llvm::sys::path::append(WinSDKInjection, "module.modulemap");
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
-                                             VFS, SearchPathOpts);
+                                             SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
                                                AuxiliaryFile);
@@ -520,7 +523,7 @@ void GetWindowsFileMappings(
     llvm::sys::path::remove_filename(WinSDKInjection);
     llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
     AuxiliaryFile = GetPlatformAuxiliaryFile(
-        "windows", "winsdk_shared.modulemap", VFS, SearchPathOpts);
+        "windows", "winsdk_shared.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
                                                AuxiliaryFile);
@@ -537,8 +540,8 @@ void GetWindowsFileMappings(
     llvm::sys::path::append(UCRTInjection, "Include", UCRTSDK.Version, "ucrt");
     llvm::sys::path::append(UCRTInjection, "module.modulemap");
 
-    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", VFS,
-                                             SearchPathOpts);
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", SearchPathOpts);
     if (!AuxiliaryFile.empty()) {
       // The ucrt module map has the C standard library headers all together.
       // That leads to module cycles with the clang _Builtin_ modules. e.g.
@@ -575,16 +578,18 @@ void GetWindowsFileMappings(
     llvm::sys::path::append(VCToolsInjection, "include");
 
     llvm::sys::path::append(VCToolsInjection, "module.modulemap");
-    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "vcruntime.modulemap",
-                                             VFS, SearchPathOpts);
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "vcruntime.modulemap",
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
 
     llvm::sys::path::remove_filename(VCToolsInjection);
     llvm::sys::path::append(VCToolsInjection, "vcruntime.apinotes");
-    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "vcruntime.apinotes",
-                                             VFS, SearchPathOpts);
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "vcruntime.apinotes",
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
@@ -605,17 +610,23 @@ void GetWindowsFileMappings(
     for (const char * const header : kInjectedHeaders) {
       llvm::sys::path::remove_filename(VCToolsInjection);
       llvm::sys::path::append(VCToolsInjection, header);
-      if (!VFS.exists(VCToolsInjection))
-        fileMapping.overridenFiles.emplace_back(
-            llvm::MemoryBuffer::getMemBufferCopy("", VCToolsInjection));
+      if (!llvm::sys::fs::exists(VCToolsInjection))
+        fileMapping.overridenFiles.emplace_back(std::string{VCToolsInjection},
+                                                "");
     }
   }
 }
 } // namespace
 
+ClangInvocationFileMappingContext::ClangInvocationFileMappingContext(
+    const swift::ASTContext &Ctx)
+  : ClangInvocationFileMappingContext(Ctx.LangOpts, Ctx.SearchPathOpts,
+        Ctx.ClangImporterOpts, Ctx.CASOpts, Ctx.Diags) {}
+
 ClangInvocationFileMapping swift::getClangInvocationFileMapping(
-    const ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
-    bool suppressDiagnostic) {
+  const ClangInvocationFileMappingContext &ctx,
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs,
+  bool suppressDiagnostic) {
   ClangInvocationFileMapping result;
   if (!vfs)
     vfs = llvm::vfs::getRealFileSystem();
@@ -682,22 +693,51 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
   GetWindowsFileMappings(result, ctx, vfs,
                          result.requiresBuiltinHeadersInSystemModules);
+  return result;
+}
 
-  // push the redirect files into a YAML vfs overlay file.
-  if (!result.redirectedFiles.empty()) {
-    // Create a vfs overlay map for all redirects.
-    llvm::vfs::YAMLVFSWriter vfsWriter;
-    vfsWriter.setUseExternalNames(true);
-    for (const auto &mapping : result.redirectedFiles)
-      vfsWriter.addFileMapping(mapping.first, mapping.second);
+ClangInvocationFileMapping swift::applyClangInvocationMapping(
+    const ClangInvocationFileMappingContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
+    bool suppressDiagnostics) {
+  if (ctx.CASOpts.HasImmutableFileSystem)
+    return ClangInvocationFileMapping();
 
-    std::string vfsYAML;
-    llvm::raw_string_ostream os(vfsYAML);
-    vfsWriter.write(os);
+  ClangInvocationFileMapping fileMapping =
+    getClangInvocationFileMapping(ctx, baseVFS, suppressDiagnostics);
 
-    result.overridenFiles.emplace_back(llvm::MemoryBuffer::getMemBufferCopy(
-        vfsYAML, ClangImporter::getClangSystemOverlayFile(ctx.SearchPathOpts)));
+  auto importerOpts = ctx.ClangImporterOpts;
+  // Wrap Swift's FS to allow Clang to override the working directory
+  fileSystem = llvm::vfs::RedirectingFileSystem::create(
+      fileMapping.redirectedFiles, true, *fileSystem);
+  if (importerOpts.DumpClangDiagnostics) {
+    llvm::errs() << "clang importer redirected file mappings:\n";
+    for (const auto &mapping : fileMapping.redirectedFiles) {
+      llvm::errs() << "   mapping real file '" << mapping.second
+                   << "' to virtual file '" << mapping.first << "'\n";
+    }
+    llvm::errs() << "\n";
   }
 
-  return result;
+  if (!fileMapping.overridenFiles.empty()) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> overridenVFS =
+        new llvm::vfs::InMemoryFileSystem();
+    for (const auto &file : fileMapping.overridenFiles) {
+      if (importerOpts.DumpClangDiagnostics) {
+        llvm::errs() << "clang importer overriding file '" << file.first
+                     << "' with the following contents:\n";
+        llvm::errs() << file.second << "\n";
+      }
+      // Note MemoryBuffer is guaranteeed to be null-terminated.
+      overridenVFS->addFile(file.first, 0,
+                            llvm::MemoryBuffer::getMemBufferCopy(file.second));
+    }
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayVFS =
+        new llvm::vfs::OverlayFileSystem(fileSystem);
+    fileSystem = overlayVFS;
+    overlayVFS->pushOverlay(overridenVFS);
+  }
+
+  return fileMapping;
 }

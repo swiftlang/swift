@@ -30,9 +30,10 @@
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/StringSaver.h"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -1035,12 +1036,6 @@ using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
 /// A carrier of state shared among possibly multiple invocations of the
 /// dependency scanner.
 class SwiftDependencyScanningService {
-  /// BumpPtrAllocator for data matching the life-time of ScanningService.
-  llvm::BumpPtrAllocator Alloc;
-
-  /// StringSaver for data matching the life-time of ScanningService.
-  llvm::StringSaver Saver;
-
   /// The CASOption created the Scanning Service if used.
   std::optional<clang::CASOptions> CASOpts;
 
@@ -1061,8 +1056,6 @@ public:
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
-
-  llvm::StringSaver &getStringSaver() { return Saver; }
 
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be

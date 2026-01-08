@@ -711,6 +711,25 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
     SourceMgr.setFileSystem(std::move(OverlayVFS));
+  } else {
+    // For non-caching -direct-clang-cc1-module-build emit-pcm build,
+    // setup the clang VFS so it can find system modulemap files
+    // (like vcruntime.modulemap) as an input file.
+    if (Invocation.getClangImporterOptions().DirectClangCC1ModuleBuild &&
+        Invocation.getFrontendOptions().RequestedAction ==
+            FrontendOptions::ActionType::EmitPCM) {
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+          SourceMgr.getFileSystem();
+      ClangInvocationFileMappingContext Context(
+          Invocation.getLangOptions(), Invocation.getSearchPathOptions(),
+          Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
+          Diagnostics);
+      ClangInvocationFileMapping FileMapping = applyClangInvocationMapping(
+          Context, nullptr, VFS, /*suppressDiagnostic=*/false);
+      if (!FileMapping.redirectedFiles.empty()) {
+        SourceMgr.setFileSystem(std::move(VFS));
+      }
+    }
   }
 
   auto ExpectedOverlay =
@@ -972,10 +991,10 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // There is no need to setup input when emit PCM. Let ClangImporter and the
-  // underlying clang CompilerInstance to handle inputs.
+  // There is no input file when building PCM using Caching.
   if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::EmitPCM)
+          FrontendOptions::ActionType::EmitPCM &&
+      Invocation.getCASOptions().EnableCaching)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
