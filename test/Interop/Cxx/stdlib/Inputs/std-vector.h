@@ -32,23 +32,13 @@ using VectorOfImmortalRefPtr = std::vector<ImmortalRef *>;
 
 struct NonCopyable {
   NonCopyable() = default;
-  NonCopyable(int x) : number(x) {}
   NonCopyable(const NonCopyable &other) = delete;
   NonCopyable(NonCopyable &&other) = default;
   ~NonCopyable() {}
-
-  int number = 0;
 };
 
 using VectorOfNonCopyable = std::vector<NonCopyable>;
 using VectorOfPointer = std::vector<NonCopyable *>;
-
-inline VectorOfNonCopyable makeVectorOfNonCopyable() {
-  VectorOfNonCopyable vec;
-  vec.emplace_back(1);
-  vec.emplace_back(2);
-  return vec;
-}
 
 struct HasVector {
   std::vector<NonCopyable> field;

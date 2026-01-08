@@ -16,11 +16,8 @@ module Test {
 
 struct NonCopyable {
     NonCopyable() = default;
-    NonCopyable(int x) : number(x) {}
     NonCopyable(const NonCopyable& other) = delete; // expected-note {{'NonCopyable' has been explicitly marked deleted here}}
     NonCopyable(NonCopyable&& other) = default;
-
-    int number = 0;
 };
 
 template <typename T>
@@ -205,11 +202,6 @@ struct FieldDependsOnMe { // used to trigger a request cycle
   OneField<NoFields<FieldDependsOnMe, NonCopyable>> field;
 };
 
-struct HasConstSubscript {
-    const NonCopyable &operator[](int idx) { return nc; }
-    NonCopyable nc;
-};
-
 //--- test.swift
 import Test
 import CxxStdlib
@@ -300,10 +292,4 @@ func couldCreateCycleOfCxxValueSemanticsRequests() {
 
   let d3 = FieldDependsOnMe()
   takeCopyable(d3) // expected-error {{global function 'takeCopyable' requires that 'FieldDependsOnMe' conform to 'Copyable'}}
-}
-
-func useConstSubscript() {
-  var obj = HasConstSubscript(nc: NonCopyable(5))
-  _ = obj[42]
-  obj[42] = NonCopyable(7) // expected-error {{cannot assign through subscript: subscript is get-only}}
 }
