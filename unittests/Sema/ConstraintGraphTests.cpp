@@ -20,17 +20,15 @@ using namespace swift::constraints::inference;
 
 static void collectSupertypes(const ConstraintGraphNode &node,
                               SmallVectorImpl<TypeVariableType *> &supertypes) {
-  node.notifyDirectSupertypes([&](ConstraintGraphNode &supertype) {
+  node.notifySupertypes([&](ConstraintGraphNode &supertype) {
     supertypes.push_back(supertype.getTypeVariable());
-    collectSupertypes(supertype, supertypes);
   });
 }
 
 static void collectSubtypes(const ConstraintGraphNode &node,
                             SmallVectorImpl<TypeVariableType *> &subtypes) {
-  node.notifyDirectSubtypes([&](ConstraintGraphNode &subtype) {
+  node.notifySubtypes([&](ConstraintGraphNode &subtype) {
     subtypes.push_back(subtype.getTypeVariable());
-    collectSubtypes(subtype, subtypes);
   });
 }
 
@@ -164,5 +162,57 @@ TEST_F(SemaTest, TestSubtypeSypertypeChains) {
       checkSupertypes(cg[typeVar], {});
 
     checkSupertypes(cg[T2], T3);
+  }
+}
+
+TEST_F(SemaTest, TestSubtypeSypertypeChainLoops) {
+  ConstraintSystem cs(DC, std::nullopt);
+  auto &cg = cs.getConstraintGraph();
+
+  auto *loc = cs.getConstraintLocator({});
+
+  ConstraintSystem::SolverState state(cs, FreeTypeVariableBinding::Disallow);
+
+  {
+    ConstraintSystem::SolverScope scope(cs);
+
+    auto *T0 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T1 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T2 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T3 = cs.createTypeVariable(loc, /*options=*/0);
+    auto *T4 = cs.createTypeVariable(loc, /*options=*/0);
+
+    cs.addConstraint(ConstraintKind::Subtype, T0, T2, loc);
+    cs.addConstraint(ConstraintKind::Subtype, T1, T4, loc);
+    cs.addConstraint(ConstraintKind::Subtype, T3, T1, loc);
+    cs.addConstraint(ConstraintKind::Subtype, T2, T3, loc);
+
+    {
+      ConstraintSystem::SolverScope bindT0T1(cs);
+
+      // $T0 == $T1
+      cs.addConstraint(ConstraintKind::Equal, T0, T1, loc);
+
+      checkSupertypes(cg[T0], {T2, T3, T4});
+      checkSubtypes(cg[T4], {T0, T3, T2});
+
+      {
+        ConstraintSystem::SolverScope bindT0(cs);
+
+        // T0 := Int
+        cs.addConstraint(ConstraintKind::Equal, T0, getStdlibType("Int"), loc);
+
+        checkSupertypes(cg[T0], {});
+        checkSubtypes(cg[T4], {});
+      }
+
+      // ! Retracting $T0 := Int should bring chains back.
+
+      checkSupertypes(cg[T0], {T2, T3, T4});
+      checkSubtypes(cg[T4], {T0, T3, T2});
+    }
+
+    checkSupertypes(cg[T0], {T2, T3, T1, T4});
+    checkSubtypes(cg[T4], {T1, T3, T2, T0});
   }
 }

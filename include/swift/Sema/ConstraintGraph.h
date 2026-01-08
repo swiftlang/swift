@@ -166,19 +166,25 @@ private:
   /// Remove the potential transitive bindings matching the given source
   /// constraint from the current node and all of its subtypes or supertypes
   /// depending on the given `direction`.
-  void retractTransitiveBindingsFrom(Constraint *constraint,
-                                     ChainDirection direction);
+  void retractAllTransitiveBindingsFrom(Constraint *constraint,
+                                        ChainDirection direction);
 
   /// Remove the potential transitive bindings matching the given
   /// originator type variable from the current node and all of its
   /// subtypes or supertypes depending on the given `direction`.
-  void retractTransitiveBindingsFrom(
+  void retractAllTransitiveBindingsFrom(
       llvm::SmallPtrSetImpl<TypeVariableType *> &typeVars,
       ChainDirection direction);
 
   /// Remove the potential transitive bindings matching the given predicate
+  /// from the current node.
+  void retractTrasitiveBindings(
+      llvm::function_ref<bool(const inference::PotentialBinding &binding)>
+          matching);
+
+  /// Remove the potential transitive bindings matching the given predicate
   /// from the current node and all of its supertypes.
-  void retractTransitiveBindings(
+  void retractAllTransitiveBindings(
       llvm::function_ref<bool(const inference::PotentialBinding &binding)>
           matching,
       ChainDirection direction);
@@ -200,9 +206,10 @@ private:
 
   /// Record the potential binding that was transitively inferred from
   /// one of the chain members and propagate it up or down depending on
-  /// the `direction` parameter.
-  void introduceTransitive(inference::PotentialBinding binding,
-                           ChainDirection direction);
+  /// the `propagateTo` parameter.
+  void
+  introduceTransitive(inference::PotentialBinding binding,
+                      std::optional<ChainDirection> propagateTo = std::nullopt);
 
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
@@ -221,19 +228,19 @@ private:
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
 
 public: // public to enable unit tests.
-  /// Notify all of the type variables that are in a direct subtype relationship
+  /// Notify all of the type variables that are in a subtype relationship
   /// with this one.
   ///
   /// For example, consider $T1 <: $T2 <: $T3, if current type variable is
-  /// $T3 this method would notify _only_ $T2.
-  void notifyDirectSubtypes(
+  /// $T3 this method would notify $T2 and $T3.
+  void notifySubtypes(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
 
   /// Notify all of the type variables that are in a supertype relationship
   /// with this one.
   /// For example, consider $T1 <: $T2 <: $T3, if current type variable is
-  /// $T1 this method would notify _only_ $T2.
-  void notifyDirectSupertypes(
+  /// $T1 this method would notify $T2 and $T3.
+  void notifySupertypes(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
   /// }
 
