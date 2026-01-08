@@ -8,7 +8,6 @@ func foo() {
 }
 
 // Checks that, due to default check delay, a modification will be ignored and fast completion will still activate.
-// REQUIRES: shell
 
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)

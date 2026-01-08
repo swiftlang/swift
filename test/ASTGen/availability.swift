@@ -21,7 +21,6 @@
 // RUN: %target-typecheck-verify-swift "${COMPILER_ARGS[@]}" \
 // RUN:   -enable-experimental-feature ParserASTGen
 
-// REQUIRES: shell
 // REQUIRES: swift_feature_ParserASTGen
 
 @available(swift 4)

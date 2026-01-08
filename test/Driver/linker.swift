@@ -1,5 +1,3 @@
-// Must be able to run xcrun-return-self.sh
-// REQUIRES: shell
 // REQUIRES: rdar65281056
 // FIXME: When this is turned on, please move the test from linker-library-with-space.swift
 // to this file and remove that file.

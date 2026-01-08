@@ -129,7 +129,7 @@ struct HasNestedType {
   struct Inner {}
 }
 
-// REQUIRES: swift_swift_parser, executable_test, shell, asserts
+// REQUIRES: swift_swift_parser, executable_test, asserts
 // REQUIRES: swift_feature_PreambleMacros
 
 // RUN: %empty-directory(%t)

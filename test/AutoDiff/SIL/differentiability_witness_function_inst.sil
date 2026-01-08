@@ -18,10 +18,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-disable-pass=Simplification -emit-ir %s | %FileCheck %s --check-prefix=IRGEN --check-prefix %target-cpu
 // NOTE: `%target-cpu`-specific FileCheck lines exist because lowered function types in LLVM IR differ between architectures.
 
-// `shell` is required only to run `sed` as a
-// https://github.com/apple/swift/issues/54526 workaround.
-// REQUIRES: shell
-
 sil_stage raw
 
 import Swift

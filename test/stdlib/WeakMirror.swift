@@ -22,7 +22,6 @@
 // RUN: %target-run %t/Mirror
 
 // REQUIRES: executable_test
-// REQUIRES: shell
 // REQUIRES: reflection
 // REQUIRES: swift_feature_ImmutableWeakCaptures
 

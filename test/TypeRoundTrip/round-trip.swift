@@ -11,7 +11,6 @@
 // RUN: %target-run %t/round-trip | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: shell
 // REQUIRES: remote_mirror
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

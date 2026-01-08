@@ -5,8 +5,6 @@ func foo() {
   /*HERE*/
 }
 
-// REQUIRES: shell
-
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)
 
