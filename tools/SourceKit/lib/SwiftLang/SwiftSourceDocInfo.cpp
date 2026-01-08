@@ -34,10 +34,10 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
-#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
@@ -61,8 +61,7 @@ using namespace swift::ide;
 namespace {
 class AnnotatedDeclarationPrinter : public XMLEscapingPrinter {
 public:
-  AnnotatedDeclarationPrinter(raw_ostream &OS)
-    :XMLEscapingPrinter(OS) { }
+  AnnotatedDeclarationPrinter(raw_ostream &OS) : XMLEscapingPrinter(OS) {}
 
 private:
   void printTypeRef(
@@ -208,7 +207,6 @@ public:
   FullyAnnotatedDeclarationPrinter(raw_ostream &OS) : XMLEscapingPrinter(OS) {}
 
 private:
-
   // MARK: The ASTPrinter callback interface.
 
   void printDeclPre(const Decl *D,
@@ -426,7 +424,8 @@ private:
 };
 } // end anonymous namespace
 
-static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty) {
+static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD,
+                                              const Type Ty) {
   if (Ty.isNull())
     return Type();
 
@@ -437,8 +436,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   return Ty->getRValueType()->getInOutObjectType()->getMetatypeInstanceType();
 }
 
-static void printAnnotatedDeclaration(const ValueDecl *VD,
-                                      const Type BaseTy,
+static void printAnnotatedDeclaration(const ValueDecl *VD, const Type BaseTy,
                                       raw_ostream &OS) {
   AnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
@@ -462,9 +460,9 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
   PO.TreatAsExplicitDeclList.push_back(VD);
 
   // Wrap this up in XML, as that's what we'll use for documentation comments.
-  OS<<"<Declaration>";
+  OS << "<Declaration>";
   VD->print(Printer, PO);
-  OS<<"</Declaration>";
+  OS << "</Declaration>";
 }
 
 void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
@@ -528,7 +526,6 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getName()];
 
-
   auto *DC = VD->getDeclContext();
   bool typeLookup = DC->isTypeContext();
 
@@ -537,18 +534,15 @@ static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   if (typeLookup) {
     auto type = DC->getDeclaredInterfaceType();
     if (!type->is<ErrorType>()) {
-      DC->lookupQualified(type, DeclNameRef(VD->getBaseName()),
-                          VD->getLoc(), NL_QualifiedDefault,
-                          results);
+      DC->lookupQualified(type, DeclNameRef(VD->getBaseName()), VD->getLoc(),
+                          NL_QualifiedDefault, results);
     }
   } else {
-    namelookup::lookupInModule(DC->getModuleScopeContext(),
-                               VD->getBaseName(), /*hasModuleSelector=*/false,
-                               results, NLKind::UnqualifiedLookup,
-                               namelookup::ResolutionKind::Overloadable,
-                               DC->getModuleScopeContext(),
-                               VD->getLoc(),
-                               NL_UnqualifiedDefault);
+    namelookup::lookupInModule(
+        DC->getModuleScopeContext(), VD->getBaseName(),
+        /*hasModuleSelector=*/false, results, NLKind::UnqualifiedLookup,
+        namelookup::ResolutionKind::Overloadable, DC->getModuleScopeContext(),
+        VD->getLoc(), NL_UnqualifiedDefault);
   }
 
   SmallVector<ValueDecl *, 8> RelatedDecls;
@@ -580,8 +574,8 @@ static StringRef getSourceToken(unsigned Offset,
     return StringRef();
 
   SourceManager SM;
-  auto MemBufRef = llvm::MemoryBuffer::getMemBuffer(MemBuf->getBuffer(),
-                                                 MemBuf->getBufferIdentifier());
+  auto MemBufRef = llvm::MemoryBuffer::getMemBuffer(
+      MemBuf->getBuffer(), MemBuf->getBufferIdentifier());
   auto BufId = SM.addNewSourceBuffer(std::move(MemBufRef));
   SourceLoc Loc = SM.getLocForOffset(BufId, Offset);
   return Lexer::getTokenAtLocation(SM, Loc).getText();
@@ -592,10 +586,10 @@ mapOffsetToOlderSnapshot(unsigned Offset, ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
   SmallVector<ReplaceImmutableTextUpdateRef, 16> Updates;
   OldSnap->foreachReplaceUntil(NewSnap,
-    [&](ReplaceImmutableTextUpdateRef Upd)->bool {
-      Updates.push_back(Upd);
-      return true;
-    });
+                               [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
+                                 Updates.push_back(Upd);
+                                 return true;
+                               });
 
   // Walk the updates backwards and "undo" them.
   for (auto I = Updates.rbegin(), E = Updates.rend(); I != E; ++I) {
@@ -605,7 +599,7 @@ mapOffsetToOlderSnapshot(unsigned Offset, ImmutableTextSnapshotRef NewSnap,
       return std::nullopt; // Offset is part of newly inserted text.
 
     if (Upd->getByteOffset() <= Offset) {
-      Offset += Upd->getLength(); // "bring back" what was removed.
+      Offset += Upd->getLength();      // "bring back" what was removed.
       Offset -= Upd->getText().size(); // "remove" what was added.
     }
   }
@@ -615,18 +609,18 @@ mapOffsetToOlderSnapshot(unsigned Offset, ImmutableTextSnapshotRef NewSnap,
 static std::optional<unsigned>
 mapOffsetToNewerSnapshot(unsigned Offset, ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {
-  bool Completed = OldSnap->foreachReplaceUntil(NewSnap,
-    [&](ReplaceImmutableTextUpdateRef Upd)->bool {
-      if (Upd->getByteOffset() <= Offset &&
-          Offset < Upd->getByteOffset() + Upd->getLength())
-        return false; // Offset is part of removed text.
+  bool Completed = OldSnap->foreachReplaceUntil(
+      NewSnap, [&](ReplaceImmutableTextUpdateRef Upd) -> bool {
+        if (Upd->getByteOffset() <= Offset &&
+            Offset < Upd->getByteOffset() + Upd->getLength())
+          return false; // Offset is part of removed text.
 
-      if (Upd->getByteOffset() <= Offset) {
-        Offset += Upd->getText().size();
-        Offset -= Upd->getLength();
-      }
-      return true;
-    });
+        if (Upd->getByteOffset() <= Offset) {
+          Offset += Upd->getText().size();
+          Offset -= Upd->getLength();
+        }
+        return true;
+      });
 
   if (Completed)
     return Offset;
@@ -635,9 +629,9 @@ mapOffsetToNewerSnapshot(unsigned Offset, ImmutableTextSnapshotRef OldSnap,
 
 /// Tries to remap the location from a previous snapshot to the latest one and
 /// then sets the location's line and column.
-static void mapLocToLatestSnapshot(
-    SwiftLangSupport &Lang, LocationInfo &Location,
-    ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
+static void
+mapLocToLatestSnapshot(SwiftLangSupport &Lang, LocationInfo &Location,
+                       ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
   auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename,
                                                          /*IsRealpath=*/true);
   if (!EditorDoc)
@@ -652,15 +646,14 @@ static void mapLocToLatestSnapshot(
       if (PrevSnap->getStamp() == LatestSnap->getStamp())
         break;
 
-      auto OptBegin = mapOffsetToNewerSnapshot(Location.Offset,
-                                               PrevSnap, LatestSnap);
+      auto OptBegin =
+          mapOffsetToNewerSnapshot(Location.Offset, PrevSnap, LatestSnap);
       if (!OptBegin.has_value()) {
         Location.Filename = StringRef();
         return;
       }
 
-      auto OptEnd = mapOffsetToNewerSnapshot(Location.Offset +
-                                             Location.Length,
+      auto OptEnd = mapOffsetToNewerSnapshot(Location.Offset + Location.Length,
                                              PrevSnap, LatestSnap);
       if (!OptEnd.has_value()) {
         Location.Filename = StringRef();
@@ -676,12 +669,11 @@ static void mapLocToLatestSnapshot(
       LatestSnap->getBuffer()->getLineAndColumn(Location.Offset);
 }
 
-
 /// Returns true for error.
-static bool passCursorInfoForModule(ModuleEntity Mod,
-                                    SwiftInterfaceGenMap &IFaceGenContexts,
-                                    const CompilerInvocation &Invok,
-                       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
+static bool passCursorInfoForModule(
+    ModuleEntity Mod, SwiftInterfaceGenMap &IFaceGenContexts,
+    const CompilerInvocation &Invok,
+    std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   std::string FullName = Mod.getFullName();
   SmallVector<CursorSymbolInfo, 1> Symbols;
   SmallVector<StringRef, 4> ModuleGroups;
@@ -730,18 +722,19 @@ static std::optional<unsigned> getParamParentNameOffset(const ValueDecl *VD,
   if (auto PD = dyn_cast<ParamDecl>(VD)) {
 
     // Avoid returning parent loc for internal-only names.
-    if (PD->getArgumentNameLoc().isValid() && PD->getArgumentNameLoc() != Cursor)
+    if (PD->getArgumentNameLoc().isValid() &&
+        PD->getArgumentNameLoc() != Cursor)
       return std::nullopt;
     auto *DC = PD->getDeclContext();
     switch (DC->getContextKind()) {
-      case DeclContextKind::SubscriptDecl:
-        Loc = cast<SubscriptDecl>(DC)->getNameLoc();
-        break;
-      case DeclContextKind::AbstractFunctionDecl:
-        Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
-        break;
-      default:
-        break;
+    case DeclContextKind::SubscriptDecl:
+      Loc = cast<SubscriptDecl>(DC)->getNameLoc();
+      break;
+    case DeclContextKind::AbstractFunctionDecl:
+      Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
+      break;
+    default:
+      break;
     }
   }
   if (Loc.isInvalid())
@@ -880,8 +873,7 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
 }
 
 static void setLocationInfoForRange(SourceManager &SM, SourceRange R,
-                                    unsigned BufID,
-                                    LocationInfo &Location,
+                                    unsigned BufID, LocationInfo &Location,
                                     bool Presumed = false) {
   CONDITIONAL_ASSERT(BufID == SM.findBufferContainingLoc(R.Start) &&
                      "SourceRange R should be in BufID");
@@ -1053,6 +1045,23 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   }
   Symbol.ContainerTypeUSR = copyAndClearString(Allocator, Buffer);
 
+  // type declaration location for inlay hint go-to-definition
+  if (Type Ty = DInfo.VD->getInterfaceType()) {
+
+    while (auto MetaTy = Ty->getAs<AnyMetatypeType>())
+      Ty = MetaTy->getInstanceType();
+
+    if (auto *NominalDecl = Ty->getAnyNominal()) {
+
+      if (!SwiftLangSupport::printUSR(NominalDecl, OS))
+        Symbol.TypeDeclUSR = copyAndClearString(Allocator, Buffer);
+
+      Symbol.TypeDeclLocation = getDeclLocationInfo(NominalDecl);
+
+      Symbol.TypeDeclModuleName = getModuleName(NominalDecl, Allocator);
+    }
+  }
+
   ide::getRawDocumentationComment(DInfo.OriginalProperty, OS);
   Symbol.DocComment = copyAndClearString(Allocator, Buffer);
 
@@ -1087,10 +1096,9 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     Options.IncludeClangDocs = true;
     Options.PrintPrivateSystemSymbols = true;
 
-    symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
-                                            DInfo.InSynthesizedExtension,
-                                            Options, OS, PathComponents,
-                                            FragmentInfos);
+    symbolgraphgen::printSymbolGraphForDecl(
+        DInfo.VD, DInfo.BaseType, DInfo.InSynthesizedExtension, Options, OS,
+        PathComponents, FragmentInfos);
     Symbol.SymbolGraph = copyAndClearString(Allocator, Buffer);
 
     SmallVector<ParentInfo, 4> Parents;
@@ -1103,9 +1111,9 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     Symbol.ParentContexts = copyArray(Allocator, llvm::ArrayRef(Parents));
 
     SmallVector<ReferencedDeclInfo, 8> ReferencedDecls;
-    for (auto &FI: FragmentInfos) {
+    for (auto &FI : FragmentInfos) {
       SmallVector<ParentInfo, 4> FIParents;
-      for (auto &Component: FI.ParentContexts) {
+      for (auto &Component : FI.ParentContexts) {
         SwiftLangSupport::printUSR(Component.VD, OS);
         FIParents.emplace_back(Component.Title.str().copy(Allocator),
                                Component.Kind,
@@ -1119,9 +1127,10 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
       } else if (auto ClangNode = FI.VD->getClangNode()) {
         auto Loc = ClangNode.getLocation();
         if (Loc.isValid()) {
-          Filename = Ctx.getClangModuleLoader()->getClangASTContext()
-              .getSourceManager()
-              .getFilename(Loc);
+          Filename = Ctx.getClangModuleLoader()
+                         ->getClangASTContext()
+                         .getSourceManager()
+                         .getFilename(Loc);
         }
       }
 
@@ -1225,7 +1234,7 @@ static ValueDecl *getCursorInfoDeclForLiteral(Expr *E) {
     return CollectionLit->getInitializer().getDecl();
   }
 
-  LiteralExpr* LitExpr = dyn_cast<LiteralExpr>(E);
+  LiteralExpr *LitExpr = dyn_cast<LiteralExpr>(E);
   if (!LitExpr) {
     return nullptr;
   }
@@ -1416,12 +1425,12 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
   const DeclName OrigName = VD->getName();
-  DeclBaseName BaseName = Info.BaseName.empty()
-                              ? OrigName.getBaseName()
-                              : DeclBaseName(
-                                Info.BaseName == "init"
-                                  ? DeclBaseName::createConstructor()
-                                  : Ctx.getIdentifier(Info.BaseName));
+  DeclBaseName BaseName =
+      Info.BaseName.empty()
+          ? OrigName.getBaseName()
+          : DeclBaseName(Info.BaseName == "init"
+                             ? DeclBaseName::createConstructor()
+                             : Ctx.getIdentifier(Info.BaseName));
   auto OrigArgs = OrigName.getArgumentNames();
   SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
   if (Info.ArgNames.size() > OrigArgs.size())
@@ -1477,7 +1486,8 @@ static bool passNameInfoForDecl(
       } else {
         Result.IsZeroArgSelector = true;
       }
-      Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
+      Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(),
+                             Pieces.end());
       Receiver(RequestResult<NameTranslatingInfo>::fromResult(Result));
     } else {
       Diagnostic = "Unable to resolve name info.";
@@ -1486,8 +1496,8 @@ static bool passNameInfoForDecl(
     return true;
   }
   case NameKind::ObjC: {
-    ClangImporter *Importer = static_cast<ClangImporter *>(VD->getDeclContext()->
-      getASTContext().getClangModuleLoader());
+    ClangImporter *Importer = static_cast<ClangImporter *>(
+        VD->getDeclContext()->getASTContext().getClangModuleLoader());
 
     const clang::NamedDecl *Named = nullptr;
     auto *BaseDecl = VD;
@@ -1535,6 +1545,7 @@ private:
 
 protected:
   bool CancelOnSubsequentRequest;
+
 protected:
   ArrayRef<ImmutableTextSnapshotRef> getPreviousASTSnaps() {
     return llvm::ArrayRef(PreviousASTSnaps);
@@ -1550,7 +1561,8 @@ public:
         TryExistingAST(TryExistingAST),
         CancelOnSubsequentRequest(CancelOnSubsequentRequest) {}
 
-  bool canUseASTWithSnapshots(ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
+  bool canUseASTWithSnapshots(
+      ArrayRef<ImmutableTextSnapshotRef> Snapshots) override {
     if (!TryExistingAST) {
       LOG_INFO_FUNC(High, "will resolve using up-to-date AST");
       return false;
@@ -1675,8 +1687,7 @@ static void resolveCursor(
 
       SourceManager &SM = CompIns.getSourceMgr();
       unsigned BufferID = SF->getBufferID();
-      SourceLoc Loc =
-        Lexer::getLocForStartOfToken(SM, BufferID, Offset);
+      SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufferID, Offset);
       if (Loc.isInvalid()) {
         Receiver(RequestResult<CursorInfoData>::fromError(
             "Unable to find initial lookup location"));
@@ -1912,7 +1923,7 @@ static void resolveName(
                                                    SF->getBufferID(), Offset);
       if (Loc.isInvalid()) {
         Receiver(RequestResult<NameTranslatingInfo>::fromError(
-          "Unable to resolve the start of the token."));
+            "Unable to resolve the start of the token."));
         return;
       }
 
@@ -2161,10 +2172,10 @@ void SwiftLangSupport::getCursorInfo(
               /*IsDynamic=*/false,
               /*ReceiverTypes=*/{},
               /*ShorthandShadowedDecls=*/{});
-          passCursorInfoForDecl(
-              Info, Actionables, SymbolGraph, {}, *this, Invok, Diagnostic,
-              /*PreviousSnaps=*/{},
-              /*DidReuseAST=*/false, Receiver);
+          passCursorInfoForDecl(Info, Actionables, SymbolGraph, {}, *this,
+                                Invok, Diagnostic,
+                                /*PreviousSnaps=*/{},
+                                /*DidReuseAST=*/false, Receiver);
         }
       } else {
         CursorInfoData Info;
@@ -2452,8 +2463,8 @@ static void resolveCursorFromUSR(
         Type ContainerType;
         if (DC->isTypeContext()) {
           auto ContainerType = DC->getSelfInterfaceType();
-          ContainerType =
-              D->getInnermostDeclContext()->mapTypeIntoEnvironment(ContainerType);
+          ContainerType = D->getInnermostDeclContext()->mapTypeIntoEnvironment(
+              ContainerType);
         }
 
         ResolvedValueRefCursorInfoPtr Info = new ResolvedValueRefCursorInfo(
@@ -2471,11 +2482,11 @@ static void resolveCursorFromUSR(
         Type selfTy;
 
         std::string Diagnostic;
-        bool Success = passCursorInfoForDecl(
-            Info, /*AddRefactorings*/ false,
-            /*AddSymbolGraph*/ false, {}, Lang, CompInvok, Diagnostic,
-            PreviousASTSnaps,
-            /*DidReuseAST=*/false, Receiver);
+        bool Success =
+            passCursorInfoForDecl(Info, /*AddRefactorings*/ false,
+                                  /*AddSymbolGraph*/ false, {}, Lang, CompInvok,
+                                  Diagnostic, PreviousASTSnaps,
+                                  /*DidReuseAST=*/false, Receiver);
         if (!Success) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.
@@ -2711,7 +2722,8 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
       assert(D);
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         if (auto *Canonical = VD->getCanonicalVarDecl()) {
-          return dyn_cast_or_null<CaseStmt>(Canonical->getRecursiveParentPatternStmt());
+          return dyn_cast_or_null<CaseStmt>(
+              Canonical->getRecursiveParentPatternStmt());
         }
       }
       return nullptr;
@@ -2813,10 +2825,12 @@ void SwiftLangSupport::findActiveRegionsInFile(
 //===----------------------------------------------------------------------===//
 
 static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
-  switch(Info.Kind) {
-    case SemanticRefactoringKind::None: return RefactoringKind::None;
+  switch (Info.Kind) {
+  case SemanticRefactoringKind::None:
+    return RefactoringKind::None;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
-    case SemanticRefactoringKind::KIND: return RefactoringKind::KIND;
+  case SemanticRefactoringKind::KIND:                                          \
+    return RefactoringKind::KIND;
 #include "swift/Refactoring/RefactoringKinds.def"
   }
 }
@@ -2842,8 +2856,8 @@ void SwiftLangSupport::semanticRefactoring(
 
   public:
     SemaRefactoringConsumer(SemanticRefactoringInfo Info,
-                            CategorizedEditsReceiver Receiver) : Info(Info),
-                                                Receiver(std::move(Receiver)) {}
+                            CategorizedEditsReceiver Receiver)
+        : Info(Info), Receiver(std::move(Receiver)) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       RequestRefactoringEditConsumer EditConsumer(Receiver);
@@ -2904,12 +2918,13 @@ void SwiftLangSupport::collectExpressionTypes(
     return;
   }
   assert(Invok);
-  class ExpressionTypeCollector: public SwiftASTConsumer {
+  class ExpressionTypeCollector : public SwiftASTConsumer {
     std::function<void(const RequestResult<ExpressionTypesInFile> &)> Receiver;
     std::string InputFile;
     std::vector<const char *> ExpectedProtocols;
     bool FullyQualified;
     bool CanonicalType;
+
   public:
     ExpressionTypeCollector(
         std::function<void(const RequestResult<ExpressionTypesInFile> &)>
@@ -2935,8 +2950,9 @@ void SwiftLangSupport::collectExpressionTypes(
       for (auto Item :
            collectExpressionType(*SF, ExpectedProtocols, Scratch,
                                  FullyQualified, CanonicalType, OS)) {
-        Result.Results.push_back({Item.offset, Item.length, Item.typeOffset, {}});
-        for (auto P: Item.protocols) {
+        Result.Results.push_back(
+            {Item.offset, Item.length, Item.typeOffset, {}});
+        for (auto P : Item.protocols) {
           Result.Results.back().ProtocolOffsets.push_back(P.first);
         }
       }
@@ -3027,7 +3043,8 @@ void SwiftLangSupport::collectVariableTypes(
       collectVariableType(*SF, Range, FullyQualified, Infos, OS);
 
       for (auto Info : Infos) {
-        Result.Results.push_back({Info.Offset, Info.Length, Info.TypeOffset, Info.HasExplicitType});
+        Result.Results.push_back(
+            {Info.Offset, Info.Length, Info.TypeOffset, Info.HasExplicitType});
       }
       Result.TypeBuffer = OS.str();
       Receiver(RequestResult<VariableTypesInFile>::fromResult(Result));

@@ -2747,6 +2747,16 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.set(KeyTypeUsr, Symbol.TypeUSR);
   if (!Symbol.ContainerTypeUSR.empty())
     Elem.set(KeyContainerTypeUsr, Symbol.ContainerTypeUSR);
+  // Type declaration location for inlay hint go-to-definition
+  if (!Symbol.TypeDeclUSR.empty())
+    Elem.set(KeyTypeDeclUsr, Symbol.TypeDeclUSR);
+  if (!Symbol.TypeDeclLocation.Filename.empty()) {
+    Elem.set(KeyTypeDeclFilePath, Symbol.TypeDeclLocation.Filename);
+    Elem.set(KeyTypeDeclLine, Symbol.TypeDeclLocation.Line);
+    Elem.set(KeyTypeDeclColumn, Symbol.TypeDeclLocation.Column);
+  }
+  if (!Symbol.TypeDeclModuleName.empty())
+    Elem.set(KeyTypeDeclModuleName, Symbol.TypeDeclModuleName);
   if (!Symbol.DocComment.empty())
     Elem.set(KeyDocComment, Symbol.DocComment);
   if (!Symbol.DocCommentAsXML.empty())

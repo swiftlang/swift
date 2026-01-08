@@ -615,6 +615,9 @@ struct CursorSymbolInfo {
   StringRef TypeName;
   StringRef TypeUSR;
   StringRef ContainerTypeUSR;
+  StringRef TypeDeclUSR;
+  LocationInfo TypeDeclLocation;
+  StringRef TypeDeclModuleName;
   StringRef DocComment;
   StringRef DocCommentAsXML;
   StringRef GroupName;
@@ -666,6 +669,9 @@ struct CursorSymbolInfo {
     OS << Indentation << "  TypeName: " << TypeName << '\n';
     OS << Indentation << "  TypeUSR: " << TypeUSR << '\n';
     OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
+    OS << Indentation << "  TypeDeclUSR: " << TypeDeclUSR << '\n';
+    TypeDeclLocation.print(OS, Indentation + "  TypeDecl");
+    OS << Indentation << "  TypeDeclModuleName: " << TypeDeclModuleName << '\n';
     OS << Indentation << "  DocComment: " << DocComment << '\n';
     OS << Indentation << "  DocCommentAsXML: " << DocCommentAsXML << '\n';
     OS << Indentation << "  GroupName: " << GroupName << '\n';
