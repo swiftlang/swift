@@ -8458,7 +8458,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           }
         }
       }
-      continue;
     }
 
     bool suppressDeepEquality = false;
