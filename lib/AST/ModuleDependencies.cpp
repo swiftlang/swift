@@ -514,8 +514,7 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
   }
 }
 
-SwiftDependencyScanningService::SwiftDependencyScanningService()
-    : Alloc(), Saver(Alloc) {
+SwiftDependencyScanningService::SwiftDependencyScanningService() {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       clang::tooling::dependencies::ScanningOutputFormat::FullTree,

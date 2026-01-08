@@ -824,9 +824,10 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
   });
 }
 
-void importer::addCommonInvocationArguments(
-    std::vector<std::string> &invocationArgStrs, ASTContext &ctx,
-    bool requiresBuiltinHeadersInSystemModules, bool needSystemVFSOverlay,
+void
+importer::addCommonInvocationArguments(
+    std::vector<std::string> &invocationArgStrs,
+    ASTContext &ctx, bool requiresBuiltinHeadersInSystemModules,
     bool ignoreClangTarget) {
   using ImporterImpl = ClangImporter::Implementation;
   llvm::Triple triple = ctx.LangOpts.Target;
@@ -998,12 +999,6 @@ void importer::addCommonInvocationArguments(
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-fbuiltin-headers-in-system-modules");
   }
-
-  if (needSystemVFSOverlay) {
-    invocationArgStrs.push_back("-ivfsoverlay");
-    invocationArgStrs.push_back(
-        ClangImporter::getClangSystemOverlayFile(ctx.SearchPathOpts));
-  }
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
@@ -1152,66 +1147,6 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.value();
 }
 
-std::string
-ClangImporter::getClangSystemOverlayFile(const SearchPathOptions &Opts) {
-  llvm::SmallString<256> overlayPath(Opts.RuntimeResourcePath);
-  llvm::sys::path::append(overlayPath,
-                          Implementation::clangSystemVFSOverlayName);
-  return overlayPath.str().str();
-}
-
-llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-ClangImporter::computeClangImporterFileSystem(
-    const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
-    bool suppressDiagnostics, llvm::StringSaver *saver) {
-  // Configure ClangImporter file system. There are two situations:
-  // * If caching is used, thus file system is immutable, the one immutable file
-  //   system is shared between swift frontend and ClangImporter.
-  // * Otherwise, ClangImporter file system is configure from scratch from
-  //   VFS in SourceMgr using ivfsoverlay options.
-  if (ctx.CASOpts.HasImmutableFileSystem)
-    return baseFS;
-
-  // If no file mapping, nothing to update.
-  if (fileMapping.redirectedFiles.empty() && fileMapping.overridenFiles.empty())
-    return baseFS;
-
-  const auto &importerOpts = ctx.ClangImporterOpts;
-  if (!fileMapping.redirectedFiles.empty()) {
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer redirected file mappings:\n";
-      for (const auto &mapping : fileMapping.redirectedFiles) {
-        llvm::errs() << "   mapping real file '" << mapping.second
-                     << "' to virtual file '" << mapping.first << "'\n";
-      }
-      llvm::errs() << "\n";
-    }
-  }
-
-  auto overridenVFS =
-      llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
-  for (auto &file : fileMapping.overridenFiles) {
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer overriding file '"
-                   << file->getBufferIdentifier()
-                   << "' with the following contents:\n";
-      llvm::errs() << file->getBuffer() << "\n";
-    }
-    // Note MemoryBuffer is guaranteeed to be null-terminated.
-    auto content = file->getMemBufferRef();
-    // If StringSaver is provided, it means the life-time of the file buffer
-    // needs to be extended by saving into the string saver.
-    if (saver)
-      content = llvm::MemoryBufferRef(saver->save(content.getBuffer()), "");
-    overridenVFS->addFileNoOwn(file->getBufferIdentifier(), 0, content);
-  }
-  auto overlayVFS =
-      llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(baseFS);
-  overlayVFS->pushOverlay(std::move(overridenVFS));
-  return overlayVFS;
-}
-
 std::vector<std::string>
 ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) {
   assert(!ctx.ClangImporterOpts.DirectClangCC1ModuleBuild &&
@@ -1229,12 +1164,8 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) 
     getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx);
     break;
   }
-  addCommonInvocationArguments(
-      invocationArgStrs, ctx,
-      clangFileMapping.requiresBuiltinHeadersInSystemModules,
-      /*needSystemVFSOverlay=*/!clangFileMapping.redirectedFiles.empty() &&
-          !ctx.CASOpts.HasImmutableFileSystem,
-      ignoreClangTarget);
+  addCommonInvocationArguments(invocationArgStrs, ctx,
+      requiresBuiltinHeadersInSystemModules, ignoreClangTarget);
   return invocationArgStrs;
 }
 
@@ -1299,11 +1230,6 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
       if (ctx.LangOpts.TargetVariant.has_value())
         CI->getTargetOpts().DarwinTargetVariantTriple = ctx.LangOpts.TargetVariant->str();
     }
-
-    if (!clangFileMapping.redirectedFiles.empty() &&
-        !ctx.CASOpts.HasImmutableFileSystem)
-      CI->getHeaderSearchOpts().AddVFSOverlayFile(
-          getClangSystemOverlayFile(ctx.SearchPathOpts));
 
     // Forward the index store path. That information is not passed to scanner
     // and it is cached invariant so we don't want to re-scan if that changed.
@@ -1418,18 +1344,18 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     }
   }
 
-  if (!ctx.CASOpts.HasImmutableFileSystem)
-    importer->clangFileMapping = getClangInvocationFileMapping(
-        ctx, ctx.SourceMgr.getFileSystem(), ignoreFileMapping);
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+      ctx.SourceMgr.getFileSystem();
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs =
-      computeClangImporterFileSystem(ctx, importer->clangFileMapping,
-                                     ctx.SourceMgr.getFileSystem(),
-                                     ignoreFileMapping);
+  ClangInvocationFileMapping fileMapping =
+    applyClangInvocationMapping(ctx, nullptr, VFS, ignoreFileMapping);
+
+  importer->requiresBuiltinHeadersInSystemModules =
+      fileMapping.requiresBuiltinHeadersInSystemModules;
 
   // Create a new Clang compiler invocation.
   {
-    if (auto ClangArgs = importer->getClangCC1Arguments(ctx, vfs))
+    if (auto ClangArgs = importer->getClangCC1Arguments(ctx, VFS))
       importer->Impl.ClangArgs = *ClangArgs;
     else
       return nullptr;
@@ -1443,7 +1369,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
       llvm::errs() << "'\n";
     }
     importer->Impl.Invocation = createClangInvocation(
-        importer.get(), importerOpts, vfs, importer->Impl.ClangArgs);
+        importer.get(), importerOpts, VFS, importer->Impl.ClangArgs);
     if (!importer->Impl.Invocation)
       return nullptr;
   }
@@ -1494,7 +1420,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
       importer->Impl, instance.getDiagnosticOpts(),
       importerOpts.DumpClangDiagnostics);
-  instance.createVirtualFileSystem(std::move(vfs), actualDiagClient.get());
+  instance.createVirtualFileSystem(std::move(VFS), actualDiagClient.get());
   instance.createFileManager();
   instance.createDiagnostics(actualDiagClient.release());
 
