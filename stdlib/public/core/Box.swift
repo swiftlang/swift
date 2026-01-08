@@ -38,6 +38,9 @@ public struct Box<Value: ~Copyable>: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
+extension Box: Sendable where Value: Sendable & ~Copyable {}
+
+@available(SwiftStdlib 6.4, *)
 extension Box where Value: ~Copyable {
   /// Consumes the box and returns the instance of `Value` that was within the
   /// box.
