@@ -2099,6 +2099,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
 
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
+    // Conformances are applicable only to the types they are
+    // placed on. They could be transferred to supertypes
+    // but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
     if (constraint->getSecondType()->is<ProtocolType>())
       Protocols.push_back(constraint);
     break;
