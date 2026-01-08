@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "Relation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
@@ -1656,6 +1657,38 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   }
 
   SolutionDiff diff(viable);
+
+  // Debugging code to verify that compareSolutions() actually defines
+  // a transitive relation.
+  static bool verifySolutionOrder = false;
+
+  if (verifySolutionOrder) {
+    auto matrix = BooleanMatrix::forPredicate(
+        viable.begin(), viable.end(),
+        [&](Solution &s1, Solution &s2) {
+          unsigned idx1 = (&s1 - viable.begin());
+          unsigned idx2 = (&s2 - viable.begin());
+          return (compareSolutions(*this, viable, diff, idx1, idx2) ==
+                  SolutionCompareResult::Better);
+        });
+      if (!matrix.isAntiReflexive()) {
+        llvm::errs() << "Broken solution order: not anti-reflexive\n\n";
+        matrix.multiply(matrix).dump(llvm::errs());
+        abort();
+      }
+      if (!matrix.isAntiSymmetric()) {
+        llvm::errs() << "Broken solution order: not anti-symmetric\n\n";
+        matrix.multiply(matrix).dump(llvm::errs());
+        abort();
+      }
+    if (!matrix.isTransitive()) {
+      llvm::errs() << "Broken solution order: not transitive\n\n";
+      matrix.dump(llvm::errs());
+      llvm::errs() << "Square:\n";
+      matrix.multiply(matrix).dump(llvm::errs());
+      abort();
+    }
+  }
 
   // Find a potential best.
   SmallVector<bool, 16> losers(viable.size(), false);
