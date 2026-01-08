@@ -1723,6 +1723,13 @@ bool MemoryBufferSerializedModuleLoader::unregisterMemoryBuffer(
 
 void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
                                                 unsigned previousGeneration) {
+  // Nominals in parsed SourceFiles can't have extensions provided by imported
+  // serialized modules. This is necessary to avoid triggering semantic requests
+  // from extension binding since looking up extensions may need to compute the
+  // mangled name.
+  if (nominal->getParentSourceFile())
+    return;
+
   for (auto &modulePair : LoadedModuleFiles) {
     if (modulePair.second <= previousGeneration)
       continue;

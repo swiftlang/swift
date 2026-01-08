@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"25bd9966","signature":"swift::rewriting::RequirementMachine::lookupNestedType(swift::Type, swift::Identifier) const"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b: Error
 }
