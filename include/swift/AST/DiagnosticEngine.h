@@ -292,7 +292,10 @@ namespace swift {
   /// for a transaction.
   struct ActiveDiagnostic {
     Diagnostic Diag;
-    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
+
+    // NOTE: The `unique_ptr` here is important since we use a DiagnosticInfo
+    // pointer as the diagnostic argument for `Diag` when wrapping.
+    SmallVector<std::unique_ptr<DiagnosticInfo>, 2> WrappedDiagnostics;
     SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
 
     ActiveDiagnostic(Diagnostic diag) : Diag(std::move(diag)) {}
@@ -1499,13 +1502,7 @@ namespace swift {
 
     /// Create a new diagnostic queue with a given engine to forward the
     /// diagnostics to.
-    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction)
-        : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
-          EmitOnDestruction(emitOnDestruction) {
-      // Open a transaction to avoid emitting any diagnostics for the temporary
-      // engine.
-      QueueEngine.TransactionCount++;
-    }
+    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction);
 
     /// Retrieve the engine which may be used to enqueue diagnostics.
     DiagnosticEngine &getDiags() { return QueueEngine; }
