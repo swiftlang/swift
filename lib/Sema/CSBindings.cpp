@@ -2138,6 +2138,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
 
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
+    // Defaults and fallbacks are applicable only to the types
+    // they are associated with. Defaults could be transferred
+    // to supertypes but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
     Defaults.push_back(constraint);
     break;
 
