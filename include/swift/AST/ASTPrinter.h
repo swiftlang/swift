@@ -365,21 +365,16 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
+  /// Print lifetimeDependence as a SIL lifetime attribute, attached to a
+  /// parameter or result of a function.
   void printLifetimeDependence(
-      std::optional<LifetimeDependenceInfo> lifetimeDependence) {
-    if (!lifetimeDependence.has_value()) {
-      return;
-    }
-    *this << lifetimeDependence->getString();
-  }
+      std::optional<LifetimeDependenceInfo> lifetimeDependence);
 
-  void printLifetimeDependenceAt(
-      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
-    if (auto lifetimeDependence =
-            getLifetimeDependenceFor(lifetimeDependencies, index)) {
-      printLifetimeDependence(*lifetimeDependence);
-    }
-  }
+  /// Print lifetimeDependence as a Swift lifetime attribute, that could be
+  /// attached to a function type or a declaration.
+  void
+  printSwiftLifetimeDependence(LifetimeDependenceInfo const &lifetimeDependence,
+                               ArrayRef<AnyFunctionType::Param> params);
 
 private:
   virtual void anchor();

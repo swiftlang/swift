@@ -331,7 +331,6 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
-  std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
 

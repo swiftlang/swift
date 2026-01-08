@@ -145,51 +145,6 @@ getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
   }
 }
 
-std::string LifetimeDependenceInfo::getString() const {
-  std::string lifetimeDependenceString = "@lifetime(";
-  auto addressable = getAddressableIndices();
-  auto condAddressable = getConditionallyAddressableIndices();
-
-  auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
-    std::string result;
-    bool isFirstSetBit = true;
-    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
-      if (bitvector->contains(i)) {
-        if (!isFirstSetBit) {
-          result += ", ";
-        }
-        result += kind;
-        if (addressable && addressable->contains(i)) {
-          result += "address ";
-        } else if (condAddressable && condAddressable->contains(i)) {
-          result += "address_for_deps ";
-        }
-        result += std::to_string(i);
-        isFirstSetBit = false;
-      }
-    }
-    return result;
-  };
-  if (inheritLifetimeParamIndices) {
-    assert(!inheritLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(inheritLifetimeParamIndices, "copy ");
-  }
-  if (scopeLifetimeParamIndices) {
-    assert(!scopeLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString +=
-        getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  if (isImmortal()) {
-    lifetimeDependenceString += "immortal";
-  }
-  lifetimeDependenceString += ") ";
-  return lifetimeDependenceString;
-}
-
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddBoolean(addressableParamIndicesAndImmortalAndInferred.getPointer()
                     .getInt()); // isImmortal
