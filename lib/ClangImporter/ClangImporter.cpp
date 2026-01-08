@@ -4850,6 +4850,14 @@ void ClangImporter::Implementation::getMangledName(
   }
 }
 
+void ClangImporter::Implementation::getItaniumMangledName(
+    const clang::NamedDecl *clangDecl, raw_ostream &os) {
+  auto &clangCtx = clangDecl->getASTContext();
+  std::unique_ptr<clang::ItaniumMangleContext> mangler{
+      clang::ItaniumMangleContext::create(clangCtx, clangCtx.getDiagnostics())};
+  return getMangledName(mangler.get(), clangDecl, os);
+}
+
 void ClangImporter::Implementation::configureOptionsForCodeGen(
     clang::DiagnosticsEngine &Diags, clang::CompilerInvocation *CI) {
   clang::TargetInfo *targetInfo = nullptr;
@@ -7572,6 +7580,24 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (!inserted)
     return ConcreteDeclRef(fnIt->second);
 
+  bool needsThunkForMetatypes =
+      newFn->getNumParams() != decl->getParameterList()->size();
+  // Before we proceed to import the newly instantiated C++ function, make sure
+  // it gets a unique name in Swift. In particular, it must have a different
+  // name from all the other instantiations of the same function template, to
+  // prevent Swift from incorrectly deduplicating the multiple instantiations,
+  // which would cause a silent miscompile. The naming itself is not important,
+  // since this will only get called from synthesized code. Let's use the
+  // mangled Clang name of this instantiation as the swift_name.
+  if (needsThunkForMetatypes) {
+    std::string mangledNewFn;
+    llvm::raw_string_ostream mangleRawStream(mangledNewFn);
+    mangleRawStream << "__swift_specializedThunk_";
+    Impl.getItaniumMangledName(newFn, mangleRawStream);
+    newFn->addAttr(clang::SwiftNameAttr::CreateImplicit(newFn->getASTContext(),
+                                                        mangledNewFn));
+  }
+
   auto *newDecl = cast_or_null<ValueDecl>(
       decl->getASTContext().getClangModuleLoader()->importDeclDirectly(newFn));
   if (!newDecl)
@@ -7586,7 +7612,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (auto *fn = dyn_cast<FuncDecl>(decl)) {
     newDecl = addThunkForDependentTypes(fn, cast<FuncDecl>(newDecl));
 
-    if (newFn->getNumParams() != fn->getParameters()->size()) {
+    if (needsThunkForMetatypes) {
       newDecl = generateThunkForExtraMetatypes(subst, fn,
                                                cast<FuncDecl>(newDecl));
     }
