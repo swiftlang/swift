@@ -1253,7 +1253,7 @@ def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-co
 def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
   HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
 
-def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
+def disable_cond_fail_message_annotation : Flag<["-"], "disable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
 
 def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
