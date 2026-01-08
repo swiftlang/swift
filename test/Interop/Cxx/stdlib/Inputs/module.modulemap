@@ -105,3 +105,9 @@ module StdExpected {
   requires cplusplus
   export *
 }
+
+module StdEnableSharedFromThis {
+  header "std-enable-shared-from-this.h"
+  requires cplusplus
+  export *
+}
