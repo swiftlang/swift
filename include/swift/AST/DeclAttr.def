@@ -608,7 +608,10 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
   110)
 
-// Unused '111'
+SIMPLE_DECL_ATTR(_owned, Owned,
+  OnVar | OnSubscript,
+  NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  111)
 
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
   OnFunc | OnConstructor | OnDestructor | OnVar | OnSubscript | OnProtocol | OnExtension | OnClass | OnStruct | OnEnum,

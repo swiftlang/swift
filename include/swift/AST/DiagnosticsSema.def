@@ -6929,7 +6929,7 @@ ERROR(exclusivity_on_computed_property,none,
       ())
 
 //------------------------------------------------------------------------------
-// MARK: @_borrowed
+// MARK: @_borrowed and @_owned
 //------------------------------------------------------------------------------
 ERROR(borrowed_with_objc_dynamic,none,
       "%kindonly0 cannot be '@_borrowed' if it is '@objc dynamic'",
@@ -6941,6 +6941,12 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 ERROR(borrowed_with_effect,none,
       "%kindonly0 cannot be '@_borrowed' if it is 'async' or 'throws'",
       (const AccessorDecl *))
+ERROR(borrowed_and_owned,none,
+      "%kindonly0 cannot be '@_borrowed' and '@_owned' at the same time",
+      (const AbstractStorageDecl *))
+ERROR(owned_non_getter,none,
+      "%kindonly0 must define a 'get' to support '@_owned'",
+      (const AbstractStorageDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: dynamic

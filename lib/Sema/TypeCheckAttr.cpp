@@ -304,6 +304,32 @@ public:
       D->getAttrs().removeAttribute(attr);
       return;
     }
+
+    // Can't have both @_owned and @_borrwed on the same decl.
+    if (D->getAttrs().hasAttribute<OwnedAttr>()) {
+      diagnose(attr->getLocation(), diag::borrowed_and_owned,
+               ASD)
+          .fixItRemove(attr->getRange());
+      D->getAttrs().removeAttribute(attr);
+    }
+  }
+
+  void visitOwnedAttr(OwnedAttr *attr) {
+    assert(!D->hasClangNode() && "@_owned on imported declaration?");
+
+    auto *ASD = cast<AbstractStorageDecl>(D);
+
+    // Ensure it defines a 'get' for read accesses.
+    //
+    // The only known use-case for this attribute is for getters returning
+    // noncopyable types that want to override the resilient '_read' that is
+    // always generated, exposing 'get' that returns an owned value.
+    if (!ASD->getAccessor(AccessorKind::Get)) {
+      diagnose(attr->getLocation(), diag::owned_non_getter,
+               ASD)
+          .fixItRemove(attr->getRange());
+      D->getAttrs().removeAttribute(attr);
+    }
   }
 
   void visitTransparentAttr(TransparentAttr *attr);
