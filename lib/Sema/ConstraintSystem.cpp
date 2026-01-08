@@ -54,6 +54,44 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
+
+static SourceLoc getAnchorLoc(ASTNode anchor) {
+  if (!anchor) return SourceLoc();
+  if (auto *E = anchor.dyn_cast<Expr *>()) return E->getStartLoc();
+  if (auto *S = anchor.dyn_cast<Stmt *>()) return S->getStartLoc();
+  if (auto *D = anchor.dyn_cast<Decl *>()) return D->getStartLoc();
+  if (auto *P = anchor.dyn_cast<Pattern *>()) return P->getStartLoc();
+  if (auto *T = anchor.dyn_cast<TypeRepr *>()) return T->getStartLoc();
+  return SourceLoc();
+}
+
+bool ConstraintSystem::hasForceOptionalFixAtSameStartLoc(ASTNode reqAnchor) const {
+  auto reqLoc = getAnchorLoc(reqAnchor);
+  if (!reqLoc.isValid())
+    return false;
+
+  for (auto *fix : getFixes()) {
+    if (!fix)
+      continue;
+
+    if (!llvm::isa<ForceOptional>(fix))
+      continue;
+
+    auto *loc = fix->getLocator();
+    if (!loc)
+      continue;
+
+    auto fixLoc = getAnchorLoc(loc->getAnchor());
+    if (!fixLoc.isValid())
+      continue;
+
+    if (fixLoc == reqLoc) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ConstraintSystem::startExpression(ASTNode node) {
   CurrentRange = node.getSourceRange();
 

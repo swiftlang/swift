@@ -1455,6 +1455,15 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (!result)
     return std::nullopt;
 
+  // Do not implicitly open an existential when it is wrapped in Optional
+  // (e.g. (any P)?). Optional existential opening is handled explicitly
+  // via ForceOptional rather than implicit existential opening.
+  if (auto objTy = argTy->getOptionalObjectType()) {
+    if (objTy->isAnyExistentialType()) {
+      return std::nullopt;
+    }
+  }
+
   // An argument expression that explicitly coerces to an existential
   // disables the implicit opening of the existential unless it's
   // wrapped in parens.
@@ -8441,8 +8450,43 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       constraints.push_back(
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
                                 fixedLocator));
+
+      if (fix->getKind() == FixKind::ForceOptional) {
+        if (auto obj = type1->getOptionalObjectType()) {
+          if (obj->isAnyExistentialType()) {
+            constraints.back()->setFavored();
+          }
+        }
+      }
+      continue;
     }
 
+    bool suppressDeepEquality = false;
+
+    if (auto obj = type1->getOptionalObjectType()) {
+      if (obj->isAnyExistentialType() && type2->hasTypeVariable())
+        suppressDeepEquality = true;
+    }
+
+    for (auto *constraint : constraints) {
+      if (constraint->getKind() == ConstraintKind::Bind && !suppressDeepEquality)
+        constraint->setFavored();
+    }
+
+    // Disfavour deep equality for optional existential conversions like (any P)? to (some P)?
+    if (auto lhsObj = type1->getOptionalObjectType()) {
+      if (lhsObj->isAnyExistentialType()) {
+        for (auto *c : constraints) {
+          if (c->isFavored()) {
+            if (auto restriction = c->getRestriction()) {
+              if (*restriction == ConversionRestrictionKind::DeepEquality) {
+                c->setFavored(false);
+              }
+            }
+          }
+        }
+      }
+    }
     // Sort favored constraints first.
     std::sort(constraints.begin(), constraints.end(),
               [&](Constraint *lhs, Constraint *rhs) -> bool {
@@ -16413,6 +16457,66 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
       addUnsolvedConstraint(
           Constraint::create(*this, kind, first, second, loc, referencedVars));
       return SolutionKind::Solved;
+    }
+  }
+
+  // SE-0375: Optional existential -> Optional opaque generic.
+  // If forcing the optional makes the conversion viable, apply ForceOptional.
+  bool shouldApplyForceOptional = false;
+  TypeVariableType *destTV = nullptr;
+
+  if (shouldAttemptFixes()){
+    if (first && first->isOptional()) {
+      if (Type fromObj = first->getOptionalObjectType()) {
+        if (fromObj->isExistentialType()) {
+          if (Type toObj = second->getOptionalObjectType()) {
+            destTV = toObj->getAs<TypeVariableType>();
+            if (destTV) {
+              auto *rep = getRepresentative(destTV);
+              if (!ForceOptionalTypeVars.count(rep)) {
+                shouldApplyForceOptional = true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  if (shouldApplyForceOptional) {
+    if (auto *loc = getConstraintLocator(locator)) {
+      if( auto anchor = loc->getAnchor()) {
+        if (auto *expr = anchor.dyn_cast<Expr *>()) {
+          if (auto *binary = dyn_cast<BinaryExpr>(expr)) {
+            if (auto *odr = dyn_cast<OverloadedDeclRefExpr>(binary->getFn())) {
+              for (auto *decl : odr->getDecls()) {
+                if (decl->getBaseName().userFacingName() == "??") {
+                  return matchTypes(first,
+                                    second,
+                                    kind,
+                                    TMF_GenerateConstraints,
+                                    locator);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    auto fix = ForceOptional::create(*this,
+                                     first,
+                                     second,
+                                     getConstraintLocator(locator));
+
+    recordFix(fix);
+
+    Type base = second->getOptionalObjectType();
+    if (!base)
+      base = second;
+
+    if (auto *tv = base->getAs<TypeVariableType>()) {
+      auto *rep = getRepresentative(tv);
+      ForceOptionalTypeVars.insert(rep);
     }
   }
   return matchTypes(first, second, kind, TMF_GenerateConstraints, locator);

@@ -449,8 +449,38 @@ RelabelArguments::create(ConstraintSystem &cs,
   return new (mem) RelabelArguments(cs, correctLabels, locator);
 }
 
+static bool isExistentialOrWrappedInOptional(Type type) {
+    if (!type)
+      return false;
+    return type->lookThroughAllOptionalTypes()->isExistentialType();
+}
+
+
 bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
   auto *locator = getLocator();
+
+  auto &cs = solution.getConstraintSystem();
+  if (locator) {
+    auto *anchor = locator->getAnchor().dyn_cast<Expr *>();
+
+    if (anchor &&
+        isExistentialOrWrappedInOptional(getNonConformingType()) &&
+        getProtocolType()->is<ProtocolType>()) {
+
+      bool sawOpenedGeneric = false;
+      bool sawTPR           = false;
+
+      for (const auto &elt : locator->getPath()) {
+        sawOpenedGeneric |=
+          elt.getKind() == ConstraintLocator::PathElementKind::OpenedGeneric;
+        sawTPR |=
+          elt.getKind() == ConstraintLocator::PathElementKind::TypeParameterRequirement;
+      }
+      if (sawOpenedGeneric && sawTPR &&
+          cs.hasForceOptionalFixAtSameStartLoc(anchor))
+        return false;
+    }
+  }
 
   if (IsContextual) {
     auto &cs = solution.getConstraintSystem();

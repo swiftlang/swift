@@ -2432,6 +2432,10 @@ private:
   /// constructions) to the argument lists for the call to that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentList *> ArgumentLists;
 
+  /// Tracks type variables involved in a ForceOptional fix.
+  /// Used to suppress default generic argument inference for those variables.
+  llvm::SmallPtrSet<TypeVariableType*, 2> ForceOptionalTypeVars;
+
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::SmallDenseMap<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4>
@@ -5559,6 +5563,11 @@ public:
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
+
+  /// Returns true if a ForceOptional fix already exists at the same
+  /// source location as the given anchor. Used to suppress secondary
+  /// diagnostics when unwrapping is the primary issue.
+  bool hasForceOptionalFixAtSameStartLoc(ASTNode anchor) const;
 
   /// Set the current sub-expression (of a multi-statement closure, etc) for
   /// the purposes of diagnosing "reasonable time" errors.
