@@ -1844,9 +1844,11 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   } else if (isAnyClosureExpr(semanticExpr)) {
     if (auto init = C.getAsConversion()) {
       auto conv = init->getConversion();
-      auto origParamType = conv.getBridgingOriginalInputType();
-      if (origParamType.isClangType())
-        destFnType = origParamType.getClangType();
+      if (conv.isBridging()) {
+        auto origParamType = conv.getBridgingOriginalInputType();
+        if (origParamType.isClangType())
+          destFnType = origParamType.getClangType();
+      }
     }
     (void)emitAnyClosureExpr(
         SGF, semanticExpr, [&](AbstractClosureExpr *closure) {
