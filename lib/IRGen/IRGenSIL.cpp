@@ -6896,6 +6896,16 @@ static ExclusivityFlags getExclusivityFlags(SILModule &M,
   return flags;
 }
 
+static SILAccessEnforcement getEffectiveEnforcement(
+    IRGenFunction &IGF, SILAccessEnforcement enforcement) {
+  // Don't use dynamic enforcement if it has been disabled on the command line.
+  if (enforcement == SILAccessEnforcement::Dynamic &&
+      !IGF.getSILModule().getOptions().EnforceExclusivityDynamic)
+    return SILAccessEnforcement::Unsafe;
+
+  return enforcement;
+}
+
 static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
                                                     BeginAccessInst *access) {
   auto enforcement = access->getEnforcement();
@@ -6913,12 +6923,7 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
     return SILAccessEnforcement::Unsafe;
   }
 
-  // Don't use dynamic enforcement if it has been disabled on the command line.
-  if (enforcement == SILAccessEnforcement::Dynamic &&
-      !IGF.getSILModule().getOptions().EnforceExclusivityDynamic)
-    return SILAccessEnforcement::Unsafe;
-
-  return enforcement;
+  return getEffectiveEnforcement(IGF, enforcement);
 }
 
 template <class BeginAccessInst>
@@ -7031,7 +7036,7 @@ static bool hasBeenInlined(BeginUnpairedAccessInst *access) {
 void IRGenSILFunction::visitBeginUnpairedAccessInst(
                                               BeginUnpairedAccessInst *access) {
   Address addr = getLoweredAddress(access->getSource());
-  switch (access->getEnforcement()) {
+  switch (getEffectiveEnforcement(*this, access->getEnforcement())) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("unknown access enforcement in IRGen!");
 
@@ -7157,7 +7162,7 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
 }
 
 void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
-  switch (i->getEnforcement()) {
+  switch (getEffectiveEnforcement(*this, i->getEnforcement())) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("unknown access enforcement in IRGen!");
 
