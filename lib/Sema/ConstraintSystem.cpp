@@ -760,35 +760,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
                             getOverloadFor);
   }
 
-  {
-    auto iter = path.rbegin();
-    if (locator->findLast<LocatorPathElt::KeyPathComponent>(iter)) {
-      auto componentElt = iter->castTo<LocatorPathElt::KeyPathComponent>();
-      auto *kpExpr = castToExpr<KeyPathExpr>(anchor);
-      auto component = kpExpr->getComponents()[componentElt.getIndex()];
-
-      using ComponentKind = KeyPathExpr::Component::Kind;
-      if (component.getKind() == ComponentKind::Apply ||
-          component.getKind() == ComponentKind::UnresolvedApply) {
-        // The callee is the previous component in the list.
-        // We must specifically target index - 1 to distinguish this call from others
-        // and avoid "recordArgumentList" collisions.
-        if (componentElt.getIndex() > 0) {
-          unsigned prevIndex = componentElt.getIndex() - 1;
-
-          // Drop the current component (the Apply)
-          auto prefix = path.drop_back(iter - path.rbegin() + 1);
-
-          // Build the new path: Prefix + KeyPathComponent(prevIndex)
-          SmallVector<LocatorPathElt, 4> newPathVec(prefix.begin(), prefix.end());
-          newPathVec.push_back(LocatorPathElt::KeyPathComponent(prevIndex));
-
-          return getConstraintLocator(anchor, newPathVec);
-        }
-          }
-    }
-  }
-
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property, subscript, initializer, or method
   // component.
@@ -813,7 +784,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       break;
     case ComponentKind::UnresolvedApply:
     case ComponentKind::Apply:
-      return getConstraintLocator(anchor, *componentElt);
+      return getConstraintLocator(anchor, LocatorPathElt::KeyPathComponent(componentElt->getIndex() - 1));
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -4267,6 +4238,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   std::optional<OverloadChoice> choice;
   Type rawFnType;
   auto *calleeLocator = getCalleeLocator(argLocator);
+
   if (auto overload = getOverloadChoiceIfAvailable(calleeLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
@@ -4275,24 +4247,27 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    auto *call = castToExpr<CallExpr>(anchor);
-    rawFnType = getType(call->getFn());
+    if (auto *call = getAsExpr<CallExpr>(anchor)) {
+      rawFnType = getType(call->getFn());
 
-    // If callee couldn't be resolved due to expression
-    // issues e.g. it's a reference to an invalid member
-    // let's just return here.
-    if (simplifyType(rawFnType)->is<ErrorType>())
-      return std::nullopt;
-
-    // A tuple construction is spelled in the AST as a function call, but
-    // is really more like a tuple conversion.
-    if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
-      if (metaTy->getInstanceType()->is<TupleType>())
+      // If callee couldn't be resolved due to expression
+      // issues e.g. it's a reference to an invalid member
+      // let's just return here.
+      if (simplifyType(rawFnType)->is<ErrorType>())
         return std::nullopt;
-    }
 
-    assert(!shouldHaveDirectCalleeOverload(call) &&
-             "Should we have resolved a callee for this?");
+      // A tuple construction is spelled in the AST as a function call, but
+      // is really more like a tuple conversion.
+      if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
+        if (metaTy->getInstanceType()->is<TupleType>())
+          return std::nullopt;
+      }
+
+      assert(!shouldHaveDirectCalleeOverload(call) &&
+               "Should we have resolved a callee for this?");
+    } else {
+      return std::nullopt;
+    }
   }
 
   // Try to resolve the function type by loading lvalues and looking through
