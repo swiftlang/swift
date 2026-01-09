@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -disable-availability-checking -parse-as-library -enable-experimental-feature Embedded %t/test.swift -c -o %t/a.o
 // RUN: %target-clang -nostdlib -lSystem %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos -lswift_Concurrency -dead_strip -Wl,-undefined,dynamic_lookup
 
-// RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort > %t/actual-dependencies.txt
+// RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
 // RUN: comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt && test ! -s %t/extra.txt
