@@ -360,13 +360,18 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       return Action::Continue(E);
     }
+
+    // Skip implicit constructor references - they're handled via CtorRefs.
+    if (DRE->isImplicit() && isa<ConstructorDecl>(DRE->getDecl()))
+      return Action::Continue(E);
   }
 
   if (!isa<InOutExpr>(E) && !isa<LoadExpr>(E) && !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) && !isa<OpaqueValueExpr>(E) &&
       !isa<SubscriptExpr>(E) && !isa<KeyPathExpr>(E) && !isa<LiteralExpr>(E) &&
-      !isa<CollectionExpr>(E) && E->isImplicit())
+      !isa<CollectionExpr>(E) && !isa<DeclRefExpr>(E) && !isa<MemberRefExpr>(E) &&
+      E->isImplicit())
     return Action::Continue(E);
 
   if (auto LE = dyn_cast<LiteralExpr>(E)) {
@@ -387,23 +392,6 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Stop();
     }
     return Action::Continue(E);
-  } else if (auto *CE = dyn_cast<CallExpr>(E)) {
-    // Handle CallExpr where the function reference is implicit
-    // (e.g., appendInterpolation calls in string interpolation).
-    // The implicit DeclRefExpr would normally be skipped, so we index it here.
-    if (CE->getFn()->isImplicit()) {
-      auto fnRef = ide::getReferencedDecl(CE->getFn());
-      auto *D = fnRef.second.getDecl();
-      // Skip constructors - they're handled via CtorRefs
-      if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(D)) {
-        if (!isa<ConstructorDecl>(FD)) {
-          ReferenceMetaData data(SemaReferenceKind::DeclMemberRef, OpAccess);
-          if (!passReference(FD, CE->getType(), CE->getLoc(),
-                             CE->getSourceRange(), data))
-            return Action::Stop();
-        }
-      }
-    }
   } else if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
@@ -412,7 +400,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
                       ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
-                                        OpAccess))) {
+                                        OpAccess, DRE->isImplicit()))) {
       return Action::Stop();
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
@@ -438,7 +426,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
-                                         OpAccess))) {
+                                         OpAccess, MRE->isImplicit()))) {
       return Action::Stop();
     }
     // We already visited the children.

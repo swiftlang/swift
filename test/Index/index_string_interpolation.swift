@@ -9,9 +9,9 @@ extension DefaultStringInterpolation {
 }
 
 func testStringInterpolation() {
-  // CHECK: [[@LINE+1]]:11 | instance-method/Swift | appendInterpolation(value:) | [[appendInterpolation_value_USR]] | Ref,Call
+  // CHECK: [[@LINE+1]]:11 | instance-method/Swift | appendInterpolation(value:) | [[appendInterpolation_value_USR]] | Ref,Call,Impl
   print("\(value: 1)")
 
-  // CHECK: [[@LINE+1]]:18 | instance-method/Swift | appendInterpolation(value:) | [[appendInterpolation_value_USR]] | Ref,Call
+  // CHECK: [[@LINE+1]]:18 | instance-method/Swift | appendInterpolation(value:) | [[appendInterpolation_value_USR]] | Ref,Call,Impl
   print("value: \(value: 42)")
 }
