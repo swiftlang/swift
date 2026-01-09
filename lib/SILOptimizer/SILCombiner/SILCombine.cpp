@@ -77,7 +77,7 @@ static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   BasicBlockWorklist Worklist(BB);
-  llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
+  llvm::SmallVector<SILInstruction *, 16> InstrsForSILCombineWorklist;
 
   while (SILBasicBlock *BB = Worklist.pop()) {
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
