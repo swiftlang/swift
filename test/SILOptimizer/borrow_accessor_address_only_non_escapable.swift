@@ -14,6 +14,8 @@ struct Butt<T: ~Escapable>: ~Escapable {
 	}
 }
 
+extension Butt: Escapable where T: Escapable {}
+
 struct Tubb<T>: ~Escapable {
 	var x: T
 
