@@ -566,6 +566,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
         .DelayedBy.push_back(TheConstraint.Constraint);
     break;
 
+  case ChangeKind::AddedProtocol: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    ERASE_CONSTRAINT(bindings.Protocols, TheConstraint.Constraint);
+    break;
+  }
+
   case ChangeKind::RetractedProtocol:
     cg[TheConstraint.TypeVar].getPotentialBindings()
         .Protocols.push_back(TheConstraint.Constraint);
