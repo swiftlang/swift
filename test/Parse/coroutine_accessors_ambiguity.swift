@@ -16,15 +16,16 @@ func read<T>(_ c : () -> T) -> T { c() }
 // enabled: need reader
 // disabled: ok!
 var im : Int {
-  modify { // expected-enabled-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-    1 // expected-enabled-warning{{integer literal is unused}}
+  yielding mutate { // expected-error{{variable with a 'yielding mutate' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
+                   // expected-disabled-error@-1{{accessor_requires_coroutine_accessor}}
+    1 // expected-warning{{integer literal is unused}}
   }
 }
 
 // enabled: ok
 // disabled: ok!
 var ir : Int {
-  read {
-    1 // expected-enabled-warning{{integer literal is unused}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessor}}
+    1 // expected-warning{{integer literal is unused}}
   }
 }
