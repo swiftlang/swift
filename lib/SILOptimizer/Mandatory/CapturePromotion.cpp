@@ -1512,7 +1512,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   unsigned opNo = 1;
   unsigned opCount = pai->getNumOperands() - pai->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> args;
-  auto numIndirectResults = calleeConv.getNumIndirectSILResults();
+  auto numIndirectResults = calleeConv.getSILArgIndexOfFirstParam();
   llvm::DenseMap<SILValue, SILValue> capturedMap;
   llvm::SmallSet<SILValue, 16> newCaptures;
   for (; opNo != opCount; ++opNo) {
@@ -1548,7 +1548,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     // alloc_box. Otherwise, it is on the specific iterated copy_value that we
     // started with.
     SILParameterInfo cpInfo = calleePInfo[index - numIndirectResults];
-    assert(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
+    ASSERT(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
                box->getType() &&
            "SILType of parameter info does not match type of parameter");
     releasePartialApplyCapturedArg(builder, pai->getLoc(), box, cpInfo);
