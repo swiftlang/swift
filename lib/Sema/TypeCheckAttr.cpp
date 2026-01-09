@@ -3511,7 +3511,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::specialize_attr_only_generic_param_req,
-												 attr->isPublic());
+                         attr->isPublic());
       hadError = true;
       continue;
     }
@@ -3524,8 +3524,8 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),
                          attr->isPublic() ?
-												 diag::specialized_attr_unsupported_kind_of_req :
-												 diag::specialize_attr_unsupported_kind_of_req);
+                         diag::specialized_attr_unsupported_kind_of_req :
+                         diag::specialize_attr_unsupported_kind_of_req);
       hadError = true;
       break;
 
@@ -3533,7 +3533,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
       if (specializedReq.getSecondType()->isTypeParameter()) {
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::specialize_attr_non_concrete_same_type_req,
-													 attr->isPublic());
+                           attr->isPublic());
         hadError = true;
       }
       break;
@@ -3577,7 +3577,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
     ctx.Diags.diagnose(attr->getLocation(),
                        diag::specialize_attr_missing_constraint,
                        paramTy->getName(),
-											 attr->isPublic());
+                       attr->isPublic());
   }
 }
 
@@ -3596,15 +3596,17 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
 
   if (!trailingWhereClause) {
     // Report a missing "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_missing_where_clause,
-						 attr->isPublic());
+    diagnose(attr->getLocation(),
+             diag::specialize_missing_where_clause,
+             attr->isPublic());
     return;
   }
 
   if (trailingWhereClause->getRequirements().empty()) {
     // Report an empty "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_empty_where_clause,
-						 attr->isPublic());
+    diagnose(attr->getLocation(),
+             diag::specialize_empty_where_clause,
+             attr->isPublic());
     return;
   }
 
@@ -6263,17 +6265,17 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
       // A `.borrow`/`.mutate` specifier also matches a yielding borrow/mutate
       // If we find a yielding version, patch up the provided funcNameWithLoc
       if (!candidate) {
-	if (accessorKind == AccessorKind::Borrow) {
-	  candidate = asd->getOpaqueAccessor(AccessorKind::YieldingBorrow);
-	  if (candidate) {
-	    maybeAccessorKind = AccessorKind::YieldingBorrow;
-	  }
-	} else if (accessorKind == AccessorKind::Mutate) {
-	  candidate = asd->getOpaqueAccessor(AccessorKind::YieldingMutate);
-	  if (candidate) {
-	    maybeAccessorKind = AccessorKind::YieldingMutate;
-	  }
-	}
+        if (accessorKind == AccessorKind::Borrow) {
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingBorrow);
+          if (candidate) {
+            maybeAccessorKind = AccessorKind::YieldingBorrow;
+          }
+        } else if (accessorKind == AccessorKind::Mutate) {
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingMutate);
+          if (candidate) {
+            maybeAccessorKind = AccessorKind::YieldingMutate;
+          }
+        }
       }
       // Error if candidate is missing the requested accessor.
       if (!candidate) {
@@ -6292,10 +6294,10 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     // Error if we're looking for an accessor and
     // the matching accessor isn't a supported kind.
     if (maybeAccessorKind.has_value() &&
-	maybeAccessorKind != AccessorKind::Get &&
-	maybeAccessorKind != AccessorKind::Set) {
+        maybeAccessorKind != AccessorKind::Get &&
+        maybeAccessorKind != AccessorKind::Set) {
       invalidCandidates.push_back(
-	  {decl, LookupErrorKind::CandidateUnsupportedAccessor});
+          {decl, LookupErrorKind::CandidateUnsupportedAccessor});
       continue;
     }
     // Error if candidate is not a `AbstractFunctionDecl`.
@@ -6366,11 +6368,11 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
         break;
       }
       case AbstractFunctionDeclLookupErrorKind::CandidateUnsupportedAccessor: {
-	auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
+        auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
         diags.diagnose(invalidCandidate,
-		       diag::derivative_attr_unsupported_accessor_kind,
-		       getAccessorDescriptiveDeclKind(accessorKind));
-	break;
+                       diag::derivative_attr_unsupported_accessor_kind,
+                       getAccessorDescriptiveDeclKind(accessorKind));
+        break;
       }
       case AbstractFunctionDeclLookupErrorKind::CandidateProtocolRequirement:
         diags.diagnose(invalidCandidate,
