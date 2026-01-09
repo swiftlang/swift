@@ -53,3 +53,8 @@ module CircularInheritance {
   header "circular-inheritance.h"
   requires cplusplus
 }
+
+module ProtectedDtor {
+  header "protected-dtor.h"
+  requires cplusplus
+}

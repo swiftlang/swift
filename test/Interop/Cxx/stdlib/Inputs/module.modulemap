@@ -99,3 +99,15 @@ module CustomSmartPtr {
   requires cplusplus
   export *
 }
+
+module StdExpected {
+  header "std-expected.h"
+  requires cplusplus
+  export *
+}
+
+module StdEnableSharedFromThis {
+  header "std-enable-shared-from-this.h"
+  requires cplusplus
+  export *
+}
