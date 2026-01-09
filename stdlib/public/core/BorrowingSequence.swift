@@ -151,10 +151,18 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
   }
 }
 
+//@available(SwiftStdlib 6.3, *)
+//extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
+//  @_transparent
+//  public func makeBorrowingIterator() -> BorrowingIterator {
+//    BorrowingIteratorAdapter(iterator: makeIterator())
+//  }
+//}
+
 @available(SwiftStdlib 6.3, *)
-extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
+extension Sequence {
   @_transparent
-  public func makeBorrowingIterator() -> BorrowingIterator {
+  public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
     BorrowingIteratorAdapter(iterator: makeIterator())
   }
 }
@@ -164,7 +172,7 @@ extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator>
 @available(SwiftStdlib 6.3, *)
 extension Span: BorrowingSequence, BorrowingIteratorProtocol {
   public typealias Element = Element
-  
+
   @_lifetime(&self)
   @_lifetime(self: copy self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
