@@ -211,7 +211,9 @@ public:
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx, std::string swiftPCHHash = "",
+  create(ASTContext &ctx,
+         const IRGenOptions *IRGenOpts = nullptr,
+         std::string swiftPCHHash = "",
          DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);

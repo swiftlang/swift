@@ -1399,7 +1399,8 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
 }
 
 std::unique_ptr<ClangImporter> ClangImporter::create(
-    ASTContext &ctx, std::string swiftPCHHash, DependencyTracker *tracker,
+    ASTContext &ctx, const IRGenOptions *IRGenOpts, std::string swiftPCHHash,
+    DependencyTracker *tracker,
     DWARFImporterDelegate *dwarfImporterDelegate, bool ignoreFileMapping) {
   std::unique_ptr<ClangImporter> importer{
       new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
@@ -1531,6 +1532,48 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   } else {
     // Set using the existing invocation.
     importer->Impl.configureOptionsForCodeGen(clangDiags);
+  }
+
+  if (IRGenOpts) {
+    // We need to set the AST-affecting CodeGenOpts here early so that
+    // the clang module cache hash will be consistent throughout. Also
+    // prefer to set the AST-benign ones here unless they are computed
+    // after this point or may var per inputs.
+    auto &CGO = importer->getCodeGenOpts();
+    CGO.OptimizationLevel = IRGenOpts->shouldOptimize() ? 3 : 0;
+    CGO.DebugTypeExtRefs = !IRGenOpts->DisableClangModuleSkeletonCUs;
+    switch (IRGenOpts->DebugInfoLevel) {
+    case IRGenDebugInfoLevel::None:
+      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
+      break;
+    case IRGenDebugInfoLevel::LineTables:
+      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
+      break;
+    case IRGenDebugInfoLevel::ASTTypes:
+    case IRGenDebugInfoLevel::DwarfTypes:
+      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
+      break;
+    }
+    switch (IRGenOpts->DebugInfoFormat) {
+    case IRGenDebugInfoFormat::None:
+      break;
+    case IRGenDebugInfoFormat::DWARF:
+      CGO.DebugCompilationDir = IRGenOpts->DebugCompilationDir;
+      CGO.DwarfVersion = IRGenOpts->DWARFVersion;
+      break;
+    case IRGenDebugInfoFormat::CodeView:
+      CGO.EmitCodeView = true;
+      CGO.DebugCompilationDir = IRGenOpts->DebugCompilationDir;
+      break;
+    }
+    if (!IRGenOpts->TrapFuncName.empty()) {
+      CGO.TrapFuncName = IRGenOpts->TrapFuncName;
+    }
+    // We don't need to perform coverage mapping for any Clang decls we've
+    // synthesized, as they have no user-written code. This is also needed to
+    // avoid a Clang crash when attempting to emit coverage for decls without
+    // source locations (rdar://100172217).
+    CGO.CoverageMapping = false;
   }
 
   // Create the associated action.
