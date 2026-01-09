@@ -6506,120 +6506,6 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseCxxFunctionCalls(E, DC);
 }
 
-/// Performs a deep recursive search to check if a statement (or any nested scope)
-/// contains a throwing expression or statement.
-static bool doesStmtThrow(const Stmt *S, ASTContext &ctx) {
-  llvm::SmallVector<ASTNode, 16> worklist;
-  worklist.push_back(const_cast<Stmt*>(S));
-
-  while (!worklist.empty()) {
-    ASTNode node = worklist.pop_back_val();
-
-    if (auto *expr = node.dyn_cast<Expr *>()) {
-      // Check for 'try', 'try?', 'try!', and other throwing expressions
-      if (TypeChecker::canThrow(ctx, expr))
-        return true;
-    } else if (auto *stmt = node.dyn_cast<Stmt *>()) {
-      // 1. Explicit Throw
-      if (isa<ThrowStmt>(stmt))
-        return true;
-
-      // 2. Control Flow Recursion
-      if (auto *brace = dyn_cast<BraceStmt>(stmt)) {
-        for (auto elem : brace->getElements())
-          worklist.push_back(elem);
-      } else if (auto *ifStmt = dyn_cast<IfStmt>(stmt)) {
-        worklist.push_back(ifStmt->getThenStmt());
-        if (auto *elseStmt = ifStmt->getElseStmt())
-          worklist.push_back(elseStmt);
-      } else if (auto *guard = dyn_cast<GuardStmt>(stmt)) {
-        worklist.push_back(guard->getBody());
-      } else if (auto *doStmt = dyn_cast<DoStmt>(stmt)) {
-        worklist.push_back(doStmt->getBody());
-      } else if (auto *nestedDoCatch = dyn_cast<DoCatchStmt>(stmt)) {
-        // For nested do-catch, errors in the 'do' are caught by the inner catch.
-        // We only care if the *inner catch* re-throws.
-        for (auto *innerCatch : nestedDoCatch->getCatches()) {
-           worklist.push_back(innerCatch->getBody());
-        }
-      } else if (auto *loop = dyn_cast<ForEachStmt>(stmt)) {
-        worklist.push_back(loop->getBody());
-      } else if (auto *whileStmt = dyn_cast<WhileStmt>(stmt)) {
-        worklist.push_back(whileStmt->getBody());
-      } else if (auto *repeat = dyn_cast<RepeatWhileStmt>(stmt)) {
-        worklist.push_back(repeat->getBody());
-      } else if (auto *switchStmt = dyn_cast<SwitchStmt>(stmt)) {
-        for (auto *caseStmt : switchStmt->getCases()) {
-          worklist.push_back(caseStmt);
-        }
-      } else if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
-        worklist.push_back(caseStmt->getBody());
-      }
-    }
-  }
-  return false;
-}
-
-/// Diagnose an empty catch block that silently ignores errors.
-///
-/// This specific diagnostic is limited to 'do-catch' statements with a single
-/// catch clause. If there are multiple catches, an empty catch usually implies
-/// a fallback that intentionally ignores specific errors while handling others.
-/// Diagnose an empty catch block that silently ignores errors.
-static void checkEmptyCatchBlock(const DoCatchStmt *doCatchStmt, ASTContext &ctx) {
-  // We only diagnose if there is a single catch clause.
-  if (doCatchStmt->getCatches().size() != 1)
-    return;
-
-  auto *catchStmt = doCatchStmt->getCatches().front();
-
-  // A generic 'catch {}' always has exactly one case label item.
-  if (catchStmt->getCaseLabelItems().size() != 1)
-    return;
-
-  const auto &labelItem = catchStmt->getCaseLabelItems().front();
-
-  // If there is a 'where' clause (guard), the catch is conditional.
-  if (labelItem.getGuardExpr())
-    return;
-
-  auto *pattern = labelItem.getPattern();
-  if (!pattern) return;
-
-  // If the pattern contains ANY errors (invalid types, redeclarations),
-  // suppress the warning. This fixes failures in redeclaration-checking.swift.
-  bool hasError = false;
-  pattern->forEachNode([&](const Pattern *P) {
-    // Check for type errors
-    if (P->hasType() && P->getType()->hasError())
-      hasError = true;
-
-    // Check for invalid variable declarations (e.g. "let x, let x")
-    if (auto *NP = dyn_cast<NamedPattern>(P)) {
-      if (auto *D = NP->getDecl()) {
-        if (D->isInvalid()) hasError = true;
-      }
-    }
-  });
-
-  if (hasError)
-    return;
-
-  // Only warn if the catch pattern is implicit.
-  // Explicit patterns (like 'catch let e') return false here.
-  if (!pattern->isImplicit())
-    return;
-
-  if (!doesStmtThrow(doCatchStmt->getBody(), ctx))
-    return;
-
-  if (auto *body = catchStmt->getBody()) {
-    if (body->empty()) {
-      ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
-    }
-  }
-}
-
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
   auto &ctx = DC->getASTContext();
 
@@ -6635,12 +6521,7 @@ void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {
 
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseStmtAvailability(S, const_cast<DeclContext*>(DC));
-
-  if (auto *doCatchStmt = dyn_cast<DoCatchStmt>(S)) {
-    checkEmptyCatchBlock(doCatchStmt, ctx);
-  }
 }
-
 
 //===----------------------------------------------------------------------===//
 // MARK: Utility functions

@@ -3607,6 +3607,46 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// context.
   ConditionalEffectKind MaxThrowingKind;
 
+  void diagnoseEmptyCatch(DoCatchStmt *S) {
+    // If the body didn't throw, 'diagnoseNoThrowInDo' handles it.
+    if (!Flags.has(ContextFlags::HasAnyThrowSite))
+      return;
+
+    // We only diagnose if there is exactly one catch clause.
+    if (S->getCatches().size() != 1)
+      return;
+
+    auto *catchStmt = S->getCatches().front();
+
+    // Must be a generic 'catch' (no specific patterns like 'catch MyError.bad')
+    if (catchStmt->getCaseLabelItems().size() != 1)
+      return;
+
+    const auto &labelItem = catchStmt->getCaseLabelItems().front();
+
+    // No 'where' clause (guard)
+    if (labelItem.getGuardExpr())
+      return;
+
+    // Check the pattern
+    auto *pattern = labelItem.getPattern();
+    if (!pattern) return;
+
+    // Suppress if pattern has errors
+    if (pattern->hasType() && pattern->getType()->hasError()) return;
+
+    // Only warn for implicit patterns (standard 'catch' vs 'catch let e')
+    if (!pattern->isImplicit())
+      return;
+
+    // Finally, check if the catch body is empty
+    if (auto *body = catchStmt->getBody()) {
+      if (body->empty()) {
+        Ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
+      }
+    }
+  }
+
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
                    PotentialEffectReason reason,
@@ -4105,6 +4145,7 @@ private:
     S->getBody()->walk(*this);
 
     diagnoseNoThrowInDo(S, scope, S->getBody()->getSourceRange());
+    diagnoseEmptyCatch(S);
 
     return MaxThrowingKind;
   }
@@ -4129,6 +4170,7 @@ private:
     S->getBody()->walk(*this);
 
     diagnoseNoThrowInDo(S, scope, S->getBody()->getSourceRange());
+    diagnoseEmptyCatch(S);
 
     scope.preserveCoverageFromNonExhaustiveCatch();
     return MaxThrowingKind;

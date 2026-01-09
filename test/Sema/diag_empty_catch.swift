@@ -126,3 +126,45 @@ func testReachabilityConflict(flag: Bool) {
   } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
 }
+
+func testConditionalCompilation() {
+  // 15. Throw in active #if block -> WARN
+  do {
+    #if true
+    try something()
+    #else
+    safe()
+    #endif
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 16. Throw in inactive #if block (Active block safe) -> NO WARN
+  do {
+    #if false
+    try something()
+    #else
+    safe()
+    #endif
+  } catch {
+  }
+
+  // 17. Throw in both blocks -> WARN
+  do {
+    #if true
+    try something()
+    #else
+    try something()
+    #endif
+  } catch { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  }
+
+  // 18. Safe in both blocks -> WARN (Unreachable)
+  do {
+    #if true
+    safe()
+    #else
+    safe()
+    #endif
+  } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  }
+}
