@@ -386,6 +386,13 @@ SolverTrail::Change::getSyntacticElementTargetKey() const {
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
+#define ERASE_CONSTRAINT(VEC, CONSTRAINT)                                      \
+  VEC.erase(llvm::remove_if(VEC,                                               \
+                            [&](Constraint *constraint) {                      \
+                              return constraint == CONSTRAINT;                 \
+                            }),                                                \
+            VEC.end());
+
   switch (Kind) {
 #define LOCATOR_CHANGE(Name, Map) \
   case ChangeKind::Name: { \
@@ -547,6 +554,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.InactiveConstraints.insert(Retiree.Where,
                                   Retiree.Constraint);
     break;
+
+  case ChangeKind::AddedDelayedBy: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    ERASE_CONSTRAINT(bindings.DelayedBy, TheConstraint.Constraint);
+    break;
+  }
 
   case ChangeKind::RetractedDelayedBy:
     cg[TheConstraint.TypeVar].getPotentialBindings()
