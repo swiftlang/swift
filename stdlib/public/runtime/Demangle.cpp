@@ -24,12 +24,6 @@
 #include <objc/runtime.h>
 #endif
 
-#ifdef _WIN32
-// We'll probably want dbghelp.h here
-#else
-#include <cxxabi.h>
-#endif
-
 using namespace swift;
 
 Demangle::NodePointer
