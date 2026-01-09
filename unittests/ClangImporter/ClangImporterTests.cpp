@@ -213,7 +213,7 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
     vfs.devtoolSet("9").libstdCxxModulemap("\n");
     auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
     ASSERT_TRUE(paths.redirectedFiles.size() == 2);
-    ASSERT_TRUE(paths.overridenFiles.empty());
+    ASSERT_TRUE(paths.overridenFiles.size() == 1);
     EXPECT_EQ(paths.redirectedFiles[0].first,
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/libstdcxx.h");
     EXPECT_EQ(paths.redirectedFiles[0].second,
@@ -229,14 +229,14 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
     vfs.devtoolSet("9").cxxStdlibHeader("string_view").libstdCxxModulemap();
     auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
     ASSERT_TRUE(paths.redirectedFiles.size() == 1);
-    ASSERT_TRUE(paths.overridenFiles.size() == 1);
+    ASSERT_TRUE(paths.overridenFiles.size() == 2);
     EXPECT_EQ(paths.redirectedFiles[0].first,
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/libstdcxx.h");
     EXPECT_EQ(paths.redirectedFiles[0].second,
               "/usr/lib/swift/linux/libstdcxx.h");
-    EXPECT_EQ(paths.overridenFiles[0].first,
+    EXPECT_EQ(paths.overridenFiles[0]->getBufferIdentifier(),
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/module.modulemap");
-    EXPECT_NE(paths.overridenFiles[0].second.find(
+    EXPECT_NE(paths.overridenFiles[0]->getBuffer().find(
                   "header \"string_view\"\n  /// additional headers."),
               StringRef::npos);
   }
@@ -255,15 +255,15 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
         .libstdCxxModulemap();
     auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
     ASSERT_TRUE(paths.redirectedFiles.size() == 1);
-    ASSERT_TRUE(paths.overridenFiles.size() == 1);
+    ASSERT_TRUE(paths.overridenFiles.size() == 2);
     EXPECT_EQ(paths.redirectedFiles[0].first,
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/libstdcxx.h");
     EXPECT_EQ(paths.redirectedFiles[0].second,
               "/usr/lib/swift/linux/libstdcxx.h");
-    EXPECT_EQ(paths.overridenFiles[0].first,
+    EXPECT_EQ(paths.overridenFiles[0]->getBufferIdentifier(),
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/module.modulemap");
     EXPECT_NE(
-        paths.overridenFiles[0].second.find(
+        paths.overridenFiles[0]->getBuffer().find(
             "header \"codecvt\"\n  header \"any\"\n  header \"charconv\"\n  "
             "header \"filesystem\"\n  header \"memory_resource\"\n  header "
             "\"optional\"\n  header \"string_view\"\n  header \"variant\"\n  "
