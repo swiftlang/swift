@@ -7,7 +7,6 @@
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: sort %t/allowed-dependencies_macos.txt -o %t/allowed-dependencies_macos.txt
 // RUN: comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt
 // RUN: test ! -s %t/extra.txt
 
@@ -32,27 +31,6 @@ _vprintf
 _vsnprintf
 
 //--- test.swift
-// DEP: ___assert_rtn
-// DEP: ___stack_chk_fail
-// DEP: ___stack_chk_guard
-// DEP: _abort
-// DEP: _clock_gettime
-// DEP: _exit
-// DEP: _free
-// DEP: _malloc
-// DEP: _memcpy
-// DEP: _memmove
-// DEP: _memset
-// DEP: _memset_s
-// DEP: _nanosleep
-// DEP: _posix_memalign
-// DEP: _putchar
-// DEP: _puts
-// DEP: _strlen
-// DEP: _strncpy
-// DEP: _vprintf
-// DEP: _vsnprintf
-
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
