@@ -282,11 +282,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MutableAddressor;
 
      case AccessorKind::Read:
-     case AccessorKind::Read2:
+     case AccessorKind::YieldingBorrow:
        return DescriptiveDeclKind::ReadAccessor;
 
      case AccessorKind::Modify:
-     case AccessorKind::Modify2:
+     case AccessorKind::YieldingMutate:
        return DescriptiveDeclKind::ModifyAccessor;
 
      case AccessorKind::Init:
@@ -409,7 +409,9 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(MacroExpansion, "pound literal");
   ENTRY(Using, "using");
   ENTRY(BorrowAccessor, "borrow accessor");
-  ENTRY(MutateAccessor, "Mutate accessor");
+  ENTRY(MutateAccessor, "mutate accessor");
+  ENTRY(YieldingBorrowAccessor, "yielding borrow accessor");
+  ENTRY(YieldingMutateAccessor, "yielding mutate accessor");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -3142,8 +3144,8 @@ getDirectReadAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadImplKind::Read:
     return AccessStrategy::getAccessor(AccessorKind::Read,
                                        /*dispatch*/ false);
-  case ReadImplKind::Read2:
-    return AccessStrategy::getAccessor(AccessorKind::Read2,
+  case ReadImplKind::YieldingBorrow:
+    return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow,
                                        /*dispatch*/ false);
   case ReadImplKind::Borrow:
     return AccessStrategy::getAccessor(AccessorKind::Borrow,
@@ -3183,8 +3185,8 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case WriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
-  case WriteImplKind::Modify2:
-    return AccessStrategy::getAccessor(AccessorKind::Modify2,
+  case WriteImplKind::YieldingMutate:
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate,
                                        /*dispatch*/ false);
   case WriteImplKind::Mutate:
     return AccessStrategy::getAccessor(AccessorKind::Mutate,
@@ -3224,14 +3226,14 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   case ReadWriteImplKind::Modify:
     return AccessStrategy::getAccessor(AccessorKind::Modify,
                                        /*dispatch*/ false);
-  case ReadWriteImplKind::Modify2:
-    return AccessStrategy::getAccessor(AccessorKind::Modify2,
+  case ReadWriteImplKind::YieldingMutate:
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate,
                                        /*dispatch*/ false);
   case ReadWriteImplKind::StoredWithDidSet:
   case ReadWriteImplKind::InheritedWithDidSet:
-    if (storage->requiresOpaqueModify2Coroutine() &&
+    if (storage->requiresOpaqueYieldingMutateCoroutine() &&
         storage->getParsedAccessor(AccessorKind::DidSet)->isSimpleDidSet()) {
-      return AccessStrategy::getAccessor(AccessorKind::Modify2,
+      return AccessStrategy::getAccessor(AccessorKind::YieldingMutate,
                                          /*dispatch*/ false);
     } else if (storage->requiresOpaqueModifyCoroutine() &&
                storage->getParsedAccessor(AccessorKind::DidSet)
@@ -3302,14 +3304,14 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     std::optional<std::pair<SourceRange, const DeclContext *>> location,
     bool useOldABI) {
   if (useOldABI) {
-    assert(storage->requiresOpaqueRead2Coroutine());
+    assert(storage->requiresOpaqueYieldingBorrowCoroutine());
     assert(storage->requiresOpaqueReadCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   }
-  if (storage->requiresOpaqueRead2Coroutine() &&
+  if (storage->requiresOpaqueYieldingBorrowCoroutine() &&
       mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
                                                 storage))
-    return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
+    return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
 
@@ -3332,14 +3334,14 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     std::optional<std::pair<SourceRange, const DeclContext *>> location,
     bool useOldABI) {
   if (useOldABI) {
-    assert(storage->requiresOpaqueModify2Coroutine());
+    assert(storage->requiresOpaqueYieldingMutateCoroutine());
     assert(storage->requiresOpaqueModifyCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   }
-  if (storage->requiresOpaqueModify2Coroutine() &&
+  if (storage->requiresOpaqueYieldingMutateCoroutine() &&
       mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
                                                 storage))
-    return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
@@ -3467,12 +3469,12 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
     return requiresOpaqueSetter();
   case AccessorKind::Read:
     return requiresOpaqueReadCoroutine();
-  case AccessorKind::Read2:
-    return requiresOpaqueRead2Coroutine();
+  case AccessorKind::YieldingBorrow:
+    return requiresOpaqueYieldingBorrowCoroutine();
   case AccessorKind::Modify:
     return requiresOpaqueModifyCoroutine();
-  case AccessorKind::Modify2:
-    return requiresOpaqueModify2Coroutine();
+  case AccessorKind::YieldingMutate:
+    return requiresOpaqueYieldingMutateCoroutine();
 
   // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
@@ -3494,7 +3496,7 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return requiresCorrespondingUnderscoredCoroutineAccessor(
-        AccessorKind::Read2);
+        AccessorKind::YieldingBorrow);
 
   // If a borrow accessor is present, we don't need a read coroutine.
   if (getParsedAccessor(AccessorKind::Borrow)) {
@@ -3503,7 +3505,7 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
 }
 
-bool AbstractStorageDecl::requiresOpaqueRead2Coroutine() const {
+bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return false;
@@ -3524,7 +3526,7 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
       false);
 }
 
-bool AbstractStorageDecl::requiresOpaqueModify2Coroutine() const {
+bool AbstractStorageDecl::requiresOpaqueYieldingMutateCoroutine() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
       ctx.evaluator,
@@ -3627,8 +3629,8 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   if (requiresOpaqueReadCoroutine())
     visit(AccessorKind::Read);
 
-  if (requiresOpaqueRead2Coroutine())
-    visit(AccessorKind::Read2);
+  if (requiresOpaqueYieldingBorrowCoroutine())
+    visit(AccessorKind::YieldingBorrow);
 
   // All mutable storage should have a setter.
   if (requiresOpaqueSetter())
@@ -3638,8 +3640,8 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
   if (requiresOpaqueModifyCoroutine())
     visit(AccessorKind::Modify);
 
-  if (requiresOpaqueModify2Coroutine())
-    visit(AccessorKind::Modify2);
+  if (requiresOpaqueYieldingMutateCoroutine())
+    visit(AccessorKind::YieldingMutate);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(
@@ -7646,19 +7648,13 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
   case AccessorKind::MutableAddress:
     return article ? "a mutable addressor" : "mutable addressor";
   case AccessorKind::Read:
-    if (underscored)
-      return article ? "a '_read' accessor" : "'_read' accessor";
-    // Fall through to the non-underscored spelling.
-    LLVM_FALLTHROUGH;
-  case AccessorKind::Read2:
-    return article ? "a 'read' accessor" : "'read' accessor";
+    return article ? "a '_read' accessor" : "'_read' accessor";
+  case AccessorKind::YieldingBorrow:
+    return article ? "a 'yielding borrow' accessor" : "'yielding borrow' accessor";
   case AccessorKind::Modify:
-    if (underscored)
-      return article ? "a '_modify' accessor" : "'_modify' accessor";
-    // Fall through to the non-underscored spelling.
-    LLVM_FALLTHROUGH;
-  case AccessorKind::Modify2:
-    return article ? "a 'modify' accessor" : "'modify' accessor";
+    return article ? "a '_modify' accessor" : "'_modify' accessor";
+  case AccessorKind::YieldingMutate:
+    return article ? "a 'yielding mutate' accessor" : "'yielding mutate' accessor";
   case AccessorKind::WillSet:
     return "'willSet'";
   case AccessorKind::DidSet:
@@ -10000,9 +9996,9 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:
       return subscript ? subscript->getName()
@@ -11414,9 +11410,9 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Borrow:
@@ -11431,7 +11427,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Borrow:
     return true;
 
@@ -11440,7 +11436,7 @@ bool AccessorDecl::isAssumedNonMutating() const {
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::Init:
   case AccessorKind::Mutate:
     return false;

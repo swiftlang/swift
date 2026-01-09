@@ -1344,9 +1344,11 @@ static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
       .Case("addressor", AccessorKind::Address)
       .Case("mutableAddressor", AccessorKind::MutableAddress)
       .Case("read", AccessorKind::Read)
-      .Case("read2", AccessorKind::Read2)
+      .Case("read2", AccessorKind::YieldingBorrow)
+      .Case("yielding_borrow", AccessorKind::YieldingBorrow)
       .Case("modify", AccessorKind::Modify)
-      .Case("modify2", AccessorKind::Modify2)
+      .Case("modify2", AccessorKind::YieldingMutate)
+      .Case("yielding_mutate", AccessorKind::YieldingMutate)
       .Default(std::nullopt);
 }
 

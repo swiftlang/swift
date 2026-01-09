@@ -2442,7 +2442,7 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
 }
 
-ManglingError Remangler::mangleModify2Accessor(Node *node, unsigned depth) {
+ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "x", depth + 1);
 }
 
@@ -3110,7 +3110,7 @@ ManglingError Remangler::mangleReadAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "r", depth + 1);
 }
 
-ManglingError Remangler::mangleRead2Accessor(Node *node, unsigned depth) {
+ManglingError Remangler::mangleYieldingBorrowAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "y", depth + 1);
 }
 
