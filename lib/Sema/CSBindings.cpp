@@ -1084,15 +1084,15 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
 void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
                                          TypeVariableType *TypeVar,
                                          Constraint *constraint) {
+  ASSERT(isDirectRequirement(CS, TypeVar, constraint));
+
   auto *protocol = constraint->getProtocol();
 
   for (const auto &literal : Literals) {
     if (literal.getProtocol() == protocol)
       return;
   }
-
-  bool isDirect = isDirectRequirement(CS, TypeVar, constraint);
-
+  
   Type defaultType;
   // `ExpressibleByNilLiteral` doesn't have a default type.
   if (!protocol->isSpecificProtocol(
@@ -1100,7 +1100,7 @@ void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
-  Literals.emplace_back(protocol, constraint, defaultType, isDirect);
+  Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
 }
 
 bool BindingSet::operator==(const BindingSet &other) {
@@ -2099,6 +2099,12 @@ void PotentialBindings::infer(ConstraintSystem &CS,
 
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
+    // Conformances are applicable only to the types they are
+    // placed on. They could be transferred to supertypes
+    // but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
     if (constraint->getSecondType()->is<ProtocolType>())
       Protocols.push_back(constraint);
     break;
@@ -2119,12 +2125,25 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     // Constraints from which we can't do anything.
     break;
 
-  case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::LiteralConformsTo: {
+    // Literal conformances are applicable only to the types they
+    // are placed on. They could be transferred to supertypes
+    // but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
     inferFromLiteral(CS, TypeVar, constraint);
     break;
+  }
 
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
+    // Defaults and fallbacks are applicable only to the types
+    // they are associated with. Defaults could be transferred
+    // to supertypes but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
     Defaults.push_back(constraint);
     break;
 
