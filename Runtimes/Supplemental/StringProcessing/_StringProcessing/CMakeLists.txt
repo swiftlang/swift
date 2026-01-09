@@ -63,6 +63,8 @@ add_library(swift_StringProcessing
   Engine/Metrics.swift
   Engine/MECapture.swift
   ByteCodeGen.swift
+  ByteCodeGen+DSLList.swift
+  Optimizations/AutoPossessification.swift
   Utility/AsciiBitset.swift
   Utility/Traced.swift
   Utility/TypedIndex.swift
