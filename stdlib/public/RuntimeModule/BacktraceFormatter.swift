@@ -363,6 +363,7 @@ private func measure<S: StringProtocol>(_ s: S) -> Int {
 }
 
 /// Pad the given string to the given width using spaces.
+@available(Backtracing 6.2, *)
 private func pad(_ s: String, to width: Int,
                  aligned alignment: BacktraceFormatter.Alignment = .left)
   -> String {

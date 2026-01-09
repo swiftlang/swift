@@ -407,6 +407,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
 // -- Capture Implementation -------------------------------------------------
 
+@available(Backtracing 6.2, *)
 extension Backtrace {
 
   // ###FIXME: There is a problem with @_specialize here that results in the
