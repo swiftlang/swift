@@ -42,6 +42,7 @@ add_library(swift_StringProcessing
   Regex/Core.swift
   Regex/ASTConversion.swift
   Regex/DSLTree.swift
+  Regex/DSLList.swift
   Regex/AnyRegexOutput.swift
   LiteralPrinter.swift
   MatchingOptions.swift
