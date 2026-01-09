@@ -82,6 +82,7 @@ GRAPH_NODE_CHANGE(AddedDelayedBy)
 GRAPH_NODE_CHANGE(RetractedDelayedBy)
 GRAPH_NODE_CHANGE(AddedProtocol)
 GRAPH_NODE_CHANGE(RetractedProtocol)
+GRAPH_NODE_CHANGE(AddedDefault)
 GRAPH_NODE_CHANGE(RetractedDefault)
 
 BINDING_RELATION_CHANGE(RetractedAdjacentVar)
