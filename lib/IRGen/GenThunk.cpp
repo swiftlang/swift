@@ -539,10 +539,13 @@ void IRGenThunk::emit() {
   } else {
     if (isAsync) {
       Explosion error;
-      if (errorValue)
+      SILType directErrorType;
+      if (errorValue) {
         error.add(errorValue);
+        directErrorType = conv.getSILErrorType(expansionContext);
+      }
       emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result,
-                      error);
+                      error, directErrorType);
       return;
     }
   }
@@ -562,7 +565,9 @@ void IRGenThunk::emit() {
   resultTy = resultTy.subst(IGF.getSILModule(), subMap);
   IGF.emitScalarReturn(resultTy, resultTy, result,
                        /*swiftCCReturn=*/false,
-                       /*isOutlined=*/false);
+                       /*isOutlined=*/false,
+                       /*mayPeepholeLoad=*/false,
+                       /*errorType=*/SILType());
 }
 
 void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {
