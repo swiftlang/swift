@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
@@ -39,6 +40,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SetVector.h"
+#include <algorithm>
 #include <set>
 
 using namespace swift;
@@ -1119,23 +1121,20 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!baseType->hasDynamicMemberLookupAttribute())
     return;
 
-  auto &ctx = dc->getASTContext();
-
-  // Lookup the `subscript(dynamicMember:)` methods in this type.
-  DeclNameRef subscriptName(
-      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember} });
-
-  SmallVector<ValueDecl *, 2> subscripts;
-  dc->lookupQualified(baseType, subscriptName, loc,
+  SmallVector<ValueDecl *, 4> subscripts;
+  dc->lookupQualified(baseType, DeclNameRef::createSubscript(), loc,
                       NL_QualifiedDefault | NL_ProtocolMembers, subscripts);
 
   for (ValueDecl *VD : subscripts) {
-    auto *subscript = dyn_cast<SubscriptDecl>(VD);
-    if (!subscript)
+    auto *subscript = cast<SubscriptDecl>(VD);
+    if (!subscript || subscript->getDynamicMemberLookupKind(dc) !=
+                          SubscriptDecl::DynamicMemberLookupKind::KeyPath) {
       continue;
+    }
 
-    auto rootType = evaluateOrDefault(subscript->getASTContext().evaluator,
-      RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
+    auto rootType = evaluateOrDefault(
+        subscript->getASTContext().evaluator,
+        RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
     if (rootType.isNull())
       continue;
 
