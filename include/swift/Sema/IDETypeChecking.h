@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <memory>
 #include <tuple>
 
@@ -347,6 +348,12 @@ namespace swift {
   SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                     CustomAttr *attr, bool passParentContext,
                                     MacroRole role, StringRef discriminator);
+
+  /// Find the Objective-C protocol requirements that the given declaration
+  /// satisfies, including requirements from inherited conformances.
+  llvm::TinyPtrVector<ValueDecl *>
+  findWitnessedObjCRequirements(const ValueDecl *witness,
+                                bool anySingleRequirement);
 }
 
 #endif
