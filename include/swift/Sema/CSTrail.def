@@ -42,6 +42,11 @@
 #define BINDING_RELATION_CHANGE(Name) CHANGE(Name)
 #endif
 
+#ifndef BINDING_RELATION_RETRACTION
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  BINDING_RELATION_CHANGE(Retracted##RelationName)
+#endif
+
 #ifndef SCORE_CHANGE
 #define SCORE_CHANGE(Name) CHANGE(Name)
 #endif
@@ -85,10 +90,10 @@ GRAPH_NODE_CHANGE(RetractedProtocol)
 GRAPH_NODE_CHANGE(AddedDefault)
 GRAPH_NODE_CHANGE(RetractedDefault)
 
-BINDING_RELATION_CHANGE(RetractedAdjacentVar)
-BINDING_RELATION_CHANGE(RetractedSubtypeOf)
-BINDING_RELATION_CHANGE(RetractedSupertypeOf)
-BINDING_RELATION_CHANGE(RetractedEquivalentTo)
+BINDING_RELATION_RETRACTION(AdjacentVar, AdjacentVars)
+BINDING_RELATION_RETRACTION(SubtypeOf, SubtypeOf)
+BINDING_RELATION_RETRACTION(SupertypeOf, SupertypeOf)
+BINDING_RELATION_RETRACTION(EquivalentTo, EquivalentTo)
 
 SCORE_CHANGE(IncreasedScore)
 SCORE_CHANGE(DecreasedScore)
@@ -124,6 +129,7 @@ LAST_CHANGE(RetractedBinding)
 #undef CONSTRAINT_CHANGE
 #undef GRAPH_NODE_CHANGE
 #undef BINDING_RELATION_CHANGE
+#undef BINDING_RELATION_RETRACTION
 #undef SCORE_CHANGE
 #undef LAST_CHANGE
 #undef CHANGE

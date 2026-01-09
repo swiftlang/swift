@@ -2307,33 +2307,22 @@ void PotentialBindings::retract(ConstraintSystem &CS,
       llvm::remove_if(Defaults, CALLBACK(RetractedDefault)),
       Defaults.end());
 
-#define PAIR_CALLBACK(ChangeKind)                                              \
-  [&](std::pair<TypeVariableType *, Constraint *> pair) {                      \
-    if (pair.second == constraint) {                                           \
-      if (recordingChanges) {                                                  \
-        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
-            TypeVar, pair.first, pair.second));                                \
-      }                                                                        \
-      return true;                                                             \
-    }                                                                          \
-    return false;                                                              \
-  }
-
-  AdjacentVars.erase(
-    llvm::remove_if(AdjacentVars, PAIR_CALLBACK(RetractedAdjacentVar)),
-    AdjacentVars.end());
-
-  SubtypeOf.erase(
-    llvm::remove_if(SubtypeOf, PAIR_CALLBACK(RetractedSubtypeOf)),
-    SubtypeOf.end());
-
-  SupertypeOf.erase(
-    llvm::remove_if(SupertypeOf, PAIR_CALLBACK(RetractedSupertypeOf)),
-    SupertypeOf.end());
-
-  EquivalentTo.erase(
-    llvm::remove_if(EquivalentTo, PAIR_CALLBACK(RetractedEquivalentTo)),
-    EquivalentTo.end());
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](std::pair<TypeVariableType *, Constraint *> pair) {  \
+                        if (pair.second == constraint) {                       \
+                          if (recordingChanges) {                              \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##RelationName(  \
+                                    TypeVar, pair.first, pair.second));        \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
+#include "swift/Sema/CSTrail.def"
 
 #undef CALLBACK
 }

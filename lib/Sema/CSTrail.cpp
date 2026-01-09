@@ -15,18 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
+
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
-#include <memory>
-#include <numeric>
 
 using namespace swift;
 using namespace constraints;
@@ -90,17 +86,16 @@ SolverTrail::~SolverTrail() {
     result.TheConstraint.Constraint = constraint; \
     return result; \
   }
-#define BINDING_RELATION_CHANGE(Name) \
-  SolverTrail::Change \
-  SolverTrail::Change::Name(TypeVariableType *typeVar, \
-                            TypeVariableType *otherTypeVar, \
-                            Constraint *constraint) { \
-    Change result; \
-    result.Kind = ChangeKind::Name; \
-    result.BindingRelation.TypeVar = typeVar; \
-    result.BindingRelation.OtherTypeVar = otherTypeVar; \
-    result.BindingRelation.Constraint = constraint; \
-    return result; \
+#define BINDING_RELATION_CHANGE(Name)                                          \
+  SolverTrail::Change SolverTrail::Change::Name(                               \
+      TypeVariableType *typeVar, TypeVariableType *otherTypeVar,               \
+      Constraint *constraint) {                                                \
+    Change result;                                                             \
+    result.Kind = ChangeKind::Name;                                            \
+    result.BindingRelation.TypeVar = typeVar;                                  \
+    result.BindingRelation.OtherTypeVar = otherTypeVar;                        \
+    result.BindingRelation.Constraint = constraint;                            \
+    return result;                                                             \
   }
 #define SCORE_CHANGE(Name) \
   SolverTrail::Change \
@@ -400,6 +395,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     ASSERT(erased); \
     break; \
   }
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  case ChangeKind::Retracted##RelationName: {                                  \
+    cg[BindingRelation.TypeVar].getPotentialBindings().Storage.emplace_back(   \
+        BindingRelation.OtherTypeVar, BindingRelation.Constraint);             \
+    break;                                                                     \
+  }
 #include "swift/Sema/CSTrail.def"
 
   case ChangeKind::AddedTypeVariable:
@@ -604,30 +605,6 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg[TheConstraint.TypeVar].getPotentialBindings()
         .inferFromLiteral(cs, TheConstraint.TypeVar,
                           TheConstraint.Constraint);
-    break;
-
-  case ChangeKind::RetractedAdjacentVar:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .AdjacentVars.emplace_back(BindingRelation.OtherTypeVar,
-                                   BindingRelation.Constraint);
-    break;
-
-  case ChangeKind::RetractedSubtypeOf:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .SubtypeOf.emplace_back(BindingRelation.OtherTypeVar,
-                                BindingRelation.Constraint);
-    break;
-
-  case ChangeKind::RetractedSupertypeOf:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .SupertypeOf.emplace_back(BindingRelation.OtherTypeVar,
-                                  BindingRelation.Constraint);
-    break;
-
-  case ChangeKind::RetractedEquivalentTo:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .EquivalentTo.emplace_back(BindingRelation.OtherTypeVar,
-                                   BindingRelation.Constraint);
     break;
 
   case ChangeKind::AddedBinding: {

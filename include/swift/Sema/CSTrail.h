@@ -176,9 +176,9 @@ public:
 #define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
 #define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
                                                    Constraint *constraint);
-#define BINDING_RELATION_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
-                                                         TypeVariableType *otherTypeVar, \
-                                                         Constraint *constraint);
+#define BINDING_RELATION_CHANGE(Name)                                          \
+  static Change Name(TypeVariableType *typeVar,                                \
+                     TypeVariableType *otherTypeVar, Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
