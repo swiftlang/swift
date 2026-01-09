@@ -21,11 +21,11 @@
 // CHECK-LABEL: sil_default_witness_table MutatableAssociatedField {
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #MutatableAssociatedField.field!read2
+// CHECK-NEXT:    method #MutatableAssociatedField.field!yielding_borrow
 // CHECK-SAME:        : @$s24coroutine_accessors_skip24MutatableAssociatedFieldP5field5AssocQzvy
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #MutatableAssociatedField.field!modify2
+// CHECK-NEXT:    method #MutatableAssociatedField.field!yielding_mutate
 // CHECK-SAME:        : @$s24coroutine_accessors_skip24MutatableAssociatedFieldP5field5AssocQzvx
 // CHECK-NEXT:  }
 public protocol MutatableAssociatedField {
