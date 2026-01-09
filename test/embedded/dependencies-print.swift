@@ -24,7 +24,6 @@ __stack_chk_guard
 memmove
 memset
 putchar
-
 //--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
