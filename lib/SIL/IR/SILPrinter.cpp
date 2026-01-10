@@ -394,16 +394,10 @@ void SILDeclRef::print(raw_ostream &OS) const {
       OS << "!init";
       break;
     case AccessorKind::YieldingBorrow:
-// TODO: Change the SIL printing to use the standard
-// terminology instead of the interim terms.
-// Note: SIL parsing already accepts both
-//      OS << "!yielding_borrow"
-      OS << "!read2";
+      OS << "!yielding_borrow";
       break;
     case AccessorKind::YieldingMutate:
-// TODO: Switch to standard terminology
-//      OS << "!yielding_mutate"
-      OS << "!modify2";
+      OS << "!yielding_mutate";
       break;
     case AccessorKind::Borrow:
       OS << "!borrow";
