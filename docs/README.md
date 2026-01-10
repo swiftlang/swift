@@ -53,8 +53,6 @@ to ask for help!
 - [CompilerPerformance.md](/docs/CompilerPerformance.md):
   Thoroughly discusses different ways of measuring compiler performance
   and common pitfalls.
-- [EmbeddedSwift/](/docs/EmbeddedSwift/):
-  A guide to all things Embedded Swift.
 - [Generics/](/docs/Generics/): "Compiling Swift Generics", a book about
   the implementation of parameteric polymorphism in the Swift compiler.
   Also covers the compilation pipeline, request evaluator, and type system in
