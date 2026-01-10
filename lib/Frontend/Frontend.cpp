@@ -338,7 +338,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getSILOptions(), Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(), Invocation.getSymbolGraphOptions(),
       Invocation.getCASOptions(), Invocation.getSerializationOptions(),
-      SourceMgr, Diagnostics, OutputBackend));
+      SourceMgr, Diagnostics, Invocation.getSDKInfo(), OutputBackend));
   if (!Invocation.getFrontendOptions().ModuleAliasMap.empty())
     Context->setModuleAliases(Invocation.getFrontendOptions().ModuleAliasMap);
 

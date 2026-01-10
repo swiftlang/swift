@@ -797,7 +797,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &serializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags,
+    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -812,7 +812,7 @@ ASTContext *ASTContext::get(
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, casOpts, serializationOpts,
-                 SourceMgr, Diags, std::move(OutputBackend));
+                 SourceMgr, Diags, DarwinSDKInfo, std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -821,7 +821,7 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &SerializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags,
+    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
@@ -867,6 +867,12 @@ ASTContext::ASTContext(
     Id_StringProcessing
   };
   StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
+
+  if (DarwinSDKInfo)
+    getImpl().SDKInfo.emplace(
+        std::make_unique<clang::DarwinSDKInfo>(*DarwinSDKInfo));
+  else
+    getImpl().SDKInfo.emplace();
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -7202,40 +7208,7 @@ bool ASTContext::isASCIIString(StringRef s) const {
 }
 
 clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
-  if (!getImpl().SDKInfo) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(*SourceMgr.getFileSystem(),
-                                                  SearchPathOpts.SDKPath);
-    if (!SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-                              // Ignore the error for now..
-                            });
-      getImpl().SDKInfo.emplace();
-    } else if (!*SDKInfoOrErr) {
-      getImpl().SDKInfo.emplace();
-    } else {
-      getImpl().SDKInfo.emplace(std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
-    }
-  }
-
   return getImpl().SDKInfo->get();
-}
-
-const clang::DarwinSDKInfo::RelatedTargetVersionMapping
-*ASTContext::getAuxiliaryDarwinPlatformRemapInfo(clang::DarwinSDKInfo::OSEnvPair Kind) const {
-  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-            *llvm::vfs::getRealFileSystem(),
-            *SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
-    if (!SDKInfoOrErr || !*SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-        // Ignore the error for now..
-      });
-    }
-    return (*SDKInfoOrErr)->getVersionMapping(Kind);
-  }
-  return nullptr;
 }
 
 /// The special Builtin.TheTupleType, which parents tuple extensions and

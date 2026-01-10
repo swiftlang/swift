@@ -524,10 +524,6 @@ public:
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
 
-  /// Path to the file that defines platform mapping for availability
-  /// version inheritance.
-  std::optional<std::string> PlatformAvailabilityInheritanceMapPath;
-
   /// Cross import module information. Map from module name to the list of cross
   /// import overlay files that associate with that module.
   using CrossImportMap = llvm::StringMap<std::vector<std::string>>;

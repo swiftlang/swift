@@ -31,6 +31,7 @@
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
@@ -1192,6 +1193,7 @@ struct ParserUnit::Implementation {
   CASOptions CASOpts;
   SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   ASTContext &Ctx;
   SourceManager &SM;
   unsigned BufferID;
@@ -1204,7 +1206,7 @@ struct ParserUnit::Implementation {
         SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, CASOpts,
-                             SerializationOpts, SM, Diags)),
+                             SerializationOpts, SM, Diags, SDKInfo)),
         SM(SM), BufferID(BufferID) {
     registerParseRequestFunctions(Ctx.evaluator);
 
