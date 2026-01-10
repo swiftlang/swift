@@ -4584,22 +4584,6 @@ ConstraintSystem::matchTypesBindTypeVar(
       // instead of re-trying it and failing later.
       if (typeVar->getImpl().canBindToHole() && !type->hasTypeVariable())
         return getTypeMatchSuccess();
-
-      // Just like in cases where both sides are dependent member types
-      // with resolved base that can't be simplified to a concrete type
-      // let's ignore this mismatch and mark affected type variable as a hole
-      // because something else has to be fixed already for this to happen.
-      if (type->is<DependentMemberType>() && !type->hasTypeVariable()) {
-        // Since the binding couldn't be performed, the type variable is a
-        // hole regardless whether it would be bound later to some other
-        // type or not. If this is not reflected in constraint system
-        // it would let the solver to form a _valid_ solution as if the
-        // constraint between the type variable and the unresolved dependent
-        // member type never existed.
-        increaseScore(SK_Hole, locator);
-        recordPotentialHole(typeVar);
-        return getTypeMatchSuccess();
-      }
     }
 
     return formUnsolvedResult();
@@ -7193,18 +7177,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (desugar1->hasError() || desugar2->hasError())
     return getTypeMatchFailure(locator);
 
-  // If both sides are dependent members without type variables, it's
-  // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
-  // is a concrete type substituted for generic parameter,
-  // so checking equality here would lead to incorrect behavior,
-  // let's defer it until later proper check.
-  if (!(desugar1->is<DependentMemberType>() &&
-        desugar2->is<DependentMemberType>())) {
-    // If the types are obviously equivalent, we're done.
-    if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2)) {
-      return getTypeMatchSuccess();
-    }
-  }
+  // If the types are obviously equivalent, we're done.
+  if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2))
+    return getTypeMatchSuccess();
 
   // Local function that should be used to produce the return value whenever
   // this function was unable to resolve the constraint. It should be used
@@ -7580,40 +7555,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
-      // If types are identical, let's consider this constraint solved
-      // even though they are dependent members, they would be resolved
-      // to the same concrete type.
-      if (desugar1->isEqual(desugar2))
-        return getTypeMatchSuccess();
-
-      if (shouldAttemptFixes()) {
-        if (!desugar1->hasTypeVariable() && !desugar2->hasTypeVariable()) {
-          auto *loc = getConstraintLocator(locator);
-
-          auto *fix =
-              loc->isLastElement<LocatorPathElt::TypeParameterRequirement>()
-                  ? fixRequirementFailure(*this, type1, type2, loc->getAnchor(),
-                                          loc->getPath())
-                  : ContextualMismatch::create(*this, type1, type2, loc);
-
-          if (!fix || recordFix(fix))
-            return getTypeMatchFailure(locator);
-
-          return getTypeMatchSuccess();
-        }
-      }
-
-      // If one of the dependent member types has no type variables,
-      // this comparison is effectively illformed, because dependent
-      // member couldn't be simplified down to the actual type, and
-      // we wouldn't be able to solve this constraint, so let's just fail.
-      // This should only happen outside of diagnostic mode, as otherwise the
-      // member is replaced by a placeholder in simplifyType.
-      if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
-        return getTypeMatchFailure(locator);
-
       // Nothing we can solve yet, since we need to wait until
       // type variables will get resolved.
+      ASSERT(desugar1->isTypeVariableOrMember() &&
+             desugar2->isTypeVariableOrMember());
       return formUnsolvedResult();
     }
 
@@ -11938,10 +11883,9 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     return SolutionKind::Unsolved;
   }
 
-  // If the wrapper type is a hole or a dependent member with no type variables,
-  // don't record a fix, because this indicates that there was an error
-  // elsewhere in the constraint system.
-  if (wrapperType->isPlaceholder() || wrapperType->is<DependentMemberType>())
+  // If the wrapper type is a hole, don't record a fix, because this indicates
+  // that there was an error elsewhere in the constraint system.
+  if (wrapperType->isPlaceholder())
     return SolutionKind::Solved;
 
   auto *wrappedVar = getAsDecl<VarDecl>(locator.getAnchor());
