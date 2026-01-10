@@ -142,20 +142,19 @@ toolchain as a one-off, there are a couple of differences:
 1. Install Xcode. The minimum required version is specified in the node
    information on <https://ci.swift.org>, may change frequently, and is often
    a beta release.
-1. Install [Ninja][] and [Sccache][]:
-   - Via [Homebrew][] (recommended):
+2. (Optional) Install [Sccache][] via [Homebrew][]:
      ```sh
-     brew install ninja sccache
+     brew install sccache
      ```
-   - Via [Homebrew Bundle][]:
-     ```sh
-     brew bundle
-     ```
+   This step is not required, but it speeds up rebuilds by caching build artifacts.
+
+**Important:** `build-script` will check out and build specific [CMake][] and [Ninja][]
+versions for you that are verified to work, so installing different versions of these tools manually is likely to cause toolchain build errors.
 
 [Xcode]: https://developer.apple.com/xcode/resources/
-[Ninja]: https://ninja-build.org
 [Homebrew]: https://brew.sh/
-[Homebrew Bundle]: https://github.com/Homebrew/homebrew-bundle
+[CMake]: https://cmake.org
+[Ninja]: https://ninja-build.org
 
 ### Linux
 
