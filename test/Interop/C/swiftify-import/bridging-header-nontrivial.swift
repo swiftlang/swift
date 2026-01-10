@@ -24,7 +24,6 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 imports for TestClang.bar:
 imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
 	Swift
-	__ObjC
 	lifetimebound
 	ptrcheck
 	_StringProcessing

@@ -1921,7 +1921,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
   if (adapter->isNonSwiftModule()) {
-    // bridging header has already been imported by main module
+    // non-swift modules don't need to access anything from the bridging header
     return true;
   }
   if (isPCHFilenameExtension(header)) {
