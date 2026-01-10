@@ -395,6 +395,20 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     ASSERT(erased); \
     break; \
   }
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  case ChangeKind::Added##RelationName: {                                      \
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
+    bindings.Storage.erase(                                                    \
+        llvm::remove_if(bindings.Storage,                                      \
+                        [&](const auto &relation) {                            \
+                          return relation.first ==                             \
+                                     BindingRelation.OtherTypeVar &&           \
+                                 relation.second ==                            \
+                                     BindingRelation.Constraint;               \
+                        }),                                                    \
+        bindings.Storage.end());                                               \
+    break;                                                                     \
+  }
 #define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
   case ChangeKind::Retracted##RelationName: {                                  \
     cg[BindingRelation.TypeVar].getPotentialBindings().Storage.emplace_back(   \
