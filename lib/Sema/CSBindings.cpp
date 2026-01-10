@@ -2283,29 +2283,21 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Literals.end());
 
-#define CALLBACK(ChangeKind)                                                   \
-  [&](Constraint *other) {                                                     \
-    if (other == constraint) {                                                 \
-      if (recordingChanges) {                                                  \
-        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
-            TypeVar, constraint));                                             \
-      }                                                                        \
-      return true;                                                             \
-    }                                                                          \
-    return false;                                                              \
-  }
-
-  DelayedBy.erase(
-      llvm::remove_if(DelayedBy, CALLBACK(RetractedDelayedBy)),
-      DelayedBy.end());
-
-  Protocols.erase(
-      llvm::remove_if(Protocols, CALLBACK(RetractedProtocol)),
-      Protocols.end());
-
-  Defaults.erase(
-      llvm::remove_if(Defaults, CALLBACK(RetractedDefault)),
-      Defaults.end());
+#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](Constraint *other) {                                 \
+                        if (other == constraint) {                             \
+                          if (recordingChanges) {                              \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##PropertyName(  \
+                                    TypeVar, constraint));                     \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
 
 #define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
   Storage.erase(                                                               \
@@ -2323,8 +2315,6 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),                                                      \
       Storage.end());
 #include "swift/Sema/CSTrail.def"
-
-#undef CALLBACK
 }
 
 void PotentialBindings::reset() {

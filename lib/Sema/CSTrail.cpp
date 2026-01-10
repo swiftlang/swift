@@ -381,19 +381,29 @@ SolverTrail::Change::getSyntacticElementTargetKey() const {
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   auto &cg = cs.getConstraintGraph();
 
-#define ERASE_CONSTRAINT(VEC, CONSTRAINT)                                      \
-  VEC.erase(llvm::remove_if(VEC,                                               \
-                            [&](Constraint *constraint) {                      \
-                              return constraint == CONSTRAINT;                 \
-                            }),                                                \
-            VEC.end());
-
   switch (Kind) {
 #define LOCATOR_CHANGE(Name, Map) \
   case ChangeKind::Name: { \
     bool erased = cs.Map.erase(TheLocator); \
     ASSERT(erased); \
     break; \
+  }
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  case ChangeKind::Added##PropertyName: {                                      \
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();         \
+    bindings.Storage.erase(llvm::remove_if(bindings.Storage,                   \
+                                           [&](Constraint *constraint) {       \
+                                             return constraint ==              \
+                                                    TheConstraint.Constraint;  \
+                                           }),                                 \
+                           bindings.Storage.end());                            \
+    break;                                                                     \
+  }
+#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+  case ChangeKind::Retracted##PropertyName: {                                  \
+    cg[TheConstraint.TypeVar].getPotentialBindings().Storage.push_back(        \
+        TheConstraint.Constraint);                                             \
+    break;                                                                     \
   }
 #define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
   case ChangeKind::Added##RelationName: {                                      \
@@ -568,39 +578,6 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   case ChangeKind::RetiredConstraint:
     cs.InactiveConstraints.insert(Retiree.Where,
                                   Retiree.Constraint);
-    break;
-
-  case ChangeKind::AddedDelayedBy: {
-    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
-    ERASE_CONSTRAINT(bindings.DelayedBy, TheConstraint.Constraint);
-    break;
-  }
-
-  case ChangeKind::RetractedDelayedBy:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .DelayedBy.push_back(TheConstraint.Constraint);
-    break;
-
-  case ChangeKind::AddedProtocol: {
-    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
-    ERASE_CONSTRAINT(bindings.Protocols, TheConstraint.Constraint);
-    break;
-  }
-
-  case ChangeKind::RetractedProtocol:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .Protocols.push_back(TheConstraint.Constraint);
-    break;
-
-  case ChangeKind::AddedDefault: {
-    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
-    ERASE_CONSTRAINT(bindings.Defaults, TheConstraint.Constraint);
-    break;
-  }
-
-  case ChangeKind::RetractedDefault:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .Defaults.push_back(TheConstraint.Constraint);
     break;
 
   case ChangeKind::AddedLiteral: {
