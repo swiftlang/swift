@@ -361,8 +361,10 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return Action::Continue(E);
     }
 
-    // Skip implicit constructor references - they're handled via CtorRefs.
-    if (DRE->isImplicit() && isa<ConstructorDecl>(DRE->getDecl()))
+    // Skip implicit DeclRefExprs that will be handled via CtorRefs in
+    // passReference. This matches the location check in passReference.
+    if (DRE->isImplicit() && !CtorRefs.empty() &&
+        CtorRefs.back()->getFn()->getLoc() == DRE->getLoc())
       return Action::Continue(E);
   }
 
