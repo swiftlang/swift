@@ -6910,8 +6910,13 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
   if (enforcement == SILAccessEnforcement::Dynamic &&
       IGF.IGM.getTypeInfo(access->getSource()->getType())
              .isKnownEmpty(ResilienceExpansion::Maximal)) {
-    enforcement = SILAccessEnforcement::Unsafe;
+    return SILAccessEnforcement::Unsafe;
   }
+
+  // Don't use dynamic enforcement if it has been disabled on the command line.
+  if (enforcement == SILAccessEnforcement::Dynamic &&
+      !IGF.getSILModule().getOptions().EnforceExclusivityDynamic)
+    return SILAccessEnforcement::Unsafe;
 
   return enforcement;
 }
