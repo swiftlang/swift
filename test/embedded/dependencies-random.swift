@@ -32,9 +32,9 @@ putchar
 //--- allowed-dependencies_wasi.txt
 __indirect_function_table
 __memory_base
-__stack_pointer
 __stack_chk_fail
 __stack_chk_guard
+__stack_pointer
 arc4random_buf
 free
 memmove
