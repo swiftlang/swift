@@ -7,7 +7,8 @@
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.out | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt && test ! -s %t/extra.txt
+// RUN: comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt > %t/extra.txt
+// RUN: test ! -s %t/extra.txt
 
 //--- allowed-dependencies.txt
 ___stack_chk_fail
