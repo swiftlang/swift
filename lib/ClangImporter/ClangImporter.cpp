@@ -1963,6 +1963,10 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
+  if (adapter->isNonSwiftModule()) {
+    // non-swift modules don't need to access anything from the bridging header
+    return true;
+  }
   if (isPCHFilenameExtension(header)) {
     return bindBridgingHeader(adapter, diagLoc);
   }
