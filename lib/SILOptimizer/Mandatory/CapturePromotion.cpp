@@ -1625,7 +1625,7 @@ namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
-    SmallVector<SILFunction *, 128> worklist;
+    SmallVector<SILFunction *, 8> worklist;
     for (auto &f : *getModule()) {
       if (f.wasDeserializedCanonical() || !f.hasOwnership())
         continue;
