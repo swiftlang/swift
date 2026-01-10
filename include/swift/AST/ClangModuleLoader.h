@@ -216,8 +216,12 @@ public:
                                           DeclContext *newContext,
                                           ClangInheritanceInfo inheritance) = 0;
 
-  /// Returnes the original method if \param decl is a clone from a base class
+  /// Returns the original method if \param decl is a clone from a base class
   virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
+
+  /// Returns true if we synthesize this member for every type so no need to
+  /// clone it for the derived classes.
+  virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -298,6 +302,24 @@ public:
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
 
+  /// Determine whether this is a functional C++ type, e.g. std::function, for
+  /// which Swift provides a synthesized constructor that takes a Swift closure
+  /// as the single parameter.
+  virtual bool
+  needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const = 0;
+
+  /// Determine whether this is an instantiation of the __SwiftFunctionWrapper
+  /// type, which wraps around a Swift closure along with its context.
+  virtual bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const = 0;
+  virtual bool isDeconstructedSwiftClosure(const clang::Type* type) const = 0;
+
+  /// Given a functional C++ type, e.g. std::function, determine the
+  /// corresponding C++ closure type.
+  ///
+  /// \see needsClosureConstructor
+  virtual const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const = 0;
+
   virtual FuncDecl *
   getAvailabilityDomainPredicate(const clang::VarDecl *var) = 0;
 
@@ -316,6 +338,10 @@ public:
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
 
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
   virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
 
   virtual DeclName

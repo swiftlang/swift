@@ -145,6 +145,7 @@ public:
         /// of a PotentialBinding.
         Type BindingType;
         PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
+        TypeVariableType *Originator;
       } Binding;
 
       ConstraintFix *TheFix;

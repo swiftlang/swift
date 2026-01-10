@@ -886,7 +886,7 @@ OwnershipLifetimeExtender::createPlusZeroCopy(SILValue value,
   boundary.visitInsertionPoints(
       [&](SILBasicBlock::iterator insertPt) {
         SILBuilderWithScope builder(insertPt);
-        auto *dvi = builder.createDestroyValue(insertPt->getLoc(), copy);
+        auto *dvi = builder.createDestroyValue(RegularLocation(insertPt->getLoc()), copy);
         callbacks.createdNewInst(dvi);
       },
       &ctx.deBlocks);

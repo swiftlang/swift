@@ -1084,7 +1084,10 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
         IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
     subIGF.emitScalarReturn(resultType, resultType, result,
-                            true /*isSwiftCCReturn*/, false);
+                            /*isSwiftCCReturn=*/true,
+                            /*isOutlined=*/false,
+                            /*mayPeepholeLoad=*/false,
+                            /*errorType=*/SILType());
   }
   
   return fwd;

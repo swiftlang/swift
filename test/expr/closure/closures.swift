@@ -551,7 +551,7 @@ do {
   let qux: () -> Void
 
   f(qux)
-  f(id(qux)) // expected-error {{conflicting arguments to generic parameter 'T' ('() -> Void' vs. '@convention(block) () -> Void')}}
+  f(id(qux))
 
   func forceUnwrap<T>(_: T?) -> T {}
 

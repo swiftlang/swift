@@ -39,7 +39,9 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfRef
     single-source/ArrayRemoveAll
     single-source/ArraySetElement
+    single-source/ArraySliceTests
     single-source/ArraySubscript
+    single-source/ArrayTests
     single-source/AsyncTree
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
@@ -65,6 +67,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ClassArrayGetter
     single-source/CodableTest
     single-source/Combos
+    single-source/ContiguousArrayTests
     single-source/CountAlgo
     single-source/DataBenchmarks
     single-source/DeadArray
@@ -80,6 +83,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
+    single-source/DictionaryIdentical
     single-source/DictionaryKeysContains
     single-source/DictionaryLiteralTest
     single-source/DictionaryOfAnyHashableStrings
@@ -175,6 +179,7 @@ set(SWIFT_BENCH_MODULES
     # Disabled while layout prespecializations are experimental
     #single-source/SimpleArraySpecialization
     single-source/SequenceAlgos
+    single-source/SetIdentical
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray

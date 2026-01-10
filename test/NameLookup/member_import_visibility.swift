@@ -85,7 +85,7 @@ extension X {
     _ = (NestedInA, NestedInB, NestedInC).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = GenericType<NestedInB>.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInC.self
-    _ = AmbiguousNestedType.self
+    _ = AmbiguousNestedType.self // expected-ambiguity-error{{ambiguous use of 'AmbiguousNestedType'}}
   }
 
   var hasNestedInAType: NestedInA { fatalError() }

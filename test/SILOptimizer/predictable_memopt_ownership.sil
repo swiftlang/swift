@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
 
 sil_stage raw
 
@@ -1240,16 +1240,17 @@ bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
 sil [ossa] @dont_promote_load_borrow_with_reborrows : $@convention(thin) (@owned SomeClass) -> () {
 bb0(%0 : @owned $SomeClass):
   %1 = alloc_stack $SomeClass
-  store %0 to [init] %1 : $*SomeClass
-  %3 = load_borrow %1 : $*SomeClass
-  br bb1(%3 : $SomeClass)
+  store %0 to [init] %1
+  %3 = load_borrow %1
+  br bb1(%3)
 
 bb1(%5 : @reborrow $SomeClass):
-  end_borrow %5 : $SomeClass
-  destroy_addr %1 : $*SomeClass
-  dealloc_stack %1 : $*SomeClass
-  %9 = tuple ()
-  return %9 : $()
+  %6 = borrowed %5 from ()
+  end_borrow %6
+  destroy_addr %1
+  dealloc_stack %1
+  %10 = tuple ()
+  return %10
 }
 
 

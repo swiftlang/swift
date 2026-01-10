@@ -918,8 +918,19 @@ void BridgedVerifier::runSwiftFunctionVerification(SILFunction * _Nonnull f, SIL
 }
 
 void BridgedVerifier::verifierError(BridgedStringRef message,
-                                    OptionalBridgedInstruction atInstruction,
-                                    OptionalBridgedArgument atArgument) {
-  Twine msg(message.unbridged());
-  verificationFailure(msg, atInstruction.unbridged(), atArgument.unbridged(), /*extraContext=*/nullptr);
+                                    BridgedInstruction atInstruction) {
+  verificationFailure(message.unbridged(), atInstruction.unbridged(),
+                      /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedArgument atArgument) {
+  verificationFailure(message.unbridged(), atArgument.getArgument(),
+                      /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedValue atValue) {
+  verificationFailure(message.unbridged(), SILValue(atValue.getSILValue()),
+                      /*extraContext=*/nullptr);
 }

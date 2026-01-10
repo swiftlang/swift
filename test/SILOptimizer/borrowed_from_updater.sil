@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -sil-disable-input-verify %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -test-runner -sil-disable-input-verify %s | %FileCheck %s
 //
 // REQUIRES: swift_in_compiler
 
@@ -37,6 +37,7 @@ sil @coro : $@yield_once @convention(thin) () -> @yields @guaranteed C
 // CHECK:       } // end sil function 'introducer_identity'
 sil [ossa] @introducer_identity : $@convention(thin) (@guaranteed C, @in C) -> () {
 bb0(%0 : @guaranteed $C, %1 : $*C):
+  specify_test "update_borrowed_from"
   %borrow1 = begin_borrow %0 : $C
   br bb1(%borrow1 : $C)
 
@@ -56,6 +57,7 @@ bb1(%reborrow : @guaranteed $C):
 // CHECK:       } // end sil function 'introducer_trivial'
 sil [ossa] @introducer_trivial : $@convention(thin) () -> () {
 bb0:
+  specify_test "update_borrowed_from"
   %trivial = enum $FakeOptional<C>, #FakeOptional.none!enumelt
   br bb1(%trivial : $FakeOptional<C>)
 
@@ -70,6 +72,7 @@ bb1(%phi : @guaranteed $FakeOptional<C>):
 // CHECK:       } // end sil function 'introducer_unreachable'
 sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
 bb0:
+  specify_test "update_borrowed_from"
   br bb2
 
 bb1(%phiCycle : @guaranteed $C):
@@ -95,6 +98,7 @@ bb2:
 // CHECK:       } // end sil function 'introducer_revisit_reborrow'
 sil [ossa] @introducer_revisit_reborrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
+  specify_test "update_borrowed_from"
   %borrow1 = begin_borrow %0 : $C
   %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
   br bb1(%borrow1 : $C, %aggregate : $PairC)
@@ -122,6 +126,7 @@ bb2:
 // CHECK:       } // end sil function 'introducer_multiple_borrow'
 sil [ossa] @introducer_multiple_borrow : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
+  specify_test "update_borrowed_from"
   %borrow1 = begin_borrow %0 : $C
   %borrow2 = begin_borrow %0 : $C
   %aggregate = struct $PairC(%0 : $C, %borrow2 : $C)
@@ -146,6 +151,7 @@ bb2:
 // CHECK:       } // end sil function 'testSelfIntroducer'
 sil [ossa] @testSelfIntroducer : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
+  specify_test "update_borrowed_from"
   %borrow = begin_borrow %0 : $C
   %d = unconditional_checked_cast %borrow : $C to D
   br bb1(%borrow : $C, %d : $D)
@@ -176,6 +182,7 @@ bb3:
 // CHECK:       } // end sil function 'testEnclosingRevisitReborrow'
 sil [ossa] @testEnclosingRevisitReborrow : $@convention(thin) (@owned C, @owned C) -> () {
 bb0(%0 : @owned $C, %1 : @owned $C):
+  specify_test "update_borrowed_from"
   %borrow = begin_borrow %0 : $C
   br bb1(%borrow : $C)
 
@@ -202,6 +209,7 @@ bb4(%outer0 : @owned $C, %outer1 : @owned $C, %inner : @guaranteed $C):
 // CHECK:       } // end sil function 'testLoadBorrow'
 sil [ossa] @testLoadBorrow : $@convention(thin) (@in_guaranteed C) -> () {
 bb0(%0 : $*C):
+  specify_test "update_borrowed_from"
   %2 = load_borrow %0 : $*C
   br bb1(%2 : $C)
 
@@ -219,6 +227,7 @@ bb1(%3 : @guaranteed $C):
 // CHECK:       } // end sil function 'testTwoLevels'
 sil [ossa] @testTwoLevels : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
+  specify_test "update_borrowed_from"
   %2 = begin_borrow %0 : $C
   br bb1(%2 : $C)
 
@@ -240,6 +249,7 @@ bb2(%6 : @reborrow $C):
 // CHECK:       } // end sil function 'testTwoLevelsWithPair'
 sil [ossa] @testTwoLevelsWithPair : $@convention(thin) (@owned PairC) -> () {
 bb0(%0 : @owned $PairC):
+  specify_test "update_borrowed_from"
   (%1, %2) = destructure_struct %0 : $PairC
   %3 = begin_borrow %1 : $C
   br bb1(%3 : $C)
@@ -267,6 +277,7 @@ bb2(%6 : @reborrow $C):
 // CHECK:       } // end sil function 'testTwoLevelReborrow'
 sil [ossa] @testTwoLevelReborrow : $@convention(thin) (@owned PairC) -> () {
 bb0(%0 : @owned $PairC):
+  specify_test "update_borrowed_from"
   %2 = begin_borrow %0 : $PairC
   %3 = struct_extract %2 : $PairC, #PairC.first
   br bb1(%2 : $PairC, %3 : $C)
@@ -289,6 +300,7 @@ bb2(%8 : @reborrow $PairC, %9 : @guaranteed $C):
 // CHECK:       } // end sil function 'unreachable_block'
 sil [ossa] @unreachable_block : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : @owned $C):
+  specify_test "update_borrowed_from"
   %1 = begin_borrow %0 : $C
   br bb2(%1 : $C)
 
@@ -315,6 +327,7 @@ public struct GenWrapper<T> {
 // CHECK-LABEL: sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
 sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
 bb0(%0 : @guaranteed $Wrapper):
+  specify_test "update_borrowed_from"
   %2 = struct_extract %0, #Wrapper._k
   return %2
 }
@@ -325,6 +338,7 @@ bb0(%0 : @guaranteed $Wrapper):
 // CHECK-LABEL: } // end sil function 'test_borrow_accessor'
 sil [ossa] @test_borrow_accessor : $@convention(thin) (@owned Wrapper) -> () {
 bb0(%0 : @owned $Wrapper):
+  specify_test "update_borrowed_from"
   %1 = begin_borrow %0
   %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   cond_br undef, bb1, bb2

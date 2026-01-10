@@ -477,12 +477,12 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  if (Opts.Config.CASPath.empty() && Opts.Config.PluginPath.empty()) {
+  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          "no CAS options provided");
     return true;
   }
-  auto MaybeDB = Opts.Config.createDatabases();
+  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
@@ -711,25 +711,6 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
     SourceMgr.setFileSystem(std::move(OverlayVFS));
-  } else {
-    // For non-caching -direct-clang-cc1-module-build emit-pcm build,
-    // setup the clang VFS so it can find system modulemap files
-    // (like vcruntime.modulemap) as an input file.
-    if (Invocation.getClangImporterOptions().DirectClangCC1ModuleBuild &&
-        Invocation.getFrontendOptions().RequestedAction ==
-            FrontendOptions::ActionType::EmitPCM) {
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-          SourceMgr.getFileSystem();
-      ClangInvocationFileMappingContext Context(
-          Invocation.getLangOptions(), Invocation.getSearchPathOptions(),
-          Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
-          Diagnostics);
-      ClangInvocationFileMapping FileMapping = applyClangInvocationMapping(
-          Context, nullptr, VFS, /*suppressDiagnostic=*/false);
-      if (!FileMapping.redirectedFiles.empty()) {
-        SourceMgr.setFileSystem(std::move(VFS));
-      }
-    }
   }
 
   auto ExpectedOverlay =
@@ -872,7 +853,8 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
   std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, Invocation.getPCHHash(),
+    ClangImporter::create(*Context, &Invocation.getIRGenOptions(),
+                          Invocation.getPCHHash(),
                           getDependencyTracker());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
@@ -991,10 +973,10 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // There is no input file when building PCM using Caching.
+  // There is no need to setup input when emit PCM. Let ClangImporter and the
+  // underlying clang CompilerInstance to handle inputs.
   if (Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getCASOptions().EnableCaching)
+      FrontendOptions::ActionType::EmitPCM)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
@@ -1539,7 +1521,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getLangOptions().hasFeature(Feature::LibraryEvolution))
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    if (Invocation.getLangOptions().isSwiftVersionAtLeast(6))
+    if (Invocation.getLangOptions().isLanguageModeAtLeast(6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions()

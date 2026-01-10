@@ -1362,7 +1362,7 @@ do {
     }
   }
 
-  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> _' to non-throwing function type '(Int) -> Void'}}
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }
@@ -1414,4 +1414,18 @@ func test_implicit_result_conversions() {
     _ = 42
     return // Ok
   }
+}
+
+// Random example reduced from swift-build which tripped an assert not
+// previously covered by our test suite
+do {
+  struct S {
+    var x: [Int: [String]] = [:]
+  }
+
+  let s = [S]()
+
+  let _: [Int: Set<String>] = s.map(\.x)
+      .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
+      .mapValues { Set($0) }
 }

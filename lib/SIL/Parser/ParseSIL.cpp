@@ -70,16 +70,6 @@ ParseIncompleteOSSA("parse-incomplete-ossa",
 //===----------------------------------------------------------------------===//
 
 SILParserState::~SILParserState() {
-  if (!ForwardRefFns.empty()) {
-    for (auto Entry : ForwardRefFns) {
-      if (Entry.second.Loc.isValid()) {
-        M.getASTContext().Diags.diagnose(Entry.second.Loc,
-                                         diag::sil_use_of_undefined_value,
-                                         Entry.first.str());
-      }
-    }
-  }
-
   // Turn any debug-info-only function declarations into zombies.
   markZombies();
 }
@@ -91,6 +81,21 @@ void SILParserState::markZombies() {
       M.eraseFunction(Fn);
     }
   }
+}
+
+bool SILParserState::diagnoseUndefinedValues(DiagnosticEngine &diags) {
+  bool hasError = false;
+  if (!ForwardRefFns.empty()) {
+    for (auto Entry : ForwardRefFns) {
+      if (Entry.second.Loc.isValid()) {
+        diags.diagnose(Entry.second.Loc,
+                       diag::sil_use_of_undefined_value,
+                       Entry.first.str());
+        hasError = true;
+      }
+    }
+  }
+  return hasError;
 }
 
 std::unique_ptr<SILModule>
@@ -111,6 +116,10 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
   }
 
   auto hadError = parser.parseTopLevelSIL();
+
+  if (parserState.diagnoseUndefinedValues(parser.Diags))
+    hadError = true;
+
   if (hadError) {
     // The rest of the SIL pipeline expects well-formed SIL, so if we encounter
     // a parsing error, just return an empty SIL module.
@@ -1335,9 +1344,11 @@ static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
       .Case("addressor", AccessorKind::Address)
       .Case("mutableAddressor", AccessorKind::MutableAddress)
       .Case("read", AccessorKind::Read)
-      .Case("read2", AccessorKind::Read2)
+      .Case("read2", AccessorKind::YieldingBorrow)
+      .Case("yielding_borrow", AccessorKind::YieldingBorrow)
       .Case("modify", AccessorKind::Modify)
-      .Case("modify2", AccessorKind::Modify2)
+      .Case("modify2", AccessorKind::YieldingMutate)
+      .Case("yielding_mutate", AccessorKind::YieldingMutate)
       .Default(std::nullopt);
 }
 
@@ -4994,6 +5005,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto isFromVarDecl = IsNotFromVarDecl;
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
+    auto isNested = StackAllocationIsNested;
 
     StringRef attributeName;
     SourceLoc attributeLoc;
@@ -5006,6 +5018,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         isFromVarDecl = IsFromVarDecl;
       else if (attributeName == "moveable_value_debuginfo")
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
+      else if (attributeName == "non_nested")
+        isNested = StackAllocationIsNotNested;
       else {
         P.diagnose(attributeLoc, diag::sil_invalid_attribute_for_instruction,
                    attributeName, "alloc_stack");
@@ -5025,14 +5039,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
     // It doesn't make sense to attach a debug var info if the name is empty
+    AllocStackInst *ASI;
     if (VarInfo.Name.size())
-      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
-                                     isLexical, isFromVarDecl,
-                                     usesMoveableValueDebugInfo);
+      ASI = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime,
+                               isLexical, isFromVarDecl,
+                               usesMoveableValueDebugInfo);
     else
-      ResultVal =
-          B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
-                             isFromVarDecl, usesMoveableValueDebugInfo);
+      ASI = B.createAllocStack(InstLoc, Ty, {}, hasDynamicLifetime, isLexical,
+                               isFromVarDecl, usesMoveableValueDebugInfo);
+    ASI->setStackAllocationIsNested(isNested);
+    ResultVal = ASI;
     break;
   }
   case SILInstructionKind::MetatypeInst: {

@@ -449,7 +449,7 @@ GlobalActorAttributeRequest::evaluate(
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       if (!accessor->isGetter()) {
         decl->diagnose(diag::global_actor_disallowed, decl)
-            .warnUntilSwiftVersion(6)
+            .warnUntilLanguageMode(6)
             .fixItRemove(globalActorAttr->getRangeWithAt());
 
         auto &ctx = decl->getASTContext();
@@ -482,7 +482,7 @@ GlobalActorAttributeRequest::evaluate(
         }
 
         // In Swift 6, once the diag above is an error, it is disallowed.
-        if (ctx.isSwiftVersionAtLeast(6))
+        if (ctx.isLanguageModeAtLeast(6))
           return std::nullopt;
       }
     }
@@ -951,7 +951,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
 
         ctx.Diags
             .diagnose(importLoc, diag::add_predates_concurrency_import,
-                      ctx.LangOpts.isSwiftVersionAtLeast(6),
+                      ctx.isLanguageModeAtLeast(6),
                       nominal->getParentModule()->getName())
             .fixItInsert(importLoc, "@preconcurrency ");
 
@@ -1377,10 +1377,15 @@ static bool checkSendableInstanceStorage(
 void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
   // Only diagnose when explicitly requested.
   ASTContext &ctx = nominal->getASTContext();
-  if (ctx.Diags.isIgnoredDiagnosticGroupTree(DiagGroupID::ExplicitSendable))
-    return;
 
   if (nominal->getLoc().isInvalid())
+    return;
+
+  auto locBufferID = ctx.SourceMgr.findBufferContainingLoc(nominal->getLoc());
+  auto locBufferSFs = ctx.SourceMgr.getSourceFilesForBufferID(locBufferID);
+  SourceFile *locSF = locBufferSFs.empty() ? nullptr : locBufferSFs.front();
+  if (!ctx.Diags.isDiagnosticGroupEnabled(locSF,
+                                          DiagGroupID::ExplicitSendable))
     return;
 
   // Protocols aren't checked.
@@ -1450,6 +1455,17 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
       } else {
         addSendableFixIt(nominal, note, isUnchecked);
       }
+    }
+  }
+
+  // Note to supress Sendable conformance is feature is enabled.
+  if (ctx.LangOpts.hasFeature(Feature::TildeSendable)) {
+    auto note = nominal->diagnose(diag::suppress_sendable_conformance);
+    auto inheritance = nominal->getInherited();
+    if (inheritance.empty()) {
+      note.fixItInsertAfter(nominal->getNameLoc(), ": ~Sendable");
+    } else {
+      note.fixItInsertAfter(inheritance.getEndLoc(), ", ~Sendable");
     }
   }
 
@@ -1916,7 +1932,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(
     ValueDecl const *member, SourceLoc memberLoc,
     std::optional<VarRefUseEnv> useKind) {
   // no need for this in Swift 6+
-  if (refCxt->getASTContext().isSwiftVersionAtLeast(6))
+  if (refCxt->getASTContext().isLanguageModeAtLeast(6))
     return false;
 
   // must be an access to an instance member.
@@ -1984,14 +2000,11 @@ static bool memberAccessHasSpecialPermissionInSwift5(
         useKind.value_or(VarRefUseEnv::Read));
 
     auto isolation = getActorIsolation(const_cast<ValueDecl *>(member));
-    diags.diagnose(
-        memberLoc, diag::actor_isolated_non_self_reference,
-        member,
-        useKindInt,
-        baseActor.kind + 1,
-        baseActor.globalActor,
-        isolation)
-    .warnUntilSwiftVersion(6);
+    diags
+        .diagnose(memberLoc, diag::actor_isolated_non_self_reference, member,
+                  useKindInt, baseActor.kind + 1, baseActor.globalActor,
+                  isolation)
+        .warnUntilLanguageMode(6);
 
     noteIsolatedActorMember(member, useKind);
     maybeNoteMutatingMethodSuggestion(C, member, memberLoc, refCxt, isolation, useKind);
@@ -2376,16 +2389,6 @@ namespace {
     /// an expression or function.
     llvm::SmallDenseMap<const DeclContext *, ActorIsolation> requiredIsolation;
 
-    using ActorRefKindPair = std::pair<ReferencedActor::Kind, ActorIsolation>;
-
-    using IsolationPair = std::pair<ActorIsolation, ActorIsolation>;
-
-    using DiagnosticList = std::vector<IsolationError>;
-
-    llvm::DenseMap<ActorRefKindPair, DiagnosticList> refErrors;
-
-    llvm::DenseMap<IsolationPair, DiagnosticList> applyErrors;
-
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
     llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
@@ -2433,7 +2436,7 @@ namespace {
             if (behavior != DiagnosticBehavior::Note) {
               fn->diagnose(diag::invalid_isolated_calls_in_body,
                            globalActor->getString(), fn)
-                  .limitBehaviorUntilSwiftVersion(behavior, 6);
+                  .limitBehaviorUntilLanguageMode(behavior, 6);
             }
 
             // Overrides cannot be isolated to a global actor; the isolation
@@ -2450,77 +2453,6 @@ namespace {
         }
       }
       return false;
-    }
-
-  public:
-    bool diagnoseIsolationErrors() {
-      bool diagnosedError = false;
-
-      for (auto list : refErrors) {
-        ActorRefKindPair key = list.getFirst();
-        DiagnosticList errors = list.getSecond();
-        ActorIsolation isolation = key.second;
-
-        auto behavior = DiagnosticBehavior::Warning;
-        // Upgrade behavior if @preconcurrency not detected
-        if (llvm::any_of(errors, [&](IsolationError error) {
-          return !error.preconcurrency;
-        })) {
-          behavior = DiagnosticBehavior::Error;
-        }
-
-        // Add Fix-it for missing @SomeActor annotation
-        if (isolation.isGlobalActor()) {
-          if (missingGlobalActorOnContext(
-                  const_cast<DeclContext *>(getDeclContext()),
-                  isolation.getGlobalActor(), behavior) &&
-              errors.size() > 1) {
-            behavior = DiagnosticBehavior::Note;
-          }
-        }
-
-        for (IsolationError error : errors) {
-          // Diagnose actor_isolated_non_self_reference as note
-          // if there are multiple of these diagnostics
-          ctx.Diags.diagnose(error.loc, error.diag)
-            .limitBehaviorUntilSwiftVersion(behavior, 6);
-        }
-      }
-
-      for (auto list : applyErrors) {
-        IsolationPair key = list.getFirst();
-        DiagnosticList errors = list.getSecond();
-        ActorIsolation isolation = key.first;
-
-        auto behavior = DiagnosticBehavior::Warning;
-        // Upgrade behavior if @preconcurrency not detected
-        if (llvm::any_of(errors, [&](IsolationError error) {
-          return !error.preconcurrency;
-        })) {
-          behavior = DiagnosticBehavior::Error;
-        }
-
-
-        // Add Fix-it for missing @SomeActor annotation
-        if (isolation.isGlobalActor()) {
-          if (missingGlobalActorOnContext(
-                  const_cast<DeclContext *>(getDeclContext()),
-                  isolation.getGlobalActor(), behavior) &&
-              errors.size() > 1) {
-            behavior = DiagnosticBehavior::Note;
-          }
-        }
-
-        for (IsolationError error : errors) {
-          // Diagnose actor_isolated_call as note if
-          // if there are multiple actor-isolated function calls
-          // from outside the actor
-          ctx.Diags.diagnose(error.loc, error.diag)
-            .limitBehaviorUntilSwiftVersion(behavior, 6);
-        }
-      }
-
-      return diagnosedError;
     }
 
   private:
@@ -2708,7 +2640,7 @@ namespace {
                     fromType, toType);
 
                 if (warnUntilSwiftMode)
-                  diag.warnUntilSwiftVersion(*warnUntilSwiftMode);
+                  diag.warnUntilLanguageMode(*warnUntilSwiftMode);
               }
 
               for (auto type : nonSendableTypes) {
@@ -2743,7 +2675,7 @@ namespace {
                     .diagnose(funcConv->getLoc(),
                               diag::converting_func_loses_global_actor,
                               fromType, toType, fromActor)
-                    .warnUntilSwiftVersion(6);
+                    .warnUntilLanguageMode(6);
                 return;
               }
             }
@@ -2757,7 +2689,7 @@ namespace {
                 .diagnose(funcConv->getLoc(),
                           diag::isolated_any_conversion_to_synchronous_func,
                           fromFnType, toFnType)
-                .warnUntilFutureSwiftVersion();
+                .warnUntilFutureLanguageMode();
             return;
           }
 
@@ -3835,7 +3767,7 @@ namespace {
       }
 
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
-          .limitBehaviorUntilSwiftVersion(limit, 6)
+          .limitBehaviorUntilLanguageMode(limit, 6)
           // Preconcurrency global variables are warnings even in Swift 6
           .limitBehaviorIf(isPreconcurrencyImport, limit);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
@@ -3877,7 +3809,7 @@ namespace {
               ctx.Diags.diagnose(apply->getLoc(),
                                  diag::actor_isolated_mutating_func,
                                  fnDecl->getName(), decl)
-                  .warnUntilSwiftVersionIf(downgradeToWarning, 6);
+                  .warnUntilLanguageModeIf(downgradeToWarning, 6);
               result = true;
               return;
             }
@@ -3980,10 +3912,11 @@ namespace {
         // parameter, e.g. `(isolated DA) -> Void`. Stage in the error as a
         // warning until Swift 6.
         if (var->getTypeInContext()->getAs<FunctionType>()) {
-          ctx.Diags.diagnose(declLoc,
-                             diag::distributed_actor_isolated_non_self_reference,
-                             decl)
-            .warnUntilSwiftVersion(6);
+          ctx.Diags
+              .diagnose(declLoc,
+                        diag::distributed_actor_isolated_non_self_reference,
+                        decl)
+              .warnUntilLanguageMode(6);
           noteIsolatedActorMember(decl, context);
           return std::nullopt;
         }
@@ -4249,37 +4182,24 @@ namespace {
             /*args*/*unsatisfiedIsolation, getContextIsolation()
           );
 
-        if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-          IsolationError mismatch(apply->getLoc(), preconcurrency, diagnostic);
-          auto key = std::make_pair(
-              unsatisfiedIsolation->withPreconcurrency(false),
-              getContextIsolation());
-          if (applyErrors.find(key) == applyErrors.end()) {
-            applyErrors.insert(std::make_pair(key, DiagnosticList()));
-          }
+        ctx.Diags
+            .diagnose(apply->getLoc(), diagnostic.getID(), diagnostic.getArgs())
+            .limitBehaviorIf(preconcurrency, DiagnosticBehavior::Warning);
 
-          applyErrors[key].push_back(mismatch);
-        } else {
-          ctx.Diags
-              .diagnose(apply->getLoc(), diagnostic.getID(),
-                        diagnostic.getArgs())
-              .limitBehaviorIf(preconcurrency, DiagnosticBehavior::Warning);
-
-          if (calleeDecl) {
-            auto calleeIsolation = getInferredActorIsolation(calleeDecl);
-            calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
-            if (calleeIsolation.source.isInferred()) {
-              calleeDecl->diagnose(diag::actor_isolation_source,
-                                   calleeIsolation.isolation,
-                                   calleeIsolation.source);
-            }
+        if (calleeDecl) {
+          auto calleeIsolation = getInferredActorIsolation(calleeDecl);
+          calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
+          if (calleeIsolation.source.isInferred()) {
+            calleeDecl->diagnose(diag::actor_isolation_source,
+                                 calleeIsolation.isolation,
+                                 calleeIsolation.source);
           }
+        }
 
-          if (unsatisfiedIsolation->isGlobalActor()) {
-            missingGlobalActorOnContext(
-                                        const_cast<DeclContext *>(getDeclContext()),
-                                        unsatisfiedIsolation->getGlobalActor(), DiagnosticBehavior::Note);
-          }
+        if (unsatisfiedIsolation->isGlobalActor()) {
+          missingGlobalActorOnContext(
+              const_cast<DeclContext *>(getDeclContext()),
+              unsatisfiedIsolation->getGlobalActor(), DiagnosticBehavior::Note);
         }
 
         return true;
@@ -4612,10 +4532,11 @@ namespace {
                 options.contains(
                     ActorReferenceResult::Flags::CompatibilityDowngrade);
 
-            ctx.Diags.diagnose(
-                component.getLoc(), diag::actor_isolated_keypath_component,
-                isolation, decl)
-              .warnUntilSwiftVersionIf(downgrade, 6);
+            ctx.Diags
+                .diagnose(component.getLoc(),
+                          diag::actor_isolated_keypath_component, isolation,
+                          decl)
+                .warnUntilLanguageModeIf(downgrade, 6);
 
             diagnosed = !downgrade;
             break;
@@ -4821,51 +4742,33 @@ namespace {
           }
         }
 
-        if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-          IsolationError mismatch = IsolationError(loc,
-              preconcurrencyContext,
-              Diagnostic(diag::actor_isolated_non_self_reference,
-                  decl, useKind, refKind + 1, refGlobalActor,
-                  result.isolation));
+        {
+          auto diagnostic = ctx.Diags.diagnose(
+              loc, diag::actor_isolated_non_self_reference, decl, useKind,
+              refKind + 1, refGlobalActor, result.isolation);
 
-          auto iter = refErrors.find(std::make_pair(refKind,result.isolation));
-          if (iter != refErrors.end()) {
-            iter->second.push_back(mismatch);
-          } else {
-            DiagnosticList list;
-            list.push_back(mismatch);
-            auto keyPair = std::make_pair(refKind,result.isolation);
-            refErrors.insert(std::make_pair(keyPair, list));
-          }
-        } else {
-          {
-            auto diagnostic = ctx.Diags.diagnose(
-                loc, diag::actor_isolated_non_self_reference, decl, useKind,
-                refKind + 1, refGlobalActor, result.isolation);
+          // For compatibility downgrades - the error is downgraded until
+          // Swift 6, for preconcurrency - always.
+          if (shouldDowngradeToWarning)
+            diagnostic.limitBehaviorWithPreconcurrency(
+                DiagnosticBehavior::Warning, preconcurrencyContext);
+        }
 
-            // For compatibility downgrades - the error is downgraded until
-            // Swift 6, for preconcurrency - always.
-            if (shouldDowngradeToWarning)
-              diagnostic.limitBehaviorWithPreconcurrency(
-                  DiagnosticBehavior::Warning, preconcurrencyContext);
-          }
+        maybeNoteMutatingMethodSuggestion(
+            ctx, decl, loc, getDeclContext(), result.isolation,
+            kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
 
-          maybeNoteMutatingMethodSuggestion(
-              ctx, decl, loc, getDeclContext(), result.isolation,
-              kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
+        if (derivedConformanceType) {
+          auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
+          ctx.Diags.diagnose(loc, diag::in_derived_witness, decl,
+                             requirementName, derivedConformanceType);
+        }
 
-          if (derivedConformanceType) {
-            auto *decl = dyn_cast<ValueDecl>(getDeclContext()->getAsDecl());
-            ctx.Diags.diagnose(loc, diag::in_derived_witness, decl,
-                               requirementName, derivedConformanceType);
-          }
-
-          noteIsolatedActorMember(decl, context);
-          if (result.isolation.isGlobalActor()) {
-            missingGlobalActorOnContext(
-                const_cast<DeclContext *>(getDeclContext()),
-                result.isolation.getGlobalActor(), DiagnosticBehavior::Note);
-          }
+        noteIsolatedActorMember(decl, context);
+        if (result.isolation.isGlobalActor()) {
+          missingGlobalActorOnContext(
+              const_cast<DeclContext *>(getDeclContext()),
+              result.isolation.getGlobalActor(), DiagnosticBehavior::Note);
         }
 
         return true;
@@ -5013,6 +4916,10 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     auto normalIsolation = computeClosureIsolationFromParent(
         closure, parentIsolation, checkIsolatedCapture);
 
+    bool isIsolationBoundary =
+        isIsolationInferenceBoundaryClosure(closure,
+                                            /*canInheritActorContext=*/true);
+
     // The solver has to be conservative and produce a conversion to
     // `nonisolated(nonsending)` because at solution application time
     // we don't yet know whether there are any captures which would
@@ -5023,7 +4930,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     // isolated parameters. If our closure is nonisolated and we have a
     // conversion to nonisolated(nonsending), then we should respect that.
     if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
-        !normalIsolation.isGlobalActor()) {
+        isIsolationBoundary || !normalIsolation.isGlobalActor()) {
       if (auto *fce =
               dyn_cast_or_null<FunctionConversionExpr>(Parent.getAsExpr())) {
         auto expectedIsolation =
@@ -5042,8 +4949,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     // NOTE: Since we already checked for global actor isolated things, we
     // know that all Sendable closures must be nonisolated. That is why it is
     // safe to rely on this path to handle Sendable closures.
-    if (isIsolationInferenceBoundaryClosure(closure,
-                                            /*canInheritActorContext=*/true))
+    if (isIsolationBoundary)
       return ActorIsolation::forNonisolated(/*unsafe=*/false);
 
     return normalIsolation;
@@ -5129,13 +5035,9 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
     return;
 
-  auto &ctx = decl->getASTContext();
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
-    if (ctx.LangOpts.hasFeature(Feature::GroupActorErrors)) {
-      checker.diagnoseIsolationErrors();
-    }
   }
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     if (auto superInit = ctor->getSuperInitCall())
@@ -5308,7 +5210,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
           ctx.Diags.diagnose(attr->getLocation(), diag::unsafe_global_actor)
               .fixItRemove(attr->getArgs()->getSourceRange())
               .fixItInsert(attr->getLocation(), "@preconcurrency ")
-              .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
         }
       } else {
         ctx.Diags.diagnose(
@@ -5897,7 +5799,7 @@ static bool checkClassGlobalActorIsolation(
   // Complain about the mismatch.
   classDecl->diagnose(diag::actor_isolation_superclass_mismatch, isolation,
                       classDecl, superIsolation, superclassDecl)
-      .warnUntilSwiftVersionIf(downgradeToWarning, 6);
+      .warnUntilLanguageModeIf(downgradeToWarning, 6);
   return true;
 }
 
@@ -6052,7 +5954,7 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
       value
           ->diagnose(diag::isolated_parameter_combined_global_actor_attr, value)
           .fixItRemove(attr->first->getRangeWithAt())
-          .warnUntilSwiftVersion(6);
+          .warnUntilLanguageMode(6);
     }
   }
 
@@ -6061,7 +5963,7 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
     if (!attr->isImplicit()) {
       value->diagnose(diag::isolated_parameter_combined_nonisolated, value)
           .fixItRemove(attr->getRangeWithAt())
-          .warnUntilSwiftVersion(6);
+          .warnUntilLanguageMode(6);
     }
   }
 }
@@ -6253,7 +6155,7 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
           // non-strict concurrency modes (pre Swift 6).
           auto isolation =
               ActorIsolation::forGlobalActor(globalActor)
-                  .withPreconcurrency(!ctx.LangOpts.isSwiftVersionAtLeast(6));
+                  .withPreconcurrency(!ctx.isLanguageModeAtLeast(6));
           return {{{isolation, {}}, nullptr, {}}};
       }
 
@@ -6495,6 +6397,20 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       }
     }
 
+    // When `NonisolatedNonsendingByDefault` feature is enabled and the value is
+    // asynchronous `nonisolated` always means `nonisolated(nonsending)`.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        inferred.isNonisolated() && value->isAsync()) {
+      // Either current module or async variant of an ObjC API.
+      if (value->getModuleContext() == ctx.MainModule ||
+          (value->hasClangNode() &&
+           !isa<ProtocolDecl>(value->getDeclContext()))) {
+        inferred =
+            ActorIsolation::forCallerIsolationInheriting().withPreconcurrency(
+                inferred.preconcurrency());
+      }
+    }
+
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     switch (inferred) {
@@ -6706,13 +6622,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (shouldSelfIsolationOverrideDefault(
               ctx, value->getDeclContext(), selfTypeIsolation.isolation)) {
         auto isolation = selfTypeIsolation.isolation;
-
-        if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
-            value->isAsync() && value->getModuleContext() == ctx.MainModule &&
-            isolation.isNonisolated()) {
-          isolation = ActorIsolation::forCallerIsolationInheriting();
-        }
-
         return {inferredIsolation(isolation, onlyGlobal),
                 selfTypeIsolation.source};
       }
@@ -6900,10 +6809,9 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
     if (enclosingIsolation != requiredIsolation) {
       bool preconcurrency =
           !isa<ParamDecl>(var) || requiredIsolation.preconcurrency();
-      var->diagnose(
-          diag::isolated_default_argument_context,
-          requiredIsolation, enclosingIsolation)
-        .warnUntilSwiftVersionIf(preconcurrency, 6);
+      var->diagnose(diag::isolated_default_argument_context, requiredIsolation,
+                    enclosingIsolation)
+          .warnUntilLanguageModeIf(preconcurrency, 6);
       return ActorIsolation::forUnspecified();
     }
   }
@@ -6995,10 +6903,10 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
         .defaultDiagnosticBehavior();
   }
 
-  value->diagnose(
-      diag::actor_isolation_override_mismatch, isolation,
-      value, overriddenIsolation)
-    .limitBehaviorUntilSwiftVersion(behavior, 6);
+  value
+      ->diagnose(diag::actor_isolation_override_mismatch, isolation, value,
+                 overriddenIsolation)
+      .limitBehaviorUntilLanguageMode(behavior, 6);
   overridden->diagnose(diag::overridden_here);
 }
 
@@ -7036,7 +6944,7 @@ void swift::checkGlobalIsolation(VarDecl *var) {
         diagVar);
   } else {
     diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
     diagnosed = true;
   }
 
@@ -7174,18 +7082,10 @@ static bool checkSendableInstanceStorage(
           && SendableCheckContext(dc, check)
                .defaultDiagnosticBehavior() != DiagnosticBehavior::Ignore) {
         sd->diagnose(diag::sendable_raw_storage, sd->getName())
-          .limitBehaviorUntilSwiftVersion(behavior, 6);
+            .limitBehaviorUntilLanguageMode(behavior, 6);
       }
       return true;
     }
-  }
-
-  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
-    auto *conformanceDecl = dc->getAsDecl() ? dc->getAsDecl() : nominal;
-    if (!isImplicitSendableCheck(check)) {
-      conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
-    }
-    return true;
   }
 
   // Stored properties of structs and classes must have
@@ -7380,6 +7280,30 @@ bool swift::checkSendableConformance(
       return false;
   }
 
+  // Sendable supression allows conditional conformances only.
+  if (nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
+    bool hasUnconditionalConformance = false;
+
+    if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {
+      hasUnconditionalConformance =
+          inherited->getConditionalRequirements().empty();
+    }
+
+    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(conformance)) {
+      hasUnconditionalConformance =
+          normalConf->getConditionalRequirements().empty();
+    }
+
+    if (hasUnconditionalConformance) {
+      if (!isImplicitSendableCheck(check)) {
+        auto *conformanceDecl =
+            conformanceDC->getAsDecl() ? conformanceDC->getAsDecl() : nominal;
+        conformanceDecl->diagnose(diag::non_sendable_type_suppressed);
+      }
+      return true;
+    }
+  }
+
   // Global-actor-isolated types can be Sendable. We do not check the
   // instance data because it's all isolated to the global actor.
   switch (getActorIsolation(nominal)) {
@@ -7416,9 +7340,9 @@ bool swift::checkSendableConformance(
       conformanceDC->getOutermostParentSourceFile() !=
       nominal->getOutermostParentSourceFile()) {
     if (!(nominal->hasClangNode() && wasImplied)) {
-      conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
-                                nominal)
-        .limitBehaviorUntilSwiftVersion(behavior, 6);
+      conformanceDecl
+          ->diagnose(diag::concurrent_value_outside_source_file, nominal)
+          .limitBehaviorUntilLanguageMode(behavior, 6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -7432,7 +7356,7 @@ bool swift::checkSendableConformance(
     if (!classDecl->isSemanticallyFinal()) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,classDecl->getName())
           .fixItInsert(classDecl->getStartLoc(), "final")
-          .limitBehaviorUntilSwiftVersion(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, 6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -7447,7 +7371,7 @@ bool swift::checkSendableConformance(
               ->diagnose(diag::concurrent_value_inherit,
                          nominal->getASTContext().LangOpts.EnableObjCInterop,
                          classDecl->getName())
-              .limitBehaviorUntilSwiftVersion(behavior, 6);
+              .limitBehaviorUntilLanguageMode(behavior, 6);
 
           if (behavior == DiagnosticBehavior::Unspecified)
             return true;
@@ -7462,6 +7386,7 @@ bool swift::checkSendableConformance(
   // and not some (possibly constrained) extension.
   if (wasImplied)
     conformanceDC = nominal;
+
   return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
@@ -8714,13 +8639,12 @@ namespace {
 
       ASTContext &ctx = fromDC->getASTContext();
       auto firstConformance = badIsolatedConformances.front();
-      ctx.Diags.diagnose(
-          loc, diag::isolated_conformance_wrong_domain,
-          firstConformance->getIsolation(),
-          firstConformance->getType(),
-          firstConformance->getProtocol()->getName(),
-          getContextIsolation())
-        .warnUntilSwiftVersion(6);
+      ctx.Diags
+          .diagnose(
+              loc, diag::isolated_conformance_wrong_domain,
+              firstConformance->getIsolation(), firstConformance->getType(),
+              firstConformance->getProtocol()->getName(), getContextIsolation())
+          .warnUntilLanguageMode(6);
       return true;
     }
   };

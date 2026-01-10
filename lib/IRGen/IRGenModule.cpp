@@ -108,50 +108,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGTI = Importer->getTargetInfo();
   auto &CGO = Importer->getCodeGenOpts();
-  CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
-  CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
+  // Here we set the AST-benign CodeGenOpts options only. Set the
+  // AST-affecting ones early in ClangImporter::create.
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
-  switch (Opts.DebugInfoLevel) {
-  case IRGenDebugInfoLevel::None:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
-    break;
-  case IRGenDebugInfoLevel::LineTables:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
-    break;
-  case IRGenDebugInfoLevel::ASTTypes:
-  case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
-    break;
-  }
   switch (Opts.DebugInfoFormat) {
   case IRGenDebugInfoFormat::None:
     break;
   case IRGenDebugInfoFormat::DWARF:
-    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
-                           Context.LangOpts.hasFeature(Feature::Embedded));
-    break;
   case IRGenDebugInfoFormat::CodeView:
-    CGO.EmitCodeView = true;
-    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    // This actually contains the debug flags for codeview.
     CGO.DwarfDebugFlags =
         Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
                            Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   }
-  if (!Opts.TrapFuncName.empty()) {
-    CGO.TrapFuncName = Opts.TrapFuncName;
-  }
-
-  // We don't need to perform coverage mapping for any Clang decls we've
-  // synthesized, as they have no user-written code. This is also needed to
-  // avoid a Clang crash when attempting to emit coverage for decls without
-  // source locations (rdar://100172217).
-  CGO.CoverageMapping = false;
 
   auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
@@ -388,6 +358,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DeallocatingDtorTy = llvm::FunctionType::get(VoidTy, RefCountedPtrTy, false);
 
   FullExistentialTypeMetadataStructTy = createStructType(*this, "swift.full_existential_type", {
+    WitnessTablePtrTy,
+    TypeMetadataStructTy
+  });
+
+  EmbeddedExistentialsMetadataStructTy = createStructType(*this, "swift.embedded_existential_type", {
     WitnessTablePtrTy,
     TypeMetadataStructTy
   });
@@ -1411,13 +1386,13 @@ llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }
 
-bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
+bool IRGenModule::isWellKnownBuiltinOrStructuralType(CanType T) const {
   if (T == Context.TheEmptyTupleType || T == Context.TheNativeObjectType ||
       T == Context.TheBridgeObjectType || T == Context.TheRawPointerType ||
       T == Context.getAnyObjectType())
     return true;
 
-  if (auto IntTy = dyn_cast_or_null<BuiltinIntegerType>(T)) {
+  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
     auto Width = IntTy->getWidth();
     if (Width.isPointerWidth())
       return true;
@@ -1481,7 +1456,9 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
   // In Embedded Swift, only class-bound wtables are allowed.
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  auto &langOpts = SIL.getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
     assert(Conf->getProtocol()->requiresClass());
   }
 
@@ -1736,7 +1713,7 @@ void IRGenModule::addLinkLibraries() {
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   if (TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     registerLinkLibrary(LinkLibrary{"swiftSwiftDirectRuntime",
                                     LibraryKind::Library, /*static=*/true});
 
@@ -2365,8 +2342,7 @@ const llvm::StringRef IRGenerator::getClangDataLayoutString() {
 }
 
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
-  return TypeExpansionContext::maximal(getSILModule().getAssociatedContext(),
-                                       getSILModule().isWholeModule());
+  return getSILModule().getMaximalTypeExpansionContext();
 }
 
 const TypeLayoutEntry
@@ -2447,4 +2423,10 @@ bool swift::writeEmptyOutputFilesFor(
                        llvmModule, fileName);
   }
   return false;
+}
+
+bool IRGenModule::isEmbeddedWithExistentials() const {
+  auto &langOpts = Context.LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
 }

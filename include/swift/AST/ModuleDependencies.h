@@ -30,11 +30,9 @@
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/CAS/CASConfiguration.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/StringSaver.h"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -1037,8 +1035,14 @@ using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
 /// A carrier of state shared among possibly multiple invocations of the
 /// dependency scanner.
 class SwiftDependencyScanningService {
-  /// The CAS configuration created the Scanning Service if used.
-  std::optional<llvm::cas::CASConfiguration> CASConfig;
+  /// BumpPtrAllocator for data matching the life-time of ScanningService.
+  llvm::BumpPtrAllocator Alloc;
+
+  /// StringSaver for data matching the life-time of ScanningService.
+  llvm::StringSaver Saver;
+
+  /// The CASOption created the Scanning Service if used.
+  std::optional<clang::CASOptions> CASOpts;
 
   /// The persistent Clang dependency scanner service
   std::optional<clang::tooling::dependencies::DependencyScanningService>
@@ -1057,6 +1061,9 @@ public:
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
+
+  /// Allocate string inside ScanningService.
+  StringRef save(StringRef str);
 
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
@@ -1112,6 +1119,11 @@ public:
   bool hasDependency(StringRef moduleName) const;
   /// Whether we have cached dependency information for the given Swift module.
   bool hasSwiftDependency(StringRef moduleName) const;
+  /// Report the number of recorded Clang dependencies
+  int numberOfClangDependencies() const;
+  /// Report the number of recorded Swift dependencies
+  /// (Textual + Binary)
+  int numberOfSwiftDependencies() const;
 
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {

@@ -48,6 +48,7 @@
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -490,10 +491,13 @@ public:
 
   const Version CurrentVersion;
 
-  constexpr static const char * const moduleImportBufferName =
-    "<swift-imported-modules>";
-  constexpr static const char * const bridgingHeaderBufferName =
-    "<bridging-header-import>";
+  constexpr static const char *const moduleImportBufferName =
+      "<swift-imported-modules>";
+  constexpr static const char *const bridgingHeaderBufferName =
+      "<bridging-header-import>";
+  /// The name of system vfsoverlay.
+  constexpr static const char *const clangSystemVFSOverlayName =
+      "<clang-system-vfs-overlay>";
 
 private:
   DiagnosticWalker Walker;
@@ -624,16 +628,10 @@ public:
   void getMangledName(clang::MangleContext *mangler,
                       const clang::NamedDecl *clangDecl, raw_ostream &os);
 
-  /// Whether the C++ interoperability compatibility version is at least
-  /// 'major'.
-  ///
-  /// Use the
-  /// `isCxxInteropCompatVersionAtLeast(version::getUpcomingCxxInteropCompatVersion())`
-  /// check when making a source breaking C++ interop change.
-  bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                        unsigned minor = 0) const {
-    return SwiftContext.LangOpts.isCxxInteropCompatVersionAtLeast(major, minor);
-  }
+  /// Writes the Itanium mangled name (even on platforms that do not use Itanium
+  /// mangling, such as Windows) of \p clangDecl to \p os.
+  void getItaniumMangledName(const clang::NamedDecl *clangDecl,
+                             raw_ostream &os);
 
 private:
   /// The Importer may be configured to load modules of a different OS Version
@@ -703,6 +701,7 @@ private:
 
   // Map all cloned methods back to the original member
   llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
+  llvm::DenseSet<const ValueDecl *> membersSynthesizedPerType;
 
   // Keep track of methods that are unavailale in each class.
   // We need this set because these methods will be imported lazily. We don't
@@ -717,10 +716,16 @@ public:
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
 
+  bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const;
+
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
+  bool isMemberSynthesizedPerType(const ValueDecl *decl);
+  void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -977,13 +982,6 @@ public:
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
 
-  /// Returns the module \p MI comes from, or \c None if \p MI does not have
-  /// a valid associated module.
-  ///
-  /// The returned module may be null (but not \c None) if \p MI comes from
-  /// an imported header.
-  const clang::Module *getClangOwningModule(ClangNode Node) const;
-
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.
   static bool shouldAllowNSUIntegerAsInt(bool isFromSystemModule,
@@ -1134,6 +1132,12 @@ public:
 
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
+
+  /// Determines whether the given Clang declaration has conflicting
+  /// Swift attributes and emits diagnostics for any violations found.
+  ///
+  /// \param decl The Clang record or function declaration to validate.
+  void validateSwiftAttributes(const clang::NamedDecl *decl);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1762,6 +1766,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void finishOpaqueTypeDecl(OpaqueTypeDecl *decl,
+                            uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {
@@ -1980,6 +1989,10 @@ bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
 
+/// Checks whether this type is bool or is a C++ enum with a bool underlying
+/// type.
+bool isBoolOrBoolEnumType(Type ty);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
@@ -2007,6 +2020,7 @@ void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx,
                                   bool requiresBuiltinHeadersInSystemModules,
+                                  bool needSystemVFSOverlay,
                                   bool ignoreClangTarget);
 
 /// Finds a particular kind of nominal by looking through typealiases.
@@ -2223,6 +2237,18 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   return nullptr;
 }
 
+/// Find a unique base class that is annotated as SHARED_REFERENCE if any.
+const clang::RecordDecl *
+getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
+                   ClangImporter::Implementation *importerImpl);
+
+
+/// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+/// have a valid owning module.
+///
+/// Note that \p Node cannot itself be a clang::Module.
+const clang::Module *getClangOwningModule(ClangNode Node,
+                                          const clang::ASTContext &ClangCtx);
 } // end namespace importer
 } // end namespace swift
 

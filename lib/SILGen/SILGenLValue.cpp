@@ -35,7 +35,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILGenUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -708,9 +708,7 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  auto storage = AccessStorage::compute(address);
-  // Unsafe access may have invalid storage (e.g. a RawPointer).
-  if (storage && !isPossibleFormalAccessStorage(storage, &SGF.F))
+  if (isPossibleUnsafeAccessInvalidStorage(address, &SGF.F))
     return address;
 
   auto BAI =
@@ -3446,9 +3444,9 @@ namespace {
       }
 
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
       case AccessorKind::Modify:
-      case AccessorKind::Modify2: {
+      case AccessorKind::YieldingMutate: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
                                        AccessKind, Storage, Subs,
@@ -5752,6 +5750,7 @@ SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
   for (auto component = src.begin(); component != src.end(); component++) {
     if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
         component->get()->getKind() != PathComponent::StructElementKind &&
+        component->get()->getKind() != PathComponent::RefElementKind &&
         component->get()->getKind() != PathComponent::TupleElementKind &&
         component->get()->getKind() != PathComponent::ValueKind) {
       return std::nullopt;

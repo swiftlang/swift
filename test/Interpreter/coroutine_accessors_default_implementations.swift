@@ -171,12 +171,12 @@ open class B2 {
 struct I : P {
   var _iImpl : Int
   var i : Int {
-    read {
+    yielding borrow {
       print(#function, "before yield", _iImpl)
       yield _iImpl
       print(#function, "after yield", _iImpl)
     }
-    modify {
+    yielding mutate {
       print(#function, "before yield", _iImpl)
       yield &_iImpl
       print(#function, "after yield", _iImpl)
@@ -184,12 +184,12 @@ struct I : P {
   }
   var _sImpl: [Int]
   subscript(i : Int) -> Int {
-    read {
+    yielding borrow {
       print(#function, "before yield", _sImpl[i])
       yield _sImpl[i]
       print(#function, "after yield", _sImpl[i])
     }
-    modify {
+    yielding mutate {
       print(#function, "before yield", _sImpl[i])
       yield &_sImpl[i]
       print(#function, "after yield", _sImpl[i])
@@ -204,18 +204,18 @@ struct I : P {
 open class B {
   public init() {}
   open var i: Int {
-    read {
+    yielding borrow {
       fatalError()
     }
-    modify {
+    yielding mutate {
       fatalError()
     }
   }
   open subscript(i : Int) -> Int {
-    read {
+    yielding borrow {
       fatalError()
     }
-    modify {
+    yielding mutate {
       fatalError()
     }
   }
@@ -230,7 +230,7 @@ open class B2 {
     set {
       fatalError()
     }
-    modify {
+    yielding mutate {
       fatalError()
     }
   }
@@ -241,7 +241,7 @@ open class B2 {
     set {
       fatalError()
     }
-    modify {
+    yielding mutate {
       fatalError()
     }
   }

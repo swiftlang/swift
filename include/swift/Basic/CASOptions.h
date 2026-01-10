@@ -20,7 +20,6 @@
 
 #include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/CAS/CASConfiguration.h"
 
 namespace swift {
 
@@ -38,8 +37,8 @@ public:
   /// Import modules from CAS.
   bool ImportModuleFromCAS = false;
 
-  /// CAS Configuration.
-  llvm::cas::CASConfiguration Config;
+  /// CASOptions
+  clang::CASOptions CASOpts;
 
   /// Clang Include Trees.
   std::string ClangIncludeTree;

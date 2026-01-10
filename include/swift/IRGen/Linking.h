@@ -89,11 +89,20 @@ enum class TypeMetadataAddress {
 inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
-
+inline bool isEmbeddedWithoutEmbeddedExitentials(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+    !langOpts.hasFeature(Feature::EmbeddedExistentials);
+}
 // Metadata is not generated and not allowed to be referenced in Embedded Swift,
 // expect for classes (both generic and non-generic), dynamic self, and
 // class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
+  auto &langOpts = t->getASTContext().LangOpts;
+  bool embeddedExistentials =
+    langOpts.hasFeature(Feature::EmbeddedExistentials) &&
+    langOpts.hasFeature(Feature::Embedded);
+
   if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
       isa<DynamicSelfType>(t)) {
     return true;
@@ -106,6 +115,9 @@ inline bool isMetadataAllowedInEmbedded(CanType t) {
     if (archeTy->requiresClass())
       return true;
   }
+
+  if (embeddedExistentials)
+    return true;
   return false;
 }
 
@@ -115,6 +127,11 @@ inline bool isEmbedded(Decl *d) {
 
 inline bool isEmbedded(const ProtocolConformance *c) {
   return c->getType()->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+}
+
+inline bool isEmbeddedWithoutEmbeddedExitentials(const ProtocolConformance *c) {
+  return isEmbedded(c) && !c->getType()->getASTContext().
+    LangOpts.hasFeature(Feature::EmbeddedExistentials);
 }
 
 /// A link entity is some sort of named declaration, combined with all
@@ -450,6 +467,10 @@ class LinkEntity {
     // These are both type kinds and protocol-conformance kinds.
     // TYPE KINDS: BEGIN {{
 
+    /// A SIL differentiability witness. The pointer is a
+    /// SILDifferentiabilityWitness*.
+    DifferentiabilityWitness,
+
     /// A lazy protocol witness accessor function. The pointer is a
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
@@ -459,10 +480,6 @@ class LinkEntity {
     /// canonical TypeBase*, and the secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
-
-    /// A SIL differentiability witness. The pointer is a
-    /// SILDifferentiabilityWitness*.
-    DifferentiabilityWitness,
 
     // Everything following this is a type kind.
 
@@ -1098,7 +1115,7 @@ public:
   }
 
   static LinkEntity forValueWitnessTable(CanType type) {
-    assert(!isEmbedded(type));
+    assert(!isEmbeddedWithoutEmbeddedExitentials(type));
     LinkEntity entity;
     entity.setForType(Kind::ValueWitnessTable, type);
     return entity;
@@ -1128,7 +1145,7 @@ public:
   }
 
   static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
-    if (isEmbedded(C)) {
+    if (isEmbeddedWithoutEmbeddedExitentials(C)) {
       assert(C->getProtocol()->requiresClass());
     }
 
@@ -1845,6 +1862,15 @@ public:
   bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
+
+  /// Partial apply forwarders always need real private linkage,
+  /// to ensure the correct implementation is used in case of
+  /// colliding symbols.
+  bool privateMeansPrivate() const {
+    return getKind() == Kind::PartialApplyForwarder ||
+           getKind() == Kind::PartialApplyForwarderAsyncFunctionPointer ||
+           getKind() == Kind::PartialApplyForwarderCoroFunctionPointer;
+  }
 
   /// Whether the link entity's definitions must be considered non-unique.
   ///

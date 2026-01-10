@@ -1925,7 +1925,7 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // CSGen will diagnose cases that appear outside of pack expansion
   // expressions.
   options |= TypeResolutionFlags::AllowPackReferences;
-  const auto BaseTy = TypeResolution::resolveContextualType(
+  auto BaseTy = TypeResolution::resolveContextualType(
       InnerTypeRepr, DC, options,
       [](auto unboundTy) {
         // FIXME: Don't let unbound generic types escape type resolution.
@@ -1937,6 +1937,10 @@ TypeExpr *PreCheckTarget::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       PlaceholderType::get,
       // TypeExpr pack elements are opened in CSGen.
       /*packElementOpener*/ nullptr);
+
+  // Unwrap DynamicSelfType, because Self.Foo is the same as MyClass.Foo.
+  if (auto *SelfTy = BaseTy->getAs<DynamicSelfType>())
+    BaseTy = SelfTy->getSelfType();
 
   if (BaseTy->mayHaveMembers()) {
     // See if there is a member type with this name.
@@ -2022,7 +2026,7 @@ bool PreCheckTarget::canSimplifyDiscardAssignmentExpr(
 bool PreCheckTarget::correctInterpolationIfStrange(
     InterpolatedStringLiteralExpr *ISLE) {
   // These expressions are valid in Swift 5+.
-  if (getASTContext().isSwiftVersionAtLeast(5))
+  if (getASTContext().isLanguageModeAtLeast(5))
     return true;
 
   /// Diagnoses appendInterpolation(...) calls with multiple
@@ -2709,7 +2713,7 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
 Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   // If constructor call is expected to produce an optional let's not attempt
   // this optimization because literal initializers aren't failable.
-  if (!getASTContext().LangOpts.isSwiftVersionAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(5)) {
     if (!ExprStack.empty()) {
       auto *parent = ExprStack.back();
       if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))

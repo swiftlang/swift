@@ -2671,12 +2671,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case ReadImplKind::Read:
       AddAccessorToPrint(AccessorKind::Read);
       break;
-    case ReadImplKind::Read2:
+    case ReadImplKind::YieldingBorrow:
       if (ASD->getAccessor(AccessorKind::Read) &&
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Read);
       }
-      AddAccessorToPrint(AccessorKind::Read2);
+      AddAccessorToPrint(AccessorKind::YieldingBorrow);
       break;
     case ReadImplKind::Borrow:
       AddAccessorToPrint(AccessorKind::Borrow);
@@ -2696,7 +2696,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       AddAccessorToPrint(AccessorKind::Set);
       if (!shouldHideModifyAccessor()) {
         AddAccessorToPrint(AccessorKind::Modify);
-        AddAccessorToPrint(AccessorKind::Modify2);
+        AddAccessorToPrint(AccessorKind::YieldingMutate);
       }
       break;
     case WriteImplKind::MutableAddress:
@@ -2707,12 +2707,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case WriteImplKind::Modify:
       AddAccessorToPrint(AccessorKind::Modify);
       break;
-    case WriteImplKind::Modify2:
+    case WriteImplKind::YieldingMutate:
       if (ASD->getAccessor(AccessorKind::Modify) &&
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
-      AddAccessorToPrint(AccessorKind::Modify2);
+      AddAccessorToPrint(AccessorKind::YieldingMutate);
       break;
     case WriteImplKind::Mutate:
       AddAccessorToPrint(AccessorKind::Mutate);
@@ -3318,6 +3318,13 @@ static void suppressingFeatureTildeSendable(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureCAttribute(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCAttribute, true);
+  action();
+}
+
 namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
@@ -3413,6 +3420,14 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
+
+    // Special case: CAttribute feature prints has a hasAttribute(c) check. We
+    // might want to generalize this notion if we keep having to do it.
+    if (Feature(feature) == Feature::CAttribute) {
+      printer << "hasAttribute(c)";
+      continue;
+    }
+
     printer << "$" << Feature(feature).getName();
   }
 
@@ -3897,12 +3912,6 @@ static bool isEscaping(Type type) {
   return false;
 }
 
-static bool isNonisolatedCaller(Type type) {
-  if (auto *funcTy = type->getAs<AnyFunctionType>())
-    return funcTy->getIsolation().isNonIsolatedCaller();
-  return false;
-}
-
 static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
                                 const ParamDecl *param,
@@ -4101,11 +4110,14 @@ void PrintAST::printOneParameter(const ParamDecl *param,
         !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
       auto type = TheTypeLoc.getType();
 
+      bool isCallerIsolated = false;
+      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer()))
+        isCallerIsolated = funcTy->getIsolation().isNonIsolatedCaller();
+
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type) && !isEnumElement,
-                          isNonisolatedCaller(interfaceTy));
+                          isEscaping(type) && !isEnumElement, isCallerIsolated);
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -4269,9 +4281,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Borrow:
@@ -4397,8 +4409,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       if (decl->hasSendingResult()) {
         Printer << "sending ";
-      } else if (auto *ft = llvm::dyn_cast_if_present<AnyFunctionType>(
-                     decl->getInterfaceType())) {
+      } else if (auto *ft =
+                     decl->getInterfaceType()->getAs<AnyFunctionType>()) {
         if (ft->hasExtInfo() && ft->hasSendingResult()) {
           Printer << "sending ";
         }
@@ -4870,7 +4882,9 @@ void PrintAST::visitMacroExpansionDecl(MacroExpansionDecl *decl) {
 void CustomAttr::printCustomAttr(ASTPrinter &Printer, const PrintOptions &Options) const {
   Printer.callPrintNamePre(PrintNameContext::Attribute);
   Printer << "@";
-  if (auto type = getType())
+  if (auto *init = getSemanticInit(); init && Options.IsForSwiftInterface)
+    init->getType().print(Printer, Options);
+  else if (auto type = getType())
     type.print(Printer, Options);
   else
     getTypeRepr()->print(Printer, Options);
@@ -6137,11 +6151,15 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
 
   bool isMemberOfGenericParameter(TypeBase *T) {
     Type parent = nullptr;
-    if (auto alias = dyn_cast<TypeAliasType>(T))
+    if (auto alias = dyn_cast<TypeAliasType>(T))    // don't desugar
       parent = alias->getParent();
     else if (auto generic = T->getAs<AnyGenericType>())
       parent = generic->getParent();
-    return parent && parent->isTypeParameter();
+    else if (T->is<DependentMemberType>())
+      // Parent is always a generic parameter.
+      return true;
+    return parent && (parent->is<SubstitutableType>() ||
+                        isMemberOfGenericParameter(parent.getPointer()));
   }
 
   bool shouldPrintModuleSelector(TypeBase *T) {
@@ -8248,6 +8266,39 @@ static void getSyntacticInheritanceClause(const ProtocolDecl *proto,
   }
 }
 
+static Type stripParameterizedProtocolArgs(Type type) {
+  if (!type)
+    return type;
+
+  // For each ParameterizedProtocolType process each member recursively
+  if (auto *compositionType = type->getAs<ProtocolCompositionType>()) {
+    SmallVector<Type, 4> processedMembers;
+    bool hasChanged = false;
+    for (auto member : compositionType->getMembers()) {
+      Type processedMember = stripParameterizedProtocolArgs(member);
+      if (!processedMember)
+        continue;
+      processedMembers.push_back(processedMember);
+      if (processedMember.getPointer() != member.getPointer())
+        hasChanged = true;
+    }
+    // Rebuild ProtocolCompositionType if at least one member had generic args
+    if (hasChanged) {
+      return ProtocolCompositionType::get(
+          type->getASTContext(), processedMembers,
+          compositionType->getInverses(),
+          compositionType->hasExplicitAnyObject());
+    }
+    return type;
+  }
+
+  // Strip generic arguments of a single ParameterizedProtocolType
+  if (auto *paramProto = type->getAs<ParameterizedProtocolType>()) {
+    return paramProto->getBaseType();
+  }
+  return type;
+}
+
 void
 swift::getInheritedForPrinting(
     const Decl *decl, const PrintOptions &options,
@@ -8317,7 +8368,16 @@ swift::getInheritedForPrinting(
       }
     }
 
-    Results.push_back(inherited.getEntry(i));
+    auto entry = inherited.getEntry(i);
+    if (auto type = entry.getType()) {
+      Type strippedType = stripParameterizedProtocolArgs(type);
+      if (strippedType.getPointer() != type.getPointer()) {
+        entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
+                               entry.getOptions());
+      }
+    }
+
+    Results.push_back(entry);
   }
 
   // Collect synthesized conformances.

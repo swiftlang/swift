@@ -73,6 +73,8 @@ STATISTIC(NumNormalProtocolConformancesLoaded,
           "# of normal protocol conformances deserialized");
 STATISTIC(NumNormalProtocolConformancesCompleted,
           "# of normal protocol conformances completed");
+STATISTIC(NumOpaqueTypeDeclsCompleted,
+          "# of opaque type declarations completed");
 STATISTIC(NumNestedTypeShortcuts,
           "# of nested types resolved without full lookup");
 
@@ -181,8 +183,8 @@ const char InvalidEnumValueError::ID = '\0';
 void InvalidEnumValueError::anchor() {}
 const char ConformanceXRefError::ID = '\0';
 void ConformanceXRefError::anchor() {}
-const char InavalidAvailabilityDomainError::ID = '\0';
-void InavalidAvailabilityDomainError::anchor() {}
+const char InvalidAvailabilityDomainError::ID = '\0';
+void InvalidAvailabilityDomainError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
@@ -3111,7 +3113,8 @@ ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
       name.front().Item == getContext().getRealModuleName(parentName)) {
     if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
-      assert(importer && "no way to import shadowed module");
+      if (!importer)
+        return nullptr;
       UnderlyingModule =
           importer->loadModule(SourceLoc(), name.getTopLevelPath());
     }
@@ -3244,7 +3247,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
-  CASE(Read2)
+  CASE(YieldingBorrow)
   CASE(Borrow)
 #undef CASE
   }
@@ -3264,7 +3267,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(Mutate)
 #undef CASE
   }
@@ -3282,7 +3285,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
   CASE(Mutate)
@@ -4000,7 +4003,6 @@ public:
     bool isImplicit, isObjC, isStatic;
     uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
-    bool isLazyStorageProperty;
     bool isTopLevelGlobal;
     DeclID lazyStorageID;
     unsigned numAccessors, numBackingProperties;
@@ -4016,7 +4018,6 @@ public:
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawIntroducer,
                                        isGetterMutating, isSetterMutating,
-                                       isLazyStorageProperty,
                                        isTopLevelGlobal,
                                        lazyStorageID,
                                        opaqueReadOwnership,
@@ -4167,9 +4168,9 @@ public:
       VarDecl *storage = cast<VarDecl>(lazyStorageDecl.get());
       ctx.evaluator.cacheOutput(
           LazyStoragePropertyRequest{var}, std::move(storage));
+      storage->setLazyStorageFor(var);
     }
 
-    var->setLazyStorageProperty(isLazyStorageProperty);
     var->setTopLevelGlobal(isTopLevelGlobal);
 
     // If there are any backing properties, record them.
@@ -4615,84 +4616,6 @@ public:
     return deserializeAnyFunc(scratch, blobData, /*isAccessor*/true);
   }
 
-  void deserializeConditionalSubstitutionAvailabilityQueries(
-      SmallVectorImpl<AvailabilityQuery> &queries) {
-    using namespace decls_block;
-
-    SmallVector<uint64_t, 4> scratch;
-    StringRef blobData;
-
-    // FIXME: [availability] Support arbitrary domains (rdar://156513787).
-    auto domain = ctx.getTargetAvailabilityDomain();
-    ASSERT(domain.isPlatform());
-
-    while (true) {
-      llvm::BitstreamEntry entry =
-          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
-      if (entry.Kind != llvm::BitstreamEntry::Record)
-        break;
-
-      scratch.clear();
-
-      unsigned recordID = MF.fatalIfUnexpected(
-          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
-      if (recordID != decls_block::CONDITIONAL_SUBSTITUTION_COND)
-        break;
-
-      bool isUnavailability;
-      DEF_VER_TUPLE_PIECES(version);
-
-      ConditionalSubstitutionConditionLayout::readRecord(
-          scratch, isUnavailability, LIST_VER_TUPLE_PIECES(version));
-
-      llvm::VersionTuple version;
-      DECODE_VER_TUPLE(version);
-
-      queries.push_back(AvailabilityQuery::dynamic(
-                            domain, AvailabilityRange(version), std::nullopt)
-                            .asUnavailable(isUnavailability));
-    }
-  }
-
-  void deserializeConditionalSubstitutions(
-      SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
-          &limitedAvailability) {
-    SmallVector<uint64_t, 4> scratch;
-    StringRef blobData;
-
-    while (true) {
-      llvm::BitstreamEntry entry =
-          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
-      if (entry.Kind != llvm::BitstreamEntry::Record)
-        break;
-
-      scratch.clear();
-      unsigned recordID = MF.fatalIfUnexpected(
-          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
-      if (recordID != decls_block::CONDITIONAL_SUBSTITUTION)
-        break;
-
-      SubstitutionMapID substitutionMapRef;
-
-      decls_block::ConditionalSubstitutionLayout::readRecord(
-          scratch, substitutionMapRef);
-
-      SmallVector<AvailabilityQuery, 2> queries;
-      deserializeConditionalSubstitutionAvailabilityQueries(queries);
-
-      if (queries.empty())
-        return MF.diagnoseAndConsumeFatal();
-
-      auto subMapOrError = MF.getSubstitutionMapChecked(substitutionMapRef);
-      if (!subMapOrError)
-        return MF.diagnoseAndConsumeFatal();
-
-      limitedAvailability.push_back(
-          OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-              ctx, queries, subMapOrError.get()));
-    }
-  }
-
   Expected<Decl *> deserializeOpaqueType(ArrayRef<uint64_t> scratch,
                                          StringRef blobData) {
     DeclID namingDeclID;
@@ -4700,16 +4623,16 @@ public:
     GenericSignatureID interfaceSigID;
     TypeID interfaceTypeID;
     GenericSignatureID genericSigID;
-    SubstitutionMapID underlyingTypeSubsID;
     uint8_t rawAccessLevel;
+    bool hasUnderlyingType;
     bool exportUnderlyingType;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
-                                              underlyingTypeSubsID,
                                               rawAccessLevel,
+                                              hasUnderlyingType,
                                               exportUnderlyingType);
-    
+
     DeclContext *declContext;
     SET_OR_RETURN_ERROR(declContext, MF.getDeclContextChecked(contextID));
 
@@ -4724,14 +4647,35 @@ public:
     GenericParamList *genericParams;
     SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(declContext));
 
+    // FIXME: Do we still need exportUnderlyingType?
+    uint64_t contextData = 0;
+    if (hasUnderlyingType &&
+        (exportUnderlyingType ||
+         MF.FileContext->getParentModule()->isMainModule())) {
+      contextData = MF.DeclTypeCursor.GetCurrentBitNo();
+    }
+
     // Create the decl.
-    auto opaqueDecl = OpaqueTypeDecl::get(
-        /*NamingDecl=*/ nullptr, genericParams, declContext,
-        interfaceSigOrErr.get(), /*OpaqueReturnTypeReprs*/ { });
+    auto opaqueDecl = OpaqueTypeDecl::createDeserialized(
+        genericParams, declContext, interfaceSigOrErr.get(),
+        &MF, contextData);
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
+
+    if (contextData == 0) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Ignoring underlying information for opaque type of '";
+        llvm::dbgs() << namingDecl->getName();
+        llvm::dbgs() << "'\n");
+    } else {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Loading underlying information for opaque type of '";
+        llvm::dbgs() << namingDecl->getName();
+        llvm::dbgs() << "'\n";
+        );
+    }
 
     auto interfaceType = MF.getType(interfaceTypeID);
     opaqueDecl->setInterfaceType(MetatypeType::get(interfaceType));
@@ -4747,55 +4691,6 @@ public:
     else
       opaqueDecl->setGenericSignature(GenericSignature());
 
-    if (!MF.FileContext->getParentModule()->isMainModule() &&
-        !exportUnderlyingType) {
-      // Do not try to read the underlying type information if the function
-      // is not inlinable in clients. This reflects the swiftinterface behavior
-      // in where clients are only aware of the underlying type when the body
-      // of the function is public.
-      LLVM_DEBUG(
-        llvm::dbgs() << "Ignoring underlying information for opaque type of '";
-        llvm::dbgs() << namingDecl->getName();
-        llvm::dbgs() << "'\n";
-        );
-
-    } else if (underlyingTypeSubsID) {
-      LLVM_DEBUG(
-        llvm::dbgs() << "Loading underlying information for opaque type of '";
-        llvm::dbgs() << namingDecl->getName();
-        llvm::dbgs() << "'\n";
-        );
-
-      auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
-      if (!subMapOrError) {
-        // If the underlying type references internal details, ignore it.
-        auto unconsumedError =
-          MF.consumeExpectedError(subMapOrError.takeError());
-        if (unconsumedError)
-          return std::move(unconsumedError);
-      } else {
-        // Check whether there are any conditionally available substitutions.
-        // If there are, it means that "unique" we just read is a universally
-        // available substitution.
-        SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
-            limitedAvailability;
-
-        deserializeConditionalSubstitutions(limitedAvailability);
-
-        if (limitedAvailability.empty()) {
-          opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
-        } else {
-          limitedAvailability.push_back(
-              OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
-                  ctx,
-                  {AvailabilityQuery::universallyConstant(
-                      /*value=*/true)},
-                  subMapOrError.get()));
-
-          opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
-        }
-      }
-    }
     return opaqueDecl;
   }
 
@@ -5881,9 +5776,9 @@ decodeDomainKind(uint8_t kind) {
   }
 }
 
-static std::optional<AvailabilityDomain>
-decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
-                         PlatformKind platformKind, ValueDecl *decl) {
+static AvailabilityDomain
+decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
+                                  PlatformKind platformKind) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5898,7 +5793,8 @@ decodeAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Platform:
     return AvailabilityDomain::forPlatform(platformKind);
   case AvailabilityDomainKind::Custom:
-    return AvailabilityDomain::forCustom(decl);
+    llvm_unreachable("custom domains aren't handled here");
+    return AvailabilityDomain::forUniversal();
   }
 }
 
@@ -5912,7 +5808,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   bool isSPI;
   uint8_t rawDomainKind;
   unsigned rawPlatform;
-  DeclID domainDeclID;
+  DeclID customDomainID;
   DEF_VER_TUPLE_PIECES(Introduced);
   DEF_VER_TUPLE_PIECES(Deprecated);
   DEF_VER_TUPLE_PIECES(Obsoleted);
@@ -5921,7 +5817,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   // Decode the record, pulling the version tuple information.
   serialization::decls_block::AvailableDeclAttrLayout::readRecord(
       scratch, isImplicit, isUnavailable, isDeprecated, isNoAsync, isSPI,
-      rawDomainKind, rawPlatform, domainDeclID,
+      rawDomainKind, rawPlatform, customDomainID,
       LIST_VER_TUPLE_PIECES(Introduced), LIST_VER_TUPLE_PIECES(Deprecated),
       LIST_VER_TUPLE_PIECES(Obsoleted), messageSize, renameSize);
 
@@ -5953,24 +5849,49 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   else
     kind = AvailableAttr::Kind::Default;
 
-  ValueDecl *domainDecl = nullptr;
-  if (domainDeclID) {
-    Decl *decodedDomainDecl = nullptr;
-    SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+  AvailabilityDomain domain;
+  if (domainKind == AvailabilityDomainKind::Custom) {
+    if (customDomainID & 0x01) {
+      IdentifierID customDomainNameID = customDomainID >> 1;
+      Identifier customDomainName = MF.getIdentifier(customDomainNameID);
+      SmallVector<AvailabilityDomain, 1> foundDomains;
+      if (ctx.MainModule) {
+        ctx.MainModule->lookupAvailabilityDomains(
+            customDomainName, foundDomains);
+      }
 
-    if (decodedDomainDecl) {
-      domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
-      if (!domainDecl)
-        return llvm::make_error<InavalidAvailabilityDomainError>();
+      if (foundDomains.size() == 1) {
+        domain = foundDomains[0];
+      } else {
+        ctx.Diags.diagnose(
+            SourceLoc(), diag::serialization_dropped_custom_availability,
+            customDomainName);
+        domain = AvailabilityDomain::forUniversal();
+      }
+    } else {
+      DeclID domainDeclID = customDomainID >> 1;
+      Decl *decodedDomainDecl = nullptr;
+      SET_OR_RETURN_ERROR(decodedDomainDecl, MF.getDeclChecked(domainDeclID));
+
+      if (decodedDomainDecl) {
+        auto domainDecl = dyn_cast<ValueDecl>(decodedDomainDecl);
+        if (!domainDecl)
+          return llvm::make_error<InvalidAvailabilityDomainError>();
+
+        if (auto customDomain = AvailabilityDomain::forCustom(domainDecl))
+          domain = *customDomain;
+        else
+          return llvm::make_error<InvalidAvailabilityDomainError>();
+      } else {
+        return llvm::make_error<InvalidAvailabilityDomainError>();
+      }
     }
+  } else {
+    domain = decodeNonCustomAvailabilityDomain(domainKind, platform);
   }
 
-  auto domain = decodeAvailabilityDomain(domainKind, platform, domainDecl);
-  if (!domain)
-    return llvm::make_error<InavalidAvailabilityDomainError>();
-
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), *domain, SourceLoc(), kind,
+      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind,
                     message, rename, Introduced, SourceRange(), Deprecated,
                     SourceRange(), Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
@@ -8902,6 +8823,148 @@ ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
   return getType(contextData);
 }
 
+void
+ModuleFile::finishOpaqueTypeDecl(OpaqueTypeDecl *opaqueDecl,
+                                 uint64_t contextData) {
+  auto &ctx = getAssociatedModule()->getASTContext();
+  auto *namingDecl = opaqueDecl->getNamingDecl();
+
+  using namespace decls_block;
+  PrettyStackTraceModuleFile traceModule(*this);
+  PrettyStackTraceDecl trace("finishing opaque result type ", namingDecl);
+  ++NumOpaqueTypeDeclsCompleted;
+
+  // Find the underlying type substitutions record.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  if (diagnoseAndConsumeFatalIfNotSuccess(
+          DeclTypeCursor.JumpToBit(contextData)))
+    return;
+  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
+  assert(entry.Kind == llvm::BitstreamEntry::Record &&
+         "registered lazy loader incorrectly");
+
+  SubstitutionMapID underlyingTypeSubsID;
+  SmallVector<uint64_t, 16> scratch;
+
+  unsigned kind =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
+  if (kind != UNDERLYING_SUBSTITUTION)
+    fatal(llvm::make_error<InvalidRecordKindError>(kind,
+                    "registered lazy loader incorrectly"));
+
+  UnderlyingSubstitutionLayout::readRecord(scratch, underlyingTypeSubsID);
+
+  auto subMapOrError = getSubstitutionMapChecked(underlyingTypeSubsID);
+  if (!subMapOrError) {
+    // If the underlying type references internal details, ignore it.
+    diagnoseAndConsumeError(subMapOrError.takeError());
+    return;
+  }
+
+  // Check whether there are any conditionally available substitutions.
+  // If there are, it means that "unique" we just read is a universally
+  // available substitution.
+  SmallVector<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+      limitedAvailability;
+
+  deserializeConditionalSubstitutions(limitedAvailability);
+
+  if (limitedAvailability.empty()) {
+    opaqueDecl->setUniqueUnderlyingTypeSubstitutions(subMapOrError.get());
+  } else {
+    limitedAvailability.push_back(
+        OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+            ctx,
+            {AvailabilityQuery::universallyConstant(
+                /*value=*/true)},
+            subMapOrError.get()));
+
+    opaqueDecl->setConditionallyAvailableSubstitutions(limitedAvailability);
+  }
+}
+
+void ModuleFile::deserializeConditionalSubstitutions(
+    SmallVectorImpl<OpaqueTypeDecl::ConditionallyAvailableSubstitutions *>
+        &limitedAvailability) {
+  auto &ctx = getAssociatedModule()->getASTContext();
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  while (true) {
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = fatalIfUnexpected(
+        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::CONDITIONAL_SUBSTITUTION)
+      break;
+
+    SubstitutionMapID substitutionMapRef;
+
+    decls_block::ConditionalSubstitutionLayout::readRecord(
+        scratch, substitutionMapRef);
+
+    SmallVector<AvailabilityQuery, 2> queries;
+    deserializeConditionalSubstitutionAvailabilityQueries(queries);
+
+    if (queries.empty())
+      return diagnoseAndConsumeFatal();
+
+    auto subMapOrError = getSubstitutionMapChecked(substitutionMapRef);
+    if (!subMapOrError)
+      return diagnoseAndConsumeFatal();
+
+    limitedAvailability.push_back(
+        OpaqueTypeDecl::ConditionallyAvailableSubstitutions::get(
+            ctx, queries, subMapOrError.get()));
+  }
+}
+
+void ModuleFile::deserializeConditionalSubstitutionAvailabilityQueries(
+    SmallVectorImpl<AvailabilityQuery> &queries) {
+  using namespace decls_block;
+
+  auto &ctx = getAssociatedModule()->getASTContext();
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  // FIXME: [availability] Support arbitrary domains (rdar://156513787).
+  auto domain = ctx.getTargetAvailabilityDomain();
+  ASSERT(domain.isPlatform());
+
+  while (true) {
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+
+    unsigned recordID = fatalIfUnexpected(
+        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::CONDITIONAL_SUBSTITUTION_COND)
+      break;
+
+    bool isUnavailability;
+    DEF_VER_TUPLE_PIECES(version);
+
+    ConditionalSubstitutionConditionLayout::readRecord(
+        scratch, isUnavailability, LIST_VER_TUPLE_PIECES(version));
+
+    llvm::VersionTuple version;
+    DECODE_VER_TUPLE(version);
+
+    queries.push_back(AvailabilityQuery::dynamic(
+                          domain, AvailabilityRange(version), std::nullopt)
+                          .asUnavailable(isUnavailability));
+  }
+}
+
 ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
     const DynamicReplacementAttr *DRA, uint64_t contextData) {
   return cast<ValueDecl>(getDecl(contextData));
@@ -9057,13 +9120,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
         // Print context to stderr.
         PrintOptions Opts;
-        llvm::errs() << "Requirements:\n";
+        llvm::errs() << "Requirements seen by this invocation:\n";
         for (auto req: requirements) {
           req.print(llvm::errs(), Opts);
           llvm::errs() << "\n";
         }
 
-        llvm::errs() << "Conformances:\n";
+        llvm::errs() << "\nConformances written in the swiftmodule:\n";
         for (auto req: reqConformances) {
           req.print(llvm::errs());
           llvm::errs() << "\n";

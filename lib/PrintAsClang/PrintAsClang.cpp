@@ -358,7 +358,7 @@ static void collectClangModuleHeaderIncludes(
          dir != end && !errorCode; dir.increment(errorCode)) {
 
       if (llvm::StringSwitch<bool>(llvm::sys::path::extension(dir->path()))
-              .Cases(".h", ".H", ".hh", ".hpp", true)
+              .Cases({".h", ".H", ".hh", ".hpp"}, true)
               .Default(false)) {
 
         // Compute path to the header relative to the root of the module
@@ -567,6 +567,8 @@ static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
         "#pragma clang diagnostic ignored \"-Wunknown-pragmas\"\n"
         "#pragma clang diagnostic ignored \"-Wnullability\"\n"
         "#pragma clang diagnostic ignored "
+        "\"-Warc-bridge-casts-disallowed-in-nonarc\"\n"
+        "#pragma clang diagnostic ignored "
         "\"-Wdollar-in-identifier-extension\"\n"
         "#pragma clang diagnostic ignored "
         "\"-Wunsafe-buffer-usage\"\n"
@@ -585,7 +587,7 @@ static void writePostImportPrologue(raw_ostream &os, ModuleDecl &M) {
         "#endif\n\n";
 }
 
-static void writeObjCEpilogue(raw_ostream &os) {
+static void writeBlockEpilogue(raw_ostream &os) {
   // Pop out of `external_source_symbol` attribute
   // before emitting the C++ section as the C++ section
   // might include other files in it.
@@ -627,7 +629,9 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                  clangHeaderSearchInfo, exposedModuleHeaderNames,
                  /*useCxxImport=*/false, /*useNonModularIncludes*/true);
 
+    writePostImportPrologue(os, *M);
     emitExternC(os, [&] { os << "\n" << cModuleContents.str(); });
+    writeBlockEpilogue(os);
     moduleContentsScratch.clear();
   }
 
@@ -643,7 +647,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   });
   writePostImportPrologue(os, *M);
   emitObjCConditional(os, [&] { os << "\n" << objcModuleContents.str(); });
-  writeObjCEpilogue(os);
+  writeBlockEpilogue(os);
 
   // C++ content
   emitCxxConditional(os, [&] {

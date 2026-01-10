@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,44 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-import XCTest
+import Foundation
+import Testing
+
 @testable import SwiftXcodeGen
 
-fileprivate func expectEqual<T: Equatable>(
-  expected: [T], actual: [T], description: String,
-  file: StaticString = #file, line: UInt = #line
-) {
-  guard expected.count == actual.count else {
-    XCTFail(
-      """
-      Expected \(expected.count) '\(description)', \
-      got \(actual.count) (\(actual))
-      """,
-      file: file, line: line
-    )
-    return
-  }
-  for (expected, actual) in zip(expected, actual) {
-    XCTAssertEqual(expected, actual, file: file, line: line)
-  }
-}
-
 fileprivate func expectEqual<T, U: Equatable>(
-  _ expected: T, _ actual: T, _ kp: KeyPath<T, U>,
-  file: StaticString = #file, line: UInt = #line
+  _ expected: T,
+  _ actual: T,
+  _ kp: KeyPath<T, U>,
+  sourceLocation: SourceLocation = #_sourceLocation
 ) {
-  XCTAssertEqual(
-    expected[keyPath: kp], actual[keyPath: kp], file: file, line: line
-  )
-}
-
-fileprivate func expectEqual<T, U: Equatable>(
-  _ expected: T, _ actual: T, _ kp: KeyPath<T, [U]>,
-  file: StaticString = #file, line: UInt = #line
-) {
-  expectEqual(
-    expected: expected[keyPath: kp], actual: actual[keyPath: kp],
-    description: "\(kp)", file: file, line: line
+  #expect(
+    expected[keyPath: kp] == actual[keyPath: kp],
+    sourceLocation: sourceLocation
   )
 }
 
@@ -56,13 +32,20 @@ fileprivate func assertParse(
   bindings: [String: String] = [:],
   rules: [String: NinjaBuildFile.Rule] = [:],
   edges: [NinjaBuildFile.BuildEdge],
-  file: StaticString = #file, line: UInt = #line
+  sourceLocation: SourceLocation = #_sourceLocation
 ) {
   let filePath: AbsolutePath = "/tmp/build.ninja"
   let files: [AbsolutePath: String] = [
     filePath: str
   ]
-  assertParse(filePath, in: files, bindings: bindings, rules: rules, edges: edges, file: file, line: line)
+  assertParse(
+    filePath,
+    in: files,
+    bindings: bindings,
+    rules: rules,
+    edges: edges,
+    sourceLocation: sourceLocation
+  )
 }
 
 fileprivate func assertParse(
@@ -71,42 +54,43 @@ fileprivate func assertParse(
   bindings: [String: String] = [:],
   rules: [String: NinjaBuildFile.Rule] = [:],
   edges: [NinjaBuildFile.BuildEdge],
-  file: StaticString = #file, line: UInt = #line
+  sourceLocation: SourceLocation = #_sourceLocation
 ) {
   do {
     let buildFile = try NinjaParser.parse(filePath: filePath, fileReader: { Data(fileSystem[$0]!.utf8) })
     guard edges.count == buildFile.buildEdges.count else {
-      XCTFail(
+      Issue.record(
         "Expected \(edges.count) edges, got \(buildFile.buildEdges.count)",
-        file: file, line: line
+        sourceLocation: sourceLocation
       )
       return
     }
-    XCTAssertEqual(
-      bindings,
-      buildFile.bindings.values,
-      file: file, line: line
+    #expect(
+      bindings == buildFile.bindings.values,
+      sourceLocation: sourceLocation
     )
-    XCTAssertEqual(
-      rules, buildFile.rules,
-      file: file, line: line
+    #expect(
+      rules == buildFile.rules,
+      sourceLocation: sourceLocation
     )
     for (expected, actual) in zip(edges, buildFile.buildEdges) {
-      expectEqual(expected, actual, \.ruleName, file: file, line: line)
-      expectEqual(expected, actual, \.inputs, file: file, line: line)
-      expectEqual(expected, actual, \.outputs, file: file, line: line)
-      expectEqual(expected, actual,  \.dependencies, file: file, line: line)
-      expectEqual(expected, actual,  \.bindings, file: file, line: line)
+      expectEqual(expected, actual, \.ruleName, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.inputs, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.outputs, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.dependencies, sourceLocation: sourceLocation)
+      expectEqual(expected, actual, \.bindings, sourceLocation: sourceLocation)
 
-      XCTAssertEqual(expected, actual, file: file, line: line)
+      #expect(expected == actual, sourceLocation: sourceLocation)
     }
   } catch {
-    XCTFail("\(error)", file: file, line: line)
+    Issue.record("\(error)", sourceLocation: sourceLocation)
   }
 }
 
-class NinjaParserTests: XCTestCase {
-  func testBuildEdge() throws {
+@Suite
+struct NinjaParserTests {
+  @Test
+  func buildEdge() throws {
     assertParse(
       """
       # ignore comment, build foo.o: a.swift | dep || orderdep
@@ -126,7 +110,8 @@ class NinjaParserTests: XCTestCase {
     )
   }
 
-  func testRule() throws {
+  @Test
+  func rule() throws {
     assertParse(
       """
       rule SWIFTC
@@ -146,7 +131,8 @@ class NinjaParserTests: XCTestCase {
     )
   }
 
-  func testInclude() throws {
+  @Test
+  func include() throws {
     let files: [AbsolutePath: String] = [
       "/tmp/build.ninja": """
         include path/to/sub.ninja
@@ -180,7 +166,8 @@ class NinjaParserTests: XCTestCase {
     )
   }
 
-  func testPhonyRule() throws {
+  @Test
+  func phonyRule() throws {
     assertParse(
       """
       build foo.swiftmodule : phony bar.swiftmodule
@@ -194,7 +181,8 @@ class NinjaParserTests: XCTestCase {
     )
   }
 
-  func testBindings() throws {
+  @Test
+  func bindings() throws {
     assertParse(
       """
       x = y
@@ -252,7 +240,8 @@ class NinjaParserTests: XCTestCase {
     )
   }
 
-  func testEscape() throws {
+  @Test
+  func escape() throws {
     for newline in ["\n", "\r", "\r\n"] {
       assertParse(
         """

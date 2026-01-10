@@ -698,7 +698,7 @@ void DistributedAccessor::emitReturn(llvm::Value *errorValue) {
   error.add(errorValue);
 
   emitAsyncReturn(IGF, AsyncLayout, getResultType(), AccessorType, voidResult,
-                  error);
+                  error, getErrorType());
 }
 
 void DistributedAccessor::emit() {

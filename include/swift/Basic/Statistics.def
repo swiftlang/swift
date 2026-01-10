@@ -187,6 +187,14 @@ FRONTEND_STATISTIC(Sema, NumCrossImportsChecked)
 /// Number of pairs of modules we've actually found cross-imports for.
 FRONTEND_STATISTIC(Sema, NumCrossImportsFound)
 
+/// Number of bytes allocated in the solver arena, summed across all
+/// constraint systems for all expressions.
+FRONTEND_STATISTIC(Sema, NumSolverBytesAllocated)
+
+/// Number of bytes allocated in the solver arena, maximum across all
+/// constraint systems for all expressions.
+FRONTEND_STATISTIC(Sema, MaxSolverBytesAllocated)
+
 /// Number of steps recorded in the trail while solving expression type
 /// constraints. A rough proxy for "how much work the expression
 /// type checker did".

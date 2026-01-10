@@ -45,8 +45,8 @@ func catching(input: Float) -> Float {
 // CHECK: [[BB_NORMAL]](%[[PULLBACK:.*]] : $@callee_guaranteed (Float) -> Float)
 // Call pullback and accumulate adjoints
 // CHECK:   %[[CALLEE_ADJ:.*]] = apply %[[PULLBACK]](%{{.*}}) : $@callee_guaranteed (Float) -> Float
-// CHECK:   %[[FLOAT_ADJ:.*]] = struct_extract %[[ADJ]] : $Float, #Float._value
-// CHECK:   %[[FLOAT_CALLEE_ADJ:.*]] = struct_extract %[[CALLEE_ADJ]] : $Float, #Float._value
+// CHECK-DAG:   %[[FLOAT_ADJ:.*]] = struct_extract %[[ADJ]] : $Float, #Float._value
+// CHECK-DAG:   %[[FLOAT_CALLEE_ADJ:.*]] = struct_extract %[[CALLEE_ADJ]] : $Float, #Float._value
 // CHECK:   %[[NEW_FLOAT_ADJ:.*]] = builtin "fadd_FPIEEE32"(%[[FLOAT_CALLEE_ADJ]] : $Builtin.FPIEEE32, %[[FLOAT_ADJ]] : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
 // CHECK:   %[[NEW_ADJ:.*]] = struct $Float (%[[NEW_FLOAT_ADJ]] : $Builtin.FPIEEE32)
 // CHECK:   br {{.*}}(%[[NEW_ADJ]] : $Float)

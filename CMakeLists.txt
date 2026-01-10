@@ -776,6 +776,10 @@ option(SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE
   "Build the stdlib with -strict-concurrency=complete"
   FALSE)
 
+option(SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES
+  "Build the stdlib with -enable-sil-opaque-values"
+  FALSE)
+
 option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
   FALSE)
@@ -798,6 +802,10 @@ option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
 
 option(SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   "Enable experimental SwiftParser validation by default"
+  FALSE)
+
+option(SWIFT_ENABLE_DIRECT_RETAIN_RELEASE
+  "Enable use of direct refcounting calls by default"
   FALSE)
 
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT

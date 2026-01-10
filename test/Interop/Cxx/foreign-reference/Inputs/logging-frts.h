@@ -22,20 +22,20 @@ private:
 
   int _refCount;
 
-  friend void retainSharedFRT(SharedFRT *_Nonnull);
+public:
+  void retainSharedFRT() {
+    ++_refCount;
+    logMsg("retain");
+  }
+
   friend void releaseSharedFRT(SharedFRT *_Nonnull);
-} SWIFT_SHARED_REFERENCE(retainSharedFRT, releaseSharedFRT);
+} SWIFT_SHARED_REFERENCE(.retainSharedFRT, releaseSharedFRT);
 
 class MyToken {
 public:
   MyToken() = default;
   MyToken(MyToken const &) {}
 };
-
-inline void retainSharedFRT(SharedFRT *_Nonnull x) {
-  ++x->_refCount;
-  x->logMsg("retain");
-}
 
 inline void releaseSharedFRT(SharedFRT *_Nonnull x) {
   --x->_refCount;
@@ -85,3 +85,10 @@ private:
   explicit Payload(int value) : m_value(value) {}
   int m_value;
 };
+
+struct FirstBase {
+  int a, b, c;
+  virtual ~FirstBase() {}
+};
+
+struct DerivedFRT : FirstBase, SharedFRT {};

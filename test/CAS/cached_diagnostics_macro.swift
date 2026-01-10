@@ -4,34 +4,54 @@
 // RUN: split-file %s %t
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
 
-// RUN: %target-swift-frontend -typecheck -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
-// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   %t/main.swift -swift-version 5 -external-plugin-path %t#%swift-plugin-server 2> %t/diag1.txt
-
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t#%swift-plugin-server
 
-// RUN: %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/SwiftShims.cmd
-// RUN: %swift_frontend_plain @%t/SwiftShims.cmd
 
-// RUN: %S/Inputs/BuildCommandExtractor.py %t/deps.json MyApp > %t/MyApp.cmd
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
-// RUN: %target-swift-frontend -diagnostic-style=swift \
+// RUN: %target-swift-frontend-plain -diagnostic-style=swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
+// RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -external-plugin-path %t#%swift-plugin-server \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name MyApp -explicit-swift-module-map-file @%t/map.casid -O \
-// RUN:   %t/main.swift @%t/MyApp.cmd -serialize-diagnostics-path %t/Test.diag 2> %t/diag2.txt
+// RUN:   %t/main.swift @%t/MyApp.cmd -serialize-diagnostics-path %t/Test.diag 2>&1 | %FileCheck -check-prefix CHECK-DIAG %s
 
-// RUN: diff %t/diag1.txt %t/diag2.txt
+// CHECK-DIAG:      macro expansion #myWarning:1:1: warning: 'testDeprecated()' is deprecated [#DeprecatedDeclaration]
+// CHECK-DIAG-NEXT: `- TMP_DIR{{/|\\}}main.swift:8:36: note: expanded code originates here
+// CHECK-DIAG-NEXT:  6 |
+// CHECK-DIAG-NEXT:  7 | func testDiscardableStringify(x: Int) {
+// CHECK-DIAG-NEXT:  8 |   #toMyWarning("this is a warning")
+// CHECK-DIAG-NEXT:    |   `- note: in expansion of macro 'toMyWarning' here
+// CHECK-DIAG-NEXT:    +--- macro expansion #toMyWarning -----------------------------------
+// CHECK-DIAG-NEXT:    |1 | #myWarning("")
+// CHECK-DIAG-NEXT:    |  | `- note: in expansion of macro 'myWarning' here
+// CHECK-DIAG-NEXT:    |  +--- macro expansion #myWarning ----------------------------------
+// CHECK-DIAG-NEXT:    |  |1 | testDeprecated()
+// CHECK-DIAG-NEXT:    |  |  | `- warning: 'testDeprecated()' is deprecated [#DeprecatedDeclaration]
+// CHECK-DIAG-NEXT:    |  +-----------------------------------------------------------------
+// CHECK-DIAG-NEXT:    +--------------------------------------------------------------------
+// CHECK-DIAG-NEXT:  9 |   #myWarning("this is a warning")
+// CHECK-DIAG-NEXT: 10 | }
+
+// CHECK-DIAG:      macro expansion #myWarning:1:1: warning: 'testDeprecated()' is deprecated [#DeprecatedDeclaration]
+// CHECK-DIAG-NEXT: `- TMP_DIR{{/|\\}}main.swift:9:34: note: expanded code originates here
+// CHECK-DIAG-NEXT:  7 | func testDiscardableStringify(x: Int) {
+// CHECK-DIAG-NEXT:  8 |   #toMyWarning("this is a warning")
+// CHECK-DIAG-NEXT:  9 |   #myWarning("this is a warning")
+// CHECK-DIAG-NEXT:    |   `- note: in expansion of macro 'myWarning' here
+// CHECK-DIAG-NEXT:    +--- macro expansion #myWarning -------------------------------------
+// CHECK-DIAG-NEXT:    |1 | testDeprecated()
+// CHECK-DIAG-NEXT:    |  | `- warning: 'testDeprecated()' is deprecated [#DeprecatedDeclaration]
+// CHECK-DIAG-NEXT:    +--------------------------------------------------------------------
+// CHECK-DIAG-NEXT: 10 | }
+// CHECK-DIAG-NEXT: 11 |
+// CHECK-DIAG:      [#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
 
 //--- macro.swift
 import SwiftDiagnostics

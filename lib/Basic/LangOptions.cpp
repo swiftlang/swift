@@ -37,7 +37,7 @@ LangOptions::LangOptions() {
   // Add all promoted language features
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   enableFeature(Feature::FeatureName);
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
@@ -334,8 +334,8 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   if (state.isEnabled())
     return state;
 
-  if (auto version = feature.getLanguageVersion()) {
-    if (isSwiftVersionAtLeast(*version)) {
+  if (auto version = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(*version)) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
   }
@@ -348,8 +348,8 @@ bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
   if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageVersion()) {
-    if (isSwiftVersionAtLeast(*version))
+  if (auto version = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(*version))
       return true;
   }
 

@@ -458,6 +458,16 @@ bb3:
   return %r : $()
 }
 
+sil [ossa] @test_init_enum2 : $@convention(thin) (@inout Optional<T>, @in T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %11 = init_enum_data_addr %0, #Optional.some!enumelt
+  destroy_addr %0
+  copy_addr [take] %1 to [init] %11
+  inject_enum_addr %0, #Optional.some!enumelt
+  %121 = tuple ()
+  return %121
+}
+
 sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
   %1 = alloc_stack $Optional<T>

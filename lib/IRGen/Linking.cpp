@@ -629,6 +629,24 @@ SILDeclRef LinkEntity::getSILDeclRef() const {
   return ref;
 }
 
+static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
+  // In embedded existenitals mode we generate lazy public metadata on demand
+  // which makes it non unique.
+  auto &langOpts = ty->getASTContext().LangOpts;
+  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  if (isEmbeddedWithExistentials) {
+    if (auto nominal = ty->getAnyNominal()) {
+      if (SILDeclRef::declHasNonUniqueDefinition(nominal)) {
+        return true;
+      }
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
@@ -657,6 +675,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable: {
     auto type = getType();
+
+    // In embedded existenitals mode we generate lazy public metadata on demand
+    // which makes it non unique.
+    if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(type))
+       return SILLinkage::Shared;
 
     // Builtin types, (), () -> () and so on are in the runtime.
     if (!type.getAnyNominal())
@@ -694,6 +717,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::TypeMetadata: {
     if (isForcedShared())
+      return SILLinkage::Shared;
+
+    // In embedded existenitals mode we generate lazy public metadata on demand
+    // which makes it non unique.
+    if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
       return SILLinkage::Shared;
 
     auto *nominal = getType().getAnyNominal();
@@ -1119,11 +1147,18 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::TypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::FullMetadata:
+    case TypeMetadataAddress::FullMetadata: {
+      auto &langOpts = IGM.Context.LangOpts;
+      auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
+        langOpts.hasFeature(Feature::EmbeddedExistentials);
+      if (isEmbeddedWithExistentials) {
+        return IGM.EmbeddedExistentialsMetadataStructTy;
+      }
       if (getType().getClassOrBoundGenericClass())
         return IGM.FullHeapMetadataStructTy;
       else
         return IGM.FullTypeMetadataStructTy;
+    }
     case TypeMetadataAddress::AddressPoint:
       return IGM.TypeMetadataStructTy;
     }
@@ -1757,7 +1792,8 @@ bool LinkEntity::hasNonUniqueDefinition() const {
       getKind() == Kind::ReadOnlyGlobalObject)
     return getSILGlobalVariable()->hasNonUniqueDefinition();
 
-  if (getKind() == Kind::TypeMetadata) {
+  if (getKind() == Kind::TypeMetadata ||
+      getKind() == Kind::ValueWitnessTable) {
     // For a nominal type, check its declaration.
     CanType type = getType();
     if (auto nominal = type->getAnyNominal()) {

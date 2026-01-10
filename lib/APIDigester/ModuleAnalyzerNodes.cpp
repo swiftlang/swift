@@ -2008,7 +2008,7 @@ SwiftDeclCollector::SwiftDeclCollector(SDKContext &Ctx,
   }
   assert(!Modules.empty());
   for (auto M: Modules) {
-    llvm::SmallVector<Decl*, 512> Decls;
+    llvm::SmallVector<Decl*> Decls;
     swift::getTopLevelDeclsForDisplay(M, Decls);
     for (auto D : Decls) {
       if (Ctx.shouldIgnore(D))

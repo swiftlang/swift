@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level -strict-concurrency=complete -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -typecheck -verify %s
 
 var a = 10 // expected-note{{var declared here}}
 

@@ -196,7 +196,9 @@ private:
     }
     // drop swift-frontend executable path and leading `-frontend` from
     // command-line.
-    if (StringRef(FrontendArgs[0]).ends_with("swift-frontend"))
+    llvm::SmallString<261> path;
+    llvm::sys::path::native(Twine{FrontendArgs[0]}, path);
+    if (llvm::sys::path::filename(path).starts_with("swift-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());
     if (StringRef(FrontendArgs[0]) == "-frontend")
       FrontendArgs.erase(FrontendArgs.begin());

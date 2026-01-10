@@ -67,7 +67,7 @@ public struct ClassMetadata {
     _ContiguousArrayStorage can be promoted to __StaticArrayStorage with the HeapObject header emitted directly by the
     compiler and refcount field directly set to immortalRefCount | doNotFreeBit (see irgen::emitConstantObject).
 
-  Tne immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
+  The immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
   when they're currently inside their deinit(). This is done to prevent further retains and releases inside deinit from
   triggering deinitialization again, without the need to reserve another bit for this purpose. Retains and releases in
   deinit() are allowed, as long as they are balanced at the end, i.e. the object is not escaped (user's responsibility)
@@ -150,7 +150,7 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
 }
 
 @c
-public func swift_coroFrameAlloc(_ size: Int, _ type: UInt) -> UnsafeMutableRawPointer? {
+public func swift_coroFrameAlloc(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
   return unsafe alignedAlloc(
     size: size,
     alignment: _swift_MinAllocationAlignment)
@@ -261,6 +261,167 @@ public func swift_allocEmptyBox() -> Builtin.RawPointer {
   return box
 }
 
+/// The embedded swift_allocBox version is different to the standad one in that
+/// we want to avoid building metadata for the box type. Instead we store the
+/// metadata of the contained type in the heap object. To make this work when
+/// destroying the box the release needs to be special i.e `swift_releaseBox`.
+/// It does not call the the heap object metadata's destroy function. Rather, it
+/// knows that the allocBox's metadata is the contained objects and calls an
+/// appropriate implementation: `_swift_embedded_invoke_box_destroy`.
+/// Therefore, one cannot not use `swift_release` but rather must use
+/// `swift_releaseBox` to implement the "release" function of a box object.
+
+@_silgen_name("swift_allocBox")
+public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
+  let alignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(UnsafeMutableRawPointer(metadata)))
+  let size = Int(unsafe _swift_embedded_metadata_get_size(UnsafeMutableRawPointer(metadata)))
+  let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
+  let headerAlignMask = unsafe MemoryLayout<UnsafeRawPointer>.alignment - 1
+  let startOfBoxedValue = ((headerSize + alignMask) & ~alignMask)
+  let requiredSize: Int = startOfBoxedValue + size
+  let requiredAlignmentMask: Int = alignMask | headerAlignMask
+
+  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+  let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
+
+  unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutableRawPointer(metadata))
+  unsafe object.pointee.refcount = 1
+
+  let boxedValueAddr = unsafe UnsafeMutableRawPointer(p).advanced(by: startOfBoxedValue)
+
+  return (object._rawValue, boxedValueAddr._rawValue)
+}
+
+@c
+public func swift_deallocBox(_ object: Builtin.RawPointer) {
+  unsafe free(UnsafeMutableRawPointer(object))
+}
+
+@_silgen_name("swift_makeBoxUnique")
+public func swifft_makeBoxUnique(buffer: Builtin.RawPointer, metadata: Builtin.RawPointer, alignMask: Int) -> (Builtin.RawPointer, Builtin.RawPointer){
+  let addrOfHeapObjectPtr = unsafe UnsafeMutablePointer<Builtin.RawPointer>(buffer)
+  let box = unsafe addrOfHeapObjectPtr.pointee
+  let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
+  let startOfBoxedValue = ((headerSize + alignMask) & ~alignMask)
+  let oldObjectAddr = unsafe UnsafeMutableRawPointer(box) + startOfBoxedValue
+
+  if !swift_isUniquelyReferenced_native(object: box) {
+    let refAndObjectAddr = swift_allocBox(metadata)
+    unsafe _swift_embedded_initialize_box(UnsafeMutableRawPointer(metadata), UnsafeMutableRawPointer(refAndObjectAddr.1), oldObjectAddr)
+    swift_releaseBox(box)
+    unsafe addrOfHeapObjectPtr.pointee = refAndObjectAddr.0
+    return refAndObjectAddr
+  } else {
+    return (box, oldObjectAddr._rawValue)
+  }
+}
+/// Dynamic cast support
+/// Only supports existential container to concrete casts.
+struct DynamicCastFlags {
+  static let Default           = UInt(bitPattern: 0x0)
+  static let Unconditional     = UInt(bitPattern: 0x1)
+  static let TakeOnSuccess     = UInt(bitPattern: 0x2)
+  static let DestroyOnFailure  = UInt(bitPattern: 0x4)
+}
+
+struct MetadataKind {
+  static let LastEnumerated = UInt(bitPattern: 0x7FF)
+}
+
+func projectExistentialMetadata(
+  _ exist: Builtin.RawPointer
+) -> Builtin.RawPointer {
+
+  let offset = (3 * MemoryLayout<Builtin.RawPointer>.size)
+  let addrOfMetadata = unsafe UnsafeMutableRawPointer(exist) + offset
+  let metadataPtrAddr = unsafe addrOfMetadata.bindMemory(to: Builtin.RawPointer.self, capacity: 1)
+  return unsafe metadataPtrAddr.pointee
+}
+
+func isClassMetadata(_ metadata: Builtin.RawPointer) -> Bool {
+  let addrOfMetadataKind = unsafe UnsafePointer<UInt>(metadata)
+  let kind = unsafe addrOfMetadataKind.pointee
+  return  kind == 0 || kind > MetadataKind.LastEnumerated
+}
+
+func projectHeapObject(_ exist: Builtin.RawPointer) -> UnsafeMutableRawPointer{
+  let addrOfHeapObject = unsafe UnsafePointer<UnsafeMutableRawPointer>(exist)
+  return unsafe addrOfHeapObject.pointee
+}
+
+@c
+public func swift_dynamicCast(
+  _ dest: Builtin.RawPointer, /* points to a concrete type */
+  _ src: Builtin.RawPointer, /* points to an existential */
+  _ srcMetadata: Builtin.RawPointer, /* always nullptr */
+  _ dstMetadata: Builtin.RawPointer,
+  _ flags: UInt
+) -> Bool {
+
+  let isUnconditionalCast : Bool = (flags & DynamicCastFlags.Unconditional) != 0
+  let isTakeOnSuccess : Bool = (flags & DynamicCastFlags.TakeOnSuccess) != 0
+  let isDestroyOnFailure : Bool =
+    (flags & DynamicCastFlags.DestroyOnFailure) != 0
+
+  let srcMetadata = projectExistentialMetadata(src)
+
+  let isClass = isClassMetadata(dstMetadata)
+
+  if isClass {
+    var success = false
+    let obj = unsafe projectHeapObject(src)
+    if isClassMetadata(srcMetadata) {
+      if srcMetadata != dstMetadata {
+        // check parent chain
+        success = unsafe swift_dynamicCastClass(object: obj, targetMetadata: UnsafeMutableRawPointer(dstMetadata)) != nil
+      } else {
+        success = true
+      }
+    }
+    if !success {
+      if isDestroyOnFailure {
+        unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src))
+      }
+
+      if isUnconditionalCast {
+        fatalError("failed cast")
+      }
+      return false
+    }
+    if isTakeOnSuccess {
+      let dst = unsafe UnsafeMutablePointer<UnsafeMutableRawPointer>(dest)
+      unsafe dst.pointee = obj
+
+    } else {
+      let dst = unsafe UnsafeMutablePointer<UnsafeMutableRawPointer>(dest)
+      unsafe dst.pointee = obj
+      swift_retain(object: obj._rawValue)
+    }
+    return true;
+  }
+  // destintation type is not a class. Test exact match.
+  let success = srcMetadata == dstMetadata
+  if !success {
+    if isDestroyOnFailure {
+      unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src))
+    }
+
+    if isUnconditionalCast {
+      fatalError("failed cast")
+    }
+    return false
+  }
+  if isTakeOnSuccess {
+    // take from an existential to a concrete type
+    unsafe _swift_embedded_existential_init_with_take(
+             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src))
+  } else {
+    // copy from an existential to a concrete type
+    unsafe _swift_embedded_existential_init_with_copy(
+             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src))
+  }
+  return true
+}
 
 /// Refcounting
 
@@ -271,7 +432,7 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   #if _pointerBitWidth(_64)
   if unsafe (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
   #endif
-  
+
   return true
 }
 
@@ -388,7 +549,7 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   unsafe swift_release_n_(object: o, n: n)
 }
 
-func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
+func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBoxRelease: Bool = false) {
   guard let object = unsafe object else {
     return
   }
@@ -413,10 +574,23 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
     let doNotFree = unsafe (loadedRefcount & HeapObject.doNotFreeBit) != 0
     unsafe storeRelaxed(refcount, newValue: HeapObject.immortalRefCount | (doNotFree ? HeapObject.doNotFreeBit : 0))
 
-    unsafe _swift_embedded_invoke_heap_object_destroy(object)
+    if isBoxRelease {
+        unsafe _swift_embedded_invoke_box_destroy(object)
+    } else {
+        unsafe _swift_embedded_invoke_heap_object_destroy(object)
+    }
   } else if resultingRefcount < 0 {
     fatalError("negative refcount")
   }
+}
+
+@c
+public func swift_releaseBox(_ object: Builtin.RawPointer) {
+  if !isValidPointerForNativeRetain(object: object) {
+    fatalError("not a valid pointer for releaseBox")
+  }
+  let o = unsafe UnsafeMutablePointer<HeapObject>(object)
+  unsafe swift_release_n_(object: o, n: 1, isBoxRelease: true)
 }
 
 @c
@@ -575,4 +749,20 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
   unsafe print(message)
+}
+
+// CXX Exception Personality
+
+public typealias _Unwind_Action = CInt
+public typealias _Unwind_Reason_Code = CInt
+
+@c @used
+public func _swift_exceptionPersonality(
+  version: CInt,
+  actions: _Unwind_Action,
+  exceptionClass: UInt64,
+  exceptionObject: UnsafeMutableRawPointer,
+  context: UnsafeMutableRawPointer
+) -> _Unwind_Reason_Code {
+  fatalError("C++ exception handling detected but the Embedded Swift runtime does not support exceptions")
 }

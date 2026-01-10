@@ -5,6 +5,9 @@
 // RUN: |                                                    \
 // RUN: %IRGenFileCheck %s
 
+// FIXME: This test currently requires aggressive reg2mem to be enabled
+// UNSUPPORTED: CPU=wasm32
+
 @_silgen_name("external_symbol")
 func external_symbol()
 

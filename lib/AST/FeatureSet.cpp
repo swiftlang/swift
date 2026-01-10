@@ -109,6 +109,7 @@ UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
+UNINTERESTING_FEATURE(ExcludePrivateFromMemberwiseInit)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
 UNINTERESTING_FEATURE(RegionBasedIsolation)
@@ -121,6 +122,7 @@ UNINTERESTING_FEATURE(RawLayout)
 UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
+UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
@@ -128,6 +130,10 @@ UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedExistentials)
+
+static bool usesFeatureUnderscoreOwned(Decl *D) {
+  return D->getAttrs().hasAttribute<OwnedAttr>();
+}
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -141,43 +147,58 @@ static bool usesFeatureInlineArrayTypeSugar(Decl *D) {
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ManualOwnership)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
 UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
 UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
-static bool findUnderscoredLifetimeAttr(Decl *decl) {
-  auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
+static bool usesFeatureCAttribute(Decl *decl) {
+  for (auto attr : decl->getAttrs()) {
+    if (auto cdeclAttr = dyn_cast<CDeclAttr>(attr))
+      if (!cdeclAttr->Underscored)
+        return true;
+  }
+
+  return false;
+}
+
+static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
+  auto hasLifetimeAttr = [&](Decl *decl) {
     if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
       return false;
     }
     // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
     // any one LifetimeAttr on the decl is sufficient.
     // FIXME: Implement the ban.
-    return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    if (findUnderscored) {
+      return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+    }
+    return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
   };
 
   switch (decl->getKind()) {
   case DeclKind::Var: {
     auto *var = cast<VarDecl>(decl);
-    return llvm::any_of(var->getAllAccessors(), hasUnderscoredLifetimeAttr);
+    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
   }
   default:
-    return hasUnderscoredLifetimeAttr(decl);
+    return hasLifetimeAttr(decl);
   }
 }
 
 static bool usesFeatureLifetimeDependence(Decl *decl) {
-  if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
-    if (findUnderscoredLifetimeAttr(decl)) {
-      // Experimental feature Lifetimes will guard the decl.
-      return false;
-    }
+  if (findLifetimeAttr(decl, /*findUnderscored*/ false)) {
     return true;
   }
 
+  // Guard inferred lifetime dependencies with LifetimeDependence if it was
+  // enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::LifetimeDependence)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
@@ -190,7 +211,25 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
 }
 
 static bool usesFeatureLifetimes(Decl *decl) {
-  return findUnderscoredLifetimeAttr(decl);
+  if (findLifetimeAttr(decl, /*findUnderscored*/ true)) {
+    return true;
+  }
+
+  // Guard inferred lifetime dependencies with Lifetimes if it was enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::Lifetimes)) {
+    return false;
+  }
+
+  // Check for inferred lifetime dependencies
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    return afd->getInterfaceType()
+        ->getAs<AnyFunctionType>()
+        ->hasLifetimeDependencies();
+  }
+  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+    return !varDecl->getTypeInContext()->isEscapable();
+  }
+  return false;
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -311,6 +350,10 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureSourceWarningControl(Decl *decl) {
+  return decl->getAttrs().hasAttribute<WarnAttr>();
+}
+
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
@@ -321,6 +364,10 @@ static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
 }
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
   return false;
 }
 
@@ -466,6 +513,7 @@ static bool usesFeatureTildeSendable(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(AnyAppleOSAvailability)
+UNINTERESTING_FEATURE(StrictAccessControl)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

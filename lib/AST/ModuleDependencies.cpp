@@ -514,7 +514,8 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
   }
 }
 
-SwiftDependencyScanningService::SwiftDependencyScanningService() {
+SwiftDependencyScanningService::SwiftDependencyScanningService()
+    : Alloc(), Saver(Alloc) {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       clang::tooling::dependencies::ScanningOutputFormat::FullTree,
@@ -637,9 +638,9 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!Instance.getInvocation().getCASOptions().EnableCaching)
     return false;
 
-  if (CASConfig) {
+  if (CASOpts) {
     // If CASOption matches, the service is initialized already.
-    if (*CASConfig == Instance.getInvocation().getCASOptions().Config)
+    if (*CASOpts == Instance.getInvocation().getCASOptions().CASOpts)
       return false;
 
     // CASOption mismatch, return error.
@@ -648,18 +649,13 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   }
 
   // Setup CAS.
-  CASConfig = Instance.getInvocation().getCASOptions().Config;
-
-  clang::CASOptions CASOpts;
-  CASOpts.CASPath = CASConfig->CASPath;
-  CASOpts.PluginPath = CASConfig->PluginPath;
-  CASOpts.PluginOptions = CASConfig->PluginOptions;
+  CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
       clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
-      CASOpts, Instance.getSharedCASInstance(),
-      Instance.getSharedCacheInstance(),
+      Instance.getInvocation().getCASOptions().CASOpts,
+      Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
@@ -667,6 +663,11 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       clang::tooling::dependencies::ScanningOptimizations::All);
 
   return false;
+}
+
+StringRef SwiftDependencyScanningService::save(StringRef str) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  return Saver.save(str);
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
@@ -722,18 +723,6 @@ ModuleDependenciesCache::findDependency(
   auto known = map.find(moduleName);
   if (known != map.end())
     optionalDep = &(known->second);
-
-  // During a scan, only produce the cached source module info for the current
-  // module under scan.
-  if (optionalDep.has_value()) {
-    auto dep = optionalDep.value();
-    if (dep->getAsSwiftSourceModule() &&
-        moduleName != mainScanModuleName &&
-        moduleName != "MainModuleCrossImportOverlays") {
-      return std::nullopt;
-    }
-  }
-
   return optionalDep;
 }
 
@@ -775,6 +764,14 @@ bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
 
 bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
   return findSwiftDependency(moduleName).has_value();
+}
+
+int ModuleDependenciesCache::numberOfClangDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::Clang).size();
+}
+int ModuleDependenciesCache::numberOfSwiftDependencies() const {
+  return ModuleDependenciesMap.at(ModuleDependencyKind::SwiftInterface).size() +
+         ModuleDependenciesMap.at(ModuleDependencyKind::SwiftBinary).size();
 }
 
 void ModuleDependenciesCache::recordDependency(
@@ -913,7 +910,6 @@ void ModuleDependenciesCache::setSwiftOverlayDependencies(
     ModuleDependencyID moduleID,
     const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getSwiftOverlayDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind != ModuleDependencyKind::Clang);
@@ -928,7 +924,6 @@ void ModuleDependenciesCache::setCrossImportOverlayDependencies(
     ModuleDependencyID moduleID,
     const ModuleDependencyIDCollectionView dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getCrossImportOverlayDependencies().empty());
   // Copy the existing info to a mutable one we can then replace it with,
   // after setting its overlay dependencies.
   auto updatedDependencyInfo = dependencyInfo;

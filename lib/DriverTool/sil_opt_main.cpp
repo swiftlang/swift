@@ -593,6 +593,11 @@ struct SILOptOptions {
       "enable-address-dependencies",
       llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
 
+  llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
+      "disable-aggressive-reg2mem",
+      llvm::cl::desc("Disable aggressive reg2mem optimizations."),
+      llvm::cl::init(false));
+
   llvm::cl::opt<bool> EnableCalleeAllocatedCoroAbi = llvm::cl::opt<bool>(
       "enable-callee-allocated-coro-abi",
       llvm::cl::desc("Override per-platform settings and use yield_once_2."),
@@ -765,8 +770,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       exit(-1);
     }
 
-    if (auto firstVersion = feature->getLanguageVersion()) {
-      if (Invocation.getLangOptions().isSwiftVersionAtLeast(*firstVersion)) {
+    if (auto firstVersion = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(*firstVersion)) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
                      << " is already enabled as of Swift version "
                      << *firstVersion << '\n';
@@ -921,6 +926,8 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       options.EnablePackMetadataStackPromotion;
 
   SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
+  if (options.DisaleAggressiveReg2Mem)
+    SILOpts.UseAggressiveReg2MemForCodeSize = false;
   if (options.EnableCalleeAllocatedCoroAbi)
     SILOpts.CoroutineAccessorsUseYieldOnce2 = true;
   if (options.DisableCalleeAllocatedCoroAbi)

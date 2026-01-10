@@ -11,9 +11,9 @@
 # ===----------------------------------------------------------------------===#
 
 import os
+import shutil
 
 from . import scheme_mock
-from unittest import mock
 
 
 class CloneTestCase(scheme_mock.SchemeMockTestCase):
@@ -55,28 +55,40 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         )
 
         # Test that we're actually checking out the 'extra' scheme based on the output
-        self.assertIn("git checkout refs/heads/main", output.decode("utf-8"))
+        self.assertIn("git checkout refs/heads/main", output)
 
-    def test_manager_not_called_on_long_socket(self):
-        fake_tmpdir = "/tmp/very/" + "/long" * 20 + "/tmp"
+    def test_clone_missing_repos(self):
+        output = self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+            ]
+        )
+        self.assertNotIn(
+            "You don't have all swift sources. Call this script with --clone to get them.",
+            output,
+        )
 
-        with mock.patch("tempfile.gettempdir", return_value=fake_tmpdir), mock.patch(
-            "multiprocessing.Manager"
-        ) as mock_manager:
-
-            self.call(
-                [
-                    self.update_checkout_path,
-                    "--config",
-                    self.config_path,
-                    "--source-root",
-                    self.source_root,
-                    "--clone",
-                ]
-            )
-            # Ensure that we do not try to create a Manager when the tempdir
-            # is too long.
-            mock_manager.assert_not_called()
+        repo = self.get_all_repos()[0]
+        repo_path = os.path.join(self.source_root, repo)
+        shutil.rmtree(repo_path)
+        output = self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+            ]
+        )
+        self.assertIn(
+            "You don't have all swift sources. Call this script with --clone to get them.",
+            output,
+        )
 
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):

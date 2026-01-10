@@ -213,6 +213,20 @@ bool SILType::isEmpty(const SILFunction &F) const {
   return false;
 }
 
+bool SILType::isEmptyTuple(const SILFunction &F) const {
+  if (auto tupleTy = getAs<TupleType>()) {
+    // A tuple is empty if it either has no elements or if all elements are
+    // empty.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!getTupleElementType(idx).isEmptyTuple(F))
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
@@ -1119,10 +1133,8 @@ bool SILType::isEscapable(const SILFunction &function) const {
   // TODO: Support ~Escapable in parameter packs.
   //
   // Treat all other SIL-specific types as Escapable.
-  if (isa<SILBlockStorageType,
-          SILBoxType,
-          SILPackType,
-          SILTokenType>(ty)) {
+  if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
+      isa<SILPackType>(ty) || isa<SILTokenType>(ty)) {
     return true;
   }
   return ty->isEscapable();
@@ -1157,10 +1169,8 @@ bool SILType::isMoveOnly(bool orWrapped) const {
     return false;
 
   // Treat all other SIL-specific types as Copyable.
-  if (isa<SILBlockStorageType,
-          SILBoxType,
-          SILPackType,
-          SILTokenType>(ty)) {
+  if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
+      isa<SILPackType>(ty) || isa<SILTokenType>(ty)) {
     return false;
   }
 

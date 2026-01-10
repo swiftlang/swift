@@ -14,7 +14,10 @@
 #define SWIFT_SWIFT_DECL_SYNTHESIZER_H
 
 #include "ImporterImpl.h"
+#include "swift/AST/Decl.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/DeclCXX.h"
 
 namespace swift {
 
@@ -133,6 +136,9 @@ public:
                                                      VarDecl *storedRawValue,
                                                      bool wantLabel,
                                                      bool wantBody);
+
+  /// Create a constructor that initializes a class from a smart pointer.
+  VarDecl *createSmartPtrBridgingProperty(FuncDecl *bridgingFunction);
 
   /// Make a struct declaration into a raw-value-backed struct, with
   /// bridged computed rawValue property which differs from stored backing
@@ -335,6 +341,10 @@ public:
                                 const swift::Type &swiftParamTy,
                                 SourceLoc paramLoc);
 
+  /// Synthesizes a constructor for a functional type imported from C++, which
+  /// takes a Swift closure as a single parameter.
+  ConstructorDecl *makeClosureConstructor(NominalTypeDecl *decl);
+
   /// Synthesize a static factory method for a C++ foreign reference type,
   /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
   /// allocation function is not found.
@@ -347,6 +357,14 @@ public:
   /// that calls that destroy operation.
   void addExplicitDeinitIfRequired(
       NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
+
+  /// When a base class is marked as SHARED_REFERENCE, synthesize a call to
+  /// the ref counting operations. This call does the derived to base conversion
+  /// that is responsible for all the offset adjustments on the pointer.
+  std::pair<CustomRefCountingOperationResult, CustomRefCountingOperationResult>
+  addRefCountOperations(ClassDecl *decl, clang::CXXRecordDecl *clangDecl,
+                        const ClassDecl *baseDecl,
+                        const clang::CXXRecordDecl *baseClangDecl);
 
   /// Synthesize a Swift function that calls the Clang runtime predicate
   /// function for the availability domain represented by `var`.

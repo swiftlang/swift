@@ -334,7 +334,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     // TypeRepr into account).
 
     if (typeRepr && mayBeInferred &&
-        !Context.LangOpts.isSwiftVersionAtLeast(5) &&
+        !Context.isLanguageModeAtLeast(5) &&
         !useDC->getParentModule()->isResilient()) {
       // Swift 4.2 and earlier didn't check the Type when a TypeRepr was
       // present. However, this is a major hole when generic parameters are
@@ -550,13 +550,14 @@ void AccessControlCheckerBase::checkGenericParamAccess(
   if (minAccessScope.isPublic())
     return;
 
-  // FIXME: Promote these to an error in the next -swift-version break.
-  if (isa<SubscriptDecl>(ownerDecl) || isa<TypeAliasDecl>(ownerDecl))
+  auto &Context = ownerDecl->getASTContext();
+
+  if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      (isa<SubscriptDecl>(ownerDecl) || isa<TypeAliasDecl>(ownerDecl)))
     downgradeToWarning = DowngradeToWarning::Yes;
 
-  auto &Context = ownerDecl->getASTContext();
   if (checkUsableFromInline) {
-    if (!Context.isSwiftVersionAtLeast(5))
+    if (!Context.isLanguageModeAtLeast(5))
       downgradeToWarning = DowngradeToWarning::Yes;
 
     auto diagID = diag::generic_param_usable_from_inline;
@@ -955,7 +956,7 @@ public:
 
         // Swift versions before 5.0 did not check requirements on the
         // protocol's where clause, so emit a warning.
-        if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
+        if (!assocType->getASTContext().isLanguageModeAtLeast(5))
           downgradeToWarning = DowngradeToWarning::Yes;
       }
     });
@@ -1039,7 +1040,7 @@ public:
 
       auto outerDowngradeToWarning = DowngradeToWarning::No;
       if (superclassDecl->isGenericContext() &&
-          !CD->getASTContext().isSwiftVersionAtLeast(5)) {
+          !CD->getASTContext().isLanguageModeAtLeast(5)) {
         // Swift 4 failed to properly check this if the superclass was generic,
         // because the above loop was too strict.
         outerDowngradeToWarning = DowngradeToWarning::Yes;
@@ -1140,7 +1141,7 @@ public:
               declKind = declKindForType(type);
               // Swift versions before 5.0 did not check requirements on the
               // protocol's where clause, so emit a warning.
-              if (!proto->getASTContext().isSwiftVersionAtLeast(5))
+              if (!proto->getASTContext().isLanguageModeAtLeast(5))
                 downgradeToWarning = DowngradeToWarning::Yes;
             }
           });
@@ -1441,7 +1442,7 @@ public:
       : AccessControlCheckerBase(/*checkUsableFromInline=*/true) {}
 
   void visit(Decl *D) {
-    if (!D->getASTContext().isSwiftVersionAtLeast(4, 2))
+    if (!D->getASTContext().isLanguageModeAtLeast(4, 2))
       return;
 
     if (D->isInvalid() || D->isImplicit())
@@ -1498,7 +1499,7 @@ public:
   /// the struct instead of the VarDecl, and customize the diagnostics.
   static const ValueDecl *
   getFixedLayoutStructContext(const VarDecl *VD) {
-    if (VD->isLayoutExposedToClients())
+    if (VD->isLayoutExposedToClients() == ExportedLevel::Exported)
       return dyn_cast<NominalTypeDecl>(VD->getDeclContext());
 
     return nullptr;
@@ -1528,7 +1529,7 @@ public:
           auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
           if (fixedLayoutStructContext) {
             diagID = diag::pattern_type_not_usable_from_inline_inferred_frozen;
-          } else if (!Ctx.isSwiftVersionAtLeast(5)) {
+          } else if (!Ctx.isLanguageModeAtLeast(5)) {
             diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
           }
           Ctx.Diags.diagnose(NP->getLoc(), diagID, theVar->isLet(),
@@ -1567,7 +1568,7 @@ public:
           auto diagID = diag::pattern_type_not_usable_from_inline;
           if (fixedLayoutStructContext)
             diagID = diag::pattern_type_not_usable_from_inline_frozen;
-          else if (!Ctx.isSwiftVersionAtLeast(5))
+          else if (!Ctx.isLanguageModeAtLeast(5))
             diagID = diag::pattern_type_not_usable_from_inline_warn;
           auto diag = Ctx.Diags.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
                                          isTypeContext);
@@ -1623,7 +1624,7 @@ public:
                         DowngradeToWarning downgradeToWarning,
                         ImportAccessLevel importLimit) {
       auto diagID = diag::type_alias_underlying_type_not_usable_from_inline;
-      if (!TAD->getASTContext().isSwiftVersionAtLeast(5))
+      if (!TAD->getASTContext().isLanguageModeAtLeast(5))
         diagID = diag::type_alias_underlying_type_not_usable_from_inline_warn;
       auto diag = TAD->diagnose(diagID);
       highlightOffendingType(diag, complainRepr);
@@ -1645,7 +1646,7 @@ public:
             DowngradeToWarning downgradeDiag,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::associated_type_not_usable_from_inline;
-        if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
+        if (!assocType->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
@@ -1660,7 +1661,7 @@ public:
                         DowngradeToWarning downgradeDiag,
                         ImportAccessLevel importLimit) {
       auto diagID = diag::associated_type_not_usable_from_inline;
-      if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
+      if (!assocType->getASTContext().isLanguageModeAtLeast(5))
         diagID = diag::associated_type_not_usable_from_inline_warn;
       auto diag = assocType->diagnose(diagID, ACEK_DefaultDefinition);
       highlightOffendingType(diag, complainRepr);
@@ -1678,7 +1679,7 @@ public:
                                  DowngradeToWarning downgradeDiag,
                                  ImportAccessLevel importLimit) {
         auto diagID = diag::associated_type_not_usable_from_inline;
-        if (!assocType->getASTContext().isSwiftVersionAtLeast(5))
+        if (!assocType->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::associated_type_not_usable_from_inline_warn;
         auto diag = assocType->diagnose(diagID, ACEK_Requirement);
         highlightOffendingType(diag, complainRepr);
@@ -1709,7 +1710,7 @@ public:
                           DowngradeToWarning downgradeToWarning,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::enum_raw_type_not_usable_from_inline;
-        if (!ED->getASTContext().isSwiftVersionAtLeast(5))
+        if (!ED->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::enum_raw_type_not_usable_from_inline_warn;
         auto diag = ED->diagnose(diagID);
         highlightOffendingType(diag, complainRepr);
@@ -1754,7 +1755,7 @@ public:
                           DowngradeToWarning downgradeToWarning,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::class_super_not_usable_from_inline;
-        if (!CD->getASTContext().isSwiftVersionAtLeast(5))
+        if (!CD->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::class_super_not_usable_from_inline_warn;
         auto diag = CD->diagnose(diagID, superclassLocIter->getTypeRepr() !=
                                              complainRepr);
@@ -1778,7 +1779,7 @@ public:
                           DowngradeToWarning downgradeDiag,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::protocol_usable_from_inline;
-        if (!proto->getASTContext().isSwiftVersionAtLeast(5))
+        if (!proto->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Refine);
         highlightOffendingType(diag, complainRepr);
@@ -1797,7 +1798,7 @@ public:
                                  DowngradeToWarning downgradeDiag,
                                  ImportAccessLevel importLimit) {
         auto diagID = diag::protocol_usable_from_inline;
-        if (!proto->getASTContext().isSwiftVersionAtLeast(5))
+        if (!proto->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::protocol_usable_from_inline_warn;
         auto diag = proto->diagnose(diagID, PCEK_Requirement);
         highlightOffendingType(diag, complainRepr);
@@ -1816,7 +1817,7 @@ public:
               DowngradeToWarning downgradeDiag,
               ImportAccessLevel importLimit) {
             auto diagID = diag::subscript_type_usable_from_inline;
-            if (!SD->getASTContext().isSwiftVersionAtLeast(5))
+            if (!SD->getASTContext().isLanguageModeAtLeast(5))
               diagID = diag::subscript_type_usable_from_inline_warn;
             auto diag = SD->diagnose(diagID, /*problemIsElement=*/false);
             highlightOffendingType(diag, complainRepr);
@@ -1831,7 +1832,7 @@ public:
                         DowngradeToWarning downgradeDiag,
                         ImportAccessLevel importLimit) {
       auto diagID = diag::subscript_type_usable_from_inline;
-      if (!SD->getASTContext().isSwiftVersionAtLeast(5))
+      if (!SD->getASTContext().isLanguageModeAtLeast(5))
         diagID = diag::subscript_type_usable_from_inline_warn;
       auto diag = SD->diagnose(diagID, /*problemIsElement=*/true);
       highlightOffendingType(diag, complainRepr);
@@ -1867,7 +1868,7 @@ public:
                   DowngradeToWarning downgradeDiag,
                   ImportAccessLevel importLimit) {
                 auto diagID = diag::function_type_usable_from_inline;
-                if (!fn->getASTContext().isSwiftVersionAtLeast(5))
+                if (!fn->getASTContext().isLanguageModeAtLeast(5))
                   diagID = diag::function_type_usable_from_inline_warn;
                 auto diag = fn->diagnose(diagID, functionKind,
                                          /*problemIsResult=*/false,
@@ -1884,7 +1885,7 @@ public:
               DowngradeToWarning downgradeDiag,
               ImportAccessLevel importLimit) {
             auto diagID = diag::function_type_usable_from_inline;
-            if (!fn->getASTContext().isSwiftVersionAtLeast(5))
+            if (!fn->getASTContext().isLanguageModeAtLeast(5))
               diagID = diag::function_type_usable_from_inline_warn;
             auto diag = fn->diagnose(diagID, functionKind,
                                      /*problemIsResult=*/false,
@@ -1902,7 +1903,7 @@ public:
                           DowngradeToWarning downgradeDiag,
                           ImportAccessLevel importLimit) {
         auto diagID = diag::function_type_usable_from_inline;
-        if (!fn->getASTContext().isSwiftVersionAtLeast(5))
+        if (!fn->getASTContext().isLanguageModeAtLeast(5))
           diagID = diag::function_type_usable_from_inline_warn;
         auto diag = fn->diagnose(diagID, functionKind,
                                  /*problemIsResult=*/true,
@@ -1927,7 +1928,7 @@ public:
               DowngradeToWarning downgradeToWarning,
               ImportAccessLevel importLimit) {
             auto diagID = diag::enum_case_usable_from_inline;
-            if (!EED->getASTContext().isSwiftVersionAtLeast(5))
+            if (!EED->getASTContext().isLanguageModeAtLeast(5))
               diagID = diag::enum_case_usable_from_inline_warn;
             auto diag = EED->diagnose(diagID);
             highlightOffendingType(diag, complainRepr);
@@ -2042,14 +2043,16 @@ swift::getDisallowedOriginKind(const Decl *decl,
   downgradeToWarning = DowngradeToWarning::No;
   ModuleDecl *M = decl->getModuleContext();
   auto *SF = where.getDeclContext()->getParentSourceFile();
+  auto &Context = M->getASTContext();
 
   RestrictedImportKind howImported = SF->getRestrictedImportKind(M);
   if (howImported != RestrictedImportKind::None) {
     // Temporarily downgrade implementation-only exportability in SPI to
     // a warning.
-    if (where.isSPI() &&
+    if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+        where.isSPI() &&
         where.getFragileFunctionKind().kind == FragileFunctionKind::None &&
-        !SF->getASTContext().LangOpts.EnableSPIOnlyImports)
+        !Context.LangOpts.EnableSPIOnlyImports)
       downgradeToWarning = DowngradeToWarning::Yes;
 
     if (where.isSPI() && howImported == RestrictedImportKind::SPIOnly)
@@ -2058,8 +2061,9 @@ swift::getDisallowedOriginKind(const Decl *decl,
     // Before Swift 6, implicit imports were not reported unless an
     // implementation-only import was also present. Downgrade to a warning
     // just in this case.
-    if (howImported == RestrictedImportKind::MissingImport &&
-        !SF->getASTContext().isSwiftVersionAtLeast(6) &&
+    if (!Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+        howImported == RestrictedImportKind::MissingImport &&
+        !Context.isLanguageModeAtLeast(6) &&
         !SF->hasImportsWithFlag(ImportFlags::ImplementationOnly)) {
       downgradeToWarning = DowngradeToWarning::Yes;
     }
@@ -2087,7 +2091,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
         if (!owningModule)
           continue;
         auto moduleWrapper =
-            decl->getASTContext().getClangModuleLoader()->getWrapperForModule(
+            Context.getClangModuleLoader()->getWrapperForModule(
                 owningModule);
         auto visibleAccessPath =
             find_if(sfImportedModules, [&moduleWrapper](auto importedModule) {
@@ -2150,7 +2154,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
   }
 
   // C++ APIs do not support library evolution.
-  if (SF->getASTContext().LangOpts.EnableCXXInterop && where.getDeclContext() &&
+  if (Context.LangOpts.EnableCXXInterop && where.getDeclContext() &&
       where.getDeclContext()->getAsDecl() &&
       where.getDeclContext()->getAsDecl()->getModuleContext()->isResilient() &&
       !where.getDeclContext()
@@ -2159,13 +2163,13 @@ swift::getDisallowedOriginKind(const Decl *decl,
            ->getUnderlyingModuleIfOverlay() &&
       decl->hasClangNode() && !decl->getModuleContext()->isSwiftShimsModule() &&
       isFragileClangNode(decl->getClangNode()) &&
-      !SF->getASTContext().LangOpts.hasFeature(
+      !Context.LangOpts.hasFeature(
           Feature::AssumeResilientCxxTypes))
     return DisallowedOriginKind::FragileCxxAPI;
 
   // Implementation-only memory layouts for non-library-evolution mode.
   if (isa<NominalTypeDecl>(decl) &&
-      decl->getASTContext().LangOpts.hasFeature(
+      Context.LangOpts.hasFeature(
           Feature::CheckImplementationOnly) &&
       decl->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     return DisallowedOriginKind::ImplementationOnlyMemoryLayout;
@@ -2383,8 +2387,12 @@ public:
     if (seenVars.count(theVar))
       return;
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicVarDecl :
+        ExportabilityReason::PublicVarDecl;
     checkType(theVar->getValueInterfaceType(), /*typeRepr*/nullptr, theVar,
-              ExportabilityReason::PublicVarDecl);
+              reason);
 
     for (auto attr : theVar->getAttachedPropertyWrappers()) {
       checkType(attr->getType(), attr->getTypeRepr(), theVar,
@@ -2405,9 +2413,13 @@ public:
       anyVar = V;
     });
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicVarDecl :
+        ExportabilityReason::PublicVarDecl;
     checkType(TP->hasType() ? TP->getType() : Type(),
               TP->getTypeRepr(), anyVar ? (Decl *)anyVar : (Decl *)PBD,
-              ExportabilityReason::PublicVarDecl);
+              reason);
 
     // Check the property wrapper types.
     if (anyVar) {
@@ -2485,9 +2497,13 @@ public:
       flags |= DeclAvailabilityFlag::
           AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicInheritance :
+        ExportabilityReason::Inheritance;
     for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::Inheritance,
+                reason,
                 flags | DeclAvailabilityFlag::DisableUnsafeChecking);
     }
   }
@@ -2551,8 +2567,12 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!EED->hasAssociatedValues())
       return;
+    ExportabilityReason reason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicAssociatedValue :
+        ExportabilityReason::AssociatedValue;
     for (auto &P : *EED->getParameterList())
-      checkType(P->getInterfaceType(), P->getTypeRepr(), EED);
+      checkType(P->getInterfaceType(), P->getTypeRepr(), EED, reason);
   }
 
   void visitMacroDecl(MacroDecl *MD) {
@@ -2589,9 +2609,13 @@ public:
     // must be exported.
     DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
     flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
+    ExportabilityReason inheritanceReason =
+      Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?
+        ExportabilityReason::ImplicitlyPublicInheritance :
+        ExportabilityReason::Inheritance;
     for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
-                ExportabilityReason::Inheritance, flags);
+                inheritanceReason, flags);
     }
 
     auto wasWhere = Where;
@@ -2603,7 +2627,7 @@ public:
       auto *valueMember = dyn_cast<ValueDecl>(member);
       if (!valueMember)
         return false;
-      return isExported(valueMember);
+      return isExported(valueMember) == ExportedLevel::Exported;
     });
 
     Where = wasWhere.withExported(hasExportedMembers);
@@ -2777,7 +2801,7 @@ void swift::recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
                    *sourceModule = decl->getModuleContext();
         dc->getASTContext().Diags.diagnose(
             diagLoc, diag::module_api_import, decl, importedVia, sourceModule,
-            importedVia->getTopLevelModule() == sourceModule, loc.isInvalid());
+            importedVia == sourceModule, loc.isInvalid());
       });
 }
 

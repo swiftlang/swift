@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
-// REQUIRES: macosx
 
 sil_stage canonical
 
@@ -80,6 +79,22 @@ extension Klass : MyFakeAnyObject {
 
 struct NonTrivialStruct {
   var val: Klass
+}
+
+class MyArrayStorageBase {
+  @_hasStorage let countAndCapacity: Int
+}
+
+struct MyBridgeStorage {
+  let rawValue: Builtin.NativeObject
+}
+
+struct MyArrayBuffer {
+  let storage: MyBridgeStorage
+}
+
+struct MyArray {
+  let buffer: MyArrayBuffer
 }
 
 sil @getKlass : $@convention(thin) () -> @owned Klass
@@ -2242,21 +2257,40 @@ bb1(%1 : @guaranteed $C):
 // CHECK-LABEL: sil [ossa] @borrowed_from_forward2 : {{.*}} {
 // CHECK-NOT:   copy_value
 // CHECK-LABEL: } // end sil function 'borrowed_from_forward2'
-sil [ossa] @borrowed_from_forward2 : $@convention(thin) (@guaranteed Array<Int>) -> () {
-bb0(%0 : @guaranteed $Array<Int>):
-  %1 = struct_extract %0, #Array._buffer
-  %2 = struct_extract %1, #_ArrayBuffer._storage
-  %3 = struct_extract %2, #_BridgeStorage.rawValue
-  %4 = unchecked_ref_cast %3 to $__ContiguousArrayStorageBase
+sil [ossa] @borrowed_from_forward2 : $@convention(thin) (@guaranteed MyArray) -> () {
+bb0(%0 : @guaranteed $MyArray):
+  %1 = struct_extract %0, #MyArray.buffer
+  %2 = struct_extract %1, #MyArrayBuffer.storage
+  %3 = struct_extract %2, #MyBridgeStorage.rawValue
+  %4 = unchecked_ref_cast %3 to $MyArrayStorageBase
   br bb1(%4)
 
-bb1(%6 : @guaranteed $__ContiguousArrayStorageBase):
+bb1(%6 : @guaranteed $MyArrayStorageBase):
   %7 = borrowed %6 from (%0)
   %8 = copy_value %7
   %9 = begin_borrow %8
-  %10 = ref_element_addr [immutable] %9, #__ContiguousArrayStorageBase.countAndCapacity
+  %10 = ref_element_addr [immutable] %9, #MyArrayStorageBase.countAndCapacity
   end_borrow %9
   destroy_value %8
   %13 = tuple ()
   return %13
 }
+
+// CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
+// CHECK:         borrowed {{.*}} from (%0)
+// CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
+sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %1 = destructure_struct %0 : $NonTrivialStruct
+  %2 = copy_value %1 : $Klass
+  %3 = begin_borrow %2 : $Klass
+  br bb1(%3 : $Klass)
+
+bb1(%5 : @reborrow $Klass):
+  %6 = borrowed %5 : $Klass from (%2 : $Klass)
+  end_borrow %6 : $Klass
+  destroy_value %2 : $Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+

@@ -975,3 +975,116 @@ private extension BridgedAliasAnalysis {
     UnsafeMutableRawPointer(aa)
   }
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+/// Prints the memory behavior of relevant instructions in relation to address values of the function.
+let aliasingTest = FunctionTest("aliasing") {
+  function, arguments, context in
+
+  let aliasAnalysis = context.aliasAnalysis
+
+  print("@\(function.name)")
+
+  let values = function.allValues
+
+  var pair = 0
+  for (index1, value1) in values.enumerated() {
+    for (index2, value2) in values.enumerated() {
+      if index2 >= index1 {
+        let result = aliasAnalysis.mayAlias(value1, value2)
+        precondition(result == aliasAnalysis.mayAlias(value2, value1), "alias analysis not symmetric")
+
+        print("PAIR #\(pair).")
+        print("  \(value1)")
+        print("  \(value2)")
+        if result {
+          print("  MayAlias")
+        } else if !value1.uses.isEmpty && !value2.uses.isEmpty {
+          print("  NoAlias")
+        } else {
+          print("  noalias?")
+        }
+
+        pair += 1
+      }
+    }
+  }
+}
+
+/// Prints the memory behavior of relevant instructions in relation to address values of the function.
+let memoryEffectsTest = FunctionTest("memory_effects") {
+  function, arguments, context in
+
+  let aliasAnalysis = context.aliasAnalysis
+
+  print("@\(function.name)")
+
+  let values = function.allValues
+
+  var currentPair = 0
+  for inst in function.instructions where inst.shouldTest {
+
+    for value in values where value.definingInstruction != inst {
+
+      if value.type.isAddress {
+        let read = inst.mayRead(fromAddress: value, aliasAnalysis)
+        let write = inst.mayWrite(toAddress: value, aliasAnalysis)
+        print("PAIR #\(currentPair).")
+        print("  \(inst)")
+        print("  \(value)")
+        print("  r=\(read ? 1 : 0),w=\(write ? 1 : 0)")
+        currentPair += 1
+      }
+    }
+  }
+  print()
+}
+
+private extension Instruction {
+  var shouldTest: Bool {
+    switch self {
+    case is ApplySite,
+         is EndApplyInst,
+         is AbortApplyInst,
+         is BeginAccessInst,
+         is EndAccessInst,
+         is EndCOWMutationInst,
+         is EndCOWMutationAddrInst,
+         is CopyValueInst,
+         is DestroyValueInst,
+         is StrongReleaseInst,
+         is IsUniqueInst,
+         is EndBorrowInst,
+         is LoadInst,
+         is LoadBorrowInst,
+         is StoreInst,
+         is CopyAddrInst,
+         is BuiltinInst,
+         is StoreBorrowInst,
+         is MarkDependenceInst,
+         is MarkDependenceAddrInst,
+         is DebugValueInst,
+         is DebugStepInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+private extension Function {
+  var allValues: [Value] {
+    var values: [Value] = []
+    for block in blocks {
+      values.append(contentsOf: block.arguments.map { $0 })
+      for inst in block.instructions {
+        values.append(contentsOf: inst.results)
+      }
+    }
+    return values
+  }
+}
+

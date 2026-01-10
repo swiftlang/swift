@@ -314,7 +314,7 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
   if (D->getFormalAccess() == AccessLevel::Open) {
     auto &context = D->getASTContext();
     auto diagID = diag::implicitly_final_cannot_be_open;
-    if (!context.isSwiftVersionAtLeast(5))
+    if (!context.isLanguageModeAtLeast(5))
       diagID = diag::implicitly_final_cannot_be_open_swift4;
     auto inFlightDiag = context.Diags.diagnose(D, diagID,
                                     static_cast<unsigned>(reason.value()));
@@ -336,7 +336,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Get: {
     auto readImpl = storage->getReadImpl();
     if (!isObjC &&
-        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Read2 ||
+        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::YieldingBorrow ||
          readImpl == ReadImplKind::Address))
       return false;
     return storage->isDynamic();
@@ -347,7 +347,7 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
     if (!isObjC && (writeImpl == WriteImplKind::Modify ||
-                    writeImpl == WriteImplKind::Modify2 ||
+                    writeImpl == WriteImplKind::YieldingMutate ||
                     writeImpl == WriteImplKind::MutableAddress ||
                     writeImpl == WriteImplKind::StoredWithObservers))
       return false;
@@ -357,8 +357,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
       return storage->isDynamic();
     return false;
-  case AccessorKind::Read2:
-    if (!isObjC && storage->getReadImpl() == ReadImplKind::Read2)
+  case AccessorKind::YieldingBorrow:
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::YieldingBorrow)
       return storage->isDynamic();
     return false;
   case AccessorKind::Modify: {
@@ -366,8 +366,8 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
       return storage->isDynamic();
     return false;
   }
-  case AccessorKind::Modify2: {
-    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify2)
+  case AccessorKind::YieldingMutate: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::YieldingMutate)
       return storage->isDynamic();
     return false;
   }
@@ -408,11 +408,12 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (classDecl->isAnyActor()) {
           // For an actor "convenience" is not required, but we'll honor it.
-          diags.diagnose(decl->getLoc(),
-                diag::no_convenience_keyword_init, "actors")
-            .fixItRemove(convenAttr->getLocation())
-            .warnInSwiftInterface(dc)
-            .warnUntilSwiftVersion(6);
+          diags
+              .diagnose(decl->getLoc(), diag::no_convenience_keyword_init,
+                        "actors")
+              .fixItRemove(convenAttr->getLocation())
+              .warnInSwiftInterface(dc)
+              .warnUntilLanguageMode(6);
 
         } else { // not an actor
           // Forbid convenience inits on Foreign CF types, as Swift does not yet
@@ -640,7 +641,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // be delegating because, well, we don't know the layout.
       // A dynamic replacement is permitted to be non-delegating.
       if (NTD->isResilient() ||
-          (ctx.isSwiftVersionAtLeast(5) &&
+          (ctx.isLanguageModeAtLeast(5) &&
            !decl->getAttrs().getAttribute<DynamicReplacementAttr>())) {
         if (decl->getParentModule() != NTD->getParentModule())
           Kind = BodyInitKind::Delegating;
@@ -842,7 +843,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           if (VD->getFormalAccess() == AccessLevel::Open) {
             auto &context = decl->getASTContext();
             auto diagID = diag::implicitly_final_cannot_be_open;
-            if (!context.isSwiftVersionAtLeast(5))
+            if (!context.isLanguageModeAtLeast(5))
               diagID = diag::implicitly_final_cannot_be_open_swift4;
             auto inFlightDiag =
               context.Diags.diagnose(decl, diagID,
@@ -1648,7 +1649,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Borrow:
       break;
 
@@ -1656,7 +1657,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Mutate:
       if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
@@ -2069,9 +2070,9 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // Coroutine accessors don't mention the value type directly.
     // If we add yield types to the function type, we'll need to update this.
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       return TupleType::getEmpty(ctx);
     }
   }

@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/Crash
 // RUN: %target-codesign %t/Crash
 // RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/Crash 2>&1 || true
-// RUN: %validate-json %t/crash.json | %FileCheck %s
+// RUN: %validate-json %t/crash.json | %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
 
 
 // Also check that we generate valid JSON with various different options set.
@@ -14,13 +14,13 @@
 // RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash6.json,images=all %target-run %t/Crash 2>&1 || true
 // RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash7.json,symbolicate=off %target-run %t/Crash 2>&1 || true
 // RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash8.json,demangle=no %target-run %t/Crash 2>&1 || true
-// RUN: %validate-json %t/crash2.json
-// RUN: %validate-json %t/crash3.json
-// RUN: %validate-json %t/crash4.json
-// RUN: %validate-json %t/crash5.json
-// RUN: %validate-json %t/crash6.json
-// RUN: %validate-json %t/crash7.json
-// RUN: %validate-json %t/crash8.json
+// RUN: %validate-json %t/crash2.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
+// RUN: %validate-json %t/crash3.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
+// RUN: %validate-json %t/crash4.json| %FileCheck %s --check-prefixes CHECK,SANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED
+// RUN: %validate-json %t/crash5.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,SYMBOLICATED,CAPTUREDMEM
+// RUN: %validate-json %t/crash6.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,SYMBOLICATED,CAPTUREDMEM
+// RUN: %validate-json %t/crash7.json| %FileCheck %s --check-prefixes CHECK,IMAGES,OMITTEDIMAGES,CAPTUREDMEM
+// RUN: %validate-json %t/crash8.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,UNDEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
@@ -98,109 +98,116 @@ struct Crash {
 // CHECK-NEXT:     "frames": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "programCounter",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level5yyF",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "level5() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 51,
-// CHECK-NEXT:           "column": 15
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5Crash6level5yyF",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "level5() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 51,
+// SYMBOLICATED-NEXT:    "column": 15
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level4yyF",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "level4() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 45,
-// CHECK-NEXT:           "column": 3
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5Crash6level4yyF",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "level4() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 45,
+// SYMBOLICATED-NEXT:    "column": 3
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level3yyF",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "level3() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 41,
-// CHECK-NEXT:           "column": 3
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5Crash6level3yyF",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "level3() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 41,
+// SYMBOLICATED-NEXT:    "column": 3
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level2yyF",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "level2() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 37,
-// CHECK-NEXT:           "column": 3
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5Crash6level2yyF",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "level2() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 37,
+// SYMBOLICATED-NEXT:    "column": 3
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "symbol": "{{_?}}$s5Crash6level1yyF",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "level1() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 33,
-// CHECK-NEXT:           "column": 3
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5Crash6level1yyF",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "level1() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 33,
+// SYMBOLICATED-NEXT:    "column": 3
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "symbol": "{{_?}}$s5CrashAAV4mainyyFZ",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "static Crash.main() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 57,
-// CHECK-NEXT:           "column": 5
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5CrashAAV4mainyyFZ",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "static Crash.main() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 57,
+// SYMBOLICATED-NEXT:    "column": 5
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "system": true,
-// CHECK-NEXT:         "symbol": "{{_?}}$s5CrashAAV5$mainyyFZ",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "static Crash.$main() + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{/*}}<compiler-generated>",
-// CHECK-NEXT:           "line": 0,
-// CHECK-NEXT:           "column": 0
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "system": true,
+// SYMBOLICATED-NEXT:  "symbol": "{{_?}}$s5CrashAAV5$mainyyFZ",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "static Crash.$main() + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// SYMBOLICATED-NEXT:    "file": "{{/*}}<compiler-generated>",
+// SYMBOLICATED-NEXT:    "line": 0,
+// SYMBOLICATED-NEXT:    "column": 0
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "returnAddress",
-// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:         "system": true,
-// CHECK-NEXT:         "symbol": "{{_?main}}",
-// CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
-// CHECK-NEXT:         "description": "main + [[OFFSET]]",
-// CHECK-NEXT:         "image": "Crash",
-// CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 0,
-// CHECK-NEXT:           "column": 0
-// CHECK-NEXT:         }
+// CHECK-NEXT:         "address": "0x{{[0-9a-f]+}}"
+// SYMBOLICATED-NEXT:  "system": true,
+// SYMBOLICATED-NEXT:  "symbol": "{{_?main}}",
+// SYMBOLICATED-NEXT:  "offset": [[OFFSET:[0-9]+]],
+// DEMANGLED-NEXT:     "description": "main + [[OFFSET]]",
+// SYMBOLICATED-NEXT:  "image": "Crash",
+// SYMBOLICATED-NEXT:  "sourceLocation": {
+// UNSANITIZED-NEXT:     "file": "{{.*}}/test/Backtracing/JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*}}/JSON.swift",
+// SYMBOLICATED-NEXT:    "line": 0,
+// SYMBOLICATED-NEXT:    "column": 0
+// SYMBOLICATED-NEXT:  }
 // CHECK-NEXT:       },
 
 // More frames here, but they're system specific
@@ -208,28 +215,28 @@ struct Crash {
 // CHECK:          ]
 // CHECK:        }
 // CHECK-NEXT: ],
-// CHECK-NEXT: "capturedMemory": {
-// CHECK-NEXT:   "0x{{[[0-9a-f]+}}": "{{([0-9a-f][0-9a-f])+}}",
+// CAPTUREDMEM-NEXT: "capturedMemory": {
+// CAPTUREDMEM-NEXT:   "0x{{[[0-9a-f]+}}": "{{([0-9a-f][0-9a-f])+}}",
 
 // More captures here, but system specific
 
-// CHECK:      },
-// CHECK-NEXT: "omittedImages": {{[0-9]+}},
-// CHECK-NEXT: "images": [
-// CHECK-NEXT:   {
+// CAPTUREDMEM:      },
+// OMITTEDIMAGES-NEXT: "omittedImages": {{[0-9]+}},
+// IMAGES-NEXT: "images": [
+// IMAGES-NEXT:   {
 
 // Maybe multiple images before this one
 
-// CHECK:          "name": "Crash",
+// IMAGES:          "name": "Crash",
 //                 "buildId": ... is optional
-// CHECK:          "path": "{{.*}}/Crash",
-// CHECK-NEXT:     "baseAddress": "0x{{[0-9a-f]+}}",
-// CHECK-NEXT:     "endOfText": "0x{{[0-9a-f]+}}"
-// CHECK-NEXT:   }
+// IMAGES:          "path": "{{.*}}/Crash",
+// IMAGES-NEXT:     "baseAddress": "0x{{[0-9a-f]+}}",
+// IMAGES-NEXT:     "endOfText": "0x{{[0-9a-f]+}}"
+// IMAGES-NEXT:   }
 
 // Maybe multiple images after this one
 
-// CHECK:      ],
+// IMAGES:      ],
 // CHECK-NEXT: "backtraceTime": {{[0-9]+(\.[0-9]+)?}}
 
 // CHECK-NEXT: }

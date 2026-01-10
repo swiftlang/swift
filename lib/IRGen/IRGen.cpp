@@ -129,7 +129,8 @@ static cl::opt<bool> AlignModuleToPageSize(
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
            std::string>
-swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
+swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
+                          std::shared_ptr<llvm::cas::ObjectStore> CAS) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
   //   - code model
@@ -149,6 +150,9 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
 
   // Set option to select the CASBackendMode.
   TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
+
+  // Set CAS and CASID callbacks.
+  TargetOpts.MCOptions.CAS = std::move(CAS);
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
@@ -185,6 +189,11 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   }
 
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
+
+  // Add +mte target feature when memtag-stack sanitizer is enabled
+  if (Opts.Sanitizers & SanitizerKind::MemTagStack)
+    ClangOpts.Features.push_back("+mte");
+
   return std::make_tuple(TargetOpts, ClangOpts.CPU, ClangOpts.Features, ClangOpts.Triple);
 }
 
@@ -1104,7 +1113,8 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
 }
 
 std::unique_ptr<llvm::TargetMachine>
-swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
+swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
+                           std::shared_ptr<llvm::cas::ObjectStore> CAS) {
   CodeGenOptLevel OptLevel = Opts.shouldOptimize()
                                    ? CodeGenOptLevel::Default // -Os
                                    : CodeGenOptLevel::None;
@@ -1114,8 +1124,8 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   std::string CPU;
   std::string EffectiveClangTriple;
   std::vector<std::string> targetFeaturesArray;
-  std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveClangTriple)
-    = getIRTargetOptions(Opts, Ctx);
+  std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveClangTriple) =
+      getIRTargetOptions(Opts, Ctx, std::move(CAS));
   const llvm::Triple &EffectiveTriple = llvm::Triple(EffectiveClangTriple);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {
@@ -1140,8 +1150,7 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   }
 
   std::string Error;
-  const Target *Target =
-      TargetRegistry::lookupTarget(EffectiveTriple.str(), Error);
+  const Target *Target = TargetRegistry::lookupTarget(EffectiveTriple, Error);
   if (!Target) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target, EffectiveTriple.str(),
                        Error);
@@ -1168,12 +1177,12 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
   return std::unique_ptr<llvm::TargetMachine>(TargetMachine);
 }
 
-IRGenerator::IRGenerator(const IRGenOptions &options, SILModule &module)
-  : Opts(options), SIL(module), QueueIndex(0) {
-}
+IRGenerator::IRGenerator(const IRGenOptions &options, SILModule &module,
+                         std::shared_ptr<llvm::cas::ObjectStore> CAS)
+    : Opts(options), SIL(module), CAS(std::move(CAS)), QueueIndex(0) {}
 
 std::unique_ptr<llvm::TargetMachine> IRGenerator::createTargetMachine() {
-  return ::createTargetMachine(Opts, SIL.getASTContext());
+  return ::createTargetMachine(Opts, SIL.getASTContext(), CAS);
 }
 
 // With -embed-bitcode, save a copy of the llvm IR as data in the
@@ -1479,7 +1488,7 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   auto *primaryFile =
       dyn_cast_or_null<SourceFile>(desc.Ctx.dyn_cast<FileUnit *>());
 
-  IRGenerator irgen(Opts, *SILMod);
+  IRGenerator irgen(Opts, *SILMod, desc.CAS);
 
   auto targetMachine = irgen.createTargetMachine();
   if (!targetMachine) return GeneratedModule::null();
@@ -1687,7 +1696,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   auto SILMod = std::unique_ptr<SILModule>(desc.SILMod);
   auto *M = desc.getParentModule();
 
-  IRGenerator irgen(Opts, *SILMod);
+  IRGenerator irgen(Opts, *SILMod, desc.CAS);
 
   // Enter a cleanup to delete all the IGMs and their associated LLVMContexts
   // that have been associated with the IRGenerator.
@@ -1726,6 +1735,16 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
     // Create the IR emitter.
     auto outputName = *OutputIter++;
+    if (desc.casBackend) {
+      targetMachine->Options.MCOptions.ResultCallBack =
+          [=](const llvm::cas::CASID &id) -> llvm::Error {
+        if (auto Err = desc.casBackend->storeMCCASObjectID(outputName, id))
+          return Err;
+
+        return llvm::Error::success();
+      };
+    }
+
     IRGenModule *IGM = new IRGenModule(
         irgen, std::move(targetMachine), nextSF, desc.ModuleName, outputName,
         nextSF->getFilename(), nextSF->getPrivateDiscriminator().str());
@@ -1929,16 +1948,19 @@ GeneratedModule swift::performIRGeneration(
     swift::ModuleDecl *M, const IRGenOptions &Opts,
     const TBDGenOptions &TBDOpts, std::unique_ptr<SILModule> SILMod,
     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS,
     ArrayRef<std::string> parallelOutputFilenames,
     ArrayRef<std::string> parallelIROutputFilenames,
-    llvm::GlobalVariable **outModuleHash) {
+    llvm::GlobalVariable **outModuleHash,
+    cas::SwiftCASOutputBackend *casBackend) {
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forWholeModule(
       M, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
-      ModuleName, PSPs, /*symsToEmit*/ std::nullopt, parallelOutputFilenames,
-      parallelIROutputFilenames, outModuleHash);
+      ModuleName, PSPs, std::move(CAS), /*symsToEmit*/ std::nullopt,
+      parallelOutputFilenames, parallelIROutputFilenames, outModuleHash,
+      casBackend);
 
   if (Opts.shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty() &&
@@ -1951,20 +1973,20 @@ GeneratedModule swift::performIRGeneration(
   return evaluateOrFatal(M->getASTContext().evaluator, IRGenRequest{desc});
 }
 
-GeneratedModule swift::
-performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
-                    const TBDGenOptions &TBDOpts,
-                    std::unique_ptr<SILModule> SILMod,
-                    StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-                    StringRef PrivateDiscriminator,
-                    llvm::GlobalVariable **outModuleHash) {
+GeneratedModule swift::performIRGeneration(
+    FileUnit *file, const IRGenOptions &Opts, const TBDGenOptions &TBDOpts,
+    std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
+    const PrimarySpecificPaths &PSPs,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS, StringRef PrivateDiscriminator,
+    llvm::GlobalVariable **outModuleHash,
+    cas::SwiftCASOutputBackend *casBackend) {
   // Get a pointer to the SILModule to avoid a potential use-after-move.
   const auto *SILModPtr = SILMod.get();
   const auto &SILOpts = SILModPtr->getOptions();
   auto desc = IRGenDescriptor::forFile(
       file, Opts, TBDOpts, SILOpts, SILModPtr->Types, std::move(SILMod),
-      ModuleName, PSPs, PrivateDiscriminator,
-      /*symsToEmit*/ std::nullopt, outModuleHash);
+      ModuleName, PSPs, std::move(CAS), PrivateDiscriminator,
+      /*symsToEmit*/ std::nullopt, outModuleHash, casBackend);
   return evaluateOrFatal(file->getASTContext().evaluator, IRGenRequest{desc});
 }
 
@@ -2038,7 +2060,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
                         llvm::Module *Module, StringRef OutputFilename) {
   // Build TargetMachine.
-  auto TargetMachine = createTargetMachine(Opts, Ctx);
+  auto TargetMachine = createTargetMachine(Opts, Ctx, /*CAS=*/nullptr);
   if (!TargetMachine)
     return true;
 

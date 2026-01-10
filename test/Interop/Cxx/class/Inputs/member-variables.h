@@ -5,6 +5,12 @@
 #include <type_traits>
 #include <optional>
 
+#if defined(_MSC_VER)
+#define NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+#define NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
+
 class MyClass {
 public:
   const int const_member = 23;
@@ -17,11 +23,11 @@ struct Empty {
 
 struct HasZeroSizedField {
   int a;
-  [[no_unique_address]] Empty b;
+  NO_UNIQUE_ADDRESS Empty b;
   short c;
-  [[no_unique_address]] Empty d;
+  NO_UNIQUE_ADDRESS Empty d;
   int* e;
-  [[no_unique_address]] Empty f;
+  NO_UNIQUE_ADDRESS Empty f;
 
   int get_a() const { return a; }
   short get_c() const { return c; }
@@ -29,7 +35,7 @@ struct HasZeroSizedField {
 };
 
 struct ReuseOptionalFieldPadding {
-  [[no_unique_address]] std::optional<int> a = {2};
+  NO_UNIQUE_ADDRESS std::optional<int> a = {2};
   char c;
   char get_c() const { return c; }
   void set_c(char c) { this->c = c; }
@@ -40,7 +46,7 @@ struct ReuseOptionalFieldPadding {
 using OptInt = std::optional<int>;
 
 struct ReuseOptionalFieldPaddingWithTypedef {
-  [[no_unique_address]] OptInt a;
+  NO_UNIQUE_ADDRESS OptInt a;
   char c;
   char get_c() const { return c; }
   void set_c(char c) { this->c = c; }
@@ -59,7 +65,7 @@ public:
 static_assert(std::is_standard_layout_v<NonStandardLayoutClass<int>> == false);
 
 struct ReuseNonStandardLayoutFieldPadding {
-  [[no_unique_address]] NonStandardLayoutClass<int> a;
+  NO_UNIQUE_ADDRESS NonStandardLayoutClass<int> a;
   char c;
   char get_c() const { return c; }
   void set_c(char c) { this->c = c; }
@@ -69,7 +75,7 @@ struct ReuseNonStandardLayoutFieldPadding {
 
 template<typename T>
 struct ReuseDependentFieldPadding {
-  [[no_unique_address]] struct { private: T x; public: char pad_me; } a;
+  NO_UNIQUE_ADDRESS struct { private: T x; public: char pad_me; } a;
   char c;
   char get_c() const { return c; }
   void set_c(char c) { this->c = c; }
@@ -94,7 +100,7 @@ struct EmptyNotImported {
 
 struct LastFieldNoUniqueAddress {
   char c;
-  [[no_unique_address]] EmptyNotImported p0;
+  NO_UNIQUE_ADDRESS EmptyNotImported p0;
 
   LastFieldNoUniqueAddress(const LastFieldNoUniqueAddress &other) {}
   LastFieldNoUniqueAddress(LastFieldNoUniqueAddress &&other) {}

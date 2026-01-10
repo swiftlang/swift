@@ -1000,7 +1000,7 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
   FunctionPointer function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getNativeStrongRetainDirectFunctionPointer();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongRetainFunctionPointer();
@@ -1265,13 +1265,19 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getNativeStrongReleaseDirectFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongReleaseFn();
   else
     function = IGM.getNativeNonAtomicStrongReleaseFn();
   emitUnaryRefCountCall(*this, function, value);
+}
+
+void IRGenFunction::emitReleaseBox(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value))
+    return;
+  emitUnaryRefCountCall(*this, IGM.getReleaseBoxFn(), value);
 }
 
 void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
@@ -1367,7 +1373,7 @@ void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getBridgeObjectStrongRetainDirectFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getBridgeObjectStrongRetainFn();
@@ -1381,7 +1387,7 @@ void IRGenFunction::emitBridgeStrongRelease(llvm::Value *value,
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getBridgeObjectStrongReleaseDirectFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getBridgeObjectStrongReleaseFn();

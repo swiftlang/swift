@@ -1141,7 +1141,7 @@ Constraint::getTrailingClosureMatching() const {
 
 void *Constraint::operator new(size_t bytes, ConstraintSystem& cs,
                                size_t alignment) {
-  return ::operator new (bytes, cs, alignment);
+  return cs.getAllocator().Allocate(bytes, alignment);
 }
 
 // FIXME: Perhaps we should store the Constraint -> PreparedOverload mapping

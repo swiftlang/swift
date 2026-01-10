@@ -411,6 +411,9 @@ public:
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;
 
+  /// Suppress printing of @c in favor of @_cdecl.
+  bool SuppressCAttribute = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

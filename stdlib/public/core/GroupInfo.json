@@ -178,6 +178,7 @@
       "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
+      "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
       "FloatingPointToString.swift",
       "FloatingPointTypes.swift",

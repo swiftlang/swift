@@ -12,6 +12,8 @@
 
 #define DEBUG_TYPE "sil-verifier"
 
+#include "FlowSensitiveVerifier.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -62,6 +64,7 @@
 #include <memory>
 
 using namespace swift;
+using namespace swift::silverifier;
 
 using Lowering::AbstractionPattern;
 
@@ -95,22 +98,14 @@ static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
                                               llvm::cl::init(true));
 extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
-void swift::verificationFailure(const Twine &complaint,
-              const SILInstruction *atInstruction,
-              const SILArgument *atArgument,
-              llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+void swift::verificationFailure(
+    const Twine &complaint, const SILInstruction *atInstruction,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
   llvm::raw_ostream &out = llvm::dbgs();
   SILPrintContext ctx(out);
 
-  const SILFunction *f = nullptr;
-  StringRef funcName = "?";
-  if (atInstruction) {
-    f = atInstruction->getFunction();
-    funcName = f->getName();
-  } else if (atArgument) {
-    f = atArgument->getFunction();
-    funcName = f->getName();
-  }
+  auto *f = atInstruction->getFunction();
+  StringRef funcName = f->getName();
   if (ContinueOnFailure) {
     out << "Begin Error in function " << funcName << "\n";
   }
@@ -119,13 +114,8 @@ void swift::verificationFailure(const Twine &complaint,
   if (extraContext)
     extraContext(ctx);
 
-  if (atInstruction) {
-    out << "Verifying instruction:\n";
-    atInstruction->printInContext(ctx);
-  } else if (atArgument) {
-    out << "Verifying argument:\n";
-    atArgument->printInContext(ctx);
-  }
+  out << "Verifying instruction:\n";
+  atInstruction->printInContext(ctx);
   if (ContinueOnFailure) {
     out << "End Error in function " << funcName << "\n";
     return;
@@ -149,6 +139,129 @@ void swift::verificationFailure(const Twine &complaint,
     exit(1);
 }
 
+void swift::verificationFailure(
+    const Twine &complaint, const SILArgument *atArgument,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  auto *f = atArgument->getFunction();
+  StringRef funcName = f->getName();
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  out << "Verifying argument:\n";
+  atArgument->printInContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, SILValue atValue,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  const SILFunction *f = atValue->getFunction();
+  StringRef funcName = f->getName();
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  out << "Verifying value:\n";
+  atValue->printInContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, const SILFunction *f,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  StringRef funcName = f->getName();
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in function " << funcName << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  if (ContinueOnFailure) {
+    out << "End Error in function " << funcName << "\n";
+    return;
+  }
+
+  if (f) {
+    out << "In function:\n";
+    f->print(out);
+    if (DumpModuleOnFailure) {
+      // Don't do this by default because modules can be _very_ large.
+      out << "In module:\n";
+      f->getModule().print(out);
+    }
+  }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -258,11 +371,13 @@ class SILVerifierBase : public SILInstructionVisitor<Impl> {
 public:
   // visitCLASS calls visitPARENT and checkCLASS.
   // checkCLASS does nothing by default.
-#define INST(CLASS, PARENT)                                     \
-  void visit##CLASS(CLASS *I) {                                 \
-    static_cast<Impl*>(this)->visit##PARENT(I);                 \
-    static_cast<Impl*>(this)->check##CLASS(I);                  \
-  }                                                             \
+#define INST(CLASS, PARENT)                                                    \
+  void visit##CLASS(CLASS *I) {                                                \
+    typename Impl::VerifierErrorEmitterGuard guard(static_cast<Impl *>(this),  \
+                                                   I);                         \
+    static_cast<Impl *>(this)->visit##PARENT(I);                               \
+    static_cast<Impl *>(this)->check##CLASS(I);                                \
+  }                                                                            \
   void check##CLASS(CLASS *I) {}
 #include "swift/SIL/SILNodes.def"
 
@@ -924,8 +1039,79 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   bool checkLinearLifetime = false;
 
   SmallVector<std::pair<StringRef, SILType>, 16> DebugVars;
-  const SILInstruction *CurInstruction = nullptr;
-  const SILArgument *CurArgument = nullptr;
+
+public:
+  class VerifierErrorEmitter {
+    std::optional<std::variant<const SILInstruction *, const SILArgument *,
+                               const SILFunction *>>
+        value;
+
+  public:
+    class VerifierErrorEmitterGuard {
+      SILVerifier *verifier;
+
+      VerifierErrorEmitter &getEmitter() const {
+        return verifier->ErrorEmitter;
+      }
+
+    public:
+      VerifierErrorEmitterGuard(SILVerifier *verifier,
+                                const SILInstruction *inst)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = inst;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILFunction *f)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = f;
+      }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILArgument *arg)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = arg;
+      }
+      ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
+    };
+
+    void emitError(const Twine &complaint,
+                   llvm::function_ref<void(SILPrintContext &)> extraContext) {
+      if (!value.has_value()) {
+        llvm::report_fatal_error("Must have a construct to emit for");
+      }
+
+      auto v = *value;
+      if (std::holds_alternative<const SILInstruction *>(v)) {
+        return verificationFailure(
+            complaint, std::get<const SILInstruction *>(v), extraContext);
+      }
+
+      if (std::holds_alternative<const SILArgument *>(v)) {
+        return verificationFailure(complaint, std::get<const SILArgument *>(v),
+                                   extraContext);
+      }
+
+      if (std::holds_alternative<const SILFunction *>(v)) {
+        return verificationFailure(complaint, std::get<const SILFunction *>(v),
+                                   extraContext);
+      }
+
+      llvm::report_fatal_error("Unhandled case?!");
+    }
+  };
+  using VerifierErrorEmitterGuard =
+      VerifierErrorEmitter::VerifierErrorEmitterGuard;
+
+private:
+  VerifierErrorEmitter ErrorEmitter;
   std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
@@ -983,7 +1169,7 @@ public:
                   = nullptr) {
     if (condition) return;
 
-    verificationFailure(complaint, CurInstruction, CurArgument, extraContext);
+    ErrorEmitter.emitError(complaint, extraContext);
   }
 #define require(condition, complaint) \
   _require(bool(condition), complaint ": " #condition)
@@ -1292,7 +1478,7 @@ public:
   }
 
   void visitSILArgument(SILArgument *arg) {
-    CurArgument = arg;
+    VerifierErrorEmitterGuard guard(this, arg);
     checkLegalType(arg->getFunction(), arg, nullptr);
 
     if (checkLinearLifetime) {
@@ -1327,7 +1513,6 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *I) {
-    CurInstruction = I;
     checkSILInstruction(I);
 
     // Check the SILLLocation attached to the instruction,
@@ -6595,6 +6780,7 @@ public:
   // This verifies that the entry block of a SIL function doesn't have
   // any predecessors and also verifies the entry point arguments.
   void verifyEntryBlock(SILBasicBlock *entry) {
+    VerifierErrorEmitterGuard guard(this, entry->getParent());
     require(entry->pred_empty(), "entry block cannot have predecessors");
 
     LLVM_DEBUG(
@@ -6834,6 +7020,7 @@ public:
   }
 
   void verifyEpilogBlocks(SILFunction *F) {
+    VerifierErrorEmitterGuard guard(this, F);
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
     bool FoundUnwindBlock = false;
@@ -6886,494 +7073,6 @@ public:
             "Should only ever be isolated to a single parameter");
   }
 
-  struct VerifyFlowSensitiveRulesDetails {
-    enum CFGState {
-      /// No special rules are in play.
-      Normal,
-      /// We've followed the resume edge of a yield in a yield_once coroutine.
-      YieldOnceResume,
-      /// We've followed the unwind edge of a yield.
-      YieldUnwind
-    };
-
-    struct BBState {
-      std::vector<SILValue> Stack;
-
-      /// Contents: BeginAccessInst*, BeginApplyInst*.
-      std::set<SILInstruction*> ActiveOps;
-
-      CFGState CFG = Normal;
-
-      GetAsyncContinuationInstBase *GotAsyncContinuation = nullptr;
-
-      BBState() = default;
-
-      // Clang (as of LLVM 22) does not elide the final move for this;
-      // see https://github.com/llvm/llvm-project/issues/34037. But
-      // GCC and MSVC do, and the clang issue will presumably get fixed
-      // eventually, and the move is not an outrageous cost to bear
-      // compared to actually copying it.
-      BBState(maybe_movable_ref<BBState> other)
-        : BBState(std::move(other).construct()) {}
-
-      void printStack(SILPrintContext &ctx, StringRef label) const {
-        ctx.OS() << label << ": [";
-        if (!Stack.empty()) ctx.OS() << "\n";
-        for (auto allocation: Stack) {
-          allocation->print(ctx);
-        }
-        ctx.OS() << "]\n";
-      }
-
-      void printActiveOps(SILPrintContext &ctx, StringRef label) const {
-        ctx.OS() << label << ": [";
-        if (!ActiveOps.empty()) ctx.OS() << "\n";
-        for (auto op: ActiveOps) {
-          op->print(ctx);
-        }
-        ctx.OS() << "]\n";
-      }
-
-      /// Given that we have two edges to the same block or dead-end region,
-      /// handle any potential mismatch between the states we were in on
-      /// those edges.
-      ///
-      /// For the most part, we don't allow mismatches and immediately report
-      /// them as errors. However, we do allow certain mismatches on edges
-      /// that enter dead-end regions,
-      /// in which case the states need to be conservatively merged.
-      ///
-      /// This state is the previously-recorded state of the block, which
-      /// is also what needs to be updated for the merge.
-      ///
-      /// Note that, when we have branches to a dead-end region, we merge
-      /// state across *all* branches into the region, not just to a single
-      /// block. The existence of multiple blocks in a dead-end region
-      /// implies that all of the blocks are in a loop. This means that
-      /// flow-sensitive states that were begun externally to the region
-      /// cannot possibly change within the region in any well-formed way,
-      /// which is why we can merge across all of them.
-      ///
-      /// For example, consider this function excerpt:
-      ///
-      ///   bb5:
-      ///     %alloc = alloc_stack $Int
-      ///     cond_br %cond1, bb6, bb100
-      ///   bb6:
-      ///     dealloc_stack %alloc
-      ///     cond_br %cond2, bb7, bb101
-      ///
-      /// Now suppose that the branches to bb100 and bb101 are branches
-      /// into the same dead-end region. We will conservatively merge the
-      /// BBState heading into this region by recognizing that there's
-      /// a stack mismatch and therefore clearing the stack (preventing
-      /// anything currently on the stack from being deallocated).
-      ///
-      /// One might think that this is problematic because, e.g.,
-      /// bb100 might deallocate %alloc before proceeding to bb101. But
-      /// for bb100 and bb101 to be in the *same* dead-end region, they
-      /// must be in a strongly-connected component, which means there
-      /// must be a path from bb101 back to bb100. That path cannot
-      /// possibly pass through %alloc again, or else bb5 would be a
-      /// branch *within* the region, not *into* it. So the loop from
-      /// bb100 -> bb101 -> ... -> bb100 repeatedly deallocates %alloc
-      /// and should be ill-formed.
-      ///
-      /// That's why it's okay (and necessary) to merge state across
-      /// all paths to the dead-end region.
-      void handleJoinPoint(const BBState &otherState, bool isDeadEndEdge,
-                           SILInstruction *term, SILBasicBlock *succBB) {
-        // A helper function for reporting a failure in the edge.
-
-        // Note that this doesn't always abort, e.g. when running under
-        // -verify-continue-on-failure. So if there's a mismatch, we do the
-        // conservative merge regardless of failure so that we're in a
-        // coherent state in the successor block.
-        auto fail = [&](StringRef complaint,
-                        llvm::function_ref<void(SILPrintContext &out)> extra
-                          = nullptr) {
-          verificationFailure(complaint, term, nullptr,
-                              [&](SILPrintContext &ctx) {
-            ctx.OS() << "Entering basic block " << ctx.getID(succBB) << "\n";
-
-            if (extra) extra(ctx);
-          });
-        };
-
-        // These rules are required to hold unconditionally; there is
-        // no merge rule for dead-end edges.
-        if (CFG != otherState.CFG) {
-          fail("inconsistent coroutine states entering basic block");
-        }
-        if (GotAsyncContinuation != otherState.GotAsyncContinuation) {
-          fail("inconsistent active async continuations entering basic block");
-        }
-
-        // The stack normally has to agree exactly, but we allow stacks
-        // to disagree on different edges into a dead-end region.
-        // Intersecting the stacks would be wrong because we actually
-        // cannot safely allow anything to be popped in this state;
-        // instead, we simply clear the stack completely. This would
-        // allow us to incorrectly pass the function-exit condition,
-        // but we know we cannot reach an exit from succBB because it's
-        // dead-end.
-        if (Stack != otherState.Stack) {
-          if (!isDeadEndEdge) {
-            fail("inconsistent stack states entering basic block",
-                 [&](SILPrintContext &ctx) {
-              otherState.printStack(ctx, "Current stack state");
-              printStack(ctx, "Recorded stack state");
-            });
-          }
-
-          Stack.clear();
-        }
-
-        // The set of active operations normally has to agree exactly,
-        // but we allow sets to diverge on different edges into a
-        // dead-end region.
-        if (ActiveOps != otherState.ActiveOps) {
-          if (!isDeadEndEdge) {
-            fail("inconsistent active-operations sets entering basic block",
-                 [&](SILPrintContext &ctx) {
-              otherState.printActiveOps(ctx, "Current active operations");
-              printActiveOps(ctx, "Recorded active operations");
-            });
-          }
-
-          // Conservatively remove any operations that aren't also found
-          // in the other state's active set.
-          for (auto i = ActiveOps.begin(), e = ActiveOps.end(); i != e; ) {
-            if (otherState.ActiveOps.count(*i)) {
-              ++i;
-            } else {
-              i = ActiveOps.erase(i);
-            }
-          }
-        }
-      }
-    };
-
-    struct DeadEndRegionState {
-      BBState sharedState;
-      llvm::SmallPtrSet<SILBasicBlock *, 4> entryBlocks;
-
-      DeadEndRegionState(maybe_movable_ref<BBState> state)
-        : sharedState(std::move(state).construct()) {}
-    };
-  };
-
-  static bool isScopeInst(SILInstruction *i) {
-    if (isa<BeginAccessInst>(i) ||
-        isa<BeginApplyInst>(i) ||
-        isa<StoreBorrowInst>(i)) {
-      return true;
-    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
-      if (auto bk = bi->getBuiltinKind()) {
-        switch (*bk) {
-        case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
-          return true;
-
-        default:
-          return false;
-        }
-      }
-    }
-    return false;
-  }
-
-  static bool isScopeEndingInst(SILInstruction *i) {
-    if (isa<EndAccessInst>(i) ||
-        isa<AbortApplyInst>(i) ||
-        isa<EndApplyInst>(i)) {
-      return true;
-    } else if (auto bi = dyn_cast<BuiltinInst>(i)) {
-      if (auto bk = bi->getBuiltinKind()) {
-        switch (*bk) {
-        case BuiltinValueKind::FinishAsyncLet:
-          return true;
-
-        default:
-          return false;
-        }
-      }
-    }
-    return false;
-  }
-
-  /// Verify the various control-flow-sensitive rules of SIL:
-  ///
-  /// - stack allocations and deallocations must obey a stack discipline
-  /// - accesses must be uniquely ended
-  /// - async continuations must be awaited before getting the continuation again, suspending
-  ///  the task, or exiting the function
-  /// - flow-sensitive states must be equivalent on all paths into a block
-  void verifyFlowSensitiveRules(SILFunction *F) {
-    if (F->getASTContext().hadError())
-      return;
-
-    // Compute which blocks are part of dead-end regions, and start tracking
-    // all of the edges to those regions.
-    DeadEndEdges deadEnds(F);
-    auto visitedDeadEndEdges = deadEnds.createVisitingSet();
-
-    using BBState = VerifyFlowSensitiveRulesDetails::BBState;
-    llvm::DenseMap<SILBasicBlock*, BBState> visitedBBs;
-
-    using DeadEndRegionState = VerifyFlowSensitiveRulesDetails::DeadEndRegionState;
-    SmallVector<std::optional<DeadEndRegionState>> deadEndRegionStates;
-    deadEndRegionStates.resize(deadEnds.getNumDeadEndRegions());
-
-    // Do a traversal of the basic blocks.
-    // Note that we intentionally don't verify these properties in blocks
-    // that can't be reached from the entry block.
-    SmallVector<SILBasicBlock*, 16> Worklist;
-    visitedBBs.try_emplace(&*F->begin());
-    Worklist.push_back(&*F->begin());
-    while (!Worklist.empty()) {
-      SILBasicBlock *BB = Worklist.pop_back_val();
-      BBState state = visitedBBs[BB];
-
-      for (SILInstruction &i : *BB) {
-        CurInstruction = &i;
-
-        if (i.maySuspend()) {
-          // Instructions that may suspend an async context must not happen
-          // while the continuation is being accessed, with the exception of
-          // the AwaitAsyncContinuationInst that completes suspending the task.
-          if (auto aaci = dyn_cast<AwaitAsyncContinuationInst>(&i)) {
-            require(state.GotAsyncContinuation == aaci->getOperand(),
-                    "encountered await_async_continuation that doesn't match active gotten continuation");
-            state.GotAsyncContinuation = nullptr;
-          } else {
-            require(!state.GotAsyncContinuation,
-                    "cannot suspend async task while unawaited continuation is active");
-          }
-        }
-
-        if (i.isAllocatingStack()) {
-          if (auto *BAI = dyn_cast<BeginApplyInst>(&i)) {
-            state.Stack.push_back(BAI->getCalleeAllocationResult());
-          } else {
-            state.Stack.push_back(cast<SingleValueInstruction>(&i));
-          }
-          // Not "else if": begin_apply both allocates stack and begins an
-          // operation.
-        }
-        if (i.isDeallocatingStack()) {
-          SILValue op = i.getOperand(0);
-          while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
-            op = mvi->getOperand();
-          }
-
-          if (!state.Stack.empty() && op == state.Stack.back()) {
-            state.Stack.pop_back();
-          } else {
-            verificationFailure("deallocating allocation that is not the top of the stack",
-                                &i, nullptr,
-                                [&](SILPrintContext &ctx) {
-              state.printStack(ctx, "Current stack state");
-              ctx.OS() << "Stack allocation:\n" << *op;
-              // The deallocation is printed out as the focus of the failure.
-            });
-          }
-        } else if (isScopeInst(&i)) {
-          bool notAlreadyPresent = state.ActiveOps.insert(&i).second;
-          require(notAlreadyPresent,
-                  "operation was not ended before re-beginning it");
-        } else if (isScopeEndingInst(&i)) {
-          if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-            bool present = state.ActiveOps.erase(beginOp);
-            require(present, "operation has already been ended");
-          }
-        } else if (auto *endBorrow = dyn_cast<EndBorrowInst>(&i)) {
-          if (isa<StoreBorrowInst>(endBorrow->getOperand())) {
-            if (auto beginOp = i.getOperand(0)->getDefiningInstruction()) {
-              bool present = state.ActiveOps.erase(beginOp);
-              require(present, "operation has already been ended");
-            }
-          }
-        } else if (auto gaci = dyn_cast<GetAsyncContinuationInstBase>(&i)) {
-          require(!state.GotAsyncContinuation,
-                  "get_async_continuation while unawaited continuation is already active");
-          state.GotAsyncContinuation = gaci;
-        } else if (auto term = dyn_cast<TermInst>(&i)) {
-          if (term->isFunctionExiting()) {
-            require(state.Stack.empty(),
-                    "return with stack allocs that haven't been deallocated");
-            require(state.ActiveOps.empty(),
-                    "return with operations still active");
-            require(!state.GotAsyncContinuation,
-                    "return with unawaited async continuation");
-
-            if (isa<UnwindInst>(term)) {
-              require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldUnwind,
-                      "encountered 'unwind' when not on unwind path");
-            } else {
-              require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldUnwind,
-                      "encountered 'return' or 'throw' when on unwind path");
-              if (isa<ReturnInst>(term) &&
-                  F->getLoweredFunctionType()->getCoroutineKind() ==
-                    SILCoroutineKind::YieldOnce &&
-                  F->getModule().getStage() != SILStage::Raw) {
-                require(state.CFG == VerifyFlowSensitiveRulesDetails::YieldOnceResume,
-                        "encountered 'return' before yielding a value in "
-                        "yield_once coroutine");
-              }
-            }
-          }
-          
-          if (isa<YieldInst>(term)) {
-            require(state.CFG != VerifyFlowSensitiveRulesDetails::YieldOnceResume,
-                    "encountered multiple 'yield's along single path");
-            require(state.CFG == VerifyFlowSensitiveRulesDetails::Normal,
-                    "encountered 'yield' on abnormal CFG path");
-            require(!state.GotAsyncContinuation,
-                    "encountered 'yield' while an unawaited continuation is active");
-          }
-
-          auto successors = term->getSuccessors();
-          for (auto i : indices(successors)) {
-            SILBasicBlock *succBB = successors[i].getBB();
-            auto succStateRef = move_if(state, i + 1 == successors.size());
-
-            // Some successors (currently just `yield`) have state
-            // transitions on the edges themselves. Fortunately,
-            // these successors all require their destination blocks
-            // to be uniquely referenced, so we never have to combine
-            // the state change with merging or consistency checking.
-
-
-            // Check whether this edge enters a dead-end region.
-            if (auto deadEndRegion = deadEnds.entersDeadEndRegion(BB, succBB)) {
-              // If so, record it in the visited set, which will tell us
-              // whether it's the last remaining edge to the region.
-              bool isLastDeadEndEdge = visitedDeadEndEdges.visitEdgeTo(succBB);
-
-              // Check for an existing shared state for the region.
-              auto &regionInfo = deadEndRegionStates[*deadEndRegion];
-
-              // If we don't have an existing shared state, and this is the
-              // last edge to the region, just fall through and process it
-              // like a normal edge.
-              if (!regionInfo && isLastDeadEndEdge) {
-                // This can only happen if there's exactly one edge to the
-                // block, so we will end up in the insertion success case below.
-                // Note that the state-changing terminators like `yield`
-                // always take this path: since this must be the unique edge
-                // to the successor, it must be in its own dead-end region.
-
-                // fall through to the main path
-
-              // Otherwise, we need to merge this into the shared state.
-              } else {
-                require(!isa<YieldInst>(term),
-                        "successor of 'yield' should not be encountered twice");
-
-                // Copy/move our current state into the shared state if it
-                // doesn't already exist.
-                if (!regionInfo) {
-                  regionInfo.emplace(std::move(succStateRef));
-
-                // Otherwise, merge our current state into the shared state.
-                } else {
-                  regionInfo->sharedState
-                    .handleJoinPoint(succStateRef.get(), /*dead end*/true,
-                                     term, succBB);
-                }
-
-                // Add the successor block to the state's set of entry blocks.
-                regionInfo->entryBlocks.insert(succBB);
-
-                // If this was the last branch to the region, act like we
-                // just saw the edges to each of its entry blocks.
-                if (isLastDeadEndEdge) {
-                  for (auto ebi = regionInfo->entryBlocks.begin(),
-                            ebe = regionInfo->entryBlocks.end(); ebi != ebe; ) {
-                    auto *regionEntryBB = *ebi++;
-
-                    // Copy/move the shared state to be the state for the
-                    // region entry block.
-                    auto insertResult =
-                      visitedBBs.try_emplace(regionEntryBB,
-                        move_if(regionInfo->sharedState, ebi == ebe));
-                    assert(insertResult.second &&
-                           "already visited edge to dead-end region!");
-                    (void) insertResult;
-
-                    // Add the region entry block to the worklist.
-                    Worklist.push_back(regionEntryBB);
-                  }
-                }
-
-                // Regardless, don't fall through to the main path.
-                continue;
-              }
-            }
-
-            // Okay, either this isn't an edge to a dead-end region or it
-            // was a unique edge to it.
-
-            // Optimistically try to set our current state as the state
-            // of the successor.  We can use a move on the final successor;
-            // note that if the insertion fails, the move won't actually
-            // happen, which is important because we'll still need it
-            // to compare against the already-recorded state for the block.
-            auto insertResult =
-              visitedBBs.try_emplace(succBB, std::move(succStateRef));
-
-            // If the insertion was successful, we need to add the successor
-            // block to the worklist.
-            if (insertResult.second) {
-              auto &insertedState = insertResult.first->second;
-
-              // 'yield' has successor-specific state updates, so we do that
-              // now. 'yield' does not permit critical edges, so we don't
-              // have to worry about doing this in the case below where
-              // insertion failed.
-              if (isa<YieldInst>(term)) {
-                // Enforce that the unwind logic is segregated in all stages.
-                if (i == 1) {
-                  insertedState.CFG = VerifyFlowSensitiveRulesDetails::YieldUnwind;
-
-                // We check the yield_once rule in the mandatory analyses,
-                // so we can't assert it yet in the raw stage.
-                } else if (F->getLoweredFunctionType()->getCoroutineKind()
-                             == SILCoroutineKind::YieldOnce && 
-                           F->getModule().getStage() != SILStage::Raw) {
-                  insertedState.CFG = VerifyFlowSensitiveRulesDetails::YieldOnceResume;
-                }
-              }
-
-              // Go ahead and add the block.
-              Worklist.push_back(succBB);
-              continue;
-            }
-
-            // This rule is checked elsewhere, but we'd want to assert it
-            // here anyway.
-            require(!isa<YieldInst>(term),
-                    "successor of 'yield' should not be encountered twice");
-
-            // Okay, we failed to insert. That means there's an existing
-            // state for the successor block. That existing state generally
-            // needs to match the current state, but certain rules are
-            // relaxed for branches that enter dead-end regions.
-            auto &foundState = insertResult.first->second;
-
-            // Join the states into `foundState`. We can still validly use
-            // succStateRef here because the insertion didn't work.
-            foundState.handleJoinPoint(succStateRef.get(), /*dead-end*/false,
-                                       term, succBB);
-          }
-        }
-      }
-    }
-
-    assert(visitedDeadEndEdges.visitedAllEdges() &&
-           "didn't visit all edges");
-  }
-
   void verifyBranches(const SILFunction *F) {
     // Verify no critical edge.
     auto requireNonCriticalSucc = [this](const TermInst *termInst,
@@ -7392,7 +7091,7 @@ public:
 
     for (auto &bb : *F) {
       const TermInst *termInst = bb.getTerminator();
-      CurInstruction = termInst;
+      VerifierErrorEmitterGuard guard(this, termInst);
 
       if (isSILOwnershipEnabled() && F->hasOwnership()) {
         requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
@@ -7406,6 +7105,7 @@ public:
 
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
+    VerifierErrorEmitterGuard guard(this, BB->getParent());
     if (!VerifyDIHoles)
       return;
 
@@ -7522,7 +7222,6 @@ public:
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
-    CurInstruction = nullptr;
     for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
          ++argI)
       visitSILArgument(*argI);
@@ -7612,92 +7311,95 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
-    CanSILFunctionType FTy = F->getLoweredFunctionType();
-    verifySILFunctionType(FTy);
-    verifyParentFunctionSILFunctionType(FTy);
-
     SILModule &mod = F->getModule();
-    bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+    {
+      VerifierErrorEmitterGuard functionTypeErrorGuard(this, F);
+      CanSILFunctionType FTy = F->getLoweredFunctionType();
+      verifySILFunctionType(FTy);
+      verifyParentFunctionSILFunctionType(FTy);
 
-    require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
-            "cannot have a serialized function after the module has been serialized");
+      bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    switch (F->getLinkage()) {
-    case SILLinkage::Public:
-    case SILLinkage::Package:
-    case SILLinkage::Shared:
-      require(F->isDefinition() || F->hasForeignBody(),
-              "public/package/shared function must have a body");
-      break;
-    case SILLinkage::PublicNonABI:
-    case SILLinkage::PackageNonABI:
-      require(F->isDefinition(),
-              "alwaysEmitIntoClient function must have a body");
-      require(F->isAnySerialized() || mod.isSerialized(),
-              "alwaysEmitIntoClient function must be serialized");
-      break;
-    case SILLinkage::Hidden:
-    case SILLinkage::Private:
-      require(F->isDefinition() || F->hasForeignBody(),
-              "internal/private function must have a body");
-      require(!F->isAnySerialized() || embedded,
-              "internal/private function cannot be serialized or serializable");
-      break;
-    case SILLinkage::PublicExternal:
-      require(F->isExternalDeclaration() ||
-              F->isAnySerialized() ||
-              mod.isSerialized(),
-            "public-external function definition must be serialized");
-      break;
-    case SILLinkage::PackageExternal:
-      require(F->isExternalDeclaration() ||
-              F->isAnySerialized() ||
-              mod.isSerialized(),
-              "package-external function definition must be serialized");
-      break;
-    case SILLinkage::HiddenExternal:
-      require(F->isExternalDeclaration() || embedded,
-              "hidden-external function cannot have a body");
-      break;
-    }
+      require(!F->isAnySerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
+              "cannot have a serialized function after the module has been serialized");
 
-    // Don't verify functions that were skipped. We are likely to see them in
-    // FunctionBodySkipping::NonInlinableWithoutTypes mode.
-    auto Ctx = F->getDeclContext();
-    if (Ctx) {
-      if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
-        if (AFD->isBodySkipped())
-          return;
+      switch (F->getLinkage()) {
+      case SILLinkage::Public:
+      case SILLinkage::Package:
+      case SILLinkage::Shared:
+        require(F->isDefinition() || F->hasForeignBody(),
+                "public/package/shared function must have a body");
+        break;
+      case SILLinkage::PublicNonABI:
+      case SILLinkage::PackageNonABI:
+        require(F->isDefinition(),
+                "alwaysEmitIntoClient function must have a body");
+        require(F->isAnySerialized() || mod.isSerialized(),
+                "alwaysEmitIntoClient function must be serialized");
+        break;
+      case SILLinkage::Hidden:
+      case SILLinkage::Private:
+        require(F->isDefinition() || F->hasForeignBody(),
+                "internal/private function must have a body");
+        require(!F->isAnySerialized() || embedded,
+                "internal/private function cannot be serialized or serializable");
+        break;
+      case SILLinkage::PublicExternal:
+        require(F->isExternalDeclaration() ||
+                F->isAnySerialized() ||
+                mod.isSerialized(),
+              "public-external function definition must be serialized");
+        break;
+      case SILLinkage::PackageExternal:
+        require(F->isExternalDeclaration() ||
+                F->isAnySerialized() ||
+                mod.isSerialized(),
+                "package-external function definition must be serialized");
+        break;
+      case SILLinkage::HiddenExternal:
+        require(F->isExternalDeclaration() || embedded,
+                "hidden-external function cannot have a body");
+        break;
       }
-    }
 
-    if (F->isExternalDeclaration()) {
-      if (F->hasForeignBody())
+      // Don't verify functions that were skipped. We are likely to see them in
+      // FunctionBodySkipping::NonInlinableWithoutTypes mode.
+      auto Ctx = F->getDeclContext();
+      if (Ctx) {
+        if (auto AFD = dyn_cast<AbstractFunctionDecl>(Ctx)) {
+          if (AFD->isBodySkipped())
+            return;
+        }
+      }
+
+      if (F->isExternalDeclaration()) {
+        if (F->hasForeignBody())
+          return;
+
+        require(F->isAvailableExternally(),
+                "external declaration of internal SILFunction not allowed");
+        // If F is an external declaration, there is nothing further to do,
+        // return.
         return;
+      }
 
-      require(F->isAvailableExternally(),
-              "external declaration of internal SILFunction not allowed");
-      // If F is an external declaration, there is nothing further to do,
-      // return.
-      return;
-    }
+      require(!FTy->hasErasedIsolation(),
+              "function declarations cannot have erased isolation");
 
-    require(!FTy->hasErasedIsolation(),
-            "function declarations cannot have erased isolation");
+      assert(!F->hasForeignBody());
 
-    assert(!F->hasForeignBody());
-
-    // Make sure that our SILFunction only has context generic params if our
-    // SILFunctionType is non-polymorphic.
-    if (F->getGenericEnvironment() &&
-        !F->getGenericEnvironment()->getGenericSignature()
-            ->areAllParamsConcrete()) {
-      require(FTy->isPolymorphic(),
-              "non-generic function definitions cannot have a "
-              "generic environment");
-    } else {
-      require(!FTy->isPolymorphic(),
-              "generic function definition must have a generic environment");
+      // Make sure that our SILFunction only has context generic params if our
+      // SILFunctionType is non-polymorphic.
+      if (F->getGenericEnvironment() &&
+          !F->getGenericEnvironment()->getGenericSignature()
+              ->areAllParamsConcrete()) {
+        require(FTy->isPolymorphic(),
+                "non-generic function definitions cannot have a "
+                "generic environment");
+      } else {
+        require(!FTy->isPolymorphic(),
+                "generic function definition must have a generic environment");
+      }
     }
 
     // Before verifying the body of the function, validate the SILUndef map to

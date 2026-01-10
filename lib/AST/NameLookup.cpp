@@ -527,11 +527,27 @@ static void recordShadowedDeclsAfterTypeMatch(
           }
         }
 
+        auto *firstProto = firstDecl->getDeclContext()->getSelfProtocolDecl();
+        auto *secondProto = secondDecl->getDeclContext()->getSelfProtocolDecl();
+
         // If one declaration is in a protocol or extension thereof and the
         // other is not, prefer the one that is not.
-        if ((bool)firstDecl->getDeclContext()->getSelfProtocolDecl() !=
-              (bool)secondDecl->getDeclContext()->getSelfProtocolDecl()) {
-          if (firstDecl->getDeclContext()->getSelfProtocolDecl()) {
+        if ((bool)firstProto != (bool)secondProto) {
+          if (firstProto) {
+            shadowed.insert(firstDecl);
+            break;
+          } else {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
+        // If one declaration is an associated type and the other is a type alias
+        // in a protocol or protocol extension, prefer the associated type.
+        if ((bool)firstProto && (bool)secondProto &&
+            (isa<AssociatedTypeDecl>(firstDecl) !=
+             isa<AssociatedTypeDecl>(secondDecl))) {
+          if (isa<AssociatedTypeDecl>(secondDecl)) {
             shadowed.insert(firstDecl);
             break;
           } else {
@@ -610,7 +626,7 @@ static void recordShadowedDeclsAfterTypeMatch(
       // This is due to the fact that in Swift 4, we only gave custom overload
       // types to properties in extensions of generic types, otherwise we
       // used the null type.
-      if (!ctx.isSwiftVersionAtLeast(5) && isa<ValueDecl>(firstDecl)) {
+      if (!ctx.isLanguageModeAtLeast(5) && isa<ValueDecl>(firstDecl)) {
         auto secondSig = cast<ValueDecl>(secondDecl)->getOverloadSignature();
         auto firstSig = cast<ValueDecl>(firstDecl)->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
@@ -2518,6 +2534,16 @@ bool namelookup::isInABIAttr(SourceFile *sourceFile, SourceLoc loc) {
 void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
                                       Identifier moduleSelector,
                                       SmallVectorImpl<ValueDecl *> &decls) {
+  // If we're supposed to remove associated type declarations, do so now.
+  if (options & NL_RemoveAssociatedTypes) {
+    decls.erase(
+      std::remove_if(decls.begin(), decls.end(),
+                     [&](ValueDecl *decl) {
+                       return isa<AssociatedTypeDecl>(decl);
+                     }),
+      decls.end());
+  }
+
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
@@ -3238,6 +3264,11 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
 static DirectlyReferencedTypeDecls directReferencesForDeclRefTypeRepr(
     Evaluator &evaluator, ASTContext &ctx, DeclRefTypeRepr *repr,
     DeclContext *dc, DirectlyReferencedTypeLookupOptions options) {
+  // If we've already bound this TypeRepr, don't repeat the work.
+  if (repr->isBound()) {
+    return DirectlyReferencedTypeDecls({ repr->getBoundDecl() }, {});
+  }
+
   if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr)) {
     auto result = directReferencesForTypeRepr(
         evaluator, ctx, qualIdentTR->getBase(), dc, options);

@@ -21,15 +21,8 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -O \
 // RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-cross-import-overlays -module-load-mode prefer-serialized
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
-// RUN: %swift_frontend_plain @%t/shim.cmd
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:C > %t/C.cmd
-// RUN: %swift_frontend_plain @%t/C.cmd
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json %t > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: %FileCheck %s --input-file=%t/MyApp.cmd --check-prefix CMD
 // CMD: -swift-module-cross-import
 // CMD-NEXT: [[CMI1:[B|C]]]
@@ -38,12 +31,12 @@
 // CMD-NEXT: [[CMI2:[B|C]]]
 // CMD-NEXT: [[CMI2]].swiftcrossimport{{/|\\}}A.swiftoverlay
 
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule  \
+// RUN: %target-swift-frontend-plain -emit-module -o %t/Test.swiftmodule  \
 // RUN:   -emit-module-interface-path %t/Test.swiftinterface \
 // RUN:   -cache-compile-job -cas-path %t/cas \
-// RUN:   -disable-implicit-swift-modules -swift-version 5 -enable-cross-import-overlays \
+// RUN:   -swift-version 5 -enable-cross-import-overlays \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
+// RUN:   -module-name Test \
 // RUN:   %t/main.swift @%t/MyApp.cmd
 
 // RUN: %FileCheck %s --input-file=%t/Test.swiftinterface

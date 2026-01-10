@@ -18,11 +18,20 @@ private protocol VerifiableInstruction : Instruction {
   func verify(_ context: VerifierContext)
 }
 
-private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction? = nil) {
+private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction) {
   if !condition {
     let msg = message()
     msg._withBridgedStringRef { stringRef in
-      BridgedVerifier.verifierError(stringRef, atInstruction.bridged, Optional<Argument>.none.bridged)
+      BridgedVerifier.verifierError(stringRef, atInstruction.bridged)
+    }
+  }
+}
+
+private func require(_ condition: Bool, _ message: @autoclosure () -> String, atArgument: Argument) {
+  if !condition {
+    let msg = message()
+    msg._withBridgedStringRef { stringRef in
+      BridgedVerifier.verifierError(stringRef, atArgument.bridged)
     }
   }
 }
@@ -53,16 +62,21 @@ extension Function {
 private extension Instruction {
   func checkForwardingConformance() {
     if bridged.shouldBeForwarding() {
-      require(self is ForwardingInstruction, "instruction \(self)\nshould conform to ForwardingInstruction")
+      require(self is ForwardingInstruction,
+              "instruction \(self)\nshould conform to ForwardingInstruction",
+              atInstruction: self)
     } else {
-      require(!(self is ForwardingInstruction), "instruction \(self)\nshould not conform to ForwardingInstruction")
+      require(!(self is ForwardingInstruction),
+              "instruction \(self)\nshould not conform to ForwardingInstruction",
+              atInstruction: self)
     }
   }
 
   func checkGuaranteedResults() {
     for result in results where result.ownership == .guaranteed {
       require(BeginBorrowValue(result) != nil || self is ForwardingInstruction || result.isGuaranteedApplyResult,
-              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction")
+              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction",
+              atInstruction: self)
     }
   }
 }
@@ -89,14 +103,17 @@ private extension Phi {
     var forwardingBorrowedFromFound = false
     for use in value.uses {
       require(use.instruction is BorrowedFromInst,
-              "guaranteed phi: \(self)\n has non borrowed-from use: \(use)")
+              "guaranteed phi: \(self)\n has non borrowed-from use: \(use)",
+              atArgument: self.value)
       if use.index == 0 {
-        require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses")
+        require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses",
+                atArgument: self.value)
         forwardingBorrowedFromFound = true
       }
     }
     require(forwardingBorrowedFromFound,
-            "missing forwarding borrowed-from user of guaranteed phi \(self)")
+            "missing forwarding borrowed-from user of guaranteed phi \(self)",
+            atArgument: self.value)
   }
 }
 
@@ -104,7 +121,9 @@ extension BorrowedFromInst : VerifiableInstruction {
   func verify(_ context: VerifierContext) {
 
     for ev in enclosingValues {
-      require(ev.isValidEnclosingValueInBorrowedFrom, "invalid enclosing value in borrowed-from: \(ev)")
+      require(ev.isValidEnclosingValueInBorrowedFrom,
+              "invalid enclosing value in borrowed-from: \(ev)",
+              atInstruction: self)
     }
 
     var computedEVs = Stack<Value>(context)
@@ -120,7 +139,8 @@ extension BorrowedFromInst : VerifiableInstruction {
 
     for computedEV in computedEVs {
       require(existingEVs.contains(computedEV),
-                   "\(computedEV)\n  missing in enclosing values of \(self)")
+              "\(computedEV)\n  missing in enclosing values of \(self)",
+              atInstruction: self)
     }
   }
 }
@@ -170,7 +190,7 @@ extension BeginAccessInst : VerifiableInstruction {
       return
     }
 
-    if address.type.isMoveOnly && enforcement == .static {
+    if enforcement == .static {
       // This is a workaround for a bug in the move-only checker: rdar://151841926.
       // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
       // TODO: remove this once the bug is fixed.
@@ -189,10 +209,12 @@ extension BeginAccessInst : VerifiableInstruction {
 extension VectorBaseAddrInst : VerifiableInstruction {
   func verify(_ context: VerifierContext) {
     require(vector.type.isBuiltinFixedArray,
-            "vector operand of vector_element_addr must be a Builtin.FixedArray")
+            "vector operand of vector_element_addr must be a Builtin.FixedArray",
+            atInstruction: self)
     require(type == vector.type.builtinFixedArrayElementType(in: parentFunction,
                                                              maximallyAbstracted: true).addressType,
-            "result of vector_element_addr has wrong type")
+            "result of vector_element_addr has wrong type",
+            atInstruction: self)
   }
 }
 
@@ -235,7 +257,8 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
           if let bf = phi.borrowedFrom {
             linearLiveranges.pushIfNotVisited(bf)
           } else {
-            require(false, "missing borrowed-from for \(phi.value)")
+            require(false, "missing borrowed-from for \(phi.value)",
+                    atArgument: phi.value)
           }
         }
       }
@@ -256,6 +279,15 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
               "read-only scope invalidated by a local write", atInstruction: inst)
       instWorklist.pushPredecessors(of: inst, ignoring: startInst)
     }
+  }
+
+  mutating func walkDown(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if let beginAccess = address.instruction as? BeginAccessInst, beginAccess.accessKind != .read {
+      // Don't verify that there are no stores in read-only access scopes if there is a conflicting scope.
+      // This is a programming error, but the compiler should not crash. The violation is caught at runtime.
+      return .continueWalk
+    }
+    return walkDownDefault(address: address, path: path)
   }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
@@ -288,7 +320,7 @@ private extension Operand {
       {
         switch convention {
         case .indirectIn, .indirectInGuaranteed:
-          // Such operands are consumed by the `partial_apply` and therefore cound as "written".
+          // Such operands are consumed by the `partial_apply` and therefore count as "written".
           return true
         default:
           return false

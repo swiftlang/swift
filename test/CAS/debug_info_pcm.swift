@@ -6,17 +6,23 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -I %t/include
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
-// RUN: %swift_frontend_plain @%t/shim.cmd
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:B > %t/B.cmd
-// RUN: %swift_frontend_plain @%t/B.cmd
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/A.cmd
-// RUN: %swift_frontend_plain @%t/A.cmd
-// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:A modulePath > %t/A.path
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
+// RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:A modulePath > %t/A.path
 // RUN: dwarfdump --debug-info @%t/A.path | %FileCheck %s
 
 // CHECK: DW_AT_GNU_dwo_name ("llvmcas://{{.*}}")
+
+// RUN: %target-swift-frontend-plain -emit-module-path %t/Test.swiftmodule  \
+// RUN:   -emit-module-interface-path %t/Test.swiftinterface \
+// RUN:   -c -o %t/test.o -g \
+// RUN:   -cache-compile-job -cas-path %t/cas \
+// RUN:   -swift-version 5 -enable-cross-import-overlays \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
+// RUN:   -module-name Test \
+// RUN:   %t/test.swift @%t/MyApp.cmd
+
+// RUN: dwarfdump --debug-info %t/test.o | %FileCheck %s
 
 //--- test.swift
 import A

@@ -1708,8 +1708,28 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   return M;
 }
 
+bool MemoryBufferSerializedModuleLoader::registerMemoryBuffer(
+    StringRef importPath, std::unique_ptr<llvm::MemoryBuffer> input,
+    llvm::VersionTuple version) {
+  return MemoryBuffers
+      .insert({importPath, MemoryBufferInfo(std::move(input), version)})
+      .second;
+}
+
+bool MemoryBufferSerializedModuleLoader::unregisterMemoryBuffer(
+    StringRef importPath) {
+  return MemoryBuffers.erase(importPath);
+}
+
 void SerializedModuleLoaderBase::loadExtensions(NominalTypeDecl *nominal,
                                                 unsigned previousGeneration) {
+  // Nominals in parsed SourceFiles can't have extensions provided by imported
+  // serialized modules. This is necessary to avoid triggering semantic requests
+  // from extension binding since looking up extensions may need to compute the
+  // mangled name.
+  if (nominal->getParentSourceFile())
+    return;
+
   for (auto &modulePair : LoadedModuleFiles) {
     if (modulePair.second <= previousGeneration)
       continue;

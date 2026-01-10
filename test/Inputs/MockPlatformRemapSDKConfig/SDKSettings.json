@@ -1,6 +1,15 @@
 {
   "DisplayName": "visionOS 1.1",
   "Version": "1.1",
+  "SupportedTargets": {
+    "xros": {
+      "Archs": ["arm64e","arm64"],
+      "LLVMTargetTripleVendor": "apple",
+      "LLVMTargetTripleSys": "xros",
+      "LLVMTargetTripleEnvironment": "",
+      "SystemPrefix": ""
+    }
+  },
   "VersionMap": {
     "xrOS_iOS": {
       "1.0": "17.1",

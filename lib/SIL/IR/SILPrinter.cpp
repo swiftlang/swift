@@ -87,6 +87,10 @@ SILPrintTypes("sil-print-types", llvm::cl::init(false),
                    llvm::cl::desc("always print type annotations for instruction operands in SIL output"));
 
 llvm::cl::opt<bool>
+SILPrintOwnership("sil-print-ownership", llvm::cl::init(false),
+                   llvm::cl::desc("print ownership of instruction results in SIL output"));
+
+llvm::cl::opt<bool>
 SILPrintNoUses("sil-print-no-uses", llvm::cl::init(false),
                    llvm::cl::desc("omit use comments in SIL output"));
 
@@ -389,10 +393,16 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Init:
       OS << "!init";
       break;
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
+// TODO: Change the SIL printing to use the standard
+// terminology instead of the interim terms.
+// Note: SIL parsing already accepts both
+//      OS << "!yielding_borrow"
       OS << "!read2";
       break;
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
+// TODO: Switch to standard terminology
+//      OS << "!yielding_mutate"
       OS << "!modify2";
       break;
     case AccessorKind::Borrow:
@@ -692,6 +702,35 @@ protected:
     return opcodeCommentString.size();
   }
 };
+
+static bool hasNonAddressResults(const SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    if (result->getType().isObject())
+      return true;
+  }
+  return false;
+}
+
+/// Returns true if the ownership of a result of `inst` mismatches with its type.
+/// That can happen e.g. for non-trivial enums which are constructed with a trivial case:
+/// ```
+/// enum E {
+///   case A
+///   case B(AnyObject)
+/// }
+///
+///   %1 = enum $E, #E.A!enumelt  // type of %1 is non trivial, but ownership is "none"
+/// ```
+static bool hasUnusualResultOwnership(const SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    if (result->getType().isObject() &&
+        result->getOwnershipKind() == OwnershipKind::None &&
+        !result->getType().isTrivial(*inst->getFunction())) {
+      return true;
+    }
+  }
+  return false;
+}
 
 } // namespace
 
@@ -1092,6 +1131,28 @@ public:
     printBranchTargets(inst);
   }
 
+  void printOwnershipOfInstruction(const SILInstruction *inst) {
+
+    if (!inst->isStaticInitializerInst() &&
+        inst->getFunction()->hasOwnership() &&
+        hasNonAddressResults(inst) &&
+        (SILPrintOwnership || hasUnusualResultOwnership(inst)))
+    {
+      lineComments.delim();
+
+      *this << "ownership: ";
+      llvm::interleave(inst->getResults(),
+        [&](SILValue result) {
+          if (result->getType().isAddress()) {
+            *this << '-';
+          } else {
+            *this << result->getOwnershipKind();
+          }
+        },
+        [&] { *this << ", "; });
+    }
+  }
+
   void printUserList(ArrayRef<SILValue> values, SILNodePointer node) {
     if (SILPrintNoUses)
       return;
@@ -1364,6 +1425,8 @@ public:
     // Print users, or id for valueless instructions.
     printUsersOfInstruction(I);
 
+    printOwnershipOfInstruction(I);
+
     // Print SIL location.
     if (Ctx.printVerbose()) {
       printSILLocation(I->getLoc(), I->getModule(), I->getDebugScope());
@@ -1568,7 +1631,17 @@ public:
       printDebugInfoExpression(Var->DIExpr);
   }
 
+  template <class T>
+  void printNonNested(T *inst) {
+    static_assert(&T::isStackAllocationNested !=
+                      &SILInstruction::isStackAllocationNested,
+                  "Type doesn't override isStackAllocationNested");
+    if (inst->isStackAllocationNested() == StackAllocationIsNotNested)
+      *this << "[non_nested] ";
+  }
+
   void visitAllocStackInst(AllocStackInst *AVI) {
+    printNonNested(AVI);
     if (AVI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
     if (AVI->isLexical())
@@ -1951,6 +2024,23 @@ public:
       return;
 
     if (inst->getForwardingOwnershipKind() != op->getOwnershipKind()) {
+      *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
+    }
+  }
+
+  template <typename Inst>
+  void printForwardingOwnershipKind(Inst *inst) {
+    if (inst->getNumRealOperands() == 0) {
+      return;
+    }
+    bool matching = false;
+    for (Operand *op : inst->getRealOperands()) {
+      if (inst->getForwardingOwnershipKind() == op->get()->getOwnershipKind()) {
+        matching = true;
+        break;
+      }
+    }
+    if (!matching) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }
   }
@@ -2399,6 +2489,7 @@ public:
         SI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
         [&] { *this << ", "; });
     *this << ')';
+    printForwardingOwnershipKind(SI);
   }
 
   void visitObjectInst(ObjectInst *OI) {
@@ -2454,6 +2545,7 @@ public:
           [&] { *this << ", "; });
       *this << ')';
     }
+    printForwardingOwnershipKind(TI);
   }
 
   void visitTupleAddrConstructorInst(TupleAddrConstructorInst *TI) {
@@ -3505,18 +3597,18 @@ void SILFunction::dump(const char *FileName) const {
   print(os);
 }
 
-static StringRef getLinkageString(SILLinkage linkage) {
+StringRef swift::getLinkageString(SILLinkage linkage) {
   switch (linkage) {
-  case SILLinkage::Public: return "public ";
-  case SILLinkage::PublicNonABI: return "non_abi ";
-  case SILLinkage::Package: return "package ";
-  case SILLinkage::PackageNonABI: return "package_non_abi ";
-  case SILLinkage::Hidden: return "hidden ";
-  case SILLinkage::Shared: return "shared ";
-  case SILLinkage::Private: return "private ";
-  case SILLinkage::PublicExternal: return "public_external ";
-  case SILLinkage::PackageExternal: return "package_external ";
-  case SILLinkage::HiddenExternal: return "hidden_external ";
+  case SILLinkage::Public: return "public";
+  case SILLinkage::PublicNonABI: return "non_abi";
+  case SILLinkage::Package: return "package";
+  case SILLinkage::PackageNonABI: return "package_non_abi";
+  case SILLinkage::Hidden: return "hidden";
+  case SILLinkage::Shared: return "shared";
+  case SILLinkage::Private: return "private";
+  case SILLinkage::PublicExternal: return "public_external";
+  case SILLinkage::PackageExternal: return "package_external";
+  case SILLinkage::HiddenExternal: return "hidden_external";
   }
   llvm_unreachable("bad linkage");
 }
@@ -3527,7 +3619,7 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
       (!isDefinition && linkage == SILLinkage::DefaultForDeclaration))
     return;
 
-  OS << getLinkageString(linkage);
+  OS << getLinkageString(linkage) << ' ';
 }
 
 

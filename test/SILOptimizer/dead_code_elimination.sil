@@ -253,11 +253,10 @@ bb3:
   br bb1
 }
 
-// Check that DCE eliminates dead access instructions.
+// Dead accesses must not be removed
 // CHECK-LABEL: sil @dead_access
-// CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK:         begin_access
+// CHECK:         begin_access
 // CHECK-LABEL: end sil function 'dead_access'
 sil @dead_access : $@convention(thin) (@in Container) -> () {
 bb0(%0 : $*Container):

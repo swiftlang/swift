@@ -52,7 +52,7 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseC9openFieldxvyTwd'
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s16default_override8OpenBaseC9openFieldxvxTwd
@@ -83,7 +83,7 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseC9openFieldxvxTwd'
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
@@ -121,7 +121,7 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseCyxqd___AA0C0OmtcluiyTwd'
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd
@@ -157,39 +157,39 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd'
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public var publicField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public subscript<U>(_ u: U, _ _: Public.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   var internalField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   subscript<U>(_ u: U, _ _: Internal.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
@@ -197,50 +197,50 @@ open class OpenBase<T> {
 
 public class PublicBase<T> {
   open var openField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   open subscript<U>(_ u: U, _ _: Open.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public var publicField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public subscript<U>(_ u: U, _ _: Public.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   var internalField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   subscript<U>(_ u: U, _ _: Internal.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
@@ -248,50 +248,50 @@ public class PublicBase<T> {
 
 class InternalBase<T> {
   open var openField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   open subscript<U>(_ u: U, _ _: Open.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public var publicField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public subscript<U>(_ u: U, _ _: Public.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   var internalField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   subscript<U>(_ u: U, _ _: Internal.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }

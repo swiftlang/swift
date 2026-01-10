@@ -164,7 +164,7 @@ extension OutputSpan {
   /// the common case of a completely uninitialized `buffer`.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: a slice of an `UnsafeMutableBufferPointer` to be initialized
   ///   - initializedCount: the number of initialized elements
   ///                       at the beginning of `buffer`.
   @unsafe
@@ -256,14 +256,14 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
-    _precondition(indices.contains(Index(i)))
-    _precondition(indices.contains(Index(j)))
+    _precondition(indices.contains(i))
+    _precondition(indices.contains(j))
     unsafe swapAt(unchecked: i, unchecked: j)
   }
 
   /// Exchange the elements at the two given offsets
   ///
-  /// This subscript does not validate `i` or `j`; this is an unsafe operation.
+  /// This function does not validate `i` or `j`; this is an unsafe operation.
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.

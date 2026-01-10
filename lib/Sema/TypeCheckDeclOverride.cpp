@@ -581,7 +581,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
             diags
                 .diagnose(decl, diag::override_sendability_mismatch,
                           decl->getName())
-                .limitBehaviorUntilSwiftVersion(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, 6)
                 .limitBehaviorIf(
                     fromContext.preconcurrencyBehavior(baseDeclClass));
             return false;
@@ -599,7 +599,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
       diags
           .diagnose(decl, diag::override_global_actor_isolation_mismatch,
                     decl->getName())
-          .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 6)
+          .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 6)
           .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
     }
     break;
@@ -1218,7 +1218,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // is helpful in several cases - just not this one.
   auto dc = decl->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
-  if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
+  if (decl->getASTContext().isLanguageModeAtLeast(5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
       !classDecl->isSemanticallyFinal()) {
@@ -1615,6 +1615,7 @@ namespace  {
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(Owned)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(Nonexhaustive)
     UNINTERESTING_ATTR(NoLocks)
@@ -1756,6 +1757,7 @@ namespace  {
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
     UNINTERESTING_ATTR(UnsafeSelfDependentResult)
+    UNINTERESTING_ATTR(Warn)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -1926,7 +1928,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
         !overrideASD->hasObservers()) {
       bool downgradeToWarning = false;
-      if (!ctx.isSwiftVersionAtLeast(5) &&
+      if (!ctx.isLanguageModeAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
         // Swift 4.0 had a bug where lazy properties were considered
         // computed by the time of this check. Downgrade this diagnostic to
@@ -2369,9 +2371,9 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:
       break;
@@ -2411,11 +2413,11 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
         break;
 
       case AccessorKind::Modify:
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

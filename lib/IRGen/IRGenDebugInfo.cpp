@@ -69,6 +69,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -666,11 +667,11 @@ private:
         case AccessorKind::Init:
           Kind = ".init";
           break;
-        case AccessorKind::Modify2:
-          Kind = ".modify2";
+        case AccessorKind::YieldingMutate:
+          Kind = ".yielding_mutate";
           break;
-        case AccessorKind::Read2:
-          Kind = ".read2";
+        case AccessorKind::YieldingBorrow:
+          Kind = ".yielding_borrow";
           break;
         case AccessorKind::Borrow:
           Kind = ".borrow";
@@ -914,6 +915,8 @@ private:
         CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
     StringRef IncludePath =
         HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
+    StringRef ASTFile =
+        Desc.getCASID().empty() ? Desc.getASTFile() : Desc.getCASID();
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -931,16 +934,16 @@ private:
         ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
         Parent = getOrCreateModule(
             {ParentDescriptor.getModuleName(), ParentDescriptor.getPath(),
-             Desc.getASTFile(), Desc.getSignature(), /*CASID=*/""},
+             Desc.getASTFile(), Desc.getSignature(), Desc.getCASID()},
             ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               IncludePath, Signature, Desc.getASTFile());
+                               IncludePath, Signature, ASTFile);
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
                              Desc.getModuleName(), IncludePath, Signature,
-                             Desc.getASTFile());
+                             ASTFile);
   };
 
   static std::optional<ASTSourceDescriptor>
@@ -1599,7 +1602,7 @@ private:
     std::vector<Type> GenericArgs;
     Type CurrentType = BGT;
     while (CurrentType && CurrentType->getAnyNominal()) {
-      if (auto *BGT = llvm::dyn_cast<BoundGenericType>(CurrentType))
+      if (auto *BGT = CurrentType->getAs<BoundGenericType>())
         GenericArgs.insert(GenericArgs.end(), BGT->getGenericArgs().begin(),
                            BGT->getGenericArgs().end());
       CurrentType = CurrentType->getNominalParent();
@@ -1728,6 +1731,21 @@ private:
         Scope, "$swift.fixedbuffer", File, Line, 3 * PtrSize, 0, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
         llvm::dwarf::DW_LANG_Swift, nullptr);
+  }
+
+  /// Create struct with a single member, used for Swift types that do not yet
+  /// have specialized DIDerivedTypes.
+  llvm::DIType *createSingleMemberStruct(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, StringRef MemberName, llvm::DIType *MemberType) {
+    llvm::Metadata *Elements[] = {
+        DBuilder.createMemberType(Scope, MemberName, File, 0, SizeInBits,
+                                  AlignInBits, 0, Flags, MemberType)};
+    return DBuilder.createStructType(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, nullptr, 0);
   }
 
   llvm::DIType *createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
@@ -2062,18 +2080,29 @@ private:
                                       SpecificationOf);
     }
 
-    case TypeKind::Protocol: {
-      auto *ProtocolTy = BaseTy->castTo<ProtocolType>();
-      auto *Decl = ProtocolTy->getDecl();
-      // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
-      auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                L.File, FwdDeclLine, SizeInBits, AlignInBits,
-                                Flags, MangledName);
+    case TypeKind::Existential: {
+      auto *ExistentialTy = BaseTy->castTo<ExistentialType>();
+      Type ConstraintTy = ExistentialTy->getConstraintType();
+      TypeBase *TyPtr = ConstraintTy.getPointer();
+      if (!isa<ProtocolType>(TyPtr) && !isa<ProtocolCompositionType>(TyPtr) &&
+          !isa<ParameterizedProtocolType>(TyPtr)) {
+        // This could be an alias type, which we need to anchor in DWARF.
+        auto *Decl = DbgTy.getDecl();
+        auto L = getFileAndLocation(Decl);
+        unsigned FwdDeclLine = 0;
+        return createSingleMemberStruct(
+            Scope, Decl ? Decl->getNameStr() : MangledName, L.File, FwdDeclLine,
+            SizeInBits, AlignInBits, Flags, MangledName, "$swift.constraint",
+            getOrCreateType(ConstraintTy));
+      }
+      // If the existential is just a protocol type it shares its mangled name
+      // with it, so we can just represent it directly as a protocol.
+      BaseTy = TyPtr;
     }
+      LLVM_FALLTHROUGH;
 
-    case TypeKind::Existential:
+    // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
+    case TypeKind::Protocol:
     case TypeKind::ProtocolComposition:
     case TypeKind::ParameterizedProtocol: {
       auto *Decl = DbgTy.getDecl();
@@ -2460,9 +2489,10 @@ private:
         return TypeWalker::Action::Stop;
 
       DeclContext *D = nullptr;
-      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T))
+      if (auto *TAT = llvm::dyn_cast<TypeAliasType>(T.getPointer()))
         D = TAT->getDecl()->getDeclContext();
-      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(T))
+      else if (auto *NT = llvm::dyn_cast<NominalOrBoundGenericNominalType>(
+                   T.getPointer()))
         D = NT->getDecl()->getDeclContext();
 
       // A type inside a function uses that function's signature as part of
@@ -2629,11 +2659,12 @@ private:
           // Describe the submodule, but substitute the cached ASTFile from
           // the toplevel module. The ASTFile pointer in SubModule may be
           // dangling and cant be trusted.
-          Scope = getOrCreateModule(
-              {SubModuleDesc->getModuleName(), SubModuleDesc->getPath(),
-               TopLevelModuleDesc->getASTFile(),
-               TopLevelModuleDesc->getSignature(), /*CASID=*/""},
-              SubModuleDesc->getModuleOrNull());
+          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                     SubModuleDesc->getPath(),
+                                     TopLevelModuleDesc->getASTFile(),
+                                     TopLevelModuleDesc->getSignature(),
+                                     TopLevelModuleDesc->getCASID()},
+                                    SubModuleDesc->getModuleOrNull());
         else if (SubModuleDesc->getModuleOrNull() == nullptr)
           // This is (bridging header) PCH.
           Scope = getOrCreateModule(*SubModuleDesc, nullptr);
@@ -3747,7 +3778,7 @@ struct DbgIntrinsicEmitter {
   PointerUnion<llvm::BasicBlock *, llvm::Instruction *> InsertPt;
   irgen::IRBuilder &IRBuilder;
   llvm::DIBuilder &DIBuilder;
-  AddrDbgInstrKind ForceDbgDeclareOrCoro;
+  AddrDbgInstrKind ForceDbgDeclareOrDeclareValue;
 
   /// Initialize the emitter and initialize the emitter to assume that it is
   /// going to insert an llvm.dbg.declare or an llvm.dbg.addr either at the
@@ -3756,7 +3787,7 @@ struct DbgIntrinsicEmitter {
   DbgIntrinsicEmitter(irgen::IRBuilder &IRBuilder, llvm::DIBuilder &DIBuilder,
                       AddrDbgInstrKind AddrDInstrKind)
       : InsertPt(), IRBuilder(IRBuilder), DIBuilder(DIBuilder),
-        ForceDbgDeclareOrCoro(AddrDInstrKind) {
+        ForceDbgDeclareOrDeclareValue(AddrDInstrKind) {
     auto *ParentBB = IRBuilder.GetInsertBlock();
     auto InsertBefore = IRBuilder.GetInsertPoint();
 
@@ -3783,13 +3814,13 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
                                      InsertBefore->getIterator());
 
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
-      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL,
-                                            InsertBefore->getIterator());
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+      return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL,
+                                          InsertBefore->getIterator());
 
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
@@ -3800,11 +3831,11 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
 
-    if (ForceDbgDeclareOrCoro == AddrDbgInstrKind::DbgCoroFrameEntry)
-      return DIBuilder.insertCoroFrameEntry(Addr, VarInfo, Expr, DL, Block);
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+      return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL, Block);
 
     Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
@@ -3866,7 +3897,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
 
   if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValueDeref)
-    AddrDInstKind = AddrDbgInstrKind::DbgCoroFrameEntry;
+    AddrDInstKind = AddrDbgInstrKind::DbgDeclareValue;
 
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
 
@@ -3875,7 +3906,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     auto InsertBefore = Builder.GetInsertPoint();
 
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
-        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
+        AddrDInstKind == AddrDbgInstrKind::DbgDeclareValue) {
       ParentBlock = Alloca->getParent();
       InsertBefore = std::next(Alloca->getIterator());
     }
@@ -3903,7 +3934,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // in the coroutine context by creating a llvm.dbg.declare for the variable
     // in the entry block of each funclet.
     if (AddrDInstKind == AddrDbgInstrKind::DbgDeclare ||
-        AddrDInstKind == AddrDbgInstrKind::DbgCoroFrameEntry) {
+        AddrDInstKind == AddrDbgInstrKind::DbgDeclareValue) {
       // Function arguments in async functions are emitted without a shadow copy
       // (that would interfere with coroutine splitting) but with a
       // llvm.dbg.declare to give CoroSplit.cpp license to emit a shadow copy

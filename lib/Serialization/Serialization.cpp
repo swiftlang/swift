@@ -534,7 +534,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
-  CASE(Read2)
+  CASE(YieldingBorrow)
   CASE(Borrow)
 #undef CASE
   }
@@ -553,7 +553,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(Mutate)
 #undef CASE
   }
@@ -570,7 +570,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
   CASE(Mutate)
@@ -2964,6 +2964,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
+    case DeclAttrKind::Warn:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -3182,7 +3183,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       };
 
       auto domainKind = getDomainKind(domain);
-      const Decl *domainDecl = domain.getDecl();
+
+      // Custom availablity domains provided via the command line don't have
+      // corresponding declarations. Serialize them as identifiers instead.
+      DeclID customDomainID = 0;
+      if (auto custom = domain.getCustomDomain()) {
+        if (auto customDecl = custom->getDecl()) {
+          customDomainID = S.addDeclRef(customDecl) << 1;
+        } else {
+          // emit the name,
+          customDomainID = (S.addDeclBaseNameRef(custom->getName()) << 1) | 0x1;
+        }
+      }
 
       llvm::SmallString<32> blob;
       blob.append(theAttr->getMessage());
@@ -3197,7 +3209,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isSPI(),
           static_cast<uint8_t>(domainKind),
           static_cast<unsigned>(domain.getPlatformKind()),
-          S.addDeclRef(domainDecl),
+          customDomainID,
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
@@ -4168,7 +4180,7 @@ public:
       writeABIOnlyCounterpart(abiRole.getCounterpartUnchecked());
 
     // Emit attributes (if any).
-    for (auto Attr : D->getAttrs())
+    for (auto Attr : D->getSemanticAttrs())
       writeDeclAttribute(D, Attr);
 
     if (auto *value = dyn_cast<ValueDecl>(D))
@@ -4757,7 +4769,6 @@ public:
                           rawIntroducer,
                           var->isGetterMutating(),
                           var->isSetterMutating(),
-                          var->isLazyStorageProperty(),
                           var->isTopLevelGlobal(),
                           S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
@@ -4915,41 +4926,50 @@ public:
 
     auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
+    uint8_t rawAccessLevel =
+        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+    bool exportUnderlyingType = opaqueDecl->exportUnderlyingType();
+
+    bool hasUnderlyingType = false;
     SubstitutionMapID underlyingSubsID = 0;
     if (auto underlying = opaqueDecl->getUniqueUnderlyingTypeSubstitutions()) {
       underlyingSubsID = S.addSubstitutionMapRef(*underlying);
+      hasUnderlyingType = true;
     } else if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
       // Universally available type doesn't have any availability conditions
-      // so it could be serialized into "unique" slot to safe space.
+      // so it could be serialized into "unique" slot to save space.
       auto universal =
           opaqueDecl->getConditionallyAvailableSubstitutions().back();
       underlyingSubsID = S.addSubstitutionMapRef(universal->getSubstitutions());
+      hasUnderlyingType = true;
     }
-    uint8_t rawAccessLevel =
-        getRawStableAccessLevel(opaqueDecl->getFormalAccess());
-    bool exportDetails = opaqueDecl->exportUnderlyingType();
 
-    unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
-    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+    OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord,
+                                 S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code],
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingSubsID, rawAccessLevel,
-                                 exportDetails);
+                                 rawAccessLevel, hasUnderlyingType,
+                                 exportUnderlyingType);
     writeGenericParams(opaqueDecl->getGenericParams());
+
+    if (!hasUnderlyingType)
+      return;
+
+    UnderlyingSubstitutionLayout::emitRecord(
+        S.Out, S.ScratchRecord,
+        S.DeclTypeAbbrCodes[UnderlyingSubstitutionLayout::Code],
+        underlyingSubsID);
 
     // Serialize all of the conditionally available substitutions expect the
     // last one - universal, it's serialized into "unique" slot.
     if (opaqueDecl->hasConditionallyAvailableSubstitutions()) {
-      unsigned abbrCode =
-          S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code];
       for (const auto *subs :
            opaqueDecl->getConditionallyAvailableSubstitutions().drop_back()) {
         ConditionalSubstitutionLayout::emitRecord(
-            S.Out, S.ScratchRecord, abbrCode,
+            S.Out, S.ScratchRecord,
+            S.DeclTypeAbbrCodes[ConditionalSubstitutionLayout::Code],
             S.addSubstitutionMapRef(subs->getSubstitutions()));
 
-        unsigned condAbbrCode =
-            S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code];
         for (const auto &query : subs->getAvailabilityQueries()) {
           // FIXME: [availability] Support arbitrary domains (rdar://156513787).
           DEBUG_ASSERT(query.getDomain().isPlatform());
@@ -4961,8 +4981,9 @@ public:
                            std::optional<llvm::VersionTuple>(
                                availableRange.getRawMinimumVersion()));
           ConditionalSubstitutionConditionLayout::emitRecord(
-              S.Out, S.ScratchRecord, condAbbrCode, query.isUnavailability(),
-              LIST_VER_TUPLE_PIECES(osVersion));
+              S.Out, S.ScratchRecord,
+              S.DeclTypeAbbrCodes[ConditionalSubstitutionConditionLayout::Code],
+              query.isUnavailability(), LIST_VER_TUPLE_PIECES(osVersion));
         }
       }
     }
@@ -5626,7 +5647,7 @@ struct ImplementationOnlyWalker : TypeWalker {
   const ModuleDecl *currentModule;
   ImplementationOnlyWalker(const ModuleDecl *M) : currentModule(M) {}
   Action walkToTypePre(Type ty) override {
-    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty)) {
+    if (auto *typeAlias = dyn_cast<TypeAliasType>(ty.getPointer())) {
       if (importedImplementationOnly(typeAlias->getDecl()))
         return Action::Stop;
     } else if (auto *nominal = ty->getAs<NominalType>()) {
@@ -6559,6 +6580,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 
+  registerDeclTypeAbbr<UnderlyingSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionLayout>();
   registerDeclTypeAbbr<ConditionalSubstitutionConditionLayout>();
 
