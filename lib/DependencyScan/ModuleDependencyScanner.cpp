@@ -240,7 +240,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
                       workerCompilerInvocation->getSerializationOptions(),
-                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
+                      ScanASTContext.SourceMgr, *workerDiagnosticEngine,
+                      workerCompilerInvocation->getSDKInfo()));
 
   scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
