@@ -148,8 +148,8 @@ toolchain as a one-off, there are a couple of differences:
      ```
    This step is not required, but it speeds up rebuilds by caching build artifacts.
 
-**Note:** `build-script` will check out and build [CMake][] and [Ninja][]
-for you, so installing these tools manually is not required.
+**Important:** `build-script` will check out and build specific [CMake][] and [Ninja][]
+versions for you that are verified to work, so installing different versions of these tools manually is likely to cause toolchain build errors.
 
 [Xcode]: https://developer.apple.com/xcode/resources/
 [Homebrew]: https://brew.sh/
