@@ -1810,6 +1810,11 @@ static Type replacePlaceholderType(PlaceholderType *placeholder,
     if (!tv)
       return std::nullopt;
 
+    // If we have a concrete fixed type we can use that directly.
+    auto fixedTy = S.getFixedType(tv);
+    if (!fixedTy->isPlaceholder())
+      return ErrorType::get(fixedTy);
+
     auto *gp = getGenericParamForHoleTypeVar(tv, S);
     if (!gp)
       return std::nullopt;
