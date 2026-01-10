@@ -18,7 +18,7 @@ func one() {
 
   do {
     
-  } catch _ { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  } catch { // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
     let error2 = error
   }
 
@@ -66,7 +66,7 @@ func one() {
   do {
     throw opaque_error()
   } catch MSV.Foo, MSV.CarriesInt(let num) { // expected-error {{'num' must be bound in every pattern}}
-  } catch _ {
+  } catch {
   }
 }
 

@@ -34,11 +34,11 @@ func testStrictCatch() {
     if true {}
   }
 
-  // 5. Catch All with Explicit Binding -> PASS
+  // 5. Catch All with Explicit Binding -> WARN
   do {
     try something()
-  } catch let e {
-    // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
+  } catch let e { // expected-warning {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
 }
 

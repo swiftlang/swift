@@ -3618,6 +3618,14 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     auto *catchStmt = S->getCatches().front();
 
+    // Check if the catch body is empty
+    if (auto *body = catchStmt->getBody()) {
+      if (!body->empty())
+        return;
+    } else {
+      return;
+    }
+
     // Must be a generic 'catch' (no specific patterns like 'catch MyError.bad')
     if (catchStmt->getCaseLabelItems().size() != 1)
       return;
@@ -3636,15 +3644,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     if (pattern->hasType() && pattern->getType()->hasError()) return;
 
     // Only warn for implicit patterns (standard 'catch' vs 'catch let e')
-    if (!pattern->isImplicit())
+    if (isa<AnyPattern>(pattern->getSemanticsProvidingPattern()))
       return;
 
-    // Finally, check if the catch body is empty
-    if (auto *body = catchStmt->getBody()) {
-      if (body->empty()) {
-        Ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
-      }
-    }
+    Ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
   }
 
   struct DiagnosticInfo {

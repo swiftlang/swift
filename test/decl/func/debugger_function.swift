@@ -59,6 +59,6 @@ func test4() {
   do {
     do {}
     catch {} // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
-  } catch _ {
+  } catch {
   }
 }
