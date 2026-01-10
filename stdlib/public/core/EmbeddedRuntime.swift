@@ -650,20 +650,6 @@ fileprivate func storeRelaxed(_ atomic: UnsafeMutablePointer<Int>, newValue: Int
   Builtin.atomicstore_monotonic_Word(atomic._rawValue, newValue._builtinWordValue)
 }
 
-/// Exclusivity checking
-
-@c
-public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
-  // TODO: Add actual exclusivity checking.
-}
-
-@c
-public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
-  // TODO: Add actual exclusivity checking.
-}
-
-
-
 // Once
 
 @c

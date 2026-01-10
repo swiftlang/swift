@@ -298,26 +298,26 @@ class InternalBase<T> {
 }
 
 // CHECK-LABEL: sil_default_override_table OpenBase {
-// CHECK-NEXT:    #OpenBase.openField!read2
+// CHECK-NEXT:    #OpenBase.openField!yielding_borrow
 // CHECK-SAME:        #OpenBase.openField!read
 // CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseC9openFieldxvyTwd
-// CHECK-NEXT:    #OpenBase.openField!modify2
+// CHECK-NEXT:    #OpenBase.openField!yielding_mutate
 // CHECK-SAME:        #OpenBase.openField!modify
 // CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseC9openFieldxvxTwd
-// CHECK-NEXT:    #OpenBase.subscript!read2
+// CHECK-NEXT:    #OpenBase.subscript!yielding_borrow
 // CHECK-SAME:        #OpenBase.subscript!read
 // CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluiyTwd
-// CHECK-NEXT:    #OpenBase.subscript!modify2
+// CHECK-NEXT:    #OpenBase.subscript!yielding_mutate
 // CHECK-SAME:        #OpenBase.subscript!modify
 // CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd
-// CHECK-NOT:     #OpenBase.publicField!read2
-// CHECK-NOT:     #OpenBase.publicField!modify2
-// CHECK-NOT:     #OpenBase.subscript!read2: #OpenBase.subscript!read: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
-// CHECK-NOT:     #OpenBase.subscript!modify2: #OpenBase.subscript!modify: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
+// CHECK-NOT:     #OpenBase.publicField!yielding_borrow
+// CHECK-NOT:     #OpenBase.publicField!yielding_mutate
+// CHECK-NOT:     #OpenBase.subscript!yielding_borrow: #OpenBase.subscript!read: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
+// CHECK-NOT:     #OpenBase.subscript!yielding_mutate: #OpenBase.subscript!modify: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
 // CHECK-NEXT:  }
 
 // CHECK-NOT: sil_default_override_table PublicBase {

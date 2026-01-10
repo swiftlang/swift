@@ -263,7 +263,7 @@ protocol GettableTitle {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
-// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read2
+// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!yielding_borrow
 // CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]]]) = begin_apply [[READER]]([[SELF]])
 // CHECK:         [[RETVAL:%[^,]+]] = copy_value [[TITLE]]
 // CHECK:         end_apply [[TOKEN]] as $()
@@ -286,7 +286,7 @@ class OverridableReader : GettableTitle {
 
 // CHECK-LABEL: sil_default_witness_table ReadableField {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ReadableField.field!read2 
+// CHECK-NEXT:    method #ReadableField.field!yielding_borrow
 // CHECK-SAME:        : @$s19coroutine_accessors13ReadableFieldP5fieldSivy
 // CHECK-NEXT:  }
 public protocol ReadableField {

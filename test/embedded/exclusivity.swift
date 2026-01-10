@@ -1,11 +1,8 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o -enforce-exclusivity=checked
-// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -enforce-exclusivity=checked -enable-experimental-feature Embedded -parse-as-library | %FileCheck -check-prefix DYNAMIC %s
+// RUN: %target-swift-frontend -parse-as-library -emit-ir %s -enforce-exclusivity=unchecked -enable-experimental-feature Embedded | %FileCheck -check-prefix STATIC-ONLY %s
+// RUN: %target-swift-frontend -parse-as-library -emit-ir %s -enable-experimental-feature Embedded | %FileCheck -check-prefix STATIC-ONLY %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 
 func f() -> Bool? { return nil }
@@ -22,7 +19,10 @@ public class MyClass {
 struct Main {
   static var o: MyClass? = nil
 
+  // CHECK: 4main
   static func main() {
+    // DYNAMIC: call void @swift_beginAccess
+    // STATIC-ONLY-NOT: call void @swift_beginAccess
     o = MyClass()
     o!.handler = { print("no captures") }
     o!.foo() // CHECK: no captures
@@ -42,14 +42,4 @@ struct Main {
     }
     closure()   // CHECK: success
   }
-}
-
-/// Exclusivity checking stubs
-
-@c
-public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
-}
-
-@c
-public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
 }

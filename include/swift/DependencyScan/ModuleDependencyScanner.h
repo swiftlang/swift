@@ -37,6 +37,14 @@ using ImportStatementInfoMap =
     std::unordered_map<ModuleDependencyID,
                        std::vector<ScannerImportStatementInfo>>;
 
+/// A map from a module ID to a collection of module IDs.
+using ModuleIDToModuleIDSetVectorMap =
+    std::unordered_map<ModuleDependencyID,
+                       ModuleDependencyIDSetVector>;
+
+using ModuleIDImportInfoPair =
+    std::pair<ModuleDependencyID, ScannerImportStatementInfo>;
+
 struct ScannerMetrics {
   /// Number of performed queries for a Swift dependency with a given name
   std::atomic<uint32_t> SwiftModuleQueries;
@@ -328,7 +336,7 @@ private:
   void resolveSwiftModuleDependencies(
       const ModuleDependencyID &rootModuleID,
       ModuleDependencyIDSetVector &discoveredSwiftModules);
-  void resolveAllClangModuleDependencies(
+  void resolveClangModuleDependencies(
       ArrayRef<ModuleDependencyID> swiftModules,
       ModuleDependencyIDSetVector &discoveredClangModules);
   void resolveHeaderDependencies(
@@ -412,25 +420,19 @@ private:
   ///    in \c failedToResolveImports.
   /// 4. Update the set of resolved Clang dependencies for each Swift
   ///    module dependency in \c resolvedClangDependenciesMap.
-  void cacheComputedClangModuleLookupResults(
+  void processBatchClangModuleQueryResult(
       const BatchClangModuleLookupResult &lookupResult,
       const ImportStatementInfoMap &unresolvedImportsMap,
       const ImportStatementInfoMap &unresolvedOptionalImportsMap,
-      ArrayRef<ModuleDependencyID> swiftModuleDependents,
       ModuleDependencyIDSetVector &allDiscoveredClangModules,
-      std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-          &failedToResolveImports,
-      std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-          &resolvedClangDependenciesMap);
+      std::vector<ModuleIDImportInfoPair> &failedToResolveImports,
+      ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap);
 
   /// Re-query some failed-to-resolve Clang imports from cache
   /// in chance they were brought in as transitive dependencies.
   void reQueryMissedModulesFromCache(
-      const std::vector<
-          std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-          &failedToResolveImports,
-      std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-          &resolvedClangDependenciesMap);
+      const std::vector<ModuleIDImportInfoPair> &failedToResolveImports,
+      ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap);
 
   /// Assuming the \c `moduleImport` failed to resolve,
   /// iterate over all binary Swift module dependencies with serialized
