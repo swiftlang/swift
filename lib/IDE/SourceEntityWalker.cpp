@@ -458,8 +458,14 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // a member being accessed, so it should reflect the access kind.
     bool isKeyPathDynamicMemberLookup = false;
     if (auto *SD = dyn_cast_or_null<SubscriptDecl>(SubscrD)) {
-      if (isValidKeyPathDynamicMemberLookup(SD)) {
-        isKeyPathDynamicMemberLookup = true;
+      // Check if the base type has @dynamicMemberLookup
+      Type baseType = SE->getBase()->getType();
+      if (baseType) {
+        baseType = baseType->getWithoutSpecifierType();
+        if (baseType->hasDynamicMemberLookupAttribute() &&
+            isValidKeyPathDynamicMemberLookup(SD)) {
+          isKeyPathDynamicMemberLookup = true;
+        }
       }
     }
 
