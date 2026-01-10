@@ -64,7 +64,7 @@ func testProtocolExtensions<T1, T2, T3, T4>(t1: T1, t2: T2, t3: T3, t4: T4)
 }
 
 class Class<T> {
-  // expected-note@+1 {{where 'T' = 'T}} // expected-note@+1 {{where 'T.Assoc' = 'T.Assoc'}}
+  // expected-note@+1 {{where 'T' = 'T}}
   static func staticFunc() where T: Whereable, T.Assoc == Int { }
 
   // expected-note@+1 {{candidate requires that the types 'T' and 'Bool' be equivalent}}
@@ -101,7 +101,6 @@ extension Class where T == Bool {
 }
 
 func testMemberDeclarations<T, U: Comparable>(arg1: Class<T>, arg2: Class<U>) {
-  // expected-error@+2 {{static method 'staticFunc()' requires the types 'T.Assoc' and 'Int' be equivalent}}
   // expected-error@+1 {{static method 'staticFunc()' requires that 'T' conform to 'Whereable'}}
   Class<T>.staticFunc()
   Class<T>.staticExtensionFunc() // expected-error {{static method 'staticExtensionFunc()' requires that 'T' inherit from 'Class<Int>'}}

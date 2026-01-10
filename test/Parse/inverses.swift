@@ -123,9 +123,7 @@ func typeInExpression() {
 
   _ = X<(borrowing any ~Copyable) -> Void>()
 
-  _ = ~Copyable.self // expected-error{{type '(any Copyable).Type' cannot conform to 'BinaryInteger'}}
-  // expected-note@-1{{required by referencing operator function '~' on 'BinaryInteger' where 'Self' = '(any Copyable).Type'}}
-  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  _ = ~Copyable.self // expected-error{{unary operator '~' cannot be applied to an operand of type '(any Copyable).Type'}}
   _ = (any ~Copyable).self
 }
 

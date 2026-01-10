@@ -1674,6 +1674,9 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
+      if (lookupBaseType->isTypeVariableOrMember())
+        return DependentMemberType::get(lookupBaseType, assocType);
+
       if (lookupBaseType->mayHaveMembers() ||
           lookupBaseType->is<PackType>()) {
         auto *proto = assocType->getProtocol();
@@ -1697,19 +1700,17 @@ struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
           // order to continue solving.
-          auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
-          if (CS.inSalvageMode())
-            return PlaceholderType::get(CS.getASTContext(), memberTy);
-
-          return memberTy;
+          return PlaceholderType::get(CS.getASTContext(), depMemTy);
         }
 
         auto result = conformance.getTypeWitness(assocType);
-        if (result && !result->hasError())
-          return result;
+        if (result->hasError())
+          return PlaceholderType::get(CS.getASTContext(), depMemTy);
+
+        return result;
       }
 
-      return DependentMemberType::get(lookupBaseType, assocType);
+      return PlaceholderType::get(CS.getASTContext(), depMemTy);
     }
 
     return std::nullopt;

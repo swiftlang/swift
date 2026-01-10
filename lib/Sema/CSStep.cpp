@@ -256,6 +256,35 @@ bool SplitterStep::mergePartialSolutions() const {
   return anySolutions;
 }
 
+/// Increase the score to account for bound DependentMemberType holes.
+/// FIXME: This should go away once we model DependentMemberType with a
+/// constraint.
+static void increaseScoreForDependentMemberHoles(ConstraintSystem &cs) {
+  struct FindDependentMemberHole : TypeWalker {
+    ConstraintSystem &CS;
+    FindDependentMemberHole(ConstraintSystem &cs) : CS(cs) {}
+
+    Action walkToTypePre(Type ty) override {
+      if (!ty->hasPlaceholder() && !ty->hasDependentMember())
+        return Action::SkipNode;
+
+      if (auto *DMT = dyn_cast<DependentMemberType>(ty.getPointer()))
+        ty = CS.simplifyType(DMT);
+
+      if (auto *placeholder = dyn_cast<PlaceholderType>(ty.getPointer())) {
+        if (isa<DependentMemberType *>(placeholder->getOriginator()))
+          return Action::Stop;
+      }
+      return Action::Continue;
+    }
+  };
+  for (auto *tv : cs.getTypeVariables()) {
+    auto type = cs.getFixedType(tv);
+    if (type && type.walk(FindDependentMemberHole(cs)))
+      cs.increaseScore(SK_Hole, tv->getImpl().getLocator());
+  }
+}
+
 StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
@@ -372,6 +401,12 @@ StepResult ComponentStep::take(bool prevFailed) {
       return finalize(/*isSuccess=*/false);
     }
   }
+  // FIXME: DependentMemberTypes get turned into holes on simplification so we
+  // currently have no way of marking the solution invalid when this happens. As
+  // such we need to do it here, increase the number of holes for each binding
+  // that has a hole DependentMemberType. Once we replace DependentMemberType
+  // with a constraint this can go away.
+  increaseScoreForDependentMemberHoles(CS);
 
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
