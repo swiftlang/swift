@@ -787,8 +787,8 @@ void importer::getNormalInvocationArguments(
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
                               languageVersion.asAPINotesVersionString());
 
-  // Prefer `-sdk` paths.
-  if (!searchPathOpts.getSDKPath().empty()) {
+  // Prefer `-sdk` paths for Darwin.
+  if (triple.isOSDarwin() && !searchPathOpts.getSDKPath().empty()) {
     llvm::SmallString<261> path{searchPathOpts.getSDKPath()};
     llvm::sys::path::append(path, "usr", "lib", "swift", "apinotes");
 

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded
-// RUN: %target-swift-frontend -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -O
-// RUN: %target-swift-frontend -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -Osize
+// RUN: %swift_frontend_plain -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded
+// RUN: %swift_frontend_plain -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -O
+// RUN: %swift_frontend_plain -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -Osize
 
 // UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_in_compiler
