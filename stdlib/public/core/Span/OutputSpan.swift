@@ -411,29 +411,10 @@ extension OutputSpan where Element: ~Copyable {
       _ initializedCount: inout Int
     ) throws(E) -> R
   ) throws(E) -> R {
-    guard let start = unsafe _pointer, capacity > 0 else {
-      let buffer = UnsafeMutableBufferPointer<Element>(_empty: ())
-      var initializedCount = 0
-      defer {
-        _precondition(initializedCount == 0, "OutputSpan capacity overflow")
-      }
-      return unsafe try body(buffer, &initializedCount)
-    }
-    // bind memory by hand to sidestep alignment concerns
-    let binding = Builtin.bindMemory(
-      start._rawValue, capacity._builtinWordValue, Element.self
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: capacity
     )
-    defer { Builtin.rebindMemory(start._rawValue, binding) }
-#if SPAN_COMPATIBILITY_STUB
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: .init(start._rawValue), count: capacity
-    )
-#else
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      _uncheckedStart: .init(start._rawValue), count: capacity
-    )
-#endif
-    var initializedCount = self._count
+    var initializedCount = _count
     defer {
       _precondition(
         0 <= initializedCount && initializedCount <= capacity,
@@ -441,7 +422,10 @@ extension OutputSpan where Element: ~Copyable {
       )
       self._count = initializedCount
     }
-    return unsafe try body(buffer, &initializedCount)
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> R in
+      try unsafe body(buffer, &initializedCount)
+    }
   }
 }
 
