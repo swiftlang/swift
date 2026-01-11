@@ -352,6 +352,7 @@ do {
   do {
     throw E.Boom
   } catch let e as E.Boom { // expected-error {{enum case 'Boom' is not a member type of 'E'}}
+        // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
 }
 

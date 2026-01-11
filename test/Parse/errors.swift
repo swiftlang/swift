@@ -38,6 +38,7 @@ func one() {
   do {
     throw opaque_error()
   } catch is Error {  // expected-warning {{'is' test is always true}}
+          // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
   
   func foo() throws {}

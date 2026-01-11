@@ -9,6 +9,6 @@ func bar() throws {}
 func foo() {
   do {
     try bar()
-  } catch _ as NSError {
-  }
+    } catch _ as NSError {  // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+    }
 }

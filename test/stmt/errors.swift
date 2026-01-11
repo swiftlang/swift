@@ -138,6 +138,7 @@ func eleven_one() {
       try thrower()
     // FIXME: suppress the double-emission of the 'always true' warning
     } catch let e as Error { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
+            // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
     }
   }
 }
@@ -189,10 +190,12 @@ do {
     do {
       throw E.castError
     } catch is S1 {} // expected-warning {{cast from 'any Error' to unrelated type 'S1' always fails}}
+    // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
 
     do {
       throw E.castError
     } catch is S2 {} // Ok
+    // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
   }
 
   do {
