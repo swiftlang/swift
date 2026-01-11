@@ -28,7 +28,7 @@
 
 import Test
 
-// CHECK-SIL: sil_global public_external [serialized] @_swiftEmptySetSingleton : $_SwiftEmptySetSingleton
+// CHECK-SIL: sil_global public_external [serialized] [asmname "_swiftEmptySetSingleton"] @$ss23_swiftEmptySetSingletonSo06_SwiftbcD0Vvp : $_SwiftEmptySetSingleton
 
 func testNestedTypes() {
   let c = Container()

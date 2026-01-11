@@ -135,7 +135,7 @@ internal class __EmptySetSingleton: __RawSetStorage {
 //
 // TODO: We should figure out how to make this a constant so that it's placed in
 // non-writable memory (can't be a let, Builtin.addressof below requires a var).
-@unsafe
+@exclusivity(unchecked)
 public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, UInt32, Int, Int, Int) =
     (
       /*isa*/0, /*refcount*/-1, // HeapObject header
@@ -149,6 +149,10 @@ public var _swiftEmptySetSingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, U
       /*rawElements*/1, 
       /*metadata*/~1
     )
+#else
+@exclusivity(unchecked)
+@_extern(c)
+public var _swiftEmptySetSingleton: _SwiftEmptySetSingleton
 #endif
 
 extension __RawSetStorage {

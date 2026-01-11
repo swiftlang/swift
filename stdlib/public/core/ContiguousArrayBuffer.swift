@@ -70,9 +70,13 @@ internal final class __EmptyArrayStorage
 //
 // TODO: We should figure out how to make this a constant so that it's placed in
 // non-writable memory (can't be a let, Builtin.addressof below requires a var).
-@unsafe
+@exclusivity(unchecked)
 public var _swiftEmptyArrayStorage: (Int, Int, Int, Int) =
     (/*isa*/0, /*refcount*/-1, /*count*/0, /*flags*/1)
+#else
+@exclusivity(unchecked)
+@_extern(c)
+public var _swiftEmptyArrayStorage: _SwiftEmptyArrayStorage
 #endif
 
 /// The storage for static read-only arrays.

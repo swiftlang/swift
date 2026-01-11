@@ -150,14 +150,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     while true {
       switch addr {
       case let ga as GlobalAddrInst:
-        switch ga.global.name {
-        case "_swiftEmptyArrayStorage",
-             "_swiftEmptyDictionarySingleton",
-             "_swiftEmptySetSingleton":
-          return true
-        default:
-          return false
-        }
+        return ga.global.name.isEmptyCollectionSingleton
       case let sea as StructElementAddrInst:
         let structType = sea.struct.type
         if structType.nominal!.name == "_SwiftArrayBodyStorage" {
