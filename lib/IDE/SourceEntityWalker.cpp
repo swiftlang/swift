@@ -360,13 +360,20 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       return Action::Continue(E);
     }
+
+    // Skip implicit DeclRefExprs that will be handled via CtorRefs in
+    // passReference. This matches the location check in passReference.
+    if (DRE->isImplicit() && !CtorRefs.empty() &&
+        CtorRefs.back()->getFn()->getLoc() == DRE->getLoc())
+      return Action::Continue(E);
   }
 
   if (!isa<InOutExpr>(E) && !isa<LoadExpr>(E) && !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) && !isa<OpaqueValueExpr>(E) &&
       !isa<SubscriptExpr>(E) && !isa<KeyPathExpr>(E) && !isa<LiteralExpr>(E) &&
-      !isa<CollectionExpr>(E) && E->isImplicit())
+      !isa<CollectionExpr>(E) && !isa<DeclRefExpr>(E) && !isa<MemberRefExpr>(E) &&
+      E->isImplicit())
     return Action::Continue(E);
 
   if (auto LE = dyn_cast<LiteralExpr>(E)) {
@@ -395,7 +402,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
                       ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
-                                        OpAccess))) {
+                                        OpAccess, DRE->isImplicit()))) {
       return Action::Stop();
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
@@ -421,7 +428,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
-                                         OpAccess))) {
+                                         OpAccess, MRE->isImplicit()))) {
       return Action::Stop();
     }
     // We already visited the children.
