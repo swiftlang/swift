@@ -293,23 +293,9 @@ extension OutputRawSpan {
       _ initializedCount: inout Int
     ) throws(E) -> R
   ) throws(E) -> R {
-    guard let start = unsafe _pointer, capacity > 0 else {
-      let buffer = UnsafeMutableRawBufferPointer(_empty: ())
-      var initializedCount = 0
-      defer {
-        _precondition(initializedCount == 0, "OutputRawSpan capacity overflow")
-      }
-      return unsafe try body(buffer, &initializedCount)
-    }
-#if SPAN_COMPATIBILITY_STUB
-    let buffer = unsafe UnsafeMutableRawBufferPointer(
-      start: start, count: capacity
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: capacity
     )
-#else
-    let buffer = unsafe UnsafeMutableRawBufferPointer(
-      _uncheckedStart: start, count: capacity
-    )
-#endif
     var initializedCount = _count
     defer {
       _precondition(
@@ -318,7 +304,7 @@ extension OutputRawSpan {
       )
       _count = initializedCount
     }
-    return unsafe try body(buffer, &initializedCount)
+    return unsafe try body(bytes, &initializedCount)
   }
 }
 

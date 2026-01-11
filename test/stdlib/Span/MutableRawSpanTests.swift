@@ -128,7 +128,7 @@ suite.test("withUnsafeBytes()")
     view = MutableRawSpan(_unsafeBytes: empty)
     view.withUnsafeBytes {
       expectEqual($0.count, 0)
-      expectNil($0.baseAddress)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -157,7 +157,7 @@ suite.test("withUnsafeMutableBytes")
     view = MutableRawSpan(_unsafeBytes: empty)
     view.withUnsafeMutableBytes {
       expectEqual($0.count, 0)
-      expectNil($0.baseAddress)
+      expectNotNil($0.baseAddress)
     }
   }
   expectEqual(Int(a[i]), i+1)
