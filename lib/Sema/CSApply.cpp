@@ -9387,48 +9387,6 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   return resultTarget;
 }
 
-static std::optional<SequenceIterationInfo>
-applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
-                                   SequenceIterationInfo info, DeclContext *dc,
-                                   SyntacticElementTargetRewriter &rewriter) {
-  auto &solution = rewriter.getSolution();
-
-  auto *parsedSequence = stmt->getSequence();
-
-  // Simplify the various types.
-  info.sequenceType = solution.simplifyType(info.sequenceType);
-  info.initType = solution.simplifyType(info.initType);
-
-  auto sequenceTarget = *solution.getTargetFor(parsedSequence);
-
-  auto rewrittenTarget = rewriter.rewriteTarget(sequenceTarget);
-  if (!rewrittenTarget)
-    return std::nullopt;
-
-  stmt->setSequence(rewrittenTarget->getAsExpr());
-  return info;
-}
-
-static std::optional<PackIterationInfo>
-applySolutionToForEachStmtPreamble(ForEachStmt *stmt, PackIterationInfo info,
-                                   SyntacticElementTargetRewriter &rewriter) {
-  auto &solution = rewriter.getSolution();
-  auto &cs = solution.getConstraintSystem();
-  auto *sequenceExpr = stmt->getSequence();
-  PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
-
-  // First, let's apply the solution to the pack expansion.
-  auto makeExpansionTarget = *cs.getTargetFor(expansion);
-  auto rewrittenTarget = rewriter.rewriteTarget(makeExpansionTarget);
-  if (!rewrittenTarget)
-    return std::nullopt;
-
-  // Simplify the pattern type of the pack expansion.
-  info.patternType = solution.simplifyType(info.patternType);
-
-  return info;
-}
-
 /// Apply the given solution to the for-each statement target.
 ///
 /// \returns the resulting initialization expression.
@@ -9436,29 +9394,17 @@ static std::optional<SyntacticElementTarget>
 applySolutionToForEachStmtPreamble(SyntacticElementTarget target,
                                    SyntacticElementTargetRewriter &rewriter) {
   auto resultTarget = target;
-  auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
+  auto &solution = rewriter.getSolution();
   auto *stmt = target.getAsForEachStmt();
 
-  Type rewrittenPatternType;
-
-  if (auto *info = forEachStmtInfo.dyn_cast<SequenceIterationInfo>()) {
-    auto resultInfo = applySolutionToForEachStmtPreamble(
-        stmt, *info, target.getDeclContext(), rewriter);
-    if (!resultInfo) {
+  {
+    auto *sequenceExpr = stmt->getSequence();
+    auto sequenceTarget = *solution.getTargetFor(sequenceExpr);
+    auto rewrittenTarget = rewriter.rewriteTarget(sequenceTarget);
+    if (!rewrittenTarget)
       return std::nullopt;
-    }
 
-    forEachStmtInfo = *resultInfo;
-    rewrittenPatternType = resultInfo->initType;
-  } else {
-    auto resultInfo = applySolutionToForEachStmtPreamble(
-        stmt, forEachStmtInfo.get<PackIterationInfo>(), rewriter);
-    if (!resultInfo) {
-      return std::nullopt;
-    }
-
-    forEachStmtInfo = *resultInfo;
-    rewrittenPatternType = resultInfo->patternType;
+    stmt->setSequence(rewrittenTarget->getAsExpr());
   }
 
   // Coerce the pattern to the element type.
@@ -9472,6 +9418,8 @@ applySolutionToForEachStmtPreamble(SyntacticElementTarget target,
 
     // Apply the solution to the pattern as well.
     auto contextualPattern = target.getContextualPattern();
+    auto rewrittenPatternType =
+        solution.getResolvedType(contextualPattern.getPattern());
     auto coercedPattern = TypeChecker::coercePatternToType(
         contextualPattern, rewrittenPatternType, options, tryRewritePattern);
     if (!coercedPattern)

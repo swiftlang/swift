@@ -6323,19 +6323,6 @@ bool ConstraintSystem::repairFailures(
     if (isFixedRequirement(reqLoc, rhs))
       return true;
 
-    // If this is a requirement on sequence of for-in statement where one
-    // of the sides is a completely resolved dependent member, skip it
-    // since the issue is with the conformance to `Sequence`, otherwise
-    // dependent member would have been substituted.
-    if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-      if (UDE->isImplicit() &&
-          getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence) {
-        if ((lhs->is<DependentMemberType>() && !lhs->hasTypeVariable()) ||
-            (rhs->is<DependentMemberType>() && !rhs->hasTypeVariable()))
-          return true;
-      }
-    }
-
     if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path)) {
       recordFixedRequirement(reqLoc, rhs);
       conversionsOrFixes.push_back(fix);
@@ -9009,16 +8996,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
-    // If existential type is used as a for-in sequence, let's open it
-    // and check whether underlying type conforms to `Sequence`.
-    if (type->isExistentialType()) {
-      if (auto elt = loc->getLastElementAs<LocatorPathElt::ContextualType>()) {
-        if (elt->getPurpose() == CTP_ForEachSequence) {
-          type = openAnyExistentialType(type, loc).first;
-        }
-      }
-    }
-
     // Check whether this type conforms to the protocol.
     auto conformance = lookupConformance(type, protocol);
     if (conformance) {
@@ -11524,69 +11501,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     }
   }
 
-  // Special handling of injected references to `makeIterator` and `next`
-  // in for-in loops.
-  if (auto *expr = getAsExpr(locator->getAnchor())) {
-    // `next()` could be wrapped in `await` expression.
-    auto memberRef =
-        getAsExpr<UnresolvedDotExpr>(expr->getSemanticsProvidingExpr());
-
-    if (memberRef && memberRef->isImplicit() &&
-        locator->isLastElement<LocatorPathElt::Member>()) {
-      auto &ctx = getASTContext();
-
-      // Cannot simplify this constraint yet since we don't know whether
-      // the base type is going to be existential or not.
-      if (baseObjTy->isTypeVariableOrMember())
-        return formUnsolved();
-
-      // Check whether the given dot expression is a reference
-      // to the given name with the given set of argument labels
-      // (aka compound name).
-      auto isRefTo = [&](UnresolvedDotExpr *UDE, Identifier name,
-                         ArrayRef<StringRef> labels) {
-        auto refName = UDE->getName().getFullName();
-        return refName.isCompoundName(name, labels);
-      };
-
-      auto *baseExpr = memberRef->getBase();
-      // Handle `makeIterator` reference.
-      if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-          isRefTo(memberRef, ctx.Id_makeIterator, /*lables=*/{})) {
-        auto *sequenceProto = cast<ProtocolDecl>(
-            getContextualType(baseExpr, /*forConstraint=*/false)
-                ->getAnyNominal());
-        bool isAsync = sequenceProto->getKnownProtocolKind() ==
-                       KnownProtocolKind::AsyncSequence;
-
-        auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
-
-        return simplifyValueWitnessConstraint(
-            ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, useDC,
-            FunctionRefInfo::singleBaseNameApply(), flags, locator);
-      }
-
-      // Handle `next` reference.
-      if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-          (isRefTo(memberRef, ctx.Id_next, /*labels=*/{}) ||
-           isRefTo(memberRef, ctx.Id_next, /*labels=*/{ "isolation" }))) {
-        auto *iteratorProto = cast<ProtocolDecl>(
-            getContextualType(baseExpr, /*forConstraint=*/false)
-                ->getAnyNominal());
-        bool isAsync = iteratorProto->getKnownProtocolKind() ==
-                       KnownProtocolKind::AsyncIteratorProtocol;
-
-        auto loc = locator->getAnchor().getStartLoc();
-        auto *next = TypeChecker::getForEachIteratorNextFunction(DC, loc, isAsync);
-
-        return simplifyValueWitnessConstraint(
-            ConstraintKind::ValueWitness, baseTy, next, memberTy, useDC,
-            FunctionRefInfo::singleBaseNameApply(), flags, locator);
-      }
-    }
-  }
-
   MemberLookupResult result =
       performMemberLookup(kind, member, baseTy, functionRefInfo, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
@@ -11759,25 +11673,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto *anchorExpr = getAsExpr(locator->getAnchor());
       if (anchorExpr) {
-        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchorExpr)) {
-          // The issue is related to a missing `Sequence` protocol
-          // conformance if either `makeIterator` or `next` are missing.
-          if (UDE->isImplicit()) {
-            // Missing `makeIterator` since the base is sequence expression.
-            if (getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
-              return success();
-
-            // Missing `next` where the base is result of `makeIterator`.
-            if (auto *base = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-              if (auto var = dyn_cast_or_null<VarDecl>(base->getDecl())) {
-                if (var->getNameStr().contains("$generator") &&
-                    (UDE->getName().getBaseIdentifier() == Context.Id_next))
-                  return success();
-              }
-            }
-          }
-        }
-
         // Increasing the impact for missing member in any argument position
         // which may be less likely than other potential mistakes
         if (getArgumentLocator(anchorExpr))

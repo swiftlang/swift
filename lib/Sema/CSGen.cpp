@@ -4628,10 +4628,10 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
 
 /// Generate constraints for a for-in statement preamble where the expression
 /// is a `PackExpansionExpr`.
-static std::optional<PackIterationInfo>
-generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
-                               PackExpansionExpr *expansion, Type patternType) {
-  auto packIterationInfo = PackIterationInfo();
+static bool generateForEachStmtConstraints(ConstraintSystem &cs,
+                                           DeclContext *dc,
+                                           PackExpansionExpr *expansion,
+                                           Type patternType) {
   auto elementLocator = cs.getConstraintLocator(
       expansion, ConstraintLocator::SequenceElementType);
 
@@ -4641,7 +4641,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                   /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target))
-      return std::nullopt;
+      return true;
 
     cs.setTargetFor(expansion, target);
   }
@@ -4650,24 +4650,17 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
   cs.addConstraint(ConstraintKind::Conversion, elementType, patternType,
                    elementLocator);
-
-  packIterationInfo.patternType = patternType;
-  return packIterationInfo;
+  return false;
 }
 
 /// Generate constraints for a for-in statement preamble, expecting an
 /// expression that conforms to `Swift.Sequence`.
-static std::optional<SequenceIterationInfo>
-generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
-                               ForEachStmt *stmt, Pattern *typeCheckedPattern,
-                               bool shouldBindPatternVarsOneWay) {
+static bool generateForEachStmtConstraints(ConstraintSystem &cs,
+                                           DeclContext *dc, ForEachStmt *stmt,
+                                           Pattern *typeCheckedPattern,
+                                           bool shouldBindPatternVarsOneWay) {
   bool isAsync = stmt->getAwaitLoc().isValid();
   auto *sequenceExpr = stmt->getSequence();
-
-  auto elementLocator = cs.getConstraintLocator(
-      sequenceExpr, ConstraintLocator::SequenceElementType);
-
-  auto sequenceIterationInfo = SequenceIterationInfo();
 
   // Set the appropriate sequence protocol as the contextual type. We'll add the
   // constraint for this as part of ForEachElement, and we rely on querying the
@@ -4676,7 +4669,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
       cs.getASTContext(), stmt->getForLoc(),
       isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
-    return std::nullopt;
+    return true;
 
   ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
                                  CTP_ForEachSequence);
@@ -4686,20 +4679,19 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
       SyntacticElementTarget(sequenceExpr, dc, contextInfo, false);
 
   if (cs.generateConstraints(seqExprTarget))
-    return std::nullopt;
+    return true;
+
   cs.setTargetFor(sequenceExpr, seqExprTarget);
 
-  auto seqType = cs.getType(sequenceExpr);
-  sequenceIterationInfo.sequenceType = seqType;
+  auto elementLocator = cs.getConstraintLocator(
+      sequenceExpr, ConstraintLocator::SequenceElementType);
 
   // Generate constraints for the pattern.
   Type initType =
       cs.generateConstraints(typeCheckedPattern, elementLocator,
                              shouldBindPatternVarsOneWay, nullptr, 0);
   if (!initType)
-    return std::nullopt;
-
-  sequenceIterationInfo.initType = initType;
+    return true;
 
   // Introduce a `TVO_PrefersSubtypeBinding` type variable for the type of the
   // sequence to maintain the same ranking behavior as if
@@ -4712,7 +4704,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
   cs.addConstraint(ConstraintKind::ForEachElement, externalSeqTy, initType,
                    elementLocator);
-  return sequenceIterationInfo;
+  return false;
 }
 
 static std::optional<SyntacticElementTarget>
@@ -4746,21 +4738,13 @@ generateForEachPreambleConstraints(ConstraintSystem &cs,
           cs, cs.getConstraintLocator(whereClause)));
     }
 
-    auto packIterationInfo =
-        generateForEachStmtConstraints(cs, dc, expansion, patternType);
-    if (!packIterationInfo) {
+    if (generateForEachStmtConstraints(cs, dc, expansion, patternType))
       return std::nullopt;
-    }
 
-    target.getForEachStmtInfo() = *packIterationInfo;
   } else {
-    auto sequenceIterationInfo = generateForEachStmtConstraints(
-        cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay());
-    if (!sequenceIterationInfo) {
+    auto bindOneWay = target.shouldBindPatternVarsOneWay();
+    if (generateForEachStmtConstraints(cs, dc, stmt, pattern, bindOneWay))
       return std::nullopt;
-    }
-
-    target.getForEachStmtInfo() = *sequenceIterationInfo;
   }
   return target;
 }

@@ -30,27 +30,6 @@
 namespace swift {
 
 namespace constraints {
-/// Describes information about a for-in loop over a sequence that needs to be
-/// tracked in the constraint system.
-struct SequenceIterationInfo {
-  /// The type of the sequence.
-  Type sequenceType;
-
-  /// The type of the pattern that matches the elements.
-  Type initType;
-};
-
-/// Describes information about a for-in loop over a pack that needs to be
-/// tracked in the constraint system.
-struct PackIterationInfo {
-  /// The type of the pattern that matches the elements.
-  Type patternType;
-};
-
-/// Describes information about a for-in loop that needs to be tracked
-/// within the constraint system.
-using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
-
 /// Describes the target (a unit of type-checking) to which a constraint
 /// system's solution can be applied.
 class SyntacticElementTarget {
@@ -157,7 +136,6 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      ForEachStmtInfo info;
     } forEachPreamble;
 
     PatternBindingDecl *patternBinding;
@@ -539,16 +517,6 @@ public:
   unsigned getInitializationPatternBindingIndex() const {
     assert(isForInitialization());
     return expression.initialization.patternBindingIndex;
-  }
-
-  const ForEachStmtInfo &getForEachStmtInfo() const {
-    assert(isForEachPreamble());
-    return forEachPreamble.info;
-  }
-
-  ForEachStmtInfo &getForEachStmtInfo() {
-    assert(isForEachPreamble());
-    return forEachPreamble.info;
   }
 
   /// Whether this context infers an opaque return type.
