@@ -3906,7 +3906,7 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     std::optional<ArgumentMismatchFailure> failure =
         ArgumentMismatchFailure::create(getSolution(), fromType, toType,
-                                        locator);
+                                        fromType, toType, locator);
     if (!failure)
       return false;
     return failure.value().diagnoseAsError();
@@ -3951,7 +3951,8 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsNote() {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     std::optional<ArgumentMismatchFailure> failure =
         ArgumentMismatchFailure::create(getSolution(), getFromType(),
-                                        getToType(), getLocator());
+                                        getToType(), getOriginalFromType(),
+                                        getOriginalToType(), getLocator());
     if (!failure)
       return false;
     return failure.value().diagnoseAsNote();
@@ -4040,6 +4041,7 @@ bool MissingCallFailure::diagnoseAsError() {
       if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
         std::optional<ArgumentMismatchFailure> failure =
             ArgumentMismatchFailure::create(getSolution(), fnType,
+                                            fnType->getResult(), fnType,
                                             fnType->getResult(), locator);
         if (!failure)
           return false;
@@ -7779,15 +7781,15 @@ ArgumentMismatchFailure::buildInfo(const Solution &solution,
   return info;
 }
 
-std::optional<ArgumentMismatchFailure>
-ArgumentMismatchFailure::create(const Solution &solution, Type argType,
-                                Type paramType, ConstraintLocator *locator,
-                                FixBehavior fixBehavior) {
+std::optional<ArgumentMismatchFailure> ArgumentMismatchFailure::create(
+    const Solution &solution, Type argType, Type paramType, Type rawArgType,
+    Type rawParamType, ConstraintLocator *locator, FixBehavior fixBehavior) {
   auto info = buildInfo(solution, locator);
   if (!info)
     return std::nullopt;
-  return ArgumentMismatchFailure(solution, argType, paramType, locator,
-                                 info.value(), fixBehavior);
+  return ArgumentMismatchFailure(solution, argType, paramType, rawArgType,
+                                 rawParamType, locator, info.value(),
+                                 fixBehavior);
 }
 
 bool ArgumentMismatchFailure::diagnoseAsError() {

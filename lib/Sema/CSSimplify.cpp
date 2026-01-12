@@ -3234,10 +3234,9 @@ bool ConstraintSystem::matchFunctionLifetimes(
   return true;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                     ConstraintKind kind, TypeMatchOptions flags,
-                                     ConstraintLocatorBuilder locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionTypes(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   // If the locator is for a @Sendable or execution semantics match, that's all
   // we want to do.
   if (auto last = locator.last()) {
@@ -4424,7 +4423,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               }
             }
             auto fix = AllowArgumentMismatch::create(
-                  *this, type1, proto, getConstraintLocator(anchor, path));
+                *this, type1, proto, getConstraintLocator(anchor, path));
             if (recordFix(fix, FixImpact::TypeMismatch))
               return SolutionKind::Error;
             break;
@@ -6003,6 +6002,14 @@ bool ConstraintSystem::repairFailures(
 
         ConstraintFix *fix = nullptr;
         if (result == SolutionKind::Error) {
+
+          // If this is a "destination" argument to a mutating operator
+          // like `+=`, let's consider it contextual and only attempt
+          // to fix type mismatch on the "source" right-hand side of
+          // such operators.
+          if (isOperatorArgument(loc) && argConv->getArgIdx() == 0)
+            break;
+
           fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
         } else {
           fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
@@ -6413,8 +6420,8 @@ bool ConstraintSystem::repairFailures(
                                locator);
 
       if (result == SolutionKind::Solved) {
-        conversionsOrFixes.push_back(AllowInOutConversion::create(*this, lhs,
-            rhs, getConstraintLocator(locator)));
+        conversionsOrFixes.push_back(AllowInOutConversion::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
         break;
       }
     }
@@ -6943,9 +6950,8 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
       if (path.back().is<LocatorPathElt::ApplyArgToParam>()) {
-        conversionsOrFixes.push_back(
-            AllowArgumentMismatch::create(*this, lhs, rhs,
-                                          getConstraintLocator(anchor, path)));
+        conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+            *this, lhs, rhs, getConstraintLocator(anchor, path)));
         return true;
       }
     }
@@ -7095,9 +7101,11 @@ bool ConstraintSystem::repairFailures(
           if (!argList || argList->size() <= argIdx)
             return false;
 
+          ASSERT(argList);
+          auto paramType = overloadTy->getParams()[paramIdx].getPlainType();
+
           conversionsOrFixes.push_back(AllowArgumentMismatch::create(
-              *this, getType(argList->getExpr(argIdx)),
-              overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
+              *this, getType(argList->getExpr(argIdx)), paramType, argLoc));
           return true;
         }
       }
@@ -8870,8 +8878,28 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
-  if (type->isTypeVariableOrMember())
+  if (type->isTypeVariableOrMember()) {
+    TypeVariableType *tv = type->getAs<TypeVariableType>();
+    if (mergeableTypes.map.contains(tv) && shouldAttemptFixes()) {
+      auto bindings = mergeableTypes.map[tv];
+      std::optional<Type> notClassType = std::nullopt;
+      for (auto b : bindings) {
+        if (!(b.diagnosticType->isEqual(classType))) {
+          notClassType = b.diagnosticType;
+          break;
+        }
+      }
+      if (notClassType.has_value()) {
+        if (auto *fix = fixRequirementFailure(*this, notClassType.value(),
+                                              classType, locator)) {
+          if (recordFix(fix))
+            return SolutionKind::Error;
+          return SolutionKind::Solved;
+        }
+      }
+    }
     return formUnsolved();
+  }
 
   // SubclassOf constraints are generated when opening a generic
   // signature with a RequirementKind::Superclass requirement, so
