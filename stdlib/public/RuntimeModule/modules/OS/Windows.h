@@ -26,7 +26,7 @@ extern "C" {
 
 // The Windows headers unfortunately don't define the various context types
 // in a reasonable manner (they're all defined as CONTEXT, and they don't
-// have other names).  Since we want all of them, we'll hae to define our
+// have other names).  Since we want all of them, we'll have to define our
 // own variants here.
 typedef struct {
   uint64_t Low;

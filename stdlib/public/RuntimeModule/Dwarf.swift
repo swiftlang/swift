@@ -598,18 +598,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
     self.source = source
     self.shouldSwap = shouldSwap
-    do {
-      self.lineNumberInfo = try readLineNumberInfo()
-    } catch {
-      print("Failed to read line number info \(error)")
-      throw error
-    }
-    do {
-      self.units = try readUnits()
-    } catch {
-      print("Failed to read unit info \(error)")
-      throw error
-    }
+    self.lineNumberInfo = try readLineNumberInfo()
+    self.units = try readUnits()
 
     // On DWARF 4 and earlier, we need to fix up a couple of things in the
     // line number info; these are explicitly included in DWARF 5 so that

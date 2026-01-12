@@ -1,4 +1,4 @@
-//===--- TargetLinux.swift - Represents a process we are inspecting -------===//
+//===--- TargetWindows.swift - Represents a process we are inspecting -----===//
 //
 // This source file is part of the Swift.org open source project
 //
