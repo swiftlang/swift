@@ -1811,6 +1811,34 @@ static bool checkWitnessAccess(DeclContext *dc,
   return false;
 }
 
+static bool checkWitnessForPropertyRequirement(DeclContext *dc,
+                                               ValueDecl *requirement,
+                                               ValueDecl *witness) {
+  auto *requirementASD = dyn_cast<AbstractStorageDecl>(requirement);
+  if (!requirementASD) {
+    return false;
+  }
+  bool hasBorrow = requirementASD->getAccessor(AccessorKind::Borrow);
+  bool hasMutate = requirementASD->getAccessor(AccessorKind::Mutate);
+  if (!hasBorrow && !hasMutate) {
+    return false;
+  }
+  auto *witnessASD = cast<AbstractStorageDecl>(witness);
+  if (witnessASD->hasStorage()) {
+    return false;
+  }
+  if (hasBorrow) {
+    if (witnessASD->getAccessor(AccessorKind::Borrow)) {
+      return false;
+    }
+    return true;
+  }
+  if (witnessASD->getAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+  return true;
+}
+
 static std::optional<AvailabilityConstraint>
 checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
                          const DeclContext *dc,
@@ -1931,6 +1959,10 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
     }
+  }
+
+  if (checkWitnessForPropertyRequirement(DC, requirement, match.Witness)) {
+    return RequirementCheck(CheckKind::BorrowMutateMismatch);
   }
 
   return CheckKind::Success;
@@ -4611,6 +4643,29 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            requirement);
           });
         break;
+      case CheckKind::BorrowMutateMismatch: {
+        getASTContext().addDelayedConformanceDiag(
+            Conformance, false,
+            [witness, requirement](NormalProtocolConformance *conformance) {
+              auto *requirementASD = cast<AbstractStorageDecl>(requirement);
+              auto &diags = witness->getASTContext().Diags;
+              bool hasBorrow =
+                  requirementASD->getAccessor(AccessorKind::Borrow);
+              bool hasMutate =
+                  requirementASD->getAccessor(AccessorKind::Mutate);
+              std::string diagMsg;
+              if (hasBorrow) {
+                diagMsg = "borrow";
+              }
+              if (hasMutate) {
+                diagMsg += "/mutate";
+              }
+              SourceLoc diagLoc =
+                  getLocForDiagnosingWitness(conformance, witness);
+              diags.diagnose(diagLoc, diag::witness_borrow_mutate_mismatch,
+                             diagMsg, witness);
+            });
+      }
     }
 
     if (auto *classDecl = DC->getSelfClassDecl()) {

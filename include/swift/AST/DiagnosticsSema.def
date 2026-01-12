@@ -3064,6 +3064,9 @@ ERROR(witness_initializer_failability,none,
       "%select{| in Objective-C protocol}1 cannot be satisfied by a "
       "failable initializer ('init%select{?|!}1')",
       (const ValueDecl *, bool))
+ERROR(witness_borrow_mutate_mismatch, none,
+      "%0 requirement cannot be satisfied by %1",
+      (StringRef, const ValueDecl *))
 ERROR(witness_self_non_subtype,none,
       "protocol %0 requirement %1 cannot be satisfied by a non-final class "
       "(%2) because it uses 'Self' in a non-parameter, non-result type "
