@@ -89,6 +89,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -110,6 +111,10 @@
 #include <utility>
 
 using namespace swift;
+
+static llvm::cl::opt<std::string> SaveSIL(
+    "save-sil", llvm::cl::Hidden,
+    llvm::cl::desc("Save SIL to a file after SIL optimizations"));
 
 static std::vector<std::string>
 collectSupplementaryOutputPaths(ArrayRef<const char *> Args,
@@ -2156,6 +2161,12 @@ static bool performCompileStepsPostSILGen(
     if (writeSIL(*SM, Instance.getMainModule(), Invocation.getSILOptions(),
                  PSPs.SupplementaryOutputs.SILOutputPath,
                  Instance.getOutputBackend()))
+      return true;
+  }
+
+  if (!SaveSIL.empty()) {
+    if (writeSIL(*SM, Instance.getMainModule(), Invocation.getSILOptions(),
+                 SaveSIL, Instance.getOutputBackend()))
       return true;
   }
 
