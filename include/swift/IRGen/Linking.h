@@ -1850,6 +1850,16 @@ public:
   bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
+
+  /// Partial apply forwarders always need real private linkage,
+  /// to ensure the correct implementation is used in case of
+  /// colliding symbols.
+  bool privateMeansPrivate() const {
+    return getKind() == Kind::PartialApplyForwarder ||
+           getKind() == Kind::PartialApplyForwarderAsyncFunctionPointer ||
+           getKind() == Kind::PartialApplyForwarderCoroFunctionPointer;
+  }
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 
