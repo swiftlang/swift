@@ -601,7 +601,7 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      ContextualMismatch(cs, lhs, rhs, locator, FixBehavior::Error);
+      ContextualMismatch(cs, lhs, rhs, lhs, rhs, locator, FixBehavior::Error);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
@@ -2001,9 +2001,10 @@ bool AllowArgumentMismatch::diagnose(const Solution &solution,
 
 AllowArgumentMismatch *
 AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
-                              Type paramType, ConstraintLocator *locator) {
+                              Type paramType, Type rawArgType,
+                              Type rawParmType, ConstraintLocator *locator) {
   return new (cs.getAllocator()) AllowArgumentMismatch(
-      cs, argType, paramType, locator);
+      cs, argType, paramType, rawArgType, rawParmType, locator);
 }
 
 bool RemoveInvalidCall::diagnose(const Solution &solution, bool asNote) const {

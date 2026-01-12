@@ -2659,6 +2659,8 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseConversionFromStdNullopt())
     return true;
 
+  const Solution &solution = getSolution();
+
   if (path.empty()) {
     if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
       Diag<Type, Type> diag;
@@ -2818,8 +2820,6 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
   case ConstraintLocator::UnresolvedMemberChainResult: {
-    auto &solution = getSolution();
-
     auto overload =
         getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor));
     if (!(overload && overload->choice.isDecl()))
@@ -3874,6 +3874,8 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   auto locator = getLocator();
   auto fromType = getFromType();
   auto toType = getToType();
+  auto origFrom = getOriginalFromType();
+  auto origTo = getOriginalToType();
   assert(fromType);
   assert(toType);
 
@@ -3886,6 +3888,9 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   if (locator->isForContextualType()) {
     return ContextualFailure::diagnoseAsError();
   }
+
+  assert(origFrom);
+  assert(origTo);
 
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     std::optional<ArgumentMismatchFailure> failure =
@@ -3934,14 +3939,13 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsNote() {
 
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     std::optional<ArgumentMismatchFailure> failure =
-        ArgumentMismatchFailure::create(getSolution(), getFromType(),
-                                        getToType(), getOriginalFromType(),
-                                        getOriginalToType(), getLocator());
+        ArgumentMismatchFailure::create(getSolution(), getFromType(), getToType(),
+                                        getOriginalFromType(), getOriginalToType(),
+                                        getLocator());
     if (!failure)
       return false;
     return failure.value().diagnoseAsNote();
   }
-
   return false;
 }
 
@@ -4024,7 +4028,7 @@ bool MissingCallFailure::diagnoseAsError() {
 
       if (MissingArgumentsFailure::isMisplacedMissingArgument(getSolution(), locator)) {
         std::optional<ArgumentMismatchFailure> failure =
-            ArgumentMismatchFailure::create(getSolution(), fnType,
+             ArgumentMismatchFailure::create(getSolution(), fnType,
                                             fnType->getResult(),
                                             fnType, fnType->getResult(), locator);
         if (!failure)
@@ -7823,14 +7827,55 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return true;
   }
 
+  llvm::errs() << "Argument Mismatch Failure\n";
+  getSolution().dump();
+  rawArgType.dump();
+  llvm::errs() << "\n";
+
+  const auto &solution = getSolution();
+  std::optional<TypeVariableType*> unifiedVariant;
+  llvm::SmallVector<ConflictedType, 4> seenVariations;
+  for (auto gt : solution.mergeableTypes.map) {
+    if (gt.first->isEqual(rawArgType)) {
+      // There should only be one entry for the parameter type variable if it
+      // occurs
+      assert(!unifiedVariant.has_value());
+      unifiedVariant = gt.first;
+      seenVariations = {gt.second.begin(),
+                        gt.second.end()};
+    }
+  }
+
   Diag<Type, Type> diagnostic = diag::cannot_convert_argument_value;
+  bool useGenericVariant = false;
 
   // If parameter type is a protocol value, let's says that
   // argument doesn't conform to a give protocol.
   if (paramType->isExistentialType())
     diagnostic = diag::cannot_convert_argument_value_protocol;
 
-  auto diag = emitDiagnostic(diagnostic, argType, paramType);
+  if (unifiedVariant.has_value() &&
+      unifiedVariant.value()->is<TypeVariableType>()) {
+    llvm::errs() << "Using memergable\n";
+    if (seenVariations.size() == 2) {
+      // diagnostic = diag::cannot_covert_argument_value_ambiguous_list2;
+    } else {
+      diagnostic = diag::cannot_convert_argument_value_general_type;
+    }
+  } else if (unifiedVariant.has_value() &&
+             !unifiedVariant.value()->is<TypeVariableType>() &&
+             !unifiedVariant.value()->isEqual(argType)) {
+    diagnostic = diag::cannot_convert_argument_value_generic_params;
+    useGenericVariant = true;
+  }
+
+  auto diag =
+      (seenVariations.size() == 2)
+          ? emitDiagnostic(diag::cannot_covert_argument_value_ambiguous_list2,
+                           argType, seenVariations[0].diagnosticType, seenVariations[1].diagnosticType)
+          : emitDiagnostic(diagnostic, argType,
+                           useGenericVariant ? unifiedVariant.value()
+                                             : paramType);
 
   // If argument is an l-value type and parameter is a pointer type,
   // let's match up its element type to the argument to see whether
