@@ -40,6 +40,8 @@ class Constraint;
 enum ScoreKind : unsigned int;
 struct SyntacticElementTargetKey;
 
+struct ConflictedType;
+
 namespace inference {
 struct PotentialBinding;
 }
@@ -149,6 +151,11 @@ public:
         PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
         TypeVariableType *Originator;
       } Binding;
+
+      struct {
+        TypeVariableType *TypeVar;
+        ConflictedType *ConflictType;
+      } Conflict;
 
       struct {
         Constraint *Disjunction;
@@ -274,6 +281,10 @@ public:
     /// bindings.
     static Change RetractedBinding(TypeVariableType *typeVar,
                                    inference::PotentialBinding binding);
+
+    /// Create a change that adds a conflict for a type variable
+    static Change AddedConflict(TypeVariableType *typeVar,
+                                ConflictedType *conflict);
 
     /// Create a change that disjunction pruning was performed.
     static Change PrunedDisjunction(Constraint *disjunction,
