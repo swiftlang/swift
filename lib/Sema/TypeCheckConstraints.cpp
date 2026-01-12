@@ -1211,6 +1211,9 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
     out << "\n";
   }
 
+  out.indent(indent) << "Ambiguous bindings:\n";
+  ambiguousBindings.print(out);
+
   if (!overloadChoices.empty()) {
     out << "\n";
     out.indent(indent) << "Overload choices:";
