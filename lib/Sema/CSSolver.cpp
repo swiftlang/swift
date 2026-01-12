@@ -101,9 +101,10 @@ Solution ConstraintSystem::finalize() {
   for (auto mBinding : mergeableTypes.map) {
     for(auto mConflicts : mBinding.second) {
       solution.mergeableTypes.map[mBinding.first]
-        .insert(ConflictedType{
-          .typeKey = mConflicts.typeKey,
-          .diagnosticType = mConflicts.diagnosticType});
+        .insert(ConflictedType(
+          mConflicts.typeKey,
+          mConflicts.diagnosticType,
+                               mConflicts.locator, mConflicts.reason));
     }
   }
 
@@ -302,9 +303,10 @@ void ConstraintSystem::replaySolution(const Solution &solution,
   for (auto mBinding : solution.mergeableTypes.map) {
     for (auto mConflicts : mBinding.second) {
       mergeableTypes.map[mBinding.first]
-        .insert(ConflictedType{
-          .typeKey = mConflicts.typeKey,
-          .diagnosticType = mConflicts.diagnosticType});
+        .insert(ConflictedType(
+          mConflicts.typeKey,
+          mConflicts.diagnosticType,
+                               mConflicts.locator, mConflicts.reason);
     }
   }
 
