@@ -4086,6 +4086,10 @@ bool ConstraintSystem::generateConstraints(
         recordImpliedResult(expr, ImpliedResultKind::Regular);
     }
 
+    // If it's implied and from a closure, we should introduce a new type
+    // variable for the function return type and make the function return void a
+    // fallbacktype constraint
+
     expr = buildTypeErasedExpr(expr, target.getDeclContext(),
                                target.getExprContextualType(),
                                target.getExprContextualTypePurpose());

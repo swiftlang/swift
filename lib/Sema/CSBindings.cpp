@@ -1670,6 +1670,7 @@ BindingSet::subsumeBinding(const PotentialBinding &binding,
       return SubsumeBindingResult(
           SubsumeBindingResult::BindingResultKind::Conflict, conversionFailure);
     }
+    // Once we have an Exact binding, we don't need anything else.
     return SubsumeBindingResult::ExistingIsBetter();
 
     // FIXME: Remove this.
