@@ -1081,9 +1081,8 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
-                                         TypeVariableType *TypeVar,
-                                         Constraint *constraint) {
+void PotentialBindings::inferFromLiteral(Constraint *constraint) {
+  ASSERT(TypeVar);
   ASSERT(isDirectRequirement(CS, TypeVar, constraint));
 
   auto *protocol = constraint->getProtocol();
@@ -1387,8 +1386,8 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   } while (true);
 }
 
-void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
-                                            PotentialBinding binding) {
+void PotentialBindings::addPotentialBinding(PotentialBinding binding) {
+  ASSERT(TypeVar);
   assert(!binding.BindingType->is<ErrorType>());
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -1710,9 +1709,8 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
 }
 
 std::optional<PotentialBinding>
-PotentialBindings::inferFromRelational(ConstraintSystem &CS,
-                                       TypeVariableType *TypeVar,
-                                       Constraint *constraint) {
+PotentialBindings::inferFromRelational(Constraint *constraint) {
+  ASSERT(TypeVar);
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
@@ -2051,9 +2049,9 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-void PotentialBindings::infer(ConstraintSystem &CS,
-                              TypeVariableType *TypeVar,
-                              Constraint *constraint) {
+void PotentialBindings::infer(Constraint *constraint) {
+  ASSERT(TypeVar);
+
   if (!Constraints.insert(constraint))
     return;
 
@@ -2074,11 +2072,11 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::LValueObject: {
-    auto binding = inferFromRelational(CS, TypeVar, constraint);
+    auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
 
-    addPotentialBinding(TypeVar, *binding);
+    addPotentialBinding(*binding);
     break;
   }
   case ConstraintKind::KeyPathApplication: {
@@ -2132,7 +2130,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    inferFromLiteral(CS, TypeVar, constraint);
+    inferFromLiteral(constraint);
     break;
   }
 
@@ -2237,9 +2235,9 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   }
 }
 
-void PotentialBindings::retract(ConstraintSystem &CS,
-                                TypeVariableType *TypeVar,
-                                Constraint *constraint) {
+void PotentialBindings::retract(Constraint *constraint) {
+  ASSERT(TypeVar);
+
   if (!Constraints.remove(constraint))
     return;
 
@@ -2328,22 +2326,27 @@ void PotentialBindings::reset() {
     ASSERT(EquivalentTo.empty());
   }
 
+  TypeVar = nullptr;
   AssociatedCodeCompletionToken = ASTNode();
 }
 
-void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
-                             llvm::raw_ostream &out, unsigned indent) const {
-  out << "Potential bindings for ";
-  typeVar->getImpl().print(out);
-  out << "\n";
+void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
+  if (TypeVar) {
+    out << "Potential bindings for ";
+    TypeVar->getImpl().print(out);
+    out << "\n";
+  } else {
+    out << "<<No type variable assigned>>\n";
+  }
 
   out << "[constraints: ";
-  interleave(Constraints,
-             [&](Constraint *constraint) {
-               constraint->print(out, &cs.getASTContext().SourceMgr, indent,
-                                 /*skipLocator=*/true);
-             },
-             [&out]() { out << ", "; });
+  interleave(
+      Constraints,
+      [&](Constraint *constraint) {
+        constraint->print(out, &CS.getASTContext().SourceMgr, indent,
+                          /*skipLocator=*/true);
+      },
+      [&out]() { out << ", "; });
   out << "] ";
 
   if (!AdjacentVars.empty()) {
@@ -2361,7 +2364,7 @@ void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
           if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
             out << " (fixed)";
           out << " via ";
-          pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
+          pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
                              /*skipLocator=*/true);
         },
         [&out]() { out << ", "; });

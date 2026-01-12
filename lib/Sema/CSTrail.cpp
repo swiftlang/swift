@@ -593,9 +593,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
   }
 
   case ChangeKind::RetractedLiteral:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .inferFromLiteral(cs, TheConstraint.TypeVar,
-                          TheConstraint.Constraint);
+    cg[TheConstraint.TypeVar].getPotentialBindings().inferFromLiteral(
+        TheConstraint.Constraint);
     break;
 
   case ChangeKind::AddedBinding: {
