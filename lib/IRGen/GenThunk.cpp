@@ -493,8 +493,10 @@ void IRGenThunk::emit() {
         if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
           llvm::Value *expandedResult =
               llvm::UndefValue::get(combined.combinedTy);
-          for (size_t i = 0, count = result.size(); i < count; i++) {
-            llvm::Value *elt = result.claimNext();
+          auto nativeResult =
+              schema.mapIntoNative(IGM, IGF, result, directResultType, false);
+          for (size_t i = 0, count = nativeResult.size(); i < count; i++) {
+            llvm::Value *elt = nativeResult.claimNext();
             auto *nativeTy = structTy->getElementType(i);
             elt = convertForDirectError(IGF, elt, nativeTy,
                                         /*forExtraction*/ false);
