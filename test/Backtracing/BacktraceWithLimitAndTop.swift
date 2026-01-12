@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -Onone -o %t/BacktraceWithLimitAndTop
+// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/BacktraceWithLimitAndTop
 // RUN: %target-codesign %t/BacktraceWithLimitAndTop
 // RUN: %target-run %t/BacktraceWithLimitAndTop | %FileCheck %s
 

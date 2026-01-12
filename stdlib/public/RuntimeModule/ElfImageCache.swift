@@ -30,6 +30,7 @@ internal import Musl
 /// Provides a per-thread image cache for ELF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
+@available(Backtracing 6.2, *)
 final class ElfImageCache {
   var elf32: [String: Elf32Image] = [:]
   var elf64: [String: Elf64Image] = [:]
