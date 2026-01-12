@@ -2086,6 +2086,15 @@ SolutionResult ConstraintSystem::salvage() {
     if (isTooComplex(viable))
       return SolutionResult::forTooComplex(getTooComplexRange());
 
+    for(auto &v : viable) {
+      if (!v.ambiguousBindings.conflictMap.empty())
+        llvm::errs() << "solution has conflicted types " << v.ambiguousBindings.conflictMap.size() << "\n";
+    }
+    if (!ambiguousBindings.conflictMap.empty()) {
+      llvm::errs() << "constraint system has conflicted types " << ambiguousBindings.conflictMap.size() << " and any fixes " << Fixes.size() << "\n";
+      ambiguousBindings.print(llvm::errs());
+    }
+
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
     if (diagnoseAmbiguityWithFixes(viable))

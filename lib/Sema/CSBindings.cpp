@@ -1560,12 +1560,30 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 
 void BindingSet::markConflicting(ConflictReason reason) {
   IsConflicting = true;
+
+  // TEMP DEBUG: remove before committing.
+  llvm::errs() << "DBG markConflicting: tv=T" << TypeVar->getImpl().getID()
+               << " inSalvageMode=" << CS.inSalvageMode()
+               << " hasSolverState=" << (CS.solverState != nullptr)
+               << " Info.Bindings=" << Info.Bindings.size()
+               << " Bindings=" << Bindings.size() << "\n";
+  // The dump below prints each type variable's potential bindings, which
+  // builds binding sets and can re-enter markConflicting, so guard against
+  // recursion. Only dump in salvage mode to keep the output manageable.
+  static thread_local bool inDebugDump = false;
+  if (CS.inSalvageMode() && !inDebugDump) {
+    inDebugDump = true;
+    CS.dump();
+    inDebugDump = false;
+  }
+
   if (CS.inSalvageMode())
     for (auto binding : Info.Bindings) {
       auto *locator = binding.getLocator();
       CS.recordConflictedType(TypeVar, binding.BindingType->getCanonicalType(),
                               locator, reason);
     }
+  
   Bindings.clear();
   Bindings.emplace_back(
       PotentialBinding::forHole(TypeVar, TypeVar->getImpl().getLocator()));

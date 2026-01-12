@@ -67,6 +67,8 @@ public:
 struct AmbiguousBindings {
   llvm::DenseMap<TypeVariableType *, llvm::SmallSetVector<ConflictedType *, 4>>
       conflictMap;
+  llvm::DenseMap<TypeVariableType *, llvm::SmallVector<ConstraintFix *, 4>>
+  inScopeFixes;
 
   void print(llvm::raw_ostream &out) const;
 };

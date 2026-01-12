@@ -3275,10 +3275,9 @@ bool ConstraintSystem::matchFunctionLifetimes(
   return true;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                     ConstraintKind kind, TypeMatchOptions flags,
-                                     ConstraintLocatorBuilder locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionTypes(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   // If the locator is for a @Sendable or execution semantics match, that's all
   // we want to do.
   if (auto last = locator.last()) {
@@ -4457,7 +4456,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               }
             }
             auto fix = AllowArgumentMismatch::create(
-                  *this, type1, proto, getConstraintLocator(anchor, path));
+                *this, type1, proto, getConstraintLocator(anchor, path));
             if (recordFix(fix, FixImpact::TypeMismatch))
               return SolutionKind::Error;
             break;
@@ -6480,8 +6479,8 @@ bool ConstraintSystem::repairFailures(
                                locator);
 
       if (result == SolutionKind::Solved) {
-        conversionsOrFixes.push_back(AllowInOutConversion::create(*this, lhs,
-            rhs, getConstraintLocator(locator)));
+        conversionsOrFixes.push_back(AllowInOutConversion::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
         break;
       }
     }
@@ -7010,9 +7009,8 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
       if (path.back().is<LocatorPathElt::ApplyArgToParam>()) {
-        conversionsOrFixes.push_back(
-            AllowArgumentMismatch::create(*this, lhs, rhs,
-                                          getConstraintLocator(anchor, path)));
+        conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+            *this, lhs, rhs, getConstraintLocator(anchor, path)));
         return true;
       }
     }
@@ -7171,9 +7169,11 @@ bool ConstraintSystem::repairFailures(
           if (!argList || argList->size() <= argIdx)
             return false;
 
+          ASSERT(argList);
+          auto paramType = overloadTy->getParams()[paramIdx].getPlainType();
+
           conversionsOrFixes.push_back(AllowArgumentMismatch::create(
-              *this, getType(argList->getExpr(argIdx)),
-              overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
+              *this, getType(argList->getExpr(argIdx)), paramType, argLoc));
           return true;
         }
       }
@@ -8928,8 +8928,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
-  if (type->isTypeVariableOrMember())
+  if (type->isTypeVariableOrMember()) {
+    TypeVariableType *tv = type->getAs<TypeVariableType>();
+    if (ambiguousBindings.conflictMap.contains(tv) && shouldAttemptFixes()) {
+      auto bindings = ambiguousBindings.conflictMap[tv];
+      std::optional<Type> notClassType = std::nullopt;
+      for (auto b : bindings) {
+        if (!(b->getTypeForDiagnostics()->isEqual(classType))) {
+          if (b->getReason().contains(ConflictFlag::Class))
+            notClassType = b->getTypeForDiagnostics();
+          break;
+        }
+      }
+      if (notClassType.has_value()) {
+        if (auto *fix = fixRequirementFailure(*this, notClassType.value(),
+                                              classType,
+                                              getConstraintLocator(locator))) {
+          if (recordFix(fix))
+            return SolutionKind::Error;
+          return SolutionKind::Solved;
+        }
+      }
+    }
     return formUnsolved();
+  }
 
   // SubclassOf constraints are generated when opening a generic
   // signature with a RequirementKind::Superclass requirement, so
@@ -15923,7 +15945,7 @@ void ConstraintSystem::recordConflictedType(TypeVariableType *key,
       ConflictedType(conflict->getCanonicalType(), conflict, locator, reason);
   ambiguousBindings.conflictMap[key].insert(conflicted);
 
-  if (solverState) {
+  if (solverState && !inSalvageMode()) {
     recordChange(SolverTrail::Change::AddedConflict(key, conflicted));
   }
 }
