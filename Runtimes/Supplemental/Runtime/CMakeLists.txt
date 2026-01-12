@@ -148,8 +148,31 @@ add_library(swiftRuntime
   RichFrame.swift
   SymbolicatedBacktrace.swift
   Utils.swift
-  Win32Extras.cpp
-  get-cpu-context.${SWIFT_ASM_EXT})
+  Win32Extras.cpp)
+
+# Add the correct assembly language files
+if(WIN32)
+  # On Windows, the assembly syntax differs depending on architecture in
+  # such a way that we can't write a single `.asm` file that supports all
+  # the different architectures we support.
+  string(TOUPPER "${CMAKE_SYSTEM_PROCESSOR}" processor)
+  if(processor STREQUAL "AMD64")
+    target_sources(swiftRuntime
+      get-cpu-context-x86_64.asm)
+  elseif(processor STREQUAL "X86")
+    target_sources(swiftRuntime
+      get-cpu-context-i686.asm)
+  elseif(processor STREQUAL "ARM64")
+    target_sources(swiftRuntime
+      get-cpu-context-aarch64.asm)
+  else()
+    message(FATAL_ERROR "You need to implement assembly code for ${processor}")
+  endif()
+else()
+  # Other platforms can use the shared `.S` file.
+  target_sources(swiftRuntime
+    get-cpu-context.S)
+endif()
 
 set_target_properties(swiftRuntime PROPERTIES
   Swift_MODULE_NAME Runtime)
