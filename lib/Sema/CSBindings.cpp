@@ -1205,6 +1205,17 @@ bool BindingSet::operator<(const BindingSet &other) {
   return isPotentiallyIncomplete() < other.isPotentiallyIncomplete();
 }
 
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  void PotentialBindings::record##PropertyName(Constraint *constraint) {       \
+    Storage.push_back(constraint);                                             \
+  }
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  void PotentialBindings::record##RelationName(TypeVariableType *typeVar,      \
+                                               Constraint *originator) {       \
+    Storage.emplace_back(typeVar, originator);                                 \
+  }
+#include "swift/Sema/CSTrail.def"
+
 const BindingSet *ConstraintSystem::determineBestBindings(
     llvm::function_ref<void(const BindingSet &)> onCandidate) {
   // Look for potential type variable bindings.
@@ -1759,7 +1770,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
         DEBUG_BAILOUT("Delayed (1)");
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         return std::nullopt;
       }
     }
@@ -1772,7 +1783,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
     if (typeVars.erase(TypeVar)) {
       for (auto *typeVar : typeVars) {
-        AdjacentVars.emplace_back(typeVar, constraint);
+        recordAdjacentVar(typeVar, constraint);
       }
     }
 
@@ -1850,7 +1861,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       kind == AllowedBindingKind::Subtypes) {
     if (type->isTypeVariableOrMember() &&
         constraint->getLocator()->directlyAt<AssignExpr>()) {
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
     }
   }
 
@@ -1881,7 +1892,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       // be bound via constraint simplification when l-value type
       // is inferred or contextually from other constraints.
       DEBUG_BAILOUT("Delayed (2)");
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
       return std::nullopt;
     }
   }
@@ -1908,7 +1919,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       // Add all type variables encountered in the type except
       // to the current type variable.
       if (var != TypeVar) {
-        AdjacentVars.emplace_back(var, constraint);
+        recordAdjacentVar(var, constraint);
         continue;
       }
 
@@ -1919,7 +1930,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // let's mark bindings as delayed until dependent member type
     // is resolved.
     if (!containsSelf)
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
 
     DEBUG_BAILOUT("Dependent member");
     return std::nullopt;
@@ -1968,26 +1979,26 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
       if (kind == AllowedBindingKind::Subtypes) {
-        SubtypeOf.emplace_back(bindingTypeVar, constraint);
+        recordSubtypeOf(bindingTypeVar, constraint);
       } else {
         assert(kind == AllowedBindingKind::Supertypes);
-        SupertypeOf.emplace_back(bindingTypeVar, constraint);
+        recordSupertypeOf(bindingTypeVar, constraint);
       }
 
-      AdjacentVars.emplace_back(bindingTypeVar, constraint);
+      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal: {
-      EquivalentTo.emplace_back(bindingTypeVar, constraint);
-      AdjacentVars.emplace_back(bindingTypeVar, constraint);
+      recordEquivalentTo(bindingTypeVar, constraint);
+      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::UnresolvedMemberChainBase: {
-      EquivalentTo.emplace_back(bindingTypeVar, constraint);
+      recordEquivalentTo(bindingTypeVar, constraint);
 
       // Don't record adjacency between base and result types,
       // this is just an auxiliary constraint to enforce ordering.
@@ -2000,7 +2011,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       // variable that presents such optional (`bindingTypeVar`
       // in this case).
       if (kind == AllowedBindingKind::Supertypes) {
-        AdjacentVars.emplace_back(bindingTypeVar, constraint);
+        recordAdjacentVar(bindingTypeVar, constraint);
       }
       break;
     }
@@ -2089,7 +2100,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
                           typeVars);
     if (typeVars.count(TypeVar)) {
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
     }
 
     break;
@@ -2104,7 +2115,7 @@ void PotentialBindings::infer(Constraint *constraint) {
       break;
 
     if (constraint->getSecondType()->is<ProtocolType>())
-      Protocols.push_back(constraint);
+      recordProtocol(constraint);
     break;
 
   case ConstraintKind::BridgingConversion:
@@ -2142,7 +2153,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    Defaults.push_back(constraint);
+    recordDefault(constraint);
     break;
 
   // For now let's avoid inferring protocol requirements from
@@ -2160,7 +2171,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     auto dynamicType = constraint->getFirstType();
     if (auto *tv = dynamicType->getAs<TypeVariableType>()) {
       if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         break;
       }
     }
@@ -2170,7 +2181,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   }
 
   case ConstraintKind::Disjunction:
-    DelayedBy.push_back(constraint);
+    recordDelayedBy(constraint);
     break;
 
   case ConstraintKind::ApplicableFunction:
@@ -2187,7 +2198,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   }
 
   case ConstraintKind::BindOverload: {
-    DelayedBy.push_back(constraint);
+    recordDelayedBy(constraint);
     break;
   }
 
@@ -2205,7 +2216,7 @@ void PotentialBindings::infer(Constraint *constraint) {
         // It's possible that member has been bound to some other type variable
         // instead of merged with it because it's wrapped in an l-value type.
         if (type->getWithoutSpecifierType()->isEqual(TypeVar)) {
-          DelayedBy.push_back(constraint);
+          recordDelayedBy(constraint);
           break;
         }
       } else {
@@ -2214,7 +2225,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     }
 
     if (memberTy == TypeVar)
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
 
     break;
   }
@@ -2225,7 +2236,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     auto firstType = constraint->getFirstType();
     if (auto *tv = firstType->getAs<TypeVariableType>()) {
       if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         break;
       }
     }

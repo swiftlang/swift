@@ -24,6 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/APInt.h"
@@ -282,6 +283,12 @@ struct PotentialBindings {
   llvm::SmallVector<Constraint *, 2> Defaults;
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
+
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  void record##PropertyName(Constraint *constraint);
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  void record##RelationName(TypeVariableType *typeVar, Constraint *originator);
+#include "swift/Sema/CSTrail.def"
 
   PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
       : CS(cs), TypeVar(typeVar) {}
