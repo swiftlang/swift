@@ -177,6 +177,7 @@ CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
 CHANGE(AddedConflict)
 CHANGE(PrunedDisjunction)
+CHANGE(AddedMergeableType)
 
 LAST_CHANGE(PrunedDisjunction)
 
