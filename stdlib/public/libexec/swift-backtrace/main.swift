@@ -742,7 +742,7 @@ Generate a backtrace for the parent process.
           writer: writer,
           options: options)
 
-        backtraceFormatter.writeCrashLog(now: formatISO8601(now))
+        backtraceFormatter.writeCrashLog(now: now.iso8601)
     }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -882,7 +882,7 @@ Generate a backtrace for the parent process.
     _ = FlushConsoleInputBuffer(inputHandle)
 
     if let timeout = timeout {
-      var target = GetTickCount() &+ DWORD(1000 * timeout)
+      let target = GetTickCount() &+ DWORD(1000 * timeout)
 
       while true {
         let ticks = GetTickCount()
