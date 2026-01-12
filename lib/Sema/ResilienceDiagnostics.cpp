@@ -252,7 +252,13 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   switch (*reason) {
   case ExportabilityReason::ExtensionWithPublicMembers:
   case ExportabilityReason::ExtensionWithConditionalConformances:
-    return true;
+    // Allow public members in extensions of implicitly exported types.
+    // Extensions cannot define stored variables avoiding the memory layout
+    // concerns and we don't print swiftinterfaces in non-library-evolution
+    // mode.
+    // We should be able to always allow this if it's correctly guarded
+    // at generating module interfaces and generated headers.
+    return where.getExportedLevel() == ExportedLevel::Exported;
   case ExportabilityReason::Inheritance:
   case ExportabilityReason::ImplicitlyPublicInheritance:
     return isa<ProtocolDecl>(D);

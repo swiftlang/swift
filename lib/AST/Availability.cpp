@@ -1062,5 +1062,5 @@ ExportedLevel swift::isExported(const ExtensionDecl *ED) {
   for (const Decl *D : ED->getMembers())
     membersExported = std::max(membersExported, isExported(D));
 
-  return membersExported;
+  return std::min(exported, membersExported);
 }
