@@ -895,25 +895,36 @@ public:
 /// Body of the closure produces `String` type when `Int` is expected
 /// by the context.
 class ContextualMismatch : public ConstraintFix {
-  Type LHS, RHS;
+  Type LHS, RHS, LHSRAW, RHSRAW;
 
-  ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                     ConstraintLocator *locator,
+  ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs, Type lhsRaw,
+                     Type rhsRaw, ConstraintLocator *locator,
                      FixBehavior fixBehavior)
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator, fixBehavior),
-        LHS(lhs), RHS(rhs) {}
+        LHS(lhs), RHS(rhs), LHSRAW(lhsRaw), RHSRAW(rhsRaw) {}
 
 protected:
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
                      ConstraintLocator *locator,
                      FixBehavior fixBehavior = FixBehavior::Error)
-      : ConstraintFix(cs, kind, locator, fixBehavior), LHS(lhs), RHS(rhs) {}
+      : ContextualMismatch(cs, kind, lhs, rhs, lhs, rhs, locator, fixBehavior) {
+  }
+
+  ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
+                     Type lhsRaw, Type rhsRaw, ConstraintLocator *locator,
+                     FixBehavior fixBehavior = FixBehavior::Error)
+      : ConstraintFix(cs, kind, locator, fixBehavior), LHS(lhs), RHS(rhs),
+        LHSRAW(lhsRaw), RHSRAW(rhsRaw) {}
+
+  std::optional<Type> GenericFixType;
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
 
   Type getFromType() const { return LHS; }
   Type getToType() const { return RHS; }
+  Type getRawFromType() const { return LHSRAW; }
+  Type getRawToType() const { return RHSRAW; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
@@ -921,18 +932,22 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+  static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                    Type rawLhs, Type rawRhs,
+                                    ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::ContextualMismatch;
   }
 };
 
+// TODO: Considering adding raw types
 class TreatArrayLiteralAsDictionary final : public ContextualMismatch {
   TreatArrayLiteralAsDictionary(ConstraintSystem &cs, Type dictionaryTy,
                                 Type arrayTy, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::TreatArrayLiteralAsDictionary,
-                           dictionaryTy, arrayTy, locator) {
-      }
+                           dictionaryTy, arrayTy, dictionaryTy, arrayTy,
+                           locator) {}
 
 public:
   std::string getName() const override {
@@ -953,6 +968,8 @@ public:
   }
 };
 
+<<<<<<< conflict 1 of 1
++++++++ pxyunqvq ad0d6bfd "Make feature flag for merging" (rebase destination)
 class TreatArrayLiteralAsTuple final : public ContextualMismatch {
   TreatArrayLiteralAsTuple(ConstraintSystem &cs, Type tupleTy,
                            Type arrayTy, ConstraintLocator *locator)
@@ -1008,7 +1025,8 @@ public:
 class AllowWrappedValueMismatch : public ContextualMismatch {
   AllowWrappedValueMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowWrappedValueMismatch, lhs, rhs, locator) {}
+      : ContextualMismatch(cs, FixKind::AllowWrappedValueMismatch, lhs, rhs,
+                           lhs, rhs, locator) {}
 
 public:
   std::string getName() const override { return "fix wrapped value type mismatch"; }
@@ -1027,8 +1045,8 @@ public:
 class MarkExplicitlyEscaping final : public ContextualMismatch {
   MarkExplicitlyEscaping(ConstraintSystem &cs, Type lhs, Type rhs,
                          ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::ExplicitlyEscaping, lhs, rhs, locator) {
-  }
+      : ContextualMismatch(cs, FixKind::ExplicitlyEscaping, lhs, rhs, lhs, rhs,
+                           locator) {}
 
 public:
   std::string getName() const override { return "add @escaping"; }
@@ -1046,11 +1064,9 @@ public:
 /// Mark function type as being part of a global actor.
 class MarkGlobalActorFunction final : public ContextualMismatch {
   MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
-                          ConstraintLocator *locator,
-                          FixBehavior fixBehavior)
-      : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
-                           locator, fixBehavior) {
-  }
+                          ConstraintLocator *locator, FixBehavior fixBehavior)
+      : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs, lhs,
+                           rhs, locator, fixBehavior) {}
 
 public:
   std::string getName() const override { return "add global actor"; }
@@ -1081,7 +1097,7 @@ class ForceOptional final : public ContextualMismatch {
   ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
                 ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::ForceOptional, fromType, toType,
-                           locator) {
+                           fromType, toType, locator) {
     assert(fromType && "Base type must not be null");
     assert(fromType->getOptionalObjectType() &&
            "Unwrapped type must not be null");
@@ -1139,8 +1155,7 @@ class DropThrowsAttribute final : public ContextualMismatch {
   DropThrowsAttribute(ConstraintSystem &cs, FunctionType *fromType,
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::DropThrowsAttribute, fromType, toType,
-                           locator) {
-  }
+                           fromType, toType, locator) {}
 
 public:
   std::string getName() const override { return "drop 'throws' attribute"; }
@@ -1159,11 +1174,13 @@ public:
 
 /// This is a contextual mismatch between the thrown error types of two
 /// function types, which could be repaired by fixing one of the types.
+/// TODO: add raw types
 class IgnoreThrownErrorMismatch final : public ContextualMismatch {
   IgnoreThrownErrorMismatch(ConstraintSystem &cs, Type fromErrorType,
                             Type toErrorType, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::IgnoreThrownErrorMismatch,
-                           fromErrorType, toErrorType, locator) {
+                           fromErrorType, toErrorType, fromErrorType,
+                           toErrorType, locator) {
     assert(!fromErrorType->isEqual(toErrorType));
   }
 
@@ -1187,7 +1204,7 @@ class DropAsyncAttribute final : public ContextualMismatch {
   DropAsyncAttribute(ConstraintSystem &cs, FunctionType *fromType,
                      FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::DropAsyncAttribute, fromType, toType,
-                           locator) {
+                           fromType, toType, locator) {
     assert(fromType->isAsync() != toType->isAsync());
   }
 
@@ -1211,7 +1228,7 @@ class ForceDowncast final : public ContextualMismatch {
   ForceDowncast(ConstraintSystem &cs, Type fromType, Type toType,
                 ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::ForceDowncast, fromType, toType,
-                           locator) {}
+                           fromType, toType, locator) {}
 
 public:
   std::string getName() const override;
@@ -1230,7 +1247,8 @@ public:
 class AddAddressOf final : public ContextualMismatch {
   AddAddressOf(ConstraintSystem &cs, Type argTy, Type paramTy,
                ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AddressOf, argTy, paramTy, locator) {}
+      : ContextualMismatch(cs, FixKind::AddressOf, argTy, paramTy, argTy,
+                           paramTy, locator) {}
 
 public:
   std::string getName() const override { return "add address-of"; }
@@ -1248,7 +1266,8 @@ public:
 class RemoveAddressOf final : public ContextualMismatch {
   RemoveAddressOf(ConstraintSystem &cs, Type lhs, Type rhs,
                   ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::RemoveAddressOf, lhs, rhs, locator) {}
+      : ContextualMismatch(cs, FixKind::RemoveAddressOf, lhs, rhs, lhs, rhs,
+                           locator) {}
 
 public:
   std::string getName() const override {
@@ -1330,7 +1349,8 @@ class AllowAutoClosurePointerConversion final : public ContextualMismatch {
                                     Type pointerType,
                                     ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowAutoClosurePointerConversion,
-                           pointeeType, pointerType, locator) {}
+                           pointeeType, pointerType, pointeeType, pointerType,
+                           locator) {}
 
 public:
   std::string getName() const override {
@@ -1827,7 +1847,8 @@ class AllowFunctionTypeMismatch final : public ContextualMismatch {
   AllowFunctionTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator, unsigned index)
       : ContextualMismatch(cs, FixKind::AllowFunctionTypeMismatch, lhs, rhs,
-                           locator), ParamIndex(index) {}
+                           locator),
+        ParamIndex(index) {}
 
 public:
   static AllowFunctionTypeMismatch *create(ConstraintSystem &cs, Type lhs,
@@ -2551,7 +2572,7 @@ class IgnoreContextualType : public ContextualMismatch {
   IgnoreContextualType(ConstraintSystem &cs, Type resultTy, Type specifiedTy,
                        ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::IgnoreContextualType, resultTy,
-                           specifiedTy, locator) {}
+                           specifiedTy, resultTy, specifiedTy, locator) {}
 
 public:
   std::string getName() const override {
@@ -2573,7 +2594,7 @@ class IgnoreAssignmentDestinationType final : public ContextualMismatch {
   IgnoreAssignmentDestinationType(ConstraintSystem &cs, Type sourceTy,
                                   Type destTy, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::IgnoreAssignmentDestinationType,
-                           sourceTy, destTy, locator) {}
+                           sourceTy, destTy, sourceTy, destTy, locator) {}
 
 public:
   std::string getName() const override {
@@ -2599,7 +2620,8 @@ class IgnoreNonMetatypeDynamicType final : public ContextualMismatch {
   IgnoreNonMetatypeDynamicType(ConstraintSystem &cs, Type instanceTy,
                                Type metatypeTy, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::IgnoreNonMetatypeDynamicType,
-                           instanceTy, metatypeTy, locator) {}
+                           instanceTy, metatypeTy, instanceTy, metatypeTy,
+                           locator) {}
 
 public:
   std::string getName() const override {
@@ -2645,15 +2667,17 @@ public:
 class AllowArgumentMismatch : public ContextualMismatch {
 protected:
   AllowArgumentMismatch(ConstraintSystem &cs, Type argType, Type paramType,
+                        Type argTypeRaw, Type paramTypeRaw,
                         ConstraintLocator *locator)
       : AllowArgumentMismatch(cs, FixKind::AllowArgumentTypeMismatch, argType,
-                              paramType, locator) {}
+                              paramType, argTypeRaw, paramTypeRaw, locator) {}
 
   AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
-                        Type paramType, ConstraintLocator *locator,
+                        Type paramType, Type argTypeRaw, Type paramTypeRaw,
+                        ConstraintLocator *locator,
                         FixBehavior fixBehavior = FixBehavior::Error)
-      : ContextualMismatch(
-            cs, kind, argType, paramType, locator, fixBehavior) {}
+      : ContextualMismatch(cs, kind, argType, paramType, argTypeRaw,
+                           paramTypeRaw, locator, fixBehavior) {}
 
 public:
   std::string getName() const override {
@@ -2665,7 +2689,8 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
-                                       Type paramType,
+                                       Type paramType, Type argTypeRaw,
+                                       Type paramTypeRaw,
                                        ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
@@ -2678,7 +2703,7 @@ class ExpandArrayIntoVarargs final : public AllowArgumentMismatch {
   ExpandArrayIntoVarargs(ConstraintSystem &cs, Type argType, Type paramType,
                          ConstraintLocator *locator)
       : AllowArgumentMismatch(cs, FixKind::ExpandArrayIntoVarargs, argType,
-                              paramType, locator) {}
+                              paramType, argType, paramType, locator) {}
 
 public:
   std::string getName() const override {
@@ -2756,7 +2781,7 @@ class CoerceToCheckedCast final : public ContextualMismatch {
   CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
                       bool useConditionalCast, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
-                           locator),
+                           fromType, toType, locator),
         UseConditionalCast(useConditionalCast) {}
   bool UseConditionalCast = false;
 
@@ -2807,7 +2832,8 @@ class TreatEphemeralAsNonEphemeral final : public AllowArgumentMismatch {
                                ConversionRestrictionKind conversionKind,
                                FixBehavior fixBehavior)
       : AllowArgumentMismatch(cs, FixKind::TreatEphemeralAsNonEphemeral,
-                              srcType, dstType, locator, fixBehavior),
+                              srcType, dstType, srcType, dstType, locator,
+                              fixBehavior),
         ConversionKind(conversionKind) {}
 
 public:
@@ -2835,7 +2861,8 @@ class AllowSendingMismatch final : public ContextualMismatch {
   AllowSendingMismatch(ConstraintSystem &cs, Type argType, Type paramType,
                        ConstraintLocator *locator, FixBehavior fixBehavior)
       : ContextualMismatch(cs, FixKind::AllowSendingMismatch, argType,
-                           paramType, locator, fixBehavior) {}
+                           paramType, argType, paramType, locator,
+                           fixBehavior) {}
 
 public:
   std::string getName() const override {
@@ -3022,7 +3049,8 @@ class AllowCoercionToForceCast final : public ContextualMismatch {
   AllowCoercionToForceCast(ConstraintSystem &cs, Type fromType, Type toType,
                            ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowCoercionToForceCast, fromType,
-                           toType, locator, FixBehavior::AlwaysWarning) {}
+                           toType, fromType, toType, locator,
+                           FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override {
@@ -3053,7 +3081,7 @@ protected:
   AllowKeyPathRootTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowKeyPathRootTypeMismatch, lhs, rhs,
-                           locator) {}
+                           lhs, rhs, locator) {}
 
 public:
   std::string getName() const override {
@@ -3103,7 +3131,7 @@ protected:
   UnwrapOptionalBaseKeyPathApplication(ConstraintSystem &cs, Type lhs, Type rhs,
                                        ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::UnwrapOptionalBaseKeyPathApplication,
-                           lhs, rhs, locator) {}
+                           lhs, rhs, lhs, rhs, locator) {}
 
 public:
   std::string getName() const override {
@@ -3436,8 +3464,8 @@ protected:
                                        Type fromType, Type toType,
                                        CheckedCastKind kind,
                                        ConstraintLocator *locator)
-      : ContextualMismatch(cs, fixKind, fromType, toType, locator,
-                           FixBehavior::AlwaysWarning),
+      : ContextualMismatch(cs, fixKind, fromType, toType, fromType, toType,
+                           locator, FixBehavior::AlwaysWarning),
         CastKind(kind) {}
   CheckedCastKind CastKind;
 };
@@ -3597,7 +3625,8 @@ class AllowTupleLabelMismatch final : public ContextualMismatch {
   AllowTupleLabelMismatch(ConstraintSystem &cs, Type fromType, Type toType,
                           ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::AllowTupleLabelMismatch, fromType,
-                           toType, locator, FixBehavior::AlwaysWarning) {}
+                           toType, fromType, toType, locator,
+                           FixBehavior::AlwaysWarning) {}
 
 public:
   std::string getName() const override { return "allow tuple label mismatch"; }
@@ -3675,7 +3704,8 @@ protected:
   IgnoreDefaultExprTypeMismatch(ConstraintSystem &cs, Type argType,
                                 Type paramType, ConstraintLocator *locator)
       : AllowArgumentMismatch(cs, FixKind::IgnoreDefaultExprTypeMismatch,
-                              argType, paramType, locator) {}
+                              argType, paramType, argType, paramType, locator) {
+  }
 
 public:
   std::string getName() const override {
