@@ -162,6 +162,19 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
         recursivelyDeleteTriviallyDeadInstructions(AI, true);
         Changed = true;
       }
+      // Specialization might create new references to conformances.
+      // A specialized init_existential_ref might now refer to a concrete
+      // conformance.
+      // In Embedded swift protocol witness tables are emitted lazily. Therefore
+      // deserialization of the sil_witness_table becomes mandatory if it is
+      // referenced because we can't rely on it being defined in the originating
+      // module.
+      if (isMandatory &&
+          FunctionBuilder.getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        for (SILFunction *NewF : reverse(NewFunctions)) {
+          FunctionBuilder.getModule().linkFunction(NewF, SILModule::LinkingMode::LinkNormal);
+        }
+      }
 
       if (auto *sft = dyn_cast<SILFunctionTransform>(transform)) {
         // If calling the specialization utility resulted in new functions
