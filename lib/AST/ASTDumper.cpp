@@ -2793,9 +2793,12 @@ namespace {
                     printRec(PBD->getOriginalInit(idx),
                              Label::always("original_init"));
                   }
-                  if (PBD->getInit(idx)) {
+                  if (auto initExpr = PBD->getInit(idx)) {
                     printRec(PBD->getInit(idx),
                              Label::always("processed_init"));
+                    if (PBD->hasSingleVarConstantFoldedInit())
+                      printRec(PBD->getExecutableInit(idx),
+                               Label::always("processed_constant_folded_init"));
                   }
 
                   printFoot();
