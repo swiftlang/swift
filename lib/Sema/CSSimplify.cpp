@@ -3272,13 +3272,13 @@ bool ConstraintSystem::matchFunctionLifetimes(
   return true;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
-                                     ConstraintKind kind, TypeMatchOptions flags,
-                                     ConstraintLocatorBuilder locator) {
+ ConstraintSystem::SolutionKind
+ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
+                                      ConstraintKind kind, TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator) {
   // If the locator is for a @Sendable or execution semantics match, that's all
   // we want to do.
-  if (auto last = locator.last()) {
+ if (auto last = locator.last()) {
     if (last->is<LocatorPathElt::FunctionSendability>())
       return matchFunctionSendability(func1, func2, kind, flags, locator);
 
@@ -3829,7 +3829,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (hasLabelingFailures && !hasFixFor(loc)) {
       ConstraintFix *fix =
           loc->isLastElement<LocatorPathElt::ApplyArgToParam>()
-              ? AllowArgumentMismatch::create(*this, func1, func2, loc)
+              ? AllowArgumentMismatch::create(*this, func1, func2,loc)
               : ContextualMismatch::create(*this, func1, func2, loc);
 
       if (recordFix(fix))
@@ -4445,7 +4445,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               }
             }
             auto fix = AllowArgumentMismatch::create(
-                  *this, type1, proto, getConstraintLocator(anchor, path));
+                *this, type1, proto, getConstraintLocator(anchor, path));
             if (recordFix(fix, FixImpact::TypeMismatch))
               return SolutionKind::Error;
             break;
@@ -5455,7 +5455,8 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
 bool ConstraintSystem::repairFailures(
-    Type lhs, Type rhs, ConstraintKind matchKind, TypeMatchOptions flags,
+    Type lhs, Type rhs, ConstraintKind matchKind,
+    TypeMatchOptions flags,
     SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
     ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
@@ -6024,6 +6025,14 @@ bool ConstraintSystem::repairFailures(
 
         ConstraintFix *fix = nullptr;
         if (result == SolutionKind::Error) {
+
+          // If this is a "destination" argument to a mutating operator
+          // like `+=`, let's consider it contextual and only attempt
+          // to fix type mismatch on the "source" right-hand side of
+          // such operators.
+          if (isOperatorArgument(loc) && argConv->getArgIdx() == 0)
+            break;
+
           fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
         } else {
           fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
@@ -6037,7 +6046,8 @@ bool ConstraintSystem::repairFailures(
       // let's re-attempt to repair without l-value conversion in the
       // locator to fix underlying type mismatch.
       if (path.back().is<LocatorPathElt::FunctionResult>()) {
-        return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
+        return repairFailures(lhs, rhs, matchKind, flags,
+                              conversionsOrFixes,
                               getConstraintLocator(anchor, path));
       }
 
@@ -6434,8 +6444,8 @@ bool ConstraintSystem::repairFailures(
                                locator);
 
       if (result == SolutionKind::Solved) {
-        conversionsOrFixes.push_back(AllowInOutConversion::create(*this, lhs,
-            rhs, getConstraintLocator(locator)));
+        conversionsOrFixes.push_back(AllowInOutConversion::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
         break;
       }
     }
@@ -6592,8 +6602,8 @@ bool ConstraintSystem::repairFailures(
 
     if (purpose == CTP_Initialization && lhs->is<TupleType>() &&
         rhs->is<TupleType>()) {
-      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
-                                                 getConstraintLocator(locator));
+      auto *fix = AllowTupleTypeMismatch::create(
+          *this, lhs, rhs, getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
       break;
     }
@@ -6807,8 +6817,8 @@ bool ConstraintSystem::repairFailures(
 
     if (tupleLocator->isForContextualType()) {
       if (auto contextualTy = isSingleUnlabeledElementTuple(rhs)) {
-        return repairFailures(lhs, contextualTy, matchKind, flags,
-                              conversionsOrFixes, tupleLocator);
+        return repairFailures(lhs, contextualTy, matchKind,
+                              flags, conversionsOrFixes, tupleLocator);
       }
     }
 
@@ -6833,7 +6843,8 @@ bool ConstraintSystem::repairFailures(
     if (!path.empty() && path.back().is<LocatorPathElt::PackType>())
       path.pop_back();
 
-    return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
+    return repairFailures(lhs, rhs, matchKind, flags,
+                          conversionsOrFixes,
                           getConstraintLocator(anchor, path));
   }
 
@@ -6964,9 +6975,8 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
       if (path.back().is<LocatorPathElt::ApplyArgToParam>()) {
-        conversionsOrFixes.push_back(
-            AllowArgumentMismatch::create(*this, lhs, rhs,
-                                          getConstraintLocator(anchor, path)));
+        conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+            *this, lhs, rhs, getConstraintLocator(anchor, path)));
         return true;
       }
     }
@@ -7096,7 +7106,8 @@ bool ConstraintSystem::repairFailures(
 
     if (!path.empty()) {
       if (path.back().is<LocatorPathElt::AnyRequirement>()) {
-        return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
+        return repairFailures(lhs, rhs, matchKind, flags,
+                              conversionsOrFixes,
                               getConstraintLocator(anchor, path));
       }
 
@@ -7116,9 +7127,11 @@ bool ConstraintSystem::repairFailures(
           if (!argList || argList->size() <= argIdx)
             return false;
 
+          ASSERT(argList);
+          auto paramType = overloadTy->getParams()[paramIdx].getPlainType();
+
           conversionsOrFixes.push_back(AllowArgumentMismatch::create(
-              *this, getType(argList->getExpr(argIdx)),
-              overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
+              *this, getType(argList->getExpr(argIdx)), paramType, argLoc));
           return true;
         }
       }
@@ -7183,8 +7196,8 @@ bool ConstraintSystem::repairFailures(
     if (fixLoc->isLastElement<LocatorPathElt::AnyRequirement>()) {
       fix = fixRequirementFailure(*this, fromType, toType, anchor, path);
     } else if (fixLoc->isLastElement<LocatorPathElt::TupleElement>()) {
-      return repairFailures(lhs, rhs, matchKind, flags, conversionsOrFixes,
-                            fixLoc);
+      return repairFailures(lhs, rhs, matchKind, flags,
+                            conversionsOrFixes, fixLoc);
     } else if (!lhs->mayHaveSuperclass() && rhs->isAnyObject()) {
       fix = AllowNonClassTypeToConvertToAnyObject::create(*this, fromType,
                                                           fixLoc);
@@ -8624,8 +8637,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
   if (shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix)) {
-    if (repairFailures(type1, type2, kind, flags, conversionsOrFixes,
-                       locator)) {
+    if (repairFailures(type1, type2, kind, flags,
+                       conversionsOrFixes, locator)) {
       if (conversionsOrFixes.empty())
         return SolutionKind::Solved;
     }
@@ -8908,8 +8921,28 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySubclassOfConstraint(
 
   // If we hit a type variable without a fixed type, we can't
   // solve this yet.
-  if (type->isTypeVariableOrMember())
+  if (type->isTypeVariableOrMember()) {
+    TypeVariableType *tv = type->getAs<TypeVariableType>();
+    if (mergeableTypes.map.contains(tv) && shouldAttemptFixes()) {
+      auto bindings = mergeableTypes.map[tv];
+      std::optional<Type> notClassType = std::nullopt;
+      for (auto b : bindings) {
+        if (!(b.diagnosticType->isEqual(classType))) {
+          notClassType = b.diagnosticType;
+          break;
+        }
+      }
+      if (notClassType.has_value()) {
+        if (auto *fix = fixRequirementFailure(*this, notClassType.value(),
+                                              classType, locator)) {
+          if (recordFix(fix))
+            return SolutionKind::Error;
+          return SolutionKind::Solved;
+        }
+      }
+    }
     return formUnsolved();
+  }
 
   // SubclassOf constraints are generated when opening a generic
   // signature with a RequirementKind::Superclass requirement, so
