@@ -24,7 +24,8 @@ import sys
 import time
 
 
-VERBOSE = False
+VERBOSE = True
+EMIT_IR = True
 NUM_ITERATIONS = 4
 
 
@@ -45,6 +46,16 @@ def compile_and_stat(compile_args, output_file):
 
     return (md5, mtime)
 
+def print_diff(output_file, suffix):
+    subprocess.run(
+        ["diff", output_file + suffix, output_file + ".ref" + suffix])
+
+def print_ir_diffs(output_file):
+    if EMIT_IR and VERBOSE:
+        print("\n## SIL differences:")
+        print_diff(output_file, ".sil")
+        print("\n## IR differences:")
+        print_diff(output_file, ".ll")
 
 def main():
 
@@ -72,6 +83,11 @@ def main():
         subprocess.check_call(new_args)
         return
 
+    if EMIT_IR:
+      new_args += [
+        '-Xfrontend', '-sil-output-path', '-Xfrontend', output_file + '.sil',
+        '-Xfrontend', '-ir-output-path', '-Xfrontend', output_file + '.ll']
+
     if VERBOSE:
         print("Reference compilation of " + output_file + ":")
 
@@ -83,6 +99,11 @@ def main():
     reference_md5, reference_time = compile_and_stat(new_args, output_file)
 
     subprocess.check_call(["cp", output_file, output_file + ".ref.o"])
+    if EMIT_IR:
+        subprocess.check_call(
+            ["cp", output_file + ".sil", output_file + ".ref.sil"])
+        subprocess.check_call(
+            ["cp", output_file + ".ll", output_file + ".ref.ll"])
 
     for iteration in range(1, NUM_ITERATIONS + 1):
 
@@ -94,6 +115,7 @@ def main():
         # This is the most important check: is the output file exactly the
         # same.
         if reference_md5 != second_md5:
+            print_ir_diffs(output_file)
             sys.exit("ERROR: non-determinism when generating: " + output_file +
                      "\ncommand line:\n" + " ".join(new_args))
 
@@ -101,8 +123,10 @@ def main():
         # file. (For compilations < 1sec this check may succeed even if the
         # file was overwritten).
         if compare_time and reference_time != second_time:
+            print_ir_diffs(output_file)
             sys.exit("ERROR: file timestamp was re-written: " + output_file)
 
 
 if __name__ == '__main__':
     main()
+
