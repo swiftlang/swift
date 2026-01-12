@@ -249,9 +249,16 @@ updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   //
   //   C:\...\Swift\Runtimes\6.0.0\usr\bin
   //
+  // But, for testing, we also need to look in `bin`, next to the driver.
+
   llvm::SmallString<128> RuntimePath(LibPath);
 
   llvm::sys::path::remove_filename(RuntimePath);
+  llvm::sys::path::remove_filename(RuntimePath);
+
+  // For testing, we need to look in `bin` first
+  llvm::sys::path::append(RuntimePath, "bin");
+  SearchPathOpts.RuntimeLibraryPaths.push_back(std::string(RuntimePath.str()));
   llvm::sys::path::remove_filename(RuntimePath);
   llvm::sys::path::remove_filename(RuntimePath);
 
