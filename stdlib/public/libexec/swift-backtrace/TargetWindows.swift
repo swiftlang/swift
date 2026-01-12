@@ -161,7 +161,6 @@ class Target {
 
         case CREATE_THREAD_DEBUG_EVENT:
           hThreads.append(event.u.CreateThread.hThread)
-          SuspendThread(event.u.CreateThread.hThread)
 
         default:
           break
@@ -352,8 +351,75 @@ class Target {
   }
 
   func withDebugger(_ body: () -> ()) throws {
-    // ###TODO
-    body()
+    for hThread in hThreads {
+      SuspendThread(hThread)
+    }
+    DebugActiveProcessStop(pid)
+
+    let cmdline = """
+      cmd.exe "/c echo Once LLDB has attached, \
+      return to the other window and press any key \
+      & lldb --attach-pid \(pid) -o c \
+      & pause "
+      """
+    let title = "Debugging \(name) (\(pid))"
+
+    var startupInfo = STARTUPINFOW()
+    startupInfo.cb = DWORD(MemoryLayout<STARTUPINFOW>.size)
+    var processInfo = PROCESS_INFORMATION()
+
+    let ret =
+      title.withCString(encodedAs: UTF16.self) { pwszTitle in
+        // Not really mutating
+        startupInfo.lpTitle = UnsafeMutablePointer(mutating: pwszTitle)
+
+        return cmdline.withCString(encodedAs: UTF16.self) { pwszCmdline in
+          return CreateProcessW(nil,
+                                // Not really mutating
+                                UnsafeMutablePointer(mutating: pwszCmdline),
+                                nil,
+                                nil,
+                                false,
+                                DWORD(NORMAL_PRIORITY_CLASS
+                                      | CREATE_NEW_CONSOLE
+                                      | CREATE_NEW_PROCESS_GROUP),
+                                nil,
+                                nil,
+                                &startupInfo,
+                                &processInfo)
+        }
+      }
+
+    if !ret {
+      let err = GetLastError()
+      print("swift-backtrace: unable to spawn debugger: \(hex(err))")
+    } else {
+      CloseHandle(processInfo.hProcess)
+      CloseHandle(processInfo.hThread)
+
+      body()
+    }
+
+    DebugActiveProcess(pid)
+
+    var event = DEBUG_EVENT()
+    hThreads = []
+    while WaitForDebugEvent(&event, 0) {
+      switch Int32(event.dwDebugEventCode) {
+        case CREATE_PROCESS_DEBUG_EVENT:
+          hProcess = event.u.CreateProcessInfo.hProcess
+          hThreads.append(event.u.CreateProcessInfo.hThread)
+
+        case CREATE_THREAD_DEBUG_EVENT:
+          hThreads.append(event.u.CreateThread.hThread)
+
+        default:
+          break
+      }
+    }
+    for hThread in hThreads {
+      ResumeThread(hThread)
+    }
   }
 }
 
