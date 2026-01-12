@@ -1300,6 +1300,15 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isStdlibInteger() {
+  return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
+         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+}
+
+bool TypeBase::isStdlibFloat() {
+  return isFloat() || isDouble() || isFloat80();
+}
+
 bool TypeBase::isObjCBool() {
   auto *NTD = getAnyNominal();
   if (!NTD)

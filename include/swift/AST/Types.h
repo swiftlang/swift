@@ -1114,6 +1114,12 @@ public:
   /// on macOS or Foundation on Linux.
   bool isCGFloat();
 
+  /// Check if this is an integer type coming from the Swift module
+  bool isStdlibInteger();
+
+  /// Check if this is a floating-point type coming from the Swift module
+  bool isStdlibFloat();
+
   /// Check if this is a ObjCBool type from the Objective-C module.
   bool isObjCBool();
 
