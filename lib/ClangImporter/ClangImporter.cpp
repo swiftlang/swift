@@ -4020,6 +4020,8 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
   if (Ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
     ID->addAttribute(new (Ctx) AccessControlAttr(
         SourceLoc(), SourceRange(), AccessLevel::Internal, /*implicit=*/true));
+    if (!Ctx.LangOpts.hasFeature(Feature::LibraryEvolution))
+      ID->addAttribute(new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/true));
   } else if (IsExported) {
     ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
   }

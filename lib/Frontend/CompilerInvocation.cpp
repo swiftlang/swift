@@ -2242,7 +2242,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   // Until we have some checking in place, internal bridging headers are a
   // bit unsafe without library evolution.
   if (Opts.BridgingHeaderIsInternal &&
-      !LangOpts.hasFeature(Feature::LibraryEvolution)) {
+      !LangOpts.hasFeature(Feature::LibraryEvolution) &&
+      !LangOpts.hasFeature(Feature::CheckImplementationOnly)) {
     Diags.diagnose(SourceLoc(),
                    diag::internal_bridging_header_without_library_evolution);
   }

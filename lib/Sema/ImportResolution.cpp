@@ -607,6 +607,8 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
         ImportedModule(headerModule), SourceLoc(), ImportFlags::Exported);
     if (ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
       import.accessLevel = AccessLevel::Internal;
+      if (!ctx.LangOpts.hasFeature(Feature::LibraryEvolution))
+        import.options |= ImportFlags::ImplementationOnly;
     }
 
     imports.emplace_back(import);
