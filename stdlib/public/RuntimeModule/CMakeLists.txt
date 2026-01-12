@@ -34,6 +34,7 @@ set(RUNTIME_SOURCES
   Address.swift
   Backtrace.swift
   Backtrace+Codable.swift
+  BacktraceBuffer.swift
   BacktraceFormatter.swift
   BacktraceJSONFormatter.swift
   Base64.swift
@@ -61,6 +62,7 @@ set(RUNTIME_SOURCES
   Mangling.swift
   MemoryReader.swift
   OSReleaseScanner.swift
+  NonAllocatingLimitSequence.swift
   ProcMapsScanner.swift
   Registers.swift
   Runtime.swift
