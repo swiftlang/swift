@@ -110,6 +110,14 @@ public:
       } Update;
 
       struct {
+        /// The type variable that saw another mergeable type
+        TypeVariableType *TypeVar;
+
+        /// The canonical type that was merged
+        CanType merged;
+      } Merged;
+
+      struct {
         /// The source type.
         Type SrcType;
 
@@ -193,6 +201,9 @@ public:
 
     /// Create a change that added a type variable.
     static Change AddedTypeVariable(TypeVariableType *typeVar);
+
+    /// Create a change that adds a mergeable type to the mergeable set
+    static Change AddedMergeableType(TypeVariableType *typeVar, CanType type);
 
     /// Create a change that extended an equivalence class.
     static Change ExtendedEquivalenceClass(TypeVariableType *typeVar,
