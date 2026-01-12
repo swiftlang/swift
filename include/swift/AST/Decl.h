@@ -2709,9 +2709,8 @@ public:
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getExecutableInit(unsigned i) const {
-    return getPatternList()[i].getExecutableInit();
-  }
+  bool hasSingleVarConstantFoldedInit() const;
+  Expr *getExecutableInit(unsigned i) const;
   Expr *getOriginalInit(unsigned i) const {
     return getPatternList()[i].getOriginalInit();
   }
