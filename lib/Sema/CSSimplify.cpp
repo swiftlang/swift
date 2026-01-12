@@ -15734,6 +15734,17 @@ void ConstraintSystem::recordImplicitCallAsFunction(ConstraintLocator *locator,
     recordChange(SolverTrail::Change::RecordedImplicitCallAsFunction(locator));
 }
 
+void ConstraintSystem::recordMergeable(TypeVariableType *key, Type conflict,
+                                       ConstraintLocator *locator,
+                                       ConflictReason *reason) {
+  ConflictedType *conflicted = new ConflictedType(conflict->getCanonicalType(),
+                                                  conflict, locator, reason);
+  mergeableTypes.map[key].insert(conflicted);
+
+  // if (solverState)
+  //   recordChange(SolverTrail::Change::AddedMergeableType(root,merging));
+}
+
 void ConstraintSystem::recordKeyPath(const KeyPathExpr *keypath,
                                      TypeVariableType *root,
                                      TypeVariableType *value, DeclContext *dc) {
