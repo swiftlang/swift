@@ -94,8 +94,8 @@ CONSTRAINT_CHANGE(GeneratedConstraint)
 
 GRAPH_NODE_CHANGE(AddedConstraint)
 GRAPH_NODE_CHANGE(RemovedConstraint)
-GRAPH_NODE_CHANGE(InferredBindings)
-GRAPH_NODE_CHANGE(RetractedBindings)
+GRAPH_NODE_CHANGE(AddedConstraintToInference)
+GRAPH_NODE_CHANGE(RetractedConstraintFromInference)
 GRAPH_NODE_CHANGE(AddedLiteral)
 GRAPH_NODE_CHANGE(RetractedLiteral)
 

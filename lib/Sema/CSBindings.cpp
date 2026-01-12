@@ -1099,6 +1099,12 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
 
+  // "undo" check is necessary here because this method is called
+  // from `Change::undo`, that's necessary because we only record
+  // a constraint.
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
+    CS.recordChange(SolverTrail::Change::AddedLiteral(TypeVar, constraint));
+
   Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
 }
 
@@ -1207,11 +1213,17 @@ bool BindingSet::operator<(const BindingSet &other) {
 
 #define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
   void PotentialBindings::record##PropertyName(Constraint *constraint) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(                                                         \
+          SolverTrail::Change::Added##PropertyName(TypeVar, constraint));      \
     Storage.push_back(constraint);                                             \
   }
 #define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
   void PotentialBindings::record##RelationName(TypeVariableType *typeVar,      \
                                                Constraint *originator) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(SolverTrail::Change::Added##RelationName(                \
+          TypeVar, typeVar, originator));                                      \
     Storage.emplace_back(typeVar, originator);                                 \
   }
 #include "swift/Sema/CSTrail.def"
@@ -1422,6 +1434,9 @@ void PotentialBindings::addPotentialBinding(PotentialBinding binding) {
       locator->dump(&TypeVar->getASTContext().SourceMgr, llvm::dbgs());
     }
     llvm::dbgs() << "\n");
+
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::AddedBinding(TypeVar, binding));
 
   Bindings.push_back(std::move(binding));
 }
@@ -2068,7 +2083,8 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   // Record the change, if there are active scopes.
   if (CS.solverState)
-    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
+    CS.recordChange(
+        SolverTrail::Change::AddedConstraintToInference(TypeVar, constraint));
 
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -2252,11 +2268,10 @@ void PotentialBindings::retract(Constraint *constraint) {
   if (!Constraints.remove(constraint))
     return;
 
-  bool recordingChanges = CS.solverState && !CS.solverState->Trail.isUndoActive();
-
   // Record the change, if there are active scopes.
-  if (recordingChanges)
-    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::RetractedConstraintFromInference(
+        TypeVar, constraint));
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
@@ -2268,7 +2283,7 @@ void PotentialBindings::retract(Constraint *constraint) {
       llvm::remove_if(Bindings,
                       [&](const PotentialBinding &binding) {
                         if (binding.getSource() == constraint) {
-                          if (recordingChanges) {
+                          if (CS.solverState) {
                             CS.recordChange(SolverTrail::Change::RetractedBinding(
                                 TypeVar, binding));
                           }
@@ -2282,7 +2297,7 @@ void PotentialBindings::retract(Constraint *constraint) {
       llvm::remove_if(Literals,
                       [&](const LiteralRequirement &literal) {
                         if (literal.getSource() == constraint) {
-                          if (recordingChanges) {
+                          if (CS.solverState) {
                             CS.recordChange(SolverTrail::Change::RetractedLiteral(
                                 TypeVar, constraint));
                           }
@@ -2297,7 +2312,7 @@ void PotentialBindings::retract(Constraint *constraint) {
       llvm::remove_if(Storage,                                                 \
                       [&](Constraint *other) {                                 \
                         if (other == constraint) {                             \
-                          if (recordingChanges) {                              \
+                          if (CS.solverState) {                                \
                             CS.recordChange(                                   \
                                 SolverTrail::Change::Retracted##PropertyName(  \
                                     TypeVar, constraint));                     \
@@ -2313,7 +2328,7 @@ void PotentialBindings::retract(Constraint *constraint) {
       llvm::remove_if(Storage,                                                 \
                       [&](std::pair<TypeVariableType *, Constraint *> pair) {  \
                         if (pair.second == constraint) {                       \
-                          if (recordingChanges) {                              \
+                          if (CS.solverState) {                                \
                             CS.recordChange(                                   \
                                 SolverTrail::Change::Retracted##RelationName(  \
                                     TypeVar, pair.first, pair.second));        \

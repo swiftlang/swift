@@ -447,11 +447,14 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.unrelateTypeVariables(Relation.TypeVar, Relation.OtherTypeVar);
     break;
 
-  case ChangeKind::InferredBindings:
-    cg.retractBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
+  case ChangeKind::AddedConstraintToInference: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    bool removed = bindings.Constraints.remove(TheConstraint.Constraint);
+    ASSERT(removed);
     break;
+  }
 
-  case ChangeKind::RetractedBindings: {
+  case ChangeKind::RetractedConstraintFromInference: {
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
     bool inserted = bindings.Constraints.insert(TheConstraint.Constraint);
     ASSERT(inserted);
