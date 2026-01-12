@@ -150,11 +150,19 @@ private extension Value {
     switch ownership {
     case .owned:
       return true
+    case .none:
+      // "none" is like "owned" and can happen e.g. if a non-trivial enum is constructed with a trivial case:
+      // ```
+      //   %1 = enum $Optional<AnyObject>, #Optional.none!enumelt   // ownership: none
+      //   ...
+      //   %3 = borrowed %phi from (%1)
+      // ```
+      return true
     case .guaranteed:
       return BeginBorrowValue(self) != nil ||
              self is BorrowedFromInst ||
              forwardingInstruction != nil
-    case .none, .unowned:
+    case .unowned:
       return false
     }
   }
