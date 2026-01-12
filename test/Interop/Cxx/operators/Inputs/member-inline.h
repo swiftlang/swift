@@ -582,4 +582,12 @@ struct ClassWithOperatorEqualsParamUnnamed {
   }
 };
 
+struct ClassWithTemplatedOperatorStar {
+  template <typename T> T operator*() const { return "bogus"; }
+};
+
+struct ClassWithDefaultTemplatedOperatorStar {
+  template <typename T = int> T operator*() const { return 42; }
+};
+
 #endif

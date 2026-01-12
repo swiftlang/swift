@@ -97,3 +97,10 @@ let _ = classWithOperatorStarUnavailable.pointee // expected-error {{'pointee' i
 let derivedClassWithOperatorStarUnavailable = DerivedClassWithOperatorStarUnavailable()
 let _ = derivedClassWithOperatorStarUnavailable.pointee
 
+let classWithTemplatedOperatorStar = ClassWithTemplatedOperatorStar()
+let _ = classWithTemplatedOperatorStar.pointee // expected-error {{has no member 'pointee'}}
+
+let classWithDefaultTemplatedOperatorStar = ClassWithDefaultTemplatedOperatorStar()
+let _ = classWithDefaultTemplatedOperatorStar.pointee  // expected-error {{has no member 'pointee'}}
+// ^this could work in theory, but is niche (https://github.com/swiftlang/swift/issues/86478)
+// Same for templated operator++.
