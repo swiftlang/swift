@@ -3810,9 +3810,7 @@ function Build-Format([Hashtable] $Platform) {
     -Bin (Get-ProjectBinaryCache $Platform Format) `
     -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
     -Platform $Platform `
-    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
-    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
-    -UseBuiltCompilers Swift `
+    -UseBuiltCompilers C,Swift `
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
@@ -3866,8 +3864,7 @@ function Build-LMDB([Hashtable] $Platform) {
     -Src $SourceCache\swift-lmdb `
     -Bin (Get-ProjectBinaryCache $Platform LMDB) `
     -Platform $Platform `
-    -UseMSVCCompilers $(if ($UseHostToolchain) { @("C") } else { @("") }) `
-    -UsePinnedCompilers $(if ($UseHostToolchain) { @("") } else { @("C") }) `
+    -UseBuiltCompilers C `
     -BuildTargets default
 }
 
