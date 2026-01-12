@@ -276,6 +276,8 @@ public:
     return getParamTypeImpl(FnType, lookThroughAutoclosure);
   }
 
+  /// \returns the raw type, including potentially type variable,
+
   /// \returns The interface type of the parameter which the argument is being
   /// applied to.
   ///
@@ -792,13 +794,16 @@ template<> struct DenseMapInfo<swift::constraints::ConflictedType> {
 
     return ConflictedType(DenseMapInfo<swift::CanType>::getEmptyKey(),
       DenseMapInfo<swift::TypeBase*>::getEmptyKey(),
-      DenseMapInfo<ConstraintLocator*>::getEmptyKey());
+      DenseMapInfo<ConstraintLocator*>::getEmptyKey(),
+      DenseMapInfo<ConflictReason*>::getEmptyKey());
   }
 
   static swift::constraints::ConflictedType getTombstoneKey() {
-    return swift::constraints::ConflictedType(llvm::DenseMapInfo<swift::CanType>::getTombstoneKey(),
-      llvm::DenseMapInfo<swift::TypeBase*>::getTombstoneKey(),
-    llvm::DenseMapInfo<swift::constraints::ConstraintLocator*>::getTombstoneKey());
+    using namespace swift::constraints;
+    return ConflictedType(DenseMapInfo<swift::CanType>::getTombstoneKey(),
+      DenseMapInfo<swift::TypeBase*>::getTombstoneKey(),
+      DenseMapInfo<ConstraintLocator*>::getTombstoneKey(),
+      DenseMapInfo<ConflictReason*>::getEmptyKey());
   }
   static unsigned getHashValue(swift::constraints::ConflictedType Val) {
     return DenseMapInfo<swift::TypeBase*>::getHashValue(Val.typeKey.getPointer());
