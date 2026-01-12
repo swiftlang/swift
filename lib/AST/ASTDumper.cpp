@@ -2793,9 +2793,19 @@ namespace {
                     printRec(PBD->getOriginalInit(idx),
                              Label::always("original_init"));
                   }
-                  if (PBD->getInit(idx)) {
+                  if (auto initExpr = PBD->getInit(idx)) {
                     printRec(PBD->getInit(idx),
                              Label::always("processed_init"));
+
+                    auto *singleVar = PBD->getSingleVar();
+                    if (singleVar && singleVar->isConstValue()) {
+                      auto &Ctx = PBD->getASTContext();
+                      auto foldedInitExpr = evaluateOrDefault(
+                          Ctx.evaluator, ConstantFoldExpression{initExpr, &Ctx},
+                          {});
+                      printRec(foldedInitExpr,
+                               Label::always("processed_constant_folded_init"));
+                    }
                   }
 
                   printFoot();
