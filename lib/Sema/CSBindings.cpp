@@ -445,6 +445,23 @@ void BindingSet::computeJoinsAndMeets() {
   if (!foundCommonSupertype && !foundCommonSubtype)
     return;
 
+  // If the joined binding is in conflict with an existing subtype binding,
+  // we have a situation where we picked a more general supertype than what
+  // was expected. Bail out.
+  //
+  // FIXME: Eventually, we should drop the supertype bindings.
+  if (!uninhabited && foundCommonSubtype && foundCommonSupertype &&
+      subsumeBinding(newBindings[1], newBindings[0]).kind ==
+          SubsumeBindingResult::BindingResultKind::Conflict) {
+    return;
+  }
+
+  if (uninhabited) {
+    LLVM_DEBUG(llvm::dbgs() << "Uninhabited meet: " << commonSubtype << "\n");
+    // TODO: make new conflict reason
+    markConflicting(ConflictReason(ConflictFlag::Exact));
+  }
+
   if (foundCommonSupertype) {
     LLVM_DEBUG(llvm::dbgs() << "Accepted join type: "
                             << commonSupertype << "\n");
