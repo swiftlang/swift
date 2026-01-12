@@ -892,13 +892,21 @@ _swift_parseBacktracingSettings(const char *settings)
 // write protected so they can't be manipulated by an attacker using a buffer
 // overrun.
 const char * const environmentVarsToPassThrough[] = {
-  "LD_LIBRARY_PATH",
-  "DYLD_LIBRARY_PATH",
-  "DYLD_FRAMEWORK_PATH",
   "PATH",
   "TERM",
   "LANG",
-  "HOME"
+  #ifndef _WIN32
+  "LD_LIBRARY_PATH",
+  "DYLD_LIBRARY_PATH",
+  "DYLD_FRAMEWORK_PATH",
+  "HOME",
+  #else
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "SystemDrive",
+  "SystemRoot",
+  "USERPROFILE",
+  #endif
 };
 
 #define BACKTRACE_MAX_ENV_VARS lengthof(environmentVarsToPassThrough)
