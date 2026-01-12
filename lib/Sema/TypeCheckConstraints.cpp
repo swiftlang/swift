@@ -1199,6 +1199,26 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
     out << "\n";
   }
 
+  out.indent(indent) << "Unioned Type variables:\n";
+  std::vector<std::pair<TypeVariableType *, Type>> unionized(
+      UnionedTypes.begin(), UnionedTypes.end());
+  llvm::sort(unionized, [](const std::pair<TypeVariableType *, Type> &lhs,
+                          const std::pair<TypeVariableType *, Type> &rhs) {
+    return lhs.first->getID() < rhs.first->getID();
+  });
+  for (auto binding : unionized) {
+    auto &typeVar = binding.first;
+    out.indent(indent + 2);
+    Type(typeVar).print(out, PO);
+    out << " as ";
+    binding.second.print(out, PO);
+    if (auto *locator = typeVar->getImpl().getLocator()) {
+      out << " @ ";
+      locator->dump(sm, out);
+    }
+    out << "\n";
+  }
+
   if (!overloadChoices.empty()) {
     out << "\n";
     out.indent(indent) << "Overload choices:";

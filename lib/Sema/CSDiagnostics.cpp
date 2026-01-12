@@ -2624,6 +2624,8 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseConversionToNil())
     return true;
 
+  const Solution& solution = getSolution();
+
   if (path.empty()) {
     if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
       Diag<Type, Type> diag;
@@ -2787,8 +2789,6 @@ bool ContextualFailure::diagnoseAsError() {
     return false;
   }
   case ConstraintLocator::UnresolvedMemberChainResult: {
-    auto &solution = getSolution();
-
     auto overload =
         getCalleeOverloadChoiceIfAvailable(getConstraintLocator(anchor));
     if (!(overload && overload->choice.isDecl()))
@@ -7559,14 +7559,39 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return true;
   }
 
+  const auto &solution = getSolution();
+  std::optional<Type> genericVariant;
+  for (auto gt : solution.UnionedTypes) {
+    if (auto typeAtTypeVar = solution.typeBindings.lookup(gt.first)) {
+      if (typeAtTypeVar && typeAtTypeVar->isEqual(paramType)) {
+        // There should be one match
+        assert(!genericVariant.has_value());
+        genericVariant = gt.second;
+      }
+    }
+  }
+
   Diag<Type, Type> diagnostic = diag::cannot_convert_argument_value;
+  bool useGenericVariant = false;
 
   // If parameter type is a protocol value, let's says that
   // argument doesn't conform to a give protocol.
   if (paramType->isExistentialType())
     diagnostic = diag::cannot_convert_argument_value_protocol;
 
-  auto diag = emitDiagnostic(diagnostic, argType, paramType);
+  if (genericVariant.has_value() &&
+      genericVariant.value()->is<TypeVariableType>()) {
+    diagnostic = diag::cannot_convert_argument_value_general_type;
+  } else if (genericVariant.has_value() &&
+             !genericVariant.value()->is<TypeVariableType>() &&
+             !genericVariant.value()->isEqual(argType)) {
+    diagnostic = diag::cannot_convert_argument_value_generic_params;
+    useGenericVariant = true;
+  }
+
+  auto diag = emitDiagnostic(diagnostic, argType,
+                             useGenericVariant ?
+                             genericVariant.value() : paramType);
 
   // If argument is an l-value type and parameter is a pointer type,
   // let's match up its element type to the argument to see whether

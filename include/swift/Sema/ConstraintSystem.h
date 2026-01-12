@@ -352,7 +352,10 @@ enum class SolutionCompareResult {
   /// The first solution is better than the second.
   Better,
   /// The second solution is better than the first.
-  Worse
+  Worse,
+  /// The two solutions are potentially mergeable into one with type refinement
+  /// If not an error, this is semantically resolved as Incomparable
+  Mergeable 
 };
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
@@ -555,14 +558,37 @@ public:
     SmallVector<OverloadChoice, 2> choices;
   };
 
+  /// A difference between selected fixes
+  struct FixDiff {
+    /// The fix
+    FixKind fix;
+
+    /// The solutions deriving that fix
+    SmallVector<size_t> solutions;
+  };
+
+  struct TypeDiff {
+    Type resolved;
+    SmallVector<size_t> solutions;
+  };
+
   /// The differences between the overload choices between the
   /// solutions.
   SmallVector<OverloadDiff, 4> overloads;
+
+  /// The differences between the fixes of the solutions
+  SmallVector<FixDiff, 4> fixes;
+
+  /// The differences between type bindings between the solutions
+  llvm::DenseMap<TypeVariableType *, SmallVector<TypeDiff, 4>> types;
 
   /// Compute the differences between the given set of solutions.
   ///
   /// \param solutions The set of solutions.
   explicit SolutionDiff(ArrayRef<Solution> solutions);
+
+  llvm::DenseMap<TypeVariableType *, std::pair<Type,Type>>
+    typesDiffPerSolution(size_t idx1, size_t idx2) const;
 };
 
 /// An intrusive, doubly-linked list of constraints.
@@ -1300,6 +1326,8 @@ private:
 
   void incrementScopeCounter();
   void incrementLeafScopes();
+
+  llvm::DenseMap<TypeVariableType*, Type> crossSolutionUnionTypes;
 
 public:
   /// Introduces a new solver scope, which any changes to the
@@ -4151,6 +4179,65 @@ public:
   void print(raw_ostream &out) const;
   void print(raw_ostream &out, Expr *) const;
 };
+
+class SolutionUnifier {
+private:
+  ASTContext *context;
+  SmallVector<std::pair<Type,Type>> typeMap;
+  typedef llvm::DenseMap<TypeVariableType*, Type> Env;
+  typedef llvm::DenseMap<TypeVariableType*, std::pair<Type, Type>> ExtendedEnv;
+  typedef std::function<Type(std::pair<Type, Type>)> AccessorFun;
+
+  AccessorFun first = [](std::pair<Type, Type> p){ return p.first; };
+  AccessorFun second = [](std::pair<Type, Type> p){ return p.second; };
+
+  unsigned int nextFreeType = 0;
+  TypeVariableType *nextVar(TypeVariableType* currentTV);
+  std::optional<Type> inTypeMap(Type key);
+  typedef std::function<std::optional<Type>(TypeVariableType*, Type)> LookupFun;
+  LookupFun liftedInMap() { return [&](TypeVariableType* _, Type key) {
+    return this->inTypeMap(key);
+  };
+  }
+
+  void mapType(Type key, Type rep) {
+    typeMap.emplace_back(std::pair(key,rep));
+  }
+
+  class TypeUnifier {
+  private:
+    Type idxType;
+    TypeVariableType *currentTV;
+    ASTContext *context;
+    SolutionUnifier* su;
+    bool storeNew;
+
+  public:
+
+    TypeUnifier(Type idxType, TypeVariableType *cTV, ASTContext *ctx,
+                SolutionUnifier *su, LookupFun inEnvTopLevel, bool storeNew) :
+    idxType(idxType), currentTV(cTV), context(ctx), su(su),
+    storeNew(storeNew), inMapTopLevel(inEnvTopLevel) {}
+
+    LookupFun inMapTopLevel;
+
+    std::optional<Type> unifyNominal(Type t);
+    std::optional<Type> unifyAll(Type t);
+    static void buildUnificationMap(ASTContext *context, SolutionUnifier *su,
+                                    ExtendedEnv baseMap, Env *storageMap,
+                                    bool storeNew, LookupFun inMapTop,
+                                    AccessorFun typeAccess);
+    static auto inReplacementMap(Env& map);
+    static std::pair<bool, bool> matchingTypes(ExtendedEnv baseMap,
+                                               Env unified1, Env comparison1,
+                                               Env unified2, Env comparison2);
+  };
+public:
+  SolutionUnifier(ASTContext *context) : context(context) {}
+  bool canUnifyTypes(const Solution* s1, const Solution* s2, ExtendedEnv baseMap,
+                     bool saveUnifiedTypes);
+};
+
 
 /// A function object suitable for use as an \c OpenRequirementFn that "opens"
 /// the requirements for a given type's generic signature given a set of
