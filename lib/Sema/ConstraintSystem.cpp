@@ -2086,6 +2086,14 @@ SolutionResult ConstraintSystem::salvage() {
     if (isTooComplex(viable))
       return SolutionResult::forTooComplex(getTooComplexRange());
 
+    if (!ambiguousBindings.conflictMap.empty())
+      assert(false);
+    for(auto &v : viable) {
+      llvm::errs() << "howdy hey!\n";
+      if (!v.ambiguousBindings.conflictMap.empty())
+        assert(false);
+    }
+
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
     if (diagnoseAmbiguityWithFixes(viable))

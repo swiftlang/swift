@@ -1566,6 +1566,7 @@ void BindingSet::markConflicting(ConflictReason reason) {
       CS.recordConflictedType(TypeVar, binding.BindingType->getCanonicalType(),
                               locator, reason);
     }
+  
   Bindings.clear();
   Bindings.emplace_back(
       PotentialBinding::forHole(TypeVar, TypeVar->getImpl().getLocator()));
