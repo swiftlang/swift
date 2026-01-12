@@ -21,6 +21,7 @@
 #include "swift/Sema/Score.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/Sema/Subtyping.h"
 
 namespace swift {
 
@@ -32,6 +33,25 @@ namespace constraints {
 
 class ConstraintSystem;
 class SyntacticElementTarget;
+
+/// Structure for mapping a type that has been seen in a
+/// conflict with the presentable version of this type
+struct ConflictedType {
+  CanType typeKey;
+  Type diagnosticType;
+  ConstraintLocator *locator;
+  ConflictReason *reason;
+
+  ConflictedType(CanType typeKey, Type diagnosticType, ConstraintLocator *locator, ConflictReason *reason) :
+    typeKey(typeKey), diagnosticType(diagnosticType), locator(locator), reason(reason) {}
+};
+
+
+/// Structure for holding types that have been in conflict and
+/// thus may be part of ambiguity for ambiguous diagnostics
+struct MergeableTypes {
+  llvm::DenseMap<TypeVariableType *, SmallSetVector<ConflictedType, 4>> map;
+};
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.
@@ -462,6 +482,10 @@ public:
   /// Contextual types introduced by this solution.
   std::vector<std::pair<ASTNode, ContextualTypeInfo>> contextualTypes;
 
+  /// Unioned types found while analyzing this and similar solutions
+  /// Also the original types encountered in the ambiguity
+  mutable MergeableTypes mergeableTypes;
+
   /// Maps AST nodes to their target.
   llvm::DenseMap<SyntacticElementTargetKey, SyntacticElementTarget> targets;
 
@@ -759,5 +783,31 @@ public:
 }  // end namespace constraints
 
 }  // end namespace swift
+
+namespace llvm {
+
+template<> struct DenseMapInfo<swift::constraints::ConflictedType> {
+  static swift::constraints::ConflictedType getEmptyKey() {
+    using namespace swift::constraints;
+
+    return ConflictedType(DenseMapInfo<swift::CanType>::getEmptyKey(),
+      DenseMapInfo<swift::TypeBase*>::getEmptyKey(),
+      DenseMapInfo<ConstraintLocator*>::getEmptyKey());
+  }
+
+  static swift::constraints::ConflictedType getTombstoneKey() {
+    return swift::constraints::ConflictedType(llvm::DenseMapInfo<swift::CanType>::getTombstoneKey(),
+      llvm::DenseMapInfo<swift::TypeBase*>::getTombstoneKey(),
+    llvm::DenseMapInfo<swift::constraints::ConstraintLocator*>::getTombstoneKey());
+  }
+  static unsigned getHashValue(swift::constraints::ConflictedType Val) {
+    return DenseMapInfo<swift::TypeBase*>::getHashValue(Val.typeKey.getPointer());
+  }
+  static bool isEqual(swift::constraints::ConflictedType LHS, swift::constraints::ConflictedType RHS) {
+    return LHS.typeKey.getPointer() == RHS.typeKey.getPointer();
+  }
+};
+
+}
 
 #endif  // SWIFT_SEMA_SOLUTION_H
