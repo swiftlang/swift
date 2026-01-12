@@ -1067,18 +1067,31 @@ public:
 } // end anonymous namespace
 
 namespace {
-/// Abstract base class for refutable pattern initializations.
-class RefutablePatternInitialization : public Initialization {
+struct RefutablePatternInitInfo {
   /// This is the label to jump to if the pattern fails to match.
   JumpDest failureDest;
+
+  /// PGO counter for the number of times the true branch is taken.
+  ProfileCounter numTrueTaken;
+
+  /// PGO counter for the number of times the false branch is taken.
+  ProfileCounter numFalseTaken;
+};
+
+/// Abstract base class for refutable pattern initializations.
+class RefutablePatternInitialization : public Initialization {
+  RefutablePatternInitInfo initInfo;
+
 public:
-  RefutablePatternInitialization(JumpDest failureDest)
-    : failureDest(failureDest) {
-    assert(failureDest.isValid() &&
+  RefutablePatternInitialization(RefutablePatternInitInfo initInfo)
+      : initInfo(initInfo) {
+    assert(initInfo.failureDest.isValid() &&
            "Refutable patterns can only exist in failable conditions");
   }
 
-  JumpDest getFailureDest() const { return failureDest; }
+  const RefutablePatternInitInfo &getInitInfo() const { return initInfo; }
+
+  JumpDest getFailureDest() const { return initInfo.failureDest; }
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override = 0;
@@ -1089,7 +1102,6 @@ public:
     InitializationPtr init = SGF.emitInitializationForVarDecl(var, var->isLet());
     RValue(SGF, loc, formalValueType, value).forwardInto(SGF, loc, init.get());
   }
-
 };
 } // end anonymous namespace
 
@@ -1097,8 +1109,8 @@ namespace {
 class ExprPatternInitialization : public RefutablePatternInitialization {
   ExprPattern *P;
 public:
-  ExprPatternInitialization(ExprPattern *P, JumpDest patternFailDest)
-    : RefutablePatternInitialization(patternFailDest), P(P) {}
+  ExprPatternInitialization(ExprPattern *P, RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), P(P) {}
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override;
@@ -1127,7 +1139,10 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
   auto falseBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
-  SGF.B.createCondBranch(loc, i1Value, contBB, falseBB);
+
+  auto &initInfo = getInitInfo();
+  SGF.B.createCondBranch(loc, i1Value, contBB, falseBB, initInfo.numTrueTaken,
+                         initInfo.numFalseTaken);
 
   SGF.B.setInsertionPoint(contBB);
 }
@@ -1139,21 +1154,22 @@ class EnumElementPatternInitialization : public RefutablePatternInitialization {
 public:
   EnumElementPatternInitialization(EnumElementDecl *ElementDecl,
                                    InitializationPtr &&subInitialization,
-                                   JumpDest patternFailDest)
-    : RefutablePatternInitialization(patternFailDest), ElementDecl(ElementDecl),
-      subInitialization(std::move(subInitialization)) {}
-    
+                                   RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), ElementDecl(ElementDecl),
+        subInitialization(std::move(subInitialization)) {}
+
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override {
     assert(isInit && "Only initialization is supported for refutable patterns");
-    emitEnumMatch(value, ElementDecl, subInitialization.get(), getFailureDest(),
+    emitEnumMatch(value, ElementDecl, subInitialization.get(), getInitInfo(),
                   loc, SGF);
   }
 
   static void emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
-                            Initialization *subInit, JumpDest FailureDest,
-                            SILLocation loc, SILGenFunction &SGF);
-  
+                            Initialization *subInit,
+                            RefutablePatternInitInfo initInfo, SILLocation loc,
+                            SILGenFunction &SGF);
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1209,7 +1225,11 @@ static EnumElementDecl *getOppositeBinaryDecl(const SILGenFunction &SGF,
 
 void EnumElementPatternInitialization::emitEnumMatch(
     ManagedValue value, EnumElementDecl *eltDecl, Initialization *subInit,
-    JumpDest failureDest, SILLocation loc, SILGenFunction &SGF) {
+    RefutablePatternInitInfo initInfo, SILLocation loc, SILGenFunction &SGF) {
+
+  auto failureDest = initInfo.failureDest;
+  auto trueCount = initInfo.numTrueTaken;
+  auto falseCount = initInfo.numFalseTaken;
 
   // Create all of the blocks early so we can maintain a consistent ordering
   // (and update less tests). Break this at your fingers parallel.
@@ -1244,11 +1264,12 @@ void EnumElementPatternInitialization::emitEnumMatch(
   bool inferredBinaryEnum = false;
   if (auto *otherDecl = getOppositeBinaryDecl(SGF, eltDecl)) {
     inferredBinaryEnum = true;
-    switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler);
+    switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler,
+                          falseCount);
   } else {
     switchBuilder.addDefaultCase(
         defaultBlock, nullptr, handler,
-        SwitchEnumBuilder::DefaultDispatchTime::BeforeNormalCases);
+        SwitchEnumBuilder::DefaultDispatchTime::BeforeNormalCases, falseCount);
   }
 
   // Always insert the some case at the front of the list. In the default case,
@@ -1342,7 +1363,8 @@ void EnumElementPatternInitialization::emitEnumMatch(
         // Pass the +1 value down into the sub initialization.
         subInit->copyOrInitValueInto(SGF, loc, mv, /*is an init*/ true);
         expr.exitAndBranch(loc);
-      });
+      },
+      trueCount);
 
   std::move(switchBuilder).emit();
 
@@ -1371,10 +1393,10 @@ class IsPatternInitialization : public RefutablePatternInitialization {
 public:
   IsPatternInitialization(IsPattern *pattern,
                           InitializationPtr &&subInitialization,
-                          JumpDest patternFailDest)
-  : RefutablePatternInitialization(patternFailDest), pattern(pattern),
-    subInitialization(std::move(subInitialization)) {}
-    
+                          RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), pattern(pattern),
+        subInitialization(std::move(subInitialization)) {}
+
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override;
   
@@ -1402,9 +1424,9 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   // Now that we have our result as an optional, we can use an enum projection
   // to do all the work.
-  EnumElementPatternInitialization::
-  emitEnumMatch(value, SGF.getASTContext().getOptionalSomeDecl(),
-                subInitialization.get(), getFailureDest(), loc, SGF);
+  EnumElementPatternInitialization::emitEnumMatch(
+      value, SGF.getASTContext().getOptionalSomeDecl(), subInitialization.get(),
+      getInitInfo(), loc, SGF);
 }
 
 namespace {
@@ -1412,8 +1434,8 @@ class BoolPatternInitialization : public RefutablePatternInitialization {
   BoolPattern *pattern;
 public:
   BoolPatternInitialization(BoolPattern *pattern,
-                            JumpDest patternFailDest)
-    : RefutablePatternInitialization(patternFailDest), pattern(pattern) {}
+                            RefutablePatternInitInfo initInfo)
+      : RefutablePatternInitialization(initInfo), pattern(pattern) {}
 
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override;
@@ -1435,7 +1457,10 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
 
   if (!pattern->getValue())
     std::swap(trueBB, falseBB);
-  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB);
+
+  auto &initInfo = getInitInfo();
+  SGF.B.createCondBranch(loc, i1Value, trueBB, falseBB, initInfo.numTrueTaken,
+                         initInfo.numFalseTaken);
   SGF.B.setInsertionPoint(contBB);
 }
 
@@ -1454,15 +1479,13 @@ struct InitializationForPattern
 {
   SILGenFunction &SGF;
 
-  /// This is the place that should be jumped to if the pattern fails to match.
-  /// This is invalid for irrefutable pattern initializations.
-  JumpDest patternFailDest;
-
+  RefutablePatternInitInfo initInfo;
   bool generateDebugInfo = true;
 
   InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest,
-                           bool generateDebugInfo)
-      : SGF(SGF), patternFailDest(patternFailDest),
+                           bool generateDebugInfo, ProfileCounter numTrueTaken,
+                           ProfileCounter numFalseTaken)
+      : SGF(SGF), initInfo({patternFailDest, numTrueTaken, numFalseTaken}),
         generateDebugInfo(generateDebugInfo) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
@@ -1509,30 +1532,28 @@ struct InitializationForPattern
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
       subInit = visit(subP);
-    auto *res = new EnumElementPatternInitialization(P->getElementDecl(),
-                                                     std::move(subInit),
-                                                     patternFailDest);
+    auto *res = new EnumElementPatternInitialization(
+        P->getElementDecl(), std::move(subInit), initInfo);
     return InitializationPtr(res);
   }
   InitializationPtr visitOptionalSomePattern(OptionalSomePattern *P) {
     InitializationPtr subInit = visit(P->getSubPattern());
-    auto *res = new EnumElementPatternInitialization(P->getElementDecl(),
-                                                     std::move(subInit),
-                                                     patternFailDest);
+    auto *res = new EnumElementPatternInitialization(
+        P->getElementDecl(), std::move(subInit), initInfo);
     return InitializationPtr(res);
   }
   InitializationPtr visitIsPattern(IsPattern *P) {
     InitializationPtr subInit;
     if (auto *subP = P->getSubPattern())
       subInit = visit(subP);
-    return InitializationPtr(new IsPatternInitialization(P, std::move(subInit),
-                                                         patternFailDest));
+    return InitializationPtr(
+        new IsPatternInitialization(P, std::move(subInit), initInfo));
   }
   InitializationPtr visitBoolPattern(BoolPattern *P) {
-    return InitializationPtr(new BoolPatternInitialization(P, patternFailDest));
+    return InitializationPtr(new BoolPatternInitialization(P, initInfo));
   }
   InitializationPtr visitExprPattern(ExprPattern *P) {
-    return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));
+    return InitializationPtr(new ExprPatternInitialization(P, initInfo));
   }
 };
 
@@ -1761,6 +1782,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
                                        SILLocation loc,
                                        ProfileCounter NumTrueTaken,
                                        ProfileCounter NumFalseTaken) {
+  // FIXME: The PGO counters here will be inaccurate when we have multiple
+  // conditions.
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
@@ -1775,14 +1798,16 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           // scope ends. The cleanup location loc isn't the perfect source location
           // but it's close enough.
           B.getSILGenFunction().enterDebugScope(loc, /*isBindingScope=*/true);
-        InitializationPtr initialization =
-          emitPatternBindingInitialization(elt.getPattern(), FalseDest);
+          InitializationPtr initialization = emitPatternBindingInitialization(
+              elt.getPattern(), FalseDest,
+              /*debugInfo*/ true, NumTrueTaken, NumFalseTaken);
 
-      // Emit the initial value into the initialization.
-      FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
-      emitExprInto(elt.getInitializer(), initialization.get(), loc);
-      // Pattern bindings handle their own tests, we don't need a boolean test.
-      continue;
+          // Emit the initial value into the initialization.
+          FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
+          emitExprInto(elt.getInitializer(), initialization.get(), loc);
+          // Pattern bindings handle their own tests, we don't need a boolean
+          // test.
+          continue;
     }
 
     case StmtConditionElement::CK_Boolean: { // Handle boolean conditions.
@@ -1851,9 +1876,17 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 }
 
 InitializationPtr SILGenFunction::emitPatternBindingInitialization(
-    Pattern *P, JumpDest failureDest, bool generateDebugInfo) {
-  auto init =
-      InitializationForPattern(*this, failureDest, generateDebugInfo).visit(P);
+    Pattern *P, JumpDest failureDest, bool generateDebugInfo,
+    ProfileCounter numTrueTaken, ProfileCounter numFalseTaken) {
+  // We only currently support PGO for single top-level refutable patterns
+  // since we don't track counters for individual refutable bits.
+  if (!P->getSemanticsProvidingPattern()->isSingleRefutablePattern()) {
+    numTrueTaken = ProfileCounter();
+    numFalseTaken = ProfileCounter();
+  }
+  auto init = InitializationForPattern(*this, failureDest, generateDebugInfo,
+                                       numTrueTaken, numFalseTaken)
+                  .visit(P);
   init->setEmitDebugValueOnInit(generateDebugInfo);
   return init;
 }
