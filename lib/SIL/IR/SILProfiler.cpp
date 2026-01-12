@@ -49,14 +49,10 @@ public:
   }
 
   /// If an ASTNode is being stored, returns it, otherwise \c nullptr.
-  ASTNode getAsNode() const {
-    return isSourceFile() ? nullptr : Storage;
-  }
+  ASTNode getAsNode() const { return isSourceFile() ? nullptr : Storage; }
 
   /// Whether this is storing a main SourceFile.
-  bool isSourceFile() const {
-    return getAsSourceFile();
-  }
+  bool isSourceFile() const { return getAsSourceFile(); }
 
   /// If a main SourceFile is being stored, returns it, otherwise \c nullptr.
   SourceFile *getAsSourceFile() const {
@@ -209,9 +205,7 @@ void ProfileCounterRef::dump(raw_ostream &OS) const {
   }
 }
 
-void ProfileCounterRef::dump() const {
-  dump(llvm::errs());
-}
+void ProfileCounterRef::dump() const { dump(llvm::errs()); }
 
 namespace {
 
@@ -222,8 +216,8 @@ namespace {
 ///
 /// Apply \p Func if the function can be visited.
 template <typename F>
-ASTWalker::PreWalkAction
-visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
+ASTWalker::PreWalkAction visitFunctionDecl(ASTWalker &Walker,
+                                           AbstractFunctionDecl *AFD, F Func) {
   if (Walker.Parent.isNull()) {
     assert(AFD->hasBody());
     Func();
@@ -317,9 +311,7 @@ struct MapRegionCounters : public ASTWalker {
     return false;
   }
 
-  void mapRegion(ASTNode N) {
-    mapRegion(ProfileCounterRef::node(N));
-  }
+  void mapRegion(ASTNode N) { mapRegion(ProfileCounterRef::node(N)); }
 
   void mapRegion(ProfileCounterRef Ref) {
     CounterMap[Ref] = NextCounter;
@@ -468,6 +460,9 @@ public:
     /// A region that refines the counter of a node region. This doesn't have
     /// an ASTNode of its own.
     Refined,
+
+    /// A branch region.
+    Branch,
   };
 
 private:
@@ -477,6 +472,9 @@ private:
   /// The counter for an incomplete region. Note we do not store counters
   /// for nodes, as we need to be able to fix them up after popping the regions.
   std::optional<CounterExpr> Counter;
+
+  /// The false counter for a branch region.
+  std::optional<CounterExpr> FalseCounter;
 
   /// The region's starting location.
   std::optional<SourceLoc> StartLoc;
@@ -489,16 +487,20 @@ private:
   bool IsInMacroExpansion = false;
 
   SourceMappingRegion(Kind RegionKind, std::optional<CounterExpr> Counter,
-                      std::optional<SourceLoc> StartLoc)
-      : RegionKind(RegionKind), Counter(Counter), StartLoc(StartLoc) {
+                      std::optional<SourceLoc> StartLoc,
+                      std::optional<CounterExpr> FalseCounter = std::nullopt)
+      : RegionKind(RegionKind), Counter(Counter), StartLoc(StartLoc),
+        FalseCounter(FalseCounter) {
     assert((!StartLoc || StartLoc->isValid()) &&
            "Expected start location to be valid");
   }
 
   SourceMappingRegion(Kind RegionKind, ASTNode Node, SourceRange Range,
                       std::optional<CounterExpr> Counter,
-                      const SourceManager &SM)
-      : RegionKind(RegionKind), Node(Node), Counter(Counter) {
+                      const SourceManager &SM,
+                      std::optional<CounterExpr> FalseCounter = std::nullopt)
+      : RegionKind(RegionKind), Node(Node), Counter(Counter),
+        FalseCounter(FalseCounter) {
     assert(Range.isValid());
     StartLoc = Range.Start;
     EndLoc = Lexer::getLocForEndOfToken(SM, Range.End);
@@ -517,6 +519,18 @@ public:
                                /*Counter*/ std::nullopt, SM);
   }
 
+  /// Create a branch region for an ASTNode.
+  static SourceMappingRegion branch(ASTNode Node, const SourceManager &SM,
+                                    CounterExpr TrueCounter,
+                                    CounterExpr FalseCounter,
+                                    SourceRange Range = SourceRange()) {
+    if (Range.isInvalid())
+      Range = Node.getSourceRange();
+
+    return SourceMappingRegion(Kind::Branch, Node, Range, TrueCounter, SM,
+                               FalseCounter);
+  }
+
   /// Create a source region for an ASTNode that is only present for scoping of
   /// child regions, and doesn't need to be included in the resulting set of
   /// regions.
@@ -530,218 +544,282 @@ public:
   /// Create a refined region for a given counter.
   static SourceMappingRegion refined(CounterExpr Counter,
                                      std::optional<SourceLoc> StartLoc) {
-    return SourceMappingRegion(Kind::Refined, Counter, StartLoc);
-  }
+    static SourceMappingRegion refined(CounterExpr Counter,
+                                       std::optional<SourceLoc> StartLoc) {
+      return SourceMappingRegion(Kind::Refined, Counter, StartLoc);
+    }
 
-  SourceMappingRegion(SourceMappingRegion &&Region) = default;
-  SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
+    SourceMappingRegion(SourceMappingRegion && Region) = default;
+    SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
 
-  bool isInMacroExpansion() const {
-    return IsInMacroExpansion;
-  }
+    bool isInMacroExpansion() const { return IsInMacroExpansion; }
 
-  void setIsInMacroExpansion() {
-    IsInMacroExpansion = true;
-  }
+    void setIsInMacroExpansion() { IsInMacroExpansion = true; }
 
-  /// Whether this region is for scoping only.
-  bool isForScopingOnly() const { return RegionKind == Kind::ScopingOnly; }
+    /// Whether this region is for scoping only.
+    bool isForScopingOnly() const { return RegionKind == Kind::ScopingOnly; }
 
-  ASTNode getNode() const { return Node; }
+    bool isBranch() const { return RegionKind == Kind::Branch; }
 
-  CounterExpr getCounter(const llvm::DenseMap<ProfileCounterRef, CounterExpr>
-                             &NodeCounters) const {
-    if (Counter)
-      return *Counter;
+    ASTNode getNode() const { return Node; }
 
-    auto Iter = NodeCounters.find(ProfileCounterRef::node(Node));
-    assert(Iter != NodeCounters.end() && "Must have counter for node");
-    return Iter->second;
-  }
+    CounterExpr getCounter(
+        const llvm::DenseMap<ProfileCounterRef, CounterExpr> &NodeCounters)
+        const {
+      if (Counter)
+        return *Counter;
 
-  bool hasStartLoc() const { return StartLoc.has_value(); }
+      auto Iter = NodeCounters.find(ProfileCounterRef::node(Node));
+      assert(Iter != NodeCounters.end() && "Must have counter for node");
+      return Iter->second;
+    }
 
-  void setStartLoc(SourceLoc Loc) {
-    assert(Loc.isValid());
-    StartLoc = Loc;
-  }
+    bool hasStartLoc() const { return StartLoc.has_value(); }
 
-  const SourceLoc &getStartLoc() const {
-    assert(StartLoc && "Region has no start location");
-    return *StartLoc;
-  }
+    void setStartLoc(SourceLoc Loc) {
+      assert(Loc.isValid());
+      StartLoc = Loc;
+    }
 
-  bool hasEndLoc() const { return EndLoc.has_value(); }
+    const SourceLoc &getStartLoc() const {
+      assert(StartLoc && "Region has no start location");
+      return *StartLoc;
+    }
 
-  void setEndLoc(SourceLoc Loc) {
-    assert(Loc.isValid());
-    EndLoc = Loc;
-  }
+    bool hasEndLoc() const { return EndLoc.has_value(); }
 
-  const SourceLoc &getEndLoc() const {
-    assert(EndLoc && "Region has no end location");
-    return *EndLoc;
-  }
+    void setEndLoc(SourceLoc Loc) {
+      assert(Loc.isValid());
+      EndLoc = Loc;
+    }
 
-  /// Whether the region has a non-empty range.
-  bool hasNonEmptyRange() const {
-    return StartLoc && EndLoc && *StartLoc != *EndLoc;
-  }
+    const SourceLoc &getEndLoc() const {
+      assert(EndLoc && "Region has no end location");
+      return *EndLoc;
+    }
 
-  void print(llvm::raw_ostream &OS, const SourceManager &SM) const {
-    OS << "[";
-    if (hasStartLoc())
-      getStartLoc().print(OS, SM);
-    else
-      OS << "?";
-    OS << ", ";
-    if (hasEndLoc())
-      getEndLoc().print(OS, SM);
-    else
-      OS << "?";
-    OS << "]";
-  }
-};
+    /// Whether the region has a non-empty range.
+    bool hasNonEmptyRange() const {
+      return StartLoc && EndLoc && *StartLoc != *EndLoc;
+    }
 
-/// An ASTWalker that maps ASTNodes to profiling counters.
-///
-/// TODO: We ought to be able to leverage the CounterExprs from the
-/// CoverageMapping walker to recompute the correct counter information
-/// for this walker.
-struct PGOMapping : public ASTWalker {
-  /// The SIL function being profiled.
-  SILDeclRef Constant;
+    void print(llvm::raw_ostream & OS, const SourceManager &SM) const {
+      OS << "[";
+      if (hasStartLoc())
+        getStartLoc().print(OS, SM);
+      else
+        OS << "?";
+      OS << ", ";
+      if (hasEndLoc())
+        getEndLoc().print(OS, SM);
+      else
+        OS << "?";
+      OS << "]";
+    }
+  };
 
-  /// The counter indices for AST nodes.
-  const llvm::DenseMap<ProfileCounterRef, unsigned> &CounterMap;
+  /// An ASTWalker that maps ASTNodes to profiling counters.
+  ///
+  /// TODO: We ought to be able to leverage the CounterExprs from the
+  /// CoverageMapping walker to recompute the correct counter information
+  /// for this walker.
+  struct PGOMapping : public ASTWalker {
+    /// The SIL function being profiled.
+    SILDeclRef Constant;
 
-  /// The loaded counter data.
-  const llvm::InstrProfRecord &LoadedCounts;
+    /// The counter indices for AST nodes.
+    const llvm::DenseMap<ProfileCounterRef, unsigned> &CounterMap;
 
-  /// The output map of statements to counters.
-  llvm::DenseMap<ProfileCounterRef, ProfileCounter> &LoadedCounterMap;
-  llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
+    /// The loaded counter data.
+    const llvm::InstrProfRecord &LoadedCounts;
 
-  PGOMapping(SILDeclRef Constant,
-             const llvm::DenseMap<ProfileCounterRef, unsigned> &CounterMap,
-             const llvm::InstrProfRecord &LoadedCounts,
-             llvm::DenseMap<ProfileCounterRef, ProfileCounter> &LoadedCounterMap,
-             llvm::DenseMap<ASTNode, ASTNode> &RegionCondToParentMap)
-      : Constant(Constant), CounterMap(CounterMap), LoadedCounts(LoadedCounts),
-        LoadedCounterMap(LoadedCounterMap),
-        CondToParentMap(RegionCondToParentMap) {}
+    /// The output map of statements to counters.
+    llvm::DenseMap<ProfileCounterRef, ProfileCounter> &LoadedCounterMap;
+    llvm::DenseMap<ASTNode, ASTNode> &CondToParentMap;
 
-  /// Retrieve the counter index for a leaf counter.
-  unsigned getCounterIndex(ProfileCounterRef Ref) const {
-    auto result = CounterMap.find(Ref);
-    assert(result != CounterMap.end() && "Unmapped node?");
-    return result->second;
-  }
+    PGOMapping(
+        SILDeclRef Constant,
+        const llvm::DenseMap<ProfileCounterRef, unsigned> &CounterMap,
+        const llvm::InstrProfRecord &LoadedCounts,
+        llvm::DenseMap<ProfileCounterRef, ProfileCounter> &LoadedCounterMap,
+        llvm::DenseMap<ASTNode, ASTNode> &RegionCondToParentMap)
+        : Constant(Constant), CounterMap(CounterMap),
+          LoadedCounts(LoadedCounts), LoadedCounterMap(LoadedCounterMap),
+          CondToParentMap(RegionCondToParentMap) {}
 
-  /// Retrieve the counter index for a leaf node.
-  unsigned getCounterIndex(ASTNode Node) const {
-    return getCounterIndex(ProfileCounterRef::node(Node));
-  }
+    /// Retrieve the counter index for a leaf counter.
+    unsigned getCounterIndex(ProfileCounterRef Ref) const {
+      auto result = CounterMap.find(Ref);
+      assert(result != CounterMap.end() && "Unmapped node?");
+      return result->second;
+    }
 
-  unsigned getParentCounter() const {
-    if (Parent.isNull())
+    /// Retrieve the counter index for a leaf node.
+    unsigned getCounterIndex(ASTNode Node) const {
+      return getCounterIndex(ProfileCounterRef::node(Node));
+    }
+
+    unsigned getParentCounter() const {
+      if (Parent.isNull())
+        return 0;
+      else if (Parent.getKind() == ASTWalker::ParentKind::Decl) {
+        auto it = CounterMap.find(ProfileCounterRef::node(Parent.getAsDecl()));
+        return (it != CounterMap.end()) ? it->getSecond() : 0;
+      } else if (Parent.getKind() == ASTWalker::ParentKind::Stmt) {
+        auto it = CounterMap.find(ProfileCounterRef::node(Parent.getAsStmt()));
+        return (it != CounterMap.end()) ? it->getSecond() : 0;
+      } else if (Parent.getKind() == ASTWalker::ParentKind::Expr) {
+        auto it = CounterMap.find(ProfileCounterRef::node(Parent.getAsExpr()));
+        return (it != CounterMap.end()) ? it->getSecond() : 0;
+      }
       return 0;
-    else if (Parent.getKind() == ASTWalker::ParentKind::Decl) {
-      auto it = CounterMap.find(ProfileCounterRef::node(Parent.getAsDecl()));
-      return (it != CounterMap.end()) ? it->getSecond() : 0;
-    } else if (Parent.getKind() == ASTWalker::ParentKind::Stmt) {
-      auto it = CounterMap.find(ProfileCounterRef::node(Parent.getAsStmt()));
-      return (it != CounterMap.end()) ? it->getSecond() : 0;
-    } else if (Parent.getKind() == ASTWalker::ParentKind::Expr) {
-      auto it = CounterMap.find(ProfileCounterRef::node(Parent.getAsExpr()));
-      return (it != CounterMap.end()) ? it->getSecond() : 0;
     }
-    return 0;
-  }
 
-  ProfileCounter subtract(ProfileCounter L, ProfileCounter R) {
-    if (!L.hasValue() || !R.hasValue()) {
-      return L;
+    ProfileCounter subtract(ProfileCounter L, ProfileCounter R) {
+      if (!L.hasValue() || !R.hasValue()) {
+        return L;
+      }
+      uint64_t LV = L.getValue();
+      uint64_t RV = R.getValue();
+      assert(LV >= RV && "Invalid counter subtraction");
+      return LV - RV;
     }
-    uint64_t LV = L.getValue();
-    uint64_t RV = R.getValue();
-    assert(LV >= RV && "Invalid counter subtraction");
-    return LV - RV;
-  }
 
-  /// Load the execution count corresponding to \p Ref from a profile, if one
-  /// is available.
-  ProfileCounter loadExecutionCount(ProfileCounterRef Ref) {
-    auto CounterIt = CounterMap.find(Ref);
-    assert(CounterIt != CounterMap.end() &&
-           "region does not have an associated counter");
+    /// Load the execution count corresponding to \p Ref from a profile, if one
+    /// is available.
+    ProfileCounter loadExecutionCount(ProfileCounterRef Ref) {
+      auto CounterIt = CounterMap.find(Ref);
+      assert(CounterIt != CounterMap.end() &&
+             "region does not have an associated counter");
 
-    unsigned CounterIndexForFunc = CounterIt->second;
-    return LoadedCounts.Counts[CounterIndexForFunc];
-  }
-
-  /// Load the execution count corresponding to \p Node from a profile, if one
-  /// is available.
-  ProfileCounter loadExecutionCount(ASTNode Node) {
-    return loadExecutionCount(ProfileCounterRef::node(Node));
-  }
-
-  /// Record the execution count for a leaf ref.
-  void setKnownExecutionCount(ProfileCounterRef Ref) {
-    LoadedCounterMap[Ref] = loadExecutionCount(Ref);
-  }
-
-  /// Record the execution count for a leaf node.
-  void setKnownExecutionCount(ASTNode Node) {
-    setKnownExecutionCount(ProfileCounterRef::node(Node));
-  }
-
-  /// Record a computed execution count for a node.
-  void setExecutionCount(ASTNode Node, ProfileCounter count) {
-    LoadedCounterMap[ProfileCounterRef::node(Node)] = count;
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      return visitFunctionDecl(*this, AFD, [&] {
-        setKnownExecutionCount(AFD->getBody());
-      });
+      unsigned CounterIndexForFunc = CounterIt->second;
+      return LoadedCounts.Counts[CounterIndexForFunc];
     }
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      setKnownExecutionCount(TLCD->getBody());
-      return Action::Continue();
+
+    /// Load the execution count corresponding to \p Node from a profile, if one
+    /// is available.
+    ProfileCounter loadExecutionCount(ASTNode Node) {
+      return loadExecutionCount(ProfileCounterRef::node(Node));
     }
-    return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
-  }
 
-  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
-    // We want to walk lazy initializers present in the synthesized getter for
-    // a lazy variable.
-    return LazyInitializerWalking::InAccessor;
-  }
+    /// Record the execution count for a leaf ref.
+    void setKnownExecutionCount(ProfileCounterRef Ref) {
+      LoadedCounterMap[Ref] = loadExecutionCount(Ref);
+    }
 
-  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
-    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
-    // mapped as part of the wrapped value initialization.
-    return false;
-  }
+    /// Record the execution count for a leaf node.
+    void setKnownExecutionCount(ASTNode Node) {
+      setKnownExecutionCount(ProfileCounterRef::node(Node));
+    }
 
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
+    /// Record a computed execution count for a node.
+    void setExecutionCount(ASTNode Node, ProfileCounter count) {
+      LoadedCounterMap[ProfileCounterRef::node(Node)] = count;
+    }
 
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    unsigned parent = getParentCounter();
-    auto parentCount = LoadedCounts.Counts[parent];
-    if (auto *IS = dyn_cast<IfStmt>(S)) {
-      auto thenStmt = IS->getThenStmt();
-      auto thenCount = loadExecutionCount(thenStmt);
-      setExecutionCount(thenStmt, thenCount);
-      if (auto elseStmt = IS->getElseStmt()) {
-        auto count = parentCount;
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        return visitFunctionDecl(
+            *this, AFD, [&] { setKnownExecutionCount(AFD->getBody()); });
+      }
+      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+        setKnownExecutionCount(TLCD->getBody());
+        return Action::Continue();
+      }
+      return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
+    }
+
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+      // We want to walk lazy initializers present in the synthesized getter for
+      // a lazy variable.
+      return LazyInitializerWalking::InAccessor;
+    }
+
+    bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+      // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+      // mapped as part of the wrapped value initialization.
+      return false;
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      unsigned parent = getParentCounter();
+      auto parentCount = LoadedCounts.Counts[parent];
+      if (auto *IS = dyn_cast<IfStmt>(S)) {
+        auto thenStmt = IS->getThenStmt();
+        auto thenCount = loadExecutionCount(thenStmt);
+        setExecutionCount(thenStmt, thenCount);
+        if (auto elseStmt = IS->getElseStmt()) {
+          auto count = parentCount;
+          if (!parent) {
+            auto thenVal = thenCount.getValue();
+            for (auto pCount = getCounterIndex(thenStmt); pCount > 0;
+                 --pCount) {
+              auto cCount = LoadedCounts.Counts[pCount];
+              if (cCount > thenVal) {
+                count = cCount;
+                break;
+              }
+            }
+          }
+          setExecutionCount(elseStmt, subtract(count, thenCount));
+          auto Cond = IS->getCond();
+          for (const auto &elt : Cond) {
+            if (elt.getKind() ==
+                StmtConditionElement::ConditionKind::CK_PatternBinding) {
+              CondToParentMap[elt.getInitializer()] = IS;
+            }
+          }
+        }
+      } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
+        auto guardBody = GS->getBody();
+        auto guardCount = loadExecutionCount(guardBody);
+        setExecutionCount(guardBody, guardCount);
+        setExecutionCount(GS, subtract(parentCount, guardCount));
+      } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
+        setKnownExecutionCount(WS->getBody());
+        setExecutionCount(WS, parentCount);
+      } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+        setKnownExecutionCount(RWS->getBody());
+        setExecutionCount(RWS, parentCount);
+      } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+        setKnownExecutionCount(FES->getBody());
+        setExecutionCount(FES, parentCount);
+      } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
+        setKnownExecutionCount(CS);
+      }
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+      // We don't walk into parameter lists. Default arguments should be visited
+      // directly.
+      // FIXME: We don't yet profile default argument generators at all.
+      return Action::SkipNode();
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (shouldSkipExpr(E))
+        return shouldWalkIntoExpr(E, Parent, Constant);
+
+      unsigned parent = getParentCounter();
+
+      if (Parent.isNull())
+        setKnownExecutionCount(E);
+
+      if (auto *IE = dyn_cast<TernaryExpr>(E)) {
+        auto thenExpr = IE->getThenExpr();
+        auto thenCount = loadExecutionCount(thenExpr);
+        setExecutionCount(thenExpr, thenCount);
+        auto elseExpr = IE->getElseExpr();
+        assert(elseExpr && "An if-expr must have an else subexpression");
+        auto count = LoadedCounts.Counts[parent];
         if (!parent) {
           auto thenVal = thenCount.getValue();
-          for (auto pCount = getCounterIndex(thenStmt); pCount > 0; --pCount) {
+          for (auto pCount = getCounterIndex(thenExpr); pCount > 0; --pCount) {
             auto cCount = LoadedCounts.Counts[pCount];
             if (cCount > thenVal) {
               count = cCount;
@@ -749,908 +827,893 @@ struct PGOMapping : public ASTWalker {
             }
           }
         }
-        setExecutionCount(elseStmt, subtract(count, thenCount));
-        auto Cond = IS->getCond();
-        for (const auto &elt : Cond) {
-          if (elt.getKind() ==
-              StmtConditionElement::ConditionKind::CK_PatternBinding) {
-            CondToParentMap[elt.getInitializer()] = IS;
-          }
-        }
+        setExecutionCount(elseExpr, subtract(count, thenCount));
       }
-    } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
-      auto guardBody = GS->getBody();
-      auto guardCount = loadExecutionCount(guardBody);
-      setExecutionCount(guardBody, guardCount);
-      setExecutionCount(GS, subtract(parentCount, guardCount));
-    } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      setKnownExecutionCount(WS->getBody());
-      setExecutionCount(WS, parentCount);
-    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
-      setKnownExecutionCount(RWS->getBody());
-      setExecutionCount(RWS, parentCount);
-    } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
-      setKnownExecutionCount(FES->getBody());
-      setExecutionCount(FES, parentCount);
-    } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      setKnownExecutionCount(CS);
-    }
-    return Action::Continue(S);
-  }
+      if (isa<LazyInitializerExpr>(E))
+        setKnownExecutionCount(E);
 
-  PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-    // We don't walk into parameter lists. Default arguments should be visited
-    // directly.
-    // FIXME: We don't yet profile default argument generators at all.
-    return Action::SkipNode();
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (shouldSkipExpr(E))
       return shouldWalkIntoExpr(E, Parent, Constant);
-
-    unsigned parent = getParentCounter();
-
-    if (Parent.isNull())
-      setKnownExecutionCount(E);
-
-    if (auto *IE = dyn_cast<TernaryExpr>(E)) {
-      auto thenExpr = IE->getThenExpr();
-      auto thenCount = loadExecutionCount(thenExpr);
-      setExecutionCount(thenExpr, thenCount);
-      auto elseExpr = IE->getElseExpr();
-      assert(elseExpr && "An if-expr must have an else subexpression");
-      auto count = LoadedCounts.Counts[parent];
-      if (!parent) {
-        auto thenVal = thenCount.getValue();
-        for (auto pCount = getCounterIndex(thenExpr); pCount > 0; --pCount) {
-          auto cCount = LoadedCounts.Counts[pCount];
-          if (cCount > thenVal) {
-            count = cCount;
-            break;
-          }
-        }
-      }
-      setExecutionCount(elseExpr, subtract(count, thenCount));
     }
-    if (isa<LazyInitializerExpr>(E))
-      setKnownExecutionCount(E);
 
-    return shouldWalkIntoExpr(E, Parent, Constant);
-  }
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (shouldSkipExpr(E))
+        return Action::Continue(E);
 
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-    if (shouldSkipExpr(E))
+      // If we have an expr that may throw an error, give it a counter for the
+      // error branch.
+      if (mayExpressionThrow(E))
+        setKnownExecutionCount(ProfileCounterRef::errorBranchOf(E));
+
       return Action::Continue(E);
-
-    // If we have an expr that may throw an error, give it a counter for the
-    // error branch.
-    if (mayExpressionThrow(E))
-      setKnownExecutionCount(ProfileCounterRef::errorBranchOf(E));
-
-    return Action::Continue(E);
-  }
-};
-
-/// Produce coverage mapping information for a function. This involves taking
-/// the counters computed by MapRegionCounters, and annotating the source with
-/// regions that are defined in terms of those counters.
-struct CoverageMapping : public ASTWalker {
-private:
-  const SourceManager &SM;
-  SourceFile *SF;
-
-  /// The SIL function being profiled.
-  SILDeclRef Constant;
-
-  /// Builder needed to produce CounterExprs.
-  llvm::coverage::CounterExpressionBuilder CounterBuilder;
-
-  /// The map of statements to counter expressions.
-  llvm::DenseMap<ProfileCounterRef, CounterExpr> CounterExprs;
-
-  /// The map of counter references to their concrete counter indices.
-  const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters;
-
-  /// The source mapping regions for this function.
-  std::vector<SourceMappingRegion> SourceRegions;
-
-  /// A stack of currently live regions.
-  std::vector<SourceMappingRegion> RegionStack;
-
-  /// A stack of active repeat-while loops.
-  std::vector<RepeatWhileStmt *> RepeatWhileStack;
-
-  std::optional<CounterExpr> ExitCounter;
-
-  Stmt *ImplicitTopLevelBody = nullptr;
-
-  /// The number of parent MacroExpansionExprs.
-  unsigned MacroDepth = 0;
-
-  /// Whether the current walk is within a macro expansion.
-  bool isInMacroExpansion() const { return MacroDepth > 0; }
-
-  /// Return true if \c Ref has an associated counter.
-  bool hasCounter(ProfileCounterRef Ref) { return CounterExprs.count(Ref); }
-
-  /// Return true if \c Node has an associated counter.
-  bool hasCounter(ASTNode Node) {
-    return hasCounter(ProfileCounterRef::node(Node));
-  }
-
-  /// Return the region counter for \c Ref.
-  ///
-  /// This should only be called on references that have a dedicated counter.
-  CounterExpr getCounter(ProfileCounterRef Ref) {
-    auto Iter = CounterExprs.find(Ref);
-    assert(Iter != CounterExprs.end() && "No counter found");
-    return Iter->second;
-  }
-
-  /// Return the region counter for \c Node.
-  ///
-  /// This should only be called on statements that have a dedicated counter.
-  CounterExpr getCounter(ASTNode Node) {
-    return getCounter(ProfileCounterRef::node(Node));
-  }
-
-  /// Create a counter expression for \c Ref and add it to the map.
-  void assignCounter(ProfileCounterRef Ref, CounterExpr Expr) {
-    auto Res = CounterExprs.insert({Ref, Expr});
-
-    // Overwrite an existing assignment.
-    if (!Res.second)
-      Res.first->second = std::move(Expr);
-  }
-
-  /// Create a counter expression for \c Node and add it to the map.
-  void assignCounter(ASTNode Node, CounterExpr Expr) {
-    assignCounter(ProfileCounterRef::node(Node), std::move(Expr));
-  }
-
-  /// Create a counter expression referencing \c Ref's own counter. This must
-  /// have been previously mapped by MapRegionCounters.
-  CounterExpr assignKnownCounter(ProfileCounterRef Ref) {
-    auto Iter = ConcreteCounters.find(Ref);
-    assert(Iter != ConcreteCounters.end() && "Should have mapped this counter");
-    auto Counter = CounterExpr::Concrete(Iter->second);
-    assignCounter(Ref, Counter);
-    return Counter;
-  }
-
-  /// Create a counter expression referencing \c Node's own counter. This must
-  /// have been previously mapped by MapRegionCounters.
-  CounterExpr assignKnownCounter(ASTNode Node) {
-    return assignKnownCounter(ProfileCounterRef::node(Node));
-  }
-
-  /// Add \c Expr to \c Node's counter.
-  void addToCounter(ASTNode Node, CounterExpr Expr) {
-    auto Counter = getCounter(Node);
-    if (Counter.isZero()) {
-      Counter = std::move(Expr);
-    } else {
-      Counter = CounterExpr::Add(Counter, std::move(Expr), CounterBuilder);
     }
-    assignCounter(Node, Counter);
-  }
-
-  /// Subtract \c Expr from \c Node's counter.
-  void subtractFromCounter(ASTNode Node, CounterExpr Expr) {
-    if (Expr.isZero())
-      return;
-
-    auto Counter = getCounter(Node);
-    assert(!Counter.isZero() && "Cannot create a negative counter");
-    assignCounter(Node,
-                  CounterExpr::Sub(Counter, std::move(Expr), CounterBuilder));
-  }
-
-  /// Return the current region's counter.
-  CounterExpr getCurrentCounter() {
-    return getRegion().getCounter(CounterExprs);
-  }
-
-  /// Get the counter from the end of the most recent scope.
-  CounterExpr getExitCounter() {
-    assert(ExitCounter && "no exit counter available");
-    return *ExitCounter;
-  }
-
-  /// Set the exit count so we can leave the scope related to \c Node
-  ///
-  /// Returns the delta of the count on entering \c Node and exiting, or null if
-  /// there was no change.
-  std::optional<CounterExpr> setExitCount(ASTNode Node) {
-    // A `try?` absorbs child error branches, so we can assume the exit count is
-    // the same as the entry count in that case.
-    // NOTE: This assumes there is no other kind of control flow that can happen
-    // in a nested expression, which is true today, but may not always be.
-    if (Node.isExpr(ExprKind::OptionalTry))
-      return std::nullopt;
-
-    ExitCounter = getCurrentCounter();
-    if (hasCounter(Node) && getRegion().getNode() != Node)
-      return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterBuilder);
-    return std::nullopt;
-  }
-
-  /// Adjust the count for control flow when exiting a scope.
-  void adjustForNonLocalExits(ASTNode Scope,
-                              std::optional<CounterExpr> ControlFlowAdjust) {
-    // If there are no regions left, there's nothing to adjust.
-    if (RegionStack.empty())
-      return;
-
-    // If the region is for a brace, check to see if we have a parent labeled
-    // statement, in which case the exit count needs to account for any direct
-    // jumps to it though e.g break statements.
-    std::optional<CounterExpr> JumpsToLabel;
-    if (Scope.isStmt(StmtKind::Brace)) {
-      if (auto *ParentStmt = Parent.getAsStmt()) {
-        if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
-          // We need to handle the brace of a DoCatchStmt here specially,
-          // applying the same logic we apply to the catch clauses (handled by
-          // the CaseStmt logic), we add on the exit count of the branch to the
-          // statement's exit count.
-          addToCounter(DCS, getExitCounter());
-          return;
-        }
-
-        // Don't apply exit adjustments to if statement branches, they should
-        // be handled at the end of the statement. This avoids creating awkward
-        // overlapping exit regions for each branch, and ensures 'break'
-        // statements only have their jump counted once for the entire
-        // statement.
-        if (isa<IfStmt>(ParentStmt))
-          return;
-
-        if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
-          JumpsToLabel = getCounter(LS);
-      }
-    }
-
-    if (!ControlFlowAdjust && !JumpsToLabel)
-      return;
-
-    auto Count = getCurrentCounter();
-    // Add the counts from jumps directly to the label (such as breaks)
-    if (JumpsToLabel)
-      Count = CounterExpr::Add(Count, *JumpsToLabel, CounterBuilder);
-    // Now apply any adjustments for control flow.
-    if (ControlFlowAdjust)
-      Count = CounterExpr::Sub(Count, *ControlFlowAdjust, CounterBuilder);
-
-    replaceCount(Count, getEndLoc(Scope));
-  }
-
-  /// Push a region onto the stack.
-  void pushRegion(SourceMappingRegion Region) {
-    // Note on the region whether we're currently in a macro expansion.
-    if (isInMacroExpansion())
-      Region.setIsInMacroExpansion();
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "Pushed region: ";
-      Region.print(llvm::dbgs(), SM);
-      llvm::dbgs() << "\n";
-    });
-    RegionStack.push_back(std::move(Region));
-  }
-
-  /// Replace the current region at \p Start with a new counter. If \p Start is
-  /// \c None, or the counter is semantically zero, an 'incomplete' region is
-  /// formed, which is not recorded unless followed by additional AST nodes.
-  void replaceCount(CounterExpr Counter, std::optional<SourceLoc> Start) {
-    // If the counter is zero, form an 'incomplete' region with no starting
-    // location. This prevents forming unreachable regions unless there is a
-    // following statement or expression to extend the region.
-    if (Start && Counter.isZero())
-      Start = std::nullopt;
-
-    pushRegion(SourceMappingRegion::refined(Counter, Start));
-  }
-
-  /// Get the location for the end of the last token in \c Node.
-  SourceLoc getEndLoc(ASTNode Node) {
-    return Lexer::getLocForEndOfToken(SM, Node.getEndLoc());
-  }
-
-  /// Record a popped region in the resulting list of regions.
-  void takePoppedRegion(SourceMappingRegion &&Region, SourceLoc ParentEndLoc) {
-    LLVM_DEBUG({
-      llvm::dbgs() << "Popped region: ";
-      Region.print(llvm::dbgs(), SM);
-      llvm::dbgs() << "\n";
-    });
-
-    // Don't record regions in macro expansions, they don't have source
-    // locations that can be meaningfully mapped to source code.
-    if (Region.isInMacroExpansion())
-      return;
-
-    // Don't bother recording regions that are only present for scoping.
-    if (Region.isForScopingOnly())
-      return;
-
-    // Don't record incomplete regions.
-    if (!Region.hasStartLoc())
-      return;
-
-    // Set the region end location to the end location of the parent.
-    if (!Region.hasEndLoc())
-      Region.setEndLoc(ParentEndLoc);
-
-    // If the range ended up being empty, ignore it (this can happen when we
-    // replace the counter, and don't extend the region any further).
-    if (!Region.hasNonEmptyRange())
-      return;
-
-    SourceRegions.push_back(std::move(Region));
-  }
-
-  /// Pop regions from the stack into the function's list of regions.
-  ///
-  /// Adds all regions from \c ParentNode to the top of the stack to the
-  /// function's \c SourceRegions.
-  void popRegions(ASTNode ParentNode) {
-    auto I = llvm::find_if(RegionStack, [&](const SourceMappingRegion &Region) {
-      return Region.getNode().getOpaqueValue() == ParentNode.getOpaqueValue();
-    });
-    auto E = RegionStack.end();
-    assert(I != E && "parent not in stack");
-    assert(I->hasNonEmptyRange() && "Pushed node with empty range?");
-
-    auto EndLoc = I->getEndLoc();
-    for (auto &Region : llvm::make_range(I, E))
-      takePoppedRegion(std::move(Region), EndLoc);
-
-    RegionStack.erase(I, E);
-  }
-
-  /// Exit the given region, popping it and its children from the region stack,
-  /// and adjusting the following counter if needed.
-  void exitRegion(ASTNode Node) {
-    auto Adjust = setExitCount(Node);
-    popRegions(Node);
-    adjustForNonLocalExits(Node, Adjust);
-  }
-
-  /// Return the currently active region.
-  SourceMappingRegion &getRegion() {
-    assert(!RegionStack.empty() && "statement has no region");
-    return RegionStack.back();
-  }
-
-  /// Ensure that \c S is included in the current region.
-  void extendRegion(ASTNode S) {
-    SourceMappingRegion &Region = getRegion();
-    SourceLoc StartLoc = S.getStartLoc();
-    if (!Region.hasStartLoc())
-      Region.setStartLoc(StartLoc);
-  }
-
-  /// Mark \c S as a terminator, starting a zero region.
-  void terminateRegion(ASTNode S) {
-    assert(!RegionStack.empty() && "Cannot terminate non-existant region");
-
-    // Walk up the region stack and cut short regions until we reach a region
-    // for an AST node. This ensures we correctly handle new regions that have
-    // been introduced as a result of replacing the count, e.g if errors have
-    // been thrown.
-    for (auto &Region : llvm::reverse(RegionStack)) {
-      if (!Region.hasEndLoc())
-        Region.setEndLoc(getEndLoc(S));
-      if (Region.getNode())
-        break;
-    }
-    replaceCount(CounterExpr::Zero(), /*Start*/ std::nullopt);
-  }
-
-  Expr *getConditionNode(StmtCondition SC) {
-    assert(!SC.empty() && "Empty condition");
-    return SC.front().getBooleanOrNull();
-  }
-
-public:
-  CoverageMapping(
-      SourceFile *SF, SILDeclRef Constant,
-      const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters)
-    : SM(SF->getASTContext().SourceMgr), SF(SF), Constant(Constant),
-      ConcreteCounters(ConcreteCounters) {}
-
-  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
-    // We want to walk lazy initializers present in the synthesized getter for
-    // a lazy variable.
-    return LazyInitializerWalking::InAccessor;
-  }
-
-  bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
-    // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
-    // mapped as part of the wrapped value initialization.
-    return false;
-  }
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
-
-  /// Generate the coverage counter mapping regions from collected
-  /// source regions.
-  SILCoverageMap *emitSourceRegions(SILModule &M, StringRef Name,
-                                    StringRef PGOFuncName, uint64_t Hash,
-                                    StringRef Filename) {
-    if (SourceRegions.empty())
-      return nullptr;
-
-    auto FileSourceRange = SM.getRangeForBuffer(SF->getBufferID());
-    auto isLocInFile = [&](SourceLoc Loc) {
-      return FileSourceRange.contains(Loc) || FileSourceRange.getEnd() == Loc;
-    };
-
-    using MappedRegion = SILCoverageMap::MappedRegion;
-    std::vector<MappedRegion> Regions;
-    SourceRange OuterRange;
-    for (const auto &Region : SourceRegions) {
-      assert(Region.hasStartLoc() && "invalid region");
-      assert(Region.hasEndLoc() && "incomplete region");
-
-      SourceRange Range(Region.getStartLoc(), Region.getEndLoc());
-
-      // Make sure we haven't ended up with any source locations outside the
-      // SourceFile (e.g for generated code such as macros), asserting in an
-      // asserts build, dropping in a non-asserts build.
-      if (!isLocInFile(Range.Start) || !isLocInFile(Range.End)) {
-        assert(false && "range outside of file");
-        continue;
-      }
-
-      // Build up the outer range from the union of all coverage regions.
-      if (!OuterRange) {
-        OuterRange = Range;
-      } else {
-        OuterRange.widen(Range);
-      }
-
-      auto Start = SM.getLineAndColumnInBuffer(Region.getStartLoc());
-      auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
-      assert(Start.first <= End.first && "region start and end out of order");
-
-      auto Counter = Region.getCounter(CounterExprs);
-      Regions.push_back(MappedRegion::code(Start.first, Start.second, End.first,
-                                           End.second,
-                                           Counter.getLLVMCounter()));
-    }
-    // Add any skipped regions present in the outer range.
-    for (auto clause : SF->getIfConfigClausesWithin(OuterRange)) {
-      CharSourceRange SkipRange;
-      switch (clause.getKind()) {
-      case IfConfigClauseRangeInfo::ActiveClause:
-      case IfConfigClauseRangeInfo::EndDirective:
-        SkipRange = clause.getDirectiveRange(SM);
-        break;
-      case IfConfigClauseRangeInfo::InactiveClause:
-        SkipRange = clause.getWholeRange(SM);
-        break;
-      }
-      if (SkipRange.getByteLength() == 0)
-        continue;
-
-      auto Start = SM.getLineAndColumnInBuffer(SkipRange.getStart());
-      auto End = SM.getLineAndColumnInBuffer(SkipRange.getEnd());
-      assert(Start.first <= End.first && "region start and end out of order");
-
-      // If this is consecutive with the last one, expand it.
-      if (!Regions.empty()) {
-        auto &last = Regions.back();
-        if (last.RegionKind == MappedRegion::Kind::Skipped &&
-            last.EndLine == Start.first && last.EndCol == Start.second) {
-          last.EndLine = End.first;
-          last.EndCol = End.second;
-          continue;
-        }
-      }
-
-      Regions.push_back(MappedRegion::skipped(Start.first, Start.second,
-                                              End.first, End.second));
-    }
-    return SILCoverageMap::create(M, SF, Filename, Name, PGOFuncName, Hash,
-                                  Regions, CounterBuilder.getExpressions());
-  }
-
-  PreWalkAction walkToDeclPre(Decl *D) override {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      return visitFunctionDecl(*this, AFD, [&] {
-        assignKnownCounter(AFD->getBody());
-      });
-    } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      assignKnownCounter(TLCD->getBody());
-      ImplicitTopLevelBody = TLCD->getBody();
-      return Action::Continue();
-    }
-    return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
-  }
-
-  PostWalkAction walkToDeclPost(Decl *D) override {
-    if (isa<TopLevelCodeDecl>(D))
-      ImplicitTopLevelBody = nullptr;
-    return Action::Continue();
-  }
-
-  class SetParentRAII final {
-    ASTWalker &Walker;
-    decltype(ASTWalker::Parent) PriorParent;
-
-  public:
-    template <typename T>
-    SetParentRAII(ASTWalker &walker, T *newParent)
-        : Walker(walker), PriorParent(walker.Parent) {
-      walker.Parent = newParent;
-    }
-
-    ~SetParentRAII() { Walker.Parent = PriorParent; }
   };
 
-  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    if (S->isImplicit() && S != ImplicitTopLevelBody)
-      return Action::Continue(S);
+  /// Produce coverage mapping information for a function. This involves taking
+  /// the counters computed by MapRegionCounters, and annotating the source with
+  /// regions that are defined in terms of those counters.
+  struct CoverageMapping : public ASTWalker {
+  private:
+    const SourceManager &SM;
+    SourceFile *SF;
 
-    // If we're in an 'incomplete' region, update it to include this node. This
-    // ensures we only create the region if needed.
-    if (!RegionStack.empty())
-      extendRegion(S);
+    /// The SIL function being profiled.
+    SILDeclRef Constant;
 
-    if (auto *BS = dyn_cast<BraceStmt>(S)) {
-      if (hasCounter(BS))
-        pushRegion(SourceMappingRegion::forNode(BS, SM));
+    /// Builder needed to produce CounterExprs.
+    llvm::coverage::CounterExpressionBuilder CounterBuilder;
 
-    } else if (auto *IS = dyn_cast<IfStmt>(S)) {
-      // The counter for the if statement itself tracks the number of jumps to
-      // it by break statements.
-      assignCounter(IS, CounterExpr::Zero());
+    /// The map of statements to counter expressions.
+    llvm::DenseMap<ProfileCounterRef, CounterExpr> CounterExprs;
 
-      // FIXME: This is a redundant region for non else-ifs.
-      if (auto *Cond = getConditionNode(IS->getCond()))
-        assignCounter(Cond, getCurrentCounter());
+    /// The map of counter references to their concrete counter indices.
+    const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters;
 
-      // Visit the children.
-      // FIXME: This is a hack.
-      {
-        SetParentRAII R(*this, S);
-        for (auto Cond : IS->getCond())
-          Cond.walk(*this);
+    /// The source mapping regions for this function.
+    std::vector<SourceMappingRegion> SourceRegions;
 
-        // The parent counter is taken after the condition in case e.g
-        // it threw an error.
-        auto ParentCounter = getCurrentCounter();
+    /// A stack of currently live regions.
+    std::vector<SourceMappingRegion> RegionStack;
 
-        // We emit a counter for the then block, and define the else block in
-        // terms of it.
-        auto ThenCounter = assignKnownCounter(IS->getThenStmt());
-        IS->getThenStmt()->walk(*this);
-        auto ThenDelta =
-            CounterExpr::Sub(ThenCounter, getExitCounter(), CounterBuilder);
+    /// A stack of active repeat-while loops.
+    std::vector<RepeatWhileStmt *> RepeatWhileStack;
 
-        std::optional<CounterExpr> ElseDelta;
-        if (auto *Else = IS->getElseStmt()) {
-          auto ElseCounter = CounterExpr::Sub(ParentCounter, ThenCounter,
-                                              CounterBuilder);
-          // We handle `else if` and `else` slightly differently here. For
-          // `else` we have a BraceStmt, and can use the existing scoping logic
-          // to handle calculating the exit count. For `else if`, we need to
-          // set up a new scope to contain the child `if` statement, effectively
-          // we treat:
-          //
-          // if .random() {
-          // } else if .random() {
-          // } else {
-          // }
-          //
-          // the same as:
-          //
-          // if .random() {
-          // } else {
-          //   if .random() {
-          //   } else {
-          //   }
-          // }
-          //
-          // This ensures we assign a correct counter to the `else if`
-          // condition, and allows us to compute the exit count correctly. We
-          // don't need the fake `else` scope to be included in the resulting
-          // set of regions, so we mark it scoping-only.
-          if (isa<BraceStmt>(Else)) {
-            assignCounter(Else, ElseCounter);
-          } else {
-            pushRegion(SourceMappingRegion::scopingOnly(Else, SM, ElseCounter));
-          }
-          Else->walk(*this);
+    std::optional<CounterExpr> ExitCounter;
 
-          // Once we've walked the `else`, compute the delta exit count. For
-          // a normal `else` we can use the computed exit count, for an
-          // `else if` we can take the current region count since we don't have
-          // a proper scope. This is a little hacked together, but we'll be able
-          // to do away with all of this once we re-implement as a SILOptimizer
-          // pass.
-          auto AfterElse = isa<BraceStmt>(Else) ? getExitCounter()
-                                                : getCurrentCounter();
-          if (!isa<BraceStmt>(Else))
-            popRegions(Else);
+    Stmt *ImplicitTopLevelBody = nullptr;
 
-          ElseDelta = CounterExpr::Sub(ElseCounter, AfterElse, CounterBuilder);
-        }
-        // Compute the exit count following the `if`, taking jumps to the
-        // statement by breaks into account, and the delta of the `then` branch
-        // and `else` branch if we have one.
-        auto AfterIf = getCurrentCounter();
-        AfterIf = CounterExpr::Add(AfterIf, getCounter(IS), CounterBuilder);
-        AfterIf = CounterExpr::Sub(AfterIf, ThenDelta, CounterBuilder);
-        if (ElseDelta)
-          AfterIf = CounterExpr::Sub(AfterIf, *ElseDelta, CounterBuilder);
+    /// The number of parent MacroExpansionExprs.
+    unsigned MacroDepth = 0;
 
-        if (AfterIf != getCurrentCounter())
-          replaceCount(AfterIf, getEndLoc(IS));
-      }
-      // Already visited the children.
-      return Action::SkipChildren(S);
+    /// Whether the current walk is within a macro expansion.
+    bool isInMacroExpansion() const { return MacroDepth > 0; }
 
-    } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
-      assignCounter(GS, CounterExpr::Zero());
-      assignKnownCounter(GS->getBody());
+    /// Return true if \c Ref has an associated counter.
+    bool hasCounter(ProfileCounterRef Ref) { return CounterExprs.count(Ref); }
 
-    } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      // The counter for the while statement itself tracks the number of jumps
-      // to it by break and continue statements.
-      assignCounter(WS, CounterExpr::Zero());
-
-      if (auto *E = getConditionNode(WS->getCond()))
-        assignCounter(E, getCurrentCounter());
-      assignKnownCounter(WS->getBody());
-
-    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
-      // The counter for the while statement itself tracks the number of jumps
-      // to it by break and continue statements.
-      assignCounter(RWS, CounterExpr::Zero());
-
-      auto BodyCounter = assignKnownCounter(RWS->getBody());
-      assignCounter(RWS->getCond(), BodyCounter);
-      RepeatWhileStack.push_back(RWS);
-
-    } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
-      // The counter for the for statement itself tracks the number of jumps
-      // to it by break and continue statements.
-      assignCounter(FES, CounterExpr::Zero());
-      assignKnownCounter(FES->getBody());
-
-    } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      // The counter for the switch statement itself tracks the number of jumps
-      // to it by break statements, including the implicit breaks at the end of
-      // cases.
-      assignCounter(SS, CounterExpr::Zero());
-
-      // FIXME: This is a redundant region.
-      assignCounter(SS->getSubjectExpr(), getCurrentCounter());
-
-      // Assign counters for cases so they're available for fallthrough.
-      for (CaseStmt *Case : SS->getCases())
-        assignKnownCounter(Case);
-
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      // The counter for the do-catch statement itself tracks the number of
-      // jumps to it by break statements, including the implicit breaks at the
-      // end of body + catches.
-      assignCounter(DCS, CounterExpr::Zero());
-
-      // The do-catch body is visited the same number of times as its parent.
-      assignCounter(DCS->getBody(), getCurrentCounter());
-
-      // The catch clauses are CaseStmts that have their own mapped counters.
-      for (CaseStmt *Catch : DCS->getCatches())
-        assignKnownCounter(Catch);
-
-    } else if (auto *DS = dyn_cast<DoStmt>(S)) {
-      // The counter for the do statement itself tracks the number of jumps
-      // to it by break statements.
-      assignCounter(DS, CounterExpr::Zero());
-
-      // The do body is visited the same number of times as its parent.
-      assignCounter(DS->getBody(), getCurrentCounter());
-
-    } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      SourceRange Range;
-      switch (CS->getParentKind()) {
-      case CaseParentKind::DoCatch:
-        // For a catch clause, we only want the range to cover the brace.
-        Range = CS->getBody()->getSourceRange();
-        break;
-      case CaseParentKind::Switch:
-        // FIXME: We may want to reconsider using the full range here, as it
-        // implies the case pattern is evaluated the same number of times as
-        // the body, which is not true. We don't currently have a way of
-        // tracking the pattern evaluation count though.
-        Range = CS->getSourceRange();
-        break;
-      }
-      pushRegion(SourceMappingRegion::forNode(CS, SM, Range));
+    /// Return true if \c Node has an associated counter.
+    bool hasCounter(ASTNode Node) {
+      return hasCounter(ProfileCounterRef::node(Node));
     }
-    return Action::Continue(S);
-  }
 
-  PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
-    if (S->isImplicit() && S != ImplicitTopLevelBody)
-      return Action::Continue(S);
+    /// Return the region counter for \c Ref.
+    ///
+    /// This should only be called on references that have a dedicated counter.
+    CounterExpr getCounter(ProfileCounterRef Ref) {
+      auto Iter = CounterExprs.find(Ref);
+      assert(Iter != CounterExprs.end() && "No counter found");
+      return Iter->second;
+    }
 
-    if (isa<BraceStmt>(S)) {
-      if (hasCounter(S))
-        exitRegion(S);
+    /// Return the region counter for \c Node.
+    ///
+    /// This should only be called on statements that have a dedicated counter.
+    CounterExpr getCounter(ASTNode Node) {
+      return getCounter(ProfileCounterRef::node(Node));
+    }
 
-    } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      // Update the condition with the backedge count.
-      if (auto *E = getConditionNode(WS->getCond()))
-        addToCounter(E, getExitCounter());
+    /// Create a counter expression for \c Ref and add it to the map.
+    void assignCounter(ProfileCounterRef Ref, CounterExpr Expr) {
+      auto Res = CounterExprs.insert({Ref, Expr});
 
-    } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
-      assert(RepeatWhileStack.back() == RWS && "Malformed repeat-while stack");
-      (void)RWS;
-      RepeatWhileStack.pop_back();
+      // Overwrite an existing assignment.
+      if (!Res.second)
+        Res.first->second = std::move(Expr);
+    }
 
-    } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
-      // Continues create extra backedges, add them to the appropriate counters.
-      if (!isa<RepeatWhileStmt>(CS->getTarget()))
-        addToCounter(CS->getTarget(), getCurrentCounter());
-      if (auto *WS = dyn_cast<WhileStmt>(CS->getTarget())) {
-        if (auto *E = getConditionNode(WS->getCond()))
-          addToCounter(E, getCurrentCounter());
-      }
-      terminateRegion(S);
+    /// Create a counter expression for \c Node and add it to the map.
+    void assignCounter(ASTNode Node, CounterExpr Expr) {
+      assignCounter(ProfileCounterRef::node(Node), std::move(Expr));
+    }
 
-    } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
-      // When we break from a loop, we need to adjust the exit count.
-      Stmt *BreakTarget = BS->getTarget();
-      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BreakTarget)) {
-        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+    /// Create a counter expression referencing \c Ref's own counter. This must
+    /// have been previously mapped by MapRegionCounters.
+    CounterExpr assignKnownCounter(ProfileCounterRef Ref) {
+      auto Iter = ConcreteCounters.find(Ref);
+      assert(Iter != ConcreteCounters.end() &&
+             "Should have mapped this counter");
+      auto Counter = CounterExpr::Concrete(Iter->second);
+      assignCounter(Ref, Counter);
+      return Counter;
+    }
+
+    /// Create a counter expression referencing \c Node's own counter. This must
+    /// have been previously mapped by MapRegionCounters.
+    CounterExpr assignKnownCounter(ASTNode Node) {
+      return assignKnownCounter(ProfileCounterRef::node(Node));
+    }
+
+    /// Add \c Expr to \c Node's counter.
+    void addToCounter(ASTNode Node, CounterExpr Expr) {
+      auto Counter = getCounter(Node);
+      if (Counter.isZero()) {
+        Counter = std::move(Expr);
       } else {
-        // Update the exit counter for the target.
-        addToCounter(BS->getTarget(), getCurrentCounter());
+        Counter = CounterExpr::Add(Counter, std::move(Expr), CounterBuilder);
+      }
+      assignCounter(Node, Counter);
+    }
+
+    /// Subtract \c Expr from \c Node's counter.
+    void subtractFromCounter(ASTNode Node, CounterExpr Expr) {
+      if (Expr.isZero())
+        return;
+
+      auto Counter = getCounter(Node);
+      assert(!Counter.isZero() && "Cannot create a negative counter");
+      assignCounter(Node,
+                    CounterExpr::Sub(Counter, std::move(Expr), CounterBuilder));
+    }
+
+    /// Return the current region's counter.
+    CounterExpr getCurrentCounter() {
+      return getRegion().getCounter(CounterExprs);
+    }
+
+    /// Get the counter from the end of the most recent scope.
+    CounterExpr getExitCounter() {
+      assert(ExitCounter && "no exit counter available");
+      return *ExitCounter;
+    }
+
+    /// Set the exit count so we can leave the scope related to \c Node
+    ///
+    /// Returns the delta of the count on entering \c Node and exiting, or null
+    /// if there was no change.
+    std::optional<CounterExpr> setExitCount(ASTNode Node) {
+      // A `try?` absorbs child error branches, so we can assume the exit count
+      // is the same as the entry count in that case. NOTE: This assumes there
+      // is no other kind of control flow that can happen in a nested
+      // expression, which is true today, but may not always be.
+      if (Node.isExpr(ExprKind::OptionalTry))
+        return std::nullopt;
+
+      ExitCounter = getCurrentCounter();
+      if (hasCounter(Node) && getRegion().getNode() != Node)
+        return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterBuilder);
+      return std::nullopt;
+    }
+
+    /// Adjust the count for control flow when exiting a scope.
+    void adjustForNonLocalExits(ASTNode Scope,
+                                std::optional<CounterExpr> ControlFlowAdjust) {
+      // If there are no regions left, there's nothing to adjust.
+      if (RegionStack.empty())
+        return;
+
+      // If the region is for a brace, check to see if we have a parent labeled
+      // statement, in which case the exit count needs to account for any direct
+      // jumps to it though e.g break statements.
+      std::optional<CounterExpr> JumpsToLabel;
+      if (Scope.isStmt(StmtKind::Brace)) {
+        if (auto *ParentStmt = Parent.getAsStmt()) {
+          if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
+            // We need to handle the brace of a DoCatchStmt here specially,
+            // applying the same logic we apply to the catch clauses (handled by
+            // the CaseStmt logic), we add on the exit count of the branch to
+            // the statement's exit count.
+            addToCounter(DCS, getExitCounter());
+            return;
+          }
+
+          // Don't apply exit adjustments to if statement branches, they should
+          // be handled at the end of the statement. This avoids creating
+          // awkward overlapping exit regions for each branch, and ensures
+          // 'break' statements only have their jump counted once for the entire
+          // statement.
+          if (isa<IfStmt>(ParentStmt))
+            return;
+
+          if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
+            JumpsToLabel = getCounter(LS);
+        }
       }
 
-      terminateRegion(S);
+      if (!ControlFlowAdjust && !JumpsToLabel)
+        return;
 
-    } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
-      addToCounter(FS->getFallthroughDest(), getCurrentCounter());
-      terminateRegion(S);
+      auto Count = getCurrentCounter();
+      // Add the counts from jumps directly to the label (such as breaks)
+      if (JumpsToLabel)
+        Count = CounterExpr::Add(Count, *JumpsToLabel, CounterBuilder);
+      // Now apply any adjustments for control flow.
+      if (ControlFlowAdjust)
+        Count = CounterExpr::Sub(Count, *ControlFlowAdjust, CounterBuilder);
 
-    } else if (isa<SwitchStmt>(S) || isa<DoCatchStmt>(S)) {
-      // Replace the parent counter with the exit count of the statement.
-      replaceCount(getCounter(S), getEndLoc(S));
+      replaceCount(Count, getEndLoc(Scope));
+    }
 
-    } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      // The end of a case/catch block is an implicit break, update the exit
-      // counter to reflect this.
-      addToCounter(CS->getParentStmt(), getCurrentCounter());
-      popRegions(S);
+    /// Push a region onto the stack.
+    void pushRegion(SourceMappingRegion Region) {
+      // Note on the region whether we're currently in a macro expansion.
+      if (isInMacroExpansion())
+        Region.setIsInMacroExpansion();
 
-    } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
-      // When we return, adjust loop condition counts and do-catch exit counts
-      // to reflect the early exit.
-      if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
-        for (auto *RWS : RepeatWhileStack)
-          subtractFromCounter(RWS->getCond(), getCurrentCounter());
+      LLVM_DEBUG({
+        llvm::dbgs() << "Pushed region: ";
+        Region.print(llvm::dbgs(), SM);
+        llvm::dbgs() << "\n";
+      });
+      RegionStack.push_back(std::move(Region));
+    }
+
+    /// Replace the current region at \p Start with a new counter. If \p Start
+    /// is
+    /// \c None, or the counter is semantically zero, an 'incomplete' region is
+    /// formed, which is not recorded unless followed by additional AST nodes.
+    void replaceCount(CounterExpr Counter, std::optional<SourceLoc> Start) {
+      // If the counter is zero, form an 'incomplete' region with no starting
+      // location. This prevents forming unreachable regions unless there is a
+      // following statement or expression to extend the region.
+      if (Start && Counter.isZero())
+        Start = std::nullopt;
+
+      pushRegion(SourceMappingRegion::refined(Counter, Start));
+    }
+
+    /// Get the location for the end of the last token in \c Node.
+    SourceLoc getEndLoc(ASTNode Node) {
+      return Lexer::getLocForEndOfToken(SM, Node.getEndLoc());
+    }
+
+    /// Record a popped region in the resulting list of regions.
+    void takePoppedRegion(SourceMappingRegion &&Region,
+                          SourceLoc ParentEndLoc) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "Popped region: ";
+        Region.print(llvm::dbgs(), SM);
+        llvm::dbgs() << "\n";
+      });
+
+      // Don't record regions in macro expansions, they don't have source
+      // locations that can be meaningfully mapped to source code.
+      if (Region.isInMacroExpansion())
+        return;
+
+      // Don't bother recording regions that are only present for scoping.
+      if (Region.isForScopingOnly())
+        return;
+
+      // Don't record incomplete regions.
+      if (!Region.hasStartLoc())
+        return;
+
+      // Set the region end location to the end location of the parent.
+      if (!Region.hasEndLoc())
+        Region.setEndLoc(ParentEndLoc);
+
+      // If the range ended up being empty, ignore it (this can happen when we
+      // replace the counter, and don't extend the region any further).
+      if (!Region.hasNonEmptyRange())
+        return;
+
+      SourceRegions.push_back(std::move(Region));
+    }
+
+    /// Pop regions from the stack into the function's list of regions.
+    ///
+    /// Adds all regions from \c ParentNode to the top of the stack to the
+    /// function's \c SourceRegions.
+    void popRegions(ASTNode ParentNode) {
+      auto I =
+          llvm::find_if(RegionStack, [&](const SourceMappingRegion &Region) {
+            return Region.getNode().getOpaqueValue() ==
+                   ParentNode.getOpaqueValue();
+          });
+      auto E = RegionStack.end();
+      assert(I != E && "parent not in stack");
+      assert(I->hasNonEmptyRange() && "Pushed node with empty range?");
+
+      auto EndLoc = I->getEndLoc();
+      for (auto &Region : llvm::make_range(I, E))
+        takePoppedRegion(std::move(Region), EndLoc);
+
+      RegionStack.erase(I, E);
+    }
+
+    /// Exit the given region, popping it and its children from the region
+    /// stack, and adjusting the following counter if needed.
+    void exitRegion(ASTNode Node) {
+      auto Adjust = setExitCount(Node);
+      popRegions(Node);
+      adjustForNonLocalExits(Node, Adjust);
+    }
+
+    /// Return the currently active region.
+    SourceMappingRegion &getRegion() {
+      assert(!RegionStack.empty() && "statement has no region");
+      return RegionStack.back();
+    }
+
+    /// Ensure that \c S is included in the current region.
+    void extendRegion(ASTNode S) {
+      SourceMappingRegion &Region = getRegion();
+      SourceLoc StartLoc = S.getStartLoc();
+      if (!Region.hasStartLoc())
+        Region.setStartLoc(StartLoc);
+    }
+
+    /// Mark \c S as a terminator, starting a zero region.
+    void terminateRegion(ASTNode S) {
+      assert(!RegionStack.empty() && "Cannot terminate non-existant region");
+
+      // Walk up the region stack and cut short regions until we reach a region
+      // for an AST node. This ensures we correctly handle new regions that have
+      // been introduced as a result of replacing the count, e.g if errors have
+      // been thrown.
+      for (auto &Region : llvm::reverse(RegionStack)) {
+        if (!Region.hasEndLoc())
+          Region.setEndLoc(getEndLoc(S));
+        if (Region.getNode())
+          break;
+      }
+      replaceCount(CounterExpr::Zero(), /*Start*/ std::nullopt);
+    }
+
+    Expr *getConditionNode(StmtCondition SC) {
+      assert(!SC.empty() && "Empty condition");
+      return SC.front().getBooleanOrNull();
+    }
+
+  public:
+    CoverageMapping(
+        SourceFile *SF, SILDeclRef Constant,
+        const llvm::DenseMap<ProfileCounterRef, unsigned> &ConcreteCounters)
+        : SM(SF->getASTContext().SourceMgr), SF(SF), Constant(Constant),
+          ConcreteCounters(ConcreteCounters) {}
+
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+      // We want to walk lazy initializers present in the synthesized getter for
+      // a lazy variable.
+      return LazyInitializerWalking::InAccessor;
+    }
+
+    bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+      // Don't walk into PropertyWrapperValuePlaceholderExprs, these should be
+      // mapped as part of the wrapped value initialization.
+      return false;
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    /// Generate the coverage counter mapping regions from collected
+    /// source regions.
+    SILCoverageMap *emitSourceRegions(SILModule &M, StringRef Name,
+                                      StringRef PGOFuncName, uint64_t Hash,
+                                      StringRef Filename) {
+      if (SourceRegions.empty())
+        return nullptr;
+
+      auto FileSourceRange = SM.getRangeForBuffer(SF->getBufferID());
+      auto isLocInFile = [&](SourceLoc Loc) {
+        return FileSourceRange.contains(Loc) || FileSourceRange.getEnd() == Loc;
+      };
+
+      using MappedRegion = SILCoverageMap::MappedRegion;
+      std::vector<MappedRegion> Regions;
+      SourceRange OuterRange;
+      for (const auto &Region : SourceRegions) {
+        assert(Region.hasStartLoc() && "invalid region");
+        assert(Region.hasEndLoc() && "incomplete region");
+
+        SourceRange Range(Region.getStartLoc(), Region.getEndLoc());
+
+        // Make sure we haven't ended up with any source locations outside the
+        // SourceFile (e.g for generated code such as macros), asserting in an
+        // asserts build, dropping in a non-asserts build.
+        if (!isLocInFile(Range.Start) || !isLocInFile(Range.End)) {
+          assert(false && "range outside of file");
+          continue;
+        }
+
+        // Build up the outer range from the union of all coverage regions.
+        if (!OuterRange) {
+          OuterRange = Range;
+        } else {
+          OuterRange.widen(Range);
+        }
+
+        auto Start = SM.getLineAndColumnInBuffer(Region.getStartLoc());
+        auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
+        assert(Start.first <= End.first && "region start and end out of order");
+
+        auto Counter = Region.getCounter(CounterExprs);
+        if (Region.isBranch()) {
+          Regions.push_back(
+              MappedRegion::branch(Start.first, Start.second, End.first,
+                                   End.second, Counter.getLLVMCounter(),
+                                   Region.getFalseCounter().getLLVMCounter()));
+        } else {
+          Regions.push_back(MappedRegion::code(Start.first, Start.second,
+                                               End.first, End.second,
+                                               Counter.getLLVMCounter()));
+        }
+      }
+      // Add any skipped regions present in the outer range.
+      for (auto clause : SF->getIfConfigClausesWithin(OuterRange)) {
+        CharSourceRange SkipRange;
+        switch (clause.getKind()) {
+        case IfConfigClauseRangeInfo::ActiveClause:
+        case IfConfigClauseRangeInfo::EndDirective:
+          SkipRange = clause.getDirectiveRange(SM);
+          break;
+        case IfConfigClauseRangeInfo::InactiveClause:
+          SkipRange = clause.getWholeRange(SM);
+          break;
+        }
+        if (SkipRange.getByteLength() == 0)
+          continue;
+
+        auto Start = SM.getLineAndColumnInBuffer(SkipRange.getStart());
+        auto End = SM.getLineAndColumnInBuffer(SkipRange.getEnd());
+        assert(Start.first <= End.first && "region start and end out of order");
+
+        // If this is consecutive with the last one, expand it.
+        if (!Regions.empty()) {
+          auto &last = Regions.back();
+          if (last.RegionKind == MappedRegion::Kind::Skipped &&
+              last.EndLine == Start.first && last.EndCol == Start.second) {
+            last.EndLine = End.first;
+            last.EndCol = End.second;
+            continue;
+          }
+        }
+
+        Regions.push_back(MappedRegion::skipped(Start.first, Start.second,
+                                                End.first, End.second));
+      }
+      return SILCoverageMap::create(M, SF, Filename, Name, PGOFuncName, Hash,
+                                    Regions, CounterBuilder.getExpressions());
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        return visitFunctionDecl(*this, AFD,
+                                 [&] { assignKnownCounter(AFD->getBody()); });
+      } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+        assignKnownCounter(TLCD->getBody());
+        ImplicitTopLevelBody = TLCD->getBody();
+        return Action::Continue();
+      }
+      return Action::VisitNodeIf(shouldWalkIntoUnhandledDecl(D));
+    }
+
+    PostWalkAction walkToDeclPost(Decl *D) override {
+      if (isa<TopLevelCodeDecl>(D))
+        ImplicitTopLevelBody = nullptr;
+      return Action::Continue();
+    }
+
+    class SetParentRAII final {
+      ASTWalker &Walker;
+      decltype(ASTWalker::Parent) PriorParent;
+
+    public:
+      template <typename T>
+      SetParentRAII(ASTWalker &walker, T *newParent)
+          : Walker(walker), PriorParent(walker.Parent) {
+        walker.Parent = newParent;
       }
 
-      terminateRegion(S);
-    }
-    return Action::Continue(S);
-  }
+      ~SetParentRAII() { Walker.Parent = PriorParent; }
+    };
 
-  PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-    // We don't walk into parameter lists. Default arguments should be visited
-    // directly.
-    // FIXME: We don't yet generate coverage for default argument generators at
-    // all. This is inconsistent with property initializers, which are
-    // effectively default values too. Seems like coverage doesn't offer much
-    // benefit in these cases, as they're unlikely to have side effects, and
-    // the values can be exercized explicitly, but we should probably at least
-    // have a consistent behavior for both no matter what we choose here.
-    return Action::SkipNode();
-  }
+    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+      if (S->isImplicit() && S != ImplicitTopLevelBody)
+        return Action::Continue(S);
 
-  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    if (shouldSkipExpr(E))
-      return shouldWalkIntoExpr(E, Parent, Constant);
+      // If we're in an 'incomplete' region, update it to include this node.
+      // This ensures we only create the region if needed.
+      if (!RegionStack.empty())
+        extendRegion(S);
 
-    // If we're in an 'incomplete' region, update it to include this node. This
-    // ensures we only create the region if needed.
-    if (!RegionStack.empty())
-      extendRegion(E);
+      if (auto *BS = dyn_cast<BraceStmt>(S)) {
+        if (hasCounter(BS))
+          pushRegion(SourceMappingRegion::forNode(BS, SM));
 
-    // If AST visitation begins with an expression, the region stack must be
-    // empty. Set up a region for the root.
-    if (Parent.isNull()) {
-      assert(RegionStack.empty() &&
-             "Mapped a region before visiting the root?");
-      assignKnownCounter(E);
-    }
+      } else if (auto *IS = dyn_cast<IfStmt>(S)) {
+        // The counter for the if statement itself tracks the number of jumps to
+        // it by break statements.
+        assignCounter(IS, CounterExpr::Zero());
 
-    if (isa<LazyInitializerExpr>(E))
-      assignKnownCounter(E);
+        // FIXME: This is a redundant region for non else-ifs.
+        if (auto *Cond = getConditionNode(IS->getCond())) {
+          if (auto *Then = IS->getThenStmt()) {
+            auto ParentCounter = getCurrentCounter();
+            auto ThenCounter = getCounter(Then);
+            auto ElseCounter =
+                CounterExpr::Sub(ParentCounter, ThenCounter, CounterBuilder);
+            pushRegion(SourceMappingRegion::branch(Cond, SM, ThenCounter,
+                                                   ElseCounter));
+          } else {
+            assignCounter(Cond, getCurrentCounter());
+          }
+        }
 
-    if (hasCounter(E)) {
-      pushRegion(SourceMappingRegion::forNode(E, SM));
-    } else if (isa<OptionalTryExpr>(E) || isa<MacroExpansionExpr>(E)) {
-      // If we have a `try?`, that doesn't already have a counter, record it
-      // as a scoping-only region. We need it to scope child error branches,
-      // but don't need it in the resulting set of regions.
-      //
-      // If we have a macro expansion, also push a scoping-only region. We'll
-      // discard any regions recorded within the macro, but will adjust for any
-      // control flow that may have happened within the macro.
-      assignCounter(E, getCurrentCounter());
-      pushRegion(SourceMappingRegion::scopingOnly(E, SM));
-    }
+        // Visit the children.
+        // FIXME: This is a hack.
+        {
+          SetParentRAII R(*this, S);
+          for (auto Cond : IS->getCond())
+            Cond.walk(*this);
 
-    assert(!RegionStack.empty() && "Must be within a region");
+          if (auto *Cond = getConditionNode(IS->getCond()))
+            if (auto *Then = IS->getThenStmt())
+              popRegions(Cond);
 
-    if (auto *TE = dyn_cast<TernaryExpr>(E)) {
-      assert(shouldWalkIntoExpr(TE, Parent, Constant).Action.Action ==
-                 PreWalkAction::Continue &&
-             "Currently this only returns false for closures");
+          // The parent counter is taken after the condition in case e.g
+          // it threw an error.
+          auto ParentCounter = getCurrentCounter();
 
-      // Visit the children.
-      // FIXME: This is a hack.
-      {
-        SetParentRAII R(*this, TE);
-        TE->getCondExpr()->walk(*this);
+          // We emit a counter for the then block, and define the else block in
+          // terms of it.
+          auto ThenCounter = assignKnownCounter(IS->getThenStmt());
+          IS->getThenStmt()->walk(*this);
+          auto ThenDelta =
+              CounterExpr::Sub(ThenCounter, getExitCounter(), CounterBuilder);
 
-        // The parent counter is taken after the condition in case e.g
-        // it threw an error.
+          std::optional<CounterExpr> ElseDelta;
+          if (auto *Else = IS->getElseStmt()) {
+            auto ElseCounter =
+                CounterExpr::Sub(ParentCounter, ThenCounter, CounterBuilder);
+            // We handle `else if` and `else` slightly differently here. For
+            // `else` we have a BraceStmt, and can use the existing scoping
+            // logic to handle calculating the exit count. For `else if`, we
+            // need to set up a new scope to contain the child `if` statement,
+            // effectively we treat:
+            //
+            // if .random() {
+            // } else if .random() {
+            // } else {
+            // }
+            //
+            // the same as:
+            //
+            // if .random() {
+            // } else {
+            //   if .random() {
+            //   } else {
+            //   }
+            // }
+            //
+            // This ensures we assign a correct counter to the `else if`
+            // condition, and allows us to compute the exit count correctly. We
+            // don't need the fake `else` scope to be included in the resulting
+            // set of regions, so we mark it scoping-only.
+            if (isa<BraceStmt>(Else)) {
+              assignCounter(Else, ElseCounter);
+            } else {
+              pushRegion(
+                  SourceMappingRegion::scopingOnly(Else, SM, ElseCounter));
+            }
+            Else->walk(*this);
+
+            // Once we've walked the `else`, compute the delta exit count. For
+            // a normal `else` we can use the computed exit count, for an
+            // `else if` we can take the current region count since we don't
+            // have a proper scope. This is a little hacked together, but we'll
+            // be able to do away with all of this once we re-implement as a
+            // SILOptimizer pass.
+            auto AfterElse =
+                isa<BraceStmt>(Else) ? getExitCounter() : getCurrentCounter();
+            if (!isa<BraceStmt>(Else))
+              popRegions(Else);
+
+            ElseDelta =
+                CounterExpr::Sub(ElseCounter, AfterElse, CounterBuilder);
+          }
+          // Compute the exit count following the `if`, taking jumps to the
+          // statement by breaks into account, and the delta of the `then`
+          // branch and `else` branch if we have one.
+          auto AfterIf = getCurrentCounter();
+          AfterIf = CounterExpr::Add(AfterIf, getCounter(IS), CounterBuilder);
+          AfterIf = CounterExpr::Sub(AfterIf, ThenDelta, CounterBuilder);
+          if (ElseDelta)
+            AfterIf = CounterExpr::Sub(AfterIf, *ElseDelta, CounterBuilder);
+
+          if (AfterIf != getCurrentCounter())
+            replaceCount(AfterIf, getEndLoc(IS));
+        }
+        // Already visited the children.
+        return Action::SkipChildren(S);
+
+      } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
+        assignCounter(GS, CounterExpr::Zero());
+
         auto ParentCounter = getCurrentCounter();
-
-        auto *Then = TE->getThenExpr();
-        auto ThenCounter = assignKnownCounter(Then);
-        Then->walk(*this);
-
-        auto *Else = TE->getElseExpr();
+        auto BodyCounter = getCounter(GS->getBody());
         auto ElseCounter =
-            CounterExpr::Sub(ParentCounter, ThenCounter, CounterBuilder);
-        assignCounter(Else, ElseCounter);
-        Else->walk(*this);
+            CounterExpr::Sub(ParentCounter, BodyCounter, CounterBuilder);
+
+        if (auto *Cond = getConditionNode(GS->getCond())) {
+          pushRegion(
+              SourceMappingRegion::branch(Cond, SM, BodyCounter, ElseCounter));
+        }
+
+        assignKnownCounter(GS->getBody());
+
+        if (auto *Cond = getConditionNode(GS->getCond())) {
+          for (auto Cond : GS->getCond())
+            Cond.walk(*this);
+          popRegions(Cond);
+        }
+
+      } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
+        // The counter for the while statement itself tracks the number of jumps
+        // to it by break and continue statements.
+        assignCounter(WS, CounterExpr::Zero());
+
+        if (auto *E = getConditionNode(WS->getCond()))
+          assignCounter(E, getCurrentCounter());
+        assignKnownCounter(WS->getBody());
+
+      } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+        // The counter for the while statement itself tracks the number of jumps
+        // to it by break and continue statements.
+        assignCounter(RWS, CounterExpr::Zero());
+
+        auto BodyCounter = assignKnownCounter(RWS->getBody());
+        assignCounter(RWS->getCond(), BodyCounter);
+        RepeatWhileStack.push_back(RWS);
+
+      } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
+        // The counter for the for statement itself tracks the number of jumps
+        // to it by break and continue statements.
+        assignCounter(FES, CounterExpr::Zero());
+        assignKnownCounter(FES->getBody());
+
+      } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
+        // The counter for the switch statement itself tracks the number of
+        // jumps to it by break statements, including the implicit breaks at the
+        // end of cases.
+        assignCounter(SS, CounterExpr::Zero());
+
+        // FIXME: This is a redundant region.
+        assignCounter(SS->getSubjectExpr(), getCurrentCounter());
+
+        // Assign counters for cases so they're available for fallthrough.
+        for (CaseStmt *Case : SS->getCases())
+          assignKnownCounter(Case);
+
+      } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+        // The counter for the do-catch statement itself tracks the number of
+        // jumps to it by break statements, including the implicit breaks at the
+        // end of body + catches.
+        assignCounter(DCS, CounterExpr::Zero());
+
+        // The do-catch body is visited the same number of times as its parent.
+        assignCounter(DCS->getBody(), getCurrentCounter());
+
+        // The catch clauses are CaseStmts that have their own mapped counters.
+        for (CaseStmt *Catch : DCS->getCatches())
+          assignKnownCounter(Catch);
+
+      } else if (auto *DS = dyn_cast<DoStmt>(S)) {
+        // The counter for the do statement itself tracks the number of jumps
+        // to it by break statements.
+        assignCounter(DS, CounterExpr::Zero());
+
+        // The do body is visited the same number of times as its parent.
+        assignCounter(DS->getBody(), getCurrentCounter());
+
+      } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
+        SourceRange Range;
+        switch (CS->getParentKind()) {
+        case CaseParentKind::DoCatch:
+          // For a catch clause, we only want the range to cover the brace.
+          Range = CS->getBody()->getSourceRange();
+          break;
+        case CaseParentKind::Switch:
+          // FIXME: We may want to reconsider using the full range here, as it
+          // implies the case pattern is evaluated the same number of times as
+          // the body, which is not true. We don't currently have a way of
+          // tracking the pattern evaluation count though.
+          Range = CS->getSourceRange();
+          break;
+        }
+        pushRegion(SourceMappingRegion::forNode(CS, SM, Range));
       }
-      // Already visited the children.
-      return Action::SkipChildren(TE);
+      return Action::Continue(S);
     }
 
-    if (isa<MacroExpansionExpr>(E))
-      MacroDepth += 1;
+    PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
+      if (S->isImplicit() && S != ImplicitTopLevelBody)
+        return Action::Continue(S);
 
-    return shouldWalkIntoExpr(E, Parent, Constant);
-  }
+      if (isa<BraceStmt>(S)) {
+        if (hasCounter(S))
+          exitRegion(S);
 
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-    if (shouldSkipExpr(E))
+      } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
+        // Update the condition with the backedge count.
+        if (auto *E = getConditionNode(WS->getCond()))
+          addToCounter(E, getExitCounter());
+
+      } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
+        assert(RepeatWhileStack.back() == RWS &&
+               "Malformed repeat-while stack");
+        (void)RWS;
+        RepeatWhileStack.pop_back();
+
+      } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
+        // Continues create extra backedges, add them to the appropriate
+        // counters.
+        if (!isa<RepeatWhileStmt>(CS->getTarget()))
+          addToCounter(CS->getTarget(), getCurrentCounter());
+        if (auto *WS = dyn_cast<WhileStmt>(CS->getTarget())) {
+          if (auto *E = getConditionNode(WS->getCond()))
+            addToCounter(E, getCurrentCounter());
+        }
+        terminateRegion(S);
+
+      } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
+        // When we break from a loop, we need to adjust the exit count.
+        Stmt *BreakTarget = BS->getTarget();
+        if (auto *RWS = dyn_cast<RepeatWhileStmt>(BreakTarget)) {
+          subtractFromCounter(RWS->getCond(), getCurrentCounter());
+        } else {
+          // Update the exit counter for the target.
+          addToCounter(BS->getTarget(), getCurrentCounter());
+        }
+
+        terminateRegion(S);
+
+      } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
+        addToCounter(FS->getFallthroughDest(), getCurrentCounter());
+        terminateRegion(S);
+
+      } else if (isa<SwitchStmt>(S) || isa<DoCatchStmt>(S)) {
+        // Replace the parent counter with the exit count of the statement.
+        replaceCount(getCounter(S), getEndLoc(S));
+
+      } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
+        // The end of a case/catch block is an implicit break, update the exit
+        // counter to reflect this.
+        addToCounter(CS->getParentStmt(), getCurrentCounter());
+        popRegions(S);
+
+      } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
+        // When we return, adjust loop condition counts and do-catch exit counts
+        // to reflect the early exit.
+        if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
+          for (auto *RWS : RepeatWhileStack)
+            subtractFromCounter(RWS->getCond(), getCurrentCounter());
+        }
+
+        terminateRegion(S);
+      }
+      return Action::Continue(S);
+    }
+
+    PreWalkAction walkToParameterListPre(ParameterList *PL) override {
+      // We don't walk into parameter lists. Default arguments should be visited
+      // directly.
+      // FIXME: We don't yet generate coverage for default argument generators
+      // at all. This is inconsistent with property initializers, which are
+      // effectively default values too. Seems like coverage doesn't offer much
+      // benefit in these cases, as they're unlikely to have side effects, and
+      // the values can be exercized explicitly, but we should probably at least
+      // have a consistent behavior for both no matter what we choose here.
+      return Action::SkipNode();
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (shouldSkipExpr(E))
+        return shouldWalkIntoExpr(E, Parent, Constant);
+
+      // If we're in an 'incomplete' region, update it to include this node.
+      // This ensures we only create the region if needed.
+      if (!RegionStack.empty())
+        extendRegion(E);
+
+      // If AST visitation begins with an expression, the region stack must be
+      // empty. Set up a region for the root.
+      if (Parent.isNull()) {
+        assert(RegionStack.empty() &&
+               "Mapped a region before visiting the root?");
+        assignKnownCounter(E);
+      }
+
+      if (isa<LazyInitializerExpr>(E))
+        assignKnownCounter(E);
+
+      if (hasCounter(E)) {
+        pushRegion(SourceMappingRegion::forNode(E, SM));
+      } else if (isa<OptionalTryExpr>(E) || isa<MacroExpansionExpr>(E)) {
+        // If we have a `try?`, that doesn't already have a counter, record it
+        // as a scoping-only region. We need it to scope child error branches,
+        // but don't need it in the resulting set of regions.
+        //
+        // If we have a macro expansion, also push a scoping-only region. We'll
+        // discard any regions recorded within the macro, but will adjust for
+        // any control flow that may have happened within the macro.
+        assignCounter(E, getCurrentCounter());
+        pushRegion(SourceMappingRegion::scopingOnly(E, SM));
+      }
+
+      assert(!RegionStack.empty() && "Must be within a region");
+
+      if (auto *TE = dyn_cast<TernaryExpr>(E)) {
+        assert(shouldWalkIntoExpr(TE, Parent, Constant).Action.Action ==
+                   PreWalkAction::Continue &&
+               "Currently this only returns false for closures");
+
+        // Visit the children.
+        // FIXME: This is a hack.
+        {
+          SetParentRAII R(*this, TE);
+          TE->getCondExpr()->walk(*this);
+
+          // The parent counter is taken after the condition in case e.g
+          // it threw an error.
+          auto ParentCounter = getCurrentCounter();
+
+          auto *Then = TE->getThenExpr();
+          auto ThenCounter = assignKnownCounter(Then);
+          Then->walk(*this);
+
+          auto *Else = TE->getElseExpr();
+          auto ElseCounter =
+              CounterExpr::Sub(ParentCounter, ThenCounter, CounterBuilder);
+          assignCounter(Else, ElseCounter);
+          Else->walk(*this);
+        }
+        // Already visited the children.
+        return Action::SkipChildren(TE);
+      }
+
+      if (isa<MacroExpansionExpr>(E))
+        MacroDepth += 1;
+
+      return shouldWalkIntoExpr(E, Parent, Constant);
+    }
+
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (shouldSkipExpr(E))
+        return Action::Continue(E);
+
+      // The region following the expression gets current counter minus the
+      // error branch counter, i.e the number of times we didn't throw an error.
+      if (mayExpressionThrow(E)) {
+        auto ThrowCount =
+            assignKnownCounter(ProfileCounterRef::errorBranchOf(E));
+        replaceCount(
+            CounterExpr::Sub(getCurrentCounter(), ThrowCount, CounterBuilder),
+            Lexer::getLocForEndOfToken(SM, E->getEndLoc()));
+      }
+
+      if (isa<MacroExpansionExpr>(E)) {
+        assert(isInMacroExpansion());
+        MacroDepth -= 1;
+      }
+
+      if (hasCounter(E))
+        exitRegion(E);
+
       return Action::Continue(E);
-
-    // The region following the expression gets current counter minus the error
-    // branch counter, i.e the number of times we didn't throw an error.
-    if (mayExpressionThrow(E)) {
-      auto ThrowCount = assignKnownCounter(ProfileCounterRef::errorBranchOf(E));
-      replaceCount(
-          CounterExpr::Sub(getCurrentCounter(), ThrowCount, CounterBuilder),
-          Lexer::getLocForEndOfToken(SM, E->getEndLoc()));
     }
-
-    if (isa<MacroExpansionExpr>(E)) {
-      assert(isInMacroExpansion());
-      MacroDepth -= 1;
-    }
-
-    if (hasCounter(E))
-      exitRegion(E);
-
-    return Action::Continue(E);
-  }
-};
+  };
 
 } // end anonymous namespace
 
