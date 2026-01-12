@@ -20,6 +20,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/Sema/Constraint.h"
 #include "llvm/ADT/ilist.h"
 #include <vector>
@@ -36,6 +37,7 @@ class TypeVariableType;
 namespace constraints {
 
 class Constraint;
+enum ScoreKind : unsigned int;
 struct SyntacticElementTargetKey;
 
 namespace inference {
