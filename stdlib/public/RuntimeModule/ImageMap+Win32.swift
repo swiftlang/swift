@@ -409,7 +409,7 @@ extension ImageMap {
             //
             // We are looking for IMAGE_DEBUG_TYPE_CODEVIEW with the signature
             // RSDS, which contains a GUID.
-            //d
+            //
             // We also keep track of FPO data for 32-bit x86.
             for entry in buffer {
               if entry.SizeOfData == 0 {
