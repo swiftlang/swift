@@ -245,12 +245,7 @@ private extension InstructionRange {
           }
 
         default:
-          // We cannot extend a lexical liverange with a non-lexical liverange, because afterwards the
-          // non-lexical liverange could be shrunk over a deinit barrier which would let the original
-          // lexical liverange to be shrunk, too.
-          if !initialDef.isInLexicalLiverange(context) || value.isInLexicalLiverange(context) {
-            self.insert(user)
-          }
+          self.insert(user)
         }
       }
     }
@@ -264,13 +259,6 @@ private extension InstructionRange {
     let domTree = context.dominatorTree
 
     if initialDef.destroyUsers(dominatedBy: store.parentBlock, domTree).isEmpty {
-      return
-    }
-
-    // We have to take care of lexical lifetimes. See comment above.
-    if initialDef.isInLexicalLiverange(context) &&
-       !store.destination.accessBase.isInLexicalOrGlobalLiverange(context)
-    {
       return
     }
 
@@ -355,27 +343,6 @@ private extension Instruction {
       return false
     default:
       return mayWrite(toAddress: address, aliasAnalysis)
-    }
-  }
-}
-
-private extension AccessBase {
-  func isInLexicalOrGlobalLiverange(_ context: FunctionPassContext) -> Bool {
-    switch self {
-    case .box(let pbi):      return pbi.box.isInLexicalLiverange(context)
-    case .class(let rea):    return rea.instance.isInLexicalLiverange(context)
-    case .tail(let rta):     return rta.instance.isInLexicalLiverange(context)
-    case .stack(let asi):    return asi.isLexical
-    case .global:            return true
-    case .argument(let arg):
-      switch arg.convention {
-      case .indirectIn, .indirectInGuaranteed, .indirectInout, .indirectInoutAliasable:
-        return arg.isLexical
-      default:
-        return false
-      }
-    case .yield, .storeBorrow, .pointer, .index, .unidentified:
-      return false
     }
   }
 }
