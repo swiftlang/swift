@@ -17,7 +17,6 @@ func foo(val: MyStruct) {
 // BEGIN DUMMY.swift
 
 // Checks that editing and saving the current file doesn't affect dependency checking.
-// REQUIRES: shell
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Frameworks)
@@ -25,21 +24,10 @@ func foo(val: MyStruct) {
 
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: COMPILER_ARGS=( \
-// RUN:   -target %target-triple \
-// RUN:   -module-name MyProject \
-// RUN:   -F %t/Frameworks \
-// RUN:   -I %t/MyProject \
-// RUN:   -import-objc-header %t/MyProject/Bridging.h \
-// RUN:   %t/MyProject/Library.swift \
-// RUN:   %t/test.swift \
-// RUN: )
-// RUN: INPUT_DIR=%S/Inputs/checkdeps
-
-// RUN: cp -R $INPUT_DIR/MyProject %t/
-// RUN: cp -R $INPUT_DIR/ClangFW.framework %t/Frameworks/
+// RUN: cp -R %S/Inputs/checkdeps/MyProject %t/
+// RUN: cp -R %S/Inputs/checkdeps/ClangFW.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule)
-// RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src/Funcs.swift
+// RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name %S/Inputs/checkdeps/SwiftFW_src/Funcs.swift
 
 // RUN: cp %t/State1.swift %t/test.swift
 // RUN: touch -t 202001010101 %t/test.swift
@@ -48,22 +36,22 @@ func foo(val: MyStruct) {
 // RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 
 // RUN:   -shell -- echo "### Initial" == \
-// RUN:   -req=complete -pos=5:4 %t/test.swift -- ${COMPILER_ARGS[@]} == \
+// RUN:   -req=complete -pos=5:4 %t/test.swift -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %t/test.swift == \
 
 // RUN:   -shell -- echo "### Modify own file - 1" == \
 // RUN:   -shell -- cp %t/State2.swift %t/test.swift == \
 // RUN:   -shell -- touch -t 210001010101 %t/test.swift == \
-// RUN:   -req=complete -pos=5:9 %t/test.swift -- ${COMPILER_ARGS[@]} == \
+// RUN:   -req=complete -pos=5:9 %t/test.swift -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %t/test.swift == \
 
 // RUN:   -shell -- echo "### Modify own file - 2" == \
 // RUN:   -shell -- cp %t/State1.swift %t/test.swift == \
 // RUN:   -shell -- touch -t 210001010102 %t/test.swift == \
-// RUN:   -req=complete -pos=5:4 %t/test.swift -- ${COMPILER_ARGS[@]} == \
+// RUN:   -req=complete -pos=5:4 %t/test.swift -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %t/test.swift == \
 
 // RUN:   -shell -- echo "### Modify own file - 3" == \
 // RUN:   -shell -- cp %t/State2.swift %t/test.swift == \
 // RUN:   -shell -- touch -t 210001010103 %t/test.swift == \
-// RUN:   -req=complete -pos=5:9 %t/test.swift -- ${COMPILER_ARGS[@]} \
+// RUN:   -req=complete -pos=5:9 %t/test.swift -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %t/test.swift \
 // RUN:   | %FileCheck %s
 
 // CHECK-LABEL: ### Initial
