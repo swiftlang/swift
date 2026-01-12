@@ -31,12 +31,23 @@ if(NOT SWIFT_BUILD_STDLIB)
   set(BUILD_STANDALONE TRUE)
 endif()
 
+# Note: we disable availability checking because we need to use code from
+# the RuntimeModule, but we also need to build with an availability version
+# below that defined by Backtracing 6.2 (for now).
+#
+# We can't use the same trick that we use in the RuntimeModule or stdlib,
+# because we're importing those modules, but because we build *with* them,
+# we want to be able to use new things that are in them.  We don't have a
+# great solution to this, other than just turning off availability checking
+# for this code.
+
 set(BACKTRACING_COMPILE_FLAGS
   "-cxx-interoperability-mode=default"
   "-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
-  "-disable-upcoming-feature;MemberImportVisibility")
+  "-disable-upcoming-feature;MemberImportVisibility"
+  "-Xfrontend;-disable-availability-checking")
 
 set(BACKTRACING_SOURCES
   main.swift

@@ -38,6 +38,7 @@ fileprivate func getSysCtlString(_ name: String) -> String? {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension ImageMap {
 
   private static let platform = {
