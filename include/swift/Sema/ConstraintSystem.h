@@ -2072,6 +2072,8 @@ public:
   bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
+  void recordMergeable(TypeVariableType *root, Type conflict);
+
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
 
@@ -2870,6 +2872,8 @@ public:
       return {};
     return substitutions->second;
   }
+
+  MergeableTypes mergeableTypes;
 
 private:
   /// \returns The opened type and the thrown error type.

@@ -1225,6 +1225,25 @@ void Solution::dump(raw_ostream &out, unsigned indent) const {
     out << "\n";
   }
 
+  out.indent(indent) << "Mergeable Type variables:\n";
+  // TODO: Get this back to being sortable, and move it to mergeable's own dump
+  for (auto binding : mergeableTypes.map) {
+    auto &typeVar = binding.first;
+    out.indent(indent + 2);
+    Type(typeVar).print(out, PO);
+    if (auto *locator = typeVar->getAs<TypeVariableType>()->getImpl().getLocator()) {
+      out << " @ ";
+      locator->dump(sm, out);
+    }
+    out << " with bindings of ";
+    for (auto conflicted : binding.second) {
+      Type(conflicted.diagnosticType).print(out, PO);
+      out << ", ";
+
+    }
+    out << "\n";
+  }
+
   if (!overloadChoices.empty()) {
     out << "\n";
     out.indent(indent) << "Overload choices:";
