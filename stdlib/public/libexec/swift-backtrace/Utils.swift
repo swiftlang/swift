@@ -254,23 +254,3 @@ struct CFileStream: TextOutputStream {
 
 var standardOutput = CFileStream(fp: stdout)
 var standardError = CFileStream(fp: stderr)
-
-/// Format a timespec as an ISO8601 date/time
-func formatISO8601(_ time: timespec) -> String {
-  var exploded = tm()
-  var secs = time.tv_sec
-
-  gmtime_r(&secs, &exploded)
-
-  let isoTime = """
-\(String(exploded.tm_year + 1900, width: 4))-\
-\(String(exploded.tm_mon + 1, width: 2))-\
-\(String(exploded.tm_mday, width: 2))T\
-\(String(exploded.tm_hour, width: 2)):\
-\(String(exploded.tm_min, width: 2)):\
-\(String(exploded.tm_sec, width: 2)).\
-\(String(time.tv_nsec / 1000, width: 6))Z
-"""
-
-  return isoTime
-}

@@ -68,6 +68,7 @@ _swift_installCrashHandler()
 namespace {
 
 LPTOP_LEVEL_EXCEPTION_FILTER pOldFilter = NULL;
+bool reinstalled = false;
 
 // Yuck.  This is horrible because the C runtime's startup code sets the
 // unhandled exception filter, but that happens *after*
@@ -78,7 +79,13 @@ LPTOP_LEVEL_EXCEPTION_FILTER pOldFilter = NULL;
 // hack things by reinstalling our filter from the vectored exception
 // handler.  This is utterly horrible.
 LONG reinstallUnhandledExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo) {
+  if (reinstalled)
+    return EXCEPTION_CONTINUE_SEARCH;
+
+  reinstalled = true;
+
   LPTOP_LEVEL_EXCEPTION_FILTER pFilter = SetUnhandledExceptionFilter(handleException);
+
   if (pFilter != handleException)
     pOldFilter = pFilter;
   return EXCEPTION_CONTINUE_SEARCH;
@@ -129,12 +136,22 @@ LONG callWithAltStack(EXCEPTION_POINTERS *arg,
 LONG handleException(EXCEPTION_POINTERS *ExceptionInfo) {
   LONG result;
 
-  AcquireSRWLockExclusive(&crashLock);
-  result = callWithAltStack(ExceptionInfo, reallyHandleException);
-  ReleaseSRWLockExclusive(&crashLock);
+  switch (ExceptionInfo->ExceptionRecord->ExceptionCode) {
+  case DBG_PRINTEXCEPTION_C:
+  case DBG_PRINTEXCEPTION_WIDE_C:
+  case 0x406d1388:      // Set debugger thread name
+    result = EXCEPTION_CONTINUE_EXECUTION;
+    break;
+  default:
+    AcquireSRWLockExclusive(&crashLock);
+    result = callWithAltStack(ExceptionInfo, reallyHandleException);
+    ReleaseSRWLockExclusive(&crashLock);
+    break;
+  }
 
-  if (pOldFilter)
+  if (pOldFilter && result == EXCEPTION_CONTINUE_SEARCH) {
     return pOldFilter(ExceptionInfo);
+  }
 
   return result;
 }
@@ -176,7 +193,7 @@ LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
     WriteFile(hOutput, message, strlen(message), NULL, NULL);
   }
 
-  return EXCEPTION_EXECUTE_HANDLER;
+  return EXCEPTION_CONTINUE_SEARCH;
 }
 
 void *pcFromContext(PCONTEXT Context) {

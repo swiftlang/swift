@@ -87,7 +87,7 @@ let EnumProcessModules = K32EnumProcessModules
 let GetModuleInformation = K32GetModuleInformation
 
 extension ImageMap.Image: Equatable {
-  static func == (lhs: Self, rhs: Self) -> Bool {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
     return (lhs.name == rhs.name
       && lhs.path == rhs.path
       && lhs.uniqueID == rhs.uniqueID
@@ -96,13 +96,13 @@ extension ImageMap.Image: Equatable {
     )
   }
 
-  static func != (lhs: Self, rhs: Self) -> Bool {
+  public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
   }
 }
 
 extension ImageMap.Image {
-  func hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(name)
     hasher.combine(path)
     hasher.combine(uniqueID)
