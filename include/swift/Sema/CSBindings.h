@@ -775,9 +775,7 @@ private:
     IsDirty = true;
   }
 
-  void markConflicting() {
-    IsConflicting = true;
-  }
+  void markConflicting(PotentialBinding conflictingBinding);
 
   /// Add a new binding to the set.
   ///

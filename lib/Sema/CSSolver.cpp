@@ -96,6 +96,7 @@ Solution ConstraintSystem::finalize() {
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
+  // If constraint system held onto any merged/conflicted types,
   // Copy over the resolved overloads.
   solution.overloadChoices.reserve(ResolvedOverloads.size());
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
@@ -287,6 +288,7 @@ void ConstraintSystem::replaySolution(const Solution &solution,
     assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
+  // Register any merged/conflicted bindings from this solution
   // Register overload choices.
   // FIXME: Copy these directly into some kind of partial solution?
   for (auto overload : solution.overloadChoices) {
