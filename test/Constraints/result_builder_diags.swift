@@ -875,10 +875,12 @@ func test_invalid_result_is_diagnosed() {
     }
   }
 
+  // expected-note@+1{{arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
   struct S<T> {}
 
   @MyBuilder
-  func test() -> S<String> { // expected-error {{conflicting arguments to generic parameter 'T1' ('S<Int>' vs. 'S<String>')}}
+  func test() -> S<String> {
+    // expected-error@+1{{cannot convert value of type 'S<Int>' to expected argument type 'S<String>'}}
     S<Int>()
   }
 }

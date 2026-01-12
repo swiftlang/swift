@@ -98,16 +98,21 @@ let _: Double? = (b ? (b ? 3.0 : 3) : nil)
 // Optional<Float> contextual type is completely broken
 let _: Float? = f(nil, f(3, 3.0))
 let _: Float? = f(nil, f(3.0, 3))  // expected-error {{conflicting arguments to generic parameter 'T' ('Float?' vs. 'Float')}}
-let _: Float? = f(3, f(3.0, nil))  // expected-error {{conflicting arguments to generic parameter 'T' ('Float?' vs. 'Double?')}}
-let _: Float? = f(3, f(nil, 3.0))  // expected-error {{conflicting arguments to generic parameter 'T' ('Float?' vs. 'Double?')}}
+// FIXME: Initialization shouldn't say assign. Switch to cannot convert value of type to type style message.
+// expected-note@+1 {{arguments to generic parameter 'Wrapped' ('Double' and 'Float') are expected to be equal}}
+let _: Float? = f(3, f(3.0, nil))  // expected-error {{cannot assign value of type 'Double?' to type 'Float?'}}
+// expected-note@+1 {{arguments to generic parameter 'Wrapped' ('Double' and 'Float') are expected to be equal}}
+let _: Float? = f(3, f(nil, 3.0))  // expected-error {{cannot assign value of type 'Double?' to type 'Float?'}}
 let _: Float? = f(3.0, f(nil, 3))
 let _: Float? = f(3.0, f(3, nil))
 
 let _: Float? = f(f(nil, 3), 3.0)
-let _: Float? = f(f(nil, 3.0), 3)  // expected-error {{conflicting arguments to generic parameter 'T' ('Float?' vs. 'Double?')}}
+// expected-note@+1 {{arguments to generic parameter 'Wrapped' ('Double' and 'Float') are expected to be equal}}
+let _: Float? = f(f(nil, 3.0), 3)  // expected-error {{cannot assign value of type 'Double?' to type 'Float?'}}
 let _: Float? = f(f(3, 3.0), nil)
 let _: Float? = f(f(3, nil), 3.0)
-let _: Float? = f(f(3.0, nil), 3)  // expected-error {{conflicting arguments to generic parameter 'T' ('Float?' vs. 'Double?')}}
+// expected-note@+1 {{arguments to generic parameter 'Wrapped' ('Double' and 'Float') are expected to be equal}}
+let _: Float? = f(f(3.0, nil), 3)  // expected-error {{cannot assign value of type 'Double?' to type 'Float?'}}
 let _: Float? = f(f(3.0, 3), nil)  // expected-error {{conflicting arguments to generic parameter 'T' ('Float?' vs. 'Float')}}
 
 let _: Float? = (b ? nil : (b ? 3 : 3.0))

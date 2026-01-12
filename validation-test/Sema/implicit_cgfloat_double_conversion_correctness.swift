@@ -104,9 +104,7 @@ extension CGFloat {
 
 func testMinMax() {
   func f1(x: CGFloat) -> Double? {
-    // FIXME: Broken with -solver-enable-promote-supertypes
     return max(0, min(1, x))
-    // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
   }
 
   func f2(x: Double) -> CGFloat? {

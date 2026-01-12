@@ -24,11 +24,14 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
    // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
 
   // Make sure we error on the following in Swift 6 mode.
-  _ = id(arr) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
-  _ = (arr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-  _ = (arr ?? [] ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-  // expected-error@-1{{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-  _ = (optArr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]'}}
+  // expected-note@+1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  _ = id(arr) as [String] // expected-error {{cannot convert value of type '[Int]' to expected argument type '[String]'}}
+  // expected-note@+1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  _ = (arr ?? []) as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
+  _ = (arr ?? [] ?? []) as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  // expected-note@+1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+  _ = (optArr ?? []) as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
 
   _ = (arr ?? []) as [String]? // expected-error {{'[Int]' is not convertible to '[String]?'}}
   // expected-note@-1 {{did you mean to use 'as!' to force downcast?}}

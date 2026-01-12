@@ -29,7 +29,8 @@ struct Row<Content: View>: View {
 
 struct ContainerDemo: View {
   var body: some View {
-    Row(label: { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    Row(label: {
+      // expected-error@+1{{cannot convert value of type 'Text' to closure result type 'Button<Text>'}}
       Text("label")
     }, control: {
       Button(action: {}, label: { Text("control") })

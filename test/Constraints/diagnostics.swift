@@ -1135,7 +1135,7 @@ func rdar17170728() {
   // condition.
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'Bool.Stride' and 'Bool'}}
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
   }
 }
 

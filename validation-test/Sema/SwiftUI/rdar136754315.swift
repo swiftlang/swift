@@ -41,9 +41,11 @@ struct ChildView: View {
 struct ParentView: View {
   var items: [Int]?
 
-  var body: some View { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+  var body: some View {
     ScrollView { Text("") }
       .sheet(isPresented: true) {
+        // expected-note@+2{{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+        // expected-error@+1{{cannot convert value of type '[Int]' to expected argument type '[String]'}}
         ChildView(items: items ?? [])
       }
   }
