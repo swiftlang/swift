@@ -7186,7 +7186,7 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
 
     conversionsOrFixes.push_back(AllowGlobalActorMismatch::create(
-        *this, lhs, rhs, getConstraintLocator(anchor, path)));
+        *this, lhs, rhs, rawLhs, rawRhs, getConstraintLocator(anchor, path)));
     break;
   }
 

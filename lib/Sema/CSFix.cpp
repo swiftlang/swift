@@ -2005,6 +2005,7 @@ unsigned AllowArgumentMismatch::getParamIdx() const {
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
   ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
+                                  getRawFromType(), getRawToType(),
                                   getLocator());
   return failure.diagnose(asNote);
 }

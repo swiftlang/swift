@@ -270,6 +270,8 @@ public:
     return getParamTypeImpl(FnType, lookThroughAutoclosure);
   }
 
+  /// \returns the raw type, including potentially type variable,
+
   /// \returns The interface type of the parameter which the argument is being
   /// applied to.
   ///
