@@ -1787,7 +1787,7 @@ handleRequestGetObjCSelector(const RequestDict &Req,
       return;
 
     int64_t Offset = 0;
-    if (!Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
       return Rec(createErrorRequestInvalid("'key.offset' is required"));
     }
 
