@@ -2977,8 +2977,12 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     }
 
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
-      forwardedArgs.push_back(
-          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
+      auto forwardedArg =
+          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
+      if (fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
+        forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
+      }
+      forwardedArgs.push_back(forwardedArg);
       continue;
     }
 
@@ -5294,6 +5298,9 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
     case ResultConvention::Owned:
     case ResultConvention::Autoreleased:
     case ResultConvention::Unowned: // Handled in OwnershipModelEliminator.
+    case ResultConvention::GuaranteedAddress:
+    case ResultConvention::Inout:
+    case ResultConvention::Guaranteed:
       return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
     case ResultConvention::Pack:
       llvm_unreachable("shouldn't have direct result with pack results");
@@ -5304,11 +5311,6 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
       SGF.SGM.diagnose(Loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
       return SGF.emitManagedCopy(Loc, resultValue, resultTL);
-    case ResultConvention::GuaranteedAddress:
-    case ResultConvention::Inout:
-      return SGF.emitManagedRValueWithCleanup(resultValue, resultTL);
-    case ResultConvention::Guaranteed:
-      llvm_unreachable("borrow/mutate accessor is not yet implemented");
     }
     llvm_unreachable("bad result convention!");
   };
