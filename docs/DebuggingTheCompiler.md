@@ -115,7 +115,7 @@ swiftc -g -emit-sil -O file.swift
 * **IRGen** To print the LLVM IR after IR generation:
 
 ```sh
-swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+swiftc -emit-irgen -O file.swift
 ```
 
 * **LLVM passes** To print the LLVM IR after LLVM passes:
@@ -130,10 +130,13 @@ swiftc -emit-ir -O file.swift
 swiftc -S -O file.swift
 ```
 
-Compilation stops at the phase where you print the output. So if you want to
-print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except `-dump-ast`) can be redirected
 with an additional `-o <file>` option.
+Compilation stops at the phase where you print the output.
+
+If you want to print the SIL or LLVM IR in addition to producing the regular
+output file (e.g an object file), use the `-sil-output-path <file>`, or
+`-ir-output-path <file>` options (prefixed with `-Xfrontend`).
 
 ## Debugging Diagnostic Emission
 
