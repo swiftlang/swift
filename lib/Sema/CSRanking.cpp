@@ -893,11 +893,12 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
   return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
     if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return tupleType->getElementType(0);
+        return getStrippedType(tupleType->getElementType(0), ctx);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
-        elts.push_back(elt.getWithoutName());
+        auto eltTy = getStrippedType(elt.getType(), ctx);
+        elts.push_back(TupleTypeElt(eltTy));
       }
 
       return TupleType::get(elts, ctx);
@@ -907,7 +908,8 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
       auto params = funcType->getParams();
       SmallVector<AnyFunctionType::Param, 4> newParams;
       for (auto param : params) {
-        auto newParam = param;
+        auto newParam =
+            param.withType(getStrippedType(param.getPlainType(), ctx));
         switch (param.getParameterFlags().getOwnershipSpecifier()) {
         case ParamSpecifier::Borrowing:
         case ParamSpecifier::Consuming: {
@@ -923,9 +925,8 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
       }
       auto newExtInfo = funcType->getExtInfo().withRepresentation(
           AnyFunctionType::Representation::Swift);
-      return FunctionType::get(newParams,
-                               funcType->getResult(),
-                               newExtInfo);
+      return FunctionType::get(
+          newParams, getStrippedType(funcType->getResult(), ctx), newExtInfo);
     }
 
     return std::nullopt;
