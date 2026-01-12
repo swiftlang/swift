@@ -1062,6 +1062,15 @@ func _internal_original_inlinable_derivative(_ x: Float) -> (value: Float, pullb
   fatalError()
 }
 
+func internal_original_alwaysemitintoclient_derivative_error(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: internal_original_alwaysemitintoclient_derivative_error)
+// expected-error @+1 {{either both or none of derivative and original function must have @alwaysEmitIntoClient attribute}}
+func _internal_original_alwaysemitintoclient_derivative_error(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+@_alwaysEmitIntoClient
 func internal_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
 @_alwaysEmitIntoClient
 @derivative(of: internal_original_alwaysemitintoclient_derivative)
@@ -1084,6 +1093,15 @@ package func _package_original_inlinable_derivative(_ x: Float) -> (value: Float
   fatalError()
 }
 
+@_alwaysEmitIntoClient
+package func package_original_alwaysemitintoclient_derivative_error(_ x: Float) -> Float { x }
+@derivative(of: package_original_alwaysemitintoclient_derivative_error)
+// expected-error @+1 {{either both or none of derivative and original function must have @alwaysEmitIntoClient attribute}}
+package func _package_original_alwaysemitintoclient_derivative_error(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+@_alwaysEmitIntoClient
 package func package_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
 @_alwaysEmitIntoClient
 @derivative(of: package_original_alwaysemitintoclient_derivative)
