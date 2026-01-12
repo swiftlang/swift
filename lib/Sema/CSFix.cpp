@@ -597,8 +597,8 @@ bool ContextualMismatch::diagnoseForAmbiguity(
 ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ContextualMismatch(
-      cs, lhs, rhs, locator, FixBehavior::Error);
+  return new (cs.getAllocator())
+      ContextualMismatch(cs, lhs, rhs, locator, FixBehavior::Error);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
@@ -732,6 +732,10 @@ bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
     return false;
 
   std::tie(purpose, fromType, toType) = *contextualTypeInfo;
+  // TODO: Likely getStructuralTypeContext needs to pull some more type
+  // information
+  /// out of the structures to make sure of the best context for original/raw
+  /// types look for examples before proceeding
   FunctionTypeMismatch failure(solution, purpose, fromType, toType, indices,
                                locator);
   return failure.diagnose(asNote);
@@ -1496,10 +1500,10 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
 }
 
 NotCompileTimeLiteral::NotCompileTimeLiteral(ConstraintSystem &cs, Type paramTy,
-                                         ConstraintLocator *locator):
-  ContextualMismatch(cs, FixKind::NotCompileTimeLiteral, paramTy,
-                     cs.getASTContext().TheEmptyTupleType, locator,
-                     FixBehavior::AlwaysWarning) {}
+                                             ConstraintLocator *locator)
+    : ContextualMismatch(cs, FixKind::NotCompileTimeLiteral, paramTy,
+                         cs.getASTContext().TheEmptyTupleType, locator,
+                         FixBehavior::AlwaysWarning) {}
 
 NotCompileTimeLiteral *
 NotCompileTimeLiteral::create(ConstraintSystem &cs, Type paramTy,
@@ -1990,7 +1994,7 @@ bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
   std::optional<ArgumentMismatchFailure> failure =
       ArgumentMismatchFailure::create(solution, getFromType(), getToType(),
-                                      getLocator());
+                                      getFromType(), getToType(), getLocator());
   if (!failure)
     return false;
   return failure.value().diagnose(asNote);
