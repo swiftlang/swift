@@ -33,4 +33,5 @@ Namespaces:
       SwiftSafety: safe
     - Name: empty
       SwiftSafety: safe
- 
+  - Name: unique_ptr
+    SwiftCopyable: false
