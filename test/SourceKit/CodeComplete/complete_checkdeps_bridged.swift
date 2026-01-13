@@ -1,3 +1,4 @@
+// UNSUPPORTED: OS=windows-msvc
 import ClangFW
 import SwiftFW
 

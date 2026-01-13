@@ -1,3 +1,4 @@
+// UNSUPPORTED: OS=windows-msvc
 // BEGIN State1.swift
 import ClangFW
 import SwiftFW
