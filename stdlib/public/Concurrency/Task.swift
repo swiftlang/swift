@@ -193,7 +193,7 @@ extension Task {
       do {
         return .success(try await value)
       } catch {
-        return .failure(error) // as!-safe, guaranteed to be Failure
+        return .failure(error)
       }
     }
   }
