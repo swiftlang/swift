@@ -2931,8 +2931,9 @@ static CanSILFunctionType getSILFunctionType(
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
       if (formalDeps.isImmortal()) {
-        return LifetimeDependenceInfo(nullptr, nullptr,
-                                      target, /*immortal*/ true);
+        return LifetimeDependenceInfo(nullptr, nullptr, target,
+                                      /*immortal*/ true,
+                                      /*inferred*/ formalDeps.isInferred());
       }
       
       auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
@@ -2967,7 +2968,8 @@ static CanSILFunctionType getSILFunctionType(
       // no dependency, leaving behind an immortal value.
       if (!inheritIndicesSet && !scopeIndicesSet) {
         return LifetimeDependenceInfo(nullptr, nullptr, target,
-                                      /*immortal*/ true);
+                                      /*immortal*/ true,
+                                      /*inferred*/ formalDeps.isInferred());
       }
       
       SmallBitVector addressableDeps = scopeIndicesSet
@@ -2983,12 +2985,10 @@ static CanSILFunctionType getSILFunctionType(
       IndexSubset *condAddressableSet = condAddressableDeps.any()
         ? IndexSubset::get(TC.Context, condAddressableDeps)
         : nullptr;
-      
-      return LifetimeDependenceInfo(inheritIndicesSet,
-                                    scopeIndicesSet,
-                                    target, /*immortal*/ false,
-                                    addressableSet,
-                                    condAddressableSet);
+
+      return LifetimeDependenceInfo(
+          inheritIndicesSet, scopeIndicesSet, target, /*immortal*/ false,
+          /*inferred*/ false, addressableSet, condAddressableSet);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {

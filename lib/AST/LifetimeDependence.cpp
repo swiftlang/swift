@@ -188,7 +188,10 @@ std::string LifetimeDependenceInfo::getString() const {
 }
 
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
-  ID.AddBoolean(addressableParamIndicesAndImmortal.getInt());
+  ID.AddBoolean(addressableParamIndicesAndImmortalAndInferred.getPointer()
+                    .getInt()); // isImmortal
+  ID.AddBoolean(
+      addressableParamIndicesAndImmortalAndInferred.getInt()); // isInferred
   ID.AddInteger(targetIndex);
   if (inheritLifetimeParamIndices) {
     ID.AddInteger((uint8_t)LifetimeDependenceKind::Inherit);
@@ -198,9 +201,11 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddInteger((uint8_t)LifetimeDependenceKind::Scope);
     scopeLifetimeParamIndices->Profile(ID);
   }
-  if (addressableParamIndicesAndImmortal.getPointer()) {
+  if (addressableParamIndicesAndImmortalAndInferred.getPointer().getPointer()) {
     ID.AddBoolean(true);
-    addressableParamIndicesAndImmortal.getPointer()->Profile(ID);
+    addressableParamIndicesAndImmortalAndInferred.getPointer()
+        .getPointer()
+        ->Profile(ID);
   } else {
     ID.AddBoolean(false);  
   }
@@ -262,7 +267,8 @@ void LifetimeDependenceInfo::getConcatenatedData(
     pushData(scopeLifetimeParamIndices);
   }
   if (hasAddressableParamIndices()) {
-    pushData(addressableParamIndicesAndImmortal.getPointer());  
+    pushData(addressableParamIndicesAndImmortalAndInferred.getPointer()
+                 .getPointer());
   }
 }
 
@@ -274,10 +280,11 @@ struct LifetimeDependenceBuilder {
     SmallBitVector scopeIndices;
     bool hasAnnotation;
     bool isImmortal = false;
+    bool isInferred;
 
-    TargetDeps(bool hasAnnotation, unsigned capacity)
+    TargetDeps(bool hasAnnotation, unsigned capacity, bool isInferred)
         : inheritIndices(capacity), scopeIndices(capacity),
-          hasAnnotation(hasAnnotation) {}
+          hasAnnotation(hasAnnotation), isInferred(isInferred) {}
 
     bool empty() const {
       return !(isImmortal || inheritIndices.any() || scopeIndices.any());
@@ -328,8 +335,8 @@ public:
   }
 
   TargetDeps *createAnnotatedTargetDeps(unsigned targetIndex) {
-    auto iterAndInserted = depsArray.try_emplace(targetIndex, true,
-                                                 sourceIndexCap);
+    auto iterAndInserted = depsArray.try_emplace(
+        targetIndex, true, sourceIndexCap, /*isInferred*/ false);
     if (!iterAndInserted.second)
       return nullptr;
 
@@ -339,7 +346,10 @@ public:
   // Check this before diagnosing any broken inference to avoid diagnosing a
   // target that has an explicit annotation.
   TargetDeps *getInferredTargetDeps(unsigned targetIndex) {
-    auto iter = depsArray.try_emplace(targetIndex, false, sourceIndexCap).first;
+    auto iter = depsArray
+                    .try_emplace(targetIndex, false, sourceIndexCap,
+                                 /*isInferred*/ true)
+                    .first;
     auto &deps = iter->second;
     return deps.hasAnnotation ? nullptr : &deps;
   }
@@ -385,10 +395,10 @@ public:
         ASSERT(!deps.isImmortal
                && "cannot combine immortal lifetime with parameter dependency");
       }
-      lifetimeDependencies.push_back(LifetimeDependenceInfo{
+      lifetimeDependencies.push_back(LifetimeDependenceInfo(
           /*inheritLifetimeParamIndices*/ inheritIndices,
           /*scopeLifetimeParamIndices*/ scopeIndices, targetIndex,
-          /*isImmortal*/ deps.isImmortal});
+          /*isImmortal*/ deps.isImmortal, /*isInferred*/ deps.isInferred));
     }
     if (lifetimeDependencies.empty()) {
       return std::nullopt;
@@ -1727,7 +1737,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
       return LifetimeDependenceInfo(/*inheritLifetimeParamIndices*/ nullptr,
                                     /*scopeLifetimeParamIndices*/ nullptr,
                                     targetIndex,
-                                    /*isImmortal*/ true);
+                                    /*isImmortal*/ true, /*isInferred*/ false);
     }
     default:
       llvm_unreachable("SIL can only have ordered or immortal lifetime "
@@ -1736,20 +1746,21 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
   }
 
   return LifetimeDependenceInfo(
-    inheritLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
-    : nullptr,
-    scopeLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
-    : nullptr,
-    targetIndex,
-    /*isImmortal*/ false,
-    addressableLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, addressableLifetimeParamIndices)
-    : nullptr,
-    conditionallyAddressableLifetimeParamIndices.any()
-    ? IndexSubset::get(ctx, conditionallyAddressableLifetimeParamIndices)
-    : nullptr);
+      inheritLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
+          : nullptr,
+      scopeLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
+          : nullptr,
+      targetIndex,
+      /*isImmortal*/ false,
+      /*isInferred*/ false,
+      addressableLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, addressableLifetimeParamIndices)
+          : nullptr,
+      conditionallyAddressableLifetimeParamIndices.any()
+          ? IndexSubset::get(ctx, conditionallyAddressableLifetimeParamIndices)
+          : nullptr);
 }
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

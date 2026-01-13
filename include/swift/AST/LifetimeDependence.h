@@ -190,23 +190,27 @@ public:
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
-  llvm::PointerIntPair<IndexSubset *, 1, bool>
-    addressableParamIndicesAndImmortal;
+  // The outer bool is the "isInferred" bit. The inner one is the "isImmortal"
+  // bit.
+  llvm::PointerIntPair<llvm::PointerIntPair<IndexSubset *, 1, bool>, 1, bool>
+      addressableParamIndicesAndImmortalAndInferred;
   IndexSubset *conditionallyAddressableParamIndices;
 
   unsigned targetIndex;
 
 public:
+  /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool isImmortal,
-                         // set during SIL type lowering
-                         IndexSubset *addressableParamIndices = nullptr,
-                         IndexSubset *conditionallyAddressableParamIndices = nullptr)
+                         unsigned targetIndex, bool isImmortal, bool isInferred,
+                         IndexSubset *addressableParamIndices,
+                         IndexSubset *conditionallyAddressableParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
-        addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
-        conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
+        addressableParamIndicesAndImmortalAndInferred(
+            {addressableParamIndices, isImmortal}, isInferred),
+        conditionallyAddressableParamIndices(
+            conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
     ASSERT(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
@@ -238,6 +242,17 @@ public:
     }
   }
 
+  /// Partially-initialized dependence info, with addressable & conditionally
+  /// addressable parameter indices unset for now.
+  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
+                         IndexSubset *scopeLifetimeParamIndices,
+                         unsigned targetIndex, bool isImmortal, bool isInferred)
+      : LifetimeDependenceInfo(inheritLifetimeParamIndices,
+                               scopeLifetimeParamIndices, targetIndex,
+                               isImmortal, isInferred,
+                               // set during SIL type lowering
+                               nullptr, nullptr) {}
+
   operator bool() const { return !empty(); }
 
   bool empty() const {
@@ -245,7 +260,13 @@ public:
            scopeLifetimeParamIndices == nullptr;
   }
 
-  bool isImmortal() const { return addressableParamIndicesAndImmortal.getInt(); }
+  bool isImmortal() const {
+    return addressableParamIndicesAndImmortalAndInferred.getPointer().getInt();
+  }
+
+  bool isInferred() const {
+    return addressableParamIndicesAndImmortalAndInferred.getInt();
+  }
 
   unsigned getTargetIndex() const { return targetIndex; }
 
@@ -256,7 +277,8 @@ public:
     return scopeLifetimeParamIndices != nullptr;
   }
   bool hasAddressableParamIndices() const {
-    return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+    return addressableParamIndicesAndImmortalAndInferred.getPointer()
+               .getPointer() != nullptr;
   }
 
   unsigned getParamIndicesLength() const {
@@ -282,7 +304,8 @@ public:
   /// not only on the value, but the memory location of a particular instance
   /// of the value.
   IndexSubset *getAddressableIndices() const {
-    return addressableParamIndicesAndImmortal.getPointer();
+    return addressableParamIndicesAndImmortalAndInferred.getPointer()
+        .getPointer();
   }
   /// Return the set of parameters which may have addressable dependencies
   /// depending on the type of the parameter.
