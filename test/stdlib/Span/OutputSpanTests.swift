@@ -386,19 +386,20 @@ suite.test("Array append throws")
   do throws(MyTestError) {
     try a.append(addingCapacity: 8) {
       span throws(MyTestError) in
-      span.append(I())
-      span.append(I())
-      expectEqual(I.count, 6)
-      throw MyTestError.error
+      for i in 1..<100 {
+        span.append(I())
+        expectEqual(I.count, 4+i)
+        if I.count >= 6 { throw MyTestError.error }
+      }
     }
     expectUnreachable("Array initializer should have thrown.")
   } catch {
     expectEqual(error, MyTestError.error)
   }
 
-  // thrown errors revert the changes
-  expectEqual(a.count, 4)
-  expectEqual(I.count, 4)
+  // changes are preserved up to a thrown error
+  expectEqual(a.count, 6)
+  expectEqual(I.count, 6)
 }
 
 suite.test("Array append overflow")
@@ -515,19 +516,20 @@ suite.test("ContiguousArray append throws")
   do throws(MyTestError) {
     try a.append(addingCapacity: 8) {
       span throws(MyTestError) in
-      span.append(I())
-      span.append(I())
-      expectEqual(I.count, 6)
-      throw MyTestError.error
+      for i in 1..<100 {
+        span.append(I())
+        expectEqual(I.count, 4+i)
+        if I.count >= 6 { throw MyTestError.error }
+      }
     }
     expectUnreachable("Array initializer should have thrown.")
   } catch {
     expectEqual(error, MyTestError.error)
-
-    // thrown errors revert the changes
-    expectEqual(a.count, 4)
-    expectEqual(I.count, 4)
   }
+
+  // changes are preserved up to a thrown error
+  expectEqual(a.count, 6)
+  expectEqual(I.count, 6)
 }
 
 suite.test("ContiguousArray append overflow")

@@ -1651,8 +1651,8 @@ extension Array {
   /// At the end of the closure, `span`'s `count` elements will have been
   /// appended to the array.
   ///
-  /// If the closure throws an error, the array will be reverted to its initial
-  /// state.
+  /// If the closure throws an error, the items appended until that point
+  /// will remain in the array.
   ///
   /// - Parameters:
   ///   - uninitializedCount: The number of new elements the array should have
@@ -1679,12 +1679,8 @@ extension Array {
     )
     var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
 
-    var initializedCount = 0
     defer {
-      if initializedCount == 0 {
-        span.removeAll()
-      }
-      _ = unsafe span.finalize(for: buffer)
+      let initializedCount = unsafe span.finalize(for: buffer)
       span = OutputSpan()
 
       // Update mutableCount even when `initializer` throws an error.
@@ -1693,7 +1689,6 @@ extension Array {
     }
 
     try initializer(&span)
-    initializedCount = span.count
   }
 }
 
