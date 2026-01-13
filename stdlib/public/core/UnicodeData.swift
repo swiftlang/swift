@@ -248,6 +248,9 @@ func _swift_stdlib_isInCB_Consonant(_ scalar: UInt32) -> Bool
 // Word Breaking
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getWordBreakProperty(_ scalar: UInt32) -> UInt8
 
