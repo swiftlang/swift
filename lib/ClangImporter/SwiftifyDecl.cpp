@@ -42,7 +42,7 @@ using namespace importer;
 
 #ifndef NDEBUG
 #define DBGS llvm::dbgs() << "[swiftify:" << __LINE__ << "] "
-#define DUMP(x) DLOG(""); x->dump()
+#define DUMP(x) DLOG(""); x->dump(llvm::errs())
 #define DLOG_SCOPE(x) DLOG(x); LogIndentTracker Scope
 #else
 #define DLOG_SCOPE(x) do {} while(false);
