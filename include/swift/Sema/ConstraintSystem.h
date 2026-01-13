@@ -5024,6 +5024,18 @@ private:
       DeclContext *useDC, FunctionRefInfo functionRefInfo,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
+  /// Lookup a dependent member, returning a null Type and recording a fix on
+  /// failure.
+  Type lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
+                             bool openExistential,
+                             ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the ForEachElement constraint.
+  SolutionKind
+  simplifyForEachElementConstraint(Type first, Type second,
+                                   TypeMatchOptions flags,
+                                   ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
                                           Type first, Type second,

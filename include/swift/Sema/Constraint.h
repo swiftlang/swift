@@ -213,6 +213,8 @@ enum class ConstraintKind : char {
   MaterializePackExpansion,
   /// The first type is a l-value type whose object type is the second type.
   LValueObject,
+  /// The first type is the sequence type. The second type is the element type.
+  ForEachElement,
 };
 
 /// Classification of the different kinds of constraints.
@@ -712,6 +714,7 @@ public:
     case ConstraintKind::ApplicableFunction:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
+    case ConstraintKind::ForEachElement:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::FallbackType:

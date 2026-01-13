@@ -2186,6 +2186,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -2550,6 +2551,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -3283,6 +3285,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
@@ -7361,6 +7364,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
+    case ConstraintKind::ForEachElement:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
@@ -9820,6 +9824,125 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
+}
+
+Type
+ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
+                                        bool openExistential,
+                                        ConstraintLocatorBuilder locator) {
+  ASSERT(!base->isTypeVariableOrMember() && "Must simplify first");
+
+  GenericEnvironment *openedEnv = nullptr;
+  if (openExistential && base->isExistentialType()) {
+    auto openedTy = ExistentialArchetypeType::get(base->getCanonicalType());
+    openedEnv = openedTy->getGenericEnvironment();
+    base = openedTy;
+  }
+
+  // Add a conformance constraint since this handles things like conditional
+  // constraints and unavailable conformances.
+  auto *proto = assocTy->getProtocol();
+  addConstraint(ConstraintKind::ConformsTo, base,
+                proto->getDeclaredInterfaceType(), locator);
+
+  // Then lookup the conformance to dig out the witness. If it's missing, we'll
+  // have recorded a fix in the ConformsTo constraint so can bail.
+  auto conformance = lookupConformance(base, proto);
+  if (!conformance) {
+    // Increase SK_Hole just to ensure the solution is marked invalid.
+    increaseScore(SK_Hole, locator);
+    return Type();
+  }
+
+  auto result = conformance.getTypeWitness(assocTy);
+  if (result->hasError()) {
+    // If the type witness is invalid we'll have emitted an error, record a
+    // fix to ensure the solution is marked invalid.
+    auto *loc = getConstraintLocator(locator);
+    recordFix(IgnoreInvalidASTNode::create(*this, loc));
+    return Type();
+  }
+
+  // If we opened an archetype, erase the result.
+  if (openedEnv)
+    result = typeEraseOpenedArchetypesFromEnvironment(result, openedEnv);
+
+  return result;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyForEachElementConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+
+  Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
+  if (seqTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+          Constraint::create(*this, ConstraintKind::ForEachElement, first,
+                             second, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  }
+
+  if (seqTy->isPlaceholder()) {
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  auto anchor = locator.getAnchor();
+  auto &ctx = getASTContext();
+
+  // We can retrieve the corresponding sequence protocol from the contextual
+  // type set.
+  auto contextualTy = getContextualTypeInfo(anchor)->getType();
+  auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
+  auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
+
+  auto *contextualLoc = getConstraintLocator(
+      anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+
+  // To lookup the corresponding element type we first need to lookup the
+  // type witness for Iterator, opening an existential if needed.
+  //
+  // We can't directly use `Sequence.Element` since that may be not be
+  // representable through the erased Iterator type, e.g for:
+  //
+  // protocol Q: Sequence where Self.Element: P {}
+  //
+  // The erased element type is `any P`, but `makeIterator` can only produce
+  // `any IteratorProtocol`, so the actual element type is `Any`.
+  auto *iteratorAssocTy = seqProto->getAssociatedType(
+      isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+  auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
+                                      /*openExistential*/ true, contextualLoc);
+  if (!iterTy) {
+    // Already recorded fix.
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  // Now we have the Iterator type, do the same lookup for Element, opening
+  // an existential if needed.
+  auto *iterProto =
+      ctx.getProtocol(isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+                              : KnownProtocolKind::IteratorProtocol);
+  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
+  auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
+                                     /*openExistential*/ true, contextualLoc);
+  if (!eltTy) {
+    // Already recorded fix.
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  // Desugar the element type if necessary, since types like
+  // `Iter<Seq>.Element` aren't helpful.
+  eltTy = eltTy->getDesugaredType();
+
+  addConstraint(ConstraintKind::Conversion, eltTy, second, locator);
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -16328,6 +16451,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(first, second, subflags, locator);
+
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
@@ -16966,6 +17092,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     }
     return result;
   }
+
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(
