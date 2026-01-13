@@ -1382,7 +1382,7 @@ function Get-Dependencies {
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
-      $FileExtension = if ($SCCache.URL -match '/[^/]+(\..+)$') { $Matches[1] } else {
+      $FileExtension = if ($SCCache.URL -match '\.(?:tar\.\w+|zip)$') { $Matches[0] } else {
           throw "Invalid sccache URL"
       }
       DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion$FileExtension" $SCCache.SHA256
