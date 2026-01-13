@@ -176,7 +176,7 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @usableFromInline internal var swift_deletedCalleeAllocatedCoroutineMethodError: () {
   // TODO: CoroutineAccessors: Change to read from _read.
   @_silgen_name("swift_deletedCalleeAllocatedCoroutineMethodError")
-  read {
+  yielding borrow {
     fatalError("Fatal error: Call of deleted method")
   }
 }
