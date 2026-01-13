@@ -392,5 +392,9 @@ class Container {
   func someFunc() {
     let _ = [Container.NestedType]()  // ok
     let _ = [Self.NestedType]()  // ok
+
+    _ = Self.NestedType // expected-warning {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{24-24=.self}}
   }
 }
