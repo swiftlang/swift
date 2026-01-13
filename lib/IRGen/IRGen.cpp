@@ -127,6 +127,14 @@ static cl::opt<bool> AlignModuleToPageSize(
     "align-module-to-page-size", cl::Hidden,
     cl::desc("Align the text section of all LLVM modules to the page size"));
 
+static cl::opt<std::string> SaveIRGen(
+    "save-irgen", cl::Hidden,
+    cl::desc("Save LLVM-IR to a file before LLVM optimizations"));
+
+static cl::opt<std::string> SaveIR(
+    "save-ir", cl::Hidden,
+    cl::desc("Save LLVM-IR to a file after LLVM optimizations"));
+
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
            std::string>
 swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
@@ -604,6 +612,15 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   MPM.run(*Module, MAM);
 
+  if (!SaveIR.empty()) {
+    std::error_code error;
+    llvm::raw_fd_ostream irFile(SaveIR, error);
+    if (irFile.has_error() || error)
+      ABORT("cannot open LLVM-IR output file");
+
+    Module->print(irFile, nullptr);
+  }
+
   if (AlignModuleToPageSize) {
     align(Module);
   }
@@ -808,6 +825,15 @@ bool swift::performLLVM(const IRGenOptions &Opts,
     }
   } else {
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
+  }
+
+  if (!SaveIRGen.empty()) {
+    std::error_code error;
+    llvm::raw_fd_ostream irgenFile(SaveIRGen, error);
+    if (irgenFile.has_error() || error)
+      ABORT("cannot open LLVM-IR output file");
+
+    Module->print(irgenFile, nullptr);
   }
 
   auto &Ctxt = Module->getContext();
