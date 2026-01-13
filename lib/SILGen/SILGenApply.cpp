@@ -3245,6 +3245,11 @@ done:
 
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(argExpr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      argExpr = underlying;
+  }
+
   ForceValueExpr *forceUnwrap = nullptr;
   // Check for a force unwrap. This might show up inside or outside of the
   // load.

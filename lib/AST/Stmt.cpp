@@ -455,13 +455,6 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-Expr *ForEachStmt::getTypeCheckedSequence() const {
-  if (auto *expansion = dyn_cast<PackExpansionExpr>(getParsedSequence()))
-    return expansion;
-
-  return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
-}
-
 DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, SourceLoc throwsLoc,
                                  TypeLoc thrownType, Stmt *body,
@@ -487,6 +480,12 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
     }
   }
   return false;
+}
+
+BraceStmt *ForEachStmt::getDesugaredStmt() {
+  auto &ctx = DC->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, DesugarForEachStmtRequest{this},
+                           nullptr);
 }
 
 Type DoCatchStmt::getExplicitCaughtType() const {

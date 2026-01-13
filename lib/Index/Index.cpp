@@ -1220,6 +1220,8 @@ private:
     return false;
   }
 
+  bool shouldWalkIntoForEachDesugaredStmt() override { return true; }
+
   /// Reports all implicit member value decl conformances that \p D introduces
   /// as implicit overrides at the source location of \p D, and returns the
   /// explicit ones so we can check against them later on when visiting them as

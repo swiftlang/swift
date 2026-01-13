@@ -54,8 +54,8 @@ func foo() {
 
 // func myLoop() {
   // CHECK: define {{.*}} @"$s4main6myLoopyyF"
-  // CHECK: #dbg_declare(ptr %index.debug, {{.*}}, ![[FORLOOP:[0-9]+]]
-  // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP]]
+  // CHECK: #dbg_declare(ptr %index.debug, {{.*}}, ![[INDEX:[0-9]+]]
+  // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP:[0-9]+]]
   // CHECK: call {{.*}} @"$s4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
 
@@ -88,6 +88,7 @@ func foo() {
 //       to keep the linetables contiguous.
 // CHECK-DAG: ![[SUM]] = distinct !DISubprogram(name: "sum", linkageName: "$s4main12SimpleStructV3sum5myArgySf_tF"
 // CHECK-DAG: ![[PROLOGUE]] = !DILocation(line: 12, scope: ![[SUM]])
+// CHECK-DAG: ![[INDEX]] = !DILocation(line: 17, scope:
 // CHECK-DAG: ![[FORLOOP]] = !DILocation(line: 17, scope:
 // CHECK-DAG: ![[FORBODY]] = !DILocation(line: 18, scope:
 // CHECK-DAG: ![[CASE]] = !DILocation(line: 24, scope:

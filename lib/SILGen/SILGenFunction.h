@@ -1799,7 +1799,8 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
+  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
+                         Stmt *parentStmt,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
 
@@ -2870,7 +2871,8 @@ public:
   InitializationPtr emitPatternBindingInitialization(
       Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
       ProfileCounter numTrueTaken = ProfileCounter(),
-      ProfileCounter numFalseTaken = ProfileCounter());
+      ProfileCounter numFalseTaken = ProfileCounter(),
+      std::optional<SILLocation> customInitLoc = std::nullopt);
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.

@@ -802,11 +802,16 @@ public:
         ForEachPatternSequences.insert(expansion);
       }
 
-      if (!S->getElementExpr())
-        return true;
-
-      assert(!OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues[S->getElementExpr()] = 0;
+      if (S->getCachedDesugaredStmt()) {
+        ASSERT(S->getOpaqueSequenceExpr());
+        ASSERT(!OpaqueValues.count(S->getOpaqueSequenceExpr()));
+        OpaqueValues[S->getOpaqueSequenceExpr()] = 0;
+        if (S->getWhere()) {
+          ASSERT(S->getOpaqueWhereExpr());
+          ASSERT(!OpaqueValues.count(S->getOpaqueWhereExpr()));
+          OpaqueValues[S->getOpaqueWhereExpr()] = 0;
+        }
+      }
       return true;
     }
 
@@ -819,12 +824,14 @@ public:
         // Clean up for real.
         cleanup(expansion);
       }
-
-      if (!S->getElementExpr())
-        return;
-
-      assert(OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues.erase(S->getElementExpr());
+      if (S->getCachedDesugaredStmt()) {
+        ASSERT(OpaqueValues.count(S->getOpaqueSequenceExpr()));
+        OpaqueValues.erase(S->getOpaqueSequenceExpr());
+        if (S->getWhere()) {
+          ASSERT(OpaqueValues.count(S->getOpaqueWhereExpr()));
+          OpaqueValues.erase(S->getOpaqueWhereExpr());
+        }
+      }
     }
 
     bool shouldVerify(InterpolatedStringLiteralExpr *expr) {

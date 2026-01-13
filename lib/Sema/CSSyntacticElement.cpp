@@ -1975,11 +1975,6 @@ private:
     auto *body = cast<Stmt *>(visit(forEachStmt->getBody()));
     forEachStmt->setBody(cast<BraceStmt>(body));
 
-    // Check to see if the sequence expr is throwing (in async context),
-    // if so require the stmt to have a `try`.
-    diagnoseUnhandledThrowsInAsyncContext(context.getAsDeclContext(),
-                                          forEachStmt);
-
     return forEachStmt;
   }
 
