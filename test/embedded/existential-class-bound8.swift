@@ -13,7 +13,7 @@
 
 
 // ORIGINBINARY-NOT: e8MyModule0A5ClassCAA08InternalC5BoundAAWP
-// CLIENTBINARY: S _$e8MyModule0A5ClassCAA08InternalC5BoundAAWP
+// CLIENTBINARY: {{(S|V)}} _$e8MyModule0A5ClassCAA08InternalC5BoundAAWP
 
 // BEGIN MyModule.swift
 
