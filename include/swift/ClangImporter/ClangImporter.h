@@ -959,6 +959,9 @@ public:
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
       : access(computeAccess(prev, base)) {}
 
+  /// Initialize an instance of this class at a particular given access level.
+  ClangInheritanceInfo(clang::AccessSpecifier access) : access(access) {}
+
   /// Whether this info represents a case of nested private inheritance.
   bool isNestedPrivate() const { return !access.has_value(); }
 

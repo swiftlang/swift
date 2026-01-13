@@ -70,6 +70,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/OperatorKinds.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -86,6 +87,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -2808,27 +2810,6 @@ namespace {
             Impl.addAlternateDecl(subscriptImpl, subscript);
           }
         }
-
-        auto getterAndSetterIt = Impl.cxxDereferenceOperators.find(result);
-        if (getterAndSetterIt != Impl.cxxDereferenceOperators.end()) {
-          // If this type has a dereference operator, synthesize a computed
-          // property called `pointee` for it.
-          auto getterAndSetter = getterAndSetterIt->second;
-
-          VarDecl *pointeeProperty =
-              synthesizer.makeDereferencedPointeeProperty(
-                  getterAndSetter.first, getterAndSetter.second);
-
-          // Import the attributes from clang decl of dereference operator to
-          // synthesized pointee property.
-          FuncDecl *getterOrSetterImpl = getterAndSetter.first
-                                             ? getterAndSetter.first
-                                             : getterAndSetter.second;
-          Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(
-              getterOrSetterImpl, pointeeProperty);
-
-          result->addMember(pointeeProperty);
-        }
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
@@ -3742,9 +3723,9 @@ namespace {
     }
 
     /// Handles special functions such as subscripts and dereference operators.
-    bool
-    processSpecialImportedFunc(FuncDecl *func, ImportedName importedName,
-                               clang::OverloadedOperatorKind cxxOperatorKind) {
+    bool processSpecialImportedFunc(FuncDecl *func, ImportedName importedName,
+                                    const clang::FunctionDecl *clangFunc) {
+      auto cxxOperatorKind = clangFunc->getOverloadedOperator();
       if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_None)
         return true;
       // If this operator was renamed via swift_name attribute, the imported
@@ -3795,50 +3776,36 @@ namespace {
         return true;
       }
 
-      if (importedName.isDereferenceAccessor()) {
-        auto &getterAndSetter = Impl.cxxDereferenceOperators[typeDecl];
-
-        switch (importedName.getAccessorKind()) {
-        case ImportedAccessorKind::DereferenceGetter:
-          getterAndSetter.first = func;
-          break;
-        case ImportedAccessorKind::DereferenceSetter:
-          getterAndSetter.second = func;
-          break;
-        default:
-          llvm_unreachable("invalid dereference operator kind");
-        }
-
-        Impl.markUnavailable(func, "use .pointee property");
-        return true;
-      }
-
-      if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_PlusPlus) {
-        // Make sure the type is not a foreign reference type.
-        // We cannot handle `operator++` for those types, since the
-        // current implementation creates a new instance of the type.
-        if (func->getParameters()->size() == 0 && !isa<ClassDecl>(typeDecl)) {
-          // This is a pre-increment operator. We synthesize a
-          // non-mutating function called `successor() -> Self`.
-          FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(func);
-
-          // Import the clang decl attributes to synthesized successor function.
-          Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(func, successorFunc);
-
-          typeDecl->addMember(successorFunc);
-
-          Impl.markUnavailable(func, "use .successor()");
-        } else {
-          Impl.markUnavailable(func, "unable to create .successor() func");
-        }
-        func->overwriteAccess(AccessLevel::Private);
-        return true;
-      }
-
       // Check if this method _is_ an overloaded operator but is not a
       // call / subscript / dereference / increment. Those
       // operators do not need static versions.
-      if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call) {
+      switch (cxxOperatorKind) {
+      case clang::OverloadedOperatorKind::OO_None:
+        llvm_unreachable("should only be handling operators at this point");
+      case clang::OverloadedOperatorKind::OO_PlusPlus:
+        if (clangFunc->getMinRequiredArguments() != 0)
+          // Do not allow post-increment to be used from Swift
+          Impl.markUnavailable(func, "unable to create .successor() func");
+        else if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
+                 method && method->getRefQualifier() == clang::RQ_RValue)
+          // TODO: we shouldn't have to handle this case. We only mark it as
+          // unavailable for now to preserve old behavior, where r-value-this
+          // operator ++ overloads are always unavailable.
+          Impl.markUnavailable(func, "use .successor()");
+        break;
+
+      case clang::OverloadedOperatorKind::OO_Star:
+        if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
+            method && method->getRefQualifier() == clang::RQ_RValue)
+          // TODO: we shouldn't have to handle this case. We only mark it as
+          // unavailable for now to preserve old behavior, where r-value-this
+          // operator * overloads are always unavailable.
+          Impl.markUnavailable(func, "use .pointee property");
+        break;
+      case clang::OverloadedOperatorKind::OO_Call:
+      case clang::OverloadedOperatorKind::OO_Subscript:
+        break;
+      default:
         auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
         Impl.addAlternateDecl(func, opFuncDecl);
 
@@ -4186,8 +4153,7 @@ namespace {
         }
         func->setAccess(importer::convertClangAccess(decl->getAccess()));
 
-        bool success = processSpecialImportedFunc(
-            func, importedName, decl->getOverloadedOperator());
+        bool success = processSpecialImportedFunc(func, importedName, decl);
         if (!success)
           return nullptr;
       }
@@ -5022,8 +4988,8 @@ namespace {
         clonedMethod->overwriteAccess(
             importer::convertClangAccess(decl->getAccess()));
 
-        bool success = processSpecialImportedFunc(
-            clonedMethod, importedName, targetMethod->getOverloadedOperator());
+        bool success = processSpecialImportedFunc(clonedMethod, importedName,
+                                                  targetMethod);
         if (!success)
           return nullptr;
 
@@ -9423,17 +9389,6 @@ static void filterUsableVersionedAttrs(
   }
 }
 
-void ClangImporter::Implementation::importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *sourceDecl, Decl* synthesizedDecl)
-{
-  // sourceDecl->getClangDecl() can be null because some lazily instantiated cases like C++ members that were instantiated from using-shadow-decls have no corresponding Clang decl.
-  // FIXME: Need to include the cases where correspondoing clang decl is not present.
-  if (auto clangDeclForSource =
-          dyn_cast_or_null<clang::NamedDecl>(
-              sourceDecl->getClangDecl())) {
-    importAttributes(clangDeclForSource, synthesizedDecl);
-  }
-}
-
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -10652,6 +10607,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       auto baseInheritance = ClangInheritanceInfo(inheritance, base);
       loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
     }
+  }
+
+  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !inheritance) {
+    lookupAndImportPointee(swiftDecl);
+    lookupAndImportSuccessor(swiftDecl);
   }
 }
 
