@@ -12,7 +12,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 //
-// RUN: %if OS=darwin %{ %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror %} %else %{ %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror %}
+// RUN: %if OS_FAMILY=darwin %{ %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror %} %else %{ %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror %}
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 //
-// RUN: %if OS=darwin %{ %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && %target-build-swift -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror %} %else %{ %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures -o %t/Mirror %}
+// RUN: %if OS_FAMILY=darwin %{ %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && %target-build-swift -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror %} %else %{ %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures -o %t/Mirror %}
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 
