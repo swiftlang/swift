@@ -140,9 +140,11 @@ public:
   /// equivalent to matching this pattern.
   ///
   /// Looks through ParenPattern, BindingPattern, and TypedPattern.
-  Pattern *getSemanticsProvidingPattern();
-  const Pattern *getSemanticsProvidingPattern() const {
-    return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
+  Pattern *getSemanticsProvidingPattern(bool lookThroughOpaque = false);
+  const Pattern *
+  getSemanticsProvidingPattern(bool lookThroughOpaque = false) const {
+    return const_cast<Pattern *>(this)->getSemanticsProvidingPattern(
+        lookThroughOpaque);
   }
 
   /// Returns whether this pattern has been type-checked yet.
@@ -259,6 +261,29 @@ public:
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
   Pattern *walk(ASTWalker &&walker) { return walk(walker); }
+};
+
+/// OpaquePattern - Wrapper class for patterns in Swift.
+/// Its initial purpose is to serve as a wrapper for the element pattern in the
+/// context of desugaring ForEachStmt into WhileStmt, to avoid duplicate
+/// traversal of that node when typechecking the synthesized statement.
+class OpaquePattern : public Pattern {
+  Pattern *SubPattern = nullptr;
+
+public:
+  OpaquePattern(Pattern *p) : Pattern(PatternKind::Opaque), SubPattern(p) {
+    setImplicit();
+  }
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  Pattern *getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Opaque;
+  }
 };
 
 /// A pattern consisting solely of grouping parentheses around a
@@ -869,13 +894,18 @@ public:
   }
 };
 
-inline Pattern *Pattern::getSemanticsProvidingPattern() {
+inline Pattern *Pattern::getSemanticsProvidingPattern(bool lookThroughOpaque) {
   if (auto *pp = dyn_cast<ParenPattern>(this))
-    return pp->getSubPattern()->getSemanticsProvidingPattern();
+    return pp->getSubPattern()->getSemanticsProvidingPattern(lookThroughOpaque);
   if (auto *tp = dyn_cast<TypedPattern>(this))
-    return tp->getSubPattern()->getSemanticsProvidingPattern();
+    return tp->getSubPattern()->getSemanticsProvidingPattern(lookThroughOpaque);
   if (auto *vp = dyn_cast<BindingPattern>(this))
-    return vp->getSubPattern()->getSemanticsProvidingPattern();
+    return vp->getSubPattern()->getSemanticsProvidingPattern(lookThroughOpaque);
+  if (lookThroughOpaque) {
+    if (auto *op = dyn_cast<OpaquePattern>(this))
+      return op->getSubPattern()->getSemanticsProvidingPattern(
+          lookThroughOpaque);
+  }
   return this;
 }
 

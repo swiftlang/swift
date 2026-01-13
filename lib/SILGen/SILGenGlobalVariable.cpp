@@ -187,6 +187,9 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
   void visitBindingPattern(BindingPattern *P) {
     return visit(P->getSubPattern());
   }
+  void visitOpaquePattern(OpaquePattern *P) {
+    return visit(P->getSubPattern());
+  }
   void visitTuplePattern(TuplePattern *P) {
     for (auto &elt : P->getElements())
       visit(elt.getPattern());

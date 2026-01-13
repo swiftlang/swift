@@ -3591,7 +3591,8 @@ public:
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
                                          ContextualTypePurpose purpose,
-                                         ConstraintLocator *locator);
+                                         ConstraintLocator *locator,
+                                         bool shouldOpenOpaqueType = true);
 
   /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
   Type addJoinConstraint(ConstraintLocator *locator,

@@ -1404,6 +1404,18 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   SGF.BreakContinueDestStack.pop_back();
 }
 
+void StmtEmitter::visitOpaqueStmt(OpaqueStmt *S) {
+  auto *stmt = SGF.OpaqueStmts[S];
+  ASSERT(stmt);
+
+  auto *P = SGF.F.getProfiler();
+  auto ref = ProfileCounterRef::node(stmt);
+  if (P && P->hasCounterFor(ref))
+    SGF.emitProfilerIncrement(ref);
+
+  visit(SGF.OpaqueStmts[S]);
+}
+
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
   if (auto *expansion =

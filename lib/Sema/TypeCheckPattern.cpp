@@ -310,6 +310,8 @@ public:
   ALWAYS_RESOLVED_PATTERN(Bool)
 #undef ALWAYS_RESOLVED_PATTERN
 
+  Pattern *visitOpaquePattern(OpaquePattern *P) { return P; }
+
   Pattern *visitBindingPattern(BindingPattern *P) {
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
@@ -838,6 +840,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     return subType;
   }
 
+  case PatternKind::Opaque:
+    // Opaque patterns already have an assigned type.
+    return cast<OpaquePattern>(P)->getSubPattern()->getType();
+
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
@@ -1150,6 +1156,14 @@ Pattern *TypeChecker::coercePatternToType(
     PP->setType(sub->getType());
     return P;
   }
+
+  case PatternKind::Opaque: {
+    auto *OP = cast<OpaquePattern>(P);
+    OP->setType(OP->getSubPattern()->getType());
+    ASSERT(OP->getType()->isEqual(type) && "Opaque pattern changed type?");
+    return OP;
+  }
+
   case PatternKind::Binding: {
     auto VP = cast<BindingPattern>(P);
 

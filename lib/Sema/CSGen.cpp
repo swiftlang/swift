@@ -2718,6 +2718,11 @@ namespace {
       };
 
       switch (pattern->getKind()) {
+      case PatternKind::Opaque: {
+        auto *opaque = cast<OpaquePattern>(pattern);
+        auto *ogPattern = opaque->getSubPattern();
+        return setType(ogPattern->getType());
+      }
       case PatternKind::Paren: {
         auto *paren = cast<ParenPattern>(pattern);
 
@@ -4999,8 +5004,13 @@ bool ConstraintSystem::generateConstraints(
             return std::nullopt;
           });
 
-      addContextualConversionConstraint(expr, convertType, ctp,
-                                        convertTypeLocator);
+      // Don't open opaque types for opaque patterns since they already have
+      // the expected archetype contextual type.
+      auto shouldOpenOpaqueType =
+          !isa_and_nonnull<OpaquePattern>(target.getPattern());
+
+      addContextualConversionConstraint(
+          expr, convertType, ctp, convertTypeLocator, shouldOpenOpaqueType);
     }
 
     // For an initialization target, generate constraints for the pattern.

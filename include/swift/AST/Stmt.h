@@ -168,6 +168,22 @@ public:
   void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 };
 
+/// OpaqueStmt - created to serve as an indirection to a ForEachStmt's body
+/// to avoid visiting it twice in the ASTWalker after having desugared the loop.
+/// This ensures we only visit the body once, and this OpaqueStmt will only be
+/// visited to emit the underlying statement in SILGen.
+class OpaqueStmt final : public Stmt {
+public:
+  OpaqueStmt() : Stmt(StmtKind::Opaque, true /*always implicit*/) {}
+
+  SourceLoc getStartLoc() const { return SourceLoc(); }
+  SourceLoc getEndLoc() const { return SourceLoc(); }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Opaque;
+  }
+};
+
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
 /// { var x = 10; print(10) }.
 class BraceStmt final : public Stmt,

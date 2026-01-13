@@ -1520,6 +1520,8 @@ public:
     return S;
   }
 
+  Stmt *visitOpaqueStmt(OpaqueStmt *S) { return S; }
+
   Stmt *visitBreakStmt(BreakStmt *S) {
     // Force the target to be computed in case it produces diagnostics.
     (void)S->getTarget();

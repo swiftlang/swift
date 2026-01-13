@@ -89,6 +89,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "discard";
   case StmtKind::PoundAssert:
     return "#assert";
+  case StmtKind::Opaque:
+    llvm_unreachable("OpaqueStmt only exists for SILGen, the type-checker should never care about it");
   }
   llvm_unreachable("Unhandled case in switch!");
 }

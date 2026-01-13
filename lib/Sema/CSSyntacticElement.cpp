@@ -866,6 +866,7 @@ private:
   }
 
   // These statements don't require any type-checking.
+  void visitOpaqueStmt(OpaqueStmt *opaqueStmt) {}
   void visitBreakStmt(BreakStmt *breakStmt) {}
   void visitContinueStmt(ContinueStmt *continueStmt) {}
   void visitDeferStmt(DeferStmt *deferStmt) {}
@@ -1815,6 +1816,8 @@ private:
     // `diagnoseImplicitSelfUseInClosure`
     rewriter.addLocalDeclToTypeCheck(decl);
   }
+
+  ASTNode visitOpaqueStmt(OpaqueStmt *opaqueStmt) { return opaqueStmt; }
 
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {
     // Force the target to be computed in case it produces diagnostics.

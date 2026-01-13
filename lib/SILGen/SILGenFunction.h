@@ -2449,6 +2449,13 @@ public:
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
 
+  /// A mapping from opaque statements to the statements that should be emitted.
+  llvm::SmallDenseMap<OpaqueStmt *, Stmt *> OpaqueStmts;
+
+  /// A mapping from OpaqueValueExprs to the whole expressions that should be
+  /// emitted.
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *> OpaqueExprs;
+
   /// Mapping from OpaqueValueExpr/PackElementExpr to their values.
   llvm::SmallDenseMap<Expr *, ManagedValue> OpaqueValues;
 

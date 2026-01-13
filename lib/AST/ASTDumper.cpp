@@ -2001,7 +2001,10 @@ namespace {
       printField(P->getValue(), Label::always("value"));
       printFoot();
     }
-
+    void visitOpaquePattern(OpaquePattern *P, Label label) {
+      printCommon(P, "pattern_opaque", label);
+      printFoot();
+    }
   };
 
   /// PrintDecl - Visitor implementation of Decl::print.
@@ -3251,6 +3254,8 @@ public:
     printSourceRange(S->getSourceRange(), Ctx);
     printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
   }
+
+  void visitOpaqueStmt(OpaqueStmt *S, Label label) {}
 
   void visitBraceStmt(BraceStmt *S, Label label) {
     printCommon(S, "brace_stmt", label);

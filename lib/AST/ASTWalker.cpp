@@ -1890,6 +1890,11 @@ Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
   return S;
 }
 
+Stmt *Traversal::visitOpaqueStmt(OpaqueStmt *OS) {
+  // We do not want to visit it.
+  return OS;
+}
+
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
     if (auto *SubExpr = Elem.dyn_cast<Expr*>()) {
@@ -2235,6 +2240,8 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   }
   return nullptr;
 }
+
+Pattern *Traversal::visitOpaquePattern(OpaquePattern *P) { return P; }
 
 Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {
