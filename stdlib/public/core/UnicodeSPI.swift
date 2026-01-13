@@ -180,6 +180,9 @@ extension Substring {
 // Unicode.Script
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)
@@ -220,6 +223,9 @@ extension Unicode.Scalar.Properties {
 // Case folding
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode.Scalar.Properties {
   @_spi(_Unicode)
   @available(SwiftStdlib 5.7, *)

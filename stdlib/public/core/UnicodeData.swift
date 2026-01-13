@@ -258,21 +258,39 @@ func _swift_stdlib_getWordBreakProperty(_ scalar: UInt32) -> UInt8
 // Unicode.Scalar.Properties
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getBinaryProperties(_ scalar: UInt32) -> UInt64
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNumericType(_ scalar: UInt32) -> UInt8
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNumericValue(_ scalar: UInt32) -> Double
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getNameAlias(_ scalar: UInt32) -> UnsafePointer<UInt8>?
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getMapping(_ scalar: UInt32, _ mapping: UInt8) -> Int32
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getSpecialMapping(
   _ scalar: UInt32,
@@ -280,6 +298,9 @@ func _swift_stdlib_getSpecialMapping(
   _ length: UnsafeMutablePointer<Int>
 ) -> UnsafePointer<UInt8>?
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getScalarName(
   _ scalar: UInt32,
@@ -287,21 +308,36 @@ func _swift_stdlib_getScalarName(
   _ capacity: Int
 ) -> Int
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getAge(_ scalar: UInt32) -> UInt16
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getGeneralCategory(_ scalar: UInt32) -> UInt8
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getScript(_ scalar: UInt32) -> UInt8
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getScriptExtensions(
   _ scalar: UInt32,
   _ count: UnsafeMutablePointer<UInt8>
 ) -> UnsafeMutablePointer<UInt8>?
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 @_extern(c)
 func _swift_stdlib_getCaseMapping(
   _ scalar: UInt32,

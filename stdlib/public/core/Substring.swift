@@ -1345,10 +1345,16 @@ extension Substring: RangeReplaceableCollection {
 }
 
 extension Substring {
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public func lowercased() -> String {
     return String(self).lowercased()
   }
 
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public func uppercased() -> String {
     return String(self).uppercased()
   }
