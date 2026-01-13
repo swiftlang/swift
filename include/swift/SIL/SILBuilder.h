@@ -2174,10 +2174,7 @@ public:
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances,
                            ValueOwnershipKind forwardingOwnershipKind) {
-    ASSERT(isa<ClassType>(FormalConcreteType) ||
-           isa<BoundGenericClassType>(FormalConcreteType) ||
-           isa<ArchetypeType>(FormalConcreteType) ||
-           isa<DynamicSelfType>(FormalConcreteType));
+    ASSERT(FormalConcreteType->isBridgeableObjectType());
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), forwardingOwnershipKind));
