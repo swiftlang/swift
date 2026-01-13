@@ -1195,8 +1195,8 @@ extension ContiguousArray {
   /// At the end of the closure, `span`'s `count` elements will have been
   /// appended to the array.
   ///
-  /// If the closure throws an error, the array will be reverted to its initial
-  /// state.
+  /// If the closure throws an error, the items appended until that point
+  /// will remain in the array.
   ///
   /// - Parameters:
   ///   - uninitializedCount: The number of new elements the array should have
@@ -1217,23 +1217,22 @@ extension ContiguousArray {
       minimumCapacity: self.count + uninitializedCount, growForAppend: true
     )
     let pointer = unsafe _buffer.mutableFirstElementAddress
-    let uninitializedPointer = unsafe pointer.advanced(by: count)
+    let buffer = unsafe UnsafeMutableBufferPointer(
+      start: unsafe pointer.advanced(by: count),
+      count: uninitializedCount
+    )
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
 
-    var initializedCount = 0
     defer {
+      let initializedCount = unsafe span.finalize(for: buffer)
+      span = OutputSpan()
+
       // Update mutableCount even when `initializer` throws an error.
       _buffer.mutableCount += initializedCount
       _endMutation()
     }
 
-    let buffer = unsafe UnsafeMutableBufferPointer(
-      start: uninitializedPointer, count: uninitializedCount
-    )
-    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
     try initializer(&span)
-    // no need to finalize in the `defer` block: if `initializer` throws,
-    // the elements will be deinitialized by the `OutputSpan`'s deinit.
-    initializedCount = unsafe span.finalize(for: buffer)
   }
 }
 
