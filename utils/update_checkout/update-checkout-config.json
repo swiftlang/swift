@@ -240,7 +240,7 @@
                 "swift-docc-render-artifact": "release/6.3",
                 "swift-docc-symbolkit": "release/6.3",
                 "swift-markdown": "release/6.3",
-                "swift-nio": "2.92.1",
+                "swift-nio": "2.65.0",
                 "swift-experimental-string-processing": "release/6.3",
                 "swift-sdk-generator": "release/6.3",
                 "wasi-libc": "wasi-sdk-27",
