@@ -134,9 +134,11 @@ The output of all these dump options (except `-dump-ast`) can be redirected
 with an additional `-o <file>` option.
 Compilation stops at the phase where you print the output.
 
-If you want to print the SIL or LLVM IR in addition to producing the regular
-output file (e.g an object file), use the `-sil-output-path <file>`, or
-`-ir-output-path <file>` options (prefixed with `-Xfrontend`).
+If you want to print the SIL or IR in addition to producing the regular output
+file (e.g an object file), use the `-save-sil`, `save-irgen` or `save-ir`
+options.
+Those options take a file argument and save the SIL or LLVM-IR before or after
+LLVM optimization, respectively.
 
 ## Debugging Diagnostic Emission
 

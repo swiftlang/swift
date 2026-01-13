@@ -52,9 +52,11 @@ def print_diff(output_file, suffix):
 
 def print_ir_diffs(output_file):
     if EMIT_IR and VERBOSE:
-        print("\n## SIL differences:")
+        print("\n## SIL differences:", flush=True)
         print_diff(output_file, ".sil")
-        print("\n## IR differences:")
+        print("\n## IRGen differences:", flush=True)
+        print_diff(output_file, ".irgen.ll")
+        print("\n## IR differences:", flush=True)
         print_diff(output_file, ".ll")
 
 def main():
@@ -85,8 +87,9 @@ def main():
 
     if EMIT_IR:
       new_args += [
-        '-Xfrontend', '-sil-output-path', '-Xfrontend', output_file + '.sil',
-        '-Xfrontend', '-ir-output-path', '-Xfrontend', output_file + '.ll']
+        '-Xllvm', '-save-sil', '-Xllvm', output_file + '.sil',
+        '-Xllvm', '-save-irgen', '-Xllvm', output_file + '.irgen.ll',
+        '-Xllvm', '-save-ir', '-Xllvm', output_file + '.ll']
 
     if VERBOSE:
         print("Reference compilation of " + output_file + ":")
@@ -102,6 +105,8 @@ def main():
     if EMIT_IR:
         subprocess.check_call(
             ["cp", output_file + ".sil", output_file + ".ref.sil"])
+        subprocess.check_call(
+            ["cp", output_file + ".irgen.ll", output_file + ".ref.irgen.ll"])
         subprocess.check_call(
             ["cp", output_file + ".ll", output_file + ".ref.ll"])
 
