@@ -1,0 +1,3 @@
+# Test that a malformed AutoDiffSubsetParametersThunk is handled gracefully
+RUN: %swift-demangle '$STJSdSSSSSSSSSSSSSpSrSSP' | %FileCheck %s --check-prefix=PASSTHROUGH
+PASSTHROUGH: $STJSdSSSSSSSSSSSSSpSrSSP ---> $STJSdSSSSSSSSSSSSSpSrSSP
