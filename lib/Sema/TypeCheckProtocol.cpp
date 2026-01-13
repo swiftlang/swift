@@ -495,6 +495,51 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
   }
 }
 
+static std::optional<RequirementMatch>
+checkWitnessAccessor(AbstractStorageDecl *witness,
+                     AbstractStorageDecl *requirement) {
+  // Check that the static-ness matches.
+  if (requirement->isStatic() != witness->isStatic())
+    return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+
+  // Check that the compile-time constness matches.
+  if (requirement->isCompileTimeLiteral() && !witness->isCompileTimeLiteral()) {
+    return RequirementMatch(witness, MatchKind::CompileTimeLiteralConflict);
+  }
+
+  // If the requirement is settable and the witness is not, reject it.
+  if (requirement->isSettable(requirement->getDeclContext()) &&
+      !witness->isSettable(witness->getDeclContext()))
+    return RequirementMatch(witness, MatchKind::SettableConflict);
+
+  // Validate that the 'mutating' bit lines up for getters and setters.
+  if (!requirement->isGetterMutating() && witness->isGetterMutating())
+    return RequirementMatch(getStandinForAccessor(witness, AccessorKind::Get),
+                            MatchKind::MutatingConflict);
+
+  if (requirement->isSettable(requirement->getDeclContext())) {
+    if (!requirement->isSetterMutating() && witness->isSetterMutating())
+      return RequirementMatch(getStandinForAccessor(witness, AccessorKind::Set),
+                              MatchKind::MutatingConflict);
+  }
+
+  // Check borrow/mutate requirement is witnessed by stored property or
+  // borrow/mutate accessor.
+  bool hasBorrow = requirement->getAccessor(AccessorKind::Borrow);
+  bool hasMutate = requirement->getAccessor(AccessorKind::Mutate);
+  if (hasBorrow) {
+    if (!witness->hasStorage() && !witness->getAccessor(AccessorKind::Borrow)) {
+      return RequirementMatch(witness, MatchKind::BorrowMutateConflict);
+    }
+  }
+  if (hasMutate) {
+    if (!witness->hasStorage() && !witness->getAccessor(AccessorKind::Mutate)) {
+      return RequirementMatch(witness, MatchKind::BorrowMutateConflict);
+    }
+  }
+  return std::nullopt;
+}
+
 /// A property or subscript witness must have the same or fewer
 /// effects specifiers than the protocol requirement.
 ///
@@ -626,29 +671,8 @@ matchWitnessStructureImpl(ValueDecl *req, ValueDecl *witness,
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
 
-    // Check that the static-ness matches.
-    if (reqASD->isStatic() != witnessASD->isStatic())
-      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-
-    // Check that the compile-time constness matches.
-    if (reqASD->isCompileTimeLiteral() && !witnessASD->isCompileTimeLiteral()) {
-      return RequirementMatch(witness, MatchKind::CompileTimeLiteralConflict);
-    }
-
-    // If the requirement is settable and the witness is not, reject it.
-    if (reqASD->isSettable(req->getDeclContext()) &&
-        !witnessASD->isSettable(witness->getDeclContext()))
-      return RequirementMatch(witness, MatchKind::SettableConflict);
-
-    // Validate that the 'mutating' bit lines up for getters and setters.
-    if (!reqASD->isGetterMutating() && witnessASD->isGetterMutating())
-      return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
-                              MatchKind::MutatingConflict);
-
-    if (reqASD->isSettable(req->getDeclContext())) {
-      if (!reqASD->isSetterMutating() && witnessASD->isSetterMutating())
-        return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
-                                MatchKind::MutatingConflict);
+    if (auto problem = checkWitnessAccessor(witnessASD, reqASD)) {
+      return problem.value();
     }
 
     // Check for async mismatches.
@@ -1811,34 +1835,6 @@ static bool checkWitnessAccess(DeclContext *dc,
   return false;
 }
 
-static bool checkWitnessForPropertyRequirement(DeclContext *dc,
-                                               ValueDecl *requirement,
-                                               ValueDecl *witness) {
-  auto *requirementASD = dyn_cast<AbstractStorageDecl>(requirement);
-  if (!requirementASD) {
-    return false;
-  }
-  bool hasBorrow = requirementASD->getAccessor(AccessorKind::Borrow);
-  bool hasMutate = requirementASD->getAccessor(AccessorKind::Mutate);
-  if (!hasBorrow && !hasMutate) {
-    return false;
-  }
-  auto *witnessASD = cast<AbstractStorageDecl>(witness);
-  if (witnessASD->hasStorage()) {
-    return false;
-  }
-  if (hasBorrow) {
-    if (witnessASD->getAccessor(AccessorKind::Borrow)) {
-      return false;
-    }
-    return true;
-  }
-  if (witnessASD->getAccessor(AccessorKind::Mutate)) {
-    return false;
-  }
-  return true;
-}
-
 static std::optional<AvailabilityConstraint>
 checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
                          const DeclContext *dc,
@@ -1959,10 +1955,6 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
     }
-  }
-
-  if (checkWitnessForPropertyRequirement(DC, requirement, match.Witness)) {
-    return RequirementCheck(CheckKind::BorrowMutateMismatch);
   }
 
   return CheckKind::Success;
@@ -3287,6 +3279,21 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::EnumCaseWithAssociatedValues:
     diags.diagnose(match.Witness, diag::protocol_witness_enum_case_payload);
     break;
+  case MatchKind::BorrowMutateConflict: {
+    auto *witness = cast<AbstractStorageDecl>(match.Witness);
+    bool hasBorrow = witness->getAccessor(AccessorKind::Borrow);
+    bool hasMutate = witness->getAccessor(AccessorKind::Mutate);
+    std::string diagMsg;
+    if (!hasBorrow) {
+      diagMsg = "borrow";
+    }
+    if (!hasMutate) {
+      diagMsg += "/mutate";
+    }
+    diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
+                   diagMsg);
+    break;
+  }
   }
 }
 
@@ -4643,29 +4650,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                            requirement);
           });
         break;
-      case CheckKind::BorrowMutateMismatch: {
-        getASTContext().addDelayedConformanceDiag(
-            Conformance, false,
-            [witness, requirement](NormalProtocolConformance *conformance) {
-              auto *requirementASD = cast<AbstractStorageDecl>(requirement);
-              auto &diags = witness->getASTContext().Diags;
-              bool hasBorrow =
-                  requirementASD->getAccessor(AccessorKind::Borrow);
-              bool hasMutate =
-                  requirementASD->getAccessor(AccessorKind::Mutate);
-              std::string diagMsg;
-              if (hasBorrow) {
-                diagMsg = "borrow";
-              }
-              if (hasMutate) {
-                diagMsg += "/mutate";
-              }
-              SourceLoc diagLoc =
-                  getLocForDiagnosingWitness(conformance, witness);
-              diags.diagnose(diagLoc, diag::witness_borrow_mutate_mismatch,
-                             diagMsg, witness);
-            });
-      }
     }
 
     if (auto *classDecl = DC->getSelfClassDecl()) {

@@ -84,7 +84,7 @@ enum OrderStatus: ~Copyable {
 }
 
 public protocol Q {
-  var id: NonTrivial { borrow mutate }
+  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}}
 }
 
 public struct NonTrivial {
@@ -110,10 +110,10 @@ struct S2 : Q {
   var id: NonTrivial
 }
  
-public struct S3 : Q {
+public struct S3 : Q { // expected-error{{type 'S3' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
   public var _id: NonTrivial
 
-  public var id: NonTrivial { // expected-error {{borrow/mutate requirement cannot be satisfied by 'id'}}
+  public var id: NonTrivial { // expected-error {{candidate is not a stored property or a computed property with borrow/mutate accessor, but protocol requires it}}
     _read {
       yield _id
     }
@@ -123,10 +123,11 @@ public struct S3 : Q {
   }
 }
 
-struct S4 : Q {
+struct S4 : Q { // expected-error{{type 'S4' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
+
   var _id: NonTrivial
 
-  var id: NonTrivial { // expected-error {{borrow/mutate requirement cannot be satisfied by 'id'}}
+  var id: NonTrivial { // expected-error {{candidate is not a stored property or a computed property with borrow/mutate accessor, but protocol requires it}}
     get {
       return _id
     }
@@ -151,12 +152,12 @@ extension S5 {
   }
 }
 
-struct S6 : Q { // expected-error {{borrow/mutate requirement cannot be satisfied by 'id'}}
+struct S6 : Q { // expected-error{{type 'S6' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
   var _id: NonTrivial
 }
 
 extension S6 {
-  var id: NonTrivial {
+  var id: NonTrivial { // expected-error{{candidate is not a stored property or a computed property with borrow/mutate accessor, but protocol requires it}}
     get {
       return _id
     }
