@@ -578,7 +578,7 @@ enum CompactBacktraceFormat {
             // Grab a rich frame and encode it
             guard let frame = iterator.next() else {
               state = .done
-              return nil
+              return Instruction.end.rawValue
             }
 
             if let lastFrame, lastFrame == frame {
