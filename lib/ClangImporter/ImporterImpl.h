@@ -37,6 +37,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -51,6 +52,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
@@ -689,9 +691,6 @@ public:
                                  std::map<SmallVector<TypeBase *>, unsigned>>>
       cxxSubscripts;
 
-  llvm::MapVector<NominalTypeDecl *, std::pair<FuncDecl *, FuncDecl *>>
-      cxxDereferenceOperators;
-
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
 private:
@@ -710,6 +709,29 @@ private:
   // the method is finally generated, we check if it's present here
   llvm::DenseSet<std::pair<const clang::CXXRecordDecl *, DeclName>>
       unavailableMethods;
+
+public:
+  // Attempt to lookup and import the synthesized .pointee computed property.
+  //
+  // Requires that \a Record is a (Swift) StructDecl and is import from
+  // a CXXRecordDecl.
+  //
+  // This function is idempotent, and if successful, ensures the synthesized
+  // .pointee that it returns is a mamber of \a Record.
+  VarDecl *lookupAndImportPointee(NominalTypeDecl *Record);
+
+  // Attempt to lookup and import the synthesized .successor() method.
+  //
+  // Requires that \a Record is a (Swift) StructDecl and is import from
+  // a CXXRecordDecl.
+  //
+  // This function is idempotent, and if successful, ensures the synthesized
+  // .successor() that it returns is a mamber of \a Record.
+  FuncDecl *lookupAndImportSuccessor(NominalTypeDecl *Record);
+
+private:
+  llvm::DenseMap<NominalTypeDecl *, VarDecl *> importedPointeeCache;
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
 
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
@@ -1110,15 +1132,6 @@ public:
   /// Create attribute with given text and attach it to decl, creating or
   /// retrieving a chached source file as needed.
   void importNontrivialAttribute(Decl *MappedDecl, StringRef attributeText);
-
-  /// Utility function to import Clang attributes from a source Swift decl to
-  /// synthesized Swift decl.
-  ///
-  /// \param SourceDecl The Swift decl to copy the atteribute from.
-  /// \param SynthesizedDecl The synthesized Swift decl to attach attributes to.
-  void
-  importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *SourceDecl,
-                                                      Decl *SynthesizedDecl);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.

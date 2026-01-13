@@ -22,3 +22,8 @@ module RenamedOperators {
   header "renamed-operators.h"
   requires cplusplus
 }
+
+module PointeeOverloads {
+  header "pointee-overloads.h"
+  requires cplusplus
+}
