@@ -86,6 +86,20 @@ fileprivate func getProcessName(_ hProcess: HANDLE) -> String? {
   }
 }
 
+fileprivate func duplicateHandle(_ handle: HANDLE) -> HANDLE? {
+  var hResult: HANDLE? = nil
+  if DuplicateHandle(GetCurrentProcess(),
+                     handle,
+                     GetCurrentProcess(),
+                     &hResult,
+                     0,
+                     false,
+                     DWORD(DUPLICATE_SAME_ACCESS)) {
+    return hResult
+  }
+  return nil
+}
+
 class Target {
   typealias Address = UInt64
 
@@ -350,15 +364,30 @@ class Target {
     }
   }
 
-  func withDebugger(_ body: () -> ()) throws {
+  enum DebuggerResult {
+    case abort
+    case handOffToDebugger
+  }
+
+  func withDebugger(_ body: () -> DebuggerResult) throws {
+    // Suspend all the threads and duplicate the thread handles, since
+    // DebugActiveProcessStop() will close them, and we want to call
+    // ResumeThread() on them after LLDB attaches.
+    var hDuplicateThreadHandles: [HANDLE] = []
     for hThread in hThreads {
-      SuspendThread(hThread)
+      if let hDuplicate = duplicateHandle(hThread) {
+        SuspendThread(hThread)
+        hDuplicateThreadHandles.append(hDuplicate)
+      }
     }
+
+    // Stop debugging the process
     DebugActiveProcessStop(pid)
 
     let cmdline = """
       cmd.exe "/c echo Once LLDB has attached, \
       return to the other window and press any key \
+      & echo. \
       & lldb --attach-pid \(pid) -o c \
       & pause "
       """
@@ -397,11 +426,30 @@ class Target {
       CloseHandle(processInfo.hProcess)
       CloseHandle(processInfo.hThread)
 
-      body()
+      if body() == .handOffToDebugger {
+        for hThread in hDuplicateThreadHandles {
+          ResumeThread(hThread)
+          CloseHandle(hThread)
+        }
+        exit(0)
+      }
+
     }
 
-    DebugActiveProcess(pid)
+    // Resume debugging the process
+    while !DebugActiveProcess(pid) {
+      let err = GetLastError()
+      print("swift-backtrace: unable to debug process: \(hex(err)); retrying in 5s")
+      Sleep(5000)
+    }
 
+    // Resume the threads we suspended and close the copied handles
+    for hThread in hDuplicateThreadHandles {
+      ResumeThread(hThread)
+      CloseHandle(hThread)
+    }
+
+    // Update our handles
     var event = DEBUG_EVENT()
     hThreads = []
     while WaitForDebugEvent(&event, 0) {
@@ -416,9 +464,6 @@ class Target {
         default:
           break
       }
-    }
-    for hThread in hThreads {
-      ResumeThread(hThread)
     }
   }
 }

@@ -1099,11 +1099,12 @@ Generate a backtrace for the parent process.
 
     do {
       try target.withDebugger {
-
         if let ch = waitForKey("Press any key once LLDB is attached, or A to abort", timeout: nil),
            ch != UInt8(ascii: "A") && ch != UInt8(ascii: "a") {
-          exit(0)
+          return .handOffToDebugger
         }
+
+        return .abort
       }
     } catch {
       writeln(theme.error("unable to spawn debugger"))
