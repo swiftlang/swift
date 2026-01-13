@@ -30,8 +30,7 @@ if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
   set(cxxstdlib_overlay CxxStdlib)
 endif()
 
-set(RUNTIME_SOURCES
-  empty.c
+set(backtracing_sources
   Address.swift
   Backtrace.swift
   Backtrace+Codable.swift
@@ -60,7 +59,6 @@ set(RUNTIME_SOURCES
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
-  Mangling.swift
   MemoryReader.swift
   OSReleaseScanner.swift
   PeCoff.swift
@@ -74,7 +72,15 @@ set(RUNTIME_SOURCES
   Win32Unwinder.swift
 )
 
-set(RUNTIME_COMPILE_FLAGS
+set(runtime_sources
+  empty.c
+  Mangling.swift
+)
+if(SWIFT_ENABLE_BACKTRACING)
+  list(APPEND runtime_sources ${backtracing_sources})
+endif()
+
+set(runtime_compile_flags
   "-cxx-interoperability-mode=default"
   "-Xfrontend;-experimental-spi-only-imports"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
@@ -84,7 +90,7 @@ set(RUNTIME_COMPILE_FLAGS
 
 ###TODO: Add these when we add static linking support
 #
-#list(APPEND RUNTIME_COMPILE_FLAGS
+#list(APPEND runtime_compile_flags
 #  "-Xcc;-I${SWIFT_PATH_TO_ZLIB_SOURCE}"
 #  "-Xcc;-I${SWIFT_PATH_TO_ZSTD_SOURCE}/lib"
 #  "-Xcc;-I${SWIFT_PATH_TO_LIBLZMA_SOURCE}/src/liblzma/api")
@@ -92,13 +98,14 @@ set(RUNTIME_COMPILE_FLAGS
 if(NOT SWIFT_ASM_AVAILABLE)
   message(warning "Assembly language not available on this platform; backtracing will fail.")
 else()
-  list(APPEND RUNTIME_COMPILE_FLAGS "-DSWIFT_ASM_AVAILABLE")
+  list(APPEND runtime_compile_flags "-DSWIFT_ASM_AVAILABLE")
 endif()
 
 set(LLVM_OPTIONAL_SOURCES
   get-cpu-context.S
   get-cpu-context-aarch64.asm
   get-cpu-context-x86_64.asm
+  ${backtracing_sources}
 )
 
 # We have to build with a deployment target of at least 10.15, otherwise
@@ -112,7 +119,7 @@ else()
 endif()
 
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  ${RUNTIME_SOURCES}
+  ${runtime_sources}
 
   SWIFT_MODULE_DEPENDS ${concurrency} ${cxxstdlib_overlay}
 
@@ -131,8 +138,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    ${RUNTIME_COMPILE_FLAGS}
-    -g
+    ${runtime_compile_flags}
     -parse-stdlib
 
   LINK_FLAGS
@@ -144,31 +150,33 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   TARGET_SDKS OSX LINUX LINUX_STATIC WINDOWS
 )
 
-# Add the correct assembly file for each SDK; this needs to be done this
-# way because Windows has a different assembler for each architecture, and
-# they don't all support the same syntax, so cannot share a single file.
-foreach(sdk ${SWIFT_SDKS})
-  set(sdk_supported_archs
-    ${SWIFT_SDK_${sdk}_ARCHITECTURES}
-    ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
-  list(REMOVE_DUPLICATES sdk_supported_archs)
+if(SWIFT_ENABLE_BACKTRACING)
+  # Add the correct assembly file for each SDK; this needs to be done this
+  # way because Windows has a different assembler for each architecture, and
+  # they don't all support the same syntax, so cannot share a single file.
+  foreach(sdk ${SWIFT_SDKS})
+    set(sdk_supported_archs
+      ${SWIFT_SDK_${sdk}_ARCHITECTURES}
+      ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+    list(REMOVE_DUPLICATES sdk_supported_archs)
 
-  foreach(arch ${sdk_supported_archs})
-    set(target "swiftRuntime-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-    if("${SWIFT_SDK_${sdk}_NAME}" STREQUAL "Windows")
-      message(STATUS "Using get-cpu-context-${arch}.asm for target ${target}")
-      target_sources(${target}
-        PRIVATE get-cpu-context-${arch}.asm)
-      # Turn on /safeseh for 32-bit x86 or we won't be able to link
-      if("${arch}" STREQUAL "i686")
-        target_compile_options(${target} PRIVATE
-          $<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+    foreach(arch ${sdk_supported_archs})
+      set(target "swiftRuntime-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+      if("${SWIFT_SDK_${sdk}_NAME}" STREQUAL "Windows")
+        message(STATUS "Using get-cpu-context-${arch}.asm for target ${target}")
+        target_sources(${target}
+          PRIVATE get-cpu-context-${arch}.asm)
+        # Turn on /safeseh for 32-bit x86 or we won't be able to link
+        if("${arch}" STREQUAL "i686")
+          target_compile_options(${target} PRIVATE
+            $<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+        endif()
+      else()
+        message(STATUS "Using get-cpu-context.S for target ${target}")
+        target_sources(${target}
+          PRIVATE get-cpu-context.S)
       endif()
-    else()
-      message(STATUS "Using get-cpu-context.S for target ${target}")
-      target_sources(${target}
-        PRIVATE get-cpu-context.S)
-    endif()
-  endforeach()
+    endforeach()
 
-endforeach()
+  endforeach()
+endif()
