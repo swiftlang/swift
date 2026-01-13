@@ -639,8 +639,8 @@ public:
   resolveStableSerializationPath(
                             const StableSerializationPath &path) const override;
 
-  bool isSerializable(const clang::Type *type,
-                      bool checkCanonical) const override;
+  SerializableInfo isSerializable(const clang::Type *type,
+                                  bool checkCanonical) const override;
 
   clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,
