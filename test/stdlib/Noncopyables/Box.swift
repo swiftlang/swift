@@ -20,12 +20,12 @@ func basic() {
   var intBox = Box(123)
 
   // CHECK: 123
-  print(intBox[])
+  print(intBox.value)
 
-  intBox[] += 321
+  intBox.value += 321
 
   // CHECK: 444
-  print(intBox[])
+  print(intBox.value)
 }
 
 @available(SwiftStdlib 6.4, *)
@@ -87,14 +87,14 @@ func clone() {
   var intBox = Box(8)
   var cloneIntBox = intBox.clone()
 
-  intBox[] += 8
-  cloneIntBox[] -= 8
+  intBox.value += 8
+  cloneIntBox.value -= 8
 
   // CHECK: 16
-  print(intBox[])
+  print(intBox.value)
 
   // CHECK: 0
-  print(cloneIntBox[])
+  print(cloneIntBox.value)
 }
 
 if #available(SwiftStdlib 6.4, *) {

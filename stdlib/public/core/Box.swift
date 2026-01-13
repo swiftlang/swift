@@ -42,23 +42,11 @@ extension Box: Sendable where Value: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
 extension Box where Value: ~Copyable {
-  /// Consumes the box and returns the instance of `Value` that was within the
-  /// box.
-  @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public consuming func consume() -> Value {
-    let result = unsafe pointer.move()
-    unsafe pointer.deallocate()
-    discard self
-    return result
-  }
-
   /// Dereferences the box allowing for in-place reads and writes to the stored
   /// `Value`.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public subscript() -> Value {
+  public var value: Value {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
@@ -70,6 +58,18 @@ extension Box where Value: ~Copyable {
     mutate {
       &(unsafe pointer).pointee
     }
+  }
+
+  /// Consumes the box and returns the instance of `Value` that was within the
+  /// box.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public consuming func consume() -> Value {
+    let result = unsafe pointer.move()
+    unsafe pointer.deallocate()
+    discard self
+    return result
   }
 }
 
@@ -106,6 +106,6 @@ extension Box where Value: Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public func clone() -> Box<Value> {
-    Box(self[])
+    Box(value)
   }
 }
