@@ -286,7 +286,7 @@ BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude privat
 //   (Don't diagnose bare "read"/"modify" in accessors in source files.)
 // * "TODO" around line 12475 of lib/AST/Decl.cpp
 //   (Don't use "read"/"modify" in swiftinterface files.)
-SUPPRESSIBLE_LANGUAGE_FEATURE(CoroutineAccessors, 999, "Coroutine accessors")
+SUPPRESSIBLE_LANGUAGE_FEATURE(CoroutineAccessors, 474, "Coroutine accessors")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
