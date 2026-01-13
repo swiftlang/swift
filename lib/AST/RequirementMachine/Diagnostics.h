@@ -49,8 +49,6 @@ struct RequirementError {
     /// An inverse requirement that conflicts with the computed requirements of
     /// a generic parameter, e.g., T : Copyable, T : ~Copyable
     ConflictingInverseRequirement,
-    /// A recursive requirement, e.g. T == G<T.A>.
-    RecursiveRequirement,
     /// A not-yet-supported same-element requirement, e.g. each T == Int.
     UnsupportedSameElement,
     /// A not-yet-supported same-type requirement involving packs and concrete
@@ -154,11 +152,6 @@ public:
                                                     Requirement second,
                                                     SourceLoc loc) {
     return {Kind::ConflictingRequirement, first, second, loc};
-  }
-
-  static RequirementError forRecursiveRequirement(Requirement req,
-                                                  SourceLoc loc) {
-    return {Kind::RecursiveRequirement, req, loc};
   }
 
   static RequirementError forSameElement(Requirement req, SourceLoc loc) {

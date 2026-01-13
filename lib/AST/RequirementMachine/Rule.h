@@ -226,6 +226,8 @@ public:
 
   std::pair<unsigned, unsigned> getNestingAndSize() const;
 
+  bool isRecursiveRule() const;
+
   std::optional<int> compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;

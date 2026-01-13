@@ -370,19 +370,27 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
     // If completion failed, diagnose an error and return a dummy signature.
     if (status.first != CompletionResult::Success) {
-      // All we can do at this point is diagnose and give each protocol an empty
-      // requirement signature.
+      if (status.first == CompletionResult::RecursiveRule) {
+        for (const auto *otherProto : component) {
+          machine->diagnoseRecursiveRequirement(otherProto->getLoc(), otherProto,
+                                                status.second);
+        }
+      } else {
+        for (const auto *otherProto : component) {
+          ctx.Diags.diagnose(otherProto->getLoc(),
+                             diag::requirement_machine_completion_failed,
+                             /*protocol=*/1,
+                             unsigned(status.first));
+
+          auto rule = machine->getRuleAsStringForDiagnostics(status.second);
+          ctx.Diags.diagnose(otherProto->getLoc(),
+                             diag::requirement_machine_completion_rule,
+                             rule);
+        }
+      }
+
+      // Give each protocol an empty requirement signature.
       for (const auto *otherProto : component) {
-        ctx.Diags.diagnose(otherProto->getLoc(),
-                           diag::requirement_machine_completion_failed,
-                           /*protocol=*/1,
-                           unsigned(status.first));
-
-        auto rule = machine->getRuleAsStringForDiagnostics(status.second);
-        ctx.Diags.diagnose(otherProto->getLoc(),
-                           diag::requirement_machine_completion_rule,
-                           rule);
-
         if (otherProto != proto) {
           ctx.evaluator.cacheOutput(
             RequirementSignatureRequest{const_cast<ProtocolDecl *>(otherProto)},
@@ -971,15 +979,19 @@ InferredGenericSignatureRequest::evaluate(
 
     // If completion failed, diagnose an error and return a dummy signature.
     if (status.first != CompletionResult::Success) {
-      ctx.Diags.diagnose(loc,
-                         diag::requirement_machine_completion_failed,
-                         /*protocol=*/0,
-                         unsigned(status.first));
+      if (status.first == CompletionResult::RecursiveRule) {
+        machine->diagnoseRecursiveRequirement(loc, /*proto=*/nullptr, status.second);
+      } else {
+        ctx.Diags.diagnose(loc,
+                           diag::requirement_machine_completion_failed,
+                           /*protocol=*/0,
+                           unsigned(status.first));
 
-      auto rule = machine->getRuleAsStringForDiagnostics(status.second);
-      ctx.Diags.diagnose(loc,
-                         diag::requirement_machine_completion_rule,
-                         rule);
+        auto rule = machine->getRuleAsStringForDiagnostics(status.second);
+        ctx.Diags.diagnose(loc,
+                           diag::requirement_machine_completion_rule,
+                           rule);
+      }
 
       auto result = GenericSignature::forInvalid(genericParams);
 
