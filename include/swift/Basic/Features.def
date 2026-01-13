@@ -280,6 +280,13 @@ LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)"
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
+/// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
+// TODO: When this is turned on by default, take care of:
+// * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp
+//   (Don't diagnose bare "read"/"modify" in accessors in source files.)
+// * "TODO" around line 12475 of lib/AST/Decl.cpp
+//   (Don't use "read"/"modify" in swiftinterface files.)
+SUPPRESSIBLE_LANGUAGE_FEATURE(CoroutineAccessors, 999, "Coroutine accessors")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -503,14 +510,6 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
-
-/// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
-// TODO: When this is turned on by default, take care of:
-// * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp
-//   (Don't diagnose bare "read"/"modify" in accessors in source files.)
-// * "TODO" around line 12475 of lib/AST/Decl.cpp
-//   (Don't use "read"/"modify" in swiftinterface files.)
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
 /// `yielding borrow` and `yielding mutate` coroutine
 /// accessors always execute the second half of the
