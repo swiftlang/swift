@@ -102,6 +102,11 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
             if Version(self.args.darwin_deployment_version_osx) < Version('10.15'):
                 override_deployment_version = '10.15'
 
+            # On Darwin platforms, specify a module ABI name suffix so that this
+            # copy does not encounter runtime conflicts with a copy loaded from
+            # a pre-existing source such as Xcode.
+            self.cmake_options.define('SwiftTesting_MODULE_ABI_NAME_SUFFIX', '_toolchain')
+
         build_shared_libs = not host_target.startswith('wasi')
         self.cmake_options.define('BUILD_SHARED_LIBS',
                                   'TRUE' if build_shared_libs else 'FALSE')
