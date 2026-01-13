@@ -242,6 +242,9 @@ class WasmSwiftSDK(product.Product):
                 shell.call([self.toolchain.cmake, '--install', '.',
                             '--component', 'clang_rt.builtins-wasm32'],
                            env={'DESTDIR': clang_dir})
+                shell.call([self.toolchain.cmake, '--install', '.',
+                            '--component', 'clang_rt.profile-wasm32'],
+                           env={'DESTDIR': clang_dir})
 
         self._build_libxml2(swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot)
         self._build_foundation(swift_host_triple, clang_multiarch_triple, has_pthread, wasi_sysroot)
