@@ -84,7 +84,7 @@ enum OrderStatus: ~Copyable {
 }
 
 public protocol Q {
-  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}}
+  var id: NonTrivial { borrow mutate } // expected-note{{protocol requires property 'id' with type 'NonTrivial'}} // expected-note{{}} // expected-note{{}} // expected-note{{}}
 }
 
 public struct NonTrivial {
@@ -167,3 +167,15 @@ extension S6 {
   }
 }
 
+public struct S7 : Q { // expected-error{{type 'S7' does not conform to protocol 'Q'}} // expected-note{{add stubs for conformance}}
+  public var _id: NonTrivial
+
+  public var id: NonTrivial { // expected-error {{candidate is not a stored property or a computed property with borrow/mutate accessor, but protocol requires it}}
+    yielding borrow {
+      yield _id
+    }
+    yielding mutate {
+      yield &_id
+    }
+  }
+}
