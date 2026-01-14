@@ -1104,7 +1104,7 @@ namespace swift {
                             size_t mangledNameLength,
                             size_t *outputSize,
                             size_t flags) {
-      if (!mangledName)
+      if (!mangledName || !outputSize)
         return nullptr;
       if (flags > 0)
         return nullptr; // ignore not supported flags
