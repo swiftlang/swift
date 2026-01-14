@@ -5,6 +5,10 @@
 // https://github.com/apple/swift/issues/56649
 // SIL verification fails when differentiating a function of `[[Double]]`
 
+// On linux this test sometimes fails with a linker crash
+// rdar://168025835
+// REQUIRES: OS=macosx
+
 import _Differentiation
 
 let values: [[Double]] = [[0, 0], [0, 0]]
