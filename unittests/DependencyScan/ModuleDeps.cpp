@@ -368,7 +368,7 @@ public func funcA() { }\n"));
 }
 
 // Disabled due to rdar://165014838
-TEST_F(ScanTest, DISABLED_TestModuleCycle) {
+TEST_F(ScanTest, TestModuleCycle) {
   SmallString<256> tempDir;
   ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleCycle", tempDir));
   SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
@@ -429,6 +429,18 @@ public func funcB() { }\n"));
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   auto Diagnostics = Dependencies->diagnostics;
+  llvm::errs() << "[ScanTest.TestModuleCycle]==> Num diagnostcis "
+               << Diagnostics->count << "\n";
+  for (size_t i = 0; i < Diagnostics->count; i++) {
+    llvm::errs() << "[ScanTest.TestModuleCycle]====> [" << i << "]: ";
+    auto Diagnostic = Diagnostics->diagnostics[i];
+    auto Severity = Diagnostic->severity;
+    auto Message = std::string((const char *)Diagnostic->message.data,
+                               Diagnostic->message.length);
+    llvm::errs() << "severity: " << Severity << " ";
+    llvm::errs() << "msg: " << Message << "\n";
+  }
+
   ASSERT_TRUE(Diagnostics->count == 1);
   auto Diagnostic = Diagnostics->diagnostics[0];
   ASSERT_TRUE(Diagnostic->severity == SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR);
