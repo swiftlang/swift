@@ -162,19 +162,21 @@ if(SWIFT_ENABLE_BACKTRACING)
 
     foreach(arch ${sdk_supported_archs})
       set(target "swiftRuntime-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-      if("${SWIFT_SDK_${sdk}_NAME}" STREQUAL "Windows")
-        message(STATUS "Using get-cpu-context-${arch}.asm for target ${target}")
-        target_sources(${target}
-          PRIVATE get-cpu-context-${arch}.asm)
-        # Turn on /safeseh for 32-bit x86 or we won't be able to link
-        if("${arch}" STREQUAL "i686")
-          target_compile_options(${target} PRIVATE
-            $<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+      if(TARGET ${target})
+        if(sdk STREQUAL "WINDOWS")
+          message(STATUS "Using get-cpu-context-${arch}.asm for target ${target}")
+          target_sources(${target}
+            PRIVATE get-cpu-context-${arch}.asm)
+          # Turn on /safeseh for 32-bit x86 or we won't be able to link
+          if("${arch}" STREQUAL "i686")
+            target_compile_options(${target} PRIVATE
+              $<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+          endif()
+        else()
+          message(STATUS "Using get-cpu-context.S for target ${target}")
+          target_sources(${target}
+            PRIVATE get-cpu-context.S)
         endif()
-      else()
-        message(STATUS "Using get-cpu-context.S for target ${target}")
-        target_sources(${target}
-          PRIVATE get-cpu-context.S)
       endif()
     endforeach()
 
