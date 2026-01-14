@@ -114,7 +114,7 @@ option(SWIFT_ENABLE_MACCATALYST
   "Build the overlays with macCatalyst support"
   FALSE)
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "13.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST "15.0" CACHE STRING
   "Minimum deployment target version for macCatalyst")
 
 # -----------------------------------------------------------------------------
