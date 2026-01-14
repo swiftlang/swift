@@ -10,7 +10,8 @@ name: 💥 Report a crash
 description: >
   Report a compiler crash or other unexpected program termination caused by an
   exception.
-labels: [bug, crash, triage needed]
+labels: [crash, triage needed]
+type: Bug
 body:
   - type: markdown
     attributes:
