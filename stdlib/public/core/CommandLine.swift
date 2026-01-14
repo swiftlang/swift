@@ -19,10 +19,7 @@ internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
 @_silgen_name("_swift_stdlib_copyExecutablePath")
-private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>
-
-@_silgen_name("_swift_stdlib_deallocExecutablePath")
-private func _deallocExecutablePath(_ path: UnsafeMutablePointer<CChar>)
+private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>?
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 @_extern(c, "_NSGetExecutablePath")
@@ -136,33 +133,35 @@ extension CommandLine {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
   /// The path to the current executable.
   ///
+  /// If the path to the current executable could not be determined, the value
+  /// of this property is `nil`.
+  ///
   /// - Important: On some systems, it is possible to move an executable file on
   ///   disk while it is running. If the current executable file is moved, the
   ///   value of this property is not updated to its new path.
   @_unavailableInEmbedded
   @_alwaysEmitIntoClient
-  public static var executablePath: String { // NOTE: can't be AEIC and stored!
+  public static var executablePath: String? { // NOTE: can't be AEIC and stored!
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
     // small and updates its *bufsize argument to the required value, so we can
     // just set a reasonable initial value, then loop and try again on failure.
-    var byteCount = UInt32(128)
-    while true {
-      let result: String? = unsafe withUnsafeTemporaryAllocation(
-        of: CChar.self,
-        capacity: Int(byteCount)
-      ) { buffer in
-        if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
-          return unsafe String(cString: buffer.baseAddress!)
-        }
-        return nil
+    var byteCount = UInt32(0)
+    = unsafe _NSGetExecutablePath(nil, &byteCount)
+    return unsafe withUnsafeTemporaryAllocation(
+      of: CChar.self,
+      capacity: Int(byteCount)
+    ) { buffer in
+      if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
+        return unsafe String(cString: buffer.baseAddress!)
       }
-      if let result {
-        return result
-      }
+      return nil
     }
   }
 #else
   /// The path to the current executable.
+  ///
+  /// If the path to the current executable could not be determined, the value
+  /// of this property is `nil`.
   ///
   /// - Important: On some systems, it is possible to move an executable file on
   ///   disk while it is running. If the current executable file is moved, the
@@ -171,11 +170,13 @@ extension CommandLine {
 #if os(WASI)
   @available(*, unavailable, message: "Unavailable on WASI")
 #endif
-  public static let executablePath: String = {
+  public static let executablePath: String? = {
     // FIXME: avoid needing to allocate and free a temp C string (if possible)
-    let cString = unsafe _copyExecutablePath()
+    guard let cString = unsafe _copyExecutablePath() else {
+      return nil
+    }
     defer {
-      unsafe _deallocExecutablePath(cString)
+      cString.deallocate()
     }
     return unsafe String(cString: cString)
   }()

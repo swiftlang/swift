@@ -28,6 +28,7 @@
 #include <errno.h>
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Win32.h"
 
 #include "swift/shims/GlobalObjects.h"
@@ -546,18 +547,14 @@ namespace swift {
 /// A platform-specific implementation of `_swift_stdlib_copyExecutablePath()`.
 ///
 /// - Returns: The path to the current executable according to the operating
-///   system as a UTF-8 C string. The caller is responsible for freeing this
-///   string when done with it.
+///   system as a UTF-8 C string, or `nullptr` if we couldn't get the path. The
+///   caller is responsible for freeing this string when done with it using
+///   the Swift allocator (rather than `free()`).
 static char *copyExecutablePath(void);
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 char *_swift_stdlib_copyExecutablePath(void) {
   return copyExecutablePath();
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void _swift_stdlib_deallocExecutablePath(char *path) {
-  free(path);
 }
 
 #if defined(__APPLE__) && false
@@ -571,30 +568,26 @@ char *copyExecutablePath(void) {
   // a reasonable initial value, then loop and try again on failure.
   uint32_t byteCount = PATH_MAX;
   while (true) {
-    auto result = static_cast<char *>(malloc(byteCount));
-    if (0 == _NSGetExecutablePath(result, &byteCount)) {
-      return result;
+    auto result = swift_cxx_newBuffer<char>(byteCount);
+    if (0 == _NSGetExecutablePath(result.get(), &byteCount)) {
+      return result.release();
     }
-    free(result);
   }
 }
 #elif defined(__linux__) || defined(__ANDROID__)
 char *copyExecutablePath(void) {
   size_t byteCount = PATH_MAX;
   while (true) {
-    auto result = static_cast<char *>(malloc(byteCount));
-    ssize_t byteCountRead = readlink("/proc/self/exe", result, byteCount);
+    auto result = swift_cxx_newBuffer<char>(byteCount);
+    ssize_t byteCountRead = readlink("/proc/self/exe", result.get(), byteCount);
     if (byteCountRead < 0) {
-      swift::fatalError(
-        0,
-        "Fatal error: Could not get the path to the current executable: %d\n",
-        errno
-      );
+      // Could not get the path to the current executable. This process might
+      // not have read permissions.
+      return nullptr;
     } else if (static_cast<size_t>(byteCountRead) < byteCount) {
-      result[byteCountRead] = '\0';
-      return result;
+      result.get()[byteCountRead] = '\0';
+      return result.release();
     }
-    free(result);
     byteCount += PATH_MAX; // add more space and try again
   }
 }
@@ -602,32 +595,19 @@ char *copyExecutablePath(void) {
 char *copyExecutablePath(void) {
   DWORD byteCount = MAX_PATH;
   while (true) {
-    auto wresult = static_cast<WCHAR *>(calloc(byteCount, sizeof(WCHAR)));
+    auto wresult = swift_cxx_newBuffer<WCHAR>(byteCount);
     SetLastError(ERROR_SUCCESS);
-    (void)GetModuleFileNameW(nullptr, wresult, byteCount);
+    (void)GetModuleFileNameW(nullptr, wresult.get(), byteCount);
     DWORD errorCode = GetLastError();
     switch (errorCode) {
     case ERROR_SUCCESS:
-      if (char *result = _swift_win32_copyUTF8FromWide(wresult)) {
-        free(wresult);
-        return result;
-      } else {
-        swift::fatalError(0,
-          "Fatal error: Unable to convert executable path '%ls' to "
-          "UTF-8: %lx, %d.\n",
-          wresult, errorCode, errno);
-      }
-      break;
+      return _swift_win32_copyUTF8FromWide(wresult.get());
     case ERROR_INSUFFICIENT_BUFFER:
-      free(wresult);
       byteCount += MAX_PATH; // add more space and try again
       break;
     default:
-      swift::fatalError(
-        0,
-        "Fatal error: Could not get the path to the current executable: %lx\n",
-        errorCode
-      );
+      // Some other error prevented getting the path.
+      return nullptr;
     }
   }
 }
@@ -636,16 +616,13 @@ char *copyExecutablePath(void) {
   int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
   size_t bufferCount = 0;
   if (0 == sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0)) {
-    auto result = static_cast<char *>(malloc(bufferCount));
-    if (0 == sysctl(mib, std::size(mib), result, &bufferCount, nullptr, 0)) {
-      return result;
+    auto result = swift_cxx_newBuffer<char>(bufferCount);
+    if (0 == sysctl(mib, std::size(mib), result.get(), &bufferCount, nullptr, 0)) {
+      return result.release();
     }
   }
-  swift::fatalError(
-    0,
-    "Fatal error: Could not get the path to the current executable: %d\n",
-    errno
-  );
+
+  return nullptr;
 }
 #elif defined(__OpenBSD__)
 /// Storage for ``captureEarlyCWD()``.
@@ -656,7 +633,7 @@ static std::atomic<const char *> earlyCWD { nullptr };
 ///
 /// This function is necessary on OpenBSD so that we can (as correctly as
 /// possible) resolve the executable path when the first argument is a relative
-/// path (which can occur when manually invoking the test executable.)
+/// path (which can occur when manually invoking an executable at the shell).
 __attribute__((__constructor__(101), __used__))
 static void captureEarlyCWD(void) {
   if (const char *cwd = getcwd(nullptr, 0)) {
@@ -676,26 +653,27 @@ char *copyExecutablePath(void) {
       // path and prepend it with the early CWD.
       if (const char *cwd = earlyCWD.load()) {
         size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
-        auto result = static_cast<char *>(malloc(byteCount));
-        snprintf(result, byteCount, "%s/%s", cwd, argv[0]);
-        return result;
+        auto result = swift_cxx_newBuffer<char>(byteCount);
+        snprintf(result.get(), byteCount, "%s/%s", cwd, argv[0]);
+        return result.release();
       }
-      swift::fatalError(
-        0,
-        "Fatal error: "
-        "Could not get the current working directory at process start\n"
-      );
-    }
 
-    // Either the first character was a slash (in which case we'll treat argv[0]
-    // as an absolute path) there was no slash at all (in which case there's
-    // not much we can do other than return the string as-is.)
-    return strdup(argv[0]);
+      // We were unable to capture the current working directory before this
+      // function was called.
+      return nullptr;
+    } else {
+      // Either the first character was a slash (in which case we'll treat
+      // argv[0] as an absolute path) or there was no slash at all (in which
+      // case there's not much we can do other than return the string as-is.)
+      size_t byteCount = strlen(argv[0]) + 1;
+      auto result = swift_cxx_newBuffer<char>(byteCount);
+      std::uninitialized_copy_n(argv[0], byteCount, result.get());
+      return result.release();
+    }
   }
-  swift::fatalError(
-    0,
-    "Fatal error: Could not get the path to the current executable\n"
-  );
+
+  // We couldn't get the arguments list for the process.
+  return nullptr;
 }
 #else // Add your favorite OS's executable path getter here.
 char *copyExecutablePath(void) {

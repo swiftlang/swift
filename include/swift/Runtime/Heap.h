@@ -95,6 +95,26 @@ static inline void swift_cxx_deleteObject(T *ptr) {
   }
 }
 
+/// Allocate an uninitialized buffer that will be automatically deallocated when
+/// it goes out of scope.
+///
+/// \param count The number of elements to allocate.
+///
+/// \returns A pointer to uninitialized memory large enough to hold \a count
+///   instances of \c T. The caller is responsible for initializing and
+///   deinitializing this memory.
+template <typename T>
+static inline std::unique_ptr<typename T, decltype(swift_cxx_deleteObject)>
+swift_cxx_newBuffer(size_t count) {
+  size_t byteCount = sizeof(T) * count;
+  return std::unique_ptr<T, decltype(swift_cxx_deleteObject) *> {
+    static_cast<T *>(swift_slowAlloc(byteCount, alignof(T) - 1)),
+    [=] (T *ptr) {
+      swift_slowDealloc(ptr, byteCount, alignof(T) - 1);
+    }
+  };
+}
+
 /// Define a custom operator delete; this is useful when a class has a
 /// virtual destructor, as in that case the compiler will emit a deleting
 /// version of the destructor, which will call ::operator delete unless the
