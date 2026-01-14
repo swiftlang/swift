@@ -428,7 +428,7 @@ NODE(ConstValue)
 CONTEXT_NODE(BorrowAccessor)
 CONTEXT_NODE(MutateAccessor)
 NODE(CalledOnceFunctionType)
-NODE(Coroutine)
+NODE(YieldTypes)
 
 #undef CONTEXT_NODE
 #undef NODE

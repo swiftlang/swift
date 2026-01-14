@@ -1768,6 +1768,9 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   // params-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
 
+  // yields?
+  addChild(FuncType, popNode(Node::Kind::YieldTypes));
+
   // result-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
 
@@ -4003,13 +4006,20 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::CFunctionPointer);
     case 'O':
       return popFunctionType(Node::Kind::CalledOnceFunctionType);
-    case 'y':
-      return popFunctionType(Node::Kind::Coroutine);
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);
     case 'j':
       return demangleSymbolicExtendedExistentialType();
+    case 'y': {
+      NodePointer YieldsType = nullptr;
+      if (popNode(Node::Kind::EmptyList)) {
+        YieldsType = createType(createNode(Node::Kind::Tuple));
+      } else {
+        YieldsType = popNode(Node::Kind::Type);
+      }
+      return createWithChild(Node::Kind::YieldTypes, YieldsType);
+    }
     case 'z':
       switch (nextChar()) {
       case 'B':
