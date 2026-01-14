@@ -3,9 +3,8 @@
 // preserving response files) instead of trying to spawn the process with the
 // expansion, which may exceed `ARG_MAX`.
 
-// REQUIRES: shell
 // RUN: %{python} -c 'for i in range(500001): print("-DTEST5_" + str(i))' > %t.resp
-// RUN: cp %S/Inputs/print-args.sh %swift-bin-dir/legacy-driver-propagates-response-file.sh
+// RUN: %{python} -c "import shutil; shutil.copy(r'%S/Inputs/print-args.sh', r'%swift-bin-dir/legacy-driver-propagates-response-file.sh')"
 // RUN: env SWIFT_OVERLOAD_DRIVER=legacy-driver-propagates-response-file.sh %swiftc_driver_plain -disallow-use-new-driver %s @%t.resp | %FileCheck %s
 // RUN: rm %swift-bin-dir/legacy-driver-propagates-response-file.sh
 
