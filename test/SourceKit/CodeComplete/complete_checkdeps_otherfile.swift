@@ -1,10 +1,11 @@
-// UNSUPPORTED: OS=windows-msvc
 import ClangFW
 import SwiftFW
 
 func foo() {
   /*HERE*/
 }
+
+// UNSUPPORTED: OS=windows-msvc
 
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)
