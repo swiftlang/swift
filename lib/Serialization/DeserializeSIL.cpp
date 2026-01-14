@@ -1807,11 +1807,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto usesMoveableValueDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
+    auto inferredImmutable = (Attr >> 4) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
         std::nullopt, hasDynamicLifetime, reflection,
         usesMoveableValueDebugInfo,
-        /*skipVarDeclAssert*/ false, pointerEscape);
+        /*skipVarDeclAssert*/ false, pointerEscape, inferredImmutable);
     break;
   }
   case SILInstructionKind::AllocStackInst: {

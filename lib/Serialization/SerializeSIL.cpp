@@ -1294,6 +1294,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
     flags |= unsigned(ABI->usesMoveableValueDebugInfo()) << 2;
     flags |= unsigned(ABI->hasPointerEscape()) << 3;
+    flags |= unsigned(ABI->isInferredImmutable()) << 4;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());

@@ -2681,6 +2681,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
         DoesNotUseMoveableValueDebugInfo;
     auto hasPointerEscape = DoesNotHavePointerEscape;
+    bool inferredImmutable = false;
     StringRef attrName;
     SourceLoc attrLoc;
     while (parseSILOptional(attrName, attrLoc, *this)) {
@@ -2692,10 +2693,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
       } else if (attrName == "pointer_escape") {
         hasPointerEscape = HasPointerEscape;
+      } else if (attrName == "inferred_immutable") {
+        inferredImmutable = true;
       } else {
         P.diagnose(attrLoc, diag::sil_invalid_attribute_for_expected, attrName,
-                   "dynamic_lifetime, reflection, pointer_escape or "
-                   "usesMoveableValueDebugInfo");
+                   "dynamic_lifetime, reflection, pointer_escape, "
+                   "inferred_immutable or usesMoveableValueDebugInfo");
       }
     }
 
@@ -2711,10 +2714,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (Ty.isMoveOnly())
       usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
 
-    ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
-                                 hasDynamicLifetime, hasReflection,
-                                 usesMoveableValueDebugInfo,
-                                 /*skipVarDeclAssert*/ false, hasPointerEscape);
+    ResultVal = B.createAllocBox(
+        InstLoc, Ty.castTo<SILBoxType>(), VarInfo, hasDynamicLifetime,
+        hasReflection, usesMoveableValueDebugInfo,
+        /*skipVarDeclAssert*/ false, hasPointerEscape, inferredImmutable);
     break;
   }
   case SILInstructionKind::ApplyInst:
