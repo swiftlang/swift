@@ -1186,9 +1186,9 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       if (sbi->getDest() != asi) {
         continue;
       }
-      assert(!deinitializationPoints[blockPromotingWithin]);
-      deinitializationPoints[blockPromotingWithin] = inst;
       if (!runningVals.has_value()) {
+        assert(!deinitializationPoints[blockPromotingWithin]);
+        deinitializationPoints[blockPromotingWithin] = inst;
         continue;
       }
       if (!runningVals->value.isGuaranteed()) {
@@ -1831,7 +1831,7 @@ void StackAllocationPromoter::run(BasicBlockSetVector &livePhiBlocks) {
   // complete their lifetimes with `end_lifetime` instead of `destroy_value`.
   // This is especially important for embedded swift where we are not allowed
   // to insert destroys which were not there before.
-  OSSACompleteLifetime completion(function, domInfo,
+  OSSACompleteLifetime completion(function,
                                   *deadEndBlocksAnalysis->get(function),
                                   OSSACompleteLifetime::IgnoreTrivialVariable,
                                   /*forceLivenessVerification=*/false,
@@ -1968,11 +1968,16 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
       if (!runningVals) {
         // Loading from uninitialized memory is only acceptable if the type is
         // empty--an aggregate of types without storage.
+        const auto initialValue =
+            createEmptyAndUndefValue(asi->getElementType(), inst, ctx);
         runningVals = {
             LiveValues::toReplace(asi,
-                                  /*replacement=*/createEmptyAndUndefValue(
-                                      asi->getElementType(), inst, ctx)),
+                                  /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
+        if (auto varInfo = asi->getVarInfo()) {
+          SILBuilderWithScope(inst, ctx).createDebugValue(
+              inst->getLoc(), initialValue, *varInfo);
+        }
       }
       auto *loadInst = dyn_cast<LoadInst>(inst);
       if (loadInst &&
@@ -2116,7 +2121,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // We may have incomplete lifetimes for enum locations on trivial paths.
     // After promoting them, complete lifetime here.
     ASSERT(asi->getElementType().isOrHasEnum());
-    OSSACompleteLifetime completion(function, domInfo, *deadEndBlocks,
+    OSSACompleteLifetime completion(function, *deadEndBlocks,
                                     OSSACompleteLifetime::IgnoreTrivialVariable,
                                     /*forceLivenessVerification=*/false,
                                     /*nonDestroyingEnd=*/true);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,7 +17,6 @@ extension Unicode {
     case any
     case control
     case extend
-    case extendedPictographic
     case l
     case lv
     case lvt
@@ -56,8 +55,6 @@ extension Unicode {
         }
       case 0x1F1E6 ... 0x1F1FF:
         self = .regionalIndicator
-      case 0x1FC00 ... 0x1FFFD:
-        self = .extendedPictographic
       case 0xE01F0 ... 0xE0FFF:
         self = .control
       default:
@@ -74,9 +71,6 @@ extension Unicode {
         case 3:
           self = .spacingMark
 
-        // Extended pictographic uses 2 values for its representation.
-        case 4, 5:
-          self = .extendedPictographic
         default:
           self = .any
         }
@@ -91,7 +85,6 @@ extension Unicode {
     case any
     case doubleQuote
     case extend
-    case extendedPictographic
     case extendNumLet
     case format
     case hebrewLetter
@@ -146,8 +139,6 @@ extension Unicode {
           self = .extendNumLet
         case 10:
           self = .wSegSpace
-        case 11:
-          self = .extendedPictographic
         default:
           self = .any
         }

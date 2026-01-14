@@ -83,11 +83,30 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
       D->getFormalAccessScope(/*useDC=*/DC,
                               /*allowUsableFromInline=*/true);
 
-  // Public declarations are OK, even if they're SPI or came from an
-  // implementation-only import. We'll diagnose exportability violations
-  // from diagnoseDeclRefExportability().
-  if (declAccessScope.isPublic())
+  if (declAccessScope.isPublic()) {
+    // Diagnose private setters accessed from inlinable functions
+    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+      if (accessor->getAccessorKind() == AccessorKind::Set) {
+        auto storage = accessor->getStorage();
+        if (accessor->getFormalAccess() < storage->getFormalAccess()) {
+          auto diagID = diag::resilience_decl_unavailable;
+          if (Context.LangOpts.hasFeature(Feature::StrictAccessControl))
+            Context.Diags.diagnose(loc, diagID, D, accessor->getFormalAccess(),
+                                   fragileKind.getSelector());
+          else
+            Context.Diags
+                .diagnose(loc, diagID, D, accessor->getFormalAccess(),
+                          fragileKind.getSelector())
+                .limitBehavior(DiagnosticBehavior::Warning);
+          Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
+        }
+      }
+    }
+    // Public declarations are OK, even if they're SPI or came from an
+    // implementation-only import. We'll diagnose exportability violations
+    // from diagnoseDeclRefExportability().
     return false;
+  }
 
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
@@ -119,7 +138,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
-  if (isa<TypeAliasDecl>(DC) && !Context.isLanguageModeAtLeast(6))
+  if (isa<TypeAliasDecl>(DC) &&
+      !Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      !Context.isLanguageModeAtLeast(6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
@@ -207,7 +228,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
-  if (originKind == DisallowedOriginKind::MissingImport &&
+  if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      originKind == DisallowedOriginKind::MissingImport &&
       !ctx.isLanguageModeAtLeast(6))
     addMissingImport(loc, D, where);
 
@@ -248,6 +270,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::ExtensionWithConditionalConformances:
     return true;
   case ExportabilityReason::Inheritance:
+  case ExportabilityReason::ImplicitlyPublicInheritance:
     return isa<ProtocolDecl>(D);
   case ExportabilityReason::AvailableAttribute:
     // If the context is an extension and that extension has an explicit
@@ -262,6 +285,8 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   case ExportabilityReason::PropertyWrapper:
   case ExportabilityReason::PublicVarDecl:
   case ExportabilityReason::ImplicitlyPublicVarDecl:
+  case ExportabilityReason::AssociatedValue:
+  case ExportabilityReason::ImplicitlyPublicAssociatedValue:
     return false;
   }
 }
@@ -460,7 +485,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
               originKind == DisallowedOriginKind::MissingImport,
           6);
 
-  if (originKind == DisallowedOriginKind::MissingImport &&
+  if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
+      originKind == DisallowedOriginKind::MissingImport &&
       !ctx.isLanguageModeAtLeast(6))
     addMissingImport(loc, ext, where);
 

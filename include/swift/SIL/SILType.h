@@ -390,6 +390,10 @@ public:
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
 
+  /// True if the type is an empty tuple or a tuple containing only empty
+  /// tuples.
+  bool isEmptyTuple(const SILFunction &F) const;
+
   /// True if the type, or the referenced type of an address type, is known to
   /// be a scalar reference-counted type such as a class, box, or thick function
   /// type. Returns false for non-trivial aggregates.

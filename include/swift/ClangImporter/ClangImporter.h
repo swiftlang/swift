@@ -148,6 +148,17 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
                            const clang::Type *, const clang::Token *>
     ImportDiagnosticTarget;
 
+/// Addition file mapping information for ClangImporter.
+struct ClangInvocationFileMapping {
+  /// Mapping from a file name to an existing file path.
+  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// MemoryBuffer for files to be overriden.
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> overridenFiles;
+
+  bool requiresBuiltinHeadersInSystemModules = false;
+};
+
 /// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
@@ -166,7 +177,7 @@ public:
 private:
   Implementation &Impl;
 
-  bool requiresBuiltinHeadersInSystemModules = false;
+  ClangInvocationFileMapping clangFileMapping;
 
   ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
@@ -200,10 +211,23 @@ public:
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx, std::string swiftPCHHash = "",
+  create(ASTContext &ctx,
+         const IRGenOptions *IRGenOpts = nullptr,
+         std::string swiftPCHHash = "",
          DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
+
+  static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
+
+  /// Compute the file system used by the ClangImporter from
+  /// ClangInvocationFileMapping.
+  static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  computeClangImporterFileSystem(
+      const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
+      bool suppressDiagnostics = false,
+      llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
 
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -491,7 +515,13 @@ public:
   bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
 
   bool runPreprocessor(StringRef inputPath, StringRef outputPath);
+
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
   const clang::Module *getClangOwningModule(ClangNode Node) const override;
+
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
@@ -530,6 +560,11 @@ public:
   clang::CodeGenOptions &getCodeGenOpts() const;
 
   std::string getClangModuleHash() const;
+
+  /// Get clang file mapping.
+  const ClangInvocationFileMapping &getClangFileMapping() const {
+    return clangFileMapping;
+  }
 
   /// Get clang import creation cc1 args for swift explicit module build.
   std::vector<std::string> getSwiftExplicitModuleDirectCC1Args() const;
@@ -650,6 +685,7 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -883,36 +919,6 @@ std::optional<ResultConvention>
 getCxxRefConventionWithAttrs(const clang::Decl *decl);
 } // namespace importer
 
-struct ClangInvocationFileMapping {
-  /// Mapping from a file name to an existing file path.
-  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
-
-  /// Mapping from a file name to a string of characters that represents the
-  /// contents of the file.
-  SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
-
-  bool requiresBuiltinHeadersInSystemModules;
-};
-
-class ClangInvocationFileMappingContext {
-public:
-  const LangOptions &LangOpts;
-  SearchPathOptions &SearchPathOpts;
-  ClangImporterOptions &ClangImporterOpts;
-  const CASOptions &CASOpts;
-  DiagnosticEngine &Diags;
-
-  ClangInvocationFileMappingContext(
-    const LangOptions &LangOpts, SearchPathOptions &SearchPathOpts,
-    ClangImporterOptions &ClangImporterOpts, const CASOptions &CASOpts,
-    DiagnosticEngine &Diags)
-    : LangOpts(LangOpts), SearchPathOpts(SearchPathOpts),
-      ClangImporterOpts(ClangImporterOpts), CASOpts(CASOpts),
-      Diags(Diags) {}
-
-  ClangInvocationFileMappingContext(const swift::ASTContext &Ctx);
-};
-
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
@@ -920,18 +926,9 @@ public:
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    const ClangInvocationFileMappingContext &ctx,
+    const ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
-
-/// Apply the given file mapping to the specified 'fileSystem', used
-/// primarily to inject modulemaps on platforms with non-modularized
-/// platform libraries.
-ClangInvocationFileMapping applyClangInvocationMapping(
-    const ClangInvocationFileMappingContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
-    bool suppressDiagnostics = false);
 
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {
@@ -961,6 +958,9 @@ public:
   /// metadata for cases of (nested) inheritance.
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
       : access(computeAccess(prev, base)) {}
+
+  /// Initialize an instance of this class at a particular given access level.
+  ClangInheritanceInfo(clang::AccessSpecifier access) : access(access) {}
 
   /// Whether this info represents a case of nested private inheritance.
   bool isNestedPrivate() const { return !access.has_value(); }

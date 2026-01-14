@@ -437,13 +437,13 @@ MemberwiseInitMaxAccessLevel::evaluate(Evaluator &evaluator,
                               /*minAccess*/ AccessLevel::Private, props);
 
   // The memberwise initializer is only ever internal at most, and is limited
-  // by the access of the enclosing decl. A 'private' decl or a decl in a local
-  // context is implicitly 'fileprivate'.
-  auto nominalAccess = nominal->getFormalAccess();
-  if (nominal->getLocalContext() || nominalAccess == AccessLevel::Private)
-    nominalAccess = AccessLevel::FilePrivate;
-
-  auto maxAccess = std::min(nominalAccess, AccessLevel::Internal);
+  // by the access of the enclosing nominal. The only case that matters here is
+  // if the nominal is private or fileprivate, the memberwise initializer is
+  // effectively at most fileprivate in both cases.
+  auto nominalAccess = nominal->getFormalAccessScope();
+  auto maxAccess = nominalAccess.isPrivate() || nominalAccess.isFileScope()
+                       ? AccessLevel::FilePrivate
+                       : AccessLevel::Internal;
   if (props.empty())
     return maxAccess;
 
@@ -820,8 +820,8 @@ directAccessorKindForReadImpl(ReadImplKind reader) {
   case ReadImplKind::Read:
     return AccessorKind::Read;
 
-  case ReadImplKind::Read2:
-    return AccessorKind::Read2;
+  case ReadImplKind::YieldingBorrow:
+    return AccessorKind::YieldingBorrow;
 
   case ReadImplKind::Borrow:
     return AccessorKind::Borrow;
@@ -1004,7 +1004,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
         ReadWriteImplKind::Modify, AccessorKind::Modify);
     diagnoseReadWriteMutatingnessMismatch(
         storage, result, WriteImplKind::Set, AccessorKind::Set,
-        ReadWriteImplKind::Modify2, AccessorKind::Modify2);
+        ReadWriteImplKind::YieldingMutate, AccessorKind::YieldingMutate);
 
     return result;
   }
@@ -1017,8 +1017,8 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     return storage->getParsedAccessor(AccessorKind::Modify)
       ->isMutating();
 
-  case WriteImplKind::Modify2:
-    return storage->getParsedAccessor(AccessorKind::Modify2)->isMutating();
+  case WriteImplKind::YieldingMutate:
+    return storage->getParsedAccessor(AccessorKind::YieldingMutate)->isMutating();
 
   case WriteImplKind::Mutate:
     return storage->getParsedAccessor(AccessorKind::Mutate)->isMutating();
@@ -1065,7 +1065,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (storage->getAccessor(AccessorKind::Read2))
+  if (storage->getAccessor(AccessorKind::YieldingBorrow))
     return OpaqueReadOwnership::Borrowed;
 
   if (storage->getAccessor(AccessorKind::Borrow))
@@ -1073,6 +1073,9 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
+
+  if (storage->getAttrs().hasAttribute<OwnedAttr>())
+    return OpaqueReadOwnership::Owned;
 
   if (storage->getInnermostDeclContext()->mapTypeIntoEnvironment(
         storage->getValueInterfaceType())->isNoncopyable())
@@ -1807,8 +1810,8 @@ synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 /// Synthesize the body of a getter which just delegates to a read coroutine
 /// accessor.
 static std::pair<BraceStmt *, bool>
-synthesizeRead2CoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->getParsedAccessor(AccessorKind::Read2));
+synthesizeYieldingBorrowCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
+  assert(getter->getStorage()->getParsedAccessor(AccessorKind::YieldingBorrow));
 
   // This should call the read coroutine.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
@@ -1984,8 +1987,8 @@ synthesizeGetterBody(AccessorDecl *getter, ASTContext &ctx) {
   case ReadImplKind::Read:
     return synthesizeReadCoroutineGetterBody(getter, ctx);
 
-  case ReadImplKind::Read2:
-    return synthesizeRead2CoroutineGetterBody(getter, ctx);
+  case ReadImplKind::YieldingBorrow:
+    return synthesizeYieldingBorrowCoroutineGetterBody(getter, ctx);
 
   case ReadImplKind::Borrow:
     llvm_unreachable("borrow accessor is not yet implemented");
@@ -2056,7 +2059,7 @@ synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
 /// Synthesize the body of a setter which just delegates to a modify
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
-synthesizeModify2CoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
+synthesizeYieldingMutateCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   // This should call the modify coroutine.
   return synthesizeTrivialSetterBodyWithStorage(
       setter, TargetImpl::Implementation, setter->getStorage(), ctx);
@@ -2261,8 +2264,8 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   case WriteImplKind::Modify:
     return synthesizeModifyCoroutineSetterBody(setter, ctx);
 
-  case WriteImplKind::Modify2:
-    return synthesizeModify2CoroutineSetterBody(setter, ctx);
+  case WriteImplKind::YieldingMutate:
+    return synthesizeYieldingMutateCoroutineSetterBody(setter, ctx);
 
   case WriteImplKind::Mutate:
     return synthesizeMutateSetterBody(setter, ctx);
@@ -2408,8 +2411,8 @@ synthesizeReadCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
 
 /// Synthesize the body of a read coroutine.
 static std::pair<BraceStmt *, bool>
-synthesizeRead2CoroutineBody(AccessorDecl *read, ASTContext &ctx) {
-  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read2 ||
+synthesizeYieldingBorrowCoroutineBody(AccessorDecl *read, ASTContext &ctx) {
+  assert(read->getStorage()->getReadImpl() != ReadImplKind::YieldingBorrow ||
          isa<ProtocolDecl>(read->getStorage()->getDeclContext()->getAsDecl()));
   return synthesizeCoroutineAccessorBody(read, ctx);
 }
@@ -2430,13 +2433,13 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 
 /// Synthesize the body of a modify coroutine.
 static std::pair<BraceStmt *, bool>
-synthesizeModify2CoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
+synthesizeYieldingMutateCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 #ifndef NDEBUG
   auto storage = modify->getStorage();
   auto impl = storage->getReadWriteImpl();
   auto hasWrapper = isa<VarDecl>(storage) &&
                     cast<VarDecl>(storage)->hasAttachedPropertyWrapper();
-  assert((hasWrapper || impl != ReadWriteImplKind::Modify2 ||
+  assert((hasWrapper || impl != ReadWriteImplKind::YieldingMutate ||
           isa<ProtocolDecl>(storage->getDeclContext()->getAsDecl())) &&
          impl != ReadWriteImplKind::Immutable);
 #endif
@@ -2462,14 +2465,14 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::Read:
     return synthesizeReadCoroutineBody(accessor, ctx);
 
-  case AccessorKind::Read2:
-    return synthesizeRead2CoroutineBody(accessor, ctx);
+  case AccessorKind::YieldingBorrow:
+    return synthesizeYieldingBorrowCoroutineBody(accessor, ctx);
 
   case AccessorKind::Modify:
     return synthesizeModifyCoroutineBody(accessor, ctx);
 
-  case AccessorKind::Modify2:
-    return synthesizeModify2CoroutineBody(accessor, ctx);
+  case AccessorKind::YieldingMutate:
+    return synthesizeYieldingMutateCoroutineBody(accessor, ctx);
 
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
@@ -2664,8 +2667,8 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       asAvailableAs.push_back(mod);
     }
     break;
-  case WriteImplKind::Modify2:
-    if (auto mod = storage->getOpaqueAccessor(AccessorKind::Modify2)) {
+  case WriteImplKind::YieldingMutate:
+    if (auto mod = storage->getOpaqueAccessor(AccessorKind::YieldingMutate)) {
       asAvailableAs.push_back(mod);
     }
     break;
@@ -2759,9 +2762,9 @@ createReadCoroutinePrototype(AbstractStorageDecl *storage,
   return createCoroutineAccessorPrototype(storage, AccessorKind::Read, ctx);
 }
 
-static AccessorDecl *createRead2CoroutinePrototype(AbstractStorageDecl *storage,
+static AccessorDecl *createYieldingBorrowCoroutinePrototype(AbstractStorageDecl *storage,
                                                    ASTContext &ctx) {
-  return createCoroutineAccessorPrototype(storage, AccessorKind::Read2, ctx);
+  return createCoroutineAccessorPrototype(storage, AccessorKind::YieldingBorrow, ctx);
 }
 
 static AccessorDecl *
@@ -2771,8 +2774,8 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
 }
 
 static AccessorDecl *
-createModify2CoroutinePrototype(AbstractStorageDecl *storage, ASTContext &ctx) {
-  return createCoroutineAccessorPrototype(storage, AccessorKind::Modify2, ctx);
+createYieldingMutateCoroutinePrototype(AbstractStorageDecl *storage, ASTContext &ctx) {
+  return createCoroutineAccessorPrototype(storage, AccessorKind::YieldingMutate, ctx);
 }
 
 AccessorDecl *
@@ -2801,14 +2804,14 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Read:
     return createReadCoroutinePrototype(storage, ctx);
 
-  case AccessorKind::Read2:
-    return createRead2CoroutinePrototype(storage, ctx);
+  case AccessorKind::YieldingBorrow:
+    return createYieldingBorrowCoroutinePrototype(storage, ctx);
 
   case AccessorKind::Modify:
     return createModifyCoroutinePrototype(storage, ctx);
 
-  case AccessorKind::Modify2:
-    return createModify2CoroutinePrototype(storage, ctx);
+  case AccessorKind::YieldingMutate:
+    return createYieldingMutateCoroutinePrototype(storage, ctx);
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
@@ -2879,7 +2882,7 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     AccessorDecl const *decl, AbstractStorageDecl const *derived) {
   auto &ctx = storage->getASTContext();
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
-  assert(kind == AccessorKind::Modify2 || kind == AccessorKind::Read2);
+  assert(kind == AccessorKind::YieldingMutate || kind == AccessorKind::YieldingBorrow);
 
   // If any overridden decl requires the underscored version, then this decl
   // does too.  Otherwise dispatch to the underscored version on a value
@@ -2969,7 +2972,7 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
 
   if (hasModifyFeature && isUnderscored) {
     return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
-        AccessorKind::Modify2);
+        AccessorKind::YieldingMutate);
   }
 
   // Only for mutable storage.
@@ -3023,8 +3026,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   if (accessor->getAttrs().hasAttribute<TransparentAttr>())
     return true;
 
-  // Default implementations of read2 and modify2 provided for back-deployment
-  // are transparent.
+  // Default implementations of `yielding borrow` and `yielding mutate`
+  // for back-deployment are transparent.
   if (accessor->isRequirementWithSynthesizedDefaultImplementation())
     return true;
 
@@ -3127,16 +3130,16 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     case WriteImplKind::Stored:
     case WriteImplKind::MutableAddress:
     case WriteImplKind::Modify:
-    case WriteImplKind::Modify2:
+    case WriteImplKind::YieldingMutate:
     case WriteImplKind::Mutate:
       break;
     }
     break;
 
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::Init:
     break;
   case AccessorKind::Borrow:
@@ -4028,12 +4031,12 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   // Any accessors that read or write imply that there is no storage.
   if (storage->getParsedAccessor(AccessorKind::Get) ||
       storage->getParsedAccessor(AccessorKind::Read) ||
-      storage->getParsedAccessor(AccessorKind::Read2) ||
+      storage->getParsedAccessor(AccessorKind::YieldingBorrow) ||
       storage->getParsedAccessor(AccessorKind::Address) ||
       storage->getParsedAccessor(AccessorKind::Borrow) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
-      storage->getParsedAccessor(AccessorKind::Modify2) ||
+      storage->getParsedAccessor(AccessorKind::YieldingMutate) ||
       storage->getParsedAccessor(AccessorKind::MutableAddress) ||
       storage->getParsedAccessor(AccessorKind::Init) ||
       storage->getParsedAccessor(AccessorKind::Mutate))
@@ -4163,8 +4166,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     if (storage->getParsedAccessor(AccessorKind::Get)) {
       readImpl = ReadImplKind::Get;
     }
-    if (storage->getParsedAccessor(AccessorKind::Read2)) {
-      readImpl = ReadImplKind::Read2;
+    if (storage->getParsedAccessor(AccessorKind::YieldingBorrow)) {
+      readImpl = ReadImplKind::YieldingBorrow;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
@@ -4215,7 +4218,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
   bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
-  bool hasModify2 = storage->getParsedAccessor(AccessorKind::Modify2);
+  bool hasYieldingMutate = storage->getParsedAccessor(AccessorKind::YieldingMutate);
   bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
   bool hasInit = storage->getParsedAccessor(AccessorKind::Init);
   auto *borrow = storage->getParsedAccessor(AccessorKind::Borrow);
@@ -4225,8 +4228,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   ReadImplKind readImpl;
   if (storage->getParsedAccessor(AccessorKind::Get)) {
     readImpl = ReadImplKind::Get;
-  } else if (storage->getParsedAccessor(AccessorKind::Read2)) {
-    readImpl = ReadImplKind::Read2;
+  } else if (storage->getParsedAccessor(AccessorKind::YieldingBorrow)) {
+    readImpl = ReadImplKind::YieldingBorrow;
   } else if (storage->getParsedAccessor(AccessorKind::Read)) {
     readImpl = ReadImplKind::Read;
   } else if (storage->getParsedAccessor(AccessorKind::Address)) {
@@ -4236,7 +4239,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
     // If there's a writing accessor of any sort, there must also be a
     // reading accessor.
-  } else if (hasInit || hasSetter || hasModify || hasModify2 ||
+  } else if (hasInit || hasSetter || hasModify || hasYieldingMutate ||
              hasMutableAddress || mutate) {
     readImpl = ReadImplKind::Get;
 
@@ -4271,8 +4274,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   ReadWriteImplKind readWriteImpl;
   if (hasSetter) {
     writeImpl = WriteImplKind::Set;
-    if (hasModify2) {
-      readWriteImpl = ReadWriteImplKind::Modify2;
+    if (hasYieldingMutate) {
+      readWriteImpl = ReadWriteImplKind::YieldingMutate;
     } else if (hasModify) {
       readWriteImpl = ReadWriteImplKind::Modify;
     } else {
@@ -4281,9 +4284,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   } else if (mutate) {
     writeImpl = WriteImplKind::Mutate;
     readWriteImpl = ReadWriteImplKind::Mutate;
-  } else if (hasModify2) {
-    writeImpl = WriteImplKind::Modify2;
-    readWriteImpl = ReadWriteImplKind::Modify2;
+  } else if (hasYieldingMutate) {
+    writeImpl = WriteImplKind::YieldingMutate;
+    readWriteImpl = ReadWriteImplKind::YieldingMutate;
   } else if (hasModify) {
     writeImpl = WriteImplKind::Modify;
     readWriteImpl = ReadWriteImplKind::Modify;
@@ -4324,16 +4327,22 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (borrow || mutate) {
     if (auto *extDecl = dyn_cast<ExtensionDecl>(DC)) {
       auto extNominal = extDecl->getExtendedNominal();
-      if (!isa<StructDecl>(extNominal) && !isa<EnumDecl>(extNominal)) {
+      if (!isa<StructDecl>(extNominal)) {
         if (borrow) {
           storage->getASTContext().Diags.diagnose(
-              borrow->getLoc(), diag::accessor_not_supported_in_decl,
-              "a borrow accessor");
+              borrow->getLoc(),
+              diag::borrow_mutate_accessor_not_supported_in_decl,
+              getAccessorNameForDiagnostic(borrow->getAccessorKind(),
+                                           /*article*/ true,
+                                           /*underscored*/ false));
         }
         if (mutate) {
           storage->getASTContext().Diags.diagnose(
-              mutate->getLoc(), diag::accessor_not_supported_in_decl,
-              "a mutate accessor");
+              mutate->getLoc(),
+              diag::borrow_mutate_accessor_not_supported_in_decl,
+              getAccessorNameForDiagnostic(mutate->getAccessorKind(),
+                                           /*article*/ true,
+                                           /*underscored*/ false));
         }
       }
     }

@@ -31,7 +31,9 @@ internal import Musl
 internal import BacktracingImpl.OS.Darwin
 #endif
 
-@_spi(MemoryReaders) public protocol MemoryReader {
+@_spi(MemoryReaders)
+@available(Backtracing 6.2, *)
+public protocol MemoryReader {
   typealias Address = UInt64
   typealias Size = UInt64
 
@@ -62,6 +64,7 @@ internal import BacktracingImpl.OS.Darwin
   func fetchString(from addr: Address, length: Int) throws -> String?
 }
 
+@available(Backtracing 6.2, *)
 extension MemoryReader {
 
   public func fetch<T>(from address: Address,
@@ -115,7 +118,9 @@ extension MemoryReader {
   }
 }
 
-@_spi(MemoryReaders) public struct UnsafeLocalMemoryReader: MemoryReader {
+@_spi(MemoryReaders)
+@available(Backtracing 6.2, *)
+public struct UnsafeLocalMemoryReader: MemoryReader {
   public init() {}
 
   public func fetch(from address: Address,
@@ -138,11 +143,14 @@ extension MemoryReader {
 }
 
 #if os(macOS)
-@_spi(MemoryReaders) public struct MachError: Error {
+@_spi(MemoryReaders)
+@available(Backtracing 6.2, *)
+public struct MachError: Error {
   var result: kern_return_t
 }
 
 @_spi(MemoryReaders)
+@available(Backtracing 6.2, *)
 public struct UncachedRemoteMemoryReader: MemoryReader {
   private var task: task_t
 
@@ -170,6 +178,7 @@ public struct UncachedRemoteMemoryReader: MemoryReader {
 }
 
 @_spi(MemoryReaders)
+@available(Backtracing 6.2, *)
 public struct UncachedLocalMemoryReader: MemoryReader {
   public typealias Address = UInt64
   public typealias Size = UInt64

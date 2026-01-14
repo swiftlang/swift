@@ -30,7 +30,7 @@ public var irm: Int {
 // CHECK-SAME:      @yields Int
 // CHECK-SAME:  {
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivy'
-  read {
+  yielding borrow {
     yield _i
   }
 // CHECK-LABEL: sil [ossa] @$s19coroutine_accessors1SV3irmSivx :
@@ -41,7 +41,7 @@ public var irm: Int {
 // CHECK-SAME:      @yields @inout Int
 // CHECK-SAME:  {
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors1SV3irmSivx'
-  modify {
+  yielding mutate {
     yield &_i
   }
 // CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors1SV3irmSivr :
@@ -239,7 +239,7 @@ class OverridableGetter : ReadableTitle {
 class ImplementedReader : ReadableTitle {
   var _title: String = ""
   var title: String {
-    read {
+    yielding borrow {
       yield _title
     }
   }
@@ -263,7 +263,7 @@ protocol GettableTitle {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
-// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!read2
+// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!yielding_borrow
 // CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]]]) = begin_apply [[READER]]([[SELF]])
 // CHECK:         [[RETVAL:%[^,]+]] = copy_value [[TITLE]]
 // CHECK:         end_apply [[TOKEN]] as $()
@@ -278,7 +278,7 @@ protocol GettableTitle {
 class OverridableReader : GettableTitle {
   var _title: String = ""
   var title: String {
-    read {
+    yielding borrow {
       yield _title
     }
   }
@@ -286,7 +286,7 @@ class OverridableReader : GettableTitle {
 
 // CHECK-LABEL: sil_default_witness_table ReadableField {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #ReadableField.field!read2 
+// CHECK-NEXT:    method #ReadableField.field!yielding_borrow
 // CHECK-SAME:        : @$s19coroutine_accessors13ReadableFieldP5fieldSivy
 // CHECK-NEXT:  }
 public protocol ReadableField {

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 977; // remove lazy storage bit
+const uint16_t SWIFTMODULE_VERSION_MINOR = 978; // @warn attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -207,7 +207,7 @@ enum class ReadImplKind : uint8_t {
   Inherited,
   Address,
   Read,
-  Read2,
+  YieldingBorrow,
   Borrow,
   LastReadImplKind = Borrow,
 };
@@ -225,7 +225,7 @@ enum class WriteImplKind : uint8_t {
   Set,
   MutableAddress,
   Modify,
-  Modify2,
+  YieldingMutate,
   Mutate,
   LastWriteImplKind = Mutate,
 };
@@ -241,7 +241,7 @@ enum class ReadWriteImplKind : uint8_t {
   MutableAddress,
   MaterializeToTemporary,
   Modify,
-  Modify2,
+  YieldingMutate,
   StoredWithDidSet,
   InheritedWithDidSet,
   Mutate,
@@ -351,9 +351,9 @@ enum AccessorKind : uint8_t {
   Address,
   MutableAddress,
   Read,
-  Read2,
+  YieldingBorrow,
   Modify,
-  Modify2,
+  YieldingMutate,
   Init,
   DistributedGet,
   Borrow,
@@ -2339,6 +2339,11 @@ namespace decls_block {
     BCVBR<4>,                         // error parameter index
     TypeIDField,                      // error parameter type
     TypeIDField                       // result type
+  >;
+
+  using WarnDeclAttrLayout = BCRecordLayout<
+    Warn_DECL_ATTR,
+    BCFixed<1> // implicit flag
   >;
 
   using ForeignAsyncConventionLayout = BCRecordLayout<

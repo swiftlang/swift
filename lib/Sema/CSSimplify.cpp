@@ -14920,7 +14920,31 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
       }
 
       assert(fix);
-      return !recordFix(fix, impact);
+
+      if (recordFix(fix, impact))
+        return false;
+
+      // If we are trying to check whether "from" key path is a subclass of
+      // of a "to" key path, the problem here is either mutablity or erasure
+      // and we should still try to match their root and value types top help
+      // inference.
+      if (restriction == ConversionRestrictionKind::Superclass) {
+        if (fromType->isKnownKeyPathType() && toType->isKnownKeyPathType() &&
+            !fromType->isAnyKeyPath()) {
+          auto fromKeyPath = fromType->castTo<BoundGenericType>();
+          auto toKeyPath = toType->castTo<BoundGenericType>();
+
+          auto flags = subflags;
+          flags |= TMF_ApplyingFix;
+          flags |= TMF_MatchingGenericArguments;
+
+          (void)matchDeepTypeArguments(*this, flags,
+                                       fromKeyPath->getGenericArgs(),
+                                       toKeyPath->getGenericArgs(), locator);
+        }
+      }
+
+      return true;
     }
 
     return false;

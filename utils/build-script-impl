@@ -107,7 +107,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-watchos             "6.0"             "minimum deployment target version for watchOS"
     darwin-deployment-version-xros                "1.0"             "minimum deployment target version for xrOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
-    darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
+    darwin-install-extract-symbols-use-just-built-dsymutil ""       "whether we should extract symbols using the just built dsymutil"
     darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
     darwin-overlay-target                         ""                "single overlay target to build, dependencies are computed later"
     darwin-sdk-deployment-targets                 "xctest-ios-8.0"  "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
@@ -3093,7 +3093,7 @@ for host in "${ALL_HOSTS[@]}"; do
             printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
-               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} ${EXTRA_DSYMUTIL_ARGS[@]})
+               xargs -t -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path} --verify-dwarf=none ${EXTRA_DSYMUTIL_ARGS[@]})
             printJSONEndTimestamp dsymutil
 
             # Strip executables, shared libraries and static libraries in

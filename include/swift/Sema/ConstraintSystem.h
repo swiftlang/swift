@@ -2196,7 +2196,7 @@ private:
 
   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> ExprWeights;
 
-  /// Allocator used for all of the related constraint systems.
+  /// Allocator used for data that is local to this constraint system.
   llvm::BumpPtrAllocator Allocator;
 
   /// Arena used for memory management of constraint-checker-related
@@ -6196,7 +6196,9 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 public:
   using Element = TypeVariableBinding;
 
-  TypeVarBindingProducer(const BindingSet &bindings);
+  TypeVarBindingProducer(ConstraintSystem &cs,
+                         TypeVariableType *typeVar,
+                         const BindingSet &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }

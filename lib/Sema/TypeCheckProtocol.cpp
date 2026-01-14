@@ -266,7 +266,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
     break;
 
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     if (auto getter = witness->getParsedAccessor(AccessorKind::Get))
       return getter;
     if (auto addressor = witness->getParsedAccessor(AccessorKind::Address))
@@ -274,7 +274,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
     break;
 
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     if (auto setter = witness->getParsedAccessor(AccessorKind::Set))
       return setter;
     if (auto addressor = witness->getParsedAccessor(AccessorKind::MutableAddress))
@@ -1865,8 +1865,15 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       std::make_pair(AccessScope::getPublic(), false));
 
   bool isSetter = false;
+  if (match.Witness->isAccessibleFrom(requiredAccessLevel.getDeclContext(),
+                                      /*forConformance=*/true) &&
+      !match.Witness->isAccessibleFrom(requiredAccessLevel.getDeclContext(),
+                                       /*forConformance=*/false)) {
+    return RequirementCheck(CheckKind::AccessStrict, requiredAccessLevel,
+                            isSetter);
+  }
   if (checkWitnessAccess(DC, requirement, match.Witness, &isSetter))
-    return RequirementCheck(requiredAccessLevel, isSetter);
+    return RequirementCheck(CheckKind::Access, requiredAccessLevel, isSetter);
 
   if (mustBeUsableFromInline) {
     bool witnessIsUsableFromInline = match.Witness->getFormalAccessScope(
@@ -4414,7 +4421,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     switch (check.getKind()) {
     case CheckKind::Success:
       break;
-
+    case CheckKind::AccessStrict:
     case CheckKind::Access: {
       // Swift 4.2 relaxed some rules for protocol witness matching.
       //
@@ -4446,14 +4453,20 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
+        if (check.getKind() == CheckKind::AccessStrict) {
+          if (witness->getASTContext().LangOpts.hasFeature(
+                  Feature::StrictAccessControl))
+            diagKind = diag::witness_not_accessible_strict_check;
+          else
+            diagKind = diag::witness_not_accessible_strict_check_warn;
+        }
         bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;
         diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
                        diagKind, getProtocolRequirementKind(requirement),
                        witness, isSetter, requiredAccess,
-                       protoAccessScope.accessLevelForDiagnostics(),
-                       proto);
+                       protoAccessScope.accessLevelForDiagnostics(), proto);
 
         auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
         if (decl && decl->isSynthesized())
@@ -7088,9 +7101,9 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Init:
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:

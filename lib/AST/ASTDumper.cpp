@@ -339,8 +339,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
-  case ReadImplKind::Read2:
-    return "read2_coroutine";
+  case ReadImplKind::YieldingBorrow:
+    return "yielding_borrow";
   case ReadImplKind::Borrow:
     return "borrow";
   }
@@ -363,8 +363,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
-  case WriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case WriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case WriteImplKind::Mutate:
     return "mutate";
   }
@@ -383,8 +383,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
-  case ReadWriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case ReadWriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
@@ -5106,6 +5106,7 @@ public:
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
+  TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
   TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
@@ -5608,6 +5609,31 @@ public:
     if (Attr->hasMessage()) {
       printFieldQuoted(Attr->Message, Label::always("message"));
     }
+    printFoot();
+  }
+                         
+  void visitWarnAttr(WarnAttr *Attr, Label label) {
+    printCommon(Attr, "warn", label);
+    auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
+    printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
+                  Label::always("diagGroupID:"));
+    switch (Attr->DiagnosticBehavior) {
+    case WarningGroupBehavior::None:
+    case WarningGroupBehavior::AsWarning:
+      printFieldRaw([&](raw_ostream &out) { out << "warning"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::AsError:
+      printFieldRaw([&](raw_ostream &out) { out << "error"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::Ignored:
+        printFieldRaw([&](raw_ostream &out) { out << "ignored"; },
+                      Label::always("as:"));
+        break;
+    }
+    if (Attr->Reason)
+      printFieldQuoted(Attr->Reason, Label::always("reason:"));
     printFoot();
   }
 };

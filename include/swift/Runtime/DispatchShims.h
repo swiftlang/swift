@@ -27,7 +27,7 @@
 static inline dispatch_thread_override_info_s
 swift_dispatch_thread_get_current_override_qos_floor()
 {
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     return dispatch_thread_get_current_override_qos_floor();
   }
 
@@ -41,7 +41,7 @@ swift_dispatch_thread_get_current_override_qos_floor()
 static inline int
 swift_dispatch_thread_override_self(qos_class_t override_qos) {
 
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     return dispatch_thread_override_self(override_qos);
   }
 
@@ -64,7 +64,7 @@ swift_dispatch_thread_override_self_with_base(qos_class_t override_qos, qos_clas
 
 static inline void
 swift_dispatch_thread_reset_override_self(uint32_t opaque) {
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     dispatch_thread_reset_override_self(opaque);
   }
 }
@@ -73,7 +73,7 @@ static inline int
 swift_dispatch_lock_override_start_with_debounce(dispatch_lock_t *lock_addr,
    dispatch_tid_t expected_thread, qos_class_t override_to_apply) {
 
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     return dispatch_lock_override_start_with_debounce(lock_addr, expected_thread, override_to_apply);
   }
 
@@ -82,7 +82,7 @@ swift_dispatch_lock_override_start_with_debounce(dispatch_lock_t *lock_addr,
 
 static inline int
 swift_dispatch_lock_override_end(qos_class_t override_to_end) {
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     return dispatch_lock_override_end(override_to_end);
   }
 

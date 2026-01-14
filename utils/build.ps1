@@ -164,7 +164,7 @@ param
 
   # SBoM Support
   [switch] $IncludeSBoM = $false,
-  [string] $SyftVersion = "1.29.1",
+  [string] $SyftVersion = "1.40.0",
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
@@ -520,6 +520,18 @@ $KnownSyft = @{
       SHA256 = "3C67CD9AF40CDCC7FFCE041C8349B4A77F33810184820C05DF23440C8E0AA1D7"
       Path = [IO.Path]::Combine("$BinaryCache\syft-1.29.1", "syft.exe")
     }
+  };
+  "1.40.0" = @{
+    AMD64 = @{
+      URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_amd64.zip"
+      SHA256 = "3F4021EC098B4BCBAF19BBA7028CF7704FEF12936970778CEC3C6D669B740E6D"
+      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+    };
+    ARM64 = @{
+      URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_arm64.zip"
+      SHA256 = "CE7129DBCC39809542C9BC5032B179131DFEE72C68C5B3741E3270A3D9ED46E4"
+      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+    };
   }
 }
 
@@ -1223,6 +1235,7 @@ function Get-Dependencies {
       param
       (
           [string]$SourceName,
+          [string]$BinaryCache,
           [string]$DestinationName
       )
       $Source = Join-Path -Path $BinaryCache -ChildPath $SourceName
@@ -1369,12 +1382,14 @@ function Get-Dependencies {
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
-      $FileExtension = [System.IO.Path]::GetExtension($SCCache.URL)
-      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion.$FileExtension" $SCCache.SHA256
-      if ($FileExtension -eq "tar.gz") {
-        Expand-TapeArchive sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+      $FileExtension = if ($SCCache.URL -match '\.(?:tar\.\w+|zip)$') { $Matches[0] } else {
+          throw "Invalid sccache URL"
+      }
+      DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion$FileExtension" $SCCache.SHA256
+      if ($FileExtension -eq ".tar.gz") {
+        Expand-TapeArchive "sccache-$SCCacheVersion$FileExtension" $BinaryCache "sccache-$SCCacheVersion"
       } else {
-        Expand-ZipFile sccache-$SCCacheVersion.$FileExtension $BinaryCache sccache-$SCCacheVersion
+        Expand-ZipFile "sccache-$SCCacheVersion$FileExtension" $BinaryCache "sccache-$SCCacheVersion"
       }
       Write-Success "sccache $SCCacheVersion"
     }

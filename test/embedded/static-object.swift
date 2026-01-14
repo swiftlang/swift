@@ -9,13 +9,13 @@
 
 // Check if the optimizer is able to convert array literals to constant statically initialized arrays.
 
-// CHECK-DAG: @"$e4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test3StrV9staticLet_WZTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
-// CHECK-DAG: @"$e4test3StrV9staticVar_WZTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN", {{.*}} -1
+// CHECK-DAG: @"$e4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
+// CHECK-DAG: @"$e4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
+// CHECK-DAG: @"$e4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
+// CHECK-DAG: @"$e4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
+// CHECK-DAG: @"$e4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
+// CHECK-DAG: @"$e4test3StrV9staticLet_WZTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
+// CHECK-DAG: @"$e4test3StrV9staticVar_WZTv_r" = {{.*}} constant {{.*}} @"$es20__StaticArrayStorageCN{{(.ptrauth[.0-9]*)?}}", {{.*}} -1
 // CHECK-DAG: @"$e4test3StrV9staticVarSaySiGvpZ" = global {{.*}} ptr @"$e4test3StrV9staticVar_WZTv_r"
 // CHECK-DAG: @"$e4test3StrV14twoDimensionalSaySaySiGGvpZ" = global {{.*}} ptr @"$e4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r"
 

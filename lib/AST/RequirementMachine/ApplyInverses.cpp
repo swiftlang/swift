@@ -204,7 +204,8 @@ void swift::rewriting::applyInverses(
     //       func f() where Self: ~Copyable
     //     }
     //
-    if (representativeGPs.find(canSubject) == representativeGPs.end()) {
+    auto subjectRoot = canSubject->getDependentMemberRoot()->getCanonicalType();
+    if (representativeGPs.find(subjectRoot) == representativeGPs.end()) {
       errors.push_back(
           RequirementError::forInvalidInverseOuterSubject(inverse));
       continue;

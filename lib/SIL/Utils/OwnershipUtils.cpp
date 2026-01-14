@@ -23,6 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
 
 using namespace swift;
@@ -483,6 +484,8 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // Transitively, collect GuaranteedForwarding uses.
   for (unsigned i = 0; i < guaranteedForwardingOps.size(); i++) {
     for (auto val : guaranteedForwardingOps[i]->getUser()->getResults()) {
+      if (val->getOwnershipKind() == OwnershipKind::None)
+        continue;
       for (auto *valUse : val->getUses()) {
         if (valUse->getOperandOwnership() ==
             OperandOwnership::GuaranteedForwarding) {
@@ -1243,6 +1246,11 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     if (auto scopeIntroducer = BorrowedValue(value)) {
       out.push_back(scopeIntroducer);
       continue;
+    }
+
+    // If the introducer is a ScopedAddressValue, bailout.
+    if (auto scopedAddress = ScopedAddressValue(value)) {
+      return false;
     }
 
     // If v produces .none ownership, then we can ignore it. It is important

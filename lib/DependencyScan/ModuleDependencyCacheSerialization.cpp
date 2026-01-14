@@ -411,6 +411,23 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       break;
     }
 
+    case VISIBLE_MODULES_NODE: {
+      uint64_t identifierID;
+      uint64_t valueArrayID;
+      VisibleModulesLayout::readRecord(Scratch, identifierID, valueArrayID);
+      auto moduleName = getIdentifier(identifierID);
+      if (!moduleName)
+        llvm::report_fatal_error(
+            "Bad visible modules info: no module name");
+      auto values = getStringArray(valueArrayID);
+      if (!values)
+        llvm::report_fatal_error(
+            "Bad visible modules info: modules");
+
+      cache.clangModulesVisibleFromNamedLookup[moduleName.value()] = values.value();
+      break;
+    }
+
     case IMPORT_STATEMENT_NODE: {
       unsigned importIdentifierID, bufferIdentifierID;
       unsigned lineNumber, columnNumber;
@@ -1056,6 +1073,7 @@ enum ModuleIdentifierArrayKind : uint8_t {
   BridgingHeaderBuildCommandLine,
   NonPathCommandLine,
   FileDependencies,
+  VisibleClangModulesFromLookup,
   LastArrayKind
 };
 
@@ -1166,6 +1184,7 @@ class ModuleDependenciesCacheSerializer {
   unsigned writeSearchPaths(const SwiftBinaryModuleDependencyStorage &dependencyInfo);
   void writeSearchPathsArray(unsigned startIndex, unsigned count);
 
+  void writeVisibleClangModuleInfo(const ModuleDependenciesCache &cache);
   void writeImportStatementInfos(const ModuleDependenciesCache &cache);
   unsigned writeImportStatementInfos(const ModuleDependencyInfo &dependencyInfo,
                                      bool optional);
@@ -1433,6 +1452,21 @@ void ModuleDependenciesCacheSerializer::writeSearchPathsArray(unsigned startInde
   std::iota(vec.begin(), vec.end(), startIndex);
   SearchPathArrayLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[SearchPathArrayLayout::Code], vec);
+}
+
+void ModuleDependenciesCacheSerializer::writeVisibleClangModuleInfo(
+    const ModuleDependenciesCache &cache) {
+  using namespace graph_block;
+  for (const auto &entry : cache.clangModulesVisibleFromNamedLookup) {
+    auto moduleID =
+        ModuleDependencyID{entry.getKey().str(), ModuleDependencyKind::Clang};
+    VisibleModulesLayout::emitRecord(
+        Out, ScratchRecord, AbbrCodes[VisibleModulesLayout::Code],
+        getIdentifier(moduleID.ModuleName),
+        getIdentifierArrayID(
+            moduleID,
+            ModuleIdentifierArrayKind::VisibleClangModulesFromLookup));
+  }
 }
 
 void ModuleDependenciesCacheSerializer::writeImportStatementInfos(
@@ -1798,6 +1832,15 @@ unsigned ModuleDependenciesCacheSerializer::getOptionalImportStatementsArrayID(
 void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     const ModuleDependenciesCache &cache) {
   addIdentifier(cache.scannerContextHash);
+
+  for (const auto &entry : cache.clangModulesVisibleFromNamedLookup) {
+    auto moduleName = entry.getKey().str();
+    addIdentifier(moduleName);
+    addStringArray({moduleName, ModuleDependencyKind::Clang},
+                   ModuleIdentifierArrayKind::VisibleClangModulesFromLookup,
+                   entry.second);
+  }
+
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind) {
     auto modMap = cache.getDependenciesMap(kind);
@@ -1973,6 +2016,7 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<MacroDependencyArrayLayout>();
   registerRecordAbbr<SearchPathLayout>();
   registerRecordAbbr<SearchPathArrayLayout>();
+  registerRecordAbbr<VisibleModulesLayout>();
   registerRecordAbbr<ImportStatementLayout>();
   registerRecordAbbr<ImportStatementArrayLayout>();
   registerRecordAbbr<OptionalImportStatementArrayLayout>();
@@ -1997,6 +2041,9 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
 
   // Write the arrays
   writeArraysOfIdentifiers();
+
+  // Write the cached sets of visible modules
+  writeVisibleClangModuleInfo(cache);
 
   // Write all the import statement info
   writeImportStatementInfos(cache);

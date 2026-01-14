@@ -190,7 +190,7 @@ func f<T: P>(_: T.Type) {
 }
 
 func sendableSequence<S: AsyncSequence & Sendable>(_ s: S) throws {
-  Task.detached {
+  _ = Task.detached {
     for try await i in s {
       print(i)
     }
@@ -198,7 +198,7 @@ func sendableSequence<S: AsyncSequence & Sendable>(_ s: S) throws {
 }
 
 func nonSendableSequence<S: AsyncSequence>(_ s: S) throws {
-  Task.detached {
+  _ = Task.detached {
     for try await i in s { // expected-warning{{capture of non-Sendable type 'S.AsyncIterator.Type' in an isolated closure}}
       // expected-warning@-1{{capture of non-Sendable type 'S.Type' in an isolated closure}}
       print(i)

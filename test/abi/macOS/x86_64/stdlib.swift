@@ -1168,5 +1168,9 @@ Added: _$sSs17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
 
+// SE-0498: Add Runtime.demangle function
+Added: __swift_runtime_demangle
+Added: __swift_runtime_demangle_allocate
+
 // SE-NNNN: CommandLine.executablePath
 Added: _$ss11CommandLineO14executablePathSSvpZMV

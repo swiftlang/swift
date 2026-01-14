@@ -158,7 +158,8 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   [[R8:%.*]] = unchecked_addr_cast [[R7]] : $*AnyObject to $*SomeClass
 // OPT:   [[F6:%.*]] = function_ref @$s30pre_specialized_module_layouts14InternalThing2V9computedZxvryXl_Ts5 : $@yield_once @convention(method) (@guaranteed InternalThing2<AnyObject>) -> @yields @in_guaranteed AnyObject
 // OPT:   ([[R9:%.*]], {{%.*}}) = begin_apply [[F6]]({{.*}}) : $@yield_once @convention(method) (@guaranteed InternalThing2<AnyObject>) -> @yields @in_guaranteed AnyObject
-// OPT:   [[R10:%.*]] = unchecked_addr_cast [[R9]] : $*AnyObject to $*SomeClass
+// OPT:   [[LD:%.*]] = load [[R9]]
+// OPT:   [[R10:%.*]] = unchecked_ref_cast [[LD]] : $AnyObject to $SomeClass
 // OPT: } // end sil function '$s30pre_specialized_module_layouts16useInternalThingyyxlFAA9SomeClassC_Tg5'
 
 public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct, array: [Int], stride96: Stride96) {

@@ -279,9 +279,13 @@ class WasmSwiftSDK(product.Product):
             if build_sdk:
                 target_packages.append((swift_host_triple, wasi_sysroot, package_path))
 
-        swiftc_path = os.path.abspath(self.toolchain.swiftc)
-        toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
-        swift_run = os.path.join(toolchain_path, 'bin', 'swift-run')
+
+        if self.args.build_swift and self.args.build_swiftpm and self.args.install_swiftpm:
+            swift_run = os.path.join(self.install_toolchain_path(host_target), "bin", "swift-run")
+        else:
+            swiftc_path = os.path.abspath(self.toolchain.swiftc)
+            toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
+            swift_run = os.path.join(toolchain_path, 'bin', 'swift-run')
 
         swift_version = os.environ.get('TOOLCHAIN_VERSION',
                                        'swift-DEVELOPMENT-SNAPSHOT')

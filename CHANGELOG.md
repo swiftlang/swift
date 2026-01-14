@@ -138,7 +138,7 @@
   // priority: high!
   await withTaskPriorityEscalationHandler {
   await work()
-  } onPriorityEscalated: { newPriority in // may not be triggered if ->high escalation happened before handler was installed
+  } onPriorityEscalated: { oldPriority, newPriority in // may not be triggered if ->high escalation happened before handler was installed
   // do something
   }
   ```

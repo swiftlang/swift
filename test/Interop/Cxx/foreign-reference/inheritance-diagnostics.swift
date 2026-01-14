@@ -6,7 +6,7 @@
 import Inheritance
 
 let _ = ImmortalRefereceExample.returnImmortalRefType()
-let _ = ImmortalRefereceExample.returnDerivedFromImmortalRefType() // expected-warning {{cannot infer ownership of foreign reference value returned by 'returnDerivedFromImmortalRefType()'}}
+let _ = ImmortalRefereceExample.returnDerivedFromImmortalRefType()
 
 let _ = ExplicitAnnotationHasPrecedence1.returnValueType()
 let _ = ExplicitAnnotationHasPrecedence1.returnRefType() // expected-warning {{cannot infer ownership of foreign reference value returned by 'returnRefType()'}}

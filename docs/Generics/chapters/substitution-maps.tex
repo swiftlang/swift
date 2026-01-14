@@ -964,7 +964,7 @@ Here is the notation used by the compiler when printing this declaration's SIL f
 (Int, @guaranteed String, @in_guaranteed AddressOnly) -> ()
 \end{verbatim}
 \end{quote}
-The \texttt{Int} parameter does not have a convention annotation, so it is passed directly. The \texttt{Int} type is \index{trivial type}trivial value, so its values can be moved and copied without ownership concerns. The \texttt{String} parameter is also passed directly, but this time, the \verb|@guaranteed| convention indicates that ownership of the string is retained by the caller. Finally, the \texttt{AddressOnly} parameter is address-only, so the \verb|@in_guaranteed| convention is used to pass the value indirectly, and once again, the caller retains ownership of the value. Since \texttt{foo()} does not state a return type, the SIL function type has zero results.
+The \texttt{Int} parameter does not have a convention annotation, so it is passed directly. The \texttt{Int} type is \index{trivial type}trivial, so its values can be moved and copied without ownership concerns. The \texttt{String} parameter is also passed directly, but this time, the \verb|@guaranteed| convention indicates that ownership of the string is retained by the caller. Finally, the \texttt{AddressOnly} parameter is address-only, so the \verb|@in_guaranteed| convention is used to pass the value indirectly, and once again, the caller retains ownership of the value. Since \texttt{foo()} does not state a return type, the SIL function type has zero results.
 \end{example}
 
 \begin{example}
@@ -981,7 +981,7 @@ Here is its SIL function type:
 <T, U> (@in_guaranteed T, @in_guaranteed U) -> (@out U, @out T)
 \end{verbatim}
 \end{quote}
-Both parameters are passed indirectly, with the caller retaining ownership (so in fact the implementation of the function most copy these values). The SIL function type also returns two results indirectly (at the machine level, the caller provides a pair of return buffers, large enough to hold both results.)
+Both parameters are passed indirectly, with the caller retaining ownership (so in fact the implementation of the function must copy these values). The SIL function type also returns two results indirectly (at the machine level, the caller provides a pair of return buffers, large enough to hold both results.)
 \end{example}
 
 \paragraph{Re-abstraction thunks.}
@@ -1038,7 +1038,7 @@ For our purposes, an \index{abstraction pattern}abstraction pattern simply consi
 There is also a useful peephole optimization that we will mention now. Very often, the closure being re-abstracted is a literal \index{closure expression!re-abstraction thunk}closure expression, in which case SILGen is able to directly emit the closure with the expected abstraction pattern, instead of immediately wrapping it in a thunk. This avoids an unnecessary heap allocation.
 
 \paragraph{Opaque abstraction patterns.}
-Type lowering traverses a formal function type ``in parallel'' with the abstraction pattern when in order to build the \index{SIL function type}SIL function type. The abstraction pattern must have the same shape as the formal type, in the sense that the formal type should be obtainable from the abstraction pattern by substitution. For example, the abstraction pattern \texttt{(Int, \rU) -> \rV} is compatible with the formal type \texttt{(Int, (Bool, String) -> Float) -> Bool}, but not with the formal type \texttt{(Bool, Int, String) -> (Float, Float)}---in the latter, the number of parameters doesn't match up, and neither does the return type.
+Type lowering traverses a formal function type ``in parallel'' with the abstraction pattern in order to build the \index{SIL function type}SIL function type. The abstraction pattern must have the same shape as the formal type, in the sense that the formal type should be obtainable from the abstraction pattern by substitution. For example, the abstraction pattern \texttt{(Int, \rU) -> \rV} is compatible with the formal type \texttt{(Int, (Bool, String) -> Float) -> Bool}, but not with the formal type \texttt{(Bool, Int, String) -> (Float, Float)}---in the latter, the number of parameters doesn't match up, and neither does the return type.
 
 The implementation of this ``parallel decomposition'' is mostly obvious, except when the abstraction pattern consists of a single \index{type parameter}type parameter. This is referred to as an \index{opaque abstraction pattern}\emph{opaque} abstraction pattern in the implementation (not to be confused with opaque parameters or opaque result types). In this situation, we lower the formal function type in the ``most general'' way, as if each one of its parameters and results was passed indirectly, without exploding tuples. The next three examples will illustrate this.
 

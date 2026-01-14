@@ -295,9 +295,6 @@ def _apply_default_arguments(args):
         args.test_xros_host = False
         args.test_android_host = False
 
-    if args.build_wasmstdlib:
-        args.test_wasmstdlib = True
-
 
 def create_argument_parser():
     """Return a configured argument parser."""
@@ -862,8 +859,6 @@ def create_argument_parser():
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
-    option('--test-wasm-stdlib', toggle_true('test_wasmstdlib'),
-           help='test stdlib for WebAssembly')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
@@ -1252,6 +1247,12 @@ def create_argument_parser():
            default=False,
            help='Build and preview standard library documentation with Swift-DocC.'
                 'Note: this builds Swift-DocC to perform the docs build.')
+    option('--stdlib-docs-static-hosting', toggle_true,
+           default=False,
+           help='Build the standard library documentation for static hosting.')
+    option('--stdlib-docs-hosting-base-path', store,
+           default='/',
+           help='The base path for hosting the standard library documentation.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,

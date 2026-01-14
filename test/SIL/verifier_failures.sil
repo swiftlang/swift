@@ -138,3 +138,12 @@ bb2:
   %7 = end_apply %4 as $()
   unwind
 }
+
+// CHECK-LABEL: Begin Error in function private_without_body
+// CHECK: SIL verification failed: internal/private function must have a body
+// CHECK: End Error in function private_without_body
+// CHECK-LABEL: Begin Error in function private_without_body
+// CHECK: SIL verification failed: external declaration of internal SILFunction not allowed
+// CHECK: End Error in function private_without_body
+sil private @private_without_body : $@convention(thin) () -> ()
+

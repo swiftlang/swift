@@ -23,7 +23,7 @@ public func f(_ i : Int?)
   // CHECK1: %[[alloca:.*]] = alloca %TSiSg
   // CHECK1: #dbg_declare(ptr %i.debug
   // CHECK1: call void @llvm.memset{{.*}}(ptr align {{(4|8)}} %[[alloca]],
-  // CHECK1-SAME:                         i8 0, i64 {{(5|9)}}, i1 false){{$}}
+  // CHECK1-SAME:                         i8 0, i64 {{(5|9)}}, i1 false), !Swift.isSwiftLLDBpreinit
   // CHECK1: #dbg_declare(ptr %val.debug, !{{.*}}, !DIExpression{{.*}},
   // CHECK1-SAME:              ![[DBG0:.*]])
   // CHECK1-LABEL: define {{.*}}@"$s4main1gyySSSgF"

@@ -16,6 +16,8 @@
 #include "ImporterImpl.h"
 #include "swift/AST/Decl.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/DeclCXX.h"
 
 namespace swift {
 
@@ -355,6 +357,14 @@ public:
   /// that calls that destroy operation.
   void addExplicitDeinitIfRequired(
       NominalTypeDecl *nominal, const clang::RecordDecl *clangType);
+
+  /// When a base class is marked as SHARED_REFERENCE, synthesize a call to
+  /// the ref counting operations. This call does the derived to base conversion
+  /// that is responsible for all the offset adjustments on the pointer.
+  std::pair<CustomRefCountingOperationResult, CustomRefCountingOperationResult>
+  addRefCountOperations(ClassDecl *decl, clang::CXXRecordDecl *clangDecl,
+                        const ClassDecl *baseDecl,
+                        const clang::CXXRecordDecl *baseClangDecl);
 
   /// Synthesize a Swift function that calls the Clang runtime predicate
   /// function for the availability domain represented by `var`.

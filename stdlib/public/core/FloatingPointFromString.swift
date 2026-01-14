@@ -450,7 +450,7 @@ fileprivate func hexFloat(
 ) -> ParseResult {
   var i = start + 2 // Skip leading '0x'
   let firstDigitOffset = i
-
+  let limit = UInt64(1) << 60
   var significand: UInt64 = 0
 
   //
@@ -458,10 +458,10 @@ fileprivate func hexFloat(
   //
 
   // Accumulate the most significant 64 bits...
-  while i < input.count && hexdigit(input[i]) < 16 && significand < (1 << 60) {
-      significand &<<= 4
-      significand += UInt64(hexdigit(input[i]))
-      i += 1
+  while i < input.count && hexdigit(input[i]) < 16 && significand < limit {
+    significand &<<= 4
+    significand += UInt64(hexdigit(input[i]))
+    i += 1
   }
 
   // Initialize binary exponent to the number of bits we collected above
@@ -521,7 +521,7 @@ fileprivate func hexFloat(
       }
     }
     // Pack more bits into the accumulator (up to 60)
-    while i < input.count && hexdigit(input[i]) < 16 && significand < (1 << 60) {
+    while i < input.count && hexdigit(input[i]) < 16 && significand < limit {
       significand &<<= 4
       significand += UInt64(hexdigit(input[i]))
       i += 1
@@ -631,12 +631,12 @@ fileprivate func hexFloat(
           && (targetSignificand & 1) == 1)) {
     // Round up, test for overflow
     targetSignificand += 1
-    if targetSignificand >= (1 << targetFormat.significandBits) {
+    if targetSignificand >= (UInt64(1) << targetFormat.significandBits) {
       // Normal overflowed, need to renormalize
       targetSignificand >>= 1
       binaryExponent += 1
     } else if (binaryExponent < targetFormat.minBinaryExponent
-               && targetSignificand >= (1 << (targetFormat.significandBits - 1))) {
+               && targetSignificand >= (UInt64(1) << (targetFormat.significandBits - 1))) {
       // Subnormal overflowed to normal
       binaryExponent += 1
     }
@@ -1769,7 +1769,7 @@ fileprivate func slowDecimalToBinary(
                                               count: targetFormat.significandBits,
                                               remainderNonZero: false)
 
-    if significand >= (1 &<< targetFormat.significandBits) {
+    if significand >= (UInt64(1) &<< targetFormat.significandBits) {
       significand >>= 1
       binaryExponent &+= 1
     }
@@ -1865,7 +1865,7 @@ fileprivate func slowDecimalToBinary(
                                                 range: quotientRange,
                                                 count: targetFormat.significandBits,
                                                 remainderNonZero: remainderNonZero)
-      if significand >= (1 &<< targetFormat.significandBits) {
+      if significand >= (UInt64(1) &<< targetFormat.significandBits) {
         significand >>= 1
         binaryExponent &+= 1
       }
@@ -1889,7 +1889,7 @@ fileprivate func slowDecimalToBinary(
       // exponent.  Then we've transitioned from a subnormal to
       // a normal, so the extra overflow bit will naturally get
       // dropped, we just have to bump the exponent.
-      if significand >= (1 &<< (targetFormat.significandBits &- 1)) {
+      if significand >= (UInt64(1) &<< (targetFormat.significandBits &- 1)) {
         binaryExponent &+= 1
       }
       targetSignificand = significand

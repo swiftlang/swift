@@ -302,6 +302,7 @@ private enum DwarfError: Error {
 
 // .. Dwarf utilities for ImageSource ..........................................
 
+@available(Backtracing 6.2, *)
 extension ImageSource {
 
   func fetchULEB128(from a: Address) throws -> (Address, UInt64) {
@@ -428,6 +429,7 @@ extension ImageSource {
 
 // .. Dwarf utilities for ImageSourceCursor .....................................
 
+@available(Backtracing 6.2, *)
 extension ImageSourceCursor {
 
   mutating func readULEB128() throws -> UInt64 {
@@ -496,12 +498,14 @@ enum DwarfSection {
   case debugTuIndex
 }
 
+@available(Backtracing 6.2, *)
 protocol DwarfSource {
 
   func getDwarfSection(_ section: DwarfSection) -> ImageSource?
 
 }
 
+@available(Backtracing 6.2, *)
 struct DwarfReader<S: DwarfSource & AnyObject> {
 
   typealias Source = S
@@ -1798,6 +1802,7 @@ struct DwarfLineNumberState: CustomStringConvertible {
   }
 }
 
+@available(Backtracing 6.2, *)
 struct DwarfLineNumberInfo {
   typealias Address = UInt64
 
@@ -2006,6 +2011,7 @@ struct DwarfLineNumberInfo {
 // .. Testing ..................................................................
 
 @_spi(DwarfTest)
+@available(Backtracing 6.2, *)
 public func testDwarfReaderFor(path: String) -> Bool {
   guard let source = try? ImageSource(path: path) else {
     print("\(path) was not accessible")

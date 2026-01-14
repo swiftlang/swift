@@ -334,6 +334,7 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
   result.Binding.TypeVar = typeVar;
   result.Binding.BindingType = binding.BindingType;
   result.Binding.BindingSource = binding.BindingSource;
+  result.Binding.Originator = binding.Originator;
   result.Options = unsigned(binding.Kind);
 
   return result;
@@ -538,6 +539,22 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
         .DelayedBy.push_back(TheConstraint.Constraint);
     break;
 
+  case ChangeKind::RetractedProtocol:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .Protocols.push_back(TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedDefault:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .Defaults.push_back(TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedLiteral:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .inferFromLiteral(cs, TheConstraint.TypeVar,
+                          TheConstraint.Constraint);
+    break;
+
   case ChangeKind::RetractedAdjacentVar:
     cg[BindingRelation.TypeVar].getPotentialBindings()
         .AdjacentVars.emplace_back(BindingRelation.OtherTypeVar,
@@ -563,9 +580,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::RetractedBinding: {
-    PotentialBinding binding(Binding.BindingType,
-                             AllowedBindingKind(Options),
-                             Binding.BindingSource);
+    PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
+                             Binding.BindingSource, Binding.Originator);
 
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
     bindings.Bindings.push_back(binding);

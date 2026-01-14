@@ -534,7 +534,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
-  CASE(Read2)
+  CASE(YieldingBorrow)
   CASE(Borrow)
 #undef CASE
   }
@@ -553,7 +553,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(Mutate)
 #undef CASE
   }
@@ -570,7 +570,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
   CASE(Mutate)
@@ -2964,6 +2964,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
+    case DeclAttrKind::Warn:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -4179,7 +4180,7 @@ public:
       writeABIOnlyCounterpart(abiRole.getCounterpartUnchecked());
 
     // Emit attributes (if any).
-    for (auto Attr : D->getAttrs())
+    for (auto Attr : D->getSemanticAttrs())
       writeDeclAttribute(D, Attr);
 
     if (auto *value = dyn_cast<ValueDecl>(D))

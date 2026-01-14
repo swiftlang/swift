@@ -26,7 +26,7 @@ public class Decl: CustomStringConvertible, Hashable {
   /// The parent DeclContext.
   final public var parentDeclContext: DeclContext? {
     if let decl = bridged.getParent().decl {
-      return decl as! DeclContext
+      return (decl as! DeclContext)
     }
     if let bridgedDeclContext = BridgedDeclContext(bridged: bridged.getDeclContext()) {
       // A DeclContext which is not a Decl.
@@ -203,6 +203,7 @@ final public class EnumElementDecl: ValueDecl {
   public var hasAssociatedValues: Bool { bridged.EnumElementDecl_hasAssociatedValues() }
   public var parameterList: ParameterList { ParameterList(bridged: bridged.EnumElementDecl_getParameterList()) }
   public var name: StringRef { StringRef(bridged: bridged.EnumElementDecl_getNameStr()) }
+  public var parentEnum: EnumDecl { self.parentDeclContext as! EnumDecl }
 
   public static func create(
     declContext: DeclContext,

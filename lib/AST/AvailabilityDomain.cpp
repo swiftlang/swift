@@ -445,10 +445,9 @@ static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
 getFallbackVersionMapping(const ASTContext &Ctx,
                           clang::DarwinSDKInfo::OSEnvPair Kind) {
   auto *SDKInfo = Ctx.getDarwinSDKInfo();
-  if (SDKInfo)
-    return SDKInfo->getVersionMapping(Kind);
-
-  return Ctx.getAuxiliaryDarwinPlatformRemapInfo(Kind);
+  if (!SDKInfo)
+    return nullptr;
+  return SDKInfo->getVersionMapping(Kind);
 }
 
 static std::optional<clang::VersionTuple>

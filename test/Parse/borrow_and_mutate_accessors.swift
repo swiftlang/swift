@@ -31,15 +31,16 @@ struct Wrapper {
     }
   }
   var k4: Klass {
-    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a 'read' accessor}}
+    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a 'yielding borrow' accessor}}
       return _k
     }
-    read { // expected-note{{'read' accessor defined here}}
+    // expected-warning@+1{{'read' is deprecated; please use 'yielding borrow' instead}}
+    read { // expected-note{{'yielding borrow' accessor defined here}}
       yield _k
     }
   }
   var k5: Klass {
-    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor, getter, addressor or 'read' accessor}}
+    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor, getter, addressor or 'yielding borrow' accessor}}
       return &_otherK
     }
   }
@@ -80,28 +81,11 @@ struct Wrapper {
 var i: Int
 
 var i_accessor: Int {
-  borrow { // expected-error{{a 'borrow' accessor is supported only on a struct or enum}}
+  borrow { // expected-error{{a 'borrow' accessor is supported only on a struct}}
     fatalError()
   }
-  mutate { // expected-error{{a 'mutate' accessor is supported only on a struct or enum}}
+  mutate { // expected-error{{a 'mutate' accessor is supported only on a struct}}
     return &i // expected-error{{'&' may only be used to pass an argument to inout parameter}}
-  }
-}
-
-var _count: Int = 0
-
-enum Color {
-  case red
-  case green
-  case blue
-
-  var count: Int {
-    borrow {
-      return _count
-    }
-    mutate {
-      return &_count
-    }
   }
 }
 
@@ -113,10 +97,10 @@ class KlassWrapper {
   }
 
   var k: Klass {
-    borrow {// expected-error{{a 'borrow' accessor is supported only on a struct or enum}}
+    borrow {// expected-error{{a 'borrow' accessor is supported only on a struct}}
       return _k
     }
-    mutate {// expected-error{{a 'mutate' accessor is supported only on a struct or enum}}
+    mutate {// expected-error{{a 'mutate' accessor is supported only on a struct}}
       return &_k
     }
   }

@@ -279,6 +279,10 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums"
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 
+// TEMPORARY: Never use this, because it is only meant to allow us to model
+// suppression of @c in Swift interfaces as a temporary measure.
+SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
+
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -303,6 +307,7 @@ MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
+UPCOMING_FEATURE(StrictAccessControl, 0, 7)
 
 // Optional language features / modes
 
@@ -463,9 +468,6 @@ EXPERIMENTAL_FEATURE(ManualOwnership, false)
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
-// Group Main Actor Isolation Errors by Scope
-EXPERIMENTAL_FEATURE(GroupActorErrors, true)
-
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)
 
@@ -572,6 +574,12 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
+
+/// Enable source-level warning control with `@warn`
+EXPERIMENTAL_FEATURE(SourceWarningControl, true)
+
+/// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
+EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

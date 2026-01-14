@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -update-borrowed-from -sil-combine -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-combine -semantic-arc-opts %s | %FileCheck %s
 
 // Make sure that we can perform all of these RAUW without producing ARC traffic
 // that semantic arc opts can't eliminate.
@@ -596,19 +596,20 @@ bbExit:
 // MandatoryCombine does not handle this pattern
 sil [ossa] @guaranteed_to_guaranteed_consuming : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<Klass>):
-  switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.some: bb1, case #FakeOptional.none: bb2
+  switch_enum %0, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
-bb1(%0a : @guaranteed $Klass):
-  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $Klass
-  br bb3(%1 : $FakeOptional<Klass>)
+bb1(%2 : @guaranteed $Klass):
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %2
+  br bb3(%3)
 
 bb2:
-  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
-  br bb3(%3 : $FakeOptional<Klass>)
+  %5 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%5)
 
-bb3(%4 : @guaranteed $FakeOptional<Klass>):
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%7 : @guaranteed $FakeOptional<Klass>):
+  %8 = borrowed %7 from (%0)
+  %9 = tuple ()
+  return %9
 }
 
 // Make sure we performed the optimization.
@@ -902,43 +903,45 @@ bb7:
 // CHECK:       } // end sil function 'invalid_use_after_lifetime6'
 sil [ossa] @invalid_use_after_lifetime6 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
-  %0a = begin_borrow %0 : $Klass
+  %1 = begin_borrow %0
   br bb1
 
 bb1:
   br bb2
 
 bb2:
-  br bb3(%0a : $Klass, undef : $Klass)
+  br bb3(%1, undef : $Klass)
 
-bb3(%arg : @guaranteed $Klass, %base : @owned $Klass):
-  %0b = ref_element_addr %arg : $Klass, #Klass.structField
-  %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
+bb3(%5 : @reborrow $Klass, %6 : @owned $Klass):
+  %7 = borrowed %5 from (%0)
+  %8 = ref_element_addr %7, #Klass.structField
+  %9 = struct_element_addr %8, #NativeObjectWrapper.obj
   br bb4
 
 bb4:
-  %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
+
+  %11 = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %12 = apply %11(%9) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %13 = address_to_pointer %9 to $Builtin.RawPointer
+  %14 = pointer_to_address %13 to [strict] $*Builtin.NativeObject
   br bb5
 
 bb5:
-  end_borrow %arg : $Klass
-  destroy_value %base : $Klass
-  %3 = load [copy] %2 : $*Builtin.NativeObject
+  end_borrow %7
+  destroy_value %6
+  %18 = load [copy] %14
   cond_br undef, bb6, bb7
 
 bb6:
-  destroy_value %3 : $Builtin.NativeObject
+  destroy_value %18
   br bb3(undef : $Klass, undef : $Klass)
 
 bb7:
   br bb8
 
 bb8:
-  destroy_value %0 : $Klass
-  return %3 : $Builtin.NativeObject
+  destroy_value %0
+  return %18
 }
 
 // Make sure that we always RAUW if our new value address is from a

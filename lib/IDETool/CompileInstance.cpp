@@ -32,6 +32,7 @@
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -129,11 +130,14 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   CASOptions casOpts = ctx.CASOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
   SerializationOptions serializationOpts = ctx.SerializationOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
+  if (auto *ctxSDKInfo = ctx.getDarwinSDKInfo())
+    SDKInfo = *ctxSDKInfo;
 
   DiagnosticEngine tmpDiags(tmpSM);
-  auto &tmpCtx =
-      *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                       symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags);
+  auto &tmpCtx = *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
+                                  clangOpts, symbolOpts, casOpts,
+                                  serializationOpts, tmpSM, tmpDiags, SDKInfo);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
 

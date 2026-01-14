@@ -23,7 +23,7 @@ public func initializeSwiftModules() {
   registerOptimizerTests()
 }
 
-private func registerPass(
+func registerPass(
       _ pass: ModulePass,
       _ runFn: @escaping (@convention(c) (BridgedContext) -> ())) {
   pass.name._withBridgedStringRef { nameStr in
@@ -146,19 +146,6 @@ private func registerSwiftPasses() {
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
-
-  // Test passes
-  registerPass(aliasInfoDumper, { aliasInfoDumper.run($0) })
-  registerPass(functionUsesDumper, { functionUsesDumper.run($0) })
-  registerPass(silPrinterPass, { silPrinterPass.run($0) })
-  registerPass(escapeInfoDumper, { escapeInfoDumper.run($0) })
-  registerPass(addressEscapeInfoDumper, { addressEscapeInfoDumper.run($0) })
-  registerPass(accessDumper, { accessDumper.run($0) })
-  registerPass(deadEndBlockDumper, { deadEndBlockDumper.run($0) })
-  registerPass(memBehaviorDumper, { memBehaviorDumper.run($0) })
-  registerPass(rangeDumper, { rangeDumper.run($0) })
-  registerPass(testInstructionIteration, { testInstructionIteration.run($0) })
-  registerPass(updateBorrowedFromPass, { updateBorrowedFromPass.run($0) })
 }
 
 private func registerSwiftAnalyses() {

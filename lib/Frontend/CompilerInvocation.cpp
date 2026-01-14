@@ -198,9 +198,37 @@ void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
   SearchPathOpts.InProcessPluginServerPath = serverLibPath.str();
 }
 
-static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
-                                      const FrontendOptions &FrontendOpts,
-                                      const LangOptions &LangOpts) {
+static std::optional<clang::DarwinSDKInfo>
+parseSDKSettings(llvm::vfs::FileSystem &VFS, const LangOptions &LangOpts,
+                 const SearchPathOptions &SearchPathOpts,
+                 DiagnosticEngine &Diags) {
+  if (!LangOpts.Target.isOSDarwin() || SearchPathOpts.getSDKPath().empty())
+    return std::nullopt;
+  auto SDKInfoOrErr =
+      clang::parseDarwinSDKInfo(VFS, SearchPathOpts.getSDKPath());
+  if (!SDKInfoOrErr) {
+    llvm::consumeError(SDKInfoOrErr.takeError());
+    Diags.diagnose(SourceLoc(), diag::warning_darwin_sdk_invalid_settings);
+    return std::nullopt;
+  }
+  return *SDKInfoOrErr;
+}
+
+static void appendPlatformIncludePrefix(
+    SmallString<128> &Path, const llvm::Triple &Triple,
+    const std::optional<clang::DarwinSDKInfo> &SDKInfo) {
+  if (SDKInfo) {
+    const StringRef PlatformIncludePrefix = SDKInfo->getPlatformPrefix(Triple);
+    if (!PlatformIncludePrefix.empty())
+      llvm::sys::path::append(Path, PlatformIncludePrefix);
+  }
+}
+
+static void
+updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
+                          const FrontendOptions &FrontendOpts,
+                          const LangOptions &LangOpts,
+                          const std::optional<clang::DarwinSDKInfo> &SDKInfo) {
   const llvm::Triple &Triple = LangOpts.Target;
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
@@ -272,6 +300,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     }
 
     LibPath = SearchPathOpts.getSDKPath();
+    appendPlatformIncludePrefix(LibPath, Triple, SDKInfo);
     llvm::sys::path::append(LibPath, "usr", "lib", swiftDir);
     if (!Triple.isOSDarwin()) {
       // Use the non-architecture suffixed form with directory-layout
@@ -290,9 +319,9 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
 }
 
-static void
-updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
-                                   const LangOptions &LangOpts) {
+static void updateImplicitFrameworkSearchPaths(
+    SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const std::optional<clang::DarwinSDKInfo> &SDKInfo) {
   if (SearchPathOpts.SkipAllImplicitImportPaths) {
     SearchPathOpts.setImplicitFrameworkSearchPaths({});
     return;
@@ -303,6 +332,7 @@ updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
     if (!SearchPathOpts.SkipSDKImportPaths &&
         !SearchPathOpts.getSDKPath().empty()) {
       SmallString<128> SDKPath(SearchPathOpts.getSDKPath());
+      appendPlatformIncludePrefix(SDKPath, LangOpts.Target, SDKInfo);
 
       SmallString<128> systemFrameworksScratch(SDKPath);
       llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
@@ -428,11 +458,7 @@ void CompilerInvocation::computeCXXStdlibOptions() {
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path.str();
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-}
-
-void CompilerInvocation::setPlatformAvailabilityInheritanceMapPath(StringRef Path) {
-  SearchPathOpts.PlatformAvailabilityInheritanceMapPath = Path.str();
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
@@ -441,14 +467,14 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
   SearchPathOpts.setSDKPath(Path);
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
 }
 
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
@@ -575,6 +601,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   } else {
     // Any heuristics we might add would go here.
     Opts.UseModuleSelectors = false;
+  }
+
+  if (Opts.PreserveTypesAsWritten && Opts.UseModuleSelectors) {
+    Opts.PreserveTypesAsWritten = false;
+    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
+                   "-module-interface-preserve-types-as-written",
+                   "-enable-module-selectors-in-module-interface");
   }
 }
 
@@ -829,6 +862,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
   // honored, we iterate over them in reverse order.
   std::vector<StringRef> psuedoFeatures;
   llvm::SmallSet<Feature, 8> seenFeatures;
+  bool shouldEnableEmbeddedExistentialsPerDefault = false;
   for (const Arg *A : Args.filtered_reverse(
            OPT_enable_experimental_feature, OPT_disable_experimental_feature,
            OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
@@ -944,6 +978,21 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
+    // "Embedded" enables "EmbeddedExistentials" per default except if
+    // EmbeddedExistentials is explicitly disabled.
+    // "Embedded" enables "EmbeddedExistentials" if we have not yet seen
+    // explicit feature handling of "EmbeddedExistentials".
+    // Because we can see "Embedded" before (parsing in reverse) we see explict
+    // disabling of "EmbeddedExistentials" we delay default enablement so that a
+    // later (when viewed in reverse as this loop's logic does) explicit
+    // disablement can take place.
+    if (*feature == Feature::Embedded &&
+        isEnableFeatureFlag &&
+        !seenFeatures.contains(Feature::EmbeddedExistentials))
+      shouldEnableEmbeddedExistentialsPerDefault = true;
+    else if (*feature == Feature::EmbeddedExistentials && !isEnableFeatureFlag)
+      shouldEnableEmbeddedExistentialsPerDefault = false;
+
     bool forMigration = featureMode.has_value();
 
     // Enable the feature if requested.
@@ -999,6 +1048,10 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       auto modules = featureName->split("=").second;
       modules.split(Opts.ModulesRequiringObjC, ",");
     }
+  }
+
+  if (shouldEnableEmbeddedExistentialsPerDefault) {
+    Opts.enableFeature(Feature::EmbeddedExistentials);
   }
 
   // Map historical flags over to experimental features. We do this for all
@@ -1833,11 +1886,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
-  // Enable support for existentials in embedded per default.
-  if (Opts.hasFeature(Feature::Embedded) &&
-      !Args.hasArg(OPT_disable_embedded_existentials))
-    Opts.enableFeature(Feature::EmbeddedExistentials);
-
   if (Opts.hasFeature(Feature::EmbeddedExistentials) &&
       !Opts.hasFeature(Feature::Embedded)) {
       Diags.diagnose(SourceLoc(), diag::embedded_existentials_without_embedded);
@@ -2216,8 +2264,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.LoadVersionIndependentAPINotes |= Args.hasArg(OPT_version_independent_apinotes);
 
-  Opts.DisableSafeInteropWrappers |= FrontendOpts.ParseStdlib;
-
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;
 
@@ -2527,9 +2573,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
 
-  if (const Arg *A = Args.getLastArg(OPT_platform_availability_inheritance_map_path))
-    Opts.PlatformAvailabilityInheritanceMapPath = A->getValue();
-
   for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
@@ -2723,39 +2766,41 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   // If the "embedded" flag was provided, enable the EmbeddedRestrictions
   // warning group. This group is opt-in in non-Embedded builds.
   if (isEmbedded(Args) && !Args.hasArg(OPT_suppress_warnings) &&
-      !temporarilySuppressEmbeddedRestrictionDiagnostics(Args)) {
-    Opts.WarningsAsErrorsRules.push_back(
-        WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
-                           "EmbeddedRestrictions"));
-  }
+      !temporarilySuppressEmbeddedRestrictionDiagnostics(Args))
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
+                                               DiagGroupID::EmbeddedRestrictions);
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
   for (const Arg *arg : Args.filtered(OPT_warning_treating_Group)) {
-    Opts.WarningsAsErrorsRules.push_back([&] {
-      switch (arg->getOption().getID()) {
-      case OPT_warnings_as_errors:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Enable);
-      case OPT_no_warnings_as_errors:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Disable);
-      case OPT_Werror:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Enable,
-                                  arg->getValue());
-      case OPT_Wwarning:
-        return WarningAsErrorRule(WarningAsErrorRule::Action::Disable,
-                                  arg->getValue());
-      default:
-        llvm_unreachable("unhandled warning as error option");
-      }
-    }());
+    switch (arg->getOption().getID()) {
+    case OPT_warnings_as_errors:
+      Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsError);
+      break;
+    case OPT_no_warnings_as_errors:
+      Opts.WarningGroupControlRules.emplace_back(
+          WarningGroupBehavior::AsWarning);
+      break;
+    case OPT_Werror:
+      Opts.WarningGroupControlRules.emplace_back(
+          WarningGroupBehavior::AsError, getDiagGroupIDByName(arg->getValue()));
+      break;
+    case OPT_Wwarning:
+      Opts.WarningGroupControlRules.emplace_back(
+          WarningGroupBehavior::AsWarning,
+          getDiagGroupIDByName(arg->getValue()));
+      break;
+    default:
+      llvm_unreachable("unhandled warning as error option");
+    };
   }
 
   // `-require-explicit-sendable` is an alias to `-Wwarning ExplicitSendable`.
   if (Args.hasArg(OPT_require_explicit_sendable) &&
       !Args.hasArg(OPT_suppress_warnings)) {
-    Opts.WarningsAsErrorsRules.push_back(WarningAsErrorRule(
-        WarningAsErrorRule::Action::Disable, "ExplicitSendable"));
+    Opts.WarningGroupControlRules.emplace_back(
+        WarningGroupBehavior::AsWarning, DiagGroupID::ExplicitSendable);
   }
 
   if (Args.hasArg(OPT_debug_diagnostic_names)) {
@@ -2801,11 +2846,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.LocalizationPath = A->getValue();
     }
   }
-  assert(!(Opts.SuppressWarnings &&
-           WarningAsErrorRule::hasConflictsWithSuppressWarnings(
-               Opts.WarningsAsErrorsRules)) &&
-         "conflicting arguments; should have been caught by driver");
-
   return false;
 }
 
@@ -2825,7 +2865,7 @@ static void configureDiagnosticEngine(
   if (Options.SuppressRemarks) {
     Diagnostics.setSuppressRemarks(true);
   }
-  Diagnostics.setWarningsAsErrorsRules(Options.WarningsAsErrorsRules);
+  Diagnostics.setWarningGroupControlRules(Options.WarningGroupControlRules);
   Diagnostics.setPrintDiagnosticNamesMode(Options.PrintDiagnosticNames);
 
   std::string docsPath = Options.DiagnosticDocumentationPath;
@@ -3305,6 +3345,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
+  } else if (!Opts.RemoveRuntimeAsserts &&
+             LangOpts.hasFeature(Feature::Embedded)) {
+    // Embedded Swift defaults to -enforce-exclusivity=unchecked for now.
+    Opts.EnforceExclusivityStatic = true;
+    Opts.EnforceExclusivityDynamic = false;
   }
 
   Opts.OSSACompleteLifetimes =
@@ -4049,10 +4094,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.MergeableTraps = Args.hasArg(OPT_mergeable_traps);
 
-  Opts.EnableSwiftDirectRuntime =
+  Opts.EnableSwiftDirectRetainRelease =
     Args.hasFlag(OPT_enable_direct_retain_release,
                  OPT_disable_direct_retain_release,
-                 Opts.EnableSwiftDirectRuntime);
+                 Opts.EnableSwiftDirectRetainRelease);
 
   Opts.EnableObjectiveCProtocolSymbolicReferences =
     Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,
@@ -4277,9 +4322,12 @@ bool CompilerInvocation::parseArgs(
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
+  
+  SDKInfo = parseSDKSettings(*llvm::vfs::getRealFileSystem(), LangOpts,
+                             SearchPathOpts, Diags);
 
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
   setDefaultInProcessPluginServerPathIfNecessary();

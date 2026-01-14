@@ -76,6 +76,7 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
@@ -115,6 +116,7 @@ add_library(swiftRuntime
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift
+  BacktraceJSONFormatter.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
@@ -123,6 +125,8 @@ add_library(swiftRuntime
   Compression.swift
   Context.swift
   CoreSymbolication.swift
+  CrashLog.swift
+  CrashLogCapture.swift
   Dwarf.swift
   EightByteBuffer.swift
   Elf.swift
@@ -135,6 +139,7 @@ add_library(swiftRuntime
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
+  Mangling.swift
   MemoryReader.swift
   OSReleaseScanner.swift
   ProcMapsScanner.swift

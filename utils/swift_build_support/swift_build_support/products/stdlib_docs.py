@@ -17,7 +17,6 @@ from . import swiftdocc
 from . import swiftdoccrender
 from .. import shell
 
-
 class StdlibDocs(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
@@ -42,10 +41,13 @@ class StdlibDocs(product.Product):
             os.path.dirname(self.build_dir),
             f'swift-{host_target}'
         )
+
         symbol_graph_dir = os.path.join(swift_build_dir, "lib", "symbol-graph")
         output_path = os.path.join(swift_build_dir, "Swift.doccarchive")
 
         docc_action = 'preview' if self.args.preview_stdlib_docs else 'convert'
+        static_hosting_option = '--transform-for-static-hosting' if self.args.stdlib_docs_static_hosting else ''
+        hosting_base_path = self.args.stdlib_docs_hosting_base_path
 
         docc_cmd = [
             docc_path,
@@ -60,6 +62,9 @@ class StdlibDocs(product.Product):
             "Swift",
             "--fallback-bundle-identifier",
             "org.swift.swift",
+            static_hosting_option,
+            "--hosting-base-path",
+            hosting_base_path
         ]
 
         shell.call(docc_cmd)

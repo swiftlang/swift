@@ -1455,178 +1455,178 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAStored: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplAStoredVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBStored: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCStored: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements11ImplCStoredVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplCStoredVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAUnderscoredCoroutineAccessors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBUnderscoredCoroutineAccessors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCUnderscoredCoroutineAccessors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplACoroutineAccessors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements23ImplACoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBCoroutineAccessors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCCoroutineAccessors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements23ImplCCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplCCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAGetSet: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:  method #P1.ubgs!read2
+// CHECK-NEXT:  method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:  method #P1.ubgs!modify2
+// CHECK-NEXT:  method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBGetSet: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:  method #P2.urs!read2
+// CHECK-NEXT:  method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:  method #P2.urs!modify2
+// CHECK-NEXT:  method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCGetSet: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:  method #P3.ur!read2
+// CHECK-NEXT:  method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplAUnsafeAddressors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
 // CHECK-SAME:        : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvrTW
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
 // CHECK-SAME:        : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
 // CHECK-SAME:        : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvMTW
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBUnsafeAddressors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
-// CHECK-NEXT:    method #P2.urs!read2
+// CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
-// CHECK-NEXT:    method #P2.urs!modify2
+// CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplCUnsafeAddressors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
 // CHECK-SAME:        : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvrTW
-// CHECK-NEXT:    method #P3.ur!read2
+// CHECK-NEXT:    method #P3.ur!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P1 {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #P1.ubgs!read2
+// CHECK-NEXT:    method #P1.ubgs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements2P1P4ubgsAA1UVvy
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #P1.ubgs!modify2
+// CHECK-NEXT:    method #P1.ubgs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements2P1P4ubgsAA1UVvx
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P2 {
 // CHECK-NEXT:    no_default
-// CHECK-unstable-NEXT:  method #P2.urs!read2
+// CHECK-unstable-NEXT:  method #P2.urs!yielding_borrow
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-unstable-NEXT:  method #P2.urs!modify2
+// CHECK-unstable-NEXT:  method #P2.urs!yielding_mutate
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P3 {
 // CHECK-NEXT:    no_default
-// CHECK-NEXT:    method #P3.ur!read2:
+// CHECK-NEXT:    method #P3.ur!yielding_borrow:
 // CHECK-SAME:      : @$s17read_requirements2P3P2urAA1UVvy
 // CHECK-NEXT:  }

@@ -77,7 +77,7 @@ static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   BasicBlockWorklist Worklist(BB);
-  llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
+  llvm::SmallVector<SILInstruction *, 16> InstrsForSILCombineWorklist;
 
   while (SILBasicBlock *BB = Worklist.pop()) {
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
@@ -429,6 +429,14 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   return MadeChange;
 }
 
+static bool hasAddressOperands(SILInstruction *inst) {
+  for (Operand *op : inst->getRealOperands()) {
+    if (op->get()->getType().isAddress())
+      return true;
+  }
+  return false;
+}
+
 void SILCombiner::processInstruction(SILInstruction *I,
                                      SILCombineCanonicalize &scCanonicalize,
                                      bool &MadeChange) {
@@ -467,6 +475,15 @@ void SILCombiner::processInstruction(SILInstruction *I,
     if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
       if (auto fwdOp = ForwardingOperation(svi)) {
         if (fwdOp.getSingleForwardingOperand() &&
+
+            // Don't risk sinking instructions with address operands out of the
+            // addressed memory's lifetime. E.g:
+            // ```
+            //   %3 = mark_dependence %2 on %1 : $*T  // must not be moved after the destroy_addr
+            //   destroy_addr %1
+            // ```
+            !hasAddressOperands(svi) &&
+
             SILValue(svi)->getOwnershipKind() == OwnershipKind::Owned) {
           // Try to sink the value. If we sank the value and deleted it,
           // return. If we didn't optimize or sank but we are still able to

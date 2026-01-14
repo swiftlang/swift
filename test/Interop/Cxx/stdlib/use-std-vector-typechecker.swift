@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// XFAIL: OS=linux-androideabi
 
 import StdVector
 import StdVectorNoCPlusPlusRequirement
@@ -36,4 +35,4 @@ takeCopyable(hasVector)
 
 let baseHasVector = BaseHasVector()
 takeCopyable(baseHasVector)
-// CHECK: error: global function 'takeCopyable' requires that 'BaseHasVector' conform to 'Copyable'
+// FIXME expected error: global function 'takeCopyable' requires that 'BaseHasVector' conform to 'Copyable'

@@ -2040,7 +2040,7 @@ void SILGenModule::noteMemberRefExpr(MemberRefExpr *e) {
   // for a builtin.
   ASTContext &ctx = var->getASTContext();
   if (isDistributedActorAsLocalActorComputedProperty(var)) {
-    useConformance(getDistributedActorAsActorConformanceRef(ctx));
+    useConformance(nullptr, getDistributedActorAsActorConformanceRef(ctx));
   }
 }
 

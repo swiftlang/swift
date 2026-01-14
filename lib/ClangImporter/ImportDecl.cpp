@@ -70,6 +70,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/OperatorKinds.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Lex/Preprocessor.h"
@@ -86,6 +87,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -560,10 +562,8 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
     return {nullptr, false};
 
   // Unwrap one level of optionality from each.
-  if (Type getterObjectType = getterType->getOptionalObjectType())
-    getterType = getterObjectType;
-  if (Type setterObjectType = setterType->getOptionalObjectType())
-    setterType = setterObjectType;
+  getterType = getterType->lookThroughSingleOptionalType();
+  setterType = setterType->lookThroughSingleOptionalType();
 
   // If they are still different, fail.
   // FIXME: We could produce the greatest common supertype of the
@@ -818,9 +818,7 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
 static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyAttribute::Kind attrs) {
-  Type ty = prop->getInterfaceType();
-  if (auto innerTy = ty->getOptionalObjectType())
-    ty = innerTy;
+  Type ty = prop->getInterfaceType()->lookThroughSingleOptionalType();
   if (!ty->is<GenericTypeParamType>() && !ty->isAnyClassReferenceType())
     return;
 
@@ -2190,6 +2188,39 @@ namespace {
       return true;
     }
 
+    std::pair<CustomRefCountingOperationResult,
+              CustomRefCountingOperationResult>
+    addRefCountOperationsIfRequired(ClassDecl *nominal,
+                                    clang::RecordDecl *clangType) {
+      auto &context = Impl.SwiftContext;
+      auto nonInheritedRefCountingOperations = [&] {
+        auto retainResult = evaluateOrDefault(
+            context.evaluator,
+            CustomRefCountingOperation(
+                {nominal, CustomRefCountingOperationKind::retain}),
+            {});
+        auto releaseResult = evaluateOrDefault(
+            context.evaluator,
+            CustomRefCountingOperation(
+                {nominal, CustomRefCountingOperationKind::release}),
+            {});
+        return std::make_pair(retainResult, releaseResult);
+      };
+      auto clangDecl = dyn_cast<clang::CXXRecordDecl>(clangType);
+      if (!clangDecl)
+        return nonInheritedRefCountingOperations();
+      auto baseClangDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+          getRefParentOrDiag(clangDecl, context, nullptr));
+      if (!baseClangDecl || baseClangDecl == clangDecl)
+        return nonInheritedRefCountingOperations();
+
+      auto baseSwiftDecl = cast<ClassDecl>(
+          Impl.importDecl(baseClangDecl, getActiveSwiftVersion()));
+
+      return synthesizer.addRefCountOperations(nominal, clangDecl,
+                                               baseSwiftDecl, baseClangDecl);
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2359,6 +2390,16 @@ namespace {
                                  MoveOnlyAttr(/*Implicit=*/true));
       }
 
+      bool isNonEscapable = false;
+      if (evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+        result->addAttribute(new (Impl.SwiftContext)
+                                 NonEscapableAttr(/*Implicit=*/true));
+        isNonEscapable = true;
+      }
+
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
       // functions.
@@ -2368,18 +2409,25 @@ namespace {
             if (auto *baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
               Impl.importDecl(baseRecordDecl, getVersion());
             }
+
+            if (!isNonEscapable) {
+              if (evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                    ClangTypeEscapability(
+                                        {base.getType().getTypePtr(), &Impl}),
+                                    CxxEscapability::Unknown) ==
+                  CxxEscapability::NonEscapable) {
+                Impl.addImportDiagnostic(
+                    decl,
+                    Diagnostic(diag::nonescapable_member_of_escapable, true,
+                               decl,
+                               Impl.SwiftContext.AllocateCopy(
+                                   base.getType().getAsString())),
+                    base.getBeginLoc());
+                return nullptr;
+              }
+            }
           }
         }
-      }
-
-      bool isNonEscapable = false;
-      if (evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
-              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
-        result->addAttribute(new (Impl.SwiftContext)
-                                 NonEscapableAttr(/*Implicit=*/true));
-        isNonEscapable = true;
       }
 
       // Import each of the members.
@@ -2494,8 +2542,8 @@ namespace {
                 CxxEscapability::NonEscapable) {
               Impl.addImportDiagnostic(
                   decl,
-                  Diagnostic(diag::nonescapable_field_of_escapable, decl,
-                             nd->getName()),
+                  Diagnostic(diag::nonescapable_member_of_escapable, false,
+                             decl, nd->getName()),
                   decl->getLocation());
               return nullptr;
             }
@@ -2762,31 +2810,14 @@ namespace {
             Impl.addAlternateDecl(subscriptImpl, subscript);
           }
         }
-
-        auto getterAndSetterIt = Impl.cxxDereferenceOperators.find(result);
-        if (getterAndSetterIt != Impl.cxxDereferenceOperators.end()) {
-          // If this type has a dereference operator, synthesize a computed
-          // property called `pointee` for it.
-          auto getterAndSetter = getterAndSetterIt->second;
-
-          VarDecl *pointeeProperty =
-              synthesizer.makeDereferencedPointeeProperty(
-                  getterAndSetter.first, getterAndSetter.second);
-
-          // Import the attributes from clang decl of dereference operator to
-          // synthesized pointee property.
-          FuncDecl *getterOrSetterImpl = getterAndSetter.first
-                                             ? getterAndSetter.first
-                                             : getterAndSetter.second;
-          Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(
-              getterOrSetterImpl, pointeeProperty);
-
-          result->addMember(pointeeProperty);
-        }
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        validateForeignReferenceType(decl, classDecl);
+        auto operations = addRefCountOperationsIfRequired(
+            classDecl, const_cast<clang::RecordDecl *>(decl));
+
+        validateForeignReferenceType(decl, classDecl, operations.first,
+                                     operations.second);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
         if (!availability.isAlwaysAvailable()) {
@@ -2853,8 +2884,10 @@ namespace {
       }
     }
 
-    void validateForeignReferenceType(const clang::RecordDecl *decl,
-                                      ClassDecl *classDecl) {
+    void validateForeignReferenceType(
+        const clang::RecordDecl *decl, ClassDecl *classDecl,
+        CustomRefCountingOperationResult retainOperation,
+        CustomRefCountingOperationResult releaseOperation) {
 
       enum class RetainReleaseOperationKind {
         notAfunction,
@@ -2886,12 +2919,10 @@ namespace {
         Type paramType;
         NominalTypeDecl *paramDecl = nullptr;
         if (!operationFn->isInstanceMember()) {
-          paramType =
-              operationFn->getParameters()->get(0)->getInterfaceType();
-          // Unwrap if paramType is an OptionalType
-          if (Type optionalType = paramType->getOptionalObjectType()) {
-            paramType = optionalType;
-          }
+          paramType = operationFn->getParameters()
+                          ->get(0)
+                          ->getInterfaceType()
+                          ->lookThroughSingleOptionalType();
 
           paramDecl = paramType->getAnyNominal();
         } else {
@@ -2937,11 +2968,6 @@ namespace {
         return RetainReleaseOperationKind::valid;
       };
 
-      auto retainOperation = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CustomRefCountingOperation(
-              {classDecl, CustomRefCountingOperationKind::retain}),
-          {});
       if (retainOperation.kind ==
           CustomRefCountingOperationResult::noAttribute) {
         HeaderLoc loc(decl->getLocation());
@@ -3008,11 +3034,6 @@ namespace {
                CustomRefCountingOperationResult::immortal);
       }
 
-      auto releaseOperation = evaluateOrDefault(
-          Impl.SwiftContext.evaluator,
-          CustomRefCountingOperation(
-              {classDecl, CustomRefCountingOperationKind::release}),
-          {});
       if (releaseOperation.kind ==
           CustomRefCountingOperationResult::noAttribute) {
         HeaderLoc loc(decl->getLocation());
@@ -3278,29 +3299,14 @@ namespace {
 
       validatePrivateFileIDAttributes(decl);
 
-      // If this module is declared as a C++ module, try to synthesize
-      // conformances to Swift protocols from the Cxx module.
-      auto clangModule = Impl.getClangOwningModule(result->getClangNode());
-      if (!clangModule || requiresCPlusPlus(clangModule)) {
-        if (auto nominalDecl = dyn_cast<NominalTypeDecl>(result)) {
-          conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxConvertibleToBoolIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
-          conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+      if (auto *nominalResult = dyn_cast<NominalTypeDecl>(result)) {
+        deriveAutomaticCxxConformances(Impl, nominalResult, decl);
 
-          if (Impl.needsClosureConstructor(decl)) {
-            if (auto closureCtor =
-                    synthesizer.makeClosureConstructor(nominalDecl))
-              nominalDecl->addMember(closureCtor);
-          }
+        if (Impl.needsClosureConstructor(decl)) {
+          if (auto *ctor = synthesizer.makeClosureConstructor(nominalResult))
+            nominalResult->addMember(ctor);
         }
       }
-
       return result;
     }
 
@@ -3717,10 +3723,15 @@ namespace {
     }
 
     /// Handles special functions such as subscripts and dereference operators.
-    bool
-    processSpecialImportedFunc(FuncDecl *func, ImportedName importedName,
-                               clang::OverloadedOperatorKind cxxOperatorKind) {
+    bool processSpecialImportedFunc(FuncDecl *func, ImportedName importedName,
+                                    const clang::FunctionDecl *clangFunc) {
+      auto cxxOperatorKind = clangFunc->getOverloadedOperator();
       if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_None)
+        return true;
+      // If this operator was renamed via swift_name attribute, the imported
+      // Swift function already has the specified name. Do not apply any special
+      // handling to it.
+      if (importedName.hasCustomName())
         return true;
 
       auto dc = func->getDeclContext();
@@ -3765,50 +3776,36 @@ namespace {
         return true;
       }
 
-      if (importedName.isDereferenceAccessor()) {
-        auto &getterAndSetter = Impl.cxxDereferenceOperators[typeDecl];
-
-        switch (importedName.getAccessorKind()) {
-        case ImportedAccessorKind::DereferenceGetter:
-          getterAndSetter.first = func;
-          break;
-        case ImportedAccessorKind::DereferenceSetter:
-          getterAndSetter.second = func;
-          break;
-        default:
-          llvm_unreachable("invalid dereference operator kind");
-        }
-
-        Impl.markUnavailable(func, "use .pointee property");
-        return true;
-      }
-
-      if (cxxOperatorKind == clang::OverloadedOperatorKind::OO_PlusPlus) {
-        // Make sure the type is not a foreign reference type.
-        // We cannot handle `operator++` for those types, since the
-        // current implementation creates a new instance of the type.
-        if (func->getParameters()->size() == 0 && !isa<ClassDecl>(typeDecl)) {
-          // This is a pre-increment operator. We synthesize a
-          // non-mutating function called `successor() -> Self`.
-          FuncDecl *successorFunc = synthesizer.makeSuccessorFunc(func);
-
-          // Import the clang decl attributes to synthesized successor function.
-          Impl.importAttributesFromClangDeclToSynthesizedSwiftDecl(func, successorFunc);
-
-          typeDecl->addMember(successorFunc);
-
-          Impl.markUnavailable(func, "use .successor()");
-        } else {
-          Impl.markUnavailable(func, "unable to create .successor() func");
-        }
-        func->overwriteAccess(AccessLevel::Private);
-        return true;
-      }
-
       // Check if this method _is_ an overloaded operator but is not a
       // call / subscript / dereference / increment. Those
       // operators do not need static versions.
-      if (cxxOperatorKind != clang::OverloadedOperatorKind::OO_Call) {
+      switch (cxxOperatorKind) {
+      case clang::OverloadedOperatorKind::OO_None:
+        llvm_unreachable("should only be handling operators at this point");
+      case clang::OverloadedOperatorKind::OO_PlusPlus:
+        if (clangFunc->getMinRequiredArguments() != 0)
+          // Do not allow post-increment to be used from Swift
+          Impl.markUnavailable(func, "unable to create .successor() func");
+        else if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
+                 method && method->getRefQualifier() == clang::RQ_RValue)
+          // TODO: we shouldn't have to handle this case. We only mark it as
+          // unavailable for now to preserve old behavior, where r-value-this
+          // operator ++ overloads are always unavailable.
+          Impl.markUnavailable(func, "use .successor()");
+        break;
+
+      case clang::OverloadedOperatorKind::OO_Star:
+        if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
+            method && method->getRefQualifier() == clang::RQ_RValue)
+          // TODO: we shouldn't have to handle this case. We only mark it as
+          // unavailable for now to preserve old behavior, where r-value-this
+          // operator * overloads are always unavailable.
+          Impl.markUnavailable(func, "use .pointee property");
+        break;
+      case clang::OverloadedOperatorKind::OO_Call:
+      case clang::OverloadedOperatorKind::OO_Subscript:
+        break;
+      default:
         auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
         Impl.addAlternateDecl(func, opFuncDecl);
 
@@ -3888,9 +3885,10 @@ namespace {
           if (auto file = sourceManager.getFileEntryRefForID(
                   sourceManager.getFileID(decl->getLocation()))) {
             auto filename = file->getName();
-            if ((file->getDir() == owningModule->Directory) &&
-                (filename.ends_with("cmath") || filename.ends_with("math.h") ||
-                 filename.ends_with("stdlib.h") || filename.ends_with("cstdlib"))) {
+            if (filename.ends_with("cmath") || filename.ends_with("math.h") ||
+                ((filename.ends_with("stdlib.h") || filename.ends_with("cstdlib")) &&
+                 decl->getDeclName().isIdentifier() &&
+                 (decl->getName() == "abs" || decl->getName() == "div"))) {
               return nullptr;
             }
           }
@@ -4155,8 +4153,7 @@ namespace {
         }
         func->setAccess(importer::convertClangAccess(decl->getAccess()));
 
-        bool success = processSpecialImportedFunc(
-            func, importedName, decl->getOverloadedOperator());
+        bool success = processSpecialImportedFunc(func, importedName, decl);
         if (!success)
           return nullptr;
       }
@@ -4991,8 +4988,8 @@ namespace {
         clonedMethod->overwriteAccess(
             importer::convertClangAccess(decl->getAccess()));
 
-        bool success = processSpecialImportedFunc(
-            clonedMethod, importedName, targetMethod->getOverloadedOperator());
+        bool success = processSpecialImportedFunc(clonedMethod, importedName,
+                                                  targetMethod);
         if (!success)
           return nullptr;
 
@@ -6767,8 +6764,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   if (!storedUnderlyingType)
     return nullptr;
 
-  if (auto objTy = storedUnderlyingType->getOptionalObjectType())
-    storedUnderlyingType = objTy;
+  storedUnderlyingType = storedUnderlyingType->lookThroughSingleOptionalType();
 
   // If the type is Unmanaged, that is it is not CF ARC audited,
   // we will store the underlying type and leave it up to the use site
@@ -6784,8 +6780,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto computedPropertyUnderlyingType = Impl.importTypeIgnoreIUO(
       decl->getUnderlyingType(), ImportTypeKind::Property, addImportDiag,
       isInSystemModule(dc), Bridgeability::Full, ImportTypeAttrs(), OTK_None);
-  if (auto objTy = computedPropertyUnderlyingType->getOptionalObjectType())
-    computedPropertyUnderlyingType = objTy;
+  computedPropertyUnderlyingType =
+      computedPropertyUnderlyingType->lookThroughSingleOptionalType();
 
   bool isBridged =
       !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
@@ -9393,17 +9389,6 @@ static void filterUsableVersionedAttrs(
   }
 }
 
-void ClangImporter::Implementation::importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *sourceDecl, Decl* synthesizedDecl)
-{
-  // sourceDecl->getClangDecl() can be null because some lazily instantiated cases like C++ members that were instantiated from using-shadow-decls have no corresponding Clang decl.
-  // FIXME: Need to include the cases where correspondoing clang decl is not present.
-  if (auto clangDeclForSource =
-          dyn_cast_or_null<clang::NamedDecl>(
-              sourceDecl->getClangDecl())) {
-    importAttributes(clangDeclForSource, synthesizedDecl);
-  }
-}
-
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -9956,21 +9941,30 @@ static void finishTypeWitnesses(NormalProtocolConformance *conformance,
 
     SmallVector<ValueDecl *, 4> lookupResults;
     NLOptions options = (NL_QualifiedDefault |
-                          NL_OnlyTypes |
-                          NL_ProtocolMembers);
+                         NL_RemoveAssociatedTypes |
+                         NL_OnlyTypes |
+                         NL_ProtocolMembers);
 
     dc->lookupQualified(nominal, DeclNameRef(assocType->getName()),
                         nominal->getLoc(), options,
                         lookupResults);
     for (auto member : lookupResults) {
-      auto typeDecl = cast<TypeDecl>(member);
-      if (isa<AssociatedTypeDecl>(typeDecl)) continue;
+      auto *genericDecl = cast<GenericTypeDecl>(member);
 
-      auto memberType = typeDecl->getDeclaredInterfaceType();
+      // Skip generic declarations.
+      if (genericDecl->hasGenericParamList())
+        continue;
+
+      // Skip typealiases with an unbound generic type as their underlying type.
+      if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl))
+        if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
+          continue;
+
+      auto memberType = genericDecl->getDeclaredInterfaceType();
       auto subMap = selfType->getContextSubstitutionMap(
-          typeDecl->getDeclContext());
+          genericDecl->getDeclContext());
       memberType = memberType.subst(subMap);
-      conformance->setTypeWitness(assocType, memberType, typeDecl);
+      conformance->setTypeWitness(assocType, memberType, genericDecl);
       satisfied = true;
       break;
     }
@@ -10613,6 +10607,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       auto baseInheritance = ClangInheritanceInfo(inheritance, base);
       loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
     }
+  }
+
+  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !inheritance) {
+    lookupAndImportPointee(swiftDecl);
+    lookupAndImportSuccessor(swiftDecl);
   }
 }
 

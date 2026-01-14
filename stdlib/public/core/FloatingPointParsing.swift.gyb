@@ -256,14 +256,13 @@ extension ${Self}: LosslessStringConvertible {
   // Use the all-Swift `parse_float${bits}()` implementation for Float16/32/64
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
-    // TODO: Someday, this whole function should simplify down to just:
-    // ${Self}(text.utf8.span)
   #if _pointerBitWidth(_16)
     // Always fail on 16-bit targets
     return nil
   #else
-    // Work around span availability limits
-    let parsed = unsafe text.base._guts.withFastUTF8 { chars -> ${Self}? in
+    var mutableText = text
+    let parsed: ${Self}?
+    parsed = mutableText.withUTF8 { chars -> ${Self}? in
       unsafe parse_float${bits}(chars.span)
     }
 

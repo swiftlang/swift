@@ -404,6 +404,7 @@ namespace {
           && (!fixedSize.has_value()
               || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
         props.setAddressOnly();
+        props.setVeryLargeType();
       }
       return props;
     }
@@ -4669,8 +4670,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadImplKind::Read:
             collectAccessorCaptures(AccessorKind::Read);
             break;
-          case ReadImplKind::Read2:
-            collectAccessorCaptures(AccessorKind::Read2);
+          case ReadImplKind::YieldingBorrow:
+            collectAccessorCaptures(AccessorKind::YieldingBorrow);
             break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
@@ -4695,8 +4696,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case WriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
-          case WriteImplKind::Modify2:
-            collectAccessorCaptures(AccessorKind::Modify2);
+          case WriteImplKind::YieldingMutate:
+            collectAccessorCaptures(AccessorKind::YieldingMutate);
             break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
@@ -4717,8 +4718,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadWriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
-          case ReadWriteImplKind::Modify2:
-            collectAccessorCaptures(AccessorKind::Modify2);
+          case ReadWriteImplKind::YieldingMutate:
+            collectAccessorCaptures(AccessorKind::YieldingMutate);
             break;
           case ReadWriteImplKind::StoredWithDidSet:
             // We've already processed the didSet operation.

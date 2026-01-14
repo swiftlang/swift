@@ -539,11 +539,15 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
+    // Optional and Never don't need to be forward-declared.
+    if (ED->isOptionalDecl() || ED->getASTContext().getNeverDecl() == ED)
+      return;
+
     assert(ED->isCCompatibleEnum() || ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
       // Forward declare in a way to be compatible with older C standards.
-      os << "typedef SWIFT_ENUM_FWD_DECL(";
+      os << "SWIFT_ENUM_FWD_DECL(";
       printer.print(ED->getRawType());
       os << ", " << getNameForObjC(ED) << ")\n";
     });

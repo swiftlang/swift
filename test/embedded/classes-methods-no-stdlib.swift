@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo -disable-embedded-existentials | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo -disable-experimental-feature EmbeddedExistentials | %FileCheck %s
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix=EXIST
 
 // REQUIRES: swift_in_compiler

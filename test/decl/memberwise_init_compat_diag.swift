@@ -133,3 +133,31 @@ struct I { // expected-error {{cannot synthesize memberwise initializer}}
   }
   var d: Int
 }
+
+protocol P {
+  init(x: Int?, y: Int)
+}
+
+private struct TestNested {
+  struct S: P {
+    fileprivate var x: Int?
+    var y: Int
+  }
+}
+
+func testLocal() {
+  struct A: P {
+    fileprivate var x: Int?
+    var y: Int
+  }
+  struct B {
+    // expected-warning@-1 {{synthesized memberwise initializer no longer includes 'x'; uses of it will be an error in a future Swift language mode}}
+    // expected-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{159:5-5=private init(x: Int? = nil, y: Int) {\nself.x = x\nself.y = y\n\}\n}}
+    private var x: Int?
+    var y: Int
+
+    func foo() {
+      _ = B(x: 0, y: 0) // expected-note {{memberwise initializer used here}}
+    }
+  }
+}
