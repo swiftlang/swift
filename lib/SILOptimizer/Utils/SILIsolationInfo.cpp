@@ -302,7 +302,7 @@ static SILValue lookThroughNonVarDeclOwnershipInsts(SILValue v) {
 static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
   bool foundOneNonIsolatedUnsafe = false;
   for (auto &op : pai->getArgumentOperands()) {
-    if (SILIsolationInfo::isSendableType(op.get()))
+    if (SILIsolationInfo::isSendable(op.get()))
       continue;
 
     // Normally we would not look through copy_value, begin_borrow, or
@@ -852,7 +852,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       }
     } else {
       // Ok, we have a temporary. If it is non-Sendable...
-      if (SILIsolationInfo::isNonSendableType(asi)) {
+      if (SILIsolationInfo::isNonSendable(asi)) {
         if (auto isolation = inferIsolationInfoForTempAllocStack(asi))
           return isolation;
       }
@@ -922,7 +922,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
 SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Return early if we do not have a non-Sendable type.
-  if (!SILIsolationInfo::isNonSendableType(arg->getType(), arg->getFunction()))
+  if (!SILIsolationInfo::isNonSendable(arg))
     return {};
 
   // Handle a switch_enum from a global-actor-isolated type.
@@ -1578,6 +1578,11 @@ void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
     printOptions(os);
     return;
   }
+}
+
+bool SILIsolationInfo::isSendable(SILValue value) {
+  // For now just rely on the type based analysis.
+  return isSendableType(value->getType(), value->getFunction());
 }
 
 // Check if the passed in type is NonSendable.
