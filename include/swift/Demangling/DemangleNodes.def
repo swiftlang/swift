@@ -429,7 +429,7 @@ CONTEXT_NODE(BorrowAccessor)
 CONTEXT_NODE(MutateAccessor)
 NODE(AsyncMainEntryPoint)
 NODE(CalledOnceFunctionType)
-NODE(Coroutine)
+NODE(YieldTypes)
 
 #undef CONTEXT_NODE
 #undef NODE
