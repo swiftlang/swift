@@ -397,7 +397,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
 static void getPathStringToElementRec(TypeExpansionContext context,
-                                      SILModule &Module, SILType T,
+                                      const SILFunction &func, SILType T,
                                       unsigned EltNo, std::string &Result) {
   CanTupleType TT = T.getAs<TupleType>();
   if (!TT) {
@@ -406,11 +406,17 @@ static void getPathStringToElementRec(TypeExpansionContext context,
     return;
   }
 
+  if (T.isEmptyTuple(func)) {
+    // Tuple has no elements, return.
+    return;
+  }
+
   unsigned FieldNo = 0;
   for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
-    unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
+    unsigned NumFieldElements =
+        getElementCountRec(context, func.getModule(), FieldTy, false);
 
     if (EltNo < NumFieldElements) {
       Result += '.';
@@ -418,7 +424,7 @@ static void getPathStringToElementRec(TypeExpansionContext context,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToElementRec(context, Module, FieldTy, EltNo, Result);
+      return getPathStringToElementRec(context, func, FieldTy, EltNo, Result);
     }
 
     EltNo -= NumFieldElements;
@@ -461,7 +467,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
           } else {
             Result += VD->getName().str();
           }
-          getPathStringToElementRec(expansionContext, Module, FieldType,
+          getPathStringToElementRec(expansionContext,
+                                    *MemoryInst->getFunction(), FieldType,
                                     Element, Result);
           return VD;
         }
@@ -484,8 +491,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
   }
 
   // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(expansionContext, Module, MemorySILType, Element,
-                            Result);
+  getPathStringToElementRec(expansionContext, *MemoryInst->getFunction(),
+                            MemorySILType, Element, Result);
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
