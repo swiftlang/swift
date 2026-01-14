@@ -28,4 +28,4 @@ public func test(sm: SubstitutionMap) -> OptionalTypeArray {
 // Check that BridgedTypeArray is indirectly returned via sret after the fix
 
 // CHECK-before-fix: declare {{.*}} [2 x i64] @"?fromReplacementTypes@BridgedTypeArray@@SA?AU1@UBridgedSubstitutionMap@@@Z"(i64)
-// CHECK-after-fix: declare {{.*}} void @"?fromReplacementTypes@BridgedTypeArray@@SA?AU1@UBridgedSubstitutionMap@@@Z"(ptr inreg sret(%struct.BridgedTypeArray) align 8, i64)
+// CHECK-after-fix: declare {{.*}} void @"?fromReplacementTypes@BridgedTypeArray@@SA?AU1@UBridgedSubstitutionMap@@@Z"(ptr {{.*}} inreg {{.*}} sret(%struct.BridgedTypeArray) align 8, i64)
