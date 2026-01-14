@@ -649,10 +649,6 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F,
                             bool allowEmbeddedNSError) {
-  // Mark the needed conformances as used.
-  for (auto conformance : conformances)
-    SGM.useConformance(conformance);
-
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
   auto &ctx = getASTContext();
