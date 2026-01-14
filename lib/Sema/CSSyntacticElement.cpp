@@ -2749,7 +2749,7 @@ void ConjunctionElement::findReferencedVariables(
     if (auto parent =
             locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
       if (auto *forEach = getAsStmt<ForEachStmt>(parent->getElement())) {
-        if (auto *sequence = forEach->getParsedSequence())
+        if (auto *sequence = forEach->getSequence())
           sequence->walk(refFinder);
         return;
       }

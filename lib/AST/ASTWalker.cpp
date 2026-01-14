@@ -2065,9 +2065,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (Expr *Sequence = S->getParsedSequence()) {
+  if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
-      S->setParsedSequence(Sequence);
+      S->setSequence(Sequence);
     else
       return nullptr;
   }

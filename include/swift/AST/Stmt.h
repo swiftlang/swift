@@ -1086,8 +1086,8 @@ public:
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this
   /// expression to extract a range, use \c getRangeInit().
-  Expr *getParsedSequence() const { return Sequence; }
-  void setParsedSequence(Expr *S) { Sequence = S; }
+  Expr *getSequence() const { return Sequence; }
+  void setSequence(Expr *S) { Sequence = S; }
 
   /// The opaque expression used to represent the sequence expression in the
   /// desugared `while` loop.

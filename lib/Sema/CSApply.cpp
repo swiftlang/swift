@@ -9393,7 +9393,7 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
                                    SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
 
-  auto *parsedSequence = stmt->getParsedSequence();
+  auto *parsedSequence = stmt->getSequence();
 
   // Simplify the various types.
   info.sequenceType = solution.simplifyType(info.sequenceType);
@@ -9405,7 +9405,7 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
   if (!rewrittenTarget)
     return std::nullopt;
 
-  stmt->setParsedSequence(rewrittenTarget->getAsExpr());
+  stmt->setSequence(rewrittenTarget->getAsExpr());
   return info;
 }
 
@@ -9414,7 +9414,7 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt, PackIterationInfo info,
                                    SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
-  auto *sequenceExpr = stmt->getParsedSequence();
+  auto *sequenceExpr = stmt->getSequence();
   PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
 
   // First, let's apply the solution to the pack expansion.

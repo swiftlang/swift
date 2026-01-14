@@ -731,7 +731,7 @@ protected:
         ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
                     forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
                     forEachStmt->getUnsafeLoc(), forEachStmt->getPattern(),
-                    forEachStmt->getInLoc(), forEachStmt->getParsedSequence(),
+                    forEachStmt->getInLoc(), forEachStmt->getSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
                     cloneBraceWith(forEachStmt->getBody(), newBody),
                     forEachStmt->getDeclContext(), forEachStmt->isImplicit());

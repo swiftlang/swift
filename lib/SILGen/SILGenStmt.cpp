@@ -1420,7 +1420,7 @@ void StmtEmitter::visitOpaqueStmt(OpaqueStmt *S) {
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
-  if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+  if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
     auto formalPackType = dyn_cast<PackType>(
         PackType::get(SGF.getASTContext(), expansion->getType())
             ->getCanonicalType());
@@ -1457,7 +1457,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
   auto *opaqueSequence = S->getOpaqueSequenceExpr();
   ASSERT(opaqueSequence);
-  SGF.OpaqueExprs[opaqueSequence] = S->getParsedSequence();
+  SGF.OpaqueExprs[opaqueSequence] = S->getSequence();
   SWIFT_DEFER { SGF.OpaqueExprs.erase(opaqueSequence); };
 
   auto *opaqueWhere = S->getOpaqueWhereExpr();

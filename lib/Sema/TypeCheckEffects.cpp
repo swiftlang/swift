@@ -4586,13 +4586,13 @@ private:
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
     // Reparent the type-checked sequence on the parsed sequence, so we can
     // find an anchor.
-    if (auto typeCheckedExpr = S->getParsedSequence()) {
+    if (auto typeCheckedExpr = S->getSequence()) {
       parentMap = typeCheckedExpr->getParentMap();
     }
 
     // Walk everything
     S->getPattern()->walk(*this);
-    S->getParsedSequence()->walk(*this);
+    S->getSequence()->walk(*this);
     if (S->getWhere())
       S->getWhere()->walk(*this);
       

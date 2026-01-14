@@ -3336,7 +3336,7 @@ public:
     if (S->getWhere()) {
       printRec(S->getWhere(), Label::always("where"));
     }
-    printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
+    printRec(S->getSequence(), Label::optional("parsed_sequence"));
 
     printRec(S->getBody(), Label::optional("body"));
 

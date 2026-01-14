@@ -5828,7 +5828,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   Printer << tok::kw_for << " ";
   printPattern(stmt->getPattern());
   Printer << " " << tok::kw_in << " ";
-  visit(stmt->getParsedSequence());
+  visit(stmt->getSequence());
   Printer << " ";
   visit(stmt->getBody());
 }

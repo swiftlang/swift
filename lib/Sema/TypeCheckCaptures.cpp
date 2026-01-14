@@ -742,7 +742,7 @@ public:
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           // Remember this generic environment, so that it remains on the
           // visited stack until the end of the for .. in loop.
@@ -758,7 +758,7 @@ public:
   PostWalkResult<Stmt *> walkToStmtPost(Stmt *S) override {
     if (auto *forEachStmt = dyn_cast<ForEachStmt>(S)) {
       if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(forEachStmt->getParsedSequence())) {
+              dyn_cast<PackExpansionExpr>(forEachStmt->getSequence())) {
         if (auto *env = expansion->getGenericEnvironment()) {
           assert(VisitingForEachEnv.back() == env);
           (void) env;

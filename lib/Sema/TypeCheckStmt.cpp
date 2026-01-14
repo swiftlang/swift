@@ -3457,7 +3457,7 @@ public:
         isAsync(stmt->getAwaitLoc().isValid()) {}
 
   BraceStmt *operator()() {
-    auto *sequence = stmt->getParsedSequence();
+    auto *sequence = stmt->getSequence();
     auto seqType = sequence->getType();
 
     if (isa<PackExpansionExpr>(sequence))
@@ -3502,7 +3502,7 @@ private:
 
     makeIteratorVar = new (ctx) VarDecl(
         /*isStatic=*/false, VarDecl::Introducer::Var,
-        stmt->getParsedSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
+        stmt->getSequence()->getStartLoc(), ctx.getIdentifier(name), dc);
     makeIteratorVar->setImplicit();
 
     // Async iterators are not `Sendable`; they're only meant to be used from
@@ -3531,7 +3531,7 @@ private:
       labels.push_back(ctx.Id_isolation);
 
     ConcreteDeclRef nextWitness;
-    if (stmt->getParsedSequence()->getType()->isExistentialType()) {
+    if (stmt->getSequence()->getType()->isExistentialType()) {
       nextWitness = ConcreteDeclRef(nextFn);
     } else if (nextFn) {
       auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
@@ -3572,7 +3572,7 @@ private:
   }
 
   PatternBindingDecl *buildMakeIterator() {
-    auto *sequence = stmt->getParsedSequence();
+    auto *sequence = stmt->getSequence();
     auto seqType = sequence->getType();
     auto *opaqueSeqExpr =
         new (ctx) OpaqueValueExpr(sequence->getSourceRange(), seqType);

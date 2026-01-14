@@ -4662,7 +4662,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                ForEachStmt *stmt, Pattern *typeCheckedPattern,
                                bool shouldBindPatternVarsOneWay) {
   bool isAsync = stmt->getAwaitLoc().isValid();
-  auto *sequenceExpr = stmt->getParsedSequence();
+  auto *sequenceExpr = stmt->getSequence();
 
   auto elementLocator = cs.getConstraintLocator(
       sequenceExpr, ConstraintLocator::SequenceElementType);
@@ -4719,7 +4719,7 @@ static std::optional<SyntacticElementTarget>
 generateForEachPreambleConstraints(ConstraintSystem &cs,
                                    SyntacticElementTarget target) {
   ForEachStmt *stmt = target.getAsForEachStmt();
-  auto *forEachExpr = stmt->getParsedSequence();
+  auto *forEachExpr = stmt->getSequence();
   auto *dc = target.getDeclContext();
 
   auto elementLocator = cs.getConstraintLocator(

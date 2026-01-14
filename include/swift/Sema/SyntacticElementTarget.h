@@ -832,7 +832,7 @@ public:
     case Kind::forEachPreamble:
       auto *stmt = forEachPreamble.stmt;
       SourceLoc startLoc = stmt->getForLoc();
-      SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
+      SourceLoc endLoc = stmt->getSequence()->getEndLoc();
 
       if (auto *whereExpr = stmt->getWhere()) {
         endLoc = whereExpr->getEndLoc();

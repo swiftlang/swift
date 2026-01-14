@@ -792,8 +792,7 @@ public:
       if (!shouldVerify(cast<Stmt>(S)))
         return false;
 
-      if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
         if (!shouldVerify(expansion)) {
           return false;
         }
@@ -816,8 +815,7 @@ public:
     }
 
     void cleanup(ForEachStmt *S) {
-      if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
         assert(ForEachPatternSequences.count(expansion) != 0);
         ForEachPatternSequences.erase(expansion);
 
