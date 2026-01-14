@@ -618,6 +618,10 @@ protected:
       Type resultType, GenericSignature sig,
       std::optional<LifetimeDependenceInfo> lifetimeDependence,
       const ValueDecl *forDecl = nullptr);
+  void appendFunctionYieldTypes(AnyFunctionType *fnType,
+                                ArrayRef<AnyFunctionType::Yield> yields,
+                                GenericSignature sig, const ValueDecl *forDecl = nullptr,
+                                bool isRecursedInto = true);
 
   void appendTypeList(Type listTy, GenericSignature sig,
                       const ValueDecl *forDecl = nullptr);

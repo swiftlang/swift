@@ -1362,6 +1362,11 @@ ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, EntityContext 
   return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
 }
 
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  Buffer << "<yields>";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleExplicitClosure(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleNamedAndTypedEntity(node, 'F', "U", ctx,
@@ -1829,11 +1834,6 @@ ManglingError Remangler::mangleImplPatternSubstitutions(Node *node,
 ManglingError Remangler::mangleImplInvocationSubstitutions(Node *node,
                                                            unsigned depth) {
   // The old mangler does not encode substituted function types.
-  return ManglingError::Success;
-}
-
-ManglingError Remangler::mangleCoroutine(Node *node, unsigned depth) {
-  // The old mangler does not encode coroutines.
   return ManglingError::Success;
 }
 

@@ -3349,8 +3349,6 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
     }
-    if (fn->isCoroutine())
-      return appendOperator("Xy");
     return appendOperator("c");
 
   case AnyFunctionType::Representation::CFunctionPointer:
@@ -3388,8 +3386,12 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
-  // TODO: Handle yields
+  if (fn->isCoroutine()) {
+    appendFunctionYieldTypes(fn, fn->getYields(), sig, forDecl, isRecursedInto);
+    appendOperator("Xy");
+  }
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
+
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3567,6 +3569,48 @@ void ASTMangler::appendFunctionInputType(
           sig, nullptr);
       appendListSeparator(isFirstParam);
       paramIndex++;
+    }
+    appendOperator("t");
+    break;
+  }
+}
+
+void ASTMangler::appendFunctionYieldTypes(
+    AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Yield> yields,
+    GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
+
+  switch (yields.size()) {
+  case 0:
+    appendOperator("y");
+    break;
+
+  case 1: {
+    const auto &yield = yields.front();
+    auto type = yield.getType();
+
+    // TODO: decide on lifetime dependencies for yields
+    if (!type->is<TupleType>()) {
+      appendParameterTypeListElement(
+          Identifier(), type,
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
+  default:
+    bool isFirstYield = true;
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      appendParameterTypeListElement(
+          Identifier(), yield.getType(),
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      appendListSeparator(isFirstYield);
     }
     appendOperator("t");
     break;
