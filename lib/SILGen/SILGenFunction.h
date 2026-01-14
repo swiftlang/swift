@@ -2862,9 +2862,10 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  InitializationPtr
-  emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
-                                   bool generateDebugInfo = true);
+  InitializationPtr emitPatternBindingInitialization(
+      Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
+      ProfileCounter numTrueTaken = ProfileCounter(),
+      ProfileCounter numFalseTaken = ProfileCounter());
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.
