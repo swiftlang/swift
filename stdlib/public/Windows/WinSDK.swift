@@ -351,3 +351,19 @@ extension GUID: @retroactive Hashable {
     hasher.combine(uint128Value)
   }
 }
+
+extension GUID: @retroactive CustomStringConvertible {
+  public var description: String {
+    var buffer: RPC_CSTR!
+    defer {
+      RpcStringFreeA(&buffer)
+    }
+
+    withUnsafePointer(to: self) { uuidAddress in
+      let status = UuidToStringA(uuidAddress, &buffer)
+      assert(status == RPC_S_OK, "Could not create the string representation of a GUID: \(status)")
+    }
+
+    return String(cString: buffer)
+  }
+}
