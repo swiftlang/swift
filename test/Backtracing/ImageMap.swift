@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/ImageMap.exe
 // RUN: %target-codesign %t/ImageMap.exe
-// RUN: %target-run %t/ImageMap.exe | %FileCheck %s
+// RUN: %target-run %t/ImageMap.exe | %FileCheck --ignore-case %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

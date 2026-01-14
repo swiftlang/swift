@@ -103,8 +103,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "level5() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 51,
 // SYMBOLICATED-NEXT:    "column": 15
 // SYMBOLICATED-NEXT:  }
@@ -117,8 +117,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "level4() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 45,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -131,8 +131,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "level3() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 41,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -145,8 +145,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "level2() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 37,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -159,8 +159,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "level1() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 33,
 // SYMBOLICATED-NEXT:    "column": 3
 // SYMBOLICATED-NEXT:  }
@@ -173,8 +173,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "static Crash.main() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 57,
 // SYMBOLICATED-NEXT:    "column": 5
 // SYMBOLICATED-NEXT:  }
@@ -188,7 +188,7 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "static Crash.$main() + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// SYMBOLICATED-NEXT:    "file": "{{[\\/]*}}<compiler-generated>",
+// SYMBOLICATED-NEXT:    "file": "{{(\\\\|/)*}}<compiler-generated>",
 // SYMBOLICATED-NEXT:    "line": 0,
 // SYMBOLICATED-NEXT:    "column": 0
 // SYMBOLICATED-NEXT:  }
@@ -202,8 +202,8 @@ struct Crash {
 // DEMANGLED-NEXT:     "description": "main + [[OFFSET]]",
 // SYMBOLICATED-NEXT:  "image": "Crash.exe",
 // SYMBOLICATED-NEXT:  "sourceLocation": {
-// UNSANITIZED-NEXT:     "file": "{{.*[\\/]}}test{{[\\/]}}Backtracing{{[\\/]}}JSON.swift",
-// SANITIZED-NEXT:       "file": "{{.*[\\/]}}JSON.swift",
+// UNSANITIZED-NEXT:     "file": "{{.*(\\\\|/)}}test{{(\\\\|/)}}Backtracing{{(\\\\|/)}}JSON.swift",
+// SANITIZED-NEXT:       "file": "{{.*(\\\\|/)}}JSON.swift",
 // SYMBOLICATED-NEXT:    "line": 0,
 // SYMBOLICATED-NEXT:    "column": 0
 // SYMBOLICATED-NEXT:  }
@@ -228,7 +228,7 @@ struct Crash {
 
 // IMAGES:          "name": "Crash.exe",
 //                 "buildId": ... is optional
-// IMAGES:          "path": "{{.*[\\/]}}Crash.exe",
+// IMAGES:          "path": "{{.*(\\\\|/)}}Crash.exe",
 // IMAGES-NEXT:     "baseAddress": "0x{{[0-9a-f]+}}",
 // IMAGES-NEXT:     "endOfText": "0x{{[0-9a-f]+}}"
 // IMAGES-NEXT:   }
