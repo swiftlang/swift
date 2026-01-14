@@ -1329,6 +1329,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       fArg->setClosureCapture(isClosureCapture);
       bool isFormalParameterPack = (Args[I + 1] >> 17) & 0x1;
       fArg->setFormalParameterPack(isFormalParameterPack);
+      bool isInferredImmutable = (Args[I + 1] >> 18) & 0x1;
+      fArg->setInferredImmutable(isInferredImmutable);
       Arg = fArg;
     } else {
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,

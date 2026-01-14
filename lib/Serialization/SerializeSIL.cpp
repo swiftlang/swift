@@ -764,8 +764,9 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 14; // 2 bits
       packedMetadata |= unsigned(SFA->isClosureCapture()) << 16;      // 1 bit
       packedMetadata |= unsigned(SFA->isFormalParameterPack()) << 17; // 1 bit
+      packedMetadata |= unsigned(SFA->isInferredImmutable()) << 18;   // 1 bit
     }
-    // Used: 17 bits. Free: 15.
+    // Used: 18 bits. Free: 14.
     //
     // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);
