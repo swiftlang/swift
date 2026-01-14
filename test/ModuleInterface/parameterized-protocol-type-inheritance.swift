@@ -58,3 +58,14 @@ public protocol R<E>: ~Copyable & ~Escapable {
 // CHECK: public typealias E = Swift.Int
 public struct N: R<Int> & B<Float64> & ~Copyable  {
 }
+
+public protocol P1<AT> {
+  associatedtype AT
+}
+
+public protocol P2<AT> {
+   associatedtype AT
+}
+
+// CHECK-COUNT-1: public typealias AT = Swift.Int
+public struct S1: P1<Int>, P2<Int> {}

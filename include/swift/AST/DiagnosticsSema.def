@@ -3272,6 +3272,11 @@ NOTE(associated_type_deduction_default,none,
      "using associated type default %0", (Type))
 NOTE(ambiguous_witnesses_type,none,
      "multiple matching types named %0", (Identifier))
+ERROR(ambiguous_associated_type_from_parameterized_protocols,none,
+     "ambiguous associated type %0 in conformance to %1",
+     (const AssociatedTypeDecl *, const ProtocolDecl *))
+NOTE(associated_type_candidate_from_parameterized_protocol,none,
+     "candidate inferred from parameterized protocol here", ())
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_non_sendable,none,
