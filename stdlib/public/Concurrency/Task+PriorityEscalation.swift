@@ -106,7 +106,7 @@ extension UnsafeCurrentTask {
 ///              and the second argument is the new escalated priority.
 /// - Returns: the value returned by `operation`
 /// - Throws: when the `operation` throws an error
-@export(implementation)
+@_alwaysEmitIntoClient
 @available(SwiftStdlib 6.2, *)
 public nonisolated(nonsending) func withTaskPriorityEscalationHandler<T, E>(
   operation: nonisolated(nonsending)  () async throws(E) -> T,
