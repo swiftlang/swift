@@ -33,6 +33,7 @@ internal import Musl
 internal import BacktracingImpl.Runtime
 
 /// A symbolicated backtrace
+@available(Backtracing 6.2, *)
 public struct SymbolicatedBacktrace: CustomStringConvertible {
   /// The `Backtrace` from which this was constructed
   public var backtrace: Backtrace
