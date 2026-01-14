@@ -293,12 +293,10 @@ func copyableDisposablePOD(p: DisposablePOD) {
 
 func couldCreateCycleOfCxxValueSemanticsRequests() {
   let d1 = DerivesFromMe()
-  // FIXME expected error {{global function 'takeCopyable' requires that 'DerivesFromMe' conform to 'Copyable'}}
-  takeCopyable(d1)
+  takeCopyable(d1) // expected-error {{global function 'takeCopyable' requires that 'DerivesFromMe' conform to 'Copyable'}}
 
   let d2 = DerivesFromMeToo()
-  // FIXME expected error {{global function 'takeCopyable' requires that 'DerivesFromMeToo' conform to 'Copyable'}}
-  takeCopyable(d2)
+  takeCopyable(d2) // expected-error {{global function 'takeCopyable' requires that 'DerivesFromMeToo' conform to 'Copyable'}}
 
   let d3 = FieldDependsOnMe()
   takeCopyable(d3) // expected-error {{global function 'takeCopyable' requires that 'FieldDependsOnMe' conform to 'Copyable'}}

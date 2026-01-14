@@ -8456,6 +8456,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
         // ~Copyable, the type should also be ~Copyable.
         for (auto field : cxxRecordDecl->fields())
           maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
+        for (auto base : cxxRecordDecl->bases())
+          maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
       }
     }
 
