@@ -12,6 +12,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_CustomAvailability
 
 //--- header.h
 enum class SomeEnum {
