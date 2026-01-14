@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -emit-sil
 
+// REQUIRES: rdar168066916
+
 func useValue<T>(_ x: T) {}
 func consumeValue<T>(_ x: __owned T) {}
 
