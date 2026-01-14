@@ -1341,8 +1341,10 @@ public:
 
     // If we already have an interface type, don't bother trying to
     // avoid a cycle.
-    if (witness->hasInterfaceType())
+    if (witness->hasInterfaceType()) {
+      LLVM_DEBUG(llvm::errs() << "Already has an interface type\n");
       return false;
+    }
 
     // We call checkForPotentailCycle() multiple times with
     // different witnesses.
@@ -4011,6 +4013,8 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
     case ResolveWitnessResult::Missing:
       // We did not find the witness via name lookup. Try to derive
       // it below.
+      LLVM_DEBUG(llvm::dbgs() << "Associated type " << assocType->getName()
+                              << " will be inferred\n";);
       break;
     }
 

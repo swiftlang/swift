@@ -561,11 +561,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto *concrete = conformance.getConcrete();
       auto *normal = concrete->getRootNormalConformance();
 
-      // This is the only case where NormalProtocolConformance::
-      // getTypeWitnessAndDecl() returns a null type.
-      if (dc->getASTContext().evaluator.hasActiveRequest(
-            ResolveTypeWitnessesRequest{normal})) {
-        continue;
+      if (!concrete->hasTypeWitness(assocType)) {
+        // This is the only case where NormalProtocolConformance::
+        // getTypeWitnessAndDecl() returns a null type.
+        if (dc->getASTContext().evaluator.hasActiveRequest(
+              ResolveTypeWitnessesRequest{normal})) {
+          continue;
+        }
       }
 
       auto *typeDecl =
