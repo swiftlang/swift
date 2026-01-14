@@ -236,7 +236,8 @@ protected:
                  dynamicLifetime : 1,
                  reflection : 1,
                  usesMoveableValueDebugInfo : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 inferredImmutable : 1);
 
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
