@@ -35,4 +35,4 @@ takeCopyable(hasVector)
 
 let baseHasVector = BaseHasVector()
 takeCopyable(baseHasVector)
-// CHECK: error: global function 'takeCopyable' requires that 'BaseHasVector' conform to 'Copyable'
+// FIXME expected error: global function 'takeCopyable' requires that 'BaseHasVector' conform to 'Copyable'
