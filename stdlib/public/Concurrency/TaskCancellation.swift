@@ -74,7 +74,7 @@ import Swift
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
-@export(implementation)
+@_alwaysEmitIntoClient
 nonisolated(nonsending)
 public func withTaskCancellationHandler<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,

@@ -202,7 +202,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// the operation closure.
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  @export(implementation)
+  @_alwaysEmitIntoClient
   public nonisolated(nonsending) func withValue<R>(_ valueDuringOperation: Value,
                            operation: nonisolated(nonsending) () async throws -> R,
                            file: String = #fileID, line: UInt = #line) async rethrows -> R {
@@ -269,7 +269,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
   /// - withValueImpl contains the calls to Builtin.taskLocalValuePush/Pop
   @discardableResult
-  @export(implementation)
+  @_alwaysEmitIntoClient
   internal nonisolated(nonsending)
   func withValueNonisolatedNonsendingImpl<R>(_ valueDuringOperation: __owned Value,
                                              operation: nonisolated(nonsending) () async throws -> R,

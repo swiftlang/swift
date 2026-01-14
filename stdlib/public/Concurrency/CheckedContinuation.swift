@@ -291,7 +291,7 @@ extension CheckedContinuation {
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@export(implementation)
+@_alwaysEmitIntoClient
 @_silgen_name("$ss25withCheckedContinuation_X8function_xSS_yScCyxs5NeverOGXEtYalF") // The `_X` suffix is only here to avoid silgen_name clash with original _unsafeInheritExecutor ABI
 public nonisolated(nonsending) func withCheckedContinuation<T>(
   function: String = #function,
@@ -373,7 +373,7 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
-@export(implementation)
+@_alwaysEmitIntoClient
 @_silgen_name("$ss33withCheckedThrowingContinuation_X8function_xSS_yScCyxs5Error_pGXEtYaKlF") // The `_X` suffix is only here to avoid silgen_name clash with original _unsafeInheritExecutor ABI
 public nonisolated(nonsending) func withCheckedThrowingContinuation<T>(
   function: String = #function,
