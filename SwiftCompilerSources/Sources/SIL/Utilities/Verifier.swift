@@ -121,12 +121,8 @@ private extension Argument {
 
       phi.verifyBorrowedFromUse()
 
-      // TODO: enable this check once we have complete OSSA lifetimes.
-      // In a dead-end block an end_borrow might have been deleted.
-      /*
       require(phi.isReborrow == phi.hasBorrowEndingUse,
-              "\(self) has stale reborrow flag");
-      */
+              "\(self) has stale reborrow flag", atArgument: self);
     }
   }
 
