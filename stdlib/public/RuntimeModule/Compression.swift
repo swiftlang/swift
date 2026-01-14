@@ -31,6 +31,7 @@ import Swift
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)

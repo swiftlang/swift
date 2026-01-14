@@ -17,15 +17,22 @@
 #ifndef SWIFT_CODEVIEW_H_
 #define SWIFT_CODEVIEW_H_
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-// ###FIXME: Need to define this without windows.h
+#include <stdint.h>
 
 #ifdef __cplusplus
 namespace swift {
 namespace runtime {
 #endif
+
+typedef uint32_t DWORD;
+typedef char CHAR;
+
+typedef struct {
+  uint32_t Data1;
+  uint16_t Data2;
+  uint16_t Data3;
+  uint8_t  Data4[8];
+} GUID;
 
 typedef struct {
   DWORD dwMagic;
