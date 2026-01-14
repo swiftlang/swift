@@ -127,7 +127,8 @@ func testNoncopyableSendableStructWithEscapingMainActorAsync() {
   let x = NoncopyableStructSendable()
   let _ = {
     escapingAsyncUse { @MainActor in
-      useValue(x)
+      useValue(x) // expected-error {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 }
@@ -252,7 +253,8 @@ func testNoncopyableSendableStructWithEscapingMainActorAsyncNormalCapture() {
   let x = NoncopyableStructSendable()
   let _ = { [x] in
     escapingAsyncUse { @MainActor in
-      useValue(x)
+      useValue(x) // expected-error {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 }
@@ -262,7 +264,8 @@ func testMutableNoncopyableSendableStructWithEscapingMainActorAsyncNormalCapture
   x = NoncopyableStructSendable()
   let _ = { [x] in
     escapingAsyncUse { @MainActor in
-      useValue(x)
+      useValue(x) // expected-error {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 }
