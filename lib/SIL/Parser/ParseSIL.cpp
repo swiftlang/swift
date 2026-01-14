@@ -7236,9 +7236,11 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         bool foundEagerMove = false;
         bool foundReborrow = false;
         bool hasPointerEscape = false;
-        while (auto attributeName = parseOptionalAttribute(
-                   {"noImplicitCopy", "_lexical", "_eagerMove",
-                    "closureCapture", "reborrow", "pointer_escape"})) {
+        bool foundInferredImmutable = false;
+        while (
+            auto attributeName = parseOptionalAttribute(
+                {"noImplicitCopy", "_lexical", "_eagerMove", "closureCapture",
+                 "reborrow", "pointer_escape", "inferredImmutable"})) {
           if (*attributeName == "noImplicitCopy")
             foundNoImplicitCopy = true;
           else if (*attributeName == "_lexical")
@@ -7251,6 +7253,8 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
             foundReborrow = true;
           else if (*attributeName == "pointer_escape")
             hasPointerEscape = true;
+          else if (*attributeName == "inferredImmutable")
+            foundInferredImmutable = true;
           else {
             llvm_unreachable("Unexpected attribute!");
           }
@@ -7288,6 +7292,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
           fArg->setLifetimeAnnotation(lifetime);
           fArg->setReborrow(foundReborrow);
           fArg->setHasPointerEscape(hasPointerEscape);
+          fArg->setInferredImmutable(foundInferredImmutable);
           Arg = fArg;
 
           // Today, we construct the ownership kind straight from the function
