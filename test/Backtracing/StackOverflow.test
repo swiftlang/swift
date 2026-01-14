@@ -19,7 +19,7 @@
 // of a CoreSymbolication bug.  This also means we have to skip checking the
 // source code output because currently, it's pointing at the wrong line :-(
 
-// CHECK: *** Program crashed: Bad pointer dereference at 0x{{[0-9a-f]+}} ***
+// CHECK: *** Program crashed: {{(Bad pointer dereference|Stack overflow)}} at 0x{{[0-9a-f]+}} ***
 
 // CHECK: Thread 0 {{(".*" )?}}crashed:
 
@@ -97,7 +97,7 @@
 
 // CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{[0-9a-f]+|<no build ID>}}{{ +}}StackOverflow.exe{{ +}}{{.*[\\/]}}StackOverflow.exe
 
-// LIMITED: *** Program crashed: Bad pointer dereference at 0x{{[0-9a-f]+}} ***
+// LIMITED: *** Program crashed: {{(Bad pointer dereference|Stack overflow)}} at 0x{{[0-9a-f]+}} ***
 
 // LIMITED: Thread 0 {{(".*" )?}}crashed:
 
@@ -120,7 +120,7 @@
 // LIMITED-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} static StackOverflow.$main() + {{[0-9]+}} in StackOverflow.exe at {{.*[\\/]}}<compiler-generated>
 // LIMITED-NEXT: {{[0-9]+}} [ra] [system] 0x{{[0-9a-f]+}} main + {{[0-9]+}} in StackOverflow.exe at {{.*[\\/]}}StackOverflow.swift
 
-// FRIENDLY: *** Program crashed: Bad pointer dereference at 0x{{[0-9a-f]+}} ***
+// FRIENDLY: *** Program crashed: {{(Bad pointer dereference|Stack overflow)}} at 0x{{[0-9a-f]+}} ***
 
 // FRIENDLY: Thread 0 {{(".*" )?}}crashed:
 

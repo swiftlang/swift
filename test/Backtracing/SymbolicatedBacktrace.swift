@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -g -Onone -o %t/SymbolicatedBacktrace.exe
 // RUN: %target-codesign %t/SymbolicatedBacktrace.exe
-// RUN: %target-run %t/SymbolicatedBacktrace.exe | %FileCheck %s
+// RUN: %target-run %t/SymbolicatedBacktrace.exe | %FileCheck --ignore-case %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

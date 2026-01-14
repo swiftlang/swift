@@ -149,7 +149,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   NULL,
 };
 
+#ifdef _WIN32
 static bool flattenCommandLine(char *buffer, size_t buflen, const char **argv);
+#endif
 
 }
 }
@@ -1132,13 +1134,13 @@ namespace {
 #ifdef _WIN32
 char cmdline_buf[32768];
 WCHAR cmdline_wbuf[32768];
+char pid_buf[22];
 #endif
 
 char addr_buf[18];
 char timeout_buf[22];
 char limit_buf[22];
 char top_buf[22];
-char pid_buf[22];
 const char *backtracer_argv[] = {
   "swift-backtrace",            // 0
   "--unwind",                   // 1
@@ -1465,6 +1467,8 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 // N.B. THIS FUNCTION MUST BE SAFE TO USE FROM A CRASH HANDLER.  On Linux
 // and macOS, that means it must be async-signal-safe.  On Windows, there
 // isn't an equivalent notion but a similar restriction applies.
+
+#if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 #ifdef _WIN32
 static sys_fd_t getOutputHandle() {
   HANDLE hOutput;
@@ -1494,6 +1498,7 @@ static void sys_print(sys_fd_t fd, const char *str) {
   write(fd, str, strlen(str));
 }
 #endif
+#endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
 SWIFT_RUNTIME_STDLIB_INTERNAL void
 _swift_displayCrashMessage(

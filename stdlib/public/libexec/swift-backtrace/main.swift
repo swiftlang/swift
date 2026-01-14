@@ -628,7 +628,7 @@ Generate a backtrace for the parent process.
             let exists = GetLastError() == ERROR_ALREADY_EXISTS
             #else
             let interrupted = errno == EINTR
-            let exists = errno == EXIST
+            let exists = errno == EEXIST
             #endif
 
             if !interrupted && !exists {
@@ -961,7 +961,7 @@ Generate a backtrace for the parent process.
 
     _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), &terminalSize)
 
-    width = terminalSize.ws_col
+    width = Int(terminalSize.ws_col)
     #else
     var consoleInfo = CONSOLE_SCREEN_BUFFER_INFO()
     if GetConsoleScreenBufferInfo(outputStream!.handle,
