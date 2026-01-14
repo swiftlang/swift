@@ -13,7 +13,7 @@
 // offsets in section headers, breaking the Swift reflection data ELF parser
 // resulting in missing metadata.
 // rdar://159139154
-// XFAIL: OS=freebsd
+// UNSUPPORTED: OS=freebsd
 
 sil_stage canonical
 
