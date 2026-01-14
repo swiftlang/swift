@@ -23,8 +23,8 @@ func foo(value: MyStruct) {
 // RUN:   -req=global-config -req-opts=completion_check_dependency_interval=100 == \
 // RUN:   -req=complete.open -pos=2:9 -pass-as-sourcetext -vfs-files=%t%{fs-sep}VFS%{fs-sep}Main.swift=@%s,%t%{fs-sep}VFS%{fs-sep}Library.swift=@%S/Inputs/checkdeps/MyProject_mod/Library.swift %t%{fs-sep}VFS%{fs-sep}Main.swift -- -target %target-triple %t%{fs-sep}VFS%{fs-sep}Main.swift %t%{fs-sep}VFS%{fs-sep}LibraryExt.swift %t%{fs-sep}VFS%{fs-sep}Library.swift == \
 // RUN:   -req=complete.close -pos=2:9 -name %t%{fs-sep}VFS%{fs-sep}Main.swift %s \
-
-// RUN:   | tee %t/trace | %FileCheck %s
+//
+// RUN:   | %FileCheck %s
 
 // CHECK-LABEL: ### Initial
 // CHECK: key.results: [
