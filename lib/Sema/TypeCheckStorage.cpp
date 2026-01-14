@@ -3019,7 +3019,7 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
   // statically the super but dynamically this subtype would not dispatch to an
   // override of the underscored version but rather (incorrectly) the
   // supertype's implementation.
-  auto *current = this;
+  auto *current = storage;
   while ((current = current->getOverriddenDecl())) {
     if (current->requiresCorrespondingUnderscoredCoroutineAccessor(kind,
                                                                    nullptr)) {
