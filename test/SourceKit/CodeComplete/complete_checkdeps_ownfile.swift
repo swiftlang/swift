@@ -17,7 +17,6 @@ func foo(val: MyStruct) {
 // BEGIN DUMMY.swift
 
 // Checks that editing and saving the current file doesn't affect dependency checking.
-// REQUIRES: shell
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Frameworks)

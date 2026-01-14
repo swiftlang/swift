@@ -2,8 +2,6 @@ func foo(value: MyStruct) {
   value./*HERE*/
 }
 
-// REQUIRES: shell
-
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/VFS)
 // RUN: cp %S/Inputs/checkdeps/MyProject/LibraryExt.swift %t/VFS/

@@ -1,8 +1,6 @@
 // This test ensures a certain set of arguments allows both compiler and sourcekitd invocations to share the same module cache.
 // NOTE: Do not change this test without a review from @akyrtzi
 
-// REQUIRES: shell
-
 // RUN: %empty-directory(%t)
 
 // RUN: COMPILER_ARGS=( \
