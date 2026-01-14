@@ -1101,9 +1101,9 @@ namespace swift {
 
     SWIFT_RUNTIME_STDLIB_SPI char *
     _swift_runtime_demangle_allocate(const char *mangledName,
-                            size_t mangledNameLength,
-                            size_t *outputSize,
-                            size_t flags) {
+                                    size_t mangledNameLength,
+                                    size_t *outputSize,
+                                    size_t flags) {
       if (!mangledName || !outputSize)
         return nullptr;
       if (flags > 0)
@@ -1113,7 +1113,6 @@ namespace swift {
       if (Demangle::isSwiftSymbol(name)) {
         // Determine demangling/formatting options:
         auto options = DemangleOptions();
-
         auto result = Demangle::demangleSymbolAsString(name, options);
 
         // we allocate the buffer for the result; truncation cannot happen in this case.
@@ -1124,22 +1123,9 @@ namespace swift {
           *outputSize = 0;
           return nullptr;
         }
-        size_t bufferSize = result.length();
 
-        size_t toCopy = std::min(bufferSize, result.length());
-
-        // Are we accidentally cutting of an UTF8 codepoint in the middle?
-        // There may be up to 4 continuations of a codepoint so we need to see if we're cutting off in the middle,
-        // and if so, back out until we find the actual non-continuation byte.
-        while (toCopy > 0 &&
-               toCopy + 1 < result.length() && isUTF8CodePointContinuationByte(result.data()[toCopy + 1])) {
-          // we're in the middle of an utf8 scalar, a truncated UTF8-scalar.
-          // don't do that, and instead truncate further back
-          toCopy -= 1;
-        }
-
-        ::memcpy(outputBuffer, result.data(), toCopy);
-        *outputSize = toCopy;
+        ::memcpy(outputBuffer, result.data(), totalLength);
+        *outputSize = totalLength;
         return outputBuffer;
       }
 
