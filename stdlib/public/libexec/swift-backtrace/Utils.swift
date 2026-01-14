@@ -14,14 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if canImport(Darwin)
+#if os(Windows)
+import CRT
+import WinSDK
+#elseif canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
-#elseif canImport(CRT)
-import CRT
 #endif
 
 import Swift
