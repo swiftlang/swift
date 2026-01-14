@@ -410,33 +410,42 @@ static bool isIrrefutableExprPattern(const ExprPattern *EP) {
   }
 }
 
+bool Pattern::isSingleRefutablePattern() const {
+  // If this is an always matching 'is' pattern, then it isn't refutable.
+  if (auto *is = dyn_cast<IsPattern>(this))
+    if (is->getCastKind() == CheckedCastKind::Coercion ||
+        is->getCastKind() == CheckedCastKind::BridgingCoercion)
+      return false;
+
+  // If this is an ExprPattern that isn't resolved yet, do some simple
+  // syntactic checks.
+  // FIXME: This is unsound, since type checking will turn other more
+  // complicated patterns into non-refutable forms.
+  if (auto *ep = dyn_cast<ExprPattern>(this))
+    if (isIrrefutableExprPattern(ep))
+      return false;
+
+  switch (getKind()) {
+#define PATTERN(ID, PARENT)                                                    \
+  case PatternKind::ID:                                                        \
+    break;
+#define REFUTABLE_PATTERN(ID, PARENT)                                          \
+  case PatternKind::ID:                                                        \
+    return true;
+#include "swift/AST/PatternNodes.def"
+  }
+  return false;
+}
+
 /// Return true if this pattern (or a subpattern) is refutable.
 bool Pattern::isRefutablePattern() const {
   bool foundRefutablePattern = false;
-  const_cast<Pattern*>(this)->forEachNode([&](Pattern *Node) {
-
-    // If this is an always matching 'is' pattern, then it isn't refutable.
-    if (auto *is = dyn_cast<IsPattern>(Node))
-      if (is->getCastKind() == CheckedCastKind::Coercion ||
-          is->getCastKind() == CheckedCastKind::BridgingCoercion)
-        return;
-
-    // If this is an ExprPattern that isn't resolved yet, do some simple
-    // syntactic checks.
-    // FIXME: This is unsound, since type checking will turn other more
-    // complicated patterns into non-refutable forms.
-    if (auto *ep = dyn_cast<ExprPattern>(Node))
-      if (isIrrefutableExprPattern(ep))
-        return;
-
-    switch (Node->getKind()) {
-#define PATTERN(ID, PARENT) case PatternKind::ID: break;
-#define REFUTABLE_PATTERN(ID, PARENT) \
-case PatternKind::ID: foundRefutablePattern = true; break;
-#include "swift/AST/PatternNodes.def"
-    }
+  const_cast<Pattern *>(this)->forEachNode([&](Pattern *Node) {
+    if (foundRefutablePattern)
+      return;
+    foundRefutablePattern = Node->isSingleRefutablePattern();
   });
-    
+
   return foundRefutablePattern;
 }
 
