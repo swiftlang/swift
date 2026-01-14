@@ -3251,13 +3251,13 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Modify:
   case AccessorKind::YieldingMutate:
   case AccessorKind::Init:
-    break;
   case AccessorKind::Borrow:
+  case AccessorKind::Mutate:  
+    break;
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-  case AccessorKind::Mutate:
     llvm_unreachable("bad synthesized function kind");
   }
 
