@@ -15,10 +15,10 @@ public struct NonTrivial {
 }
 
 // Protocol requirements witnessed via borrow/mutate accessors
-struct S1 : P {
+public struct S1 : P {
   var _id: NonTrivial
 
-  var id: NonTrivial {
+  public var id: NonTrivial {
     borrow {
       return _id
     }
@@ -28,7 +28,7 @@ struct S1 : P {
   }
 }
 
-// CHECK: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S1) -> @guaranteed NonTrivial {
+// CHECK: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S1) -> @guaranteed NonTrivial {
 // CHECK: bb0([[REG0:%.*]] : $*S1):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S1V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
@@ -38,7 +38,7 @@ struct S1 : P {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK-SIL: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S1) -> @guaranteed NonTrivial {
+// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S1) -> @guaranteed NonTrivial {
 // CHECK-SIL: bb0([[REG0:%.*]] : $*S1):
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S1V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
@@ -54,16 +54,16 @@ struct S1 : P {
 // CHECK-EVO: }
 
 // Protocol requirements witnessed via stored property
-struct S2 : P {
-  var id: NonTrivial
+public struct S2 : P {
+  public var id: NonTrivial
 }
 
-struct S3 : P {
+public struct S3 : P {
   var _id: NonTrivial
 }
 
 extension S3 {
-  var id: NonTrivial {
+  public var id: NonTrivial {
     borrow  {
       return _id
     }
@@ -73,7 +73,7 @@ extension S3 {
   }
 }
 
-// CHECK: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S2) -> @guaranteed NonTrivial {
+// CHECK: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S2) -> @guaranteed NonTrivial {
 // CHECK: bb0([[REG0:%.*]] : $*S2):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S2V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
@@ -83,7 +83,7 @@ extension S3 {
 // CHECK:   return [[REG4]]
 // CHECK: }
 
-// CHECK-SIL: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S2) -> @guaranteed NonTrivial {
+// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S2) -> @guaranteed NonTrivial {
 // CHECK-SIL: bb0([[REG0:%.*]] : $*S2):
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S2V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
@@ -97,4 +97,3 @@ extension S3 {
 // CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S2) -> @guaranteed_address NonTrivial
 // CHECK-EVO:   return [[REG2]]
 // CHECK-EVO: }
-
