@@ -95,23 +95,31 @@ static inline void swift_cxx_deleteObject(T *ptr) {
   }
 }
 
+/// A type that acts as a deleter for `std::unique_ptr` instances returned by
+/// `swift_cxx_newBuffer()`.
+template <typename T>
+struct swift_cxx_newBuffer_deleter {
+  size_t count;
+
+  void operator()(T *_Nullable ptr) {
+    swift_slowDealloc(ptr, sizeof(T) * count, alignof(T) - 1);
+  }
+};
+
 /// Allocate an uninitialized buffer that will be automatically deallocated when
 /// it goes out of scope.
 ///
 /// \param count The number of elements to allocate.
 ///
-/// \returns A pointer to uninitialized memory large enough to hold \a count
-///   instances of \c T. The caller is responsible for initializing and
+/// \returns A smart pointer to uninitialized memory large enough to hold
+///   \a count instances of \c T. The caller is responsible for initializing and
 ///   deinitializing this memory.
 template <typename T>
-static inline std::unique_ptr<typename T, decltype(swift_cxx_deleteObject)>
+static inline std::unique_ptr<T, swift_cxx_newBuffer_deleter<T>>
 swift_cxx_newBuffer(size_t count) {
-  size_t byteCount = sizeof(T) * count;
-  return std::unique_ptr<T, decltype(swift_cxx_deleteObject) *> {
-    static_cast<T *>(swift_slowAlloc(byteCount, alignof(T) - 1)),
-    [=] (T *ptr) {
-      swift_slowDealloc(ptr, byteCount, alignof(T) - 1);
-    }
+  return std::unique_ptr<T, swift_cxx_newBuffer_deleter<T>> {
+    static_cast<T *>(swift_slowAlloc(sizeof(T) * count, alignof(T) - 1)),
+    swift_cxx_newBuffer_deleter<T>(count)
   };
 }
 

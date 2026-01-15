@@ -152,7 +152,7 @@ extension CommandLine {
       capacity: Int(byteCount)
     ) { buffer in
       if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
-        return unsafe String(cString: buffer.baseAddress!)
+        return unsafe String(validatingCString: buffer.baseAddress!)
       }
       return nil
     }
@@ -178,7 +178,7 @@ extension CommandLine {
     defer {
       cString.deallocate()
     }
-    return unsafe String(cString: cString)
+    return unsafe String(validatingCString: cString)
   }()
 #endif
 }
