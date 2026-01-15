@@ -229,6 +229,13 @@ void NormalProtocolConformance::setSourceKindAndImplyingConformance(
   }
 }
 
+bool ProtocolConformance::isReparented() const {
+  if (auto *normal = dyn_cast<NormalProtocolConformance>(getRootConformance())) {
+    return normal->isReparented();
+  }
+  return false;
+}
+
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
@@ -1478,13 +1485,51 @@ LookupAllConformancesInContextRequest::evaluate(
     return { };
   }
 
-  // Protocols only have self-conformances.
+  // Protocols only have self-conformances or reparented conformances.
+  // They do not use the ConformanceTable.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    if (protocol->requiresSelfConformanceWitnessTable()) {
-      return { protocol->getASTContext().getSelfConformance(protocol) };
+    auto &ctx = protocol->getASTContext();
+    std::vector<ProtocolConformance *> conformances;
+
+    InheritedTypes inherited(protocol);
+    for (auto const &entry : inherited.getEntries()) {
+      if (!entry.isReparented())
+        continue;
+
+      if (entry.isNull() || entry.isError())
+        continue;
+
+      auto baseTy = entry.getType()->getAs<ProtocolType>();
+      if (!baseTy)
+        continue;
+
+
+      DeclContext *dc = protocol;
+
+      // FIXME: To satisfy IRGen, assign the decl context of this conformance
+      // to an arbitrary extension of the protocol, for now, until we possibly
+      // make @reparented required in a specific extension.
+      dc = protocol->getLastExtension();
+      ASSERT(dc);
+
+      // FIXME: should this really be CanGenericTypeParamType::getType(0, 0, ctx); ?
+      auto conformingType = protocol->getDeclaredInterfaceType();
+
+      auto *conf = ctx.getNormalConformance(
+          conformingType, baseTy->getDecl(),
+          entry.getLoc(), entry.getTypeRepr(), dc,
+          ProtocolConformanceState::Incomplete,
+          ProtocolConformanceFlags::Reparented);
+
+      assert(conf->isConformanceOfProtocol());
+      conformances.push_back(conf);
     }
 
-    return { };
+    if (protocol->requiresSelfConformanceWitnessTable()) {
+      conformances.push_back(ctx.getSelfConformance(protocol));
+    }
+
+    return conformances;
   }
 
   // Record all potential conformances.

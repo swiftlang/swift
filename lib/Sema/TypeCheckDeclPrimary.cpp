@@ -3437,6 +3437,8 @@ public:
     if (!PD->getPrimaryAssociatedTypeNames().empty())
       (void) PD->getPrimaryAssociatedTypes();
 
+    checkInheritanceClause(PD);
+
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member references another declaration whose generic signature
@@ -3448,8 +3450,6 @@ public:
       visit(Member);
 
     checkAccessControl(PD);
-
-    checkInheritanceClause(PD);
 
     checkProtocolRefinementRequirements(PD);
 
@@ -3481,6 +3481,10 @@ public:
     }
 
     checkExplicitAvailability(PD);
+
+    // For reparented protocols, we need to check that the derived protocol's
+    // default witnesses are enough to satisfy the new base's requirements.
+    TypeChecker::checkConformancesInContext(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
