@@ -25,7 +25,7 @@ private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>?
 @_extern(c, "_NSGetExecutablePath")
 @usableFromInline
 func _NSGetExecutablePath(
-  _ buf: UnsafeMutablePointer<CChar>,
+  _ buf: UnsafeMutablePointer<CChar>?,
   _ bufsize: UnsafeMutablePointer<UInt32>
 ) -> CInt
 #endif
