@@ -27,7 +27,7 @@ func exampleVJP_${arity}(${params}) -> (value: Float, pullback: (Float) -> ${pb_
 }
 
 func exampleDiffFunc_${arity}_throws(${params}) throws -> Float {
-    fatalError()
+  fatalError()
 }
 @derivative(of: exampleDiffFunc_${arity}_throws)
 func exampleVJP_${arity}_throws(${params}) throws -> (value: Float, pullback: (Float) -> ${pb_return_type}) {
