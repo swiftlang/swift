@@ -47,6 +47,8 @@ struct Bar {
 
 extension Event {
     static func test1(foo: Foo) -> Event {
+        // Invalid expression, because the dictionary literal has the
+        // wrong type.
         .init(properties: [  // expected-error {{reasonable time}}
             .dim1: foo.bar?.bar,
             .dim2: foo.bar?.baz,
