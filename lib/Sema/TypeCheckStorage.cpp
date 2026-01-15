@@ -2704,7 +2704,8 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // The forwarding index parameters.
   auto *params = buildIndexForwardingParamList(storage, {}, ctx);
 
-  // Coroutine accessors always return ().
+  // Coroutine accessors always return (). The constructor below
+  // will take care of deducing yield type.
   const Type retTy = TupleType::getEmpty(ctx);
 
   auto *accessor = AccessorDecl::create(

@@ -586,8 +586,8 @@ public:
 
   bool isContextualYieldKeyword() {
     return (Tok.isContextualKeyword("yield") &&
-            isa<AccessorDecl>(CurDeclContext) &&
-            cast<AccessorDecl>(CurDeclContext)->isCoroutine());
+            (isa<AbstractFunctionDecl>(CurDeclContext) &&
+             cast<AbstractFunctionDecl>(CurDeclContext)->isCoroutine()));
   }
 
   /// Whether the current token is the contextual keyword for a \c then
@@ -1652,16 +1652,11 @@ public:
                                       ParameterList *&BodyParams,
                                       ParameterContextKind paramContext,
                                       DefaultArgumentInfo &defaultArgs);
-  ParserStatus parseFunctionSignature(DeclBaseName functionName,
-                                      DeclName &fullName,
-                                      ParameterList *&bodyParams,
-                                      DefaultArgumentInfo &defaultArgs,
-                                      SourceLoc &asyncLoc,
-                                      bool &reasync,
-                                      SourceLoc &throws,
-                                      bool &rethrows,
-                                      TypeRepr *&thrownType,
-                                      TypeRepr *&retType);
+  ParserStatus parseFunctionSignature(
+      DeclBaseName functionName, DeclName &fullName, ParameterList *&bodyParams,
+      DefaultArgumentInfo &defaultArgs, SourceLoc &asyncLoc, bool &reasync,
+      SourceLoc &throws, bool &rethrows, TypeRepr *&thrownType,
+      SourceLoc &yieldsLoc, TypeRepr *&yieldType, TypeRepr *&retType);
 
   /// Parse 'async' and 'throws', if present, putting the locations of the
   /// keywords into the \c SourceLoc parameters.
@@ -1679,6 +1674,8 @@ public:
                                       SourceLoc &asyncLoc, bool *reasync,
                                       SourceLoc &throwsLoc, bool *rethrows,
                                       TypeRepr *&thrownType);
+
+  ParserStatus parseYield(SourceLoc &yieldsLoc, TypeRepr *&yieldType);
 
   /// Returns 'true' if \p T is consider a throwing effect specifier.
   static bool isThrowsEffectSpecifier(const Token &T);

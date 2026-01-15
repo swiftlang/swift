@@ -469,6 +469,15 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
       Printer << ")";
     }
   }
+  if (isCoroutine()) {
+    Printer << " ";
+    Printer.printKeyword("yields", Opts);
+    // FIXME: Do we need a PrintStructureKind for this?
+    Printer << "(";
+    printTypeRepr(YieldTy, Printer, Opts);
+    Printer << ")";
+  }
+
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 

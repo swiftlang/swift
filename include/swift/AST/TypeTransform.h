@@ -834,6 +834,34 @@ case TypeKind::Id:
         }
       }
 
+      // Transform function yield types.
+      SmallVector<AnyFunctionType::Yield, 8> substYields;
+      for (auto yield : function->getYields()) {
+        auto type = yield.getType();
+        auto flags = yield.getFlags();
+
+        Type substType = doIt(type, pos);
+        if (!substType)
+          return Type();
+
+        if (type.getPointer() != substType.getPointer())
+          isUnchanged = false;
+
+        // TODO: Verify logic here
+        if (substType->is<InOutType>()) {
+          substType = substType->getInOutObjectType();
+          flags = flags.withInOut(true);
+        }
+
+        if (auto substPack = getTransformedPack(substType)) {
+          for (auto substEltType : substPack->getElementTypes()) {
+            substYields.emplace_back(substEltType, flags);
+          }
+        } else {
+          substYields.emplace_back(substType, flags);
+        }
+      }
+
       // Transform result type.
       Type resultTy = doIt(function->getResult(), pos);
       if (!resultTy)
@@ -899,8 +927,8 @@ case TypeKind::Id:
         if (isUnchanged) return t;
 
         auto genericSig = genericFnType->getGenericSignature();
-        return GenericFunctionType::get(
-            genericSig, substParams, resultTy, extInfo);
+        return GenericFunctionType::get(genericSig, substParams, substYields,
+                                        resultTy, extInfo);
       }
       
       if (isUnchanged) {
@@ -943,7 +971,7 @@ case TypeKind::Id:
         }
       }
 
-      return FunctionType::get(substParams, resultTy, extInfo);
+      return FunctionType::get(substParams, substYields, resultTy, extInfo);
     }
 
     case TypeKind::ArraySlice: {

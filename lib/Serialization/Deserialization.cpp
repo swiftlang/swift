@@ -35,6 +35,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -4342,6 +4343,7 @@ public:
     uint8_t rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
+    TypeID yieldTypeID; bool isInoutYield = false;
     unsigned numNameComponentsBiased;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
@@ -4362,6 +4364,7 @@ public:
                                           rawMutModifier,
                                           hasForcedStaticDispatch,
                                           async, throws, thrownTypeID,
+                                          yieldTypeID, isInoutYield,
                                           genericSigID,
                                           resultInterfaceTypeID,
                                           isIUO,
@@ -4505,10 +4508,17 @@ public:
       return thrownTypeOrError.takeError();
     const auto thrownType = thrownTypeOrError.get();
 
+    auto yieldTypeOrError = MF.getTypeChecked(yieldTypeID);
+    if (!yieldTypeOrError)
+      return yieldTypeOrError.takeError();
+    auto yieldType = yieldTypeOrError.get();
+    if (isInoutYield)
+      yieldType = InOutType::get(yieldType);
+
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(ctx, staticSpelling.value(), name,
-                                        async, throws, thrownType,
+                                        async, throws, thrownType, yieldType,
                                         genericParams, resultType, DC);
     } else {
       auto *accessor =
@@ -7325,7 +7335,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasSendingResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult, coro;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -7335,12 +7345,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult);
+        hasSendingResult, coro);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, coro,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -7396,6 +7406,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                   /*LifetimeDependenceInfo */ {}, hasSendingResult)
                   .withSendable(sendable)
                   .withAsync(async)
+                  .withCoroutine(coro)
                   .build();
 
   auto resultTy = MF.getTypeChecked(resultID);
@@ -7448,6 +7459,39 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                         MF.getIdentifier(internalLabelID));
   }
 
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  while (true) {
+    BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
+    llvm::BitstreamEntry entry =
+        MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    scratch.clear();
+    unsigned recordID = MF.fatalIfUnexpected(
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+    if (recordID != decls_block::FUNCTION_YIELD)
+      break;
+
+    restoreOffset.reset();
+
+    TypeID typeID;
+    unsigned rawOwnership;
+    decls_block::FunctionYieldLayout::readRecord(
+        scratch, typeID, rawOwnership);
+
+    auto ownership = getActualParamDeclSpecifier(
+      (serialization::ParamDeclSpecifier)rawOwnership);
+    if (!ownership)
+      return MF.diagnoseFatal();
+
+    auto yieldTy = MF.getTypeChecked(typeID);
+    if (!yieldTy)
+      return yieldTy.takeError();
+
+    yields.emplace_back(yieldTy.get(), *ownership);
+  }
+
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
 
   while (auto lifetimeDependence = MF.maybeReadLifetimeDependence()) {
@@ -7460,11 +7504,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
 
   if (!isGeneric) {
     assert(genericSig.isNull());
-    return FunctionType::get(params, resultTy.get(), info);
+    return FunctionType::get(params, yields, resultTy.get(), info);
   }
 
   assert(!genericSig.isNull());
-  return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
+  return GenericFunctionType::get(genericSig, params, yields, resultTy.get(),
+                                  info);
 }
 
 Expected<Type> DESERIALIZE_TYPE(FUNCTION_TYPE)(

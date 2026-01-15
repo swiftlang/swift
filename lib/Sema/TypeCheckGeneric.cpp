@@ -938,8 +938,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         }
       }();
       if (resultTypeRepr && !resultTypeRepr->hasOpaque()) {
+        bool isCoroutine = func ? func->isCoroutine() : false;
+        TypeResolutionOptions resultOptions(TypeResolverContext::FunctionResult);
+        if (isCoroutine)
+          resultOptions |= TypeResolutionFlags::Coroutine;
         const auto resultType =
-            resolution.withOptions(TypeResolverContext::FunctionResult)
+            resolution.withOptions(resultOptions)
                 .resolveType(resultTypeRepr);
 
         inferenceSources.push_back(resultType.getPointer());

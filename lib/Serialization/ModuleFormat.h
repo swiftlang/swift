@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 978; // @warn attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 979; // coro AST
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1363,7 +1363,8 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>                       // has sending result
+    BCFixed<1>,                      // has sending result
+    BCFixed<1>                       // coroutine?
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1383,6 +1384,12 @@ namespace decls_block {
                      BCFixed<1>,              // constValue
                      BCFixed<1>,              // sending
                      BCFixed<1>               // addressable
+                     >;
+
+  using FunctionYieldLayout =
+      BCRecordLayout<FUNCTION_YIELD,
+                     TypeIDField,             // type
+                     ParamDeclSpecifierField // inout, shared or owned?
                      >;
 
   TYPE_LAYOUT(MetatypeTypeLayout,
@@ -1465,6 +1472,7 @@ namespace decls_block {
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
     BCFixed<1>,                      // has sending result
+    BCFixed<1>,                       // coroutine?
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1782,6 +1790,8 @@ namespace decls_block {
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     TypeIDField,  // thrown error
+    TypeIDField,  // yield value type
+    BCFixed<1>,   // inout yield?
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?

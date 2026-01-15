@@ -1964,6 +1964,12 @@ public:
         Out << "\n";
         abort();
       }
+      if (FT->hasExtInfo() && FT->isCoroutine()) {
+        Out << "cannot apply a coroutine yet:";
+        E->getFn()->getType().print(Out);
+        Out << "\n";
+        abort();
+      }
       Type ResultExprTy = E->getType();
       if (!ResultExprTy->isEqual(FT->getResult())) {
         Out << "result of ApplyExpr does not match result type of callee:";

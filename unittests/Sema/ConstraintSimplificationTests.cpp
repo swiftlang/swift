@@ -28,7 +28,8 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   auto floatType = getStdlibType("Float");
 
   auto func = FunctionType::get(
-      {FunctionType::Param(intType), FunctionType::Param(intType)}, floatType);
+      {FunctionType::Param(intType), FunctionType::Param(intType)}, {},
+      floatType);
 
   cs.addApplicationConstraint(
       func, func, /*trailingClosureMatching=*/std::nullopt, DC,
@@ -104,7 +105,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
   auto extInfo = FunctionType::ExtInfo();
 
   auto defaultTy = FunctionType::get({FunctionType::Param(paramTy, paramName)},
-                                     resultTy, extInfo);
+                                     {}, resultTy, extInfo);
 
   cs.setClosureType(closure, defaultTy);
 
@@ -116,7 +117,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
       cs.getConstraintLocator(closure), /*referencedVars=*/{}));
 
   auto contextualTy =
-      FunctionType::get({FunctionType::Param(getStdlibType("Int"))},
+      FunctionType::get({FunctionType::Param(getStdlibType("Int"))}, {},
                         Context.TheEmptyTupleType, extInfo);
 
   // Try to resolve closure:
@@ -189,7 +190,7 @@ TEST_F(SemaTest, TestInitializerUseDCIsSetCorrectlyInClosure) {
   auto extInfo = FunctionType::ExtInfo();
 
   auto defaultTy = FunctionType::get({FunctionType::Param(paramTy, paramName)},
-                                     resultTy, extInfo);
+                                     {}, resultTy, extInfo);
 
   cs.setClosureType(closure, defaultTy);
 
@@ -201,7 +202,7 @@ TEST_F(SemaTest, TestInitializerUseDCIsSetCorrectlyInClosure) {
       cs.getConstraintLocator(closure), /*referencedVars=*/{}));
 
   auto contextualTy =
-      FunctionType::get({FunctionType::Param(getStdlibType("Int"))},
+      FunctionType::get({FunctionType::Param(getStdlibType("Int"))}, {},
                         Context.TheEmptyTupleType, extInfo);
 
   cs.resolveClosure(closureTy, contextualTy, closureLoc);

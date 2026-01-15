@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining  -enable-experimental-feature CoroutineFunctions | %FileCheck %s
+
+// REQUIRES: swift_feature_CoroutineFunctions
 
 sil_stage raw
 
@@ -569,7 +571,7 @@ bb2:
 // CHECK: } // end sil function 'begin_apply_devirt_caller'
 sil [ossa] @begin_apply_devirt_caller : $@convention(method) (@owned C2) -> @error Error {
 bb0(%0 : @owned $C2):
-  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> @yield_once () yields (inout Builtin.Int64) -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   br bb1
 
@@ -585,7 +587,7 @@ bb1:
 // CHECK: } // end sil function 'begin_apply_devirt_caller_2'
 sil [ossa] @begin_apply_devirt_caller_2 : $@convention(method) (@owned C2) -> @error Error {
 bb0(%0 : @owned $C2):
-  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> @yield_once () yields (inout Builtin.Int64) -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   br bb1
 
@@ -601,7 +603,7 @@ bb1:
 // CHECK: } // end sil function 'begin_apply_devirt_caller_3'
 sil [ossa] @begin_apply_devirt_caller_3 : $@convention(method) (@owned C2) -> @error Error {
 bb0(%0 : @owned $C2):
-  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> () -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
+  %1 = class_method %0 : $C2, #C2.i!modify : (C2) -> @yield_once () yields (inout Builtin.Int64) -> (), $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   (%mem, %tok) = begin_apply %1(%0) : $@yield_once @convention(method) (@guaranteed C2) -> @yields @inout Builtin.Int64
   cond_br undef, bb1, bb2
 
@@ -656,5 +658,5 @@ bb0(%0 : $Int):
 }
 
 sil_vtable C2 {
-  #C2.i!modify: (C2) -> () -> () : @devirt_callee
+  #C2.i!modify: (C2) -> @yield_once () yields (inout Builtin.Int64) -> () : @devirt_callee
 }

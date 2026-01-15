@@ -1132,10 +1132,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(fd,
-                  fd->getResultInterfaceType(),
-                  fd->getEffectiveThrownErrorType(),
-                  CleanupLocation(fd));
+    prepareEpilog(fd, fd->getResultInterfaceType(),
+                  fd->getEffectiveThrownErrorType(), CleanupLocation(fd));
 
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();

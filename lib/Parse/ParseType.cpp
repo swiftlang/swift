@@ -410,6 +410,34 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
   return makeParserResult(attrs.applyAttributesToType(*this, repr));
 }
 
+ParserStatus Parser::parseYield(SourceLoc &yieldLoc, TypeRepr *&yieldType) {
+  ParserStatus status;
+
+  if (!Tok.isContextualKeyword("yields"))
+    return makeParserSuccess();
+
+  if (!Context.LangOpts.hasFeature(Feature::CoroutineFunctions))
+    diagnose(Tok, diag::yields_requires_coroutine_functions);
+  
+  yieldLoc = consumeToken();
+
+  // Parse the yield type.
+  SourceLoc lParenLoc;
+  if (consumeIf(tok::l_paren, lParenLoc)) {
+    ParserResult<TypeRepr> parsedYieldTy = parseType(diag::expected_yield_type);
+    yieldType = parsedYieldTy.getPtrOrNull();
+    status |= parsedYieldTy;
+
+    // TODO: Validate parsed yield type.
+    
+    SourceLoc rParenLoc;
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expected_rparen_after_yield_type,
+                       lParenLoc);
+  }
+
+  return status;
+}
 
 /// parseTypeScalar
 ///   type-scalar:
@@ -417,7 +445,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///     attribute-list type-function
 ///
 ///   type-function:
-///     type-composition 'async'? 'throws'? '->' type-scalar
+///     type-composition 'async'? 'throws'? '->' ('yields' type-scalar)?
+///     type-scalar
 ///
 ParserResult<TypeRepr> Parser::parseTypeScalar(
     Diag<> MessageID, ParseTypeReason reason) {
@@ -480,11 +509,14 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   TypeRepr *thrownTy = nullptr;
+  SourceLoc yieldsLoc;
+  TypeRepr *yieldTy = nullptr;
   if (isAtFunctionTypeArrow()) {
     status |= parseEffectsSpecifiers(SourceLoc(),
                                      asyncLoc, /*reasync=*/nullptr,
                                      throwsLoc, /*rethrows=*/nullptr,
                                      thrownTy);
+    status |= parseYield(yieldsLoc, yieldTy);
   }
 
   // Handle type-function if we have an arrow.
@@ -580,9 +612,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-                                         thrownTy, arrowLoc, SecondHalf.get(),
-                                         patternGenerics, patternSubsTypes,
-                                         invocationSubsTypes);
+                                         thrownTy, yieldsLoc, yieldTy, arrowLoc,
+                                         SecondHalf.get(), patternGenerics,
+                                         patternSubsTypes, invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
     // Only function types may be generic.
     auto brackets = firstGenerics->getSourceRange();
@@ -2018,6 +2050,12 @@ bool Parser::isAtFunctionTypeArrow() {
       return true;
 
     return false;
+  } else if (Tok.isContextualKeyword("yields") &&
+             peekToken().is(tok::l_paren)) {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    skipSingle();
+    return isAtFunctionTypeArrow();
   }
 
   // Don't look for '->' in code completion. The user may write it later.

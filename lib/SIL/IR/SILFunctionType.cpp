@@ -4920,29 +4920,32 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   if (auto derivedFunc = dyn_cast<AnyFunctionType>(derived)) {
     if (auto baseFunc = dyn_cast<AnyFunctionType>(base)) {
       SmallVector<FunctionType::Param, 8> params;
-
-      auto derivedParams = derivedFunc.getParams();
-      auto baseParams = baseFunc.getParams();
-      assert(derivedParams.size() == baseParams.size());
-      for (unsigned i = 0, e = derivedParams.size(); i < e; ++i) {
-        assert(derivedParams[i].getParameterFlags() ==
-               baseParams[i].getParameterFlags());
-
+      for (auto [baseParam, derivedParam] :
+           llvm::zip_equal(baseFunc.getParams(), derivedFunc.getParams())) {
+        assert(derivedParam.getParameterFlags() ==
+               baseParam.getParameterFlags());
         params.emplace_back(
-          copyOptionalityFromDerivedToBase(
-            tc,
-            derivedParams[i].getPlainType(),
-            baseParams[i].getPlainType()),
-          Identifier(),
-          baseParams[i].getParameterFlags());
+            copyOptionalityFromDerivedToBase(tc, derivedParam.getPlainType(),
+                                             baseParam.getPlainType()),
+            Identifier(), baseParam.getParameterFlags());
+      }
+
+      SmallVector<FunctionType::Yield, 1> yields;
+      for (auto [baseYield, derivedYield] :
+           llvm::zip_equal(baseFunc.getYields(), derivedFunc.getYields())) {
+        assert(derivedYield.getFlags() == baseYield.getFlags());
+        yields.emplace_back(
+            copyOptionalityFromDerivedToBase(tc, derivedYield.getType(),
+                                             baseYield.getType()),
+            baseYield.getFlags());
       }
 
       auto result = copyOptionalityFromDerivedToBase(tc,
                                                      derivedFunc.getResult(),
                                                      baseFunc.getResult());
-      return CanAnyFunctionType::get(baseFunc.getOptGenericSignature(),
-                                     llvm::ArrayRef(params), result,
-                                     baseFunc->getExtInfo());
+      return CanAnyFunctionType::get(
+          baseFunc.getOptGenericSignature(), llvm::ArrayRef(params),
+          llvm::ArrayRef(yields), result, baseFunc->getExtInfo());
     }
   }
 
@@ -5008,13 +5011,12 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
   }
 
   if (genericSig && !genericSig->areAllParamsConcrete()) {
-    overrideInterfaceTy =
-      cast<AnyFunctionType>(
-        GenericFunctionType::get(genericSig,
-                                 overrideInterfaceTy->getParams(),
+    overrideInterfaceTy = cast<AnyFunctionType>(
+        GenericFunctionType::get(genericSig, overrideInterfaceTy->getParams(),
+                                 overrideInterfaceTy->getYields(),
                                  overrideInterfaceTy->getResult(),
                                  overrideInterfaceTy->getExtInfo())
-          ->getCanonicalType());
+            ->getCanonicalType());
   }
 
   // Build the lowered AST function type for the class method call.
@@ -5064,8 +5066,8 @@ CanAnyFunctionType TypeConverter::getBridgedFunctionType(
                                        bridging,
                                        suppressOptional);
 
-    return CanAnyFunctionType::get(genericSig, llvm::ArrayRef(params), result,
-                                   t->getExtInfo());
+    return CanAnyFunctionType::get(genericSig, llvm::ArrayRef(params), {},
+                                   result, t->getExtInfo());
   }
   }
   llvm_unreachable("bad calling convention");
@@ -5197,6 +5199,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto innerExtInfo =
     fnType->getExtInfo().withRepresentation(FunctionTypeRepresentation::Swift);
   auto methodParams = fnType->getParams();
+  auto methodYields = fnType->getYields();
 
   auto resultType = fnType.getResult();
   bool suppressOptionalResult =
@@ -5204,6 +5207,7 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Bridge input and result types.
   SmallVector<AnyFunctionType::Param, 8> bridgedParams;
+  SmallVector<AnyFunctionType::Yield, 1> bridgedYields;
   CanType bridgedResultType;
 
   switch (rep) {
@@ -5218,12 +5222,14 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     // Native functions don't need bridging.
     bridgedParams.append(methodParams.begin(), methodParams.end());
+    bridgedYields.append(methodYields.begin(), methodYields.end());
     bridgedResultType = resultType;
     break;
 
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer: {
+    assert(methodYields.empty() && !innerExtInfo.isCoroutine());
     if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
       // The "self" parameter should not get bridged unless it's a metatype.
       if (selfParam.getPlainType()->is<AnyMetatypeType>()) {
@@ -5253,10 +5259,10 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Build the curried function type.
   auto inner = CanFunctionType::get(llvm::ArrayRef(bridgedParams),
+                                    llvm::ArrayRef(bridgedYields),
                                     bridgedResultType, innerExtInfo);
-
   auto curried =
-    CanAnyFunctionType::get(genericSig, {selfParam}, inner, extInfo);
+      CanAnyFunctionType::get(genericSig, {selfParam}, {}, inner, extInfo);
 
   // Replace the type in the abstraction pattern with the curried type.
   bridgingFnPattern.rewriteType(genericSig, curried);
@@ -5266,6 +5272,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true, innerExtInfo.getThrownError());
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+  if (innerExtInfo.isCoroutine())
+    extInfo = extInfo.withCoroutine(true);
 
   // Distributed thunks are always `async throws`
   if (constant.isDistributedThunk()) {
@@ -5292,7 +5300,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withSendingResult();
 
   auto uncurried = CanAnyFunctionType::get(
-      genericSig, llvm::ArrayRef(bridgedParams), bridgedResultType, extInfo);
+      genericSig, llvm::ArrayRef(bridgedParams), llvm::ArrayRef(bridgedYields),
+      bridgedResultType, extInfo);
 
   return { bridgingFnPattern, uncurried };
 }

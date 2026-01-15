@@ -3375,7 +3375,12 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                            forDecl ? fn->getLifetimeDependenceForResult(forDecl)
                                    : std::nullopt,
                            forDecl);
+  if (fn->isCoroutine()) {
+    appendFunctionYieldTypes(fn, fn->getYields(), sig, forDecl, isRecursedInto);
+    appendOperator("Xy");
+  }
   appendFunctionInputType(fn, fn->getParams(), sig, forDecl, isRecursedInto);
+
   if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
@@ -3553,6 +3558,48 @@ void ASTMangler::appendFunctionInputType(
           sig, nullptr);
       appendListSeparator(isFirstParam);
       paramIndex++;
+    }
+    appendOperator("t");
+    break;
+  }
+}
+
+void ASTMangler::appendFunctionYieldTypes(
+    AnyFunctionType *fnType, ArrayRef<AnyFunctionType::Yield> yields,
+    GenericSignature sig, const ValueDecl *forDecl, bool isRecursedInto) {
+  auto defaultSpecifier = getDefaultParamSpecifier(forDecl);
+
+  switch (yields.size()) {
+  case 0:
+    appendOperator("y");
+    break;
+
+  case 1: {
+    const auto &yield = yields.front();
+    auto type = yield.getType();
+
+    // TODO: decide on lifetime dependencies for yields
+    if (!type->is<TupleType>()) {
+      appendParameterTypeListElement(
+          Identifier(), type,
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      break;
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
+  default:
+    bool isFirstYield = true;
+    for (auto [index, yield] : llvm::enumerate(yields)) {
+      appendParameterTypeListElement(
+          Identifier(), yield.getType(),
+          getParameterFlagsForMangling(yield.getFlags().asParamFlags(),
+                                       defaultSpecifier, isRecursedInto),
+          std::nullopt, sig, nullptr);
+      appendListSeparator(isFirstYield);
     }
     appendOperator("t");
     break;
@@ -4217,7 +4264,7 @@ CanType ASTMangler::getDeclTypeForMangling(
         isa<SubscriptDecl>(decl)) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
+      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)}, {},
                                   C.TheErrorType, info);
     }
     return C.TheErrorType;
@@ -4238,8 +4285,8 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
 
-    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                 gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getYields(),
+                                 gft.getResult(), gft->getExtInfo());
   }
 
   if (!canTy->hasError()) {

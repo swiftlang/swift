@@ -359,7 +359,8 @@ CanType TypeJoin::visitFunctionType(CanType second) {
   if (secondFnTy->getExtInfo().isNoEscape())
     extInfo = extInfo.withNoEscape(true);
 
-  return FunctionType::get(firstFnTy->getParams(), result, extInfo)
+  return FunctionType::get(firstFnTy->getParams(), firstFnTy->getYields(),
+                           result, extInfo)
       ->getCanonicalType();
 }
 

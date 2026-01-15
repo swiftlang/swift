@@ -2442,6 +2442,12 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
 }
 
+ManglingError Remangler::mangleYieldTypes(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleArgumentTuple(node, depth + 1));
+  Buffer << "Xy";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "x", depth + 1);
 }

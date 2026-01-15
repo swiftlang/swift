@@ -2161,7 +2161,8 @@ static Type applyNonEscapingIfNecessary(Type ty,
     // FIXME(https://github.com/apple/swift/issues/45125): It would be better
     // to add a new AttributedType sugared type, which would wrap the
     // TypeAliasType and apply the isNoEscape bit when de-sugaring.
-    return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
+    return FunctionType::get(funcTy->getParams(), funcTy->getYields(),
+                             funcTy->getResult(), extInfo);
   }
 
   // Note: original sugared type
@@ -2344,7 +2345,6 @@ namespace {
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
                                  DifferentiabilityKind diffKind);
-
     NeverNullType resolveSILFunctionType(
         FunctionTypeRepr *repr, TypeResolutionOptions options,
         TypeAttrSet *attrs);
@@ -4225,6 +4225,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   }
 
   bool sendable = claim<SendableTypeAttr>(attrs);
+  bool coroutine = claim<YieldOnceTypeAttr>(attrs);
 
   auto isolation = FunctionTypeIsolation::forNonIsolated();
 
@@ -4413,8 +4414,28 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                     diag::lifetime_dependence_function_type);
   }
 
+  SmallVector<AnyFunctionType::Yield, 1> yields;
+  if (coroutine) {
+    auto yieldsOptions = options.withoutContext();
+    yieldsOptions.setContext(TypeResolverContext::FunctionResult);
+    yieldsOptions |= TypeResolutionFlags::Coroutine;
+    assert(repr->getYieldTypeRepr());
+    auto yieldTy = resolveType(repr->getYieldTypeRepr(), yieldsOptions);
+    if (yieldTy->hasError())
+      return ErrorType::get(ctx);
+    // TODO: Do something wrt tuple of yields
+    if (auto inOutType = yieldTy->getAs<InOutType>()) {
+      yields.emplace_back(inOutType->getObjectType(), ParamSpecifier::InOut);
+    } else {
+      yields.emplace_back(yieldTy, ParamSpecifier::Default);
+    }
+  }
+
   auto resultOptions = options.withoutContext();
   resultOptions.setContext(TypeResolverContext::FunctionResult);
+  // TODO: Do we need this here?
+  if (coroutine)
+    resultOptions |= TypeResolutionFlags::Coroutine;
   auto outputTy = resolveType(repr->getResultTypeRepr(), resultOptions);
   if (outputTy->hasError()) {
     return ErrorType::get(ctx);
@@ -4477,15 +4498,15 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withSendable(sendable)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
+                     .withCoroutine(coroutine)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericSig = repr->getGenericSignature()) {
-    return GenericFunctionType::get(genericSig, params, outputTy, extInfo);
+    return GenericFunctionType::get(genericSig, params, {}, outputTy, extInfo);
   }
 
-  auto fnTy = FunctionType::get(params, outputTy, extInfo);
-  
+  auto fnTy = FunctionType::get(params, yields, outputTy, extInfo);
   if (fnTy->hasError())
     return fnTy;
 
@@ -4587,6 +4608,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     default:
       llvm_unreachable("bad TypeAttrKind for TAR_SILCoroutine");
     }
+    options |= TypeResolutionFlags::Coroutine;
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;
@@ -5309,12 +5331,20 @@ NeverNullType
 TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
   auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
-  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
-  // function parameters.
-  if (!options.is(TypeResolverContext::FunctionInput) ||
-      options.hasBase(TypeResolverContext::SubscriptDecl) ||
-      options.hasBase(TypeResolverContext::EnumElementDecl)) {
 
+  // ownership is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters or coroutine results (yields)
+  bool isCoroutineInOutYield =
+    (options.hasBase(TypeResolverContext::FunctionResult) || // decls
+     options.is(TypeResolverContext::FunctionResult)) && // function types
+    options.contains(TypeResolutionFlags::Coroutine) &&
+    (ownershipRepr &&
+     ownershipRepr->getSpecifier() == ParamSpecifier::InOut);
+
+  if (!(options.is(TypeResolverContext::FunctionInput) &&
+        !options.hasBase(TypeResolverContext::SubscriptDecl) &&
+        !options.hasBase(TypeResolverContext::EnumElementDecl)) &&
+      !isCoroutineInOutYield) {
     decltype(diag::attr_only_on_parameters) diagID;
     if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
         options.hasBase(TypeResolverContext::EnumElementDecl)) {
@@ -5342,6 +5372,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   auto result = resolveType(repr->getBase(), options);
   if (result->hasError())
     return result;
+
+  if (isCoroutineInOutYield)
+    return InOutType::get(result);
 
   // Check for illegal combinations of ownership specifiers and types.
   switch (ownershipRepr->getSpecifier()) {
@@ -5995,6 +6028,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   auto elementOptions = options;
   if (!repr->isParenType()) {
+    elementOptions = elementOptions.withBaseContext(options.getContext());
     elementOptions = elementOptions.withoutContext(true);
     elementOptions = elementOptions.withContext(TypeResolverContext::TupleElement);
   }
@@ -6017,10 +6051,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (!ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples) &&
         !options.contains(TypeResolutionFlags::SILMode) &&
         inStage(TypeResolutionStage::Interface) &&
-        !moveOnlyElementIndex.has_value() &&
-        !ty->hasUnboundGenericType() &&
-        !ty->hasTypeVariable() &&
-        !isa<TupleTypeRepr>(tyR)) {
+        !moveOnlyElementIndex.has_value() && !ty->hasUnboundGenericType() &&
+        !ty->hasTypeVariable() && !isa<TupleTypeRepr>(tyR)) {
       auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
       if (!contextTy->hasError() && contextTy->isNoncopyable())
