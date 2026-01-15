@@ -330,9 +330,9 @@ public protocol Sequence<Element>: BorrowingSequence {
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
+  //  @available(SwiftStdlib 6.3, *)
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  @available(SwiftStdlib 6.3, *)
   associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator>
 
   // FIXME: <rdar://problem/34142121>
