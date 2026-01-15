@@ -821,6 +821,59 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
 } // end anonymous namespace
 
+/// Determine whether the candidate type is a subclass of the superclass
+/// type.
+///
+/// FIXME: This should be a common utility somewhere instead of being
+/// re-implemented in several places in the compiler.
+static bool isSubclassOf(Type candidateType, Type superclassType) {
+  // Conversion from a concrete type to its existential value.
+  if (superclassType->isExistentialType() && !superclassType->isAny()) {
+    auto layout = superclassType->getExistentialLayout();
+
+    if (auto layoutConstraint = layout.getLayoutConstraint()) {
+      if (layoutConstraint->isClass() &&
+          !(candidateType->isClassExistentialType() ||
+            candidateType->mayHaveSuperclass()))
+        return false;
+    }
+
+    if (layout.explicitSuperclass &&
+        !isSubclassOf(candidateType, layout.explicitSuperclass))
+      return false;
+
+    return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
+      if (auto superclass = P->getSuperclassDecl()) {
+        if (!isSubclassOf(candidateType,
+                          superclass->getDeclaredInterfaceType()))
+          return false;
+      }
+
+      auto result = TypeChecker::containsProtocol(candidateType, P,
+                                                  /*allowMissing=*/false);
+      return result.first || result.second;
+    });
+  }
+
+  if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
+    candidateType = selfType->getSelfType();
+  }
+
+  if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
+    candidateType = archetypeType->getSuperclass();
+    if (!candidateType)
+      return false;
+  }
+
+  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
+  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
+
+  if (!(subclassDecl && superclassDecl))
+    return false;
+
+  return superclassDecl->isSuperclassOf(subclassDecl);
+}
+
 /// Given a set of disjunctions, attempt to determine
 /// favored choices in the current context.
 static void determineBestChoicesInContext(
@@ -1172,57 +1225,6 @@ static void determineBestChoicesInContext(
                                 paramListInfo,
                                 argumentList->getFirstTrailingClosureIndex(),
                                 /*allow fixes*/ false, listener, std::nullopt);
-    };
-
-    // Determine whether the candidate type is a subclass of the superclass
-    // type.
-    std::function<bool(Type, Type)> isSubclassOf = [&](Type candidateType,
-                                                       Type superclassType) {
-      // Conversion from a concrete type to its existential value.
-      if (superclassType->isExistentialType() && !superclassType->isAny()) {
-        auto layout = superclassType->getExistentialLayout();
-
-        if (auto layoutConstraint = layout.getLayoutConstraint()) {
-          if (layoutConstraint->isClass() &&
-              !(candidateType->isClassExistentialType() ||
-                candidateType->mayHaveSuperclass()))
-            return false;
-        }
-
-        if (layout.explicitSuperclass &&
-            !isSubclassOf(candidateType, layout.explicitSuperclass))
-          return false;
-
-        return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-          if (auto superclass = P->getSuperclassDecl()) {
-            if (!isSubclassOf(candidateType,
-                              superclass->getDeclaredInterfaceType()))
-              return false;
-          }
-
-          auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                      /*allowMissing=*/false);
-          return result.first || result.second;
-        });
-      }
-
-      if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
-        candidateType = selfType->getSelfType();
-      }
-
-      if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
-        candidateType = archetypeType->getSuperclass();
-        if (!candidateType)
-          return false;
-      }
-
-      auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-      auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-
-      if (!(subclassDecl && superclassDecl))
-        return false;
-
-      return superclassDecl->isSuperclassOf(subclassDecl);
     };
 
     enum class MatchFlag {
