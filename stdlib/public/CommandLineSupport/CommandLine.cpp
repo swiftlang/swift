@@ -563,15 +563,14 @@ char *_swift_stdlib_copyExecutablePath(void) {
 extern "C" int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
 
 char *copyExecutablePath(void) {
-  // _NSGetExecutablePath() returns non-zero if the provided buffer is too small
-  // and updates its *bufsize argument to the required value, so we can just set
-  // a reasonable initial value, then loop and try again on failure.
+    // _NSGetExecutablePath() returns non-zero if the provided buffer is too
+    // small and updates its *bufsize argument to the required value. Call it
+    // once to get the buffer size before allocating.
   uint32_t byteCount = PATH_MAX;
-  while (true) {
-    auto result = swift_cxx_newBuffer<char>(byteCount);
-    if (0 == _NSGetExecutablePath(result.get(), &byteCount)) {
-      return result.release();
-    }
+  (void)_NSGetExecutablePath(nullptr, &byteCount);
+  auto result = swift_cxx_newBuffer<char>(byteCount);
+  if (0 == _NSGetExecutablePath(result.get(), &byteCount)) {
+    return result.release();
   }
 }
 #elif defined(__linux__) || defined(__ANDROID__)

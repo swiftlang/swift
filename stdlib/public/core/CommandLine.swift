@@ -135,7 +135,7 @@ extension CommandLine {
   ///
   /// The value of this property may not be canonical. If you need the canonical
   /// path to the current executable, you can pass the value of this property to
-  /// [`realpath(3)`](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/realpath.3.html)
+  /// [`realpath()`](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/realpath.3.html)
   /// or use [`URL`](https://developer.apple.com/documentation/foundation/url)
   /// to standardize the path.
   ///
@@ -149,10 +149,10 @@ extension CommandLine {
   @_alwaysEmitIntoClient
   public static var executablePath: String? { // NOTE: can't be AEIC and stored!
     // _NSGetExecutablePath() returns non-zero if the provided buffer is too
-    // small and updates its *bufsize argument to the required value, so we can
-    // just set a reasonable initial value, then loop and try again on failure.
+    // small and updates its *bufsize argument to the required value. Call it
+    // once to get the buffer size before allocating.
     var byteCount = UInt32(0)
-    = unsafe _NSGetExecutablePath(nil, &byteCount)
+    _ = unsafe _NSGetExecutablePath(nil, &byteCount)
     return unsafe withUnsafeTemporaryAllocation(
       of: CChar.self,
       capacity: Int(byteCount)
@@ -168,7 +168,7 @@ extension CommandLine {
   ///
   /// The value of this property may not be canonical. If you need the canonical
   /// path to the current executable, you can pass the value of this property to
-  /// [`realpath(3)`](https://www.kernel.org/doc/man-pages/online/pages/man3/realpath.3.html)
+  /// [`realpath()`](https://www.kernel.org/doc/man-pages/online/pages/man3/realpath.3.html)
   /// ([`_wfullpath()`](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fullpath-wfullpath?view=msvc-170)
   /// on Windows) or use [`URL`](https://developer.apple.com/documentation/foundation/url)
   /// to standardize the path.
