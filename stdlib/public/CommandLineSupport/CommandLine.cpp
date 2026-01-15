@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include <errno.h>
@@ -544,17 +545,27 @@ static void swift::enumerateUnsafeArgv(const F& body) { }
 #pragma mark - CommandLine.executablePath
 
 namespace swift {
+/// A C++ string that can contain an executable path.
+template <typename C = char>
+using ExecutablePath = std::basic_string<C, std::char_traits<C>, cxx_allocator<C>>;
+
 /// A platform-specific implementation of `_swift_stdlib_copyExecutablePath()`.
 ///
 /// - Returns: The path to the current executable according to the operating
-///   system as a UTF-8 C string, or `nullptr` if we couldn't get the path. The
-///   caller is responsible for freeing this string when done with it using
-///   the Swift allocator (rather than `free()`).
-static char *copyExecutablePath(void);
+///   system as a UTF-8 C++ string, or `""` if we couldn't get the path.
+static ExecutablePath<> copyExecutablePath(void);
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 char *_swift_stdlib_copyExecutablePath(void) {
-  return copyExecutablePath();
+  auto path = copyExecutablePath();
+  if (path.empty()) {
+    return nullptr;
+  }
+
+  char *result = swift_slowAlloc(path.size() + 1, 0);
+  std::uninitialized_copy(path.cbegin(), path.cend(), result);
+  result[path.size()] = '\0';
+  return result;
 }
 
 #if defined(__APPLE__) && false
@@ -562,66 +573,72 @@ char *_swift_stdlib_copyExecutablePath(void) {
 // back-deployed. Here is a reference C implementation.
 extern "C" int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
 
-char *copyExecutablePath(void) {
-    // _NSGetExecutablePath() returns non-zero if the provided buffer is too
-    // small and updates its *bufsize argument to the required value. Call it
-    // once to get the buffer size before allocating.
-  uint32_t byteCount = PATH_MAX;
+ExecutablePath<> copyExecutablePath(void) {
+  // _NSGetExecutablePath() returns non-zero if the provided buffer is too small
+  // and updates its *bufsize argument to the required value. Call it once to
+  // get the buffer size before allocating.
+  uint32_t byteCount = 0;
   (void)_NSGetExecutablePath(nullptr, &byteCount);
-  auto result = swift_cxx_newBuffer<char>(byteCount);
-  if (0 == _NSGetExecutablePath(result.get(), &byteCount)) {
-    return result.release();
+
+  ExecutablePath<> result(byteCount, '\0');
+  if (0 == _NSGetExecutablePath(result.data(), &byteCount)) {
+    return result;
   }
+
+  return "";
 }
 #elif defined(__linux__) || defined(__ANDROID__)
-char *copyExecutablePath(void) {
+ExecutablePath<> copyExecutablePath(void) {
   size_t byteCount = PATH_MAX;
   while (true) {
-    auto result = swift_cxx_newBuffer<char>(byteCount);
-    ssize_t byteCountRead = readlink("/proc/self/exe", result.get(), byteCount);
+    ExecutablePath<> result(byteCount, '\0');
+    auto byteCountRead = readlink("/proc/self/exe", result.data(), byteCount);
     if (byteCountRead < 0) {
       // Could not get the path to the current executable. This process might
       // not have read permissions.
-      return nullptr;
+      return "";
     } else if (static_cast<size_t>(byteCountRead) < byteCount) {
-      result.get()[byteCountRead] = '\0';
-      return result.release();
+      return result;
     }
     byteCount += PATH_MAX; // add more space and try again
   }
 }
 #elif defined(_WIN32)
-char *copyExecutablePath(void) {
-  DWORD byteCount = MAX_PATH;
+ExecutablePath<> copyExecutablePath(void) {
+  DWORD charCount = MAX_PATH;
   while (true) {
-    auto wresult = swift_cxx_newBuffer<WCHAR>(byteCount);
+    ExecutablePath<WCHAR> wresult(charCount, L'\0');
     SetLastError(ERROR_SUCCESS);
-    (void)GetModuleFileNameW(nullptr, wresult.get(), byteCount);
-    DWORD errorCode = GetLastError();
-    switch (errorCode) {
-    case ERROR_SUCCESS:
-      return _swift_win32_copyUTF8FromWide(wresult.get());
+    (void)GetModuleFileNameW(nullptr, wresult.data(), charCount);
+    switch (GetLastError()) {
+    case ERROR_SUCCESS: {
+      std::unique_ptr<char, decltype(&free)> utf8 = {
+        _swift_win32_copyUTF8FromWide(wresult.c_str()),
+        &free
+      };
+      return utf8.get();
+    }
     case ERROR_INSUFFICIENT_BUFFER:
-      byteCount += MAX_PATH; // add more space and try again
+      charCount += MAX_PATH; // add more space and try again
       break;
     default:
       // Some other error prevented getting the path.
-      return nullptr;
+      return "";
     }
   }
 }
 #elif defined(__FreeBSD__)
-char *copyExecutablePath(void) {
+ExecutablePath<> copyExecutablePath(void) {
   int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
   size_t bufferCount = 0;
-  if (0 == sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0)) {
-    auto result = swift_cxx_newBuffer<char>(bufferCount);
-    if (0 == sysctl(mib, std::size(mib), result.get(), &bufferCount, nullptr, 0)) {
-      return result.release();
+  if (0 != sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0)) {
+    ExecutablePath<> result(bufferCount, '\0');
+    if (0 == sysctl(mib, std::size(mib), result.data(), &bufferCount, nullptr, 0)) {
+      return result;
     }
   }
 
-  return nullptr;
+  return "";
 }
 #elif defined(__OpenBSD__)
 /// Storage for ``captureEarlyCWD()``.
@@ -647,7 +664,7 @@ static void captureEarlyCWD(void) {
 /// construct executable paths from relatively weak sources on OpenBSD. This
 /// check is not meant to be secure or authoritative, but simply serves to
 /// eliminate patently bad constructed paths.
-static bool checkExecutablePath(char *executablePath) {
+static bool checkExecutablePath(const char *executablePath) {
   struct stat s;
   if (0 == stat(executablePath, &s) && !S_ISDIR(s.st_mode)) {
     return (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0;
@@ -655,7 +672,9 @@ static bool checkExecutablePath(char *executablePath) {
   return false;
 }
 
-char *copyExecutablePath(void) {
+ExecutablePath<> copyExecutablePath(void) {
+  ExecutablePath<> result;
+
   int argc = 0;
   char **argv = getUnsafeArgvArgc(&argc);
   if (argv && argc > 0) {
@@ -664,33 +683,31 @@ char *copyExecutablePath(void) {
     if (strchr(argv[0], '/') == argv[0]) {
       // The first character was a slash, so we'll assume that argv[0] is an
       // absolute path.
-      size_t byteCount = strlen(argv[0]) + 1;
-      auto result = swift_cxx_newBuffer<char>(byteCount);
-      std::uninitialized_copy_n(argv[0], byteCount, result.get());
-      if (checkExecutablePath(result.get())) {
-        return result.release();
+      result = argv[0];
+      if (checkExecutablePath(result.c_str())) {
+        return result;
       }
     } else {
       // There's a slash _after_ the first character _or_ there's no slash at
       // all. Assume it's a relative path and prepend it with the early CWD.
       if (const char *cwd = earlyCWD.load()) {
-        size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
-        auto result = swift_cxx_newBuffer<char>(byteCount);
-        snprintf(result.get(), byteCount, "%s/%s", cwd, argv[0]);
-        if (checkExecutablePath(result.get())) {
-          return result.release();
+        result = cwd;
+        result += '/';
+        result += argv[0];
+        if (checkExecutablePath(result.c_str())) {
+          return result;
         }
       }
     }
   }
 
-  return nullptr;
+  return result;
 }
 #else // Add your favorite OS's executable path getter here.
-char *copyExecutablePath(void) {
+ExecutablePath<> copyExecutablePath(void) {
   swift::fatalError(
-      0,
-      "Fatal error: Executable path not available on this platform.\n");
+    0,
+    "Fatal error: Executable path not available on this platform.\n");
 }
 #endif
 }

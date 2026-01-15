@@ -19,7 +19,6 @@
 
 #include <cstddef>
 #include <limits>
-#include <memory>
 #include <new>
 #include <utility>
 
@@ -94,34 +93,6 @@ static inline void swift_cxx_deleteObject(T *ptr) {
     ptr->~T();
     swift_slowDealloc(ptr, sizeof(T), alignof(T) - 1);
   }
-}
-
-/// A type that acts as a deleter for `std::unique_ptr` instances returned by
-/// `swift_cxx_newBuffer()`.
-template <typename T>
-struct swift_cxx_newBuffer_deleter {
-  size_t count;
-
-  void operator()(T *ptr) {
-    swift_slowDealloc(ptr, sizeof(T) * count, alignof(T) - 1);
-  }
-};
-
-/// Allocate an uninitialized buffer that will be automatically deallocated when
-/// it goes out of scope.
-///
-/// \param count The number of elements to allocate.
-///
-/// \returns A smart pointer to uninitialized memory large enough to hold
-///   \a count instances of \c T. The caller is responsible for initializing and
-///   deinitializing this memory.
-template <typename T>
-static inline std::unique_ptr<T, swift_cxx_newBuffer_deleter<T>>
-swift_cxx_newBuffer(size_t count) {
-  return std::unique_ptr<T, swift_cxx_newBuffer_deleter<T>> {
-    static_cast<T *>(swift_slowAlloc(sizeof(T) * count, alignof(T) - 1)),
-    swift_cxx_newBuffer_deleter<T>(count)
-  };
 }
 
 /// Define a custom operator delete; this is useful when a class has a
