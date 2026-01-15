@@ -1766,11 +1766,16 @@ public:
         return;
       }
 
+      // For associated type witnesses for reparented conformances,
+      // the metadata is relative to the protocol itself, rather than
+      // found in the conforming type's metadata.
+      bool inProtocolContext = Conformance.isReparented();
+
       llvm::Constant *typeWitnessAddr =
           IGM.getAssociatedTypeWitness(
             typeWitness,
             Conformance.getDeclContext()->getGenericSignatureOfContext(),
-            /*inProtocolContext=*/false);
+            inProtocolContext);
       typeWitnessAddr = llvm::ConstantExpr::getBitCast(typeWitnessAddr, IGM.Int8PtrTy);
 
       if (isRelative) {

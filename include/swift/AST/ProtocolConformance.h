@@ -445,6 +445,11 @@ public:
   /// conforming type and the protocol.
   bool isRetroactive() const;
 
+  /// Does this conformance represent a protocol P that was @reparented by some
+  /// other protocol Q, such that all of Q's requirements can be witnessed
+  /// within an extension of P?
+  bool isReparented() const;
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
@@ -711,6 +716,11 @@ public:
   /// Whether this is an "unchecked" conformance.
   bool isUnchecked() const {
     return getOptions().contains(ProtocolConformanceFlags::Unchecked);
+  }
+
+  /// Whether this is a reparented conformance.
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
   }
 
   /// Mark the conformance as unchecked (equivalent to the @unchecked

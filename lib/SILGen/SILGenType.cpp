@@ -1084,6 +1084,25 @@ public:
   void addProtocolConformanceDescriptor() { }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+    // Check if there is a reparented base protocol conformance.
+    auto local = Proto->getLocalConformances();
+    for (auto conf : local) {
+      if (conf->getProtocol() != baseProto)
+        continue;
+
+      if (isa<SelfProtocolConformance>(conf))
+        continue;
+
+      ASSERT(conf->isReparented());
+      DefaultWitnesses.push_back(
+          SILWitnessTable::BaseProtocolWitness{baseProto, conf});
+
+      // Ensure the witness table is emitted for this conformance.
+      SGM.useConformance(ProtocolConformanceRef(conf));
+      return;
+    }
+
+    // Otherwise, there is no default conformance for this base protocol.
     addMissingDefault();
   }
 
