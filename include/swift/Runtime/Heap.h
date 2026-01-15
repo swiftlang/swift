@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <new>
 #include <utility>
 
@@ -101,7 +102,7 @@ template <typename T>
 struct swift_cxx_newBuffer_deleter {
   size_t count;
 
-  void operator()(T *_Nullable ptr) {
+  void operator()(T *ptr) {
     swift_slowDealloc(ptr, sizeof(T) * count, alignof(T) - 1);
   }
 };
