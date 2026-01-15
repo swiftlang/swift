@@ -1,19 +1,27 @@
 REQUIRES: rsync
-REQUIRES: shell
 
 RUN: %empty-directory(%t)
-RUN: %debug-remote-run -n --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-INPUT %s
-RUN: test -z "`ls %t`"
+RUN: mkdir -p %t/log
+RUN: %debug-remote-run -n --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 1>/dev/null 2>%t/log/input-log.txt
+RUN: %FileCheck -check-prefix CHECK-INPUT %s < %t/log/input-log.txt
+RUN: ls %t > %t/log/top.txt
+RUN: %FileCheck -check-prefix CHECK-TOP-ONLY-LOG %s < %t/log/top.txt
 RUN: test ! -e %t-REMOTE
 
+CHECK-TOP-ONLY-LOG: log
+CHECK-TOP-ONLY-LOG-NOT: {{.}}
+
 CHECK-INPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input
-CHECK-INPUT-NEXT: rsync
+CHECK-INPUT: rsync
 CHECK-INPUT: /usr/bin/env {{.*}}ls
 
 RUN: %empty-directory(%t)
+RUN: mkdir -p %t/log
 RUN: %empty-directory(%t/nested)
 RUN: touch %t/nested/input %t/nested/BAD
-RUN: %debug-remote-run -n --output-prefix %t cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-OUTPUT %s
+RUN: %debug-remote-run -n --output-prefix %t cp %t/nested/input %t/nested/output 1>/dev/null 2>%t/log/output-log.txt
+RUN: %FileCheck -check-prefix CHECK-OUTPUT %s < %t/log/output-log.txt
+RUN: test ! -e %t/nested/output
 RUN: test ! -e %t-REMOTE
 
 CHECK-OUTPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/output/nested
