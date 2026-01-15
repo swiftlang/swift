@@ -641,38 +641,50 @@ static void captureEarlyCWD(void) {
   }
 }
 
+/// Test if a (potential) executable path refers to an actual executable file on
+/// disk.
+///
+/// We only perform this test on OpenBSD (rather than everywhere) because we
+/// construct executable paths from relatively weak sources on OpenBSD. This
+/// check is not meant to be secure or authoritative, but simply serves to
+/// eliminate patently bad constructed paths.
+static bool checkExecutablePath(char *executablePath) {
+  struct stat s;
+  if (0 == stat(executablePath, &s) && !S_ISDIR(s.st_mode)) {
+    return (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0;
+  }
+  return false;
+}
+
 char *copyExecutablePath(void) {
   int argc = 0;
   char **argv = getUnsafeArgvArgc(&argc);
   if (argv && argc > 0) {
     // OpenBSD does not have API to get a path to the running executable. Use
     // argv[0]. We do a basic sniff test for a path-like string.
-    const char *slash = strchr(argv[0], '/');
-    if (slash && slash > argv[0]) {
-      // There's a slash _after_ the first character. Assume it's a relative
-      // path and prepend it with the early CWD.
+    if (strchr(argv[0], '/') == argv[0]) {
+      // The first character was a slash, so we'll assume that argv[0] is an
+      // absolute path.
+      size_t byteCount = strlen(argv[0]) + 1;
+      auto result = swift_cxx_newBuffer<char>(byteCount);
+      std::uninitialized_copy_n(argv[0], byteCount, result.get());
+      if (checkExecutablePath(result.get())) {
+        return result.release();
+      }
+    } else {
+      // There's a slash _after_ the first character _or_ there's no slash at
+      // all. Assume it's a relative path and prepend it with the early CWD.
       if (const char *cwd = earlyCWD.load()) {
         size_t byteCount = strlen(cwd) + 1 + strlen(argv[0]) + 1;
         auto result = swift_cxx_newBuffer<char>(byteCount);
         snprintf(result.get(), byteCount, "%s/%s", cwd, argv[0]);
-        return result.release();
+        if (checkExecutablePath(result.get())) {
+          return result.release();
+        }
       }
-
-      // We were unable to capture the current working directory before this
-      // function was called.
-      return nullptr;
-    } else {
-      // Either the first character was a slash (in which case we'll treat
-      // argv[0] as an absolute path) or there was no slash at all (in which
-      // case there's not much we can do other than return the string as-is.)
-      size_t byteCount = strlen(argv[0]) + 1;
-      auto result = swift_cxx_newBuffer<char>(byteCount);
-      std::uninitialized_copy_n(argv[0], byteCount, result.get());
-      return result.release();
     }
   }
 
-  // We couldn't get the arguments list for the process.
   return nullptr;
 }
 #else // Add your favorite OS's executable path getter here.

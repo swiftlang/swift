@@ -133,6 +133,12 @@ extension CommandLine {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
   /// The path to the current executable.
   ///
+  /// The value of this property may not be canonical. If you need the canonical
+  /// path to the current executable, you can pass the value of this property to
+  /// [`realpath(3)`](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/realpath.3.html)
+  /// or use [`URL`](https://developer.apple.com/documentation/foundation/url)
+  /// to standardize the path.
+  ///
   /// If the path to the current executable could not be determined, the value
   /// of this property is `nil`.
   ///
@@ -159,6 +165,13 @@ extension CommandLine {
   }
 #else
   /// The path to the current executable.
+  ///
+  /// The value of this property may not be canonical. If you need the canonical
+  /// path to the current executable, you can pass the value of this property to
+  /// [`realpath(3)`](https://www.kernel.org/doc/man-pages/online/pages/man3/realpath.3.html)
+  /// ([`_wfullpath()`](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fullpath-wfullpath?view=msvc-170)
+  /// on Windows) or use [`URL`](https://developer.apple.com/documentation/foundation/url)
+  /// to standardize the path.
   ///
   /// If the path to the current executable could not be determined, the value
   /// of this property is `nil`.
