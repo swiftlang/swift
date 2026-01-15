@@ -333,7 +333,6 @@ suite.test("Array initialization throws")
   }
 }
 
-
 suite.test("Array initialization overflow")
 .skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
@@ -343,6 +342,17 @@ suite.test("Array initialization overflow")
     span in
     span.append(1)
     span.append(2)
+  }
+  expectUnreachable("Array initializer should have trapped.")
+}
+
+suite.test("Array initialization underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  _ = Array<Int>(capacity: -1) {
+    $0.removeAll()
   }
   expectUnreachable("Array initializer should have trapped.")
 }
@@ -413,7 +423,19 @@ suite.test("Array append overflow")
     span.append(1)
     span.append(2)
   }
-  expectUnreachable("Array initializer should have trapped.")
+  expectUnreachable("Array.append should have trapped.")
+}
+
+suite.test("Array append underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  var a: [Int] = []
+  a.append(addingCapacity: -1) {
+    $0.removeAll()
+  }
+  expectUnreachable("Array.append should have trapped.")
 }
 
 suite.test("ContiguousArray initialization")
@@ -473,6 +495,17 @@ suite.test("ContiguousArray initialization overflow")
     span in
     span.append(1)
     span.append(2)
+  }
+  expectUnreachable("ContiguousArray initializer should have trapped.")
+}
+
+suite.test("ContiguousArray initialization underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  _ = ContiguousArray<Int>(capacity: -1) {
+    $0.removeAll()
   }
   expectUnreachable("ContiguousArray initializer should have trapped.")
 }
@@ -543,5 +576,17 @@ suite.test("ContiguousArray append overflow")
     span.append(1)
     span.append(2)
   }
-  expectUnreachable("ContiguousArray initializer should have trapped.")
+  expectUnreachable("ContiguousArray append should have trapped.")
+}
+
+suite.test("ContiguousArray.append underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  var a: [Int] = [1, 2, 3]
+  a.append(addingCapacity: -1) {
+    $0.removeAll()
+  }
+  expectUnreachable("ContiguousArray.append should have trapped.")
 }
