@@ -2769,6 +2769,7 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
