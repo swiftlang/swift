@@ -167,3 +167,53 @@ public struct S5 : P {
 // CHECK-EVO:   return [[REG2]]
 // CHECK-EVO: }
 
+// CHECK: sil_witness_table [serialized] S1: P module borrow_accessor_protocol {
+// CHECK:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S1
+// CHECK:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S1
+// CHECK: }
+
+// CHECK: sil_witness_table [serialized] S2: P module borrow_accessor_protocol {
+// CHECK:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S2
+// CHECK:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S2
+// CHECK: }
+
+// CHECK: sil_witness_table [serialized] S3: P module borrow_accessor_protocol {
+// CHECK:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S3VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S3
+// CHECK:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S3VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S3
+// CHECK: }
+
+// CHECK: sil_witness_table [serialized] S4: P module borrow_accessor_protocol {
+// CHECK:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S4
+// CHECK:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S4
+// CHECK: }
+
+// CHECK: sil_witness_table [serialized] S5: P module borrow_accessor_protocol {
+// CHECK:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S5
+// CHECK:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S5
+// CHECK: }
+
+// CHECK-EVO: sil_witness_table S1: P module borrow_accessor_protocol {
+// CHECK-EVO:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S1
+// CHECK-EVO:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S1
+// CHECK-EVO: }
+
+// CHECK-EVO: sil_witness_table S2: P module borrow_accessor_protocol {
+// CHECK-EVO:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S2
+// CHECK-EVO:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S2
+// CHECK-EVO: }
+
+// CHECK-EVO: sil_witness_table S3: P module borrow_accessor_protocol {
+// CHECK-EVO:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S3VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S3
+// CHECK-EVO:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S3VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S3
+// CHECK-EVO: }
+
+// CHECK-EVO: sil_witness_table [serialized] S4: P module borrow_accessor_protocol {
+// CHECK-EVO:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S4
+// CHECK-EVO:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S4
+// CHECK-EVO: }
+
+// CHECK-EVO: sil_witness_table [serialized] S5: P module borrow_accessor_protocol {
+// CHECK-EVO:   method #P.id!borrow: <Self where Self : P> (Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW	// protocol witness for P.id.borrow in conformance S5
+// CHECK-EVO:   method #P.id!mutate: <Self where Self : P> (inout Self) -> () -> NonTrivial : @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvzTW	// protocol witness for P.id.mutate in conformance S5
+// CHECK-EVO: }
+

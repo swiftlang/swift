@@ -3323,6 +3323,8 @@ static AccessStrategy
 getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
   if (storage->hasInitAccessor() && !storage->getAccessor(AccessorKind::Set))
     return AccessStrategy::getAccessor(AccessorKind::Init, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
@@ -3490,6 +3492,9 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   if (!supportsMutation()) {
     return false;
   }
+  if (getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
   return true;
 }
 
@@ -3551,7 +3556,7 @@ bool AbstractStorageDecl::requiresOpaqueYieldingMutateCoroutine() const {
 }
 
 bool AbstractStorageDecl::requiresOpaqueMutateAccessor() const {
-  return getAccessor(AccessorKind::Mutate) != nullptr;
+  return getParsedAccessor(AccessorKind::Mutate) != nullptr;
 }
 
 AccessorDecl *
