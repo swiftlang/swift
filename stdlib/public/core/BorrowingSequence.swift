@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A type that provides borrowed access to the values of a borrowing sequence.
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable
 
@@ -79,7 +79,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   mutating func skip(by maximumOffset: Int) -> Int
 }
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
@@ -103,7 +103,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 }
 
 /// A type that provides sequential, borrowing access to its elements.
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element: ~Copyable
@@ -117,7 +117,7 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   func makeBorrowingIterator() -> BorrowingIterator
 }
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension BorrowingSequence where Self: BorrowingIteratorProtocol & ~Escapable,
   BorrowingIterator == Self
 {
@@ -127,7 +127,7 @@ extension BorrowingSequence where Self: BorrowingIteratorProtocol & ~Escapable,
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 @frozen
 public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIteratorProtocol {
   @usableFromInline
@@ -159,7 +159,7 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
 //  }
 //}
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension Sequence {
   @_transparent
   public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
@@ -169,7 +169,7 @@ extension Sequence {
 
 // MARK: Conformances
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension Span: BorrowingSequence, BorrowingIteratorProtocol {
   public typealias Element = Element
 
@@ -182,7 +182,7 @@ extension Span: BorrowingSequence, BorrowingIteratorProtocol {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension RawSpan: BorrowingSequence {
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<UInt8> {
@@ -190,7 +190,7 @@ extension RawSpan: BorrowingSequence {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension Array: BorrowingSequence {
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<Element> {
@@ -198,7 +198,7 @@ extension Array: BorrowingSequence {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+//@available(SwiftStdlib 6.3, *)
 extension InlineArray: BorrowingSequence {
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<Element> {
