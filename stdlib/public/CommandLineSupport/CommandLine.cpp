@@ -562,7 +562,7 @@ char *_swift_stdlib_copyExecutablePath(void) {
     return nullptr;
   }
 
-  char *result = swift_slowAlloc(path.size() + 1, 0);
+  auto result = reinterpret_cast<char *>(swift_slowAlloc(path.size() + 1, 0));
   std::uninitialized_copy(path.cbegin(), path.cend(), result);
   result[path.size()] = '\0';
   return result;
