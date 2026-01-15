@@ -1667,6 +1667,9 @@ extension Array {
       _ span: inout OutputSpan<Element>
     ) throws(E) -> Void
   ) throws(E) {
+    _precondition(
+      uninitializedCount >= 0, "uninitializedCount must not be negative"
+    )
     // Ensure uniqueness, mutability, and sufficient storage.
     _reserveCapacityImpl(
       minimumCapacity: self.count + uninitializedCount, growForAppend: true
