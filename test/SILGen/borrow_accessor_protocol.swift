@@ -97,3 +97,73 @@ extension S3 {
 // CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S2) -> @guaranteed_address NonTrivial
 // CHECK-EVO:   return [[REG2]]
 // CHECK-EVO: }
+
+@frozen
+public struct S4 : P {
+  var _id: NonTrivial
+
+  public var id: NonTrivial {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
+}
+
+// CHECK: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S4) -> @guaranteed NonTrivial {
+// CHECK: bb0([[REG0:%.*]] : $*S4):
+// CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S4V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
+// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
+// CHECK:   end_borrow [[REG1]]
+// CHECK:   return [[REG4]]
+// CHECK: }
+
+// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S4) -> @guaranteed NonTrivial {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*S4):
+// CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S4V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
+// CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL: }
+
+// CHECK-EVO: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S4) -> @guaranteed_address NonTrivial {
+// CHECK-EVO: bb0([[REG0:%.*]] : $*S4):
+// CHECK-EVO:   [[REG1:%.*]] = function_ref @$s24borrow_accessor_protocol2S4V2idAA10NonTrivialVvb : $@convention(method) (@in_guaranteed S4) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S4) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   return [[REG2]]
+// CHECK-EVO: }
+
+@frozen
+public struct S5 : P {
+  public var id: NonTrivial
+}
+
+// CHECK: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S5) -> @guaranteed NonTrivial {
+// CHECK: bb0([[REG0:%.*]] : $*S5):
+// CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
+// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
+// CHECK:   end_borrow [[REG1]]
+// CHECK:   return [[REG4]]
+// CHECK: }
+
+// CHECK-SIL: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S5) -> @guaranteed NonTrivial {
+// CHECK-SIL: bb0([[REG0:%.*]] : $*S5):
+// CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
+// CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL: }
+
+// CHECK-EVO: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S5) -> @guaranteed_address NonTrivial {
+// CHECK-EVO: bb0([[REG0:%.*]] : $*S5):
+// CHECK-EVO:   [[REG1:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@in_guaranteed S5) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S5) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   return [[REG2]]
+// CHECK-EVO: }
+
