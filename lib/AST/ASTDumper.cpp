@@ -2409,7 +2409,7 @@ namespace {
         printTypeField(VD->getInterfaceType(), Label::always("interface_type"),
                        PrintOptions(), InterfaceTypeColor);
       }
-
+      printIsolation(getActorIsolation(VD));
       if (VD->hasAccess()) {
         printField(VD->getFormalAccess(), Label::always("access"),
                    AccessLevelColor);
