@@ -1186,9 +1186,9 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
       if (sbi->getDest() != asi) {
         continue;
       }
-      assert(!deinitializationPoints[blockPromotingWithin]);
-      deinitializationPoints[blockPromotingWithin] = inst;
       if (!runningVals.has_value()) {
+        assert(!deinitializationPoints[blockPromotingWithin]);
+        deinitializationPoints[blockPromotingWithin] = inst;
         continue;
       }
       if (!runningVals->value.isGuaranteed()) {
