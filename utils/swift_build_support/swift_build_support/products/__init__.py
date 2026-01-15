@@ -12,6 +12,7 @@
 
 from .benchmarks import Benchmarks
 from .cmark import CMark
+from .cross_compilation_stdlib import CrossCompilationStdlib
 from .curl import LibCurl
 from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
@@ -51,6 +52,7 @@ from .zlib import Zlib
 
 __all__ = [
     'CMark',
+    'CrossCompilationStdlib',
     'Foundation',
     'FoundationTests',
     'SwiftFoundationTests',
