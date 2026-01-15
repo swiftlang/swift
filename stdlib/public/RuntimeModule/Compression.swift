@@ -318,6 +318,7 @@ struct LZMAStream: CompressedStream {
 
 // .. Image Sources ............................................................
 
+@available(Backtracing 6.2, *)
 fileprivate func decompress<S: CompressedStream>(
   stream: S,
   source: ImageSource,
@@ -343,6 +344,7 @@ fileprivate func decompress<S: CompressedStream>(
   output.used(bytes: Int(totalBytes))
 }
 
+@available(Backtracing 6.2, *)
 fileprivate func decompressChunked<S: CompressedStream>(
   stream: S,
   source: ImageSource,
@@ -377,6 +379,7 @@ fileprivate func decompressChunked<S: CompressedStream>(
   )
 }
 
+@available(Backtracing 6.2, *)
 extension ImageSource {
   @_specialize(kind: full, where Traits == Elf32Traits)
   @_specialize(kind: full, where Traits == Elf64Traits)

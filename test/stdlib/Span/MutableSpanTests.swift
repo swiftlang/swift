@@ -255,7 +255,7 @@ suite.test("withUnsafeMutableBufferPointer")
     var emptySpan = MutableSpan(_unsafeElements: empty0)
     emptySpan.withUnsafeMutableBufferPointer {
       expectEqual($0.count, 0)
-      expectNil($0.baseAddress)
+      expectNotNil($0.baseAddress)
     }
   }
   expectEqual(Int(a[i]), i+1)
@@ -282,7 +282,7 @@ suite.test("withUnsafeMutableBytes")
     var emptySpan = MutableSpan(_unsafeElements: empty0)
     emptySpan.withUnsafeMutableBytes {
       expectEqual($0.count, 0)
-      expectNil($0.baseAddress)
+      expectNotNil($0.baseAddress)
     }
   }
   expectEqual(Int(a[i]), i+1)

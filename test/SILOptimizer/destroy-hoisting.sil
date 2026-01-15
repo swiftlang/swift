@@ -57,14 +57,14 @@ bb0(%0 : $Int):
   return %7
 } // end sil function '$s3nix6testitAA1SVyF'
 
-// CHECK-LABEL: sil [ossa] @no_hoisting_into_non_lexical_lifetime :
-// CHECK:         apply
+// CHECK-LABEL: sil [ossa] @hoisting_into_non_lexical_lifetime :
+// CHECK:         %2 = copy_value
 // CHECK-NEXT:    destroy_value %0
-// CHECK:       } // end sil function 'no_hoisting_into_non_lexical_lifetime'
-sil [ossa] @no_hoisting_into_non_lexical_lifetime : $@convention(thin) (@owned Klass, Int) -> @owned S {
+// CHECK:       } // end sil function 'hoisting_into_non_lexical_lifetime'
+sil [ossa] @hoisting_into_non_lexical_lifetime : $@convention(thin) (@owned Klass, Int) -> @owned S {
 bb0(%0 : @owned  $Klass, %1 : $Int):
-  %3 = copy_value %0
-  %4 = struct $S (%3, %1)
+  %2 = copy_value %0
+  %4 = struct $S (%2, %1)
   %5 = function_ref @deinit_barrier : $@convention(thin) () -> ()
   apply %5() : $@convention(thin) () -> () 
   destroy_value %0
@@ -273,7 +273,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @not_lexical_access_base :
-// CHECK:         end_borrow
+// CHECK:         %1 = copy_value %0
 // CHECK-NEXT:    destroy_value %0
 // CHECK:       } // end sil function 'not_lexical_access_base'
 sil [ossa] @not_lexical_access_base : $@convention(method) (@owned Klass) -> () {

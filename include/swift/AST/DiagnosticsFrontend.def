@@ -24,6 +24,9 @@
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
 
+WARNING(warning_darwin_sdk_invalid_settings, none,
+        "SDK settings were ignored as 'SDKSettings.json' could not be parsed", ())
+
 ERROR(error_no_frontend_args, none,
       "no arguments provided to '-frontend'", ())
 

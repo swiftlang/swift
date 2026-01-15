@@ -1963,6 +1963,10 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols,
                                          bool implicitImport) {
+  if (adapter->isNonSwiftModule()) {
+    // non-swift modules don't need to access anything from the bridging header
+    return true;
+  }
   if (isPCHFilenameExtension(header)) {
     return bindBridgingHeader(adapter, diagLoc);
   }
@@ -8452,8 +8456,6 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
         // ~Copyable, the type should also be ~Copyable.
         for (auto field : cxxRecordDecl->fields())
           maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
-        for (auto base : cxxRecordDecl->bases())
-          maybePushToStack(base.getType()->getUnqualifiedDesugaredType());
       }
     }
 

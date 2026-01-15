@@ -36,6 +36,7 @@
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -268,9 +269,12 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   CASOptions casOpts;
   SerializationOptions serializationOpts =
       CachedCI->getASTContext().SerializationOpts;
-  std::unique_ptr<ASTContext> tmpCtx(
-      ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                      symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
+  if (auto *contextSDKInfo = CachedCI->getASTContext().getDarwinSDKInfo())
+    SDKInfo = *contextSDKInfo;
+  std::unique_ptr<ASTContext> tmpCtx(ASTContext::get(
+      langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
+      casOpts, serializationOpts, tmpSM, tmpDiags, SDKInfo));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);

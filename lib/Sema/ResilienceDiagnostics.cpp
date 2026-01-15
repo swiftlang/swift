@@ -90,10 +90,14 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
         auto storage = accessor->getStorage();
         if (accessor->getFormalAccess() < storage->getFormalAccess()) {
           auto diagID = diag::resilience_decl_unavailable;
-          Context.Diags
-              .diagnose(loc, diagID, D, accessor->getFormalAccess(),
-                        fragileKind.getSelector())
-              .limitBehavior(DiagnosticBehavior::Warning);
+          if (Context.LangOpts.hasFeature(Feature::StrictAccessControl))
+            Context.Diags.diagnose(loc, diagID, D, accessor->getFormalAccess(),
+                                   fragileKind.getSelector());
+          else
+            Context.Diags
+                .diagnose(loc, diagID, D, accessor->getFormalAccess(),
+                          fragileKind.getSelector())
+                .limitBehavior(DiagnosticBehavior::Warning);
           Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
         }
       }

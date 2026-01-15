@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -parse-as-library -g -Onone -o %t/SymbolicatedBacktrace
+// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -g -Onone -o %t/SymbolicatedBacktrace
 // RUN: %target-codesign %t/SymbolicatedBacktrace
 // RUN: %target-run %t/SymbolicatedBacktrace | %FileCheck %s
 

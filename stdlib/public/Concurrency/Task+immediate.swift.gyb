@@ -13,25 +13,6 @@
 import Swift
 @_implementationOnly import SwiftConcurrencyInternalShims
 
-// ==== Task.startSynchronously ------------------------------------------------
-
-% METHOD_VARIANTS = [
-%   'THROWING',
-%   'NON_THROWING',
-% ]
-% for THROWING_VARIANT in METHOD_VARIANTS:
-
-% IS_THROWING = THROWING_VARIANT == 'THROWING'
-% if IS_THROWING:
-%   FAILURE_TYPE = 'Error'
-%   THROWS = 'throws '
-% else:
-%   FAILURE_TYPE = 'Never'
-%   THROWS = ''
-% end
-
-% end
-
 // ==== Task.immediate(Detached) ---------------------------------------------------------
 
 % METHOD_VARIANTS = [
@@ -45,15 +26,19 @@ import Swift
 % IS_THROWING = THROWING_VARIANT == 'THROWING'
 % IS_DETACHED = 'Detached' in METHOD_NAME
 % if IS_THROWING:
-%   FAILURE_TYPE = 'Error'
-%   THROWS = 'throws '
+%   FAILURE_TYPE = 'Failure'
+%   THROWS = 'throws(Failure) '
 % else:
 %   FAILURE_TYPE = 'Never'
 %   THROWS = ''
 % end
 
 @available(SwiftStdlib 6.2, *)
+% if IS_THROWING:
+extension Task { // throwing Failure error type
+% else:
 extension Task where Failure == ${FAILURE_TYPE} {
+% end
 
   % if IS_DETACHED:
   /// Create and immediately start running a new detached task in the context of the calling thread/task.

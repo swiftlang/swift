@@ -20,7 +20,6 @@ imports for TMP_DIR/test.swift:
 imports for A.foo:
 imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 	Swift
-	__ObjC
 	lifetimebound
 	ptrcheck
 	_StringProcessing
