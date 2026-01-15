@@ -1226,13 +1226,20 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   assert(origFnType->isTrivialNoEscape());
   assert(derivativeFnType->isTrivialNoEscape());
 
-  // Do the apply for the indirect result case.
-  if (derivativeFnType->hasIndirectFormalResults() &&
-      SGF.SGM.M.useLoweredAddresses()) {
+  // Do the apply for the indirect result / error case.
+  if (SGF.SGM.M.useLoweredAddresses() &&
+      (derivativeFnType->hasIndirectFormalResults() ||
+       derivativeFnType->hasIndirectErrorResult())) {
+    assert(derivativeFnType->hasIndirectFormalResults() &&
+           "expecting indirect normal results with indirect error result");
+
     auto indResBuffer = SGF.getBufferForExprResult(
         loc, derivativeFnType->getAllResultsInterfaceType(), C);
     SmallVector<SILValue, 3> applyArgs;
     applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
+    if (derivativeFnType->hasIndirectErrorResult())
+      applyArgs.push_back(SGF.IndirectErrorResult);
+
     for (auto origFnArgVal : origFnArgVals)
       applyArgs.push_back(origFnArgVal);
     auto differential = SGF.emitApplyWithRethrow(
