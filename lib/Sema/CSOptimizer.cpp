@@ -1260,10 +1260,6 @@ static void determineBestChoicesInContext(
             [&](GenericSignature genericSig, ValueDecl *choice,
                 std::optional<unsigned> paramIdx, Type candidateType,
                 Type paramType, MatchOptions options) -> std::optional<double> {
-      auto areEqual = [&](Type a, Type b) {
-        return a->getDesugaredType()->isEqual(b->getDesugaredType());
-      };
-
       auto isCGFloatDoubleConversionSupported = [&options]() {
         // CGFloat <-> Double conversion is supposed only while
         // match argument candidates to parameters.
@@ -1294,13 +1290,13 @@ static void determineBestChoicesInContext(
             return cs.isDictionaryType(paramType) ? 0.3 : 0;
         }
 
-        if (!areEqual(candidateType, paramType))
+        if (!candidateType->isEqual(paramType))
           return 0;
         return options.contains(MatchFlag::Literal) ? 0.3 : 1;
       }
 
       // Exact match between candidate and parameter types.
-      if (areEqual(candidateType, paramType)) {
+      if (candidateType->isEqual(paramType)) {
         return options.contains(MatchFlag::Literal) ? 0.3 : 1;
       }
 
