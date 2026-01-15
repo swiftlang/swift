@@ -341,7 +341,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @_transparent
-  public var byteCount: Int { _count }
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// A Boolean value indicating whether the span is empty.
   ///

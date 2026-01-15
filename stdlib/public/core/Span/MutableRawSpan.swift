@@ -136,7 +136,7 @@ extension MutableRawSpan {
 extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @_transparent
-  public var byteCount: Int { _count }
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
   @_transparent
