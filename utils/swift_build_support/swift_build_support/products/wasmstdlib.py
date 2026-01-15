@@ -205,7 +205,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
-            '-Xclang-linker', '-resource-dir=' + self._wasi_sysroot_path(target_triple),
+            '-Xclang-linker', '-resource-dir=' + self._wasi_resource_dir_path(target_triple),
         ]
         # Leading space is needed to separate from other options
         self.cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
@@ -270,6 +270,10 @@ class WasmStdlib(cmake_product.CMakeProduct):
     def _wasi_sysroot_path(self, target_triple):
         build_root = os.path.dirname(self.build_dir)
         return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
+
+    def _wasi_resource_dir_path(self, target_triple):
+        build_root = os.path.dirname(self.build_dir)
+        return wasisysroot.WASILibc.resource_dir_install_path(build_root, target_triple)
 
     def should_install(self, host_target):
         return False
