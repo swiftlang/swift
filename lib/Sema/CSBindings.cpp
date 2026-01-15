@@ -1081,9 +1081,8 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
-                                         TypeVariableType *TypeVar,
-                                         Constraint *constraint) {
+void PotentialBindings::inferFromLiteral(Constraint *constraint) {
+  ASSERT(TypeVar);
   ASSERT(isDirectRequirement(CS, TypeVar, constraint));
 
   auto *protocol = constraint->getProtocol();
@@ -1099,6 +1098,12 @@ void PotentialBindings::inferFromLiteral(ConstraintSystem &CS,
           KnownProtocolKind::ExpressibleByNilLiteral)) {
     defaultType = TypeChecker::getDefaultType(protocol, CS.DC);
   }
+
+  // "undo" check is necessary here because this method is called
+  // from `Change::undo`, that's necessary because we only record
+  // a constraint.
+  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
+    CS.recordChange(SolverTrail::Change::AddedLiteral(TypeVar, constraint));
 
   Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
 }
@@ -1205,6 +1210,23 @@ bool BindingSet::operator<(const BindingSet &other) {
   // potentially incomplete, and if so, let's de-prioritize them.
   return isPotentiallyIncomplete() < other.isPotentiallyIncomplete();
 }
+
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  void PotentialBindings::record##PropertyName(Constraint *constraint) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(                                                         \
+          SolverTrail::Change::Added##PropertyName(TypeVar, constraint));      \
+    Storage.push_back(constraint);                                             \
+  }
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  void PotentialBindings::record##RelationName(TypeVariableType *typeVar,      \
+                                               Constraint *originator) {       \
+    if (CS.solverState)                                                        \
+      CS.recordChange(SolverTrail::Change::Added##RelationName(                \
+          TypeVar, typeVar, originator));                                      \
+    Storage.emplace_back(typeVar, originator);                                 \
+  }
+#include "swift/Sema/CSTrail.def"
 
 const BindingSet *ConstraintSystem::determineBestBindings(
     llvm::function_ref<void(const BindingSet &)> onCandidate) {
@@ -1387,8 +1409,8 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
   } while (true);
 }
 
-void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
-                                            PotentialBinding binding) {
+void PotentialBindings::addPotentialBinding(PotentialBinding binding) {
+  ASSERT(TypeVar);
   assert(!binding.BindingType->is<ErrorType>());
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -1412,6 +1434,9 @@ void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
       locator->dump(&TypeVar->getASTContext().SourceMgr, llvm::dbgs());
     }
     llvm::dbgs() << "\n");
+
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::AddedBinding(TypeVar, binding));
 
   Bindings.push_back(std::move(binding));
 }
@@ -1710,9 +1735,8 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
 }
 
 std::optional<PotentialBinding>
-PotentialBindings::inferFromRelational(ConstraintSystem &CS,
-                                       TypeVariableType *TypeVar,
-                                       Constraint *constraint) {
+PotentialBindings::inferFromRelational(Constraint *constraint) {
+  ASSERT(TypeVar);
   assert(constraint->getClassification() ==
              ConstraintClassification::Relational &&
          "only relational constraints handled here");
@@ -1761,7 +1785,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     if (auto *typeVar = first->getAs<TypeVariableType>()) {
       if (typeVar->getImpl().isClosureType()) {
         DEBUG_BAILOUT("Delayed (1)");
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         return std::nullopt;
       }
     }
@@ -1774,7 +1798,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
 
     if (typeVars.erase(TypeVar)) {
       for (auto *typeVar : typeVars) {
-        AdjacentVars.emplace_back(typeVar, constraint);
+        recordAdjacentVar(typeVar, constraint);
       }
     }
 
@@ -1852,7 +1876,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       kind == AllowedBindingKind::Subtypes) {
     if (type->isTypeVariableOrMember() &&
         constraint->getLocator()->directlyAt<AssignExpr>()) {
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
     }
   }
 
@@ -1883,7 +1907,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // be bound via constraint simplification when l-value type
       // is inferred or contextually from other constraints.
       DEBUG_BAILOUT("Delayed (2)");
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
       return std::nullopt;
     }
   }
@@ -1910,7 +1934,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // Add all type variables encountered in the type except
       // to the current type variable.
       if (var != TypeVar) {
-        AdjacentVars.emplace_back(var, constraint);
+        recordAdjacentVar(var, constraint);
         continue;
       }
 
@@ -1921,7 +1945,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     // let's mark bindings as delayed until dependent member type
     // is resolved.
     if (!containsSelf)
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
 
     DEBUG_BAILOUT("Dependent member");
     return std::nullopt;
@@ -1970,26 +1994,26 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
       if (kind == AllowedBindingKind::Subtypes) {
-        SubtypeOf.emplace_back(bindingTypeVar, constraint);
+        recordSubtypeOf(bindingTypeVar, constraint);
       } else {
         assert(kind == AllowedBindingKind::Supertypes);
-        SupertypeOf.emplace_back(bindingTypeVar, constraint);
+        recordSupertypeOf(bindingTypeVar, constraint);
       }
 
-      AdjacentVars.emplace_back(bindingTypeVar, constraint);
+      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal: {
-      EquivalentTo.emplace_back(bindingTypeVar, constraint);
-      AdjacentVars.emplace_back(bindingTypeVar, constraint);
+      recordEquivalentTo(bindingTypeVar, constraint);
+      recordAdjacentVar(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::UnresolvedMemberChainBase: {
-      EquivalentTo.emplace_back(bindingTypeVar, constraint);
+      recordEquivalentTo(bindingTypeVar, constraint);
 
       // Don't record adjacency between base and result types,
       // this is just an auxiliary constraint to enforce ordering.
@@ -2002,7 +2026,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // variable that presents such optional (`bindingTypeVar`
       // in this case).
       if (kind == AllowedBindingKind::Supertypes) {
-        AdjacentVars.emplace_back(bindingTypeVar, constraint);
+        recordAdjacentVar(bindingTypeVar, constraint);
       }
       break;
     }
@@ -2051,15 +2075,16 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
 /// Retrieve the set of potential type bindings for the given
 /// representative type variable, along with flags indicating whether
 /// those types should be opened.
-void PotentialBindings::infer(ConstraintSystem &CS,
-                              TypeVariableType *TypeVar,
-                              Constraint *constraint) {
+void PotentialBindings::infer(Constraint *constraint) {
+  ASSERT(TypeVar);
+
   if (!Constraints.insert(constraint))
     return;
 
   // Record the change, if there are active scopes.
   if (CS.solverState)
-    CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
+    CS.recordChange(
+        SolverTrail::Change::AddedConstraintToInference(TypeVar, constraint));
 
   switch (constraint->getKind()) {
   case ConstraintKind::Bind:
@@ -2074,11 +2099,11 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::LValueObject: {
-    auto binding = inferFromRelational(CS, TypeVar, constraint);
+    auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
 
-    addPotentialBinding(TypeVar, *binding);
+    addPotentialBinding(*binding);
     break;
   }
   case ConstraintKind::KeyPathApplication: {
@@ -2091,7 +2116,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     findInferableTypeVars(CS.simplifyType(constraint->getThirdType()),
                           typeVars);
     if (typeVars.count(TypeVar)) {
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
     }
 
     break;
@@ -2106,7 +2131,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
       break;
 
     if (constraint->getSecondType()->is<ProtocolType>())
-      Protocols.push_back(constraint);
+      recordProtocol(constraint);
     break;
 
   case ConstraintKind::BridgingConversion:
@@ -2132,7 +2157,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    inferFromLiteral(CS, TypeVar, constraint);
+    inferFromLiteral(constraint);
     break;
   }
 
@@ -2144,7 +2169,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    Defaults.push_back(constraint);
+    recordDefault(constraint);
     break;
 
   // For now let's avoid inferring protocol requirements from
@@ -2162,7 +2187,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     auto dynamicType = constraint->getFirstType();
     if (auto *tv = dynamicType->getAs<TypeVariableType>()) {
       if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         break;
       }
     }
@@ -2172,7 +2197,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   }
 
   case ConstraintKind::Disjunction:
-    DelayedBy.push_back(constraint);
+    recordDelayedBy(constraint);
     break;
 
   case ConstraintKind::ApplicableFunction:
@@ -2189,7 +2214,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   }
 
   case ConstraintKind::BindOverload: {
-    DelayedBy.push_back(constraint);
+    recordDelayedBy(constraint);
     break;
   }
 
@@ -2207,7 +2232,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
         // It's possible that member has been bound to some other type variable
         // instead of merged with it because it's wrapped in an l-value type.
         if (type->getWithoutSpecifierType()->isEqual(TypeVar)) {
-          DelayedBy.push_back(constraint);
+          recordDelayedBy(constraint);
           break;
         }
       } else {
@@ -2216,7 +2241,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     }
 
     if (memberTy == TypeVar)
-      DelayedBy.push_back(constraint);
+      recordDelayedBy(constraint);
 
     break;
   }
@@ -2227,7 +2252,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     auto firstType = constraint->getFirstType();
     if (auto *tv = firstType->getAs<TypeVariableType>()) {
       if (tv->getImpl().getRepresentative(nullptr) == TypeVar) {
-        DelayedBy.push_back(constraint);
+        recordDelayedBy(constraint);
         break;
       }
     }
@@ -2237,17 +2262,16 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   }
 }
 
-void PotentialBindings::retract(ConstraintSystem &CS,
-                                TypeVariableType *TypeVar,
-                                Constraint *constraint) {
+void PotentialBindings::retract(Constraint *constraint) {
+  ASSERT(TypeVar);
+
   if (!Constraints.remove(constraint))
     return;
 
-  bool recordingChanges = CS.solverState && !CS.solverState->Trail.isUndoActive();
-
   // Record the change, if there are active scopes.
-  if (recordingChanges)
-    CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
+  if (CS.solverState)
+    CS.recordChange(SolverTrail::Change::RetractedConstraintFromInference(
+        TypeVar, constraint));
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
@@ -2259,7 +2283,7 @@ void PotentialBindings::retract(ConstraintSystem &CS,
       llvm::remove_if(Bindings,
                       [&](const PotentialBinding &binding) {
                         if (binding.getSource() == constraint) {
-                          if (recordingChanges) {
+                          if (CS.solverState) {
                             CS.recordChange(SolverTrail::Change::RetractedBinding(
                                 TypeVar, binding));
                           }
@@ -2273,7 +2297,7 @@ void PotentialBindings::retract(ConstraintSystem &CS,
       llvm::remove_if(Literals,
                       [&](const LiteralRequirement &literal) {
                         if (literal.getSource() == constraint) {
-                          if (recordingChanges) {
+                          if (CS.solverState) {
                             CS.recordChange(SolverTrail::Change::RetractedLiteral(
                                 TypeVar, constraint));
                           }
@@ -2283,59 +2307,38 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Literals.end());
 
-#define CALLBACK(ChangeKind)                                                   \
-  [&](Constraint *other) {                                                     \
-    if (other == constraint) {                                                 \
-      if (recordingChanges) {                                                  \
-        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
-            TypeVar, constraint));                                             \
-      }                                                                        \
-      return true;                                                             \
-    }                                                                          \
-    return false;                                                              \
-  }
+#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](Constraint *other) {                                 \
+                        if (other == constraint) {                             \
+                          if (CS.solverState) {                                \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##PropertyName(  \
+                                    TypeVar, constraint));                     \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
 
-  DelayedBy.erase(
-      llvm::remove_if(DelayedBy, CALLBACK(RetractedDelayedBy)),
-      DelayedBy.end());
-
-  Protocols.erase(
-      llvm::remove_if(Protocols, CALLBACK(RetractedProtocol)),
-      Protocols.end());
-
-  Defaults.erase(
-      llvm::remove_if(Defaults, CALLBACK(RetractedDefault)),
-      Defaults.end());
-
-#define PAIR_CALLBACK(ChangeKind)                                              \
-  [&](std::pair<TypeVariableType *, Constraint *> pair) {                      \
-    if (pair.second == constraint) {                                           \
-      if (recordingChanges) {                                                  \
-        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
-            TypeVar, pair.first, pair.second));                                \
-      }                                                                        \
-      return true;                                                             \
-    }                                                                          \
-    return false;                                                              \
-  }
-
-  AdjacentVars.erase(
-    llvm::remove_if(AdjacentVars, PAIR_CALLBACK(RetractedAdjacentVar)),
-    AdjacentVars.end());
-
-  SubtypeOf.erase(
-    llvm::remove_if(SubtypeOf, PAIR_CALLBACK(RetractedSubtypeOf)),
-    SubtypeOf.end());
-
-  SupertypeOf.erase(
-    llvm::remove_if(SupertypeOf, PAIR_CALLBACK(RetractedSupertypeOf)),
-    SupertypeOf.end());
-
-  EquivalentTo.erase(
-    llvm::remove_if(EquivalentTo, PAIR_CALLBACK(RetractedEquivalentTo)),
-    EquivalentTo.end());
-
-#undef CALLBACK
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  Storage.erase(                                                               \
+      llvm::remove_if(Storage,                                                 \
+                      [&](std::pair<TypeVariableType *, Constraint *> pair) {  \
+                        if (pair.second == constraint) {                       \
+                          if (CS.solverState) {                                \
+                            CS.recordChange(                                   \
+                                SolverTrail::Change::Retracted##RelationName(  \
+                                    TypeVar, pair.first, pair.second));        \
+                          }                                                    \
+                          return true;                                         \
+                        }                                                      \
+                        return false;                                          \
+                      }),                                                      \
+      Storage.end());
+#include "swift/Sema/CSTrail.def"
 }
 
 void PotentialBindings::reset() {
@@ -2349,22 +2352,27 @@ void PotentialBindings::reset() {
     ASSERT(EquivalentTo.empty());
   }
 
+  TypeVar = nullptr;
   AssociatedCodeCompletionToken = ASTNode();
 }
 
-void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
-                             llvm::raw_ostream &out, unsigned indent) const {
-  out << "Potential bindings for ";
-  typeVar->getImpl().print(out);
-  out << "\n";
+void PotentialBindings::dump(llvm::raw_ostream &out, unsigned indent) const {
+  if (TypeVar) {
+    out << "Potential bindings for ";
+    TypeVar->getImpl().print(out);
+    out << "\n";
+  } else {
+    out << "<<No type variable assigned>>\n";
+  }
 
   out << "[constraints: ";
-  interleave(Constraints,
-             [&](Constraint *constraint) {
-               constraint->print(out, &cs.getASTContext().SourceMgr, indent,
-                                 /*skipLocator=*/true);
-             },
-             [&out]() { out << ", "; });
+  interleave(
+      Constraints,
+      [&](Constraint *constraint) {
+        constraint->print(out, &CS.getASTContext().SourceMgr, indent,
+                          /*skipLocator=*/true);
+      },
+      [&out]() { out << ", "; });
   out << "] ";
 
   if (!AdjacentVars.empty()) {
@@ -2382,7 +2390,7 @@ void PotentialBindings::dump(ConstraintSystem &cs, TypeVariableType *typeVar,
           if (pair.first->getImpl().getFixedType(/*record=*/nullptr))
             out << " (fixed)";
           out << " via ";
-          pair.second->print(out, &cs.getASTContext().SourceMgr, indent,
+          pair.second->print(out, &CS.getASTContext().SourceMgr, indent,
                              /*skipLocator=*/true);
         },
         [&out]() { out << ", "; });
