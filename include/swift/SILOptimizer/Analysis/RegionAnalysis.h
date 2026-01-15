@@ -491,6 +491,8 @@ class RegionAnalysisFunctionInfo {
   using PartitionOpTranslator = regionanalysisimpl::PartitionOpTranslator;
   using SendingOperandSetFactory = regionanalysisimpl::SendingOperandSetFactory;
   using BasicBlockData = BasicBlockData<BlockPartitionState>;
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
 
   llvm::BumpPtrAllocator allocator;
 
@@ -621,6 +623,34 @@ public:
 
   SILValue getUnderlyingTrackedValue(SILValue value) {
     return getValueMap().getRepresentative(value);
+  }
+
+  Element getElementForValue(SILValue value) {
+    return getValueMap().getTrackableValue(value).value.getID();
+  }
+
+  /// Given a region \p r in partition \p, return an element in \p p that is in
+  /// \p r's region and that is isolated. Returns none if r does not have any
+  /// elements that are isolated.
+  std::optional<Element> getIsolatedElementInRegion(const Partition &p,
+                                                    Region r) {
+    for (const auto &pair : p.range()) {
+      if (pair.second != r)
+        continue;
+      auto info = getValueMap().getIsolationRegion(pair.first);
+
+      // If we do not have any isolation info, then something bad
+      // happened. Return SILValue().
+      if (!info)
+        return {};
+
+      if (info.isDisconnected())
+        continue;
+
+      return pair.first;
+    }
+
+    return {};
   }
 
 private:
