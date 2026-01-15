@@ -189,7 +189,7 @@ extension CommandLine {
       return nil
     }
     defer {
-      cString.deallocate()
+      unsafe cString.deallocate()
     }
     return unsafe String(validatingCString: cString)
   }()
