@@ -3638,7 +3638,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     if (B.getFunction().hasOwnership()) {
-      if (Value->getOwnershipKind() != OwnershipKind::Guaranteed) {
+      if (!Value->getOwnershipKind().isCompatibleWith(
+              OwnershipKind::Guaranteed)) {
         P.diagnose(ValueLoc, diag::sil_operand_has_wrong_ownership_kind,
                    Value->getOwnershipKind().asString(),
                    OwnershipKind(OwnershipKind::Guaranteed).asString());

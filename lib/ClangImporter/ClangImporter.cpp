@@ -91,6 +91,7 @@
 #include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -5370,7 +5371,7 @@ template <typename Kind>
 static bool checkConditionalParams(
     const clang::RecordDecl *recordDecl, ClangImporter::Implementation *impl,
     llvm::ArrayRef<int> STLParams, std::set<StringRef> &conditionalParams,
-    llvm::function_ref<void(const clang::Type *)> maybePushToStack) {
+    llvm::function_ref<void(const clang::Type *, bool)> maybePushToStack) {
   bool foundErrors = false;
   auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
   SmallVector<std::pair<unsigned, StringRef>, 4> argumentsToCheck;
@@ -5407,7 +5408,10 @@ static bool checkConditionalParams(
           foundErrors = true;
         } else {
           maybePushToStack(
-              nonPackArg.getAsType()->getUnqualifiedDesugaredType());
+              nonPackArg.getAsType()->getUnqualifiedDesugaredType(),
+              /*isBase=*/false); // None of the STL template parameters (for the
+                                 // classes enumerated in STLConditionalParams)
+                                 // are used as base classes.
         }
       }
     }
@@ -5489,7 +5493,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
   // Keep track of Types we've seen to avoid cycles
   llvm::SmallDenseSet<const clang::Type *, 4> seen;
 
-  auto maybePushToStack = [&](const clang::Type *type) {
+  auto maybePushToStack = [&](const clang::Type *type, bool unused=false) {
     auto desugared = type->getUnqualifiedDesugaredType();
     if (seen.insert(desugared).second)
       stack.push_back(desugared);
@@ -8242,37 +8246,51 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
 const clang::CXXConstructorDecl *
 importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
   for (auto ctor : decl->ctors()) {
-    if (ctor->isCopyConstructor() &&
-        // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
-        ctor->getNumParams() == 1 && ctor->getAccess() == clang::AS_public &&
-        !ctor->isDeleted() && !ctor->isIneligibleOrNotSelected())
+    if (ctor->isCopyConstructor() && !ctor->isDeleted() &&
+        !ctor->isIneligibleOrNotSelected() &&
+        // FIXME: Support default arguments
+        // (https://github.com/swiftlang/swift/issues/86260)
+        ctor->getNumParams() == 1)
       return ctor;
   }
   return nullptr;
 }
 
-static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
+static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl,
+                                  bool inherited) {
   if (decl->hasSimpleMoveConstructor())
     return true;
 
-  return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+  return llvm::any_of(decl->ctors(), [&](clang::CXXConstructorDecl *ctor) {
+    // protected constructors are reachable from derived classes, so we only
+    // consider it inaccessible if this move constructor isn't inherited.
+    auto ctorAccessible =
+        ctor->getAccess() == clang::AS_public ||
+        (inherited && ctor->getAccess() == clang::AS_protected);
+
     return ctor->isMoveConstructor() && !ctor->isDeleted() &&
            !ctor->isIneligibleOrNotSelected() &&
-           // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
-           ctor->getNumParams() == 1 &&
-           ctor->getAccess() == clang::AS_public;
+           // FIXME: Support default arguments
+           // (https://github.com/swiftlang/swift/issues/86260)
+           ctor->getNumParams() == 1 && ctorAccessible;
   });
 }
 
-static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl) {
+static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl,
+                                     bool inherited) {
   if (decl->hasSimpleDestructor())
     return true;
 
-  if (auto dtor = decl->getDestructor()) {
+  if (auto *dtor = decl->getDestructor()) {
     if (dtor->isDeleted() || dtor->isIneligibleOrNotSelected() ||
-        dtor->getAccess() != clang::AS_public) {
+        dtor->getAccess() == clang::AS_private)
       return false;
-    }
+
+    // protected destructors are reachable from derived classes, so we only
+    // consider it inaccessible if this destructor isn't inherited.
+    if (!inherited && dtor->getAccess() == clang::AS_protected)
+      return false;
+
     return true;
   }
   return false;
@@ -8383,18 +8401,20 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   const auto *type = desc.type->getUnqualifiedDesugaredType();
   auto *importerImpl = desc.importerImpl;
 
-  bool hasUnknown = false;
-  llvm::SmallVector<const clang::RecordDecl *, 4> stack;
-  // Keep track of Decls we've seen to avoid cycles
-  llvm::SmallDenseSet<const clang::RecordDecl *, 4> seen;
+  using DeclToCheck = llvm::PointerIntPair<const clang::RecordDecl *, 1, bool>;
 
-  auto maybePushToStack = [&](const clang::Type *type) {
+  // DFS to visit bases (bool is true) and fields (bool is false)
+  llvm::SmallVector<DeclToCheck, 4> stack;
+  // Keep track of Decls we've seen to avoid cycles
+  llvm::SmallDenseSet<DeclToCheck, 4> seen;
+
+  auto maybePushToStack = [&](const clang::Type *type, bool isBase) {
     auto recordType = type->getAs<clang::RecordType>();
     if (!recordType)
       return;
 
     auto recordDecl = recordType->getDecl();
-    if (seen.insert(recordDecl).second) {
+    if (seen.insert({recordDecl, isBase}).second) {
       // When a reference type is copied, the pointer’s value is copied rather
       // than the object’s storage. This means reference types can be imported
       // as copyable to Swift, even when they are non-copyable in C++.
@@ -8408,13 +8428,16 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
             recordDecl->getName() == "_Optional_construct_base")
           return;
       }
-      stack.push_back(recordDecl);
+      stack.push_back({recordDecl, isBase});
     }
   };
 
-  maybePushToStack(type);
+  maybePushToStack(type, false);
+
+  bool hasUnknown = false;
+
   while (!stack.empty()) {
-    const clang::RecordDecl *recordDecl = stack.back();
+    auto [recordDecl, isBase] = stack.back();
     stack.pop_back();
     bool isExplicitlyNonCopyable = hasNonCopyableAttr(recordDecl);
     if (!isExplicitlyNonCopyable) {
@@ -8441,29 +8464,46 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       continue;
     }
 
-    bool isCopyable = !isExplicitlyNonCopyable;
-    if (!isExplicitlyNonCopyable) {
-      auto copyCtor = findCopyConstructor(cxxRecordDecl);
-      isCopyable = copyCtor || 
-                   cxxRecordDecl->hasSimpleCopyConstructor() ||
-                   cxxRecordDecl->needsImplicitCopyConstructor();
-      if ((copyCtor && copyCtor->isDefaulted()) ||
-          cxxRecordDecl->hasSimpleCopyConstructor() ||
-          cxxRecordDecl->needsImplicitCopyConstructor()) {
+    bool isCopyable;
+    if (isExplicitlyNonCopyable) {
+      isCopyable = false;
+    } else {
+      bool hasDefaultedOrImplicitCopyCtor; // i.e., requires member-wise copy
+
+      if (auto *copyCtor = findCopyConstructor(cxxRecordDecl)) {
+        // Found a copy constructor, but only consider it viable if it can be
+        // accessed publicly. If cxxRecordDecl is a base class, it suffices to
+        // be protected, and does not need to be public.
+        isCopyable =
+            copyCtor->getAccess() == clang::AS_public ||
+            (isBase && copyCtor->getAccess() == clang::AS_protected);
+
+        hasDefaultedOrImplicitCopyCtor = isCopyable && copyCtor->isDefaulted();
+      } else {
+        // Even if the copy constructor cannot be found, it might be implicit
+        isCopyable = hasDefaultedOrImplicitCopyCtor =
+            cxxRecordDecl->needsImplicitCopyConstructor() ||
+            cxxRecordDecl->hasSimpleCopyConstructor();
+      }
+
+      if (hasDefaultedOrImplicitCopyCtor) {
         // If the copy constructor is implicit/defaulted, we ask Clang to
         // generate its definition. The implicitly-defined copy constructor
         // performs full member-wise copy. Thus, if any member of this type is
         // ~Copyable, the type should also be ~Copyable.
         for (auto field : cxxRecordDecl->fields())
-          maybePushToStack(field->getType()->getUnqualifiedDesugaredType());
+          maybePushToStack(field->getType()->getUnqualifiedDesugaredType(),
+                           /*isBase=*/false);
+        for (auto base : cxxRecordDecl->bases())
+          maybePushToStack(base.getType()->getUnqualifiedDesugaredType(),
+                           /*isBase=*/true);
       }
     }
 
-    bool isMovable = hasMoveTypeOperations(cxxRecordDecl);
+    bool isMovable = hasMoveTypeOperations(cxxRecordDecl, isBase);
+    bool isDestructible = hasDestroyTypeOperations(cxxRecordDecl, isBase);
 
-    if (!hasDestroyTypeOperations(cxxRecordDecl) ||
-        (!isCopyable && !isMovable)) {
-
+    if (!isDestructible || (!isCopyable && !isMovable)) {
       if (hasConstructorWithUnsupportedDefaultArgs(cxxRecordDecl) &&
           importerImpl)
         importerImpl->addImportDiagnostic(
