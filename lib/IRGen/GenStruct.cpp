@@ -626,6 +626,9 @@ namespace {
       auto &ctx = IGF.IGM.Context;
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
+      auto &diagEngine = importer->getClangSema().getDiagnostics();
+      clang::DiagnosticErrorTrap trap(diagEngine);
+
       if (copyConstructor->isDefaulted() &&
           copyConstructor->getAccess() == clang::AS_public &&
           !copyConstructor->isDeleted() &&
@@ -646,8 +649,6 @@ namespace {
               const_cast<clang::CXXConstructorDecl *>(copyConstructor));
       }
 
-      auto &diagEngine = importer->getClangSema().getDiagnostics();
-      clang::DiagnosticErrorTrap trap(diagEngine);
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
 
