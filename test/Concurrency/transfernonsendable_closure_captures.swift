@@ -185,22 +185,22 @@ func testMutableNoncopyableSendableStructWithNonescapingMainActorAsync() {
 }
 
 func testNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
-  let x = NoncopyableStructNonsendable()
+  let x = NoncopyableStructNonsendable() // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   let _ = {
     nonescapingAsyncUse { @MainActor in
-      useValue(x)  // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
 
 func testMutableNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
-  var x = NoncopyableStructNonsendable()
+  var x = NoncopyableStructNonsendable() // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   x = NoncopyableStructNonsendable()
   let _ = {
     nonescapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -351,10 +351,10 @@ func testMutableNoncopyableSendableStructWithNonescapingMainActorAsyncNormalCapt
 }
 func testNoncopyableNonsendableStructWithNonescapingMainActorAsyncNormalCapture() {
   let x = NoncopyableStructNonsendable()
-  let _ = { [x] in
+  let _ = { [x] in // expected-error {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     nonescapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -362,10 +362,10 @@ func testNoncopyableNonsendableStructWithNonescapingMainActorAsyncNormalCapture(
 func testMutableNoncopyableNonsendableStructWithNonescapingMainActorAsyncNormalCapture() {
   var x = NoncopyableStructNonsendable()
   x = NoncopyableStructNonsendable()
-  let _ = { [x] in
+  let _ = { [x] in // expected-error {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     nonescapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -727,7 +727,7 @@ func testChainedClosuresPartialWriteSendable() {
       escapingAsyncUse { @MainActor in
         if let obj = readOnly1 { useValue(obj) }  // Read-only throughout
         if let obj = writable { // expected-error {{sending 'writable' risks causing data races}}
-          // expected-note @-1 {{closure captures reference to mutable 'writable' which remains modifiable by code in the current task}}
+          // expected-note @-1 {{task-isolated 'writable' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
           useValue(obj)
         }
         if let obj = readOnly2 { useValue(obj) }  // Read-only throughout
@@ -1222,12 +1222,12 @@ func testMutableGenericSendableWithNonescapingMainActorAsync<T : ~Copyable>(
 func testGenericNonsendableWithNonescapingMainActorAsync<T : ~Copyable>(
   _ value: consuming sending T,
   _ value2: consuming sending T) {
-  var x = value
+  var x = value // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   x = value2
   let _ = {
     nonescapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -1235,12 +1235,12 @@ func testGenericNonsendableWithNonescapingMainActorAsync<T : ~Copyable>(
 func testMutableGenericNonsendableWithNonescapingMainActorAsync<T : ~Copyable>(
   _ value: consuming sending T,
   _ value2: consuming sending T) {
-  var x = value
+  var x = value // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   x = value2
   let _ = {
     nonescapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
