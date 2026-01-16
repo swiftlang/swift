@@ -1961,6 +1961,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoExplicitNonIsolated);
   }
 
+  if (FrontendOpts.ImportHeaderAsInternal)
+    Opts.enableFeature(Feature::CheckImplementationOnly);
+
   if (Opts.hasFeature(Feature::CheckImplementationOnlyStrict) &&
       !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY"))
     Opts.enableFeature(Feature::CheckImplementationOnly);
