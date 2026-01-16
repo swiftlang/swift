@@ -1301,7 +1301,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
       return std::make_pair(false, Type());
 
     if (isCoveredBy(type, CS)) {
-      return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
+      return std::make_pair(true, requiresUnwrap ? type : Type());
     }
 
     // Can't unwrap optionals if there is `ExpressibleByNilLiteral`
