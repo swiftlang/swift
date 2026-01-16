@@ -2092,11 +2092,21 @@ static unsigned
 borrow_getEnumTagSinglePayload(const OpaqueValue *theEnum,
                                unsigned numEmptyCases,
                                const Metadata *metatype) {
-  // FIXME
-  // auto borrowType = cast<BorrowTypeMetadata>(metatype);
-  // return borrowType->Referent->vw_getEnumTagSinglePayload(theEnum,
-  //                                                        numEmptyCases);
-  return 0;
+  auto borrowType = cast<BorrowTypeMetadata>(metatype);
+  auto referentType = borrowType->Referent;
+  auto rep = swift_getBorrowRepresentation(referentType);
+
+  switch (rep) {
+  case BorrowRepresentation::Inline:
+    return referentType->vw_getEnumTagSinglePayload(theEnum, numEmptyCases);
+
+  case BorrowRepresentation::Pointer:
+    // $sBp = Builtin.RawPointer
+    // WV = Value witness table
+    // N = Full metadata
+    return $sBpWV.getEnumTagSinglePayload(theEnum, numEmptyCases,
+                                          &asMetadata(&$sBpN)->base);
+  }
 }
 
 static void
@@ -2104,11 +2114,23 @@ borrow_storeEnumTagSinglePayload(OpaqueValue *theEnum,
                                  unsigned whichCase,
                                  unsigned numEmptyCases,
                                  const Metadata *metatype) {
-  // FIXME
-  // auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
-  // vectorType->Element->vw_storeEnumTagSinglePayload(theEnum,
-  //                                                   whichCase,
-  //                                                   numEmptyCases);
+  auto borrowType = cast<BorrowTypeMetadata>(metatype);
+  auto referentType = borrowType->Referent;
+  auto rep = swift_getBorrowRepresentation(referentType);
+
+  switch (rep) {
+  case BorrowRepresentation::Inline:
+    referentType->vw_storeEnumTagSinglePayload(theEnum, whichCase, numEmptyCases);
+    break;
+
+  case BorrowRepresentation::Pointer:
+    // $sBp = Builtin.RawPointer
+    // WV = Value witness table
+    // N = Full metadata
+    $sBpWV.storeEnumTagSinglePayload(theEnum, whichCase, numEmptyCases,
+                                     &asMetadata(&$sBpN)->base);
+    break;
+  }
 }
 
 MetadataStateWithDependency
