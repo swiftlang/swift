@@ -82,7 +82,6 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
   @_alwaysEmitIntoClient
-  @_transparent
   @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 

@@ -67,7 +67,7 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// The number of initialized bytes in this span.
   @_alwaysEmitIntoClient
-  @_transparent
+  @_semantics("fixed_storage.get_count")
   public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// The number of additional bytes that can be appended to this span.
