@@ -48,3 +48,34 @@ public struct S4 : P {
   public var id: NonTrivial
 }
 
+public protocol Q {
+  var id: NonTrivial { get set }
+}
+
+public struct S5 : P {
+  var _id: NonTrivial
+
+  public var id: NonTrivial {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
+}
+
+@frozen
+public struct S6 : P {
+  var _id: NonTrivial
+
+  public var id: NonTrivial {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
+}
+
