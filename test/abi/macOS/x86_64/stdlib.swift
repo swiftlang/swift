@@ -1173,4 +1173,4 @@ Added: __swift_runtime_demangle
 Added: __swift_runtime_demangle_allocate
 
 // SE-NNNN: CommandLine.executablePath
-Added: _$ss11CommandLineO14executablePathSSvpZMV
+Added: _$ss11CommandLineO14executablePathSSSgvpZMV
