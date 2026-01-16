@@ -1001,7 +1001,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     ASTExtInfo extInfo =
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
     extInfo = extInfo.withSendable(false);
-    if (dropGlobalActor)
+    if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
