@@ -84,6 +84,7 @@ split_embedded_sources(
   EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
+    NORMAL Exclusivity.swift
   EMBEDDED ExistentialCollection.swift
   EMBEDDED Filter.swift
   EMBEDDED FlatMap.swift
