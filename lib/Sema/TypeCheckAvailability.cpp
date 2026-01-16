@@ -3477,7 +3477,8 @@ public:
           // Serialization will serialize the sugared type if it can,
           // but we need the canonical type to be serializable or else
           // canonicalization (e.g. in SIL) might break things.
-          if (!loader->isSerializable(clangType, /*check canonical*/ true)) {
+          if (!loader->isSerializable(clangType, /*check canonical*/ true)
+                   .Serializable) {
             ctx.Diags.diagnose(Loc, diag::unexportable_clang_function_type, T);
           }
         }
