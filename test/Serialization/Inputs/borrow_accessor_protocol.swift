@@ -79,3 +79,46 @@ public struct S6 : P {
   }
 }
 
+public struct NC : ~Copyable {
+  public init() {}
+}
+
+public protocol NCP : ~Copyable {
+  var id: NC {borrow mutate}
+}
+
+public struct NCWrapper1 : NCP & ~Copyable {
+  var _id: NC
+
+  public var id: NC {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
+}
+
+public struct NCWrapper2: NCP & ~Copyable {
+  public var id: NC
+}
+
+@frozen
+public struct NCWrapper3 : NCP & ~Copyable {
+  var _id: NC
+
+  public var id: NC {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
+}
+
+@frozen
+public struct NCWrapper4: NCP & ~Copyable {
+  public var id: NC
+}
