@@ -959,8 +959,9 @@ void BindingSet::addBinding(PotentialBinding binding) {
           });
 
       if (inferredCGFloat != Bindings.end()) {
-        Bindings.erase(inferredCGFloat);
-        Bindings.insert(inferredCGFloat->withType(type));
+        auto newBinding = inferredCGFloat->withType(type);
+        (void)Bindings.erase(inferredCGFloat);
+        Bindings.insert(newBinding);
         return;
       }
     }
@@ -1048,8 +1049,9 @@ void BindingSet::determineLiteralCoverage() {
       literal.setCoveredBy(binding->getSource());
 
       if (adjustedTy) {
-        Bindings.erase(binding);
-        Bindings.insert(binding->withType(adjustedTy));
+        auto newBinding = binding->withType(adjustedTy);
+        (void)Bindings.erase(binding);
+        Bindings.insert(newBinding);
       }
 
       break;
