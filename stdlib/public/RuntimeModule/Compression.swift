@@ -241,6 +241,7 @@ struct ZStdStream: CompressedStream {
       let ret = Sym.ZSTD_decompressStream!(stream, &outBuffer, &inBuffer)
 
       if ret == 0 {
+        totalOutput += UInt(outBuffer.pos)
         _ = try output(UInt(outBuffer.pos), true)
         return totalOutput
       }
