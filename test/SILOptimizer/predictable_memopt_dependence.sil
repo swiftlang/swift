@@ -73,6 +73,33 @@ bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
   return %ld : $SomeClass
 }
 
+// Test mark_dependence_addr base: stack promotion
+//
+// Eliminate the allocation, store, and load.
+// Update the mark_dependence_addr base to the available value.
+//
+// CHECK-LABEL: sil [ossa] @markdep_addr_base_promote_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
+// CHECK: [[ST:%.*]] = copy_value %0 : $SomeClass
+// CHECK: mark_dependence_addr %1 : $UnsafeMutablePointer<Int> on %0 : $SomeClass
+// CHECK: struct_extract %1 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+// CHECK: return [[ST]] : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_addr_base_promote_stack'
+sil [ossa] @markdep_addr_base_promote_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> @owned SomeClass {
+bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_stack $SomeClass
+  store %0 to [init] %2 : $*SomeClass
+  mark_dependence_addr %1 : $UnsafeMutablePointer<Int> on %2 : $*SomeClass
+  %ld = load [copy] %2 : $*SomeClass
+  %rawp = struct_extract %1 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_addr %2 : $*SomeClass
+  dealloc_stack %2 : $*SomeClass
+  return %ld : $SomeClass
+}
+
 // Test mark_dependence base: stack promotion on trivial allocation
 //
 // CHECK-LABEL: sil [ossa] @markdep_trivial_base_promote_stack : $@convention(thin) (Int, UnsafeMutablePointer<Int>) -> Int {
@@ -214,6 +241,34 @@ bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
   store %0 to [init] %2 : $*SomeClass
   %md = mark_dependence %1 : $UnsafeMutablePointer<Int> on %2 : $*SomeClass
   %rawp = struct_extract %md : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
+  %acc = begin_access [read] [unsafe] %addr : $*Int
+  %ldp = load [trivial] %acc : $*Int
+  end_access %acc : $*Int
+  destroy_addr %2 : $*SomeClass
+  dealloc_stack %2: $*SomeClass
+  return %ldp : $Int
+}
+
+// Test mark_dependence_addr base: dead stack
+//
+// Eliminate the allocation and store.
+// Update the mark_dependence_addr to the stored value.
+// The stored value must not be destroyed until after the end_access
+//
+// CHECK-LABEL: sil [ossa] @markdep_addr_base_dead_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> Int {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: store
+// CHECK: mark_dependence_addr %1 : $UnsafeMutablePointer<Int> on %0 : $SomeClass
+// CHECK: end_access %{{.*}} : $*Int
+// CHECK: destroy_value %0 : $SomeClass
+// CHECK-LABEL: } // end sil function 'markdep_addr_base_dead_stack'
+sil [ossa] @markdep_addr_base_dead_stack : $@convention(thin) (@owned SomeClass, UnsafeMutablePointer<Int>) -> Int {
+bb0(%0 : @owned $SomeClass, %1 : $UnsafeMutablePointer<Int>):
+  %2 = alloc_stack $SomeClass
+  store %0 to [init] %2 : $*SomeClass
+  mark_dependence_addr %1 : $UnsafeMutablePointer<Int> on %2 : $*SomeClass
+  %rawp = struct_extract %1 : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
   %addr = pointer_to_address %rawp : $Builtin.RawPointer to [strict] $*Int
   %acc = begin_access [read] [unsafe] %addr : $*Int
   %ldp = load [trivial] %acc : $*Int
