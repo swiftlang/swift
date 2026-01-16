@@ -122,11 +122,11 @@ import Bar
 import Baz
 
 func callFoo(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>,
-             _ å: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
+             _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
              _ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
   unsafe foo(x, p, len)
   unsafe fooIndirect(y, p, len)
-  unsafe fooIndirectCompleteArray(å, p, len)
+  unsafe fooIndirectCompleteArray(zz, p, len)
   let _: UnsafeMutablePointer<qux> = unsafe fooReturn(p, len)
   unsafe fooWrapped(z, p, len)
 }
@@ -137,7 +137,7 @@ func callTestEnum(_ x: UnsafeMutablePointer<fwd_declared_enum>,
 }
 
 func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>,
-              _ å: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
+              _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
               _ p: UnsafeMutableBufferPointer<CInt>) {
   // expected-error@+2{{missing argument for parameter #3 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
@@ -147,7 +147,7 @@ func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMu
   unsafe fooIndirect(y, p)
   // expected-error@+2{{missing argument for parameter #3 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
-  unsafe fooIndirectCompleteArray(å, p)
+  unsafe fooIndirectCompleteArray(zz, p)
   // expected-error@+2{{missing argument for parameter #2 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
   let _: UnsafeMutablePointer<qux> = unsafe fooReturn(p)
