@@ -731,11 +731,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(DereferenceBorrowInst, dereference_borrow,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(MakeAddrBorrowInst, make_addr_borrow,
-                    SingleValueInstruction, None, DoesNotRelease)
+                    SingleValueInstruction, MayRead, DoesNotRelease)
   SINGLE_VALUE_INST(DereferenceAddrBorrowInst, dereference_addr_borrow,
-                    SingleValueInstruction, None, DoesNotRelease)
+                    SingleValueInstruction, MayRead, DoesNotRelease)
   SINGLE_VALUE_INST(DereferenceBorrowAddrInst, dereference_borrow_addr,
-                    SingleValueInstruction, None, DoesNotRelease)
+                    SingleValueInstruction, MayRead, DoesNotRelease)
 
 SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, DereferenceBorrowAddrInst)
 NODE_RANGE(ValueBase, SILPhiArgument, DereferenceBorrowAddrInst)
@@ -900,7 +900,7 @@ NON_VALUE_INST(AbortApplyInst, abort_apply,
 NON_VALUE_INST(PackElementSetInst, pack_element_set,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(InitBorrowAddrInst, init_borrow_addr,
-               SILInstruction, MayWrite, DoesNotRelease)
+               SILInstruction, MayReadWrite, DoesNotRelease)
 
 // Runtime failure
 // FIXME: Special MemBehavior for runtime failure?

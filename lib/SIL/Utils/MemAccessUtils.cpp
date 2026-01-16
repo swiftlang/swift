@@ -2791,6 +2791,13 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[InitBorrowAddrInst::Dest]);
     return;
 
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
+    visitor(&I->getAllOperands()[0]);
+    return;
+    
+
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
