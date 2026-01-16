@@ -117,7 +117,7 @@ func testExhaustiveDoCatch() async {
   do {
     _ = try await throwingAndAsync()
     // expected-error@-1{{errors thrown from here are not handled because the enclosing catch is not exhaustive}}
-    } catch let e as HomeworkError {  // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+    } catch let e as HomeworkError {
     }
 
   // Ensure that we infer 'async' through an exhaustive do-catch.
@@ -134,8 +134,8 @@ func testExhaustiveDoCatch() async {
   let fn2 = {
     do {
       _ = try await throwingAndAsync()
-        } catch let e as HomeworkError {  // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
-        }
+    } catch let e as HomeworkError {
+    }
   }
 
   let _: Int = fn2 // expected-error{{cannot convert value of type '() async throws -> ()'}}

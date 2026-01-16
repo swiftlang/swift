@@ -15,7 +15,6 @@ func bar() throws {
   do {
     try foo()
   } catch S.E(let x) {} // expected-error {{'S.E' cannot be constructed because it has no accessible initializers}}
-  // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
 }
 
 func baz(_ x: S.E) {

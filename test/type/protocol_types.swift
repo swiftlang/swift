@@ -212,27 +212,27 @@ func throwingFn() throws {}
 func testExistentialInCatch() throws {
   do {
     try throwingFn()
-  } catch is HasAssoc {} // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  } catch is HasAssoc {}
   // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   _ = {
     do {
       try throwingFn()
-    } catch is HasAssoc {} // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+    } catch is HasAssoc {}
     // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   }
   do {
     try throwingFn()
-  } catch is HasAssocAlias {} // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  } catch is HasAssocAlias {}
   // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
   _ = {
     do {
       try throwingFn()
-    } catch is HasAssocAlias {} // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+    } catch is HasAssocAlias {}
     // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
   }
   do {
     try throwingFn()
-  } catch is ~Copyable {} // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  } catch is ~Copyable {}
   // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
   // expected-warning@-2 {{'is' test is always true}}
 
@@ -240,7 +240,7 @@ func testExistentialInCatch() throws {
   _ = {
     do {
       try throwingFn()
-    } catch is ~Copyable {} // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+    } catch is ~Copyable {}
     // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
     // expected-warning@-2 2{{'is' test is always true}}
   }

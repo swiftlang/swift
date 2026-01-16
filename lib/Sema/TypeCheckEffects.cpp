@@ -3644,8 +3644,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     if (pattern->hasType() && pattern->getType()->hasError()) return;
 
     // Only warn for implicit patterns (standard 'catch' vs 'catch let e')
-    if (isa<AnyPattern>(pattern->getSemanticsProvidingPattern()))
+
+
+    const Pattern* p = pattern->getSemanticsProvidingPattern();
+
+    if (auto *bp = dyn_cast<BindingPattern>(p))
+      p = bp->getSubPattern()->getSemanticsProvidingPattern();
+
+    if (isa<AnyPattern>(p) || isa<IsPattern>(p))
       return;
+
+    Type T;
+    if (auto *tp = dyn_cast<TypedPattern>(p)) {T = tp->getType();
+      if (!T || !T->isEqual(Ctx.getErrorExistentialType())) return;
+    } else if (!isa<NamedPattern>(p)) return;
 
     Ctx.Diags.diagnose(catchStmt->getLoc(), diag::empty_catch_block);
   }

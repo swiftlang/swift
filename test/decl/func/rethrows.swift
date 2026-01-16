@@ -454,8 +454,6 @@ func testThrowsInCatchInRethrows(_ fn: () throws -> Void) rethrows {
     try fn()
     try raise() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
   } catch is SomeError {}
-    // expected-warning@-1 {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
-
   do {
     try raise()
   } catch {

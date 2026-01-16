@@ -59,8 +59,8 @@ func testDoCatchErrorTyped(cond: Bool) {
   do {
     try doSomething()
     // expected-error@-1{{errors thrown from here are not handled because the enclosing catch is not exhaustive}}
-    } catch .failed {  // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
-    }
+  } catch .failed {
+  }
 
   // "as X" errors are never exhaustive.
   do {
@@ -74,7 +74,7 @@ func testDoCatchErrorTyped(cond: Bool) {
   do {
     try doSomething()
     // expected-error@-1{{errors thrown from here are not handled because the enclosing catch is not exhaustive}}
-  } catch is HomeworkError { // // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  } catch is HomeworkError {
     // expected-warning@-1{{cast from 'MyError' to unrelated type 'HomeworkError' always fails}}
   }
 }
@@ -94,20 +94,19 @@ func testDoCatchMultiErrorType() {
 func testDoCatchRethrowsUntyped() throws {
   do {
     try doSomething()
-  } catch .failed { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  } catch .failed {
   } // okay, rethrows with a conversion to 'any Error'
 }
 
 func testDoCatchRethrowsTyped() throws(HomeworkError) {
   do {
     try doHomework()
-  } catch .dogAteIt { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
+  } catch .dogAteIt {
   } // okay, rethrows
 
   do {
     try doSomething()
-  } catch .failed { // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
-
+  } catch .failed {
   } // expected-error{{thrown expression type 'MyError' cannot be converted to error type 'HomeworkError'}}
 
   do {
@@ -263,8 +262,8 @@ func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
     do {
       do {
         _ = try doSomething()
-            } catch .failed {  // expected-warning {{empty catch block silences all errors; consider using 'try?', or use 'catch _' explicitly to silence this warning}}
-                // pick off one case, but this still rethrows
+      } catch .failed {
+        // pick off one case, but this still rethrows
       }
     } catch {
       let _: MyError = error
