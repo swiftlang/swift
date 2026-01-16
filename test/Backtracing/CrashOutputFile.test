@@ -2,9 +2,9 @@
 // RUN: %empty-directory(%t/crashlogs)
 // RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -Onone -g -o %t/CrashOutputFile.exe
 // RUN: %target-codesign %t/CrashOutputFile.exe
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,output-to=%t/crash.log %target-run %t/CrashOutputFile.exe 2>&1 || true
+// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,output-to=%t/crash.log %target-run %t/CrashOutputFile.exe 2>&1
 // RUN: %FileCheck --ignore-case %s < %t/crash.log
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no,output-to=%t/crashlogs %target-run %t/CrashOutputFile.exe 2>&1 || true
+// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,output-to=%t/crashlogs %target-run %t/CrashOutputFile.exe 2>&1
 // RUN: cat %t/crashlogs/* | %FileCheck --ignore-case %s
 
 // UNSUPPORTED: use_os_stdlib

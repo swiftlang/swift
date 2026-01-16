@@ -108,12 +108,10 @@ set(LLVM_OPTIONAL_SOURCES
   ${backtracing_sources}
 )
 
-# We have to build with a deployment target of at least 10.15, otherwise
-# the tests will all fail because dyld will get confused at the use of
-# @rpath (from magic-symbols-for-install-name.c) and the `some Sequence<Frame>`
-# in Backtrace won't be accessible.
-if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.15")
-  set(osx_deployment_target "10.15")
+# Make the minimum build version for macOS 26.0, so we don't need to
+# add extra annotations.
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "26.0")
+  set(osx_deployment_target "26.0")
 else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
 endif()

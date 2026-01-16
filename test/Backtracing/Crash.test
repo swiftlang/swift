@@ -2,10 +2,10 @@
 // RUN: %target-build-swift %S/Inputs/Crash.swift -parse-as-library -Onone %swift-debug-flags -o %t/Crash.exe
 // RUN: %target-codesign %t/Crash.exe
 
-// RUN: env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Crash.exe > %t/Crash.out 2>&1 || true
+// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Crash.exe > %t/Crash.out 2>&1
 // RUN: %FileCheck %s --ignore-case < %t/Crash.out
 
-// RUN: env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash.exe > %t/Friendly.out 2>&1 || true
+// RUN: not env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Crash.exe > %t/Friendly.out 2>&1
 // RUN: %FileCheck %s --ignore-case --check-prefix FRIENDLY < %t/Friendly.out
 
 // UNSUPPORTED: use_os_stdlib
