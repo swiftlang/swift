@@ -12127,6 +12127,8 @@ private:
       : InstructionBase(loc), Operands(this, dest, referent) {}
 
 public:
+  enum { Dest, Referent };
+
   SILValue getDest() const { return Operands[Dest].get(); }
   SILValue getReferent() const { return Operands[Referent].get(); }
 

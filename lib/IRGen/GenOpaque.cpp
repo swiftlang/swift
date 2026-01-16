@@ -1050,6 +1050,15 @@ llvm::Value *irgen::emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T) {
                                   flags->getName() + ".isBitwiseTakable");
 }
 
+/// Load the 'isBitwiseBorrowable' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) {
+  auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonBitwiseBorrowable);
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
+                                  flags->getName() + ".isBitwiseBorrowable");
+}
+
 /// Load the 'isInline' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);

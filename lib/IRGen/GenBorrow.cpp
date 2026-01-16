@@ -21,6 +21,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "NativeConventionSchema.h"
+#include "NonFixedTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeExpansionContext.h"
@@ -170,6 +171,165 @@ public:
   }
 };
 
+class BorrowNonFixedTypeInfo final
+  : public WitnessSizedTypeInfo<BorrowNonFixedTypeInfo>
+{
+public:
+  BorrowNonFixedTypeInfo(IRGenModule &IGM)
+    : WitnessSizedTypeInfo(nullptr,
+                           Alignment(1),
+                           IsTriviallyDestroyable,
+                           IsBitwiseTakableAndBorrowable,
+                           IsCopyable,
+                           IsABIAccessible)
+  {
+    setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowNonFixed);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
+  }
+
+  void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    // 'Builtin.Borrow' is always bitwise copyable.
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
+    // 'Builtin.Borrow' is always bitwise copyable.
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
+  void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override {
+    // 'Builtin.Borrow' is always bitwise copyable.
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
+  void destroy(IRGenFunction &IGF, Address address, SILType T,
+               bool isOutlined) const override {
+    // 'Builtin.Borrow' is always trivial to destroy, thus it's a nop.
+  }
+
+  llvm::Value *getBitwiseBorrowable(IRGenFunction &IGF, SILType T) const {
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy = SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    auto &referentTI = IGF.IGM.getTypeInfo(referentTy);
+    // let bitwiseBorrowable = (!T.isBitwiseTakable || T.isBitwiseBorrowable)
+    //                          && !T.isAddressableForDependencies
+    // if bitwiseBorrowable {
+    //   return T.getEnumTagSinglePayload(...)
+    // } else {
+    //   return RawPointer.getEnumTagSinglePayload(...)
+    // }
+
+    auto isBitwiseTakable = referentTI.getIsBitwiseTakable(IGF, referentTy);
+    auto notValue = IGF.Builder.CreateNot(isBitwiseTakable);
+    auto isBitwiseBorrowable = referentTI.getIsBitwiseBorrowable(IGF, referentTy);
+    auto orValue = IGF.Builder.CreateOr(notValue, isBitwiseBorrowable);
+    auto cmp = IGF.Builder.CreateICmpEQ(orValue, IGF.IGM.getBool(true));
+    // auto isAddressableForDeps = referentTI.getIsAddressableForDependencies(IGF,
+    //                                                                   referent);
+    return cmp;
+  }
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr, SILType T,
+                                       bool isOutlined) const override {
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy = SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    auto &referentTI = IGF.IGM.getTypeInfo(referentTy);
+
+    auto isBitwiseBorrowable = getBitwiseBorrowable(IGF, T);
+    auto isBitwiseBorrowableBB = IGF.createBasicBlock("is_bitwise_borrowable");
+    auto notBitwiseBorrowableBB = IGF.createBasicBlock("not_bitwise_borrowable");
+    auto doneBB = IGF.createBasicBlock("done");
+
+    IGF.Builder.CreateCondBr(isBitwiseBorrowable, isBitwiseBorrowableBB,
+                             notBitwiseBorrowableBB);
+
+    // Is bitwise borrowable, meaning we can use the referent's TypeInfo to grab
+    // this value.
+    IGF.Builder.emitBlock(isBitwiseBorrowableBB);
+
+    auto inlineResult = referentTI.getEnumTagSinglePayload(IGF, numEmptyCases,
+                                                           enumAddr,
+                                                           referentTy,
+                                                           isOutlined);
+
+    // Calling the referent's getEnumTagSinglePayload may have introduced new
+    // blocks. Get the current one that contains the result and save it for the
+    // phi node later.
+    auto isBitwiseBorrowablePhiBB = IGF.Builder.GetInsertBlock();
+
+    IGF.Builder.CreateBr(doneBB);
+
+    // Not bitwise borrowable, meaning we need to grab the value from
+    // RawPointer's TypeInfo.
+    IGF.Builder.emitBlock(notBitwiseBorrowableBB);
+
+    auto pointerTy = SILType::getPrimitiveObjectType(IGF.IGM.Context.TheRawPointerType);
+    auto &rawPointerTI = IGF.IGM.getRawPointerTypeInfo();
+    auto pointerResult = rawPointerTI.getEnumTagSinglePayload(IGF, numEmptyCases,
+                                                              enumAddr,
+                                                              pointerTy,
+                                                              isOutlined);
+
+    // Calling the raw pointer's getEnumTagSinglePayload may have introduced new
+    // blocks. Get the current one that contains the result and save it for the
+    // phi node later.
+    auto notBitwiseBorrowablePhiBB = IGF.Builder.GetInsertBlock();
+
+    IGF.Builder.CreateBr(doneBB);
+
+    IGF.Builder.emitBlock(doneBB);
+    auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
+    phi->addIncoming(inlineResult, isBitwiseBorrowablePhiBB);
+    phi->addIncoming(pointerResult, notBitwiseBorrowablePhiBB);
+
+    return phi;
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T, bool isOutlined) const override {
+    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
+    auto referentTy = SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
+    auto &referentTI = IGF.IGM.getTypeInfo(referentTy);
+
+    auto isBitwiseBorrowable = getBitwiseBorrowable(IGF, T);
+    auto isBitwiseBorrowableBB = IGF.createBasicBlock("is_bitwise_borrowable");
+    auto notBitwiseBorrowableBB = IGF.createBasicBlock("not_bitwise_borrowable");
+
+    IGF.Builder.CreateCondBr(isBitwiseBorrowable, isBitwiseBorrowableBB,
+                             notBitwiseBorrowableBB);
+
+    // Is bitwise borrowable, meaning we can use the referent's TypeInfo to
+    // store the tag.
+    IGF.Builder.emitBlock(isBitwiseBorrowableBB);
+
+    referentTI.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr,
+                                         referentTy, isOutlined);
+
+    IGF.Builder.CreateRetVoid();
+
+    // Not bitwise borrowable, meaning we need to use RawPointer's TypeInfo to
+    // store the tag.
+    IGF.Builder.emitBlock(notBitwiseBorrowableBB);
+
+    auto pointerTy = SILType::getPrimitiveObjectType(IGF.IGM.Context.TheRawPointerType);
+    auto &rawPointerTI = IGF.IGM.getRawPointerTypeInfo();
+    rawPointerTI.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr,
+                                           pointerTy, isOutlined);
+    return;
+  }
+};
+
 const TypeInfo *
 TypeConverter::convertBuiltinBorrowType(BuiltinBorrowType *T) {
   // NB: Builtin.Borrow is reabstracted through, so we lower the referent as a
@@ -181,8 +341,7 @@ TypeConverter::convertBuiltinBorrowType(BuiltinBorrowType *T) {
   // is also dependent.
   auto *fixedReferent = dyn_cast<FixedTypeInfo>(&referentTI);
   if (!fixedReferent) {
-    // TODO
-    llvm_unreachable("non-fixed borrow not implemented");
+    return new BorrowNonFixedTypeInfo(IGM);
   } 
 
   // TODO: If the referent type's layout is dependent on a type defined in a
@@ -261,8 +420,15 @@ void irgen::emitInitBorrowAtAddress(IRGenFunction &IGF,
     
   case BorrowTypeInfoSubclassKind::BorrowNonFixed:
     // The borrow representation is dependent on the referent type.
-    // Ask the runtime to handle it.    
-    llvm_unreachable("todo");
+    // Ask the runtime 'swift_initBorrow' to handle it.
+    auto astBorrowTy = borrowTy.getASTType()->castTo<BuiltinBorrowType>();
+    auto metadata = IGF.emitTypeMetadataRef(astBorrowTy->getReferentType());
+    auto initBorrow = IGF.IGM.getInitBorrowFunctionPointer();
+
+    IGF.Builder.CreateCall(initBorrow, {metadata, destBorrow.getAddress(),
+                                        srcReferent.getAddress()});
+
+    return;
   }
   llvm_unreachable("invalid borrow representation!");
 }
@@ -304,6 +470,8 @@ Address irgen::emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
   auto builtinBorrowTy = borrowTy.castTo<BuiltinBorrowType>();
 
   auto &tl = IGF.IGM.getTypeInfo(borrowTy);
+  auto &referentTL = IGF.IGM.getTypeInfo(
+      SILType::getPrimitiveObjectType(builtinBorrowTy->getReferentType()));
 
   // The address-only instruction form can handle any borrow representation.
   switch ((BorrowTypeInfoSubclassKind)tl.getSubclassKind()) {
@@ -314,9 +482,6 @@ Address irgen::emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
     return borrow;
 
   case BorrowTypeInfoSubclassKind::BorrowByPointer: {
-    auto &referentTL = IGF.IGM.getTypeInfo(
-      SILType::getPrimitiveObjectType(builtinBorrowTy->getReferentType()));
-
     // The borrow is a pointer to the referent. Load the pointer and use it as
     // the address of the value.
     auto addr = IGF.Builder.CreateLoad(borrow.getAddress(),
@@ -327,10 +492,19 @@ Address irgen::emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
                    referentTL.getBestKnownAlignment());
   }
     
-  case BorrowTypeInfoSubclassKind::BorrowNonFixed:
+  case BorrowTypeInfoSubclassKind::BorrowNonFixed: {
     // The borrow representation is dependent on the referent type.
-    // Ask the runtime to handle it.    
-    llvm_unreachable("todo");
+    // Ask the runtime 'swift_dereferenceBorrow' to handle it.
+    auto astBorrowTy = borrowTy.getASTType()->castTo<BuiltinBorrowType>();
+    auto metadata = IGF.emitTypeMetadataRef(astBorrowTy->getReferentType());
+    auto dereferenceBorrow = IGF.IGM.getDereferenceBorrowFunctionPointer();
+
+    auto addr = IGF.Builder.CreateCall(dereferenceBorrow,
+                                       {metadata, borrow.getAddress()});
+
+    return Address(addr, referentTL.getStorageType(),
+                   referentTL.getBestKnownAlignment());
+  }
   }
   llvm_unreachable("invalid borrow representation!");
 }

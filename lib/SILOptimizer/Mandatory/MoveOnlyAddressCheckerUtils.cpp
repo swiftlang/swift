@@ -2829,6 +2829,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!ue || ue->isDestructive()) {
       llvm::errs() << "Found a write classified as a liveness use?!\n";
       llvm::errs() << "Use: " << *user;
+      user->getFunction()->dump();
       llvm_unreachable("standard failure");
     }
   }

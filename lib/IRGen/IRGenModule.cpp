@@ -1572,6 +1572,10 @@ llvm::ConstantInt *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
+llvm::ConstantInt *IRGenModule::getBool(bool condition) {
+  return llvm::ConstantInt::get(Int1Ty, condition);
+}
+
 llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
   return llvm::ConstantExpr::getBitCast(ptr, Int8PtrTy);
 }

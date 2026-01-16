@@ -1740,6 +1740,17 @@ struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
 };
 using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
 
+/// The structure of `Builtin.Borrow` type metadata.
+template <typename Runtime>
+struct TargetBorrowTypeMetadata : public TargetMetadata<Runtime> {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Referent;
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::Borrow;
+  }
+};
+using BorrowTypeMetadata = TargetBorrowTypeMetadata<InProcess>;
+
 /// The structure of tuple type metadata.
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
