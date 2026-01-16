@@ -135,7 +135,7 @@ extension MutableRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
   @_alwaysEmitIntoClient
-  @_transparent
+  @_semantics("fixed_storage.get_count")
   public var byteCount: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
