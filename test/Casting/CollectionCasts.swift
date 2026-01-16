@@ -738,11 +738,7 @@ ArrayCasts.testSync("Covariant") {
   expectNil(d)
 }
 
-// Currently failing
-// See https://forums.swift.org/t/casting-closure-collections/82100/10
-if false {
 ArrayCasts.testSync("Covariant nested") {
-
   typealias X = [([() -> any StringProtocol]) -> [String]]
   typealias Y = [([() -> String]) -> [any StringProtocol]]
 
@@ -751,7 +747,11 @@ ArrayCasts.testSync("Covariant nested") {
     { _ in ["abc"] },
     { x in (x + x).map { $0() as! String } }
   ]
-
+  
+  // Currently failing
+  // See https://forums.swift.org/t/casting-closure-collections/82100/10
+  expectCrashLater()
+  
   let b = a as Y
   expectEqual(b.count, 3)
   let probe: [() -> String] = [{ "xyz" }, { "ijk" } ]
@@ -766,7 +766,6 @@ ArrayCasts.testSync("Covariant nested") {
 
   let d = (a as Any) as? Y
   expectNil(d)
-}
 }
 
 ArrayCasts.testSync("Preconcurrency") {
@@ -1517,11 +1516,7 @@ DictionaryCasts.testSync("Covariant") {
   expectNil(d)
 }
 
-// Currently failing
-// See https://forums.swift.org/t/casting-closure-collections/82100/10
-if false {
 DictionaryCasts.testSync("Covariant nested") {
-
   typealias X = [String: ([String: () -> any StringProtocol]) -> [String: String]]
   typealias Y = [String: ([String: () -> String]) -> [String: any StringProtocol]]
 
@@ -1539,7 +1534,11 @@ DictionaryCasts.testSync("Covariant nested") {
       return result
     }
   ]
-
+  
+  // Currently failing
+  // See https://forums.swift.org/t/casting-closure-collections/82100/10
+  expectCrashLater()
+  
   let b = a as Y
   expectEqual(b.count, 3)
   let probe: [String: () -> String] = ["a": { "xyz" }, "b": { "ijk" } ]
@@ -1554,7 +1553,6 @@ DictionaryCasts.testSync("Covariant nested") {
 
   let d = (a as Any) as? Y
   expectNil(d)
-}
 }
 
 DictionaryCasts.testSync("Preconcurrency") {
