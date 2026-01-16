@@ -12114,11 +12114,14 @@ class InitBorrowAddrInst final
     : public InstructionBase<SILInstructionKind::InitBorrowAddrInst,
                              NonValueInstruction>
 {
+public:
+  // Operand indices.
+  enum { Dest, Referent };
+
+private:
   friend SILBuilder;
 
   FixedOperandList<2> Operands;
-
-  enum { Dest, Referent };
 
   InitBorrowAddrInst(SILDebugLocation loc, SILValue dest, SILValue referent)
       : InstructionBase(loc), Operands(this, dest, referent) {}

@@ -2318,6 +2318,9 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
 
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
@@ -2781,6 +2784,11 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Src]);
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Dest]);
+    return;
+
+  case SILInstructionKind::InitBorrowAddrInst:
+    visitor(&I->getAllOperands()[InitBorrowAddrInst::Referent]);
+    visitor(&I->getAllOperands()[InitBorrowAddrInst::Dest]);
     return;
 
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
