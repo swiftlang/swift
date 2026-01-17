@@ -1156,7 +1156,8 @@ SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
           Loc, this->getOpType(Inst->getType()).template castTo<SILBoxType>(),
           VarInfo, Inst->hasDynamicLifetime(), Inst->emitReflectionMetadata(),
           Inst->usesMoveableValueDebugInfo(),
-          /*skipVarDeclAssert*/ true, Inst->hasPointerEscape()));
+          /*skipVarDeclAssert*/ true, Inst->hasPointerEscape(),
+          Inst->isInferredImmutable()));
 }
 
 template<typename ImplClass>
