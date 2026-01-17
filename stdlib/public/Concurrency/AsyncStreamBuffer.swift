@@ -606,14 +606,10 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
   }
 }
 
-@available(SwiftStdlib 5.1, *)
-@_silgen_name("swift_continuation_logFailedCheck")
-internal func logFailedCheck(_ message: UnsafeRawPointer)
-
 @inline(never)
 @_silgen_name("asyncstream_on_multiple_awaiters_detected")
 func onMultipleAwaitersDetected() {
-  logFailedCheck("SWIFT ASYNCSTREAM MISUSE: used by multiple awaiters!")
+  unsafe logFailedCheck("SWIFT ASYNCSTREAM MISUSE: used by multiple awaiters!")
 }
 
 #endif
