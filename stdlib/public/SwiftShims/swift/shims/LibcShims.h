@@ -38,6 +38,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                            __swift_size_t nitems);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_fputs_stderr(const char *str);
+
 // General utilities <stdlib.h>
 // Memory management functions
 static inline void _swift_stdlib_free(void *_Nullable ptr) {

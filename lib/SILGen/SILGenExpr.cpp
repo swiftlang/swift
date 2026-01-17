@@ -2210,8 +2210,6 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // convention.
   auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
 
-
-
   // Look through `as` type ascriptions that don't induce bridging too.
   while (auto subCoerce = dyn_cast<CoerceExpr>(subExpr)) {
     // Coercions that introduce bridging aren't simple type ascriptions.
@@ -2287,45 +2285,52 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       return rv;
   }
 
-  // Break the conversion into three stages:
-  // 1) changing the representation from foreign to native
-  // 2) changing the signature within the representation
-  // 3) changing the representation from native to foreign
-  //
-  // We only do one of 1) or 3), but we have to do them in the right order
-  // with respect to 2).
-
-  CanAnyFunctionType stage1Type = srcType;
-  CanAnyFunctionType stage2Type = destType;
-
-  switch(srcType->getRepresentation()) {
-  case AnyFunctionType::Representation::Swift:
-  case AnyFunctionType::Representation::Thin:
-    // Source is native, so we can convert signature first.
-    stage2Type = adjustFunctionType(destType, srcType->getRepresentation(),
-                                    srcType->getClangTypeInfo());
-    break;
-  case AnyFunctionType::Representation::Block:
-  case AnyFunctionType::Representation::CFunctionPointer:
-    // Source is foreign, so do the representation change first.
-    stage1Type = adjustFunctionType(srcType, destType->getRepresentation(),
-                                    destType->getClangTypeInfo());
-  }
-
+  // First emit the actual underlying subexpression.
   auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
 
-  if (srcType != stage1Type)
-    result = convertFunctionRepresentation(SGF, e, result, srcType, stage1Type);
+  // Then perform the conversion as appropriate. We use different strategies
+  // depending on if our srcType is foreign/native.
+  //
+  // 1. If we have a foreign function, we first perform an optional conversion
+  // to native and then change the signature within the representation (which
+  // could be native or foreign).
+  //
+  // 2. If we have a native function, we first perform an optional conversion to
+  // foreign and then change the signature within the representation (which
+  // could be native or foreign).
 
-  if (stage1Type != stage2Type) {
-    result = SGF.emitTransformedValue(e, result, stage1Type, stage2Type,
-                                      SGFContext());
+  switch (srcType->getRepresentation()) {
+  case AnyFunctionType::Representation::Swift:
+  case AnyFunctionType::Representation::Thin: {
+    // Source is native, so we can convert signature first.
+    auto adjustedDestType = adjustFunctionType(
+        destType, srcType->getRepresentation(), srcType->getClangTypeInfo());
+    if (srcType != adjustedDestType) {
+      result = SGF.emitTransformedValue(e, result, srcType, adjustedDestType,
+                                        SGFContext());
+    }
+    if (adjustedDestType != destType) {
+      result = convertFunctionRepresentation(SGF, e, result, adjustedDestType,
+                                             destType);
+    }
+    return RValue(SGF, e, result);
   }
-
-  if (stage2Type != destType)
-    result = convertFunctionRepresentation(SGF, e, result, stage2Type, destType);
-
-  return RValue(SGF, e, result);
+  case AnyFunctionType::Representation::Block:
+  case AnyFunctionType::Representation::CFunctionPointer: {
+    // Source is foreign, so do the representation change first.
+    auto adjustedSrcType = adjustFunctionType(
+        srcType, destType->getRepresentation(), destType->getClangTypeInfo());
+    if (srcType != adjustedSrcType) {
+      result = convertFunctionRepresentation(SGF, e, result, srcType,
+                                             adjustedSrcType);
+    }
+    if (adjustedSrcType != destType) {
+      result = SGF.emitTransformedValue(e, result, adjustedSrcType, destType,
+                                        SGFContext());
+    }
+    return RValue(SGF, e, result);
+  }
+  }
 }
 
 RValue RValueEmitter::visitCovariantFunctionConversionExpr(
