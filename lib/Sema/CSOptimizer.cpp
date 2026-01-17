@@ -43,7 +43,7 @@ namespace {
 struct DisjunctionInfo {
   /// The score of the disjunction is the highest score from its choices.
   /// If the score is nullopt it means that the disjunction is not optimizable.
-  std::optional<double> Score;
+  std::optional<unsigned> Score;
 
   /// The highest scoring choices that could be favored when disjunction
   /// is attempted.
@@ -54,7 +54,7 @@ struct DisjunctionInfo {
   bool IsSpeculative;
 
   DisjunctionInfo() = default;
-  DisjunctionInfo(std::optional<double> score,
+  DisjunctionInfo(std::optional<unsigned> score,
                   ArrayRef<Constraint *> favoredChoices, bool speculative)
       : Score(score), FavoredChoices(favoredChoices),
         IsSpeculative(speculative) {}
@@ -63,15 +63,15 @@ struct DisjunctionInfo {
 };
 
 class DisjunctionInfoBuilder {
-  std::optional<double> Score;
+  std::optional<unsigned> Score;
   SmallVector<Constraint *, 2> FavoredChoices;
   bool IsSpeculative;
 
 public:
-  DisjunctionInfoBuilder(std::optional<double> score)
+  DisjunctionInfoBuilder(std::optional<unsigned> score)
       : DisjunctionInfoBuilder(score, {}) {}
 
-  DisjunctionInfoBuilder(std::optional<double> score,
+  DisjunctionInfoBuilder(std::optional<unsigned> score,
                          ArrayRef<Constraint *> favoredChoices)
       : Score(score),
         FavoredChoices(favoredChoices.begin(), favoredChoices.end()),
@@ -821,12 +821,65 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
 } // end anonymous namespace
 
+/// Determine whether the candidate type is a subclass of the superclass
+/// type.
+///
+/// FIXME: This should be a common utility somewhere instead of being
+/// re-implemented in several places in the compiler.
+static bool isSubclassOf(Type candidateType, Type superclassType) {
+  // Conversion from a concrete type to its existential value.
+  if (superclassType->isExistentialType() && !superclassType->isAny()) {
+    auto layout = superclassType->getExistentialLayout();
+
+    if (auto layoutConstraint = layout.getLayoutConstraint()) {
+      if (layoutConstraint->isClass() &&
+          !(candidateType->isClassExistentialType() ||
+            candidateType->mayHaveSuperclass()))
+        return false;
+    }
+
+    if (layout.explicitSuperclass &&
+        !isSubclassOf(candidateType, layout.explicitSuperclass))
+      return false;
+
+    return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
+      if (auto superclass = P->getSuperclassDecl()) {
+        if (!isSubclassOf(candidateType,
+                          superclass->getDeclaredInterfaceType()))
+          return false;
+      }
+
+      auto result = TypeChecker::containsProtocol(candidateType, P,
+                                                  /*allowMissing=*/false);
+      return result.first || result.second;
+    });
+  }
+
+  if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
+    candidateType = selfType->getSelfType();
+  }
+
+  if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
+    candidateType = archetypeType->getSuperclass();
+    if (!candidateType)
+      return false;
+  }
+
+  auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
+  auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
+
+  if (!(subclassDecl && superclassDecl))
+    return false;
+
+  return superclassDecl->isSuperclassOf(subclassDecl);
+}
+
 /// Given a set of disjunctions, attempt to determine
 /// favored choices in the current context.
 static void determineBestChoicesInContext(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions,
     llvm::DenseMap<Constraint *, DisjunctionInfo> &result) {
-  double bestOverallScore = 0.0;
+  unsigned bestOverallScore = 0;
 
   auto recordResult = [&bestOverallScore, &result](Constraint *disjunction,
                                                    DisjunctionInfo &&info) {
@@ -841,7 +894,7 @@ static void determineBestChoicesInContext(
     // initializers for CGFloat<->Double conversions and restrictions with
     // multiple choices.
     if (disjunction->countFavoredNestedConstraints() > 0) {
-      DisjunctionInfoBuilder info(/*score=*/2.0);
+      DisjunctionInfoBuilder info(/*score=*/200);
       for (auto *choice : disjunction->getNestedConstraints()) {
         if (choice->isFavored())
           info.addFavoredChoice(choice);
@@ -883,7 +936,7 @@ static void determineBestChoicesInContext(
                 });
             recordResult(
                 disjunction,
-                DisjunctionInfoBuilder(/*score=*/1.0, favoredChoices).build());
+                DisjunctionInfoBuilder(/*score=*/100, favoredChoices).build());
             continue;
           }
 
@@ -925,7 +978,7 @@ static void determineBestChoicesInContext(
       if (!favoredChoices.empty()) {
         recordResult(
             disjunction,
-            DisjunctionInfoBuilder(/*score=*/0.01, favoredChoices).build());
+            DisjunctionInfoBuilder(/*score=*/1, favoredChoices).build());
         continue;
       }
     }
@@ -1174,57 +1227,6 @@ static void determineBestChoicesInContext(
                                 /*allow fixes*/ false, listener, std::nullopt);
     };
 
-    // Determine whether the candidate type is a subclass of the superclass
-    // type.
-    std::function<bool(Type, Type)> isSubclassOf = [&](Type candidateType,
-                                                       Type superclassType) {
-      // Conversion from a concrete type to its existential value.
-      if (superclassType->isExistentialType() && !superclassType->isAny()) {
-        auto layout = superclassType->getExistentialLayout();
-
-        if (auto layoutConstraint = layout.getLayoutConstraint()) {
-          if (layoutConstraint->isClass() &&
-              !(candidateType->isClassExistentialType() ||
-                candidateType->mayHaveSuperclass()))
-            return false;
-        }
-
-        if (layout.explicitSuperclass &&
-            !isSubclassOf(candidateType, layout.explicitSuperclass))
-          return false;
-
-        return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-          if (auto superclass = P->getSuperclassDecl()) {
-            if (!isSubclassOf(candidateType,
-                              superclass->getDeclaredInterfaceType()))
-              return false;
-          }
-
-          auto result = TypeChecker::containsProtocol(candidateType, P,
-                                                      /*allowMissing=*/false);
-          return result.first || result.second;
-        });
-      }
-
-      if (auto *selfType = candidateType->getAs<DynamicSelfType>()) {
-        candidateType = selfType->getSelfType();
-      }
-
-      if (auto *archetypeType = candidateType->getAs<ArchetypeType>()) {
-        candidateType = archetypeType->getSuperclass();
-        if (!candidateType)
-          return false;
-      }
-
-      auto *subclassDecl = candidateType->getClassOrBoundGenericClass();
-      auto *superclassDecl = superclassType->getClassOrBoundGenericClass();
-
-      if (!(subclassDecl && superclassDecl))
-        return false;
-
-      return superclassDecl->isSuperclassOf(subclassDecl);
-    };
-
     enum class MatchFlag {
       OnParam = 0x01,
       Literal = 0x02,
@@ -1251,17 +1253,13 @@ static void determineBestChoicesInContext(
     // type matches a parameter type (i.e. when partially resolved generic
     // types are matched) this function is going to produce \c std::nullopt
     // instead of `0` that indicates "not a match".
-    std::function<std::optional<double>(GenericSignature, ValueDecl *,
-                                        std::optional<unsigned>, Type, Type,
-                                        MatchOptions)>
+    std::function<std::optional<unsigned>(GenericSignature, ValueDecl *,
+                                          std::optional<unsigned>, Type, Type,
+                                          MatchOptions)>
         scoreCandidateMatch =
             [&](GenericSignature genericSig, ValueDecl *choice,
                 std::optional<unsigned> paramIdx, Type candidateType,
-                Type paramType, MatchOptions options) -> std::optional<double> {
-      auto areEqual = [&](Type a, Type b) {
-        return a->getDesugaredType()->isEqual(b->getDesugaredType());
-      };
-
+                Type paramType, MatchOptions options) -> std::optional<unsigned> {
       auto isCGFloatDoubleConversionSupported = [&options]() {
         // CGFloat <-> Double conversion is supposed only while
         // match argument candidates to parameters.
@@ -1277,7 +1275,7 @@ static void determineBestChoicesInContext(
       // be delayed as much as possible.
       if (isCGFloatDoubleConversionSupported()) {
         if (candidateType->isCGFloat() && paramType->isDouble()) {
-          return options.contains(MatchFlag::Literal) ? 0.2 : 0.9;
+          return options.contains(MatchFlag::Literal) ? 20 : 90;
         }
       }
 
@@ -1286,20 +1284,20 @@ static void determineBestChoicesInContext(
         // since everything else is going to increase to score.
         if (options.contains(MatchFlag::Literal)) {
           if (isUnboundArrayType(candidateType))
-            return paramType->isArray() ? 0.3 : 0;
+            return paramType->isArray() ? 30 : 0;
 
           if (isUnboundDictionaryType(candidateType))
-            return cs.isDictionaryType(paramType) ? 0.3 : 0;
+            return cs.isDictionaryType(paramType) ? 30 : 0;
         }
 
-        if (!areEqual(candidateType, paramType))
+        if (!candidateType->isEqual(paramType))
           return 0;
-        return options.contains(MatchFlag::Literal) ? 0.3 : 1;
+        return options.contains(MatchFlag::Literal) ? 30 : 100;
       }
 
       // Exact match between candidate and parameter types.
-      if (areEqual(candidateType, paramType)) {
-        return options.contains(MatchFlag::Literal) ? 0.3 : 1;
+      if (candidateType->isEqual(paramType)) {
+        return options.contains(MatchFlag::Literal) ? 30 : 100;
       }
 
       if (options.contains(MatchFlag::Literal)) {
@@ -1317,8 +1315,8 @@ static void determineBestChoicesInContext(
           // Optional injection lowers the score for operators to match
           // pre-optimizer behavior.
           return choice->isOperator() && paramType->getOptionalObjectType()
-                      ? 0.2
-                      : 0.3;
+                      ? 20
+                      : 30;
         } else {
           // Integer and floating-point literals can match any parameter
           // type that conforms to `ExpressibleBy{Integer, Float}Literal`
@@ -1328,17 +1326,17 @@ static void determineBestChoicesInContext(
           if (candidateType->isInt() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
-            return 0.3;
+            return 30;
 
           if (candidateType->isDouble() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
-            return 0.3;
+            return 30;
 
           if (candidateType->isBool() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByBooleanLiteral))
-            return 0.3;
+            return 30;
 
           if (candidateType->isString()) {
             auto literalProtocol =
@@ -1348,7 +1346,7 @@ static void determineBestChoicesInContext(
 
             if (TypeChecker::conformsToKnownProtocol(paramType,
                                                      literalProtocol))
-              return 0.3;
+              return 30;
           }
 
           // Check if the other side conforms to `ExpressibleByArrayLiteral`
@@ -1357,7 +1355,7 @@ static void determineBestChoicesInContext(
           if (candidateType->isArray() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByArrayLiteral))
-            return 0.3;
+            return 30;
 
           // Check if the other side conforms to
           // `ExpressibleByDictionaryLiteral` protocol (in some way).
@@ -1365,7 +1363,7 @@ static void determineBestChoicesInContext(
           if (candidateType->isDictionary() &&
               TypeChecker::conformsToKnownProtocol(
                   paramType, KnownProtocolKind::ExpressibleByDictionaryLiteral))
-            return 0.3;
+            return 30;
         }
 
         return 0;
@@ -1397,7 +1395,7 @@ static void determineBestChoicesInContext(
               // old behavior where exact matches on operator parameter
               // types were always preferred.
               if (choice->isOperator() && requiresOptionalInjection())
-                return score.value() - 0.1;
+                return score.value() - 10;
             }
 
             return score;
@@ -1410,13 +1408,13 @@ static void determineBestChoicesInContext(
 
       // Candidate could be converted to a superclass.
       if (isSubclassOf(candidateType, paramType))
-        return 1;
+        return 100;
 
       // Possible Array<T> -> Unsafe*Pointer conversion.
       if (options.contains(MatchFlag::OnParam)) {
         if (candidateType->isArray() &&
             paramType->getAnyPointerElementType())
-          return 1;
+          return 100;
       }
 
       // If both argument and parameter are tuples of the same arity,
@@ -1426,7 +1424,7 @@ static void determineBestChoicesInContext(
           auto *paramTuple = paramType->getAs<TupleType>();
           if (paramTuple &&
               candidateTuple->getNumElements() == paramTuple->getNumElements())
-            return 1;
+            return 100;
         }
       }
 
@@ -1435,7 +1433,7 @@ static void determineBestChoicesInContext(
         // convertible to it, which makes it a perfect match. The solver
         // would then decide whether erasing to an existential is preferable.
         if (paramType->isAny())
-          return 1;
+          return 100;
 
         // If the parameter is `Any.Type` we assume that all metatype
         // candidates are convertible to it.
@@ -1443,7 +1441,7 @@ static void determineBestChoicesInContext(
           if (EMT->getExistentialInstanceType()->isAny() &&
               (candidateType->is<ExistentialMetatypeType>() ||
                candidateType->is<MetatypeType>()))
-            return 1;
+            return 100;
         }
       }
 
@@ -1457,7 +1455,7 @@ static void determineBestChoicesInContext(
                                    candidateType->getMetatypeInstanceType())) {
             // Lower the score slightly for operators to make sure that
             // concrete overloads are always preferred over generic ones.
-            return choice->isOperator() ? 0.9 : 1;
+            return choice->isOperator() ? 90 : 100;
           }
         }
       }
@@ -1467,7 +1465,7 @@ static void determineBestChoicesInContext(
       if (genericSig && paramType->isTypeParameter()) {
         // Light-weight check if cases where `checkRequirements` is not
         // applicable.
-        auto checkProtocolRequirementsOnly = [&]() -> double {
+        auto checkProtocolRequirementsOnly = [&]() -> unsigned {
           auto protocolRequirements =
               genericSig->getRequiredProtocols(paramType);
           if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
@@ -1476,9 +1474,9 @@ static void determineBestChoicesInContext(
             if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
               auto *paramDecl = GP->getDecl();
               if (paramDecl && paramDecl->isOpaqueType())
-                return 1.0;
+                return 100;
             }
-            return 0.7;
+            return 70;
           }
 
           return 0;
@@ -1533,7 +1531,7 @@ static void determineBestChoicesInContext(
         // If there are no requirements associated with the generic
         // parameter or dependent member type it could match any type.
         if (requirements.empty())
-          return 0.7;
+          return 70;
 
         // If some of the requirements cannot be satisfied, because
         // they reference other generic parameters, for example:
@@ -1560,7 +1558,7 @@ static void determineBestChoicesInContext(
         // everything else the solver should try both concrete and
         // generic and disambiguate during ranking.
         if (result == CheckRequirementsResult::Success)
-          return choice->isOperator() ? 0.9 : 1.0;
+          return choice->isOperator() ? 90 : 100;
 
         return 0;
       }
@@ -1581,12 +1579,12 @@ static void determineBestChoicesInContext(
           // If the candidate it not yet fully resolved, let's lower the
           // score slightly to avoid over-favoring generic overload choices.
           if (candidateType->hasTypeVariable())
-            return 0.8;
+            return 80;
 
           // If the candidate is fully resolved we need to treat this
           // as we would generic parameter otherwise there is a risk
           // of skipping some of the valid choices.
-          return choice->isOperator() ? 0.9 : 1.0;
+          return choice->isOperator() ? 90 : 100;
         }
       }
 
@@ -1594,8 +1592,8 @@ static void determineBestChoicesInContext(
     };
 
     // The choice with the best score.
-    double bestScore = 0.0;
-    SmallVector<std::pair<Constraint *, double>, 2> favoredChoices;
+    unsigned bestScore = 0;
+    SmallVector<std::pair<Constraint *, unsigned>, 2> favoredChoices;
 
     forEachDisjunctionChoice(
         cs, disjunction,
@@ -1629,7 +1627,7 @@ static void determineBestChoicesInContext(
                                ->castTo<FunctionType>();
           }
 
-          double score = 0.0;
+          unsigned score = 0;
           unsigned numDefaulted = 0;
           for (unsigned paramIdx = 0, n = overloadType->getNumParams();
                paramIdx != n; ++paramIdx) {
@@ -1683,14 +1681,14 @@ static void determineBestChoicesInContext(
             // all bound concrete types, we consider this is mismatch
             // at this parameter position and remove the overload choice
             // from consideration.
-            double bestCandidateScore = 0;
+            unsigned bestCandidateScore = 0;
             llvm::BitVector mismatches(argumentCandidates[argIdx].size());
 
             for (unsigned candidateIdx :
                  indices(argumentCandidates[argIdx])) {
               // If one of the candidates matched exactly there is no reason
               // to continue checking.
-              if (bestCandidateScore == 1)
+              if (bestCandidateScore == 100)
                 break;
 
               auto candidate = argumentCandidates[argIdx][candidateIdx];
@@ -1780,7 +1778,7 @@ static void determineBestChoicesInContext(
                                              candidateResultTy,
                                              /*options=*/{}) > 0;
                 })) {
-              score += 1.0;
+              score += 100;
             }
           }
 
@@ -1799,7 +1797,7 @@ static void determineBestChoicesInContext(
                                [&resultTy](const auto &param) {
                                  return param.getPlainType()->isEqual(resultTy);
                                }))
-                score += 0.01;
+                score += 1;
             }
 
             favoredChoices.push_back({choice, score});
