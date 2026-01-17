@@ -2347,8 +2347,6 @@ AvailableAttr::AvailableAttr(
       IntroducedRange(IntroducedRange), Deprecated(Deprecated),
       DeprecatedRange(DeprecatedRange), Obsoleted(Obsoleted),
       ObsoletedRange(ObsoletedRange) {
-  ASSERT(!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty() ||
-      !Message.empty() || !Rename.empty() || Kind != Kind::Default);
   Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
   Bits.AvailableAttr.IsSPI = IsSPI;
   Bits.AvailableAttr.IsGroupMember = false;
