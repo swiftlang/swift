@@ -44,6 +44,7 @@
 #endif
 
 #if defined(__OpenBSD__)
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
