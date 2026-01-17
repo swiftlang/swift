@@ -2112,7 +2112,6 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
 
 template<typename Fn>
 static bool forEachConditionalConformance(const ProtocolConformance *conformance,
-                                          bool allowMarkerProtocols,
                                           Fn fn) {
   auto *rootConformance = conformance->getRootConformance();
 
@@ -2140,10 +2139,6 @@ static bool forEachConditionalConformance(const ProtocolConformance *conformance
       continue;
 
     ProtocolDecl *proto = req.getProtocolDecl();
-
-    if (!allowMarkerProtocols && proto->isMarkerProtocol())
-      continue;
-
     auto conformance = subMap.lookupConformance(
         req.getFirstType()->getCanonicalType(), proto);
     if (fn(req.getFirstType().subst(subMap), conformance))
@@ -2180,8 +2175,7 @@ static bool containsRetroactiveConformance(
 
   // If the conformance is conditional and any of the substitutions used to
   // satisfy the conditions are retroactive, it's retroactive.
-  return forEachConditionalConformance(
-    conformance, /*allowMarkerProtocols=*/false,
+  return forEachConditionalConformance(conformance,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       return containsRetroactiveConformance(substConf);
     });
@@ -4593,10 +4587,10 @@ void ASTMangler::appendAnyProtocolConformance(
                                            CanType conformingType,
                                            ProtocolConformanceRef conformance) {
   // If we have a conformance to a marker protocol but we aren't allowed to
-  // emit marker protocols, it's too late. The caller should have handled this,
-  // because otherwise they don't know if they should emit a list separator or
-  // not.
-  ASSERT(AllowMarkerProtocols || !conformance.getProtocol()->isMarkerProtocol());
+  // emit marker protocols, skip it.
+  if (!AllowMarkerProtocols &&
+      conformance.getProtocol()->isMarkerProtocol())
+    return;
 
   // While all invertible protocols are marker protocols, do not mangle them
   // as a dependent conformance. See `conformanceRequirementIndex` which skips
@@ -4657,7 +4651,7 @@ void ASTMangler::appendConcreteProtocolConformance(
 
   // Conditional conformance requirements.
   bool firstRequirement = true;
-  forEachConditionalConformance(conformance, AllowMarkerProtocols,
+  forEachConditionalConformance(conformance,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       if (substType->hasArchetype())
         substType = substType->mapTypeOutOfEnvironment();
