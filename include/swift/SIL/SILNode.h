@@ -236,7 +236,8 @@ protected:
                  dynamicLifetime : 1,
                  reflection : 1,
                  usesMoveableValueDebugInfo : 1,
-                 pointerEscape : 1);
+                 pointerEscape : 1,
+                 inferredImmutable : 1);
 
     SHARED_FIELD(AllocRefInstBase, uint8_t
       objC : 1,
@@ -318,7 +319,7 @@ protected:
     SHARED_FIELD(PointerToAddressInst, uint32_t alignment);
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
-                 parameterPack : 1);
+                 parameterPack : 1, inferredImmutable : 1);
     SHARED_FIELD(MergeRegionIsolationInst, uint32_t numOperands);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
