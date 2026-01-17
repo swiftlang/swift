@@ -568,6 +568,7 @@ public:
   /// SILIsolationInfo.
   static SILIsolationInfo getFunctionIsolation(SILFunction *fn);
 
+private:
   /// A helper that is used to ensure that we treat certain builtin values as
   /// non-Sendable that the AST level otherwise thinks are non-Sendable.
   ///
@@ -580,12 +581,20 @@ public:
     return !isNonSendableType(type, fn);
   }
 
-  static bool isNonSendableType(SILValue value) {
-    return isNonSendableType(value->getType(), value->getFunction());
+public:
+  static bool isSendable(SILValue value);
+
+  static bool isNonSendable(SILValue value) { return !isSendable(value); }
+
+  static bool boxContainsOnlySendableFields(AllocBoxInst *abi) {
+    return boxTypeContainsOnlySendableFields(abi->getBoxType(),
+                                             abi->getFunction());
   }
 
-  static bool isSendableType(SILValue value) {
-    return !isNonSendableType(value);
+  static bool boxTypeContainsOnlySendableFields(CanSILBoxType boxType,
+                                                SILFunction *fn) {
+    return llvm::all_of(boxType->getSILFieldTypes(*fn),
+                        [&](SILType type) { return isSendableType(type, fn); });
   }
 
   bool hasSameIsolation(ActorIsolation actorIsolation) const;
