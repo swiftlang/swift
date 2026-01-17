@@ -234,6 +234,9 @@ extension AsyncStream {
     func next(_ continuation: UnsafeContinuation<Element?, Never>) {
       lock()
       unsafe state.continuations.append(continuation)
+      if unsafe state.continuations.count > 1 {
+        onMultipleAwaitersDetected()
+      }
       if unsafe state.pending.count > 0 {
         let cont = unsafe state.continuations.removeFirst()
         let toSend = unsafe state.pending.removeFirst()
@@ -289,7 +292,7 @@ extension AsyncThrowingStream {
     }
 
     @unsafe struct State {
-      var continuation: UnsafeContinuation<Element?, Error>?
+      var continuations = unsafe [UnsafeContinuation<Element?, Error>]()
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -355,7 +358,9 @@ extension AsyncThrowingStream {
       lock()
       let limit = unsafe state.limit
       let count = unsafe state.pending.count
-      if let continuation = unsafe state.continuation {
+
+      if unsafe !state.continuations.isEmpty {
+        let continuation = unsafe state.continuations.removeFirst()
         if count > 0 {
           if unsafe state.terminal == nil {
             switch limit {
@@ -383,14 +388,11 @@ extension AsyncThrowingStream {
           } else {
             result = .terminated
           }
-          unsafe state.continuation = nil
           let toSend = unsafe state.pending.removeFirst()
           unlock()
           unsafe continuation.resume(returning: toSend)
         } else if let terminal = unsafe state.terminal {
           result = .terminated
-          unsafe state.continuation = nil
-          unsafe state.terminal = .finished
           unlock()
           switch terminal {
           case .finished:
@@ -408,7 +410,6 @@ extension AsyncThrowingStream {
             result = .enqueued(remaining: limit)
           }
 
-          unsafe state.continuation = nil
           unlock()
           unsafe continuation.resume(returning: value)
         }
@@ -456,22 +457,30 @@ extension AsyncThrowingStream {
         }
       }
 
-      if let continuation = unsafe state.continuation {
+      if unsafe state.continuations.count > 0 {
         if unsafe state.pending.count > 0 {
-          unsafe state.continuation = nil
+          let continuations = unsafe state.continuations
+          unsafe state.continuations = []
           let toSend = unsafe state.pending.removeFirst()
           unlock()
           handler?(.finished(error))
-          unsafe continuation.resume(returning: toSend)
+          for unsafe continuation in unsafe continuations {
+            unsafe continuation.resume(returning: toSend)
+          }
         } else if let terminal = unsafe state.terminal {
-          unsafe state.continuation = nil
+          let continuations = unsafe state.continuations
+          unsafe state.continuations = []
           unlock()
           handler?(.finished(error))
           switch terminal {
           case .finished:
-            unsafe continuation.resume(returning: nil)
+            for unsafe continuation in unsafe continuations {
+              unsafe continuation.resume(returning: nil)
+            }
           case .failed(let error):
-            unsafe continuation.resume(throwing: error)
+            for unsafe continuation in unsafe continuations {
+              unsafe continuation.resume(throwing: error)
+            }
           }
         } else {
           unlock()
@@ -485,27 +494,32 @@ extension AsyncThrowingStream {
 
     func next(_ continuation: UnsafeContinuation<Element?, Error>) {
       lock()
-      if unsafe state.continuation == nil {
-        if unsafe state.pending.count > 0 {
-          let toSend = unsafe state.pending.removeFirst()
-          unlock()
-          unsafe continuation.resume(returning: toSend)
-        } else if let terminal = unsafe state.terminal {
-          unsafe state.terminal = .finished
-          unlock()
-          switch terminal {
-          case .finished:
-            unsafe continuation.resume(returning: nil)
-          case .failed(let error):
-            unsafe continuation.resume(throwing: error)
-          }
-        } else {
-          unsafe state.continuation = unsafe continuation
-          unlock()
+      unsafe state.continuations.append(continuation)
+      if unsafe state.continuations.count > 1 {
+        onMultipleAwaitersDetected()
+      }
+      if unsafe state.pending.count > 0 {
+        let cont = unsafe state.continuations.removeFirst()
+        let toSend = unsafe state.pending.removeFirst()
+        unlock()
+        unsafe cont.resume(returning: toSend)
+      } else if let terminal = unsafe state.terminal {
+        // Only one awaiter will get the error, and all the others
+        // will recieve that the stream finished.
+        //
+        // This would be surprising if `AsyncThrowingStream` was supposed
+        // to be shared, but since it's not this is probably fine.
+        unsafe state.terminal = .finished
+        let cont = unsafe state.continuations.removeFirst()
+        unlock()
+        switch terminal {
+        case .finished:
+          unsafe cont.resume(returning: nil)
+        case .failed(let error):
+          unsafe cont.resume(throwing: error)
         }
       } else {
         unlock()
-        fatalError("attempt to await next() on more than one task")
       }
     }
 
@@ -591,4 +605,15 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return storage
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("swift_continuation_logFailedCheck")
+internal func logFailedCheck(_ message: UnsafeRawPointer)
+
+@inline(never)
+@_silgen_name("asyncstream_on_multiple_awaiters_detected")
+func onMultipleAwaitersDetected() {
+  logFailedCheck("SWIFT ASYNCSTREAM MISUSE: used by multiple awaiters!")
+}
+
 #endif
