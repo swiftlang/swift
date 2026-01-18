@@ -42,6 +42,10 @@ let package = Package(
         .testTarget(
           name: "SwiftXcodeGenTest",
           dependencies: ["SwiftXcodeGen"]
+        ),
+        .testTarget(
+          name: "UtilsTest",
+          dependencies: ["Utils"]
         )
     ],
     swiftLanguageModes: [.v6]
