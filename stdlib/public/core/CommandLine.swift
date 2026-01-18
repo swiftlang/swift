@@ -130,45 +130,24 @@ extension CommandLine {
     }
   }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+  /// Storage for ``executablePath``.
+  @available(SwiftStdlib 9999, *)
+  @usableFromInline static let _executablePath: String? = {
+    // FIXME: avoid needing to allocate and free a temp C string (if possible)
+    guard let cString = unsafe _copyExecutablePath() else {
+      return nil
+    }
+    defer {
+      unsafe cString.deallocate()
+    }
+    return unsafe String(validatingCString: cString)
+  }()
+
   /// The path to the current executable.
   ///
   /// The value of this property may not be canonical. If you need the canonical
   /// path to the current executable, you can pass the value of this property to
   /// [`realpath()`](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/realpath.3.html)
-  /// or use [`URL`](https://developer.apple.com/documentation/foundation/url)
-  /// to standardize the path.
-  ///
-  /// If the path to the current executable could not be determined, the value
-  /// of this property is `nil`.
-  ///
-  /// - Important: On some systems, it is possible to move an executable file on
-  ///   disk while it is running. If the current executable file is moved, the
-  ///   value of this property is not updated to its new path.
-  @_unavailableInEmbedded
-  @_alwaysEmitIntoClient
-  public static var executablePath: String? { // NOTE: can't be AEIC and stored!
-    // _NSGetExecutablePath() returns non-zero if the provided buffer is too
-    // small and updates its *bufsize argument to the required value. Call it
-    // once to get the buffer size before allocating.
-    var byteCount = UInt32(0)
-    _ = unsafe _NSGetExecutablePath(nil, &byteCount)
-    return unsafe withUnsafeTemporaryAllocation(
-      of: CChar.self,
-      capacity: Int(byteCount)
-    ) { buffer in
-      if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
-        return unsafe String(validatingCString: buffer.baseAddress!)
-      }
-      return nil
-    }
-  }
-#else
-  /// The path to the current executable.
-  ///
-  /// The value of this property may not be canonical. If you need the canonical
-  /// path to the current executable, you can pass the value of this property to
-  /// [`realpath()`](https://www.kernel.org/doc/man-pages/online/pages/man3/realpath.3.html)
   /// ([`_wfullpath()`](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fullpath-wfullpath?view=msvc-170)
   /// on Windows) or use [`URL`](https://developer.apple.com/documentation/foundation/url)
   /// to standardize the path.
@@ -183,16 +162,30 @@ extension CommandLine {
 #if os(WASI)
   @available(*, unavailable, message: "Unavailable on WASI")
 #endif
-  public static let executablePath: String? = {
-    // FIXME: avoid needing to allocate and free a temp C string (if possible)
-    guard let cString = unsafe _copyExecutablePath() else {
+  @backDeployed(before: SwiftStdlib 9999)
+  public static var executablePath: String? {
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+    if #available(SwiftStdlib 9999, *) {
+      return _executablePath
+    }
+
+    // _NSGetExecutablePath() returns non-zero if the provided buffer is too
+    // small and updates its *bufsize argument to the required value. Call it
+    // once to get the buffer size before allocating.
+    var byteCount = UInt32(0)
+    _ = unsafe _NSGetExecutablePath(nil, &byteCount)
+    return unsafe withUnsafeTemporaryAllocation(
+      of: CChar.self,
+      capacity: Int(byteCount)
+    ) { buffer in
+      if (unsafe 0 == _NSGetExecutablePath(buffer.baseAddress!, &byteCount)) {
+        return unsafe String(validatingCString: buffer.baseAddress!)
+      }
       return nil
     }
-    defer {
-      unsafe cString.deallocate()
-    }
-    return unsafe String(validatingCString: cString)
-  }()
+#else
+  return _executablePath
 #endif
+  }
 }
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE
