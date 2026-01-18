@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 // https://github.com/apple/swift/blob/f08f86c7/stdlib/public/libexec/swift-backtrace/AnsiColor.swift
-enum AnsiColor {
+public enum AnsiColor {
   case normal
   case black
   case red
@@ -93,7 +93,7 @@ enum AnsiColor {
   }
 }
 
-enum AnsiWeight {
+public enum AnsiWeight {
   case normal
   case bold
   case faint
@@ -107,14 +107,14 @@ enum AnsiWeight {
   }
 }
 
-enum AnsiAttribute {
+public enum AnsiAttribute {
   case fg(AnsiColor)
   case bg(AnsiColor)
   case weight(AnsiWeight)
   case inverse(Bool)
 }
 
-extension DefaultStringInterpolation {
+public extension DefaultStringInterpolation {
   mutating func appendInterpolation(ansi attrs: AnsiAttribute...) {
     var code = "\u{1b}["
     var first = true

@@ -169,9 +169,7 @@ public struct FileHandleStream: LoggableStream, @unchecked Sendable {
   }
 }
 
-extension FileHandleStream {
+public extension FileHandleStream {
   static let stdout = Self(Darwin.stdout)
   static let stderr = Self(Darwin.stderr)
 }
-
-public let log = Logger()

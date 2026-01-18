@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Synchronization
+public import Synchronization
 
-extension Mutex {
+public extension Mutex {
   init() where Value == Void {
     self.init(())
   }
@@ -31,7 +31,7 @@ extension Mutex {
 }
 
 /// Having to write `_ in` when the value is `Void` is annoying.
-extension Mutex where Value == Void {
+public extension Mutex where Value == Void {
   borrowing func withLock<Result: ~Copyable & Sendable, E>(
     _ body: () throws(E) -> sending Result
   ) throws(E) -> sending Result {
