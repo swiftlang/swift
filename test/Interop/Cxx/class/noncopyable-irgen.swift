@@ -174,7 +174,7 @@ func derivedWithDefaultedCopyConstructor() {
     takeCopyable(s)
 }
 
-#elseif TEST7 && (os(macOS) || os(Linux))
+#elseif TEST7 && (canImport(Darwin) || os(Android) || os(Linux))
 func stdUniquePtr() {
     let s = DefaultedCopyConstructorUniquePtr()
     takeCopyable(s)
