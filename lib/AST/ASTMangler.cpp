@@ -4232,8 +4232,12 @@ CanType ASTMangler::getDeclTypeForMangling(
   // If this declaration predates concurrency, adjust its type to not
   // contain type features that were not available pre-concurrency. This
   // cannot alter the ABI in any way.
+  //
+  // `dropIsolation` is set here as a workaround because `dropGlobalActor`
+  // used to call `withoutIsolation` unconditionally before.
   if (decl->preconcurrency()) {
-    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
+    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
+                              /*dropIsolation=*/true);
   }
 
   // Map any local archetypes out of context.

@@ -1519,7 +1519,12 @@ public:
   ///
   /// \param dropGlobalActor Whether to drop a global actor from a function
   /// type.
-  Type stripConcurrency(bool recurse, bool dropGlobalActor);
+  /// \param dropIsolation Whether to drop the isolation from a function type.
+  /// This should almost always be `false` except to one use in ASTMangler to
+  /// maintain old behavior where setting `dropGlobalActor` to `true` dropped
+  /// isolation for `@preconcurrency` declarations.
+  Type stripConcurrency(bool recurse, bool dropGlobalActor,
+                        bool dropIsolation = false);
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
