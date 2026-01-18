@@ -15,10 +15,11 @@ import Glibc
 @usableFromInline
 @_transparent
 func errstr(_ no: Int32) -> String {
-  let a: [CChar] = unsafe Array(unsafeUninitializedCapacity: Int(NL_TEXTMAX)) {
-    unsafe strerror_r(no, $0.baseAddress, $1)
+  unsafe withUnsafeTemporaryAllocation(of: CChar.self, capacity: Int(NL_TEXTMAX)) { buf in
+    unsafe strerror_r(no, buf.baseAddress, buf.count)
+    return String(validatingCString: buf.baseAddress)
+      ?? "An unknown error occurred (\(no))."
   }
-  return String(validatingUTF8: a) ?? ""
 }
 
 @available(SwiftStdlib 6.0, *)
