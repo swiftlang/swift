@@ -8,6 +8,8 @@
 
 // RUN: %target-run %t/main %t/%target-library-name(demangle_retroactive_equatable_other)
 
+// REQUIRES: executable_test
+
 import demangle_retroactive_equatable_other
 
 // rdar://168023786
