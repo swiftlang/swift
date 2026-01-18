@@ -569,9 +569,9 @@ char *_swift_stdlib_copyExecutablePath(void) {
   return result;
 }
 
-#if defined(__APPLE__)
-// NOTE: CommandLine.executablePath has another implementation on Darwin that we
-// use in a back-deployment scenario.
+#if defined(__APPLE__) && false
+// CommandLine.executablePath is implemented in Swift on Darwin so it can be
+// back-deployed. Here is a reference C implementation.
 extern "C" int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
 
 ExecutablePath<> copyExecutablePath(void) {
