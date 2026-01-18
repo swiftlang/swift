@@ -685,7 +685,7 @@ ExecutablePath getExecutablePath(void) {
   if (argv && argc > 0) {
     // OpenBSD does not have API to get a path to the running executable. Use
     // argv[0]. We do a basic sniff test for a path-like string.
-    if (strchr(argv[0], '/') == argv[0]) {
+    if (argv[0][0] == '/') {
       // The first character was a slash, so we'll assume that argv[0] is an
       // absolute path.
       result = argv[0];
