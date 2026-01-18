@@ -814,7 +814,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
         }
       });
 
-  return DisjunctionInfoBuilder(/*score=*/favoredChoices.empty() ? 0 : 1,
+  return DisjunctionInfoBuilder(/*score=*/favoredChoices.empty() ? 0 : 100,
                                 favoredChoices)
       .build();
 }
