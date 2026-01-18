@@ -450,3 +450,14 @@ struct HasIntInit {
 func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
   return .init(Int(x / numericCast(y)))
 }
+
+// This should pick UnicodeScalar.init(Int) and not one of the other
+// random overloads
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking19unicode_scalar_init1sys7UnicodeO6ScalarV_tF : $@convention(thin) (Unicode.Scalar) -> () {
+// CHECK: function_ref @$ss7UnicodeO6ScalarVyADSgSicfC : $@convention(method) (Int, @thin Unicode.Scalar.Type) -> Optional<Unicode.Scalar>
+// CHECK: return
+
+func unicode_scalar_init(s: UnicodeScalar) {
+  if s == UnicodeScalar(0xfe0e) {}
+}
