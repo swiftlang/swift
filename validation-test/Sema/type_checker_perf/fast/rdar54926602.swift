@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s --expected-exit-code 1 -Xfrontend=-solver-expression-time-threshold=1
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s --expected-exit-code 1 -Xfrontend=-solver-scope-threshold=1000
 // REQUIRES: asserts,no_asan
 
 class God {
