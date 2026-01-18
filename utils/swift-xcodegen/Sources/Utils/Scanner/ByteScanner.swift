@@ -11,21 +11,23 @@
 //===----------------------------------------------------------------------===//
 
 /// Helper for eating bytes.
-struct ByteScanner {
-  typealias Cursor = UnsafeRawBufferPointer.Index
+public struct ByteScanner {
+  public typealias Cursor = UnsafeRawBufferPointer.Index
 
   private let input: UnsafeRawBufferPointer
-  fileprivate(set) var cursor: Cursor
+  fileprivate(set) public var cursor: Cursor
 
-  init(_ input: UnsafeRawBufferPointer) {
+  public init(_ input: UnsafeRawBufferPointer) {
     self.input = input
     self.cursor = input.startIndex
   }
 
-  init(_ input: UnsafeBufferPointer<UInt8>) {
+  public init(_ input: UnsafeBufferPointer<UInt8>) {
     self.init(UnsafeRawBufferPointer(input))
   }
+}
 
+public extension ByteScanner {
   var hasInput: Bool { cursor != input.endIndex }
   var empty: Bool { !hasInput }
 
@@ -159,7 +161,7 @@ struct ByteScanner {
   }
 }
 
-extension ByteScanner {
+public extension ByteScanner {
   /// A wrapper type for a series of bytes consumed by Consumer, which uses
   /// a backing buffer to handle cases where intermediate bytes have been
   /// skipped. This must not outlive the underlying bytes being processed.
@@ -209,7 +211,7 @@ extension ByteScanner {
   }
 }
 
-extension ByteScanner.Bytes {
+public extension ByteScanner.Bytes {
   fileprivate mutating func skip(_ range: Range<ByteScanner.Cursor>) {
     append(upTo: range.lowerBound)
     lastCursor = range.upperBound
@@ -323,7 +325,7 @@ extension ByteScanner.Bytes {
   }
 }
 
-extension ByteScanner {
+public extension ByteScanner {
   /// A simplified ByteScanner inferface that allows for efficient skipping
   /// while producing a continguous Bytes output. Additionally, it allows for
   /// injecting values into the output through calls to `append`.
@@ -335,82 +337,84 @@ extension ByteScanner {
       self.scanner = scanner
       self.result = .init(for: scanner, consumesWhole: consumesWhole)
     }
+  }
+}
 
-    var peek: Byte? {
-      scanner.peek
-    }
+public extension ByteScanner.Consumer {
+  var peek: Byte? {
+    scanner.peek
+  }
 
-    func peek(ahead n: Int) -> Byte? {
-      scanner.peek(ahead: n)
-    }
+  func peek(ahead n: Int) -> Byte? {
+    scanner.peek(ahead: n)
+  }
 
-    var hasInput: Bool {
-      scanner.hasInput
-    }
+  var hasInput: Bool {
+    scanner.hasInput
+  }
 
-    var remaining: UnsafeRawBufferPointer {
-      scanner.remaining
-    }
+  var remaining: UnsafeRawBufferPointer {
+    scanner.remaining
+  }
 
-    mutating func append(_ byte: Byte) {
-      result.append(byte.rawValue, at: scanner.cursor)
-    }
+  mutating func append(_ byte: Byte) {
+    result.append(byte.rawValue, at: scanner.cursor)
+  }
 
-    mutating func append(utf8 str: String) {
-      result.append(contentsOf: str.utf8, at: scanner.cursor)
-    }
+  mutating func append(utf8 str: String) {
+    result.append(contentsOf: str.utf8, at: scanner.cursor)
+  }
 
-    mutating func takeResult() -> ByteScanner.Bytes {
-      result.append(upTo: scanner.cursor)
-      return result
-    }
+  mutating func takeResult() -> ByteScanner.Bytes {
+    result.append(upTo: scanner.cursor)
+    return result
+  }
 
-    mutating func eat() -> Bool {
-      scanner.tryEat()
-    }
+  mutating func eat() -> Bool {
+    scanner.tryEat()
+  }
 
-    mutating func eatRemaining() {
-      scanner.cursor = scanner.input.endIndex
-    }
+  mutating func eatRemaining() {
+    scanner.cursor = scanner.input.endIndex
+  }
 
-    mutating func skip() {
-      result.skip(at: scanner.cursor)
-      _ = scanner.eat()
-    }
+  mutating func skip() {
+    result.skip(at: scanner.cursor)
+    _ = scanner.eat()
+  }
 
-    private mutating func _skip(
-      using body: (inout ByteScanner) throws -> Void
-    ) rethrows {
-      let start = scanner.cursor
-      defer {
-        if scanner.cursor != start {
-          result.skip(start ..< scanner.cursor)
-        }
+  private mutating func _skip(
+    using body: (inout ByteScanner) throws -> Void
+  ) rethrows {
+    let start = scanner.cursor
+    defer {
+      if scanner.cursor != start {
+        result.skip(start ..< scanner.cursor)
       }
-      try body(&scanner)
     }
+    try body(&scanner)
+  }
 
-    mutating func skip(while pred: (Byte) throws -> Bool) rethrows {
-      try _skip(using: { try $0.skip(while: pred) })
-    }
+  mutating func skip(while pred: (Byte) throws -> Bool) rethrows {
+    try _skip(using: { try $0.skip(while: pred) })
+  }
 
-    mutating func skip(until pred: (Byte) throws -> Bool) rethrows {
-      try _skip(using: { try $0.skip(until: pred) })
-    }
+  mutating func skip(until pred: (Byte) throws -> Bool) rethrows {
+    try _skip(using: { try $0.skip(until: pred) })
+  }
 
-    mutating func skip(untilAfter pred: (Byte) throws -> Bool) rethrows {
-      try _skip(using: { try $0.skip(untilAfter: pred) })
-    }
+  mutating func skip(untilAfter pred: (Byte) throws -> Bool) rethrows {
+    try _skip(using: { try $0.skip(untilAfter: pred) })
+  }
 
-    mutating func trySkip<S: Sequence>(_ seq: S) -> Bool where S.Element == UInt8 {
-      let start = scanner.cursor
-      guard scanner.tryEat(seq) else { return false }
-      result.skip(start ..< scanner.cursor)
-      return true
-    }
+  mutating func trySkip<S: Sequence>(_ seq: S) -> Bool where S.Element == UInt8 {
+    let start = scanner.cursor
+    guard scanner.tryEat(seq) else { return false }
+    result.skip(start ..< scanner.cursor)
+    return true
+  }
 
-    mutating func trySkip(utf8 str: String) -> Bool {
-      trySkip(str.utf8)
-    }
+  mutating func trySkip(utf8 str: String) -> Bool {
+    trySkip(str.utf8)
   }
 }

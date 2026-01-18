@@ -107,7 +107,7 @@ public extension PathProtocol {
   }
 }
 
-extension PathProtocol {
+public extension PathProtocol {
   /// Whether this is a .swift.gyb file.
   var isSwiftGyb: Bool {
     hasExtension(.gyb) && rawPath.dropLast(4).hasExtension(.swift)
@@ -145,7 +145,7 @@ extension PathProtocol {
   }
 }
 
-extension Collection where Element: PathProtocol {
+public extension Collection where Element: PathProtocol {
   /// Computes the common parent for a collection of paths. If there is only
   /// a single unique path, this returns the parent for that path.
   var commonAncestor: Element? {
@@ -156,14 +156,14 @@ extension Collection where Element: PathProtocol {
 }
 
 extension StringProtocol {
-  func hasExtension(_ exts: FileExtension...) -> Bool {
+  public func hasExtension(_ exts: FileExtension...) -> Bool {
     guard let pathExt = FilePath(String(self)).extension else { return false }
     return exts.contains(where: { $0.matches(pathExt) })
   }
 }
 
 extension FileExtension {
-  func matches(_ extStr: String) -> Bool {
+  public func matches(_ extStr: String) -> Bool {
     rawValue.compare(extStr, options: .caseInsensitive) == .orderedSame
   }
 }

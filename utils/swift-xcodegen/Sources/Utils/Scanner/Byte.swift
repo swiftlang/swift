@@ -10,26 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct Byte: Hashable {
-  var rawValue: UInt8
-  init(_ rawValue: UInt8) {
+public struct Byte: Hashable {
+  public var rawValue: UInt8
+  public init(_ rawValue: UInt8) {
     self.rawValue = rawValue
   }
 }
 
 extension Byte: ExpressibleByUnicodeScalarLiteral {
-  init(unicodeScalarLiteral value: UnicodeScalar) {
+  public init(unicodeScalarLiteral value: UnicodeScalar) {
     self.init(UInt8(ascii: value))
   }
 }
 
 extension Byte: Comparable {
-  static func < (lhs: Self, rhs: Self) -> Bool {
+  public static func < (lhs: Self, rhs: Self) -> Bool {
     lhs.rawValue < rhs.rawValue
   }
 }
 
-extension Byte {
+public extension Byte {
   var isSpaceOrTab: Bool {
     self == " " || self == "\t"
   }

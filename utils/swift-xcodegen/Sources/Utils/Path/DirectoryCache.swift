@@ -16,15 +16,15 @@ import Synchronization
 /// A simple cache for the recursive contents of a directory under a given
 /// root path. This is pretty basic and doesn't handle cases where we've already
 /// cached the parent.
-struct DirectoryCache: ~Copyable {
+public struct DirectoryCache: Sendable, ~Copyable {
   private let root: AbsolutePath
   private let storage = Mutex<[RelativePath: [RelativePath]]>()
 
-  init(root: AbsolutePath) {
+  public init(root: AbsolutePath) {
     self.root = root
   }
 
-  func getAllSubpaths(of path: RelativePath) throws -> [RelativePath] {
+  public func getAllSubpaths(of path: RelativePath) throws -> [RelativePath] {
     if let result = storage.withLock(\.[path]) {
       return result
     }
