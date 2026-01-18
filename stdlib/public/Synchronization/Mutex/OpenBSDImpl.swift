@@ -16,8 +16,8 @@ import Glibc
 @_transparent
 func errstr(_ no: Int32) -> String {
   unsafe withUnsafeTemporaryAllocation(of: CChar.self, capacity: Int(NL_TEXTMAX)) { buf in
-    unsafe strerror_r(no, buf.baseAddress, buf.count)
-    return String(validatingCString: buf.baseAddress)
+    unsafe strerror_r(no, buf.baseAddress!, buf.count)
+    return unsafe String(validatingCString: buf.baseAddress!)
       ?? "An unknown error occurred (\(no))."
   }
 }
