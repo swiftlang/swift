@@ -565,7 +565,7 @@ static ExecutablePath getExecutablePath(void);
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_stdlib_withExecutablePath(
-  void (* SWIFT_CC(swift) body)(
+  void SWIFT_CC(swift) (* body)(
     const ExecutablePath::value_type *path,
     SWIFT_CONTEXT void *context
   ),
