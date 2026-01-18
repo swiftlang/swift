@@ -18,8 +18,13 @@ import SwiftShims
 internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
   -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
-@_silgen_name("_swift_stdlib_copyExecutablePath")
-private func _copyExecutablePath() -> UnsafeMutablePointer<CChar>?
+#if os(Windows)
+@_silgen_name("_swift_stdlib_withExecutablePath")
+private func _withExecutablePath(_ body: (UnsafePointer<CWideChar>) -> Void)
+#else
+@_silgen_name("_swift_stdlib_withExecutablePath")
+private func _withExecutablePath(_ body: (UnsafePointer<CChar>) -> Void)
+#endif
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 @_extern(c, "_NSGetExecutablePath")
@@ -184,14 +189,17 @@ extension CommandLine {
   @available(*, unavailable, message: "Unavailable on WASI")
 #endif
   public static let executablePath: String? = {
-    // FIXME: avoid needing to allocate and free a temp C string (if possible)
-    guard let cString = unsafe _copyExecutablePath() else {
-      return nil
+    var result: String?
+
+    unsafe _withExecutablePath { path in
+#if os(Windows)
+      result = unsafe String.decodeCString(path, as: UTF16.self)?.result
+#else
+      result = unsafe String(validatingCString: path)
+#endif
     }
-    defer {
-      unsafe cString.deallocate()
-    }
-    return unsafe String(validatingCString: cString)
+
+    return result
   }()
 #endif
 }
