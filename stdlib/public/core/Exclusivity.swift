@@ -223,6 +223,7 @@ internal func _swift_exclusivityAccessSetNext(
   unsafe access?.pointee.next = next
 }
 
+#if INTERNAL_CHECKS_ENABLED
 @c(swift_dumpTrackedAccesses)
 @usableFromInline
 @unsafe
@@ -238,6 +239,7 @@ internal func swift_dumpTrackedAccesses() {
     unsafe _swift_stdlib_fputs_stderr("        No Accesses.\n")
   }
 }
+#endif
 
 /// Starting from `access`, find the access that is the parent node of `child`.
 /// If `child` is `nil`, find the last access in the list.
