@@ -4,12 +4,12 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
 
@@ -43,7 +43,7 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-@_silgen_name("print_long")
+@_extern(c, "print_long")
 func print_long(_: Int)
 
 public func print(_ n: Int, terminator: StaticString = "\n") {
