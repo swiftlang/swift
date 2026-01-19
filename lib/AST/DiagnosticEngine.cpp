@@ -991,7 +991,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
-      needsQualification = true;
+      needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     } else {
       assert(Arg.getKind() == DiagnosticArgumentKind::WitnessType);
       type = Arg.getAsWitnessType().getType();
