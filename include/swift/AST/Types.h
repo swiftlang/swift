@@ -3736,6 +3736,9 @@ public:
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
 
+  /// Type has lifetime dependencies derived from explicit @_lifetime attributes.
+  bool hasExplicitLifetimeDependencies() const;
+
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
