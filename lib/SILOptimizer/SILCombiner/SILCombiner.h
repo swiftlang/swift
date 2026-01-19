@@ -136,8 +136,6 @@ public:
 
   bool runOnFunction(SILFunction &F);
 
-  bool shouldRemoveCondFail(CondFailInst &);
-
   void clear() {
     Iteration = 0;
     Worklist.resetChecked();
@@ -251,7 +249,6 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
-  SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
 

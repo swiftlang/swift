@@ -364,6 +364,13 @@ bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   return mod->getASTContext().LangOpts.hasFeature(swift::Feature(feature));
 }
 
+bool BridgedPassContext::shouldRemoveCondFail(BridgedStringRef message, BridgedStringRef function) const {
+  if (invocation->getPassManager()->getModule()->getOptions().RemoveRuntimeAsserts)
+    return true;
+
+  return swift::shouldRemoveCondFail(message.unbridged(), function.unbridged());
+}
+
 bool BridgedPassContext::enableMoveInoutStackProtection() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getOptions().EnableMoveInoutStackProtection;

@@ -260,6 +260,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableStackProtection() const;
   BRIDGED_INLINE bool enableMergeableTraps() const;
   BRIDGED_INLINE bool hasFeature(BridgedFeature feature) const;
+  BRIDGED_INLINE bool shouldRemoveCondFail(BridgedStringRef message, BridgedStringRef function) const;
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
