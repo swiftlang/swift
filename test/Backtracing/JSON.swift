@@ -208,7 +208,7 @@ struct Crash {
 // SYMBOLICATED-NEXT:    "line": 0,
 // SYMBOLICATED-NEXT:    "column": 0
 // SYMBOLICATED-NEXT:  }
-// CHECK-NEXT:       },
+// CHECK-NEXT:       }
 
 // More frames here, but they're system specific
 
