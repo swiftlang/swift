@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/Timing.exe
 // RUN: %target-codesign %t/Timing.exe
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Timing.exe > %t/Timing.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Timing.exe > %t/Timing.out 2>&1
 // RUN: %FileCheck %s < %t/Timing.out
 
 // UNSUPPORTED: use_os_stdlib

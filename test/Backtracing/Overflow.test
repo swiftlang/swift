@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/Overflow.swift -parse-as-library -Onone %swift-debug-flags -o %t/Overflow.exe
 // RUN: %target-codesign %t/Overflow.exe
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Overflow.exe > %t/Overflow.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Overflow.exe > %t/Overflow.out 2>&1
 // RUN: %FileCheck %s --ignore-case < %t/Overflow.out
-// RUN: not env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Overflow.exe > %t/Friendly.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Overflow.exe > %t/Friendly.out 2>&1
 // RUN: %FileCheck %s --ignore-case --check-prefix FRIENDLY < %t/Friendly.out
 
 // UNSUPPORTED: use_os_stdlib

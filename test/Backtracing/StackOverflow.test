@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/StackOverflow.swift -parse-as-library -Onone %swift-debug-flags -o %t/stack-overflow.exe
 // RUN: %target-codesign %t/stack-overflow.exe
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/stack-overflow.exe > %t/StackOverflow.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/stack-overflow.exe > %t/StackOverflow.out 2>&1
 // RUN: %FileCheck %s < %t/StackOverflow.out
-// RUN: not env SWIFT_BACKTRACE=limit=18,top=6,enable=yes,cache=no %target-run %t/stack-overflow.exe > %t/Limited.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=limit=18,top=6,enable=yes,cache=no %target-run %t/stack-overflow.exe > %t/Limited.out 2>&1
 // RUN: %FileCheck %s --check-prefix LIMITED < %t/Limited.out
-// RUN: not env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/stack-overflow.exe > %t/Friendly.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/stack-overflow.exe > %t/Friendly.out 2>&1
 // RUN: %FileCheck %s --check-prefix FRIENDLY < %t/Friendly.out
 
 // UNSUPPORTED: use_os_stdlib
