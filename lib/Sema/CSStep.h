@@ -583,6 +583,16 @@ protected:
     if (CS.shouldAttemptFixes())
       return false;
 
+    // For `TVO_PrefersSubtypeBinding` type variables bindings are
+    // sorted to make sure that non-subtype/equal bindings are attempted
+    // last, so if any subtype or equality bindings produced a solution,
+    // let's stop checking since supertype bindings are always concidered
+    // to be worse.
+    if (TypeVar->getImpl().prefersSubtypeBinding()) {
+      if (AnySolved)
+        return choice.fromSupertype();
+    }
+
     // If we were able to solve this without considering
     // default literals, don't bother looking at default literals.
     return AnySolved && choice.hasDefaultedProtocol() &&

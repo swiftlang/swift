@@ -12,8 +12,7 @@ do {
     let _i = Mootex<Int>()
 
     var i: Int {
-      // expected-error@+1:10 {{failed to produce diagnostic for expression}}
-      _i.withLock { _ in
+      _i.withLock { _ in // OK (prefers Never for the result)
         never()
       }
     }
