@@ -116,6 +116,7 @@ struct BridgedDomTree {
   BRIDGED_INLINE bool dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
   BRIDGED_INLINE SwiftInt getNumberOfChildren(BridgedBasicBlock bb) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock getChildAt(BridgedBasicBlock bb, SwiftInt index) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock getImmediateDominator(BridgedBasicBlock block) const;
 };
 
 struct BridgedPostDomTree {
