@@ -192,6 +192,9 @@ extension CommandLine {
     var result: String?
 
     unsafe _withExecutablePath { path in
+      if path.pointee == 0 {
+        return
+      }
 #if os(Windows)
       result = unsafe String.decodeCString(path, as: UTF16.self)?.result
 #else

@@ -571,11 +571,7 @@ void _swift_stdlib_withExecutablePath(
   ),
   SWIFT_CONTEXT void *context
 ) {
-  auto path = getExecutablePath();
-  if (path.empty()) {
-    return (* body)(nullptr, context);
-  }
-  return (* body)(path.c_str(), context);
+  return (* body)(getExecutablePath().c_str(), context);
 }
 
 #if defined(__APPLE__) && false
