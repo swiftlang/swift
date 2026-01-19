@@ -127,9 +127,6 @@ private:
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
   
-  /// For invoking Swift instruction passes.
-  SwiftPassInvocation swiftPassInvocation;
-
 public:
   SILCombiner(SILFunctionTransform *parentTransform,
               bool removeCondFails, bool enableCopyPropagation);

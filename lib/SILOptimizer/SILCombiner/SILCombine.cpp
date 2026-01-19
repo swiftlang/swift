@@ -216,9 +216,9 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
       /* EraseAction */
       [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
   deBlocks(trans->getFunction()),
-  ownershipFixupContext(getInstModCallbacks(), deBlocks),
-  swiftPassInvocation(trans->getPassManager(),
-                      trans->getFunction(), this) {}
+  ownershipFixupContext(getInstModCallbacks(), deBlocks) {
+  trans->getPassManager()->getSwiftPassInvocation()->getCurrent()->injectSILCombiner(this);
+}
 
 bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
   if (auto *consumingUse = svi->getSingleConsumingUse()) {
@@ -614,9 +614,10 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
 /// Runs a Swift instruction pass.
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
-  swiftPassInvocation.startInstructionPassRun(inst);
-  runFunction({ {inst->asSILNode()}, {&swiftPassInvocation} });
-  swiftPassInvocation.finishedInstructionPassRun();
+  auto invocation = parentTransform->getPassManager()->getSwiftPassInvocation()->getCurrent();
+  invocation->startInstructionPassRun(inst);
+  runFunction({ {inst->asSILNode()}, {invocation} });
+  invocation->finishedInstructionPassRun();
 }
 
 /// Registered briged instruction pass run functions.
