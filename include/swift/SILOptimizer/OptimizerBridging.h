@@ -127,7 +127,11 @@ struct BridgedPostDomTree {
 
 struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
+  typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
 
+  static void registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
+                                         UpdateLifetimeValuesFn completeLifetimeFn);
   static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
 };
 
@@ -234,6 +238,9 @@ struct BridgedPassContext {
 
   BRIDGED_INLINE bool getNeedBreakInfiniteLoops() const;
   BRIDGED_INLINE void setNeedBreakInfiniteLoops(bool value) const;
+  BRIDGED_INLINE bool getNeedCompleteLifetimes() const;
+  BRIDGED_INLINE void setNeedCompleteLifetimes(bool value) const;
+
   // Access SIL module data structures
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getFirstFunctionInModule() const;

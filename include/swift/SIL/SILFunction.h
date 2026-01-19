@@ -479,6 +479,8 @@ private:
   unsigned IsPerformanceConstraint : 1;
 
   unsigned NeedBreakInfiniteLoops : 1;
+  unsigned NeedCompleteLifetimes : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -1118,6 +1120,18 @@ public:
   /// cause any infinite loops.
   void setNeedBreakInfiniteLoops(bool flag = true) {
     NeedBreakInfiniteLoops = flag;
+  }
+
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off.
+  bool needCompleteLifetimes() const { return NeedCompleteLifetimes; }
+
+  /// If `flag` is true, notifies that a pass has inserted an `unreachable`
+  /// instruction which might have cut off any lifetimes. A pass can set the
+  /// notification to `false` again if an `unreachable` was inserted but the
+  /// pass knows that this didn't cut off any lifetimes.
+  void setNeedCompleteLifetimes(bool flag = true) {
+    NeedCompleteLifetimes = flag;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),

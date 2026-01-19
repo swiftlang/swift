@@ -58,6 +58,7 @@ public func registerOptimizerTests() {
     domtreeTest,
     getAutoDiffSpecializationInfoTest,
     interiorLivenessTest,
+    lifetimeComletionTest,
     lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,

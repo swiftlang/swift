@@ -93,6 +93,9 @@ bb1(%32 : $()):
   return %37 : $()
 
 bb2(%39 : @owned $Error):
+  destroy_value [dead_end] %39
+  end_borrow %21
+  destroy_value [dead_end] %a2
   unreachable
 }
 
@@ -167,6 +170,9 @@ bb1(%32 : $()):
   return %37 : $()
 
 bb2(%39 : @owned $Error):
+  destroy_value [dead_end] %39
+  end_borrow %21
+  destroy_value [dead_end] %a2
   unreachable
 }
 
@@ -216,6 +222,9 @@ bb1(%32 : $()):
   return %37 : $()
 
 bb2(%39 : @owned $Error):
+  destroy_value [dead_end] %39
+  end_borrow %21
+  destroy_value [dead_end] %a2
   unreachable
 }
 
@@ -261,6 +270,9 @@ bb3(%32 : $()):
   return %37 : $()
 
 bb4(%39 : @owned $Error):
+  destroy_value [dead_end] %39
+  end_borrow %21
+  destroy_value [dead_end] %a2
   unreachable
 }
 

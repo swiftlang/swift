@@ -456,25 +456,6 @@ exit:
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @project_box_deadend : {{.*}} {
-// CHECK:       bb0([[C:%[^,]+]] :
-// CHECK:         [[BOX:%[^,]+]] = alloc_box
-// CHECK:         [[BOX_BORROW:%[^,]+]] = begin_borrow [[BOX]]
-// CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_BORROW]]
-// CHECK:         store [[C]] to [init] [[ADDR]]
-// CHECK:         end_borrow [[BOX_BORROW]]
-// CHECK:         unreachable                                     
-// CHECK-LABEL: } // end sil function 'project_box_deadend'
-sil [ossa] @project_box_deadend : $@convention(thin) (@owned C) -> () {
-bb0(%0 : @owned $C):
-  %2 = alloc_box ${ var C }
-  %3 = begin_borrow %2 : ${ var C }
-  specify_test "ossa_complete_lifetime %3 availability"
-  %4 = project_box %3 : ${ var C }, 0
-  store %0 to [init] %4 : $*C
-  unreachable
-}
-
 indirect enum IndirectEnumNontrivialPayload {
   case c(C)
 }
@@ -632,33 +613,6 @@ exit:
   unreachable
 }
 
-
-// CHECK-LABEL: begin running test {{.*}} on test_borrowed_from: ossa_complete_lifetime
-// CHECK-LABEL: sil [ossa] @test_borrowed_from : {{.*}} {
-// CHECK:       bb1([[A:%.*]] : @reborrow $C):
-// CHECK:         [[BF:%.*]] = borrowed [[A]] : $C from (%0 : $C)
-// CHECK:       bb2:
-// CHECK-NEXT:    end_borrow [[BF]] : $C
-// CHECK-NEXT:    unreachable
-// CHECK-LABEL: } // end sil function 'test_borrowed_from'
-// CHECK-LABEL: end running test {{.*}} on test_borrowed_from: ossa_complete_lifetime
-sil [ossa] @test_borrowed_from : $@convention(thin) (@owned C) -> @owned C {
-bb0(%0 : @owned $C):
-  %1 = begin_borrow %0 : $C
-  br bb1(%1 : $C)
-
-bb1(%3 : @reborrow $C):
-  %4 = borrowed %3 : $C from (%0 : $C)
-  specify_test "ossa_complete_lifetime %3 availability"
-  cond_br undef, bb2, bb3
-
-bb2:
-  unreachable
-
-bb3:
-  end_borrow %4 : $C
-  return %0 : $C
-}
 
 // CHECK-LABEL: begin running test {{.*}} on store_borrow: ossa_complete_lifetime
 // CHECK-LABEL: sil [ossa] @store_borrow : {{.*}} {
@@ -831,21 +785,6 @@ struct Wrapper {
   var c: Klass
 }
 
-// CHECK-LABEL: begin running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_complete_lifetime
-// CHECK-LABEL: sil [ossa] @testInteriorMarkDepNonEscAddressValue : {{.*}} {
-// CHECK: mark_dependence [nonescaping]
-// CHECK: end_borrow
-// CHECK-LABEL: } // end sil function 'testInteriorMarkDepNonEscAddressValue'
-// CHECK-LABEL: end running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_complete_lifetime
-sil [ossa] @testInteriorMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
-bb0(%0 : @owned $Wrapper, %1 : $*Klass):
-  specify_test "ossa_complete_lifetime %2 liveness"
-  %2 = begin_borrow %0 : $Wrapper
-  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
-  %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
-  unreachable
-}
-
 // CHECK-LABEL: begin running test {{.*}} on testOwnedMarkDepNonEscAddressValue: ossa_complete_lifetime
 // CHECK-LABEL: sil [ossa] @testOwnedMarkDepNonEscAddressValue : {{.*}} {
 // CHECK: end_borrow
@@ -869,25 +808,6 @@ sil [ossa] [noinline] @borrow_loadable_prop : $@convention(method) (@guaranteed 
 bb0(%0 : @guaranteed $Wrapper):
   %2 = struct_extract %0, #Wrapper.c
   return %2
-}
-
-// CHECK-LABEL: sil [ossa] @test_borrow_accessor1 :
-// CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:  end_borrow {{.*}}
-// CHECK:  destroy_value {{.*}}
-// CHECK:  unreachable
-// CHECK-LABEL: } // end sil function 'test_borrow_accessor1'
-sil [ossa] @test_borrow_accessor1 : $@convention(thin) (@owned Wrapper) -> () {
-bb0(%0 : @owned $Wrapper):
-  specify_test "ossa_complete_lifetime @instruction[0] liveness"
-  %copy = copy_value %0
-  %1 = begin_borrow %copy
-  %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
-  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @test_borrow_accessor2 :

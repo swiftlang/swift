@@ -364,6 +364,7 @@ bb3:
 
 // An inconsistent state is allowed at unreachable blocks.
 bb4(%23 : @owned $Error):
+  destroy_value [dead_end] %23
   unreachable
 
 bb5(%43 : @owned $Error):

@@ -84,6 +84,9 @@ struct DiagnosticDeadFunctionEliminator : SILFunctionTransform {
     // We know that this pass does not create infinite loops even if it
     // deletes basic blocks.
     fn->setNeedBreakInfiniteLoops(false);
+    // Replacing the whole function with an `unreachable` does not create
+    // incomplete lifetimes.
+    fn->setNeedCompleteLifetimes(false);
   }
 };
 

@@ -194,9 +194,6 @@ public:
   /// Introduce linear OSSA lifetimes after SILGen
   bool OSSACompleteLifetimes = true;
 
-  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
-  bool OSSAVerifyComplete = false;
-
   /// Enable pack metadata stack "promotion".
   ///
   /// More accurately, enable skipping mandatory heapification of pack metadata

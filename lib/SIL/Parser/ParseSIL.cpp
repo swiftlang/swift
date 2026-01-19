@@ -7537,6 +7537,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
               "All forward definitions of local archetypes should be resolved");
         // We expect the parsed SIL to comply with the no-infinite loops rule.
         FunctionState.F->setNeedBreakInfiniteLoops(false);
+        // We expect the parsed SIL to have complete lifetimes.
+        FunctionState.F->setNeedCompleteLifetimes(false);
       }
     }
 

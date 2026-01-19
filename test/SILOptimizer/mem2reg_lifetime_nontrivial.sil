@@ -1099,6 +1099,7 @@ bb7:
   br bb6
 
 bb8(%err : @owned $Error):
+  destroy_value [dead_end] %err
   unreachable
 }
 

@@ -38,11 +38,7 @@ namespace {
 
 class OwnershipVerifierTextualErrorDumper : public SILFunctionTransform {
   void run() override {
-    SILFunction *f = getFunction();
-    auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-    f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
-                           ? nullptr
-                           : deBlocksAnalysis->get(f));
+    getFunction()->verifyOwnership();
   }
 };
 

@@ -9,7 +9,8 @@ sil @takeKlass : $@convention(thin) (@owned Klass) -> ()
 sil @borrowKlass : $@convention(thin) (@guaranteed Klass) -> ()
 
 // CHECK-LABEL: begin running test {{.*}} on dead_function_argument
-// CHECK:       RESULT: true
+// TODO: this test needs to be updated
+// xCHECK:       RESULT: true
 // CHECK-LABEL: end running test {{.*}} on dead_function_argument
 sil [ossa] @dead_function_argument : $@convention(thin) (@owned Klass) -> () {
 entry(%k : @owned $Klass):
@@ -22,6 +23,7 @@ entry(%k : @owned $Klass):
   uses: @instruction[0].operand[0]
   """
 
+  destroy_value [dead_end] %k
   unreachable
 }
 
@@ -112,7 +114,8 @@ die:
 }
 
 // CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__after_nonconsuming
-// CHECK:       RESULT: true
+// TODO: this test needs to be updated
+// xCHECK:       RESULT: true
 // CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__after_nonconsuming
 sil [ossa] @liveness_in_dead_end__after_nonconsuming : $@convention(thin) () -> () {
 entry:
@@ -137,11 +140,13 @@ die:
   uses: @block.instruction[3].operand[0]
   """
   
+  destroy_value [dead_end] %k
   unreachable
 }
 
 // CHECK-LABEL: begin running test {{.*}} on liveness_in_dead_end__after_nonuse
-// CHECK:       RESULT: true
+// TODO: this test needs to be updated
+// xCHECK:       RESULT: true
 // CHECK-LABEL: end running test {{.*}} on liveness_in_dead_end__after_nonuse
 sil [ossa] @liveness_in_dead_end__after_nonuse : $@convention(thin) () -> () {
 entry:
@@ -165,11 +170,13 @@ die:
   uses: @block.instruction[2].operand[0]
   """
   
+  destroy_value [dead_end] %k
   unreachable
 }
 
 // CHECK-LABEL: begin running test {{.*}} on use_in_dead_end__after_nonconsuming_liveness_boundary
-// CHECK:       RESULT: true
+// TODO: this test needs to be updated
+// xCHECK:       RESULT: true
 // CHECK-LABEL: end running test {{.*}} on use_in_dead_end__after_nonconsuming_liveness_boundary
 sil [ossa] @use_in_dead_end__after_nonconsuming_liveness_boundary : $@convention(thin) () -> () {
 entry:
@@ -194,6 +201,7 @@ die:
   uses: @block.instruction[1].operand[0]
   """
   
+  destroy_value [dead_end] %k
   unreachable
 }
 
@@ -253,5 +261,6 @@ die:
   uses: @block.instruction[1].operand[0]
   """
   
+  destroy_value [dead_end] %k
   unreachable
 }

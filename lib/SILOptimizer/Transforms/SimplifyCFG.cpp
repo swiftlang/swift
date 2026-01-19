@@ -1745,11 +1745,19 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
 // Does this basic block consist of only an "unreachable" instruction?
 static bool isOnlyUnreachable(SILBasicBlock *BB) {
-  auto *Term = BB->getTerminator();
-  if (!isa<UnreachableInst>(Term))
-    return false;
-
-  return (&*BB->begin() == BB->getTerminator());
+  for (SILInstruction &inst : *BB) {
+    switch (inst.getKind()) {
+    case SILInstructionKind::EndBorrowInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndLifetimeInst:
+    case SILInstructionKind::DeallocStackInst:
+    case SILInstructionKind::UnreachableInst:
+      break;
+    default:
+      return false;
+    }
+  }
+  return true;
 }
 
 
@@ -1783,13 +1791,12 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   LLVM_DEBUG(llvm::dbgs() << "remove unreachable case " << *SEI);
 
   if (!Dest) {
-    addToWorklist(SEI->getParent());
-    SILBuilderWithScope(SEI).createUnreachable(SEI->getLoc());
-    for (auto &succ : SEI->getSuccessors()) {
-      succ.getBB()->removeDeadBlock();
-    }
-    SEI->eraseFromParent();
-    return true;
+    if (Count == 0)
+      return false;
+    // If all successors end in unreachable, pick the first one.
+    auto enumCase = SEI->getCase(0);
+    Element = enumCase.first;
+    Dest = enumCase.second;
   }
 
   if (Dest->args_empty()) {
@@ -2353,8 +2360,6 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
-    case SILInstructionKind::DestroyValueInst:
-    case SILInstructionKind::EndBorrowInst:
       break;
     // We can only ignore a dealloc_stack instruction if we can ignore all
     // instructions in the block.
@@ -2537,17 +2542,12 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
 static bool isTryApplyWithUnreachableError(TryApplyInst *TAI,
                                            SILValue &Callee,
                                            SILType &CalleeType) {
-  SILBasicBlock *ErrorBlock = TAI->getErrorBB();
-  TermInst *Term = ErrorBlock->getTerminator();
-  if (!isa<UnreachableInst>(Term))
-    return false;
-  
-  if (&*ErrorBlock->begin() != Term)
-    return false;
-  
-  Callee = TAI->getCallee();
-  CalleeType = TAI->getSubstCalleeSILType();
-  return true;
+  if (isOnlyUnreachable(TAI->getErrorBB())) {
+    Callee = TAI->getCallee();
+    CalleeType = TAI->getSubstCalleeSILType();
+    return true;
+  }
+  return false;
 }
 
 bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
@@ -3990,6 +3990,8 @@ public:
 
     if (f->needBreakInfiniteLoops())
       breakInfiniteLoops(getPassManager(), f);
+    if (f->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), f);
   }
 };
 } // end anonymous namespace
@@ -4010,6 +4012,8 @@ public:
 
     if (f->needBreakInfiniteLoops())
       breakInfiniteLoops(getPassManager(), f);
+    if (f->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), f);
   }
 };
 } // end anonymous namespace

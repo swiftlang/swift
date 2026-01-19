@@ -3360,11 +3360,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                    OPT_disable_ossa_complete_lifetimes,
                    Opts.OSSACompleteLifetimes);
 
-  Opts.OSSAVerifyComplete =
-      Args.hasFlag(OPT_enable_ossa_verify_complete,
-                   OPT_disable_ossa_verify_complete,
-                   Opts.OSSAVerifyComplete);
-
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
   // If these optimizations are enabled never preserve functions for the

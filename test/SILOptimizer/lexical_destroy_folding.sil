@@ -618,6 +618,8 @@ entry:
   cond_br undef, left, right
 
 left:
+  end_borrow %lifetime
+  destroy_value [dead_end] %instance
   unreachable
 
 right:
@@ -646,6 +648,7 @@ entry(%instance : @owned $C):
   cond_br undef, left, right
 
 left:
+  end_borrow %lifetime
   apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
   unreachable
 

@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -208,6 +209,8 @@ class GenericSpecializer : public SILFunctionTransform {
       removeUnreachableBlocks(F);
       if (F.needBreakInfiniteLoops())
         breakInfiniteLoops(getPassManager(), &F);
+      if (F.needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), &F);
     }
   }
 };

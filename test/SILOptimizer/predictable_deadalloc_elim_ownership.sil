@@ -756,6 +756,8 @@ bb5:
   br bb6
 
 bb6:
+  destroy_value [dead_end] %25
+  destroy_value [dead_end] %6
   unreachable
 }
 

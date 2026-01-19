@@ -116,6 +116,10 @@ func runSimplification(on function: Function, _ context: FunctionPassContext,
   if context.needBreakInfiniteLoops {
     breakInfiniteLoops(in: function, context)
   }
+  if context.needCompleteLifetimes {
+    completeLifetimes(in: function, context)
+  }
+
   return changed
 }
 

@@ -25,6 +25,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -48,7 +49,12 @@ GenericCloner::cloneFunction(SILOptFunctionBuilder &FuncBuilder,
     invocation->initializeNestedSwiftPassInvocation(cloned);
     removeUnreachableBlocks(*cloned);
     breakInfiniteLoops(&FuncBuilder.getPassManager(), cloned);
+    completeAllLifetimes(&FuncBuilder.getPassManager(), cloned);
     invocation->deinitializeNestedSwiftPassInvocation();
+  } else {
+    // Cloning a whole function with `unreachable`s does not create incomplete
+    // lifetimes.
+    cloned->setNeedCompleteLifetimes(false);
   }
   return cloned;
 }

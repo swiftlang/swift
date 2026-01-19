@@ -1451,17 +1451,17 @@ void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) 
   this->transform = transform;
   this->function = transform->getFunction();
   ASSERT(!this->function->needBreakInfiniteLoops() && "didn't break infinite loops in previous module pass");
+  ASSERT(!this->function->needCompleteLifetimes() && "didn't complete lifetimes in previous module pass");
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
   ASSERT(function && transform && "not running a function pass");
   ASSERT((changeNotifications & SILContext::NotificationKind::FunctionTables) == 0
          && "a function pass must not change function tables");
-  if (changeNotifications != SILContext::NotificationKind::Nothing) {
-    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
-  }
-  changeNotifications = SILContext::NotificationKind::Nothing;
   ASSERT(!function->needBreakInfiniteLoops() && "didn't break infinite loops");
+  ASSERT(!function->needCompleteLifetimes() && "didn't complete lifetimes");
+
+  updateAnalysis();
 
   insertedPhisBySSAUpdater.clear();
   if (ssaUpdater) {

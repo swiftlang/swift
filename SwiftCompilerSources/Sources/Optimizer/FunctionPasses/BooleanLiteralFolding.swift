@@ -55,6 +55,9 @@ let booleanLiteralFolding = FunctionPass(name: "boolean-literal-folding") {
   if changed {
     _ = context.removeDeadBlocks(in: function)
     breakInfiniteLoops(in: function, context)
+    if context.needCompleteLifetimes {
+      completeLifetimes(in: function, context)
+    }
   }
 }
 

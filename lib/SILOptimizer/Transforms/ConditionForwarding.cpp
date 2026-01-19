@@ -124,6 +124,8 @@ private:
       removeUnreachableBlocks(*F);
       if (F->needBreakInfiniteLoops())
         breakInfiniteLoops(getPassManager(), F);
+      if (F->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), F);
     }
   }
 

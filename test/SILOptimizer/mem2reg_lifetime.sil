@@ -1366,6 +1366,7 @@ entry(%instance : @owned $C):
   %addr = alloc_stack [lexical] $C
   store %instance to [init] %addr : $*C
   %instance_loaded = load [take] %addr : $*C
+  destroy_value [dead_end] %instance_loaded
   unreachable
 }
 
@@ -1883,6 +1884,7 @@ bb2:
 bb3:
   br bb5
 bb4:
+  destroy_value [dead_end] %instance
   br bb5
 bb5:
   unreachable

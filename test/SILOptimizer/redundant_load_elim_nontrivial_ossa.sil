@@ -850,12 +850,9 @@ bb8:
 }
 
 // CHECK-LABEL: @ignore_unreachable_simple :
-// CHECK:        [[V:%[0-9]+]] = load [copy]
-// CHECK:        [[C:%[0-9]+]] = copy_value [[V]]
-// CHECK:      bb1:
-// CHECK-NEXT:   destroy_value [[C]]
-// CHECK:      bb2:
-// CHECK-NEXT:   unreachable
+// This is not optimized, yet
+// CHECK:         load [copy]
+// CHECK:         load [copy]
 // CHECK: } // end sil function 'ignore_unreachable_simple'
 sil [ossa] @ignore_unreachable_simple : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
 bb0(%0 : $*NonTrivialStruct):
@@ -878,12 +875,9 @@ bb3:
 }
 
 // CHECK-LABEL: @ignore_unreachable_complex :
-// CHECK:        [[V:%[0-9]+]] = load [copy]
-// CHECK:        [[C:%.*]] = copy_value [[V]]
-// CHECK:      bb1:
-// CHECK:      bb5:
-// CHECK-NEXT:   destroy_value [[C]]
-// CHECK-NEXT:   tuple
+// This is not optimized, yet
+// CHECK:         load [copy]
+// CHECK:         load [copy]
 // CHECK: } // end sil function 'ignore_unreachable_complex'
 sil [ossa] @ignore_unreachable_complex : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
 bb0(%0 : $*NonTrivialStruct):

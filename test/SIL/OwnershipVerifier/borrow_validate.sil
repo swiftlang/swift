@@ -667,6 +667,8 @@ bb1:
   return %9999 : $()
 
 bb2:
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 

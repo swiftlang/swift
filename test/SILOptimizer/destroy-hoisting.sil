@@ -352,6 +352,8 @@ bb1:
 bb2:
   end_borrow %4
   dealloc_stack %3
+  destroy_value [dead_end] %2
+  destroy_value [dead_end] %0
   unreachable
 }
 

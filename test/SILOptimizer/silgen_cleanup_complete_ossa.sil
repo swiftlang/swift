@@ -48,7 +48,7 @@ sil @unreachableHandler : $@convention(thin) () -> ()
 // CHECK: bb2:
 // CHECK:   apply
 // CHECK:   end_borrow [[BORROW]] : ${ var FakeOptional<Klass> }
-// CHECK:   dealloc_box [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
+// CHECK:   destroy_value [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
 // CHECK:   unreachable
 // CHECK-LABEL: } // end sil function 'testCompleteOSSALifetimes'
 sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {

@@ -29,16 +29,20 @@ void ValueLifetimeBoundary::visitInsertionPoints(
     }
     auto *predBB = user->getParent();
     for (SILBasicBlock *succ : predBB->getSuccessors()) {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
       if (deBlocks && deBlocks->isDeadEnd(succ))
         continue;
+#endif
 
       assert(succ->getSinglePredecessorBlock() == predBB);
       visitor(succ->begin());
     }
   }
   for (SILBasicBlock *edge : boundaryEdges) {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
     if (deBlocks && deBlocks->isDeadEnd(edge))
       continue;
+#endif
 
     visitor(edge->begin());
   }

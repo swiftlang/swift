@@ -533,6 +533,8 @@ bb0:
   end_borrow %2 : $NativeObjectPair
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -556,6 +558,7 @@ bb0:
   end_borrow %2 : $NativeObjectPair
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -571,6 +574,7 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   %4 = copy_value %3 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -579,7 +583,7 @@ bb0(%0 : @guaranteed $NativeObjectPair):
 // eliminate the copy.
 //
 // CHECK-LABEL: sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'borrowed_val_used_by_postdominating_no_return_function'
 sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
 bb0(%0 : @owned $NativeObjectPair):
@@ -588,6 +592,9 @@ bb0(%0 : @owned $NativeObjectPair):
   %3 = copy_value %2 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %3
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 
@@ -1250,6 +1257,8 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %4 = load [copy] %3 : $*Builtin.NativeObject
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %2
   unreachable
 }
 
@@ -1512,6 +1521,7 @@ some(%obj : @owned $AnyObject):
     br die
 
 die:
+    destroy_value [dead_end] %opt
     unreachable
 
 none:

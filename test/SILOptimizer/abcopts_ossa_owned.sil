@@ -26,50 +26,23 @@ struct IntTupleStruct {
   var tuple: (Int32, Int32)
 }
 
-sil public_external [ossa] [_semantics "array.check_subscript"] @checkbounds_no_meth : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> _DependenceToken {
-bb0(%0: $Int32, %1: $Bool, %2: @owned $ArrayInt):
-    unreachable
-}
+sil [ossa] [_semantics "array.check_subscript"] @checkbounds_no_meth : $@convention(thin) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
 
-sil public_external [ossa] [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool {
-bb0(%0: @owned $ArrayInt):
-    unreachable
-}
+sil [ossa] [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned ArrayInt) -> Bool
 
-sil public_external [ossa] [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken {
-bb0(%0: $Int32, %1: $Bool, %2: @owned $ArrayInt):
-    unreachable
-}
+sil [ossa] [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
 
-sil public_external [ossa] [_semantics "array.mutate_unknown"] @append : $@convention(method) (@in Int32, @inout ArrayInt) -> () {
-bb0(%0: $*Int32, %1: $*ArrayInt):
-    unreachable
-}
+sil [ossa] [_semantics "array.mutate_unknown"] @append : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
 
-sil public_external [ossa] [_semantics "array.get_element_address"] @getElementAddr : $@convention(method) (Int32, @owned ArrayInt) -> UnsafeMutablePointerInt {
-bb0(%0: $Int32, %1: @owned $ArrayInt):
-    unreachable
-}
+sil [ossa] [_semantics "array.get_element_address"] @getElementAddr : $@convention(method) (Int32, @owned ArrayInt) -> UnsafeMutablePointerInt
 
-sil public_external [ossa] [_semantics "array.init"] @arrayinit : $@convention(thin) () -> @owned ArrayInt {
-bb0:
-  unreachable
-}
+sil [ossa] [_semantics "array.init"] @arrayinit : $@convention(thin) () -> @owned ArrayInt
 
-sil public_external [ossa] [_semantics "array.get_count"] @getCount : $@convention(method) (@owned ArrayInt) -> Int32 {
-bb0(%0: @owned $ArrayInt):
-    unreachable
-}
+sil [ossa] [_semantics "array.get_count"] @getCount : $@convention(method) (@owned ArrayInt) -> Int32
 
-sil [ossa] @unknown_func : $@convention(thin) () -> () {
-bb0:
-  unreachable
-}
+sil [ossa] @unknown_func : $@convention(thin) () -> ()
 
-sil [ossa] @take_array : $@convention(thin) (@inout ArrayInt) -> () {
-bb0(%0 : $*ArrayInt):
-  unreachable
-}
+sil [ossa] @take_array : $@convention(thin) (@inout ArrayInt) -> ()
 
 sil [ossa] @getArray : $@convention(thin) () -> @owned ArrayInt
 

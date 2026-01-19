@@ -1548,15 +1548,17 @@ void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
 
   // Do not clone any end_borrow.
-  if (!getBuilder().hasOwnership() ||
-      getOpValue(Inst->getOperand())
-          ->getType()
-          .isTrivial(getBuilder().getFunction()))
+  if (!getBuilder().hasOwnership())
     return;
 
+  SILValue v = getOpValue(Inst->getOperand());
+  if (v->getType().isTrivial(getBuilder().getFunction()) &&
+      !v->isBeginApplyToken()) {
+    return;
+  }
+
   recordClonedInstruction(
-      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getOperand())));
+      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()), v));
 }
 
 template <typename ImplClass>

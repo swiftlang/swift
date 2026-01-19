@@ -1503,6 +1503,8 @@ class SILCSE : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       if (Fn->needBreakInfiniteLoops())
         breakInfiniteLoops(getPassManager(), Fn);
+      if (Fn->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), Fn);
     } else if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }

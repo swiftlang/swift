@@ -728,11 +728,14 @@ void swift::findJointPostDominatingSet(
           if (!visitedBlocks.contains(succBlock) &&
               // For this purpose also the initial blocks count as "visited",
               // although they are not added to the visitedBlocks set.
-              !initialBlocks.contains(succBlock) &&
+              !initialBlocks.contains(succBlock)
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
               // Ignore blocks which end in an unreachable. This is a very
               // simple check, but covers most of the cases, e.g. block which
               // calls fatalError().
-              !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)) {
+              && !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)
+#endif
+            ) {
             assert(succBlock->getSinglePredecessorBlock() == predBlock &&
                    "CFG must not contain critical edge");
             // Note that since there are no critical edges in the CFG, we are

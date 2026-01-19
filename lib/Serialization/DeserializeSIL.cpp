@@ -1272,6 +1272,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   // The de-serialized SIL is assumed to be in a correct state.
   fn->setNeedBreakInfiniteLoops(false);
+  fn->setNeedCompleteLifetimes(false);
+
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 

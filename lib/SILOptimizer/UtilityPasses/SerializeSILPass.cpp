@@ -68,6 +68,9 @@ void MapOpaqueArchetypes::replace() {
   // We know that this pass does not create infinite loops even if it
   // deletes basic blocks.
   fn.setNeedBreakInfiniteLoops(false);
+  // De-serializing `unreachable` instructions does not create incomplete
+  // lifetimes. We assume that the serialized SIL has no incomplete lifetimes.
+  fn.setNeedCompleteLifetimes(false);
 }
 
 static bool opaqueArchetypeWouldChange(TypeExpansionContext context,

@@ -240,6 +240,17 @@ struct FunctionPassContext : MutatingContext {
   /// that this cannot cause any infinite loops.
   func setNeedBreakInfiniteLoops(to value: Bool) { bridgedPassContext.setNeedBreakInfiniteLoops(value) }
 
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off and must be completed
+  /// by calling `completeLifetimes`.
+  var needCompleteLifetimes: Bool { bridgedPassContext.getNeedCompleteLifetimes() }
+
+  /// If `value` is true, notifies that a pass has inserted an `unreachable` instruction which might
+  /// have cut off any lifetimes.
+  /// A pass can set the notification to `false` again if an `unreachable` was inserted but the pass
+  /// knows that this didn't cut off any lifetimes.
+  func setNeedCompleteLifetimes(to value: Bool) { bridgedPassContext.setNeedCompleteLifetimes(value) }
+
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)
   }

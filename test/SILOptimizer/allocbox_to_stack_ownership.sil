@@ -468,6 +468,7 @@ bb0(%0 : $Int):
   %6 = copy_value %5 : $@callee_owned () -> ()
   apply %6() : $@callee_owned () -> ()
   destroy_value %5 : $@callee_owned () -> ()
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -990,6 +991,7 @@ bb0(%0 : $Int):
 bb1:
   %as2 = alloc_stack $Bool
   dealloc_stack %as2 : $*Bool
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:
@@ -1086,6 +1088,7 @@ bb0(%0 : $Int):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:
@@ -1117,6 +1120,7 @@ bb0(%0 : $Int):
 bb1:
   %as1 = alloc_stack $Bool
   %as2 = alloc_stack $Bool
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:

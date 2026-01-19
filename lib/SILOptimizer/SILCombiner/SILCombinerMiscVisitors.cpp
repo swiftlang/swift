@@ -821,6 +821,15 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   if (!DataAddrInst || !EnumAddrIns) {
     return nullptr;
   }
+  if (func->hasOwnership() &&
+      !DataAddrInst->getType().isTrivial(*func) &&
+      DataAddrInst->getParent() != EnumAddrIns->getParent()) {
+    // The init_enum_data_addr is in a different block than the inject_enum_addr.
+    // This might cause a leak because between the two blocks could be a CFG edge
+    // to a dead-end block with an `unreachable`
+    return nullptr;
+  }
+
   assert((EnumAddrIns == IEAI) &&
          "Found InitEnumDataAddrInst differs from IEAI");
   // Make sure the enum pattern instructions are the only ones which write to

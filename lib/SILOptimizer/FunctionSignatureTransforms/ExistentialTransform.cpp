@@ -652,6 +652,8 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   // We know that this pass does not create infinite loops even if it
   // deletes basic blocks.
   F->setNeedBreakInfiniteLoops(false);
+  // Also, it does not introduce incomplete lifetimes.
+  NewF->setNeedCompleteLifetimes(false);
 
   LLVM_DEBUG(llvm::dbgs() << "After ExistentialSpecializer Pass\n"; F->dump();
              NewF->dump(););

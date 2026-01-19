@@ -705,6 +705,8 @@ class SILCombine : public SILFunctionTransform {
       removeUnreachableBlocks(*getFunction());
       if (getFunction()->needBreakInfiniteLoops())
         breakInfiniteLoops(getPassManager(), getFunction());
+      if (getFunction()->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), getFunction());
     }
   }
 };

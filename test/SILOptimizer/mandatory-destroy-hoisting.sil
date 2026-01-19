@@ -248,6 +248,7 @@ bb1:
   %r = tuple ()
   return %r
 bb2:
+  destroy_value [dead_end] %0
   unreachable
 }
 
@@ -290,6 +291,8 @@ bb1:
   return %r
 bb2:
   fix_lifetime %1
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 
@@ -332,20 +335,24 @@ bb0(%0 : @owned $String):
 // CHECK-LABEL: sil [ossa] @dead_end_with_no_destroy :
 // CHECK:       bb0(%0 : @owned $String):
 // CHECK-NEXT:    fix_lifetime
+// CHECK-NEXT:    destroy_value [dead_end] %0
 // CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function 'dead_end_with_no_destroy'
 sil [ossa] @dead_end_with_no_destroy : $@convention(thin) (@owned String) -> () {
 bb0(%0 : @owned $String):
   fix_lifetime %0
+  destroy_value [dead_end] %0
   unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @dead_end_with_no_use :
 // CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    destroy_value [dead_end] %0
 // CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function 'dead_end_with_no_use'
 sil [ossa] @dead_end_with_no_use : $@convention(thin) (@owned String) -> () {
 bb0(%0 : @owned $String):
+  destroy_value [dead_end] %0
   unreachable
 }
 

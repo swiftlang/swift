@@ -339,6 +339,14 @@ void BridgedPassContext::setNeedBreakInfiniteLoops(bool value) const {
   invocation->getFunction()->setNeedBreakInfiniteLoops(value);
 }
 
+bool BridgedPassContext::getNeedCompleteLifetimes() const {
+  return invocation->getFunction()->needCompleteLifetimes();
+}
+
+void BridgedPassContext::setNeedCompleteLifetimes(bool value) const {
+  invocation->getFunction()->setNeedCompleteLifetimes(value);
+}
+
 bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction inst) const {
   swift::SILPassManager *pm = invocation->getPassManager();
   return pm->continueWithNextSubpassRun(
