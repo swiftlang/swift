@@ -176,6 +176,10 @@ void BridgedPassContext::notifyDependencyOnBodyOf(BridgedFunction otherFunction)
   invocation->getPassManager()->setDependingOnCalleeBodies();
 }
 
+void BridgedPassContext::updateAnalysis() const {
+  invocation->updateAnalysis();
+}
+
 bool BridgedPassContext::hadError() const {
   return invocation->getPassManager()->getModule()->getASTContext().hadError();
 }

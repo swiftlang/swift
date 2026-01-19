@@ -52,6 +52,12 @@ struct FunctionPassContext : MutatingContext {
     return LoopTree(bridged: bridgedLT, context: self)
   }
 
+  /// Updates all analysis.
+  /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
+  func updateAnalysis() {
+    bridgedPassContext.updateAnalysis()
+  }
+
   func notifyNewFunction(function: Function, derivedFrom: Function) {
     bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
   }

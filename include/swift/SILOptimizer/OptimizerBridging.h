@@ -149,6 +149,8 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool hadError() const;
   BRIDGED_INLINE void notifyDependencyOnBodyOf(BridgedFunction otherFunction) const;
 
+  BRIDGED_INLINE void updateAnalysis() const;
+
   // Analysis
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedAliasAnalysis getAliasAnalysis() const;

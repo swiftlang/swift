@@ -129,7 +129,11 @@ public:
 
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
-  
+
+  /// Updates all analysis.
+  /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
+  void updateAnalysis();
+
   void beginVerifyFunction(SILFunction *function);
   void endVerifyFunction();
 

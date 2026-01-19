@@ -1437,7 +1437,7 @@ void SwiftPassInvocation::finishedModulePassRun() {
   ASSERT(!function && transform && "not running a module pass");
   if (changeNotifications != 0) {
     ASSERT((changeNotifications & ~SILContext::NotificationKind::FunctionTables) == 0
-           && "a module pass must change the SIL of a function");
+           && "a module pass must not change the SIL of a function");
     passManager->invalidateFunctionTables();
     changeNotifications = SILContext::NotificationKind::Nothing;
   }
@@ -1473,6 +1473,13 @@ void SwiftPassInvocation::finishedFunctionPassRun() {
   transform = nullptr;
   silCombiner = nullptr;
   verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::updateAnalysis() {
+  if (changeNotifications != SILContext::NotificationKind::Nothing) {
+    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
+  }
+  changeNotifications = SILContext::NotificationKind::Nothing;
 }
 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {
