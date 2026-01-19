@@ -394,10 +394,6 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
                                     preparedOverload);
   }
 
-  bool shouldUnwrapVanishingTuples() const {
-    return false;
-  }
-
   bool shouldDesugarTypeAliases() const {
     return true;
   }
