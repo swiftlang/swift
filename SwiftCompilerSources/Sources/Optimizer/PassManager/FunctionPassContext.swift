@@ -224,6 +224,16 @@ struct FunctionPassContext : MutatingContext {
   /// In this case the pass needs to call `fixStackNesting`.
   var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
 
+  /// True if the pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might have become an infinite
+  /// loop. Infinite loops must be eliminated by calling `breakInfiniteLoops`.
+  var needBreakInfiniteLoops: Bool { bridgedPassContext.getNeedBreakInfiniteLoops() }
+
+  /// If `value` is true, notifies that a pass has deleted a basic block which might end up in an infinite loop.
+  /// A pass can set the notification to `false` again if a basic block has been deleted but the pass knows
+  /// that this cannot cause any infinite loops.
+  func setNeedBreakInfiniteLoops(to value: Bool) { bridgedPassContext.setNeedBreakInfiniteLoops(value) }
+
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)
   }

@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -417,13 +418,17 @@ void SILGenCleanup::run() {
     if (!function.isDefinition())
       continue;
 
+    getPassManager()->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&function);
+
     PrettyStackTraceSILFunction stackTrace("silgen cleanup", &function);
 
     LLVM_DEBUG(llvm::dbgs()
                << "\nRunning SILGenCleanup on " << function.getName() << "\n");
 
+    removeUnreachableBlocks(function);
     bool changed = fixupBorrowAccessors(&function);
     changed |= completeOSSALifetimes(&function);
+    breakInfiniteLoops(getPassManager(), &function);
     DeadEndBlocks deadEndBlocks(&function);
     SILGenCanonicalize sgCanonicalize(deadEndBlocks);
 
@@ -441,6 +446,8 @@ void SILGenCleanup::run() {
       auto invalidKind = SILAnalysis::InvalidationKind::Instructions;
       invalidateAnalysis(&function, invalidKind);
     }
+ 
+    getPassManager()->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 }
 

@@ -56,6 +56,40 @@ extension Function {
         }
       }
     }
+
+    if hasOwnership, isDefinition {
+      verifyNoUnreachableBlocks(context)
+      verifyNoInfiniteLoops(context)
+    }
+  }
+
+  private func verifyNoUnreachableBlocks(_ context: VerifierContext) {
+    var reachableBlocks = BasicBlockWorklist(context)
+    defer { reachableBlocks.deinitialize() }
+    reachableBlocks.transitivelyAddBlockWithSuccessors(startingAt: entryBlock)
+
+    for block in blocks {
+      require(reachableBlocks.hasBeenPushed(block),
+              "block is unreachable",
+              atInstruction: block.instructions.first!)
+    }
+  }
+
+  private func verifyNoInfiniteLoops(_ context: VerifierContext) {
+    var noInfiniteLoops = BasicBlockWorklist(context)
+    defer { noInfiniteLoops.deinitialize() }
+
+    for block in blocks {
+      if block.successors.isEmpty {
+        noInfiniteLoops.transitivelyAddBlockWithPredecessors(startingAt: block)
+      }
+    }
+
+    for block in blocks {
+      require(noInfiniteLoops.hasBeenPushed(block),
+              "function has infinite loop",
+              atInstruction: block.instructions.first!)
+    }
   }
 }
 

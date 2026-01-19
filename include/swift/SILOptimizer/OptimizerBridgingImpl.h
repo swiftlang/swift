@@ -327,6 +327,14 @@ bool BridgedPassContext::getNeedFixStackNesting() const {
   return invocation->getNeedFixStackNesting();
 }
 
+bool BridgedPassContext::getNeedBreakInfiniteLoops() const {
+  return invocation->getFunction()->needBreakInfiniteLoops();
+}
+
+void BridgedPassContext::setNeedBreakInfiniteLoops(bool value) const {
+  invocation->getFunction()->setNeedBreakInfiniteLoops(value);
+}
+
 bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction inst) const {
   swift::SILPassManager *pm = invocation->getPassManager();
   return pm->continueWithNextSubpassRun(

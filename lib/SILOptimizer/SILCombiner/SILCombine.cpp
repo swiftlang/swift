@@ -33,7 +33,9 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
@@ -697,6 +699,12 @@ class SILCombine : public SILFunctionTransform {
       updateAllGuaranteedPhis(getPassManager(), getFunction());
       // Invalidate everything.
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    }
+    if (Changed ||
+        (getPassManager()->getSwiftPassInvocation()->getChangeNotifications() & SILContext::Branches) != 0) {
+      removeUnreachableBlocks(*getFunction());
+      if (getFunction()->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), getFunction());
     }
   }
 };

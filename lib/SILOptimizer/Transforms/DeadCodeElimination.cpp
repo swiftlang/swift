@@ -1075,6 +1075,10 @@ public:
         Inv |= (unsigned)InvalidationKind::Branches;
       }
       invalidateAnalysis(SILAnalysis::InvalidationKind(Inv));
+      if (dce.mustInvalidateBranches()) {
+        if (F->needBreakInfiniteLoops())
+          breakInfiniteLoops(getPassManager(), F);
+      }
     }
   }
 };

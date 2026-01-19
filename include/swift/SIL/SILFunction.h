@@ -478,6 +478,7 @@ private:
   /// within a module by the MandatoryOptimizations pass.
   unsigned IsPerformanceConstraint : 1;
 
+  unsigned NeedBreakInfiniteLoops : 1;
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -1106,6 +1107,19 @@ public:
     IsPerformanceConstraint = flag;
   }
 
+  /// True if the current pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might
+  /// have become an infinite loop.
+  bool needBreakInfiniteLoops() const { return NeedBreakInfiniteLoops; }
+
+  /// If `flag` is true, notifies that a pass has deleted a basic block which
+  /// might end up in an infinite loop. A pass can set the notification to `false`
+  /// again if a basic block has been deleted but the pass knows that this cannot
+  /// cause any infinite loops.
+  void setNeedBreakInfiniteLoops(bool flag = true) {
+    NeedBreakInfiniteLoops = flag;
+  }
+
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).
   bool shouldOptimize() const;
@@ -1534,6 +1548,8 @@ public:
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
     assert(BB->getParent() == this);
+    if (hasOwnership())
+      setNeedBreakInfiniteLoops();
     BlockList.erase(BB);
   }
 

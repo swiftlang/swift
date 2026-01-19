@@ -38,6 +38,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -898,6 +899,10 @@ void EagerSpecializerTransform::run() {
   // calls and branches.
   if (Changed) {
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    removeUnreachableBlocks(F);
+    if (F.needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), &F);
   }
 
   // As specializations are created, the non-exported attributes should be

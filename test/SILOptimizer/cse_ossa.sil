@@ -87,40 +87,11 @@ bb3:
   return %6 : $()
 }
 
-// For now until the proper unreachable pruning code is committed for
-// SILCombine, we should not dce dead instructions in unreachable code.
-
-// CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// CHECK: bb0
-// CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
-// CHECK-LABEL: } // end sil function 'dead_inst_elimination_ignore_unreachable'
-sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int64, 24
-  br bb2
-
-bb1:
-  %1 = integer_literal $Builtin.Int64, 48
-  br bb2
-
-bb2:
-  %2 = tuple()
-  return %2 : $()
-}
-
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil [ossa] @exit : $@convention(thin) () -> Never {
-bb0:
-  br bb1
-
-bb1:
-  br bb1
-}
+sil [ossa] @exit : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
 // CHECK: store

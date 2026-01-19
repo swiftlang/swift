@@ -1852,6 +1852,7 @@ static FunctionTest SimplifyCFGSimplifySwitchEnumUnreachableBlocks(
                   /*EnableJumpThread=*/false)
           .simplifySwitchEnumUnreachableBlocks(
               cast<SwitchEnumInst>(arguments.takeInstruction()));
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2162,6 +2163,7 @@ static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
                   /*EnableJumpThread=*/false)
           .simplifySwitchEnumOnObjcClassOptional(
               cast<SwitchEnumInst>(arguments.takeInstruction()));
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2241,6 +2243,7 @@ static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
                   /*EnableJumpThread=*/false)
           .simplifySwitchEnumBlock(
               cast<SwitchEnumInst>(arguments.takeInstruction()));
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2690,6 +2693,7 @@ static FunctionTest SimplifyCFGSimplifyTermWithIdenticalDestBlocks(
       SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
                   /*EnableJumpThread=*/false)
           .simplifyTermWithIdenticalDestBlocks(arguments.takeBlock());
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -2937,6 +2941,7 @@ static FunctionTest SimplifyCFGCanonicalizeSwitchEnum(
       SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
                   /*EnableJumpThread=*/false)
           .canonicalizeSwitchEnums();
+      removeUnreachableBlocks(function);
     });
 } // end namespace swift::test
 
@@ -3978,10 +3983,13 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
-                    /*EnableJumpThread=*/false)
+    SILFunction *f = getFunction();
+    if (SimplifyCFG(*f, *this, getOptions().VerifyAll, /*EnableJumpThread=*/false)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (f->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), f);
   }
 };
 } // end anonymous namespace
@@ -3995,10 +4003,13 @@ namespace {
 class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
-                    /*EnableJumpThread=*/true)
+    SILFunction *f = getFunction();
+    if (SimplifyCFG(*f, *this, getOptions().VerifyAll, /*EnableJumpThread=*/true)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (f->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), f);
   }
 };
 } // end anonymous namespace

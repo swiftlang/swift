@@ -24,6 +24,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
@@ -204,6 +205,9 @@ class GenericSpecializer : public SILFunctionTransform {
 
     if (specializeAppliesInFunction(F, this, /*isMandatory*/ false)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      removeUnreachableBlocks(F);
+      if (F.needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), &F);
     }
   }
 };

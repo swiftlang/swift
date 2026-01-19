@@ -649,6 +649,9 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   populateThunkBody();
 
   assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
+  // We know that this pass does not create infinite loops even if it
+  // deletes basic blocks.
+  F->setNeedBreakInfiniteLoops(false);
 
   LLVM_DEBUG(llvm::dbgs() << "After ExistentialSpecializer Pass\n"; F->dump();
              NewF->dump(););

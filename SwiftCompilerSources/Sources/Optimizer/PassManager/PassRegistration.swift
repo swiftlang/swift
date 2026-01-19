@@ -19,6 +19,7 @@ public func initializeSwiftModules() {
   registerAST()
   registerSIL()
   registerSwiftAnalyses()
+  registerOptimizerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
@@ -152,4 +153,8 @@ private func registerSwiftPasses() {
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
+}
+
+private func registerOptimizerUtilities() {
+  registerControlFlowUtils()
 }

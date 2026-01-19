@@ -37,6 +37,7 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
+class SILPassManager;
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block. Allows for user injected callbacks via \p callbacks.
@@ -212,6 +213,31 @@ bool isTrapNoReturnFunction(SILFunction *f);
 /// TODO:
 bool findAllNonFailureExitBBs(SILFunction *f,
                               llvm::TinyPtrVector<SILBasicBlock *> &bbs);
+
+/// Breaks infinite loops in the control flow by inserting an "artificial" loop exit to a new
+/// dead-end block with an `unreachable`.
+///
+/// Inserts a `cond_br` with a `builtin "infinite_loop_true_condition"`:
+/// ```
+/// bb0:
+///   br bb1
+/// bb1:
+///   br bb1              // back-end branch
+/// ```
+/// ->
+/// ```
+/// bb0:
+///   br bb1
+/// bb1:
+///   %1 = builtin "infinite_loop_true_condition"() // always true, but the compiler doesn't know
+///   cond_br %1, bb2, bb3
+/// bb2:                  // new back-end block
+///   br bb1
+/// bb3:                  // new dead-end block
+///   unreachable
+/// ```
+///
+void breakInfiniteLoops(SILPassManager *pm, SILFunction *f);
 
 } // end namespace swift
 

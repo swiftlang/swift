@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
@@ -1183,6 +1184,9 @@ static void performNoReturnFunctionProcessing(SILFunction &Fn,
   if (Changed) {
     removeUnreachableBlocks(Fn);
     T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (Fn.needBreakInfiniteLoops())
+      breakInfiniteLoops(T->getPassManager(), &Fn);
   }
 }
 
@@ -1264,6 +1268,9 @@ class DiagnoseUnreachable : public SILFunctionTransform {
   void run() override {
     diagnoseUnreachable(*getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (getFunction()->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), getFunction());
   }
   };
 } // end anonymous namespace

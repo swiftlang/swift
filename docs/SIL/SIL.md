@@ -375,6 +375,41 @@ bb0(%0 : @owned $String, %1 : @guaranteed $String):
   ...
 ```
 
+## The Control Flow Graph
+
+The basic blocks of a function form a control flow graph (CFG). The nodes of
+the CFG are the blocks. Edges are defined by the set of target blocks to which
+the terminator instruction of a block may jump to. In the following example,
+block `bb1` has two successor blocks `bb2` and `bb3` because the `cond_br`
+might branch to `bb2` or `bb3`.
+```
+    bb1:
+      cond_br %cond, bb2, bb3
+```
+
+## Control Flow Graph Invariants
+
+In OSSA following rules apply to the CFG of a function:
+
+- No critical edges: every edge in the CFG must have either a single
+  predecessor or a single successor block.
+
+- No unreachable blocks: All blocks must be reachable from the entry block
+  of the function.
+
+- No infinite loops: all cyclic strongly connected components (SCC) in the
+  CFG must have at least one edge which is exiting the cyclic SCC.
+
+Optimization passes must make sure to leave the CFG of an OSSA function in a
+valid state by:
+
+- inserting blocks at critical edges
+
+- removing unreachable blocks
+
+- creating artificial exit edges from infinite loops to dead-end blocks
+  (= blocks which end in an `unreachable` instruction)
+
 # Values and Operands
 
 SIL values are introduced with the `%` sigil and named by an

@@ -21,6 +21,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -1029,6 +1030,17 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
   if (invalidatedStackNesting) {
     StackNesting::fixNesting(F);
     changedFunctions.insert(F);
+  }
+
+  if (F->isDefinition()) {
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(F);
+
+    removeUnreachableBlocks(*F);
+
+    if (F->needBreakInfiniteLoops())
+      breakInfiniteLoops(pm, F);
+
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
   }
 
   // Keep track of full inlined functions so we don't waste time recursively

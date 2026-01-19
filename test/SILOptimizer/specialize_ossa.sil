@@ -1310,11 +1310,7 @@ sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out
 // CHECK:   [[SB:%.*]] = store_borrow %0 to %{{.*}} : $*AnyObject
 // CHECK:   [[LB:%.*]] = load_borrow [[SB]] : $*AnyObject
 // CHECK:   apply %{{.*}}<Never>(%{{.*}}, [[LB]]) : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
-// CHECK:   end_borrow [[SB]] : $*AnyObject
-// CHECK:   unreachable
-// CHECK: bb1:
-// CHECK:   end_borrow [[LB]] : $AnyObject
-// CHECK:   end_borrow [[SB]] : $*AnyObject
+// CHECK-NEXT:   unreachable
 // CHECK-LABEL: } // end sil function '$s26testNoReturnSpecializations5NeverO_Tt0g5'
 sil [ossa] @testNoReturnSpecialization : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> () {
 bb0(%0 : $*AnyObject, %1 : $@thick T.Type):

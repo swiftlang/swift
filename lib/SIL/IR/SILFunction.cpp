@@ -277,6 +277,7 @@ void SILFunction::init(
   this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->HasUnsafeNonEscapableResult = false;
   this->IsPerformanceConstraint = false;
+  this->NeedBreakInfiniteLoops = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;

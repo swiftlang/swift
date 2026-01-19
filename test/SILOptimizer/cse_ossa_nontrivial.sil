@@ -735,7 +735,14 @@ bb1:
   %ele2 = ref_element_addr %borrow2 : $WrapperKlass, #WrapperKlass.val
   apply %func(%ele2) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
   end_borrow %borrow2 : $WrapperKlass
-  br bb1 
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value [dead_end] %3
+  unreachable
 }
 
 sil [ossa] @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()

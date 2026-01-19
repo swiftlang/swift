@@ -125,6 +125,12 @@ struct BridgedPostDomTree {
   BRIDGED_INLINE bool postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const;
 };
 
+struct BridgedOptimizerUtilities {
+  typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+
+  static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
+};
+
 struct BridgedLoopTree {
   swift::SILLoopInfo * _Nonnull li;
   
@@ -218,12 +224,14 @@ struct BridgedPassContext {
   SwiftInt getStaticStride(BridgedType type) const;
   bool canMakeStaticObjectReadOnly(BridgedType type) const;
 
-  // Stack nesting
+  // Stack nesting and other notifications
 
   BRIDGED_INLINE void notifyInvalidatedStackNesting() const;
   BRIDGED_INLINE bool getNeedFixStackNesting() const;
   void fixStackNesting(BridgedFunction function) const;
 
+  BRIDGED_INLINE bool getNeedBreakInfiniteLoops() const;
+  BRIDGED_INLINE void setNeedBreakInfiniteLoops(bool value) const;
   // Access SIL module data structures
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getFirstFunctionInModule() const;

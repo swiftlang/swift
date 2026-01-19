@@ -1450,6 +1450,7 @@ void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) 
   ASSERT(!silCombiner && "didn't clear silCombiner backlink");
   this->transform = transform;
   this->function = transform->getFunction();
+  ASSERT(!this->function->needBreakInfiniteLoops() && "didn't break infinite loops in previous module pass");
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
@@ -1460,6 +1461,7 @@ void SwiftPassInvocation::finishedFunctionPassRun() {
     passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
   }
   changeNotifications = SILContext::NotificationKind::Nothing;
+  ASSERT(!function->needBreakInfiniteLoops() && "didn't break infinite loops");
 
   insertedPhisBySSAUpdater.clear();
   if (ssaUpdater) {

@@ -1270,6 +1270,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     llvm_unreachable(
         "All forward definitions of local archetypes should be resolved");
 
+  // The de-serialized SIL is assumed to be in a correct state.
+  fn->setNeedBreakInfiniteLoops(false);
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
