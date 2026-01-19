@@ -104,3 +104,5 @@ let classWithDefaultTemplatedOperatorStar = ClassWithDefaultTemplatedOperatorSta
 let _ = classWithDefaultTemplatedOperatorStar.pointee  // expected-error {{has no member 'pointee'}}
 // ^this could work in theory, but is niche (https://github.com/swiftlang/swift/issues/86478)
 // Same for templated operator++.
+
+let _ = HasOperatorReturningAuto().pointee // expected-error {{value of type 'HasOperatorReturningAuto' has no member 'pointee'}}
