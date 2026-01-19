@@ -278,6 +278,7 @@ LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
+LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
