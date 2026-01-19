@@ -621,14 +621,14 @@ ExecutablePath getExecutablePath(void) {
     SetLastError(ERROR_SUCCESS);
     (void)GetModuleFileNameW(nullptr, result.data(), charCount);
     switch (GetLastError()) {
-    case ERROR_SUCCESS: {
+    case ERROR_SUCCESS:
       return result;
     case ERROR_INSUFFICIENT_BUFFER:
       charCount += MAX_PATH; // add more space and try again
       break;
     default:
       // Some other error prevented getting the path.
-      return "";
+      return L"";
     }
   }
 }
