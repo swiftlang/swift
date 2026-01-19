@@ -220,6 +220,10 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  /// True if the pass has notified that stack nesting needs to be fixed.
+  /// In this case the pass needs to call `fixStackNesting`.
+  var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
+
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)
   }
