@@ -628,11 +628,10 @@ func testForEach(_ i: Int) {
   for _ in foo(i) {}
   for _ in bar(i) {}
 
-  // FIXME: These should work too (https://github.com/swiftlang/swift/issues/86629)
-  for _ in foo(i, i) {} // expected-error {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
-  for _ in foo(0, "") {} // expected-error {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
-  for (_, _) in foo(i, i) {} // expected-error {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
-  for (_, _) in foo(0, "") {} // expected-error {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
+  for _ in foo(i, i) {}
+  for _ in foo(0, "") {}
+  for (_, _) in foo(i, i) {}
+  for (_, _) in foo(0, "") {}
 
   for _ in bar(i, i) {}
   for _ in bar(0, "") {}
@@ -642,9 +641,8 @@ func testForEach(_ i: Int) {
   let _ = foo(i).first
   let _ = foo(i).first!
 
-  // FIXME: These crash the compiler (https://github.com/swiftlang/swift/issues/86628)
-//  let _ = foo(i, i).first
-//  let _ = foo(0, "").first
+  let _ = foo(i, i).first
+  let _ = foo(0, "").first
 
   let _ = bar(i).first
   let _ = bar(i, i).first
@@ -656,9 +654,8 @@ func testForEach(_ i: Int) {
   let (_, _) = bar(i, i).first!
   let (_, _) = bar(0, "").first!
 
-  // FIXME: These should work too
-  let _ = foo(i, i).first! // expected-error {{pack reference '_, _' can only appear in pack expansion}}
-  let _ = foo(0, "").first! // expected-error {{pack reference '_, _' can only appear in pack expansion}}
-  let (_, _) = foo(i, i).first! // expected-error {{pack reference '_, _' can only appear in pack expansion}}
-  let (_, _) = foo(0, "").first! // expected-error {{pack reference '_, _' can only appear in pack expansion}}
+  let _ = foo(i, i).first!
+  let _ = foo(0, "").first!
+  let (_, _) = foo(i, i).first!
+  let (_, _) = foo(0, "").first!
 }

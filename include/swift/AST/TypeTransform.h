@@ -764,9 +764,12 @@ case TypeKind::Id:
       if (asDerived().shouldUnwrapVanishingTuples()) {
         // Handle vanishing tuples -- If the transform would yield a singleton
         // tuple, and we didn't start with one, flatten to produce the
-        // element type.
+        // element type. Avoid flattening if we have a type variable singeton,
+        // since it could be subtituted with a pack, TypeSimplifier handles the
+        // flattening in this case.
         if (elements.size() == 1 &&
             !elements[0].getType()->is<PackExpansionType>() &&
+            !elements[0].getType()->is<TypeVariableType>() &&
             !(tuple->getNumElements() == 1 &&
               !tuple->getElementType(0)->is<PackExpansionType>())) {
           return elements[0].getType();
