@@ -4,10 +4,10 @@
 // RUN: %target-codesign %t/CrashNoDebug.exe
 // RUN: %target-codesign %t/CrashOptNoDebug.exe
 
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashNoDebug.exe > %t/NoDebug.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashNoDebug.exe > %t/NoDebug.out 2>&1
 // RUN: %FileCheck %s --ignore-case --check-prefix NODEBUG < %t/NoDebug.out
 
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug.exe > %t/OptNoDebug.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashOptNoDebug.exe > %t/OptNoDebug.out 2>&1
 // RUN: %FileCheck %s --ignore-case --check-prefix OPTNODEBUG < %t/OptNoDebug.out
 
 // UNSUPPORTED: use_os_stdlib

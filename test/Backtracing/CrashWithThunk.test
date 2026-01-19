@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/CrashWithThunk.swift -parse-as-library -Onone %swift-debug-flags -o %t/CrashWithThunk.exe
 // RUN: %target-codesign %t/CrashWithThunk.exe
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashWithThunk.exe > %t/CrashWithThunk.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/CrashWithThunk.exe > %t/CrashWithThunk.out 2>&1
 // RUN: %FileCheck --ignore-case %s < %t/CrashWithThunk.out
-// RUN: not env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/CrashWithThunk.exe > %t/Friendly.out 2>&1
+// RUN: ! env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/CrashWithThunk.exe > %t/Friendly.out 2>&1
 // RUN %FileCheck %s --ignore-case --check-prefix FRIENDLY < %t/Friendly.out
 
 // UNSUPPORTED: use_os_stdlib

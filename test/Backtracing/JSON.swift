@@ -1,18 +1,18 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/json.exe
 // RUN: %target-codesign %t/json.exe
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash.json %target-run %t/json.exe 2>&1
 // RUN: %validate-json %t/crash.json | %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
 
 // Also check that we generate valid JSON with various different options set.
 
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash2.json,threads=crashed %target-run %t/json.exe 2>&1
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash3.json,registers=all %target-run %t/json.exe 2>&1
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash4.json,sanitize=yes %target-run %t/json.exe 2>&1
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash5.json,images=none %target-run %t/json.exe 2>&1
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash6.json,images=all %target-run %t/json.exe 2>&1
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash7.json,symbolicate=off %target-run %t/json.exe 2>&1
-// RUN: not env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash8.json,demangle=no %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash2.json,threads=crashed %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash3.json,registers=all %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash4.json,sanitize=yes %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash5.json,images=none %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash6.json,images=all %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash7.json,symbolicate=off %target-run %t/json.exe 2>&1
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no,format=json,output-to=%t/crash8.json,demangle=no %target-run %t/json.exe 2>&1
 // RUN: %validate-json %t/crash2.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
 // RUN: %validate-json %t/crash3.json| %FileCheck %s --check-prefixes CHECK,UNSANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED,CAPTUREDMEM
 // RUN: %validate-json %t/crash4.json| %FileCheck %s --check-prefixes CHECK,SANITIZED,DEMANGLED,IMAGES,OMITTEDIMAGES,SYMBOLICATED
