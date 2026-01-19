@@ -189,3 +189,27 @@ func asyncLetDeferInSyncFunc() {
   defer { async let _: () = voidFunc() } // expected-error {{'async' defer must appear within an 'async' context}}
   voidFunc()
 }
+
+@MainActor
+func mainActorFunc() {}
+
+@MainActor
+func mainActorAsyncFunc() async {}
+
+
+func asyncFuncToDeferCallToMainActor() async {
+  defer {
+    await mainActorFunc()
+    await mainActorAsyncFunc()
+  }
+  voidFunc()
+}
+
+@MainActor
+func mainActorAsyncFuncToDeferCallToMainActor() async {
+  defer {
+    mainActorFunc()
+    await mainActorAsyncFunc()
+  }
+  voidFunc()
+}
