@@ -81,16 +81,22 @@ bool BridgedDeadEndBlocksAnalysis::isDeadEnd(BridgedBasicBlock block) const {
 //                      BridgedDomTree, BridgedPostDomTree
 //===----------------------------------------------------------------------===//
 
+inline llvm::DomTreeNodeBase<swift::SILBasicBlock> *getDomNode(BridgedBasicBlock block, swift::DominanceInfo *di) {
+  auto *node = di->getNode(block.unbridged());
+  ASSERT(node && "missing dominance node for block");
+  return node;
+}
+
 bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
   return di->dominates(dominating.unbridged(), dominated.unbridged());
 }
 
 SwiftInt BridgedDomTree::getNumberOfChildren(BridgedBasicBlock bb) const {
-  return di->getNode(bb.unbridged())->getNumChildren();
+  return getDomNode(bb, di)->getNumChildren();
 }
 
 BridgedBasicBlock BridgedDomTree::getChildAt(BridgedBasicBlock bb, SwiftInt index) const {
-  return {di->getNode(bb.unbridged())->begin()[index]->getBlock()};
+  return {getDomNode(bb, di)->begin()[index]->getBlock()};
 }
 
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
