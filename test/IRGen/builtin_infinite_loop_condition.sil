@@ -1,0 +1,15 @@
+
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -parse-stdlib -Xllvm -sil-disable-pass=simplification | %FileCheck %s
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: define {{.*}} @entry()
+// CHECK:         ret i1 true
+// CHECK-NEXT:  }
+sil @entry : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = builtin "infinite_loop_true_condition"() : $Builtin.Int1
+  return %0
+}
+

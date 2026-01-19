@@ -699,6 +699,17 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
+/// Is true, but the compiler doesn't know.
+/// This builtin is used to break infinite loops.
+/// Note that this builtin intentionally has side effects defined (Attrs = "").
+/// This prevents optimizations to move code with side effects over an "empty"
+/// infinite loop (into the pseudo exit of the loop). E.g.
+/// ```
+///   print("end of processing") // must not be moved into the pseudo-exit of the infinite loop
+///   while true {}
+/// ```
+BUILTIN_MISC_OPERATION(InfiniteLoopTrueCondition, "infinite_loop_true_condition", "", None)
+
 /// Ifdef has type () -> Bool.
 BUILTIN_MISC_OPERATION(Ifdef, "ifdef", "n", Special)
 
