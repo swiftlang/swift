@@ -232,6 +232,64 @@ static bool usesFeatureLifetimes(Decl *decl) {
   return false;
 }
 
+/// Search for any types within decl with lifetime dependencies. Ignore
+/// lifetimes on AbstractFunctionDecl decls, since these are supported by the
+/// Lifetimes feature.
+static bool findClosureLifetimes(Decl *decl, bool onlyExplicit) {
+  // Search for any Decl that uses a type with lifetime dependencies, possibly
+  // restricting this to explicit dependencies.
+  class Walker : public ASTWalker {
+    llvm::function_ref<bool(Type)> Pred;
+  public:
+    bool useFound = false;
+
+    explicit Walker(llvm::function_ref<bool(Type)> Pred) : Pred(Pred) {}
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      if (isa<AbstractFunctionDecl>(D)) {
+        // Lifetime attributes on an AbstractFunctionDecl depend on the
+        // Lifetimes feature, not ClosureLifetimes.
+        // Continue to inspect child nodes.
+        return Action::Continue();
+      }
+      useFound = usesTypeMatching(D, Pred);
+      return Action::StopIf(useFound);
+    }
+  };
+  auto const hasLifetimeDependencies =
+      onlyExplicit ? [](Type type) -> bool {
+    if (auto *aft = type->getAs<AnyFunctionType>()) {
+      return aft->hasExplicitLifetimeDependencies();
+    }
+    return false;
+  }
+  : [](Type type) -> bool {
+      if (auto *aft = type->getAs<AnyFunctionType>()) {
+        return aft->hasLifetimeDependencies();
+      }
+      return false;
+    };
+
+  Walker walker(hasLifetimeDependencies);
+  decl->walk(walker);
+  return walker.useFound;
+}
+
+static bool usesFeatureClosureLifetimes(Decl *decl) {
+  // This will find function types with lifetimes & closures with lifetimes,
+  // since it walks the AST rooted at decl, checking types.
+  if (findClosureLifetimes(decl, /*onlyExplicit*/ true)) {
+    return true;
+  }
+  // Guard inferred lifetime dependencies with ClosureLifetimes if it was
+  // enabled.
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::ClosureLifetimes)) {
+    return false;
+  }
+
+  // Check for inferred closure lifetime dependencies
+  return findClosureLifetimes(decl, /*onlyExplicit*/ false);
+}
+
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
   auto hasInoutLifetimeDependence = [](Decl *decl) {
     for (auto attr : decl->getAttrs().getAttributes<LifetimeAttr>()) {

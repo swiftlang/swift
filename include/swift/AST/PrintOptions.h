@@ -405,6 +405,9 @@ public:
   /// Suppress @_lifetime attribute and emit @lifetime instead.
   bool SuppressLifetimes = false;
 
+  /// Suppress @_lifetime attributes on function types and closures.
+  bool SuppressClosureLifetimes = false;
+
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
 
