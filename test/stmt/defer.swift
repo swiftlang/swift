@@ -185,3 +185,7 @@ func asyncDeferInSyncFunc() {
     voidFunc()
 }
 
+func asyncLetDeferInSyncFunc() {
+  defer { async let _: () = voidFunc() } // expected-error {{'async' defer must appear within an 'async' context}}
+  voidFunc()
+}
