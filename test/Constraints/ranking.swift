@@ -461,3 +461,17 @@ func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
 func unicode_scalar_init(s: UnicodeScalar) {
   if s == UnicodeScalar(0xfe0e) {}
 }
+
+//--------------------------------------------------------------------
+// For loops
+//--------------------------------------------------------------------
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking12testForLoopsyyF : $@convention(thin) () -> ()
+func testForLoops() {
+  func foo() -> any Sequence<Int> { [0] }
+  func foo() -> some Sequence<Int> { [0] }
+  func foo() -> [Int] { [0] }
+
+  // CHECK: function_ref @$s7ranking12testForLoopsyyF3fooL1_SaySiGyF : $@convention(thin) () -> @owned Array<Int>
+  for _ in foo() {}
+}
