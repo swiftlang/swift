@@ -12,7 +12,7 @@
 
 import Testing
 
-@testable import SwiftXcodeGen
+@testable import Utils
 
 @Suite
 struct PathTests {

@@ -43,7 +43,7 @@ public final class NinjaBuildDir: Sendable {
 
   // We can infer the project root from the location of swift-xcodegen itself.
   //                      1     2         3          4           5         6      7
-  // #filePath = <root>/swift/utils/swift-xcodegen/Sources/SwiftXcodeGen/Ninja/NinjaBuildDir.swift
+  // #filePath = <root>/swift/utils/swift-dev-utils/Sources/SwiftXcodeGen/Ninja/NinjaBuildDir.swift
   private static let inferredProjectRootPath = AbsolutePath(#filePath).dropLast(7)
 
   private static func detectProjectRoot() throws -> AbsolutePath {

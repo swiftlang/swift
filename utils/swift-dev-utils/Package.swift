@@ -5,7 +5,7 @@ import PackageDescription
 import class Foundation.ProcessInfo
 
 let package = Package(
-    name: "swift-xcodegen",
+    name: "swift-dev-utils",
     platforms: [.macOS(.v15)],
     targets: [
         .target(
@@ -34,11 +34,18 @@ let package = Package(
           dependencies: [
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
             "SwiftXcodeGen"
+          ],
+          exclude: [
+            "README.md",
           ]
         ),
         .testTarget(
           name: "SwiftXcodeGenTest",
           dependencies: ["SwiftXcodeGen"]
+        ),
+        .testTarget(
+          name: "UtilsTest",
+          dependencies: ["Utils"]
         )
     ],
     swiftLanguageModes: [.v6]
