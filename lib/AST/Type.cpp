@@ -984,11 +984,12 @@ unsigned int TypeBase::getOptionalityDepth() {
   return depth;
 }
 
-Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
+Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
+                                bool dropIsolation) {
   // Look through optionals.
   if (Type optionalObject = getOptionalObjectType()) {
-    Type newOptionalObject =
-        optionalObject->stripConcurrency(recurse, dropGlobalActor);
+    Type newOptionalObject = optionalObject->stripConcurrency(
+        recurse, dropGlobalActor, dropIsolation);
     if (optionalObject->isEqual(newOptionalObject))
       return Type(this);
 
@@ -1004,6 +1005,9 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
 
+    if (dropIsolation)
+      extInfo = extInfo.withoutIsolation();
+
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
 
@@ -1012,7 +1016,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       for (unsigned paramIdx : indices(params)) {
         const auto &param = params[paramIdx];
         Type newParamType = param.getPlainType()->stripConcurrency(
-            recurse, dropGlobalActor);
+            recurse, dropGlobalActor, dropIsolation);
 
         if (!newParams.empty()) {
           newParams.push_back(param.withType(newParamType));
@@ -1029,7 +1033,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       if (!newParams.empty())
         params = newParams;
 
-      resultType = resultType->stripConcurrency(recurse, dropGlobalActor);
+      resultType =
+          resultType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     }
 
     // Drop Sendable requirements.
@@ -1070,8 +1075,9 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   }
 
   if (auto existentialType = getAs<ExistentialType>()) {
-    auto newConstraintType = existentialType->getConstraintType()
-        ->stripConcurrency(recurse, dropGlobalActor);
+    auto newConstraintType =
+        existentialType->getConstraintType()->stripConcurrency(
+            recurse, dropGlobalActor, dropIsolation);
     if (newConstraintType.getPointer() ==
             existentialType->getConstraintType().getPointer())
       return Type(this);
@@ -1096,7 +1102,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     for (unsigned i : indices(members)) {
       auto memberType = members[i];
       auto newMemberType =
-          memberType->stripConcurrency(recurse, dropGlobalActor);
+          memberType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
       if (!newMembers.empty()) {
         newMembers.push_back(newMemberType);
         continue;
@@ -1122,7 +1128,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   if (auto existentialMetatype = getAs<ExistentialMetatypeType>()) {
     auto instanceType = existentialMetatype->getExistentialInstanceType();
     auto newInstanceType =
-        instanceType->stripConcurrency(recurse, dropGlobalActor);
+        instanceType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     if (instanceType.getPointer() != newInstanceType.getPointer()) {
       std::optional<MetatypeRepresentation> repr;
       if (existentialMetatype->hasRepresentation())
@@ -1142,8 +1148,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     SmallVector<Type, 2> genericArgs;
     llvm::transform(BGT->getGenericArgs(), std::back_inserter(genericArgs),
                     [&](Type argTy) {
-                      auto newArgTy =
-                          argTy->stripConcurrency(recurse, dropGlobalActor);
+                      auto newArgTy = argTy->stripConcurrency(
+                          recurse, dropGlobalActor, dropIsolation);
                       anyChanged |= !newArgTy->isEqual(argTy);
                       return newArgTy;
                     });
@@ -1162,7 +1168,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     llvm::transform(
         tuple->getElements(), std::back_inserter(elts), [&](const auto &elt) {
           auto eltTy = elt.getType();
-          auto strippedTy = eltTy->stripConcurrency(recurse, dropGlobalActor);
+          auto strippedTy =
+              eltTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
           anyChanged |= !strippedTy->isEqual(eltTy);
           return elt.getWithType(strippedTy);
         });
@@ -1171,8 +1178,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   }
 
   if (auto *arrayTy = dyn_cast<ArraySliceType>(this)) {
-    auto newBaseTy =
-        arrayTy->getBaseType()->stripConcurrency(recurse, dropGlobalActor);
+    auto newBaseTy = arrayTy->getBaseType()->stripConcurrency(
+        recurse, dropGlobalActor, dropIsolation);
     return newBaseTy->isEqual(arrayTy->getBaseType())
                ? Type(this)
                : ArraySliceType::get(newBaseTy);
@@ -1180,9 +1187,11 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
 
   if (auto *dictTy = dyn_cast<DictionaryType>(this)) {
     auto keyTy = dictTy->getKeyType();
-    auto strippedKeyTy = keyTy->stripConcurrency(recurse, dropGlobalActor);
+    auto strippedKeyTy =
+        keyTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     auto valueTy = dictTy->getValueType();
-    auto strippedValueTy = valueTy->stripConcurrency(recurse, dropGlobalActor);
+    auto strippedValueTy =
+        valueTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
 
     return keyTy->isEqual(strippedKeyTy) && valueTy->isEqual(strippedValueTy)
                ? Type(this)
