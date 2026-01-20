@@ -761,16 +761,17 @@ case TypeKind::Id:
       if (!anyChanged)
         return t;
 
-      if (asDerived().shouldUnwrapVanishingTuples()) {
-        // Handle vanishing tuples -- If the transform would yield a singleton
-        // tuple, and we didn't start with one, flatten to produce the
-        // element type.
-        if (elements.size() == 1 &&
-            !elements[0].getType()->is<PackExpansionType>() &&
-            !(tuple->getNumElements() == 1 &&
-              !tuple->getElementType(0)->is<PackExpansionType>())) {
-          return elements[0].getType();
-        }
+      // Handle vanishing tuples -- If the transform would yield a singleton
+      // tuple, and we didn't start with one, flatten to produce the
+      // element type. Avoid flattening if we have a type variable singeton,
+      // since it could be subtituted with a pack, TypeSimplifier handles the
+      // flattening in this case.
+      if (elements.size() == 1 &&
+          !elements[0].getType()->is<PackExpansionType>() &&
+          !elements[0].getType()->is<TypeVariableType>() &&
+          !(tuple->getNumElements() == 1 &&
+            !tuple->getElementType(0)->is<PackExpansionType>())) {
+        return elements[0].getType();
       }
 
       return TupleType::get(elements, ctx);
@@ -1137,8 +1138,6 @@ case TypeKind::Id:
     auto sig = subs.getGenericSignature();
     return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
-
-  bool shouldUnwrapVanishingTuples() const { return true; }
 
   bool shouldDesugarTypeAliases() const { return false; }
 
