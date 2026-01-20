@@ -1986,13 +1986,19 @@ ConstraintSystem::selectDisjunction() {
     // Use favored choices only if disjunction score is higher
     // than zero. This means that we can maintain favoring
     // choices without impacting selection decisions.
-    unsigned numFirstFavored =
-        firstScore.value_or(0) ? firstFavorings.FavoredChoices.size() : 0;
-    unsigned numSecondFavored =
-        secondScore.value_or(0) ? secondFavorings.FavoredChoices.size() : 0;
+    unsigned numFirstFavored = firstActive;
+    if (firstScore && *firstScore != 0) {
+      if (auto numFavoredChoices = firstFavorings.FavoredChoices.size()) {
+        numFirstFavored = numFavoredChoices;
+      }
+    }
 
-    numFirstFavored = numFirstFavored ? numFirstFavored : firstActive;
-    numSecondFavored = numSecondFavored ? numSecondFavored : secondActive;
+    unsigned numSecondFavored = secondActive;
+    if (secondScore && *secondScore != 0) {
+      if (auto numFavoredChoices = secondFavorings.FavoredChoices.size()) {
+        numSecondFavored = numFavoredChoices;
+      }
+    }
 
     return numFirstFavored < numSecondFavored;
   };
