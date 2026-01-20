@@ -367,3 +367,23 @@ extension GUID: @retroactive CustomStringConvertible {
     return unsafe String(cString: buffer)
   }
 }
+
+extension GUID: @retroactive LosslessStringConvertible {
+  public init?(_ description: String) {
+    let guid: GUID? = unsafe description.withCString { description in
+      unsafe withUnsafeTemporaryAllocation(of: GUID.self, capacity: 1) { guid in
+        let guid = guid.baseAddress!
+        if RPC_S_OK == unsafe UuidFromStringA(description, guid) {
+          return guid.move()
+        } else {
+          return nil
+        }
+      }
+    }
+    if let guid {
+      self = guid
+    } else {
+      return nil
+    }
+  }
+}
