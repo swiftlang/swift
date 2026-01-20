@@ -326,3 +326,8 @@
 // CHECK: struct HasStaticOperatorCallWithUnimportableCxxType {
 // CHECK-NEXT:  init()
 // CHECK-NEXT: }
+
+// CHECK: struct HasOperatorReturningAuto {
+// CHECK-NEXT:  init()
+// CHECK-NEXT: }
+
