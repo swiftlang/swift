@@ -222,7 +222,8 @@ static bool isSupportedOperator(Constraint *disjunction) {
 
   auto name = decl->getBaseIdentifier();
   if (name.isArithmeticOperator() || name.isStandardComparisonOperator() ||
-      name.isBitwiseOperator() || name.isNilCoalescingOperator()) {
+      name.isBitwiseOperator() || name.isNilCoalescingOperator() ||
+      name.isStandardInfixLogicalOperator()) {
     return true;
   }
 
@@ -251,14 +252,6 @@ static bool isStandardComparisonOperator(Constraint *disjunction) {
   if (auto *decl = getOverloadChoiceDecl(choice))
     return decl->isOperator() &&
            decl->getBaseIdentifier().isStandardComparisonOperator();
-  return false;
-}
-
-static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
-  auto *choice = disjunction->getNestedConstraints()[0];
-  if (auto *decl = getOverloadChoiceDecl(choice))
-    return decl->isOperator() &&
-           decl->getBaseIdentifier().isStandardInfixLogicalOperator();
   return false;
 }
 
@@ -1966,11 +1959,6 @@ ConstraintSystem::selectDisjunction() {
     // form disjunctions, but when they do, let's prefer them over
     // other operators when they have fewer choices because it helps
     // to split operator chains.
-    if (isFirstOperator && isSecondOperator) {
-      if (isStandardInfixLogicalOperator(first) !=
-          isStandardInfixLogicalOperator(second))
-        return firstActive < secondActive;
-    }
 
     // Not all of the non-operator disjunctions are supported by the
     // ranking algorithm, so to prevent eager selection of operators
