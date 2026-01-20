@@ -970,7 +970,8 @@ class RefCounts {
       return bits.isUniquelyReferenced();
     }
     
-    if (bits.hasSideTable())
+    auto hasSide = bits.hasSideTable();
+    if (SWIFT_UNLIKELY(hasSide))
       return bits.getSideTable()->isUniquelyReferenced();
     
     return false;
