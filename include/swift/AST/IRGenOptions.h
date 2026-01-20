@@ -33,6 +33,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Instrumentation.h"
 #include <optional>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -737,24 +738,21 @@ public:
   std::string getDebugFlags(StringRef PrivateDiscriminator,
                             bool EnableCXXInterop,
                             bool EnableEmbeddedSwift) const {
-    std::string Flags = DebugFlags;
-    if (!PrivateDiscriminator.empty()) {
-      if (!Flags.empty())
-        Flags += " ";
-      Flags += ("-private-discriminator " + PrivateDiscriminator).str();
-    }
-    if (EnableCXXInterop) {
-      if (!Flags.empty())
-        Flags += " ";
-      Flags += "-enable-experimental-cxx-interop";
-    }
-    if (EnableEmbeddedSwift) {
-      if (!Flags.empty())
-        Flags += " ";
-      Flags += "-enable-embedded-swift";
-    }
+    llvm::SmallVector<std::string, 4> Flags{DebugFlags};
 
-    return Flags;
+    if (!PrivateDiscriminator.empty()) {
+      Flags.emplace_back("-private-discriminator");
+      Flags.emplace_back(PrivateDiscriminator);
+    }
+    if (EnableCXXInterop)
+      Flags.emplace_back("-enable-experimental-cxx-interop");
+    if (EnableEmbeddedSwift)
+      Flags.emplace_back("-enable-embedded-swift");
+
+    std::ostringstream buffer;
+    std::copy(std::begin(Flags), std::end(Flags),
+              std::ostream_iterator<std::string>(buffer, " "));
+    return buffer.str();
   }
 
   /// Return a hash code of any components from these options that should
