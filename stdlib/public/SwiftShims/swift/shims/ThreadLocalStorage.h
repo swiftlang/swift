@@ -18,13 +18,22 @@
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void * _Nonnull _swift_stdlib_threadLocalStorageGet(void);
 
+#if !defined(__swift_embedded__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void * _Nullable _swift_getExclusivityTLSImpl();
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setExclusivityTLSImpl(void * _Nullable newValue);
+#endif
 
-#if defined(__APPLE__) && __arm64__
+#if defined(__swift_embedded__)
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void * _Nullable _swift_getExclusivityTLS();
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_setExclusivityTLS(void * _Nullable newValue);
+
+#elif defined(__APPLE__) && __arm64__
 
 // Use a fast path on Apple ARM64, where we have a dedicated TLS key and fast
 // access to read/write it.
