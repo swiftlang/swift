@@ -21,6 +21,11 @@ module BacktracingImpl {
       requires cplusplus
       export *
     }
+    module PDB {
+      header "ImageFormats/PDB/pdb.h"
+      requires cplusplus
+      export *
+    }
     export *
   }
 

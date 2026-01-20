@@ -1,4 +1,4 @@
-//===--- PeImageCache.swift - PE-COFF support for Swift -------------------===//
+//===--- PDBCache.swift - PDB support for Swift ---------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Provides a per-thread PE-COFF image cache that improves efficiency when
-// taking multiple backtraces by avoiding loading PE-COFF images multiple times.
+// Provides a per-thread PDB cache that improves efficiency when taking
+// multiple backtraces by avoiding loading PDBs multiple times.
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,25 +27,24 @@ internal import Glibc
 internal import Musl
 #endif
 
-/// Provides a per-thread image cache for PE-COFF image processing.  This means
+/// Provides a per-thread image cache for PDB processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
-final class PeImageCache {
-  var cache: [String: PeCoffImage] = [:]
+final class PDBCache {
+  var cache: [String: PDBFile] = [:]
 
   func purge() {
     cache = [:]
   }
 
-  func lookup(path: String?) -> PeCoffImage? {
+  func lookup(path: String?) -> PDBFile? {
     guard let path = path else {
       return nil
     }
     if let image = cache[path] {
       return image
     }
-    if let source = try? ImageSource(path: path),
-       let image = try? PeCoffImage(source: source) {
+    if let image = PDBFile(path: path) {
       cache[path] = image
       return image
     }
@@ -56,7 +55,7 @@ final class PeImageCache {
   private static var dwTlsIndex: DWORD = {
     let dwNdx = TlsAlloc()
     if dwNdx == TLS_OUT_OF_INDEXES {
-      fatalError("Unable to allocate TSD for PeImageCache")
+      fatalError("Unable to allocate TSD for PDBCache")
     }
     return dwNdx
   }()
@@ -66,34 +65,34 @@ final class PeImageCache {
     let err = pthread_key_create(
       &theKey,
       { rawPtr in
-        let ptr = Unmanaged<PeImageCache>.fromOpaque(
+        let ptr = Unmanaged<PDBCache>.fromOpaque(
           notMutable(notOptional(rawPtr))
         )
         ptr.release()
       }
     )
     if err != 0 {
-      fatalError("Unable to create TSD key for PeImageCache")
+      fatalError("Unable to create TSD key for PDBCache")
     }
     return theKey
   }()
   #endif
 
-  static var threadLocal: PeImageCache {
+  static var threadLocal: PDBCache {
     #if os(Windows)
     guard let rawPtr = TlsGetValue(dwTlsIndex) else {
-      let cache = Unmanaged<PeImageCache>.passRetained(PeImageCache())
+      let cache = Unmanaged<PDBCache>.passRetained(PDBCache())
       TlsSetValue(dwTlsIndex, cache.toOpaque())
       return cache.takeUnretainedValue()
     }
     #else
     guard let rawPtr = pthread_getspecific(key) else {
-      let cache = Unmanaged<PeImageCache>.passRetained(PeImageCache())
+      let cache = Unmanaged<PDBCache>.passRetained(PDBCache())
       pthread_setspecific(key, cache.toOpaque())
       return cache.takeUnretainedValue()
     }
     #endif
-    let cache = Unmanaged<PeImageCache>.fromOpaque(rawPtr)
+    let cache = Unmanaged<PDBCache>.fromOpaque(rawPtr)
     return cache.takeUnretainedValue()
   }
 }
