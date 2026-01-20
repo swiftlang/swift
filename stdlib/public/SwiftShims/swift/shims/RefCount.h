@@ -964,11 +964,16 @@ class RefCounts {
   // Once deinit begins the reference count is undefined.
   bool isUniquelyReferenced() const {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (bits.isUniquelyReferenced()) {
+      //isUniquelyReferenced checks useSlowRC, and hasSideTable will be false if
+      //useSlowRC is true. So if we are here then we know hasSideTable is false.
+      return bits.isUniquelyReferenced();
+    }
+    
     if (bits.hasSideTable())
       return bits.getSideTable()->isUniquelyReferenced();
     
-    assert(!bits.getIsDeiniting());
-    return bits.isUniquelyReferenced();
+    return false;
   }
 
   // Return true if the object has started deiniting.
