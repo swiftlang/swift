@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types                     \
 // RUN:     -test-runner                    \
-// RUN:     -enable-ossa-complete-lifetimes \
 // RUN:     %s                              \
 // RUN:     -sil-disable-input-verify       \
 // RUN:     -o /dev/null                    \

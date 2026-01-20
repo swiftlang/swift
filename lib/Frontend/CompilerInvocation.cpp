@@ -3355,11 +3355,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.EnforceExclusivityDynamic = false;
   }
 
-  Opts.OSSACompleteLifetimes =
-      Args.hasFlag(OPT_enable_ossa_complete_lifetimes,
-                   OPT_disable_ossa_complete_lifetimes,
-                   Opts.OSSACompleteLifetimes);
-
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
   // If these optimizations are enabled never preserve functions for the

@@ -1542,13 +1542,6 @@ def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
 
-def enable_ossa_complete_lifetimes :
-  Flag<["-"], "enable-ossa-complete-lifetimes">,
-  HelpText<"Require linear OSSA lifetimes after SILGen">;
-def disable_ossa_complete_lifetimes :
-  Flag<["-"], "disable-ossa-complete-lifetimes">,
-  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
-
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,
     HelpText<"Which calling convention is used to perform non-swift calls. "
