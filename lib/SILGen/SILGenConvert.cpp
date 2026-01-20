@@ -812,7 +812,6 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
-    assert(concreteFormalType->isBridgeableObjectType());
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
@@ -849,10 +848,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete value is a pseudogeneric archetype, first erase it to
     // its upper bound.
     auto anyObjectTy = getASTContext().getAnyObjectType();
-    auto eraseToAnyObject =
-    [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
+    auto eraseToAnyObject = [&, concreteFormalType,
+                             F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
-      assert(concreteFormalType->isBridgeableObjectType());
       return B.createInitExistentialRef(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
           concreteValue, conformances);
