@@ -139,8 +139,15 @@ public func _stdlib_thread_barrier_wait(
 #elseif os(WASI)
   // WASI environment has only a single thread
 #else
-  if pthread_mutex_lock(barrier.pointee.mutex!) != 0 {
+  let mutex = barrier.pointee.mutex!
+  if pthread_mutex_lock(mutex) != 0 {
     return -1
+  }
+  var shouldUnlockMutex = true
+  defer {
+    if shouldUnlockMutex {
+      _ = pthread_mutex_unlock(mutex)
+    }
   }
 #endif
   barrier.pointee.numThreadsWaiting += 1
@@ -149,16 +156,18 @@ public func _stdlib_thread_barrier_wait(
 #if os(Windows)
     if !SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
                                   INFINITE, 0) {
+      ReleaseSRWLockExclusive(barrier.pointee.mutex!)
       return -1
     }
     ReleaseSRWLockExclusive(barrier.pointee.mutex!)
 #elseif os(WASI)
   // WASI environment has a only single thread
 #else
-    if pthread_cond_wait(barrier.pointee.cond!, barrier.pointee.mutex!) != 0 {
+    if pthread_cond_wait(barrier.pointee.cond!, mutex) != 0 {
       return -1
     }
-    if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
+    shouldUnlockMutex = false
+    if pthread_mutex_unlock(mutex) != 0 {
       return -1
     }
 #endif
@@ -177,7 +186,8 @@ public func _stdlib_thread_barrier_wait(
     if pthread_cond_broadcast(barrier.pointee.cond!) != 0 {
       return -1
     }
-    if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
+    shouldUnlockMutex = false
+    if pthread_mutex_unlock(mutex) != 0 {
       return -1
     }
 #endif

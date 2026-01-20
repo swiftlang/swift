@@ -2527,14 +2527,16 @@ class AllocBoxInst final
                HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
                UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo =
                    DoesNotUseMoveableValueDebugInfo,
-               HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape);
+               HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+               bool inferredImmutable = false);
 
   static AllocBoxInst *create(
       SILDebugLocation Loc, CanSILBoxType boxType, SILFunction &F,
       std::optional<SILDebugVariable> Var,
       HasDynamicLifetime_t hasDynamicLifetime, bool reflection = false,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape);
+      HasPointerEscape_t hasPointerEscape = DoesNotHavePointerEscape,
+      bool inferredImmutable = false);
 
 public:
   CanSILBoxType getBoxType() const {
@@ -2555,6 +2557,14 @@ public:
 
   HasPointerEscape_t hasPointerEscape() const {
     return HasPointerEscape_t(sharedUInt8().AllocBoxInst.pointerEscape);
+  }
+
+  void setInferredImmutable(bool value) {
+    sharedUInt8().AllocBoxInst.inferredImmutable = value;
+  }
+
+  bool isInferredImmutable() const {
+    return sharedUInt8().AllocBoxInst.inferredImmutable;
   }
 
   /// True if the box should be emitted with reflection metadata for its
@@ -10959,12 +10969,15 @@ public:
     SILBasicBlock *iBlock = succs[i].getBB();
     SILBasicBlock *jBlock = succs[j].getBB();
 
+    auto iCount = succs[i].getCount();
+    auto jCount = succs[j].getCount();
+
     // Then destroy the sil successors and reinitialize them with the new things
     // that they are pointing at.
     succs[i].~SILSuccessor();
-    ::new (succs + i) SILSuccessor(this, jBlock);
+    ::new (succs + i) SILSuccessor(this, jBlock, jCount);
     succs[j].~SILSuccessor();
-    ::new (succs + j) SILSuccessor(this, iBlock);
+    ::new (succs + j) SILSuccessor(this, iBlock, iCount);
 
     // Now swap our cases.
     auto *cases = getCaseBuf();

@@ -21,8 +21,14 @@ struct qux;
 void foo(struct qux *x, int * __counted_by(len) p, int len);
 // expected-note@+1{{'fooIndirect' declared here}}
 void fooIndirect(struct qux * * x, int * __counted_by(len) p, int len);
+// expected-note@+1{{'fooIndirectCompleteArray' declared here}}
+void fooIndirectCompleteArray(struct qux* (* x)[2], int * __counted_by(len) p, int len);
 // expected-note@+1{{'fooReturn' declared here}}
 struct qux * fooReturn(int * __counted_by(len) p, int len);
+
+enum fwd_declared_enum : int;
+// expected-note@+1{{'testEnum' declared here}}
+void testEnum(enum fwd_declared_enum *x, int * __counted_by(len) p, int len);
 
 struct container_t {
   struct qux *item;
@@ -31,11 +37,11 @@ struct container_t {
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on global function 'fooWrapped' here}}
 // }}
 // expected-expansion@+7:75{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func fooWrapped(_ x: UnsafeMutablePointer<container_t>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe fooWrapped(x, p.baseAddress!, len)|}}
 //   expected-remark@5{{macro content: |}|}}
-//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 // }}
 void fooWrapped(struct container_t * x, int * __counted_by(len) p, int len);
 
@@ -105,32 +111,55 @@ struct qux * bazReturn(int * __counted_by(len) p, int len);
 
 struct qux { int placeholder; };
 
+enum fwd_declared_enum : int {
+  enum_member,
+};
+
 
 //--- test.swift
 import Foo
 import Bar
 import Baz
 
-func callFoo(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>, _ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
+func callFoo(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>,
+             _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
+             _ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
   unsafe foo(x, p, len)
   unsafe fooIndirect(y, p, len)
+  unsafe fooIndirectCompleteArray(zz, p, len)
   let _: UnsafeMutablePointer<qux> = unsafe fooReturn(p, len)
   unsafe fooWrapped(z, p, len)
 }
 
-func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>, _ p: UnsafeMutableBufferPointer<CInt>) {
+func callTestEnum(_ x: UnsafeMutablePointer<fwd_declared_enum>,
+                  _ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
+  unsafe testEnum(x, p, len)
+}
+
+func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>,
+              _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
+              _ p: UnsafeMutableBufferPointer<CInt>) {
   // expected-error@+2{{missing argument for parameter #3 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
   unsafe foo(x, p)
   // expected-error@+2{{missing argument for parameter #3 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
   unsafe fooIndirect(y, p)
+  // expected-error@+2{{missing argument for parameter #3 in call}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  unsafe fooIndirectCompleteArray(zz, p)
   // expected-error@+2{{missing argument for parameter #2 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
   let _: UnsafeMutablePointer<qux> = unsafe fooReturn(p)
   unsafe fooWrapped(z, p)
 }
 
+func callTestEnum2(_ x: UnsafeMutablePointer<fwd_declared_enum>,
+                  _ p: UnsafeMutableBufferPointer<CInt>) {
+  // expected-error@+2{{missing argument for parameter #3 in call}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  unsafe testEnum(x, p)
+}
 
 func callBar(_ x: UnsafeMutablePointer<qux>, _ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
   unsafe bar(x, p, len)

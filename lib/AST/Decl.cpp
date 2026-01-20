@@ -3514,7 +3514,20 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
   if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+
+  // If a `_read` accessor is explicitly present and the CoroutineAccessors
+  // feature is enabled, we need to synthesize a `yielding borrow`.
+  // This is because we assume that with introduction of the feature we can
+  // call it.
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+  if (getParsedAccessor(AccessorKind::Read) &&
+      this->getModuleContext()->getResilienceStrategy() ==
+        ResilienceStrategy::Resilient &&
+      isExported(this) != ExportedLevel::None) {
+    return true;
+  }
+
+  return getOpaqueReadOwnership() !=  OpaqueReadOwnership::Owned;
 }
 
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {

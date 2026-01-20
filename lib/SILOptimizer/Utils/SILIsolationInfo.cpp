@@ -302,7 +302,7 @@ static SILValue lookThroughNonVarDeclOwnershipInsts(SILValue v) {
 static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
   bool foundOneNonIsolatedUnsafe = false;
   for (auto &op : pai->getArgumentOperands()) {
-    if (SILIsolationInfo::isSendableType(op.get()))
+    if (SILIsolationInfo::isSendable(op.get()))
       continue;
 
     // Normally we would not look through copy_value, begin_borrow, or
@@ -852,7 +852,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       }
     } else {
       // Ok, we have a temporary. If it is non-Sendable...
-      if (SILIsolationInfo::isNonSendableType(asi)) {
+      if (SILIsolationInfo::isNonSendable(asi)) {
         if (auto isolation = inferIsolationInfoForTempAllocStack(asi))
           return isolation;
       }
@@ -922,7 +922,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
 SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Return early if we do not have a non-Sendable type.
-  if (!SILIsolationInfo::isNonSendableType(arg->getType(), arg->getFunction()))
+  if (!SILIsolationInfo::isNonSendable(arg))
     return {};
 
   // Handle a switch_enum from a global-actor-isolated type.
@@ -1578,6 +1578,49 @@ void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
     printOptions(os);
     return;
   }
+}
+
+bool SILIsolationInfo::isSendable(SILValue value) {
+  // If the type system says we are sendable, then we are always sendable.
+  if (isSendableType(value->getType(), value->getFunction()))
+    return true;
+
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(value);
+      fArg && fArg->isClosureCapture() && fArg->isInferredImmutable()) {
+    CanSILBoxType boxType = fArg->getType().getAs<SILBoxType>();
+    if (!boxType || boxType->getNumFields() != 1)
+      return false;
+    auto innerType = boxType->getFieldType(*fArg->getFunction(), 0);
+    // We can only do this if the underlying type is Sendable.
+    if (isNonSendableType(innerType, fArg->getFunction()))
+      return false;
+    // For now to be conservative, only do this if we have a weak parameter.
+    if (auto ownership = innerType.getReferenceStorageOwnership();
+        !ownership || *ownership != ReferenceOwnership::Weak)
+      return false;
+    // Ok, we can treat this as Sendable.
+    return true;
+  }
+
+  if (auto *abi = dyn_cast<AllocBoxInst>(lookThroughOwnershipInsts(value));
+      abi && abi->isInferredImmutable()) {
+    CanSILBoxType boxType = abi->getType().castTo<SILBoxType>();
+    if (boxType->getNumFields() != 1)
+      return false;
+
+    auto innerType = boxType->getFieldType(*abi->getFunction(), 0);
+    if (isNonSendableType(innerType, abi->getFunction()))
+      return false;
+
+    // For now to be conservative, only do this if we have a weak parameter.
+    if (auto ownership = innerType.getReferenceStorageOwnership();
+        !ownership || *ownership != ReferenceOwnership::Weak)
+      return false;
+
+    return true;
+  }
+
+  return false;
 }
 
 // Check if the passed in type is NonSendable.

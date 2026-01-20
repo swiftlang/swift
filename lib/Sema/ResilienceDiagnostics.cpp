@@ -259,7 +259,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 /// deferred to exportability checking. An exportable extension is effectively a
 /// public extension.
 static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
-                                     const ExportContext &where) {
+                                     const ExportContext &where,
+                                     bool isInternalBridgingHeader) {
   auto reason = where.getExportabilityReason();
   auto DC = where.getDeclContext();
   if (!reason)
@@ -280,14 +281,16 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
       return !ED->getAttrs().getAttribute<AccessControlAttr>();
     return false;
 
+  case ExportabilityReason::PublicVarDecl:
+  case ExportabilityReason::AssociatedValue:
+    return false;
   case ExportabilityReason::General:
   case ExportabilityReason::ResultBuilder:
   case ExportabilityReason::PropertyWrapper:
-  case ExportabilityReason::PublicVarDecl:
   case ExportabilityReason::ImplicitlyPublicVarDecl:
-  case ExportabilityReason::AssociatedValue:
   case ExportabilityReason::ImplicitlyPublicAssociatedValue:
-    return false;
+    return isInternalBridgingHeader &&
+           where.getExportedLevel() == ExportedLevel::ImplicitlyExported;
   }
 }
 
@@ -334,7 +337,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   case DisallowedOriginKind::InternalBridgingHeaderImport:
     // With a few exceptions, access levels from imports are diagnosed during
     // access checking and should be skipped here.
-    if (!shouldDiagnoseDeclAccess(D, where))
+    if (!shouldDiagnoseDeclAccess(D, where,
+          originKind == DisallowedOriginKind::InternalBridgingHeaderImport))
       return false;
     break;
 

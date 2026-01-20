@@ -1961,6 +1961,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoExplicitNonIsolated);
   }
 
+  if (FrontendOpts.ImportHeaderAsInternal)
+    Opts.enableFeature(Feature::CheckImplementationOnly);
+
   if (Opts.hasFeature(Feature::CheckImplementationOnlyStrict) &&
       !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY"))
     Opts.enableFeature(Feature::CheckImplementationOnly);
@@ -4381,11 +4384,6 @@ bool CompilerInvocation::parseArgs(
     ParsedArgs.hasFlag(OPT_enable_aggressive_reg2mem,
                        OPT_disable_aggressive_reg2mem,
                        SILOpts.UseAggressiveReg2MemForCodeSize);
-
-  // We ran into an LLVM backend instruction selection failure.
-  // This is a workaround.
-  if (LangOpts.Target.isWasm())
-    SILOpts.UseAggressiveReg2MemForCodeSize = false;
 
   // With Swift 6, enable @_spiOnly by default. This also enables proper error
   // reporting of ioi references from spi decls.
