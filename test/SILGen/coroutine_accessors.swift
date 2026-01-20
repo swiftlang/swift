@@ -173,7 +173,7 @@ public var i_r_m: Int {
   _read {
     yield _i
   }
-// CHECK-NOT:   sil [ossa] @$s19coroutine_accessors1SV5i_r_mSivx :
+
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV5i_r_mSivM :
 // CHECK-SAME:      $@yield_once
 // CHECK-SAME:      @convention(method)
@@ -185,6 +185,15 @@ public var i_r_m: Int {
   _modify {
     yield &_i
   }
+
+// We want to assume that the new coroutine accessor ABI is available at the
+// time we introduce the feature (such that we can use it with deployment target
+// >= that time).
+// Therefore, make sure we emit yielding borrow/mutate entry points when we
+// encounter _read/_modify.
+
+// CHECK-LABEL: sil {{.*}} @$s19coroutine_accessors1SV5i_r_mSivy : $@yield_once_2 @convention(method) (@guaranteed S) -> @yields Int {
+
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV5i_r_mSivs :
 // CHECK-SAME:      $@convention(method)
 // CHECK-SAME:      (Int, @inout S)
@@ -204,6 +213,15 @@ public var i_r_m: Int {
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_access [[SELF_ACCESS]]
 // CHECK-LABEL:} // end sil function '$s19coroutine_accessors1SV5i_r_mSivs'
+
+// We want to assume that the new coroutine accessor ABI is available at the
+// time we introduce the feature (such that we can use it with deployment target
+// >= that time).
+// Therefore, make sure we emit yielding borrow/mutate entry points when we
+// encounter _read/_modify.
+
+// CHECK-LABEL: sil {{.*}} @$s19coroutine_accessors1SV5i_r_mSivx : $@yield_once_2 @convention(method) (@inout S) -> @yields @inout Int {
+
 } // public var irm
 
 } // public struct S
