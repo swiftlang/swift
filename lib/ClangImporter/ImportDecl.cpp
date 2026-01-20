@@ -893,6 +893,38 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+/// Whether to import a member decl when importing its parent record.
+///
+/// In theory this should just be isa<clang::FieldDecl>(decl), but currently
+/// various parts of ClangImporter still relies on eagerly importing non-field
+/// members (e.g., for deriving protocol conformances, etc.). This helper
+/// function encapsulates those edge cases.
+static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
+  // Look through using decls to determine whether to import decl
+  while (auto *usd = dyn_cast<clang::UsingShadowDecl>(decl)) {
+    // VisitUsingShadowDecl() only imports types and non-constructor methods,
+    // so we mirror that logic here.
+    if (!isa<clang::TypeDecl, clang::CXXMethodDecl>(usd->getTargetDecl()))
+      break;
+    if (isa<clang::CXXConstructorDecl>(usd->getTargetDecl()))
+      break;
+    decl = usd->getTargetDecl();
+  }
+
+  if (auto *td = dyn_cast<clang::TagDecl>(decl);
+      td && !td->hasNameForLinkage()) {
+    // Need to import unnamed types eagerly, otherwise we cannot look them up
+    return true;
+  }
+
+  if (isa<clang::TypeDecl>(decl)) {
+    return false;
+  }
+
+  return true;
+}
+
+
 namespace {
   /// Search the member tables for this class and its superclasses and try to
   /// identify the nearest VarDecl that serves as a base for an override.  We
@@ -2493,6 +2525,9 @@ namespace {
             continue;
           }
         }
+
+        if (!shouldEagerlyImportClangRecordMember(nd))
+          continue;
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
 
