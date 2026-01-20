@@ -21,6 +21,12 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
 
 typealias InvalidAttrOnNonExistingSelfType = @_lifetime(copy self) (_ ne: NE) -> NE // expected-error{{invalid lifetime dependence specifier on non-existent self}}
 
+let closureInvalidAttrOnNonExistingSelf =
+  @_lifetime(copy self) // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+  (_ ne: NE) -> NE {
+    ne
+  }
+
 @_lifetime(2) // expected-error{{invalid parameter index specified '2'}}
 func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
   ne
@@ -28,12 +34,24 @@ func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
 
 typealias InvalidAttrOnNonExistingParamIndexType = @_lifetime(2) (_ ne: NE) -> NE // expected-error{{invalid parameter index specified '2'}}
 
+let closureInvalidAttrOnNonExistingParamIndex =
+  @_lifetime(2) // expected-error{{invalid parameter index specified '2'}}
+  (_ ne: NE) -> NE {
+    ne
+  }
+
 @_lifetime(copy ne, borrow ne) // expected-error{{duplicate lifetime dependence specifier}}
 func invalidDuplicateLifetimeDependence(_ ne: borrowing NE) -> NE {
   ne
 }
 
 typealias InvalidDuplicateLifetimeDependenceType = @_lifetime(copy ne, borrow ne) (_ ne: borrowing NE) -> NE // expected-error{{duplicate lifetime dependence specifier}}
+
+let closureInvalidDuplicateLifetimeDependence1 =
+  @_lifetime(copy ne, borrow ne) // expected-error{{duplicate lifetime dependence specifier}}
+  (_ ne: borrowing NE) -> NE {
+    ne
+  }
 
 class Klass {}
 
@@ -43,6 +61,12 @@ func invalidDependenceConsumeKlass(_ x: consuming Klass) -> NE {
 }
 
 typealias InvalidDependenceConsumeKlassType = @_lifetime(borrow x) (_ x: consuming Klass) -> NE // expected-error{{invalid use of borrow dependence with consuming ownership}}
+
+let closureInvalidDependenceConsumeKlass =
+  @_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with consuming ownership}}
+  (_ x: consuming Klass) -> NE {
+    NE()
+  }
 
 @_lifetime(&x) // expected-error{{invalid use of & dependence with borrowing ownership}}
                // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
@@ -62,6 +86,13 @@ func invalidDependenceInoutKlass(_ x: inout Klass) -> NE {
 typealias InvalidDependenceInoutKlassType = @_lifetime(borrow x) (_ x: inout Klass) -> NE // expected-error{{invalid use of borrow dependence with inout ownership}}
                                                                                           // expected-note @-1{{use '@_lifetime(&x)' instead}}
 
+let closureInvalidDependenceInoutKlass =
+  @_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
+                       // expected-note @-1{{use '@_lifetime(&x)' instead}}
+  (_ x: inout Klass) -> NE {
+    NE()
+  }
+
 @_lifetime(borrow x) // OK
 func invalidDependenceConsumeInt(_ x: consuming Int) -> NE {
   NE()
@@ -78,6 +109,13 @@ func invalidDependenceBorrowInt(_ x: borrowing Int) -> NE {
 typealias InvalidDependenceBorrowIntType = @_lifetime(&x) (_ x: borrowing Int) -> NE // expected-error{{invalid use of & dependence with borrowing ownership}}
                                                                                      // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
 
+let closureInvalidDependenceBorrowInt =
+  @_lifetime(&x) // expected-error{{invalid use of & dependence with borrowing ownership}}
+                 // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
+  (_ x: borrowing Int) -> NE {
+    NE()
+  }
+
 @_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
                      // expected-note @-1{{use '@_lifetime(&x)' instead}}
 func invalidDependenceInoutInt(_ x: inout Int) -> NE {
@@ -86,6 +124,13 @@ func invalidDependenceInoutInt(_ x: inout Int) -> NE {
 
 typealias InvalidDependenceInoutIntType = @_lifetime(borrow x) (_ x: inout Int) -> NE // expected-error{{invalid use of borrow dependence with inout ownership}}
                                                                                       // expected-note @-1{{use '@_lifetime(&x)' instead}}
+
+let closureInvalidDependenceInoutInt =
+  @_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
+                       // expected-note @-1{{use '@_lifetime(&x)' instead}}
+  (_ x: inout Int) -> NE {
+    NE()
+  }
 
 @_lifetime(result: copy source1) // expected-error{{invalid duplicate target lifetime dependencies on function}}
 @_lifetime(result: copy source2)
@@ -97,6 +142,13 @@ typealias InvalidTargetType =
   @_lifetime(result: copy source1) // expected-error{{invalid duplicate target lifetime dependencies on function}}
   @_lifetime(result: copy source2)                                 
   (_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) -> ()
+
+let closureInvalidTarget =
+  @_lifetime(result: copy source1) // expected-error{{invalid duplicate target lifetime dependencies on function}}
+  @_lifetime(result: copy source2)
+  (_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) {
+    result = source1
+  }
 
 @_lifetime(result: copy source)   // expected-error{{invalid duplicate target lifetime dependencies on function}}
 @_lifetime(result: borrow source)
@@ -115,6 +167,12 @@ func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict betwe
 }
 
 typealias ImmortalConflictType = @_lifetime(immortal) (_ immortal: Int) -> NE // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
+
+let closureImmortalConflict =
+  @_lifetime(immortal)
+  (_ immortal: Int) -> NE { // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
+    NE()
+  }
 
 do {
   struct Test: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
@@ -144,6 +202,12 @@ func inoutLifetimeDependence(_ ne: inout NE) -> NE {
 
 typealias InoutLifetimeDependenceType = @_lifetime(&ne) (_ ne: inout NE) -> NE
 
+let closureInoutLifetimeDependence =
+  @_lifetime(&ne)
+  (_ ne: inout NE) -> NE {
+    ne
+  }
+
 @_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&k)' instead}}
 func dependOnEscapable(_ k: inout Klass) -> NE {
   NE()
@@ -158,12 +222,24 @@ func dependOnEscapable(_ k: borrowing Klass) -> NE {
 
 typealias DependOnEscapableType = @_lifetime(copy k) (_ k: borrowing Klass) -> NE // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow k)' instead}}
 
+let closureDependOnEscapable =
+  @_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow k)' instead}}
+  (_ k: borrowing Klass) -> NE {
+    NE()
+  }
+
 @_lifetime(copy k) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
 func dependOnEscapable(_ k: consuming Klass) -> NE { 
   NE()
 }
 
 typealias DependOnEscapableType = @_lifetime(copy k) (_ k: consuming Klass) -> NE // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
+
+let closureDependOnEscapable =
+  @_lifetime(copy k) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
+  (_ k: consuming Klass) -> NE {
+    NE()
+  }
 
 struct Wrapper : ~Escapable {
   var _ne: NE
@@ -202,6 +278,12 @@ func getInt(_ inValue: Int) -> Int {
 
 typealias GetIntType = @_lifetime(inValue) (_ inValue: Int) -> Int // expected-error{{invalid lifetime dependence on an Escapable result}}
 
+let closureGetInt =
+  @_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+  (_ inValue: Int) -> Int {
+    return inValue
+  }
+
 @_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
 func getInt(_outValue: inout Int, _ inValue: Int)  {
   _outValue = inValue
@@ -209,12 +291,24 @@ func getInt(_outValue: inout Int, _ inValue: Int)  {
 
 typealias GetIntType = @_lifetime(outValue: borrow inValue) (_ outValue: inout Int, _ inValue: Int) -> () // expected-error{{invalid lifetime dependence on an Escapable target}}
 
+let closureGetInt =
+  @_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+  (_outValue: inout Int, _ inValue: Int)  {
+    _outValue = inValue
+  }
+
 @_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
 func getGeneric<T>(_ inValue: T) -> T {
   return inValue
 }
 
 typealias GetGenericEscapableType<T> = @_lifetime(inValue) (_ inValue: T) -> T // expected-error{{invalid lifetime dependence on an Escapable result}}
+
+let closureGetGeneric =
+  @_lifetime(inValue) // expected-error{{invalid lifetime dependence on an Escapable result}}
+  <T>(_ inValue: T) -> T {
+    return inValue
+  }
 
 @_lifetime(_outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
 func getGeneric<T>(_outValue: inout T, _ inValue: T)  {
