@@ -282,6 +282,11 @@ struct RefCountBitOffsets<8> {
   static const size_t SideTableMarkShift = SideTableBitCount;
   static const size_t SideTableMarkBitCount = 1;
   static const uint64_t SideTableMarkMask = maskForField(SideTableMark);
+  
+  //IsDeiniting + StrongExtraRefCount + UseSlowRC
+  static const size_t IsUniqueShift = 32;
+  static const size_t IsUniqueBitCount = 32;
+  static const uint32_t IsUniqueMask = maskForField(IsUnique);
 };
 
 // 32-bit inline
@@ -319,6 +324,11 @@ struct RefCountBitOffsets<4> {
   static const size_t SideTableMarkShift = SideTableBitCount;
   static const size_t SideTableMarkBitCount = 1;
   static const uint32_t SideTableMarkMask = maskForField(SideTableMark);
+  
+  //IsDeiniting + StrongExtraRefCount + UseSlowRC
+  static const size_t IsUniqueShift = 8;
+  static const size_t IsUniqueBitCount = 24;
+  static const uint32_t IsUniqueMask = maskForField(IsUnique);
 };
 
 
@@ -621,9 +631,9 @@ class RefCountBitsT {
     // StrongExtra: 0
     // UseSlowRC: false
 
-    // Compiler is clever enough to optimize this.
-    return
-      !getUseSlowRC() && !getIsDeiniting() && getStrongExtraRefCount() == 0;
+    // Compiler is not quite clever enough to optimize this
+    // !getUseSlowRC() && !getIsDeiniting() && getStrongExtraRefCount() == 0;
+    return getField(IsUnique) == 0;
   }
 
   SWIFT_ALWAYS_INLINE
