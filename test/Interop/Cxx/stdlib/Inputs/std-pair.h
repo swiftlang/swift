@@ -39,3 +39,11 @@ struct __attribute__((swift_attr("import_owned"))) HasMethodThatReturnsUnsafePai
     PairUnsafeStructInt getUnsafePair() const { return {}; }
     PairIteratorInt getIteratorPair() const { return {}; }
 };
+
+struct __attribute__((swift_attr("~Copyable"))) NonCopyable {
+  int field;
+};
+
+using NonCopyableFirst = std::pair<NonCopyable, int>;
+using NonCopyableSecond = std::pair<int, NonCopyable>;
+using NonCopyableBoth = std::pair<NonCopyable, NonCopyable>;

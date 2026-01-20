@@ -503,6 +503,38 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
   nominal->addMember(typealias);
 }
 
+static bool isCxxProtocol(const ProtocolDecl *protocol) {
+  return protocol->getNameStr().contains("Cxx");
+}
+
+static bool
+checkSuppressedConformancesRequirements(const NominalTypeDecl *nominal,
+                                        const ProtocolDecl *protocol) {
+  auto nominalAttrs = nominal->getAttrs();
+  if (!isCxxProtocol(protocol))
+    return !(nominalAttrs.hasAttribute<MoveOnlyAttr>() ||
+             nominalAttrs.hasAttribute<NonEscapableAttr>());
+
+  auto protoInverses = protocol->getInverseRequirements();
+  auto hasInverseRequirement = [&](InvertibleProtocolKind kind) {
+    return llvm::any_of(protoInverses, [&](const InverseRequirement &ir) {
+      return ir.getKind() == kind;
+    });
+  };
+
+  if (nominalAttrs.hasAttribute<MoveOnlyAttr>()) {
+    if (!hasInverseRequirement(InvertibleProtocolKind::Copyable))
+      return false;
+  }
+
+  if (nominalAttrs.hasAttribute<NonEscapableAttr>()) {
+    if (!hasInverseRequirement(InvertibleProtocolKind::Escapable))
+      return false;
+  }
+
+  return true;
+}
+
 void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     NominalTypeDecl *nominal,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs, bool isUnchecked,
@@ -513,9 +545,11 @@ void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     // This is unfortunately not an error because some test use mock protocols.
     // If those tests were updated, we could assert that
     // ctx.getProtocol(kind) != nulltpr which would be nice.
-    if (auto proto = ctx.getProtocol(kind))
-      nominal->addAttribute(
-        new (ctx) SynthesizedProtocolAttr(proto, this, isUnchecked, isSuppressed));
+    if (auto proto = ctx.getProtocol(kind)) {
+      if (checkSuppressedConformancesRequirements(nominal, proto))
+        nominal->addAttribute(new (ctx) SynthesizedProtocolAttr(
+            proto, this, isUnchecked, isSuppressed));
+    }
   }
 }
 
