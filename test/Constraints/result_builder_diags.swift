@@ -1079,3 +1079,241 @@ func testNoDuplicateStmtDiags() {
     }
   }
 }
+
+@resultBuilder
+enum SimpleArrayBuilder<ElementKind> {
+  static func buildBlock(_ elements: ElementKind...) -> [ElementKind] {
+    elements
+  }
+}
+
+@resultBuilder
+enum CollectionBuilder<Element> {
+    static func buildBlock(_ component: Element...) -> [Element] {
+      component
+    }
+
+    static func buildFinalResult(_ component: [Element]) -> [Element] {
+        component
+    }
+
+    static func buildFinalResult(_ component: [Element]) -> Set<Element> where Element: Hashable {
+        Set(component)
+    }
+}
+
+func testInferResultBuilderGenerics() {
+  @SimpleArrayBuilder
+  var stringArray: [String] {
+    "foo"
+    "bar"
+  }
+
+  @SimpleArrayBuilder
+  func makeStringArray() -> Array<String> {
+    "foo"
+    "bar"
+  }
+
+  func takesClosure(@SimpleArrayBuilder _ makeArray: () -> [String]) {
+    print(makeArray())
+  }
+
+  @SimpleArrayBuilder // expected-error{{unable to infer generic arguments for result builder @SimpleArrayBuilder}}
+  var string: String {
+    "foo"
+  }
+
+  struct MyValue {
+    @SimpleArrayBuilder var array1: [String]
+    @SimpleArrayBuilder var array2: () -> [String]
+  }
+
+  _ = MyValue(
+    array1: {
+      "foo"
+      "bar"
+    },
+    array2: {
+      "bar"
+      "baaz"
+    },
+  )
+
+  @SimpleArrayBuilder
+  var makeStringArrayClosure: () -> [String] { // expected-error {{cannot convert return expression of type '[String]' to return type '() -> [String]'}}
+    { // expected-error {{cannot convert value of type '() -> [String]' to expected argument type 'String'}}
+      ["foo"]
+    }
+  }
+
+  @resultBuilder
+  struct TupleArrayBuilder<One, Two> {
+    static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+      elements
+    }
+  }
+
+  @TupleArrayBuilder
+  var tupleArray: [(String, Int)] {
+    ("foo", 1)
+    ("bar", 2)
+  }
+
+  @resultBuilder
+  struct TooManyArgsBuilder<One, Two, Three> {
+    static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+      elements
+    }
+  }
+
+  @TooManyArgsBuilder // expected-error {{unable to infer generic arguments for result builder @TooManyArgsBuilder}}
+  var invalidTupleArray: [(String, Int)] {
+    ("foo", 1) // expected-warning {{expression of type '(String, Int)' is unused}}
+    ("bar", 2) // expected-warning {{expression of type '(String, Int)' is unused}}
+  }
+
+  @resultBuilder
+  enum ComplexListBuilder<Element> {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+    
+    static func buildFinalResult(_ component: [Element]) -> Set<Element> where Element: Hashable {
+      Set(component)
+    }
+    
+    static func buildFinalResult(_ component: [Element]) -> ContiguousArray<Element> {
+      ContiguousArray(component)
+    }
+  }
+
+  @ComplexListBuilder
+  var stringSetFromBuildFinalResult: Set<String> {
+    "foo"
+    "bar"
+  }
+
+  @ComplexListBuilder
+  var contiguousStringsFromBuildFinalResult: ContiguousArray<String> {
+    "foo"
+    "bar"
+  }
+
+  @ComplexListBuilder
+  var stringArrayFromBuildFinalResult: [String] { // expected-error {{cannot convert return expression of type 'Set<String>' to return type '[String]'}}
+    "foo"
+    "bar"
+  }
+
+  @resultBuilder
+  enum PartialArrayBuilder<Element> {
+    static func buildPartialBlock(first: Element) -> [Element] {
+      [first]
+    }
+
+    static func buildPartialBlock(accumulated: [Element], next: Element) -> [Element] {
+      accumulated + [next]
+    }
+  }
+
+  @PartialArrayBuilder
+  var stringArrayFromBuildPartial: [String] {
+    "foo"
+    "bar"
+  }
+
+  @CollectionBuilder
+  var array: [String] {
+      "a"
+      "b"
+  }
+
+  @CollectionBuilder
+  var set: Set<String> {
+      "c"
+      "d"
+  }
+  
+  @CollectionBuilder // expected-error {{unable to infer generic arguments for result builder @CollectionBuilder}}
+  var contiguousArray: ContiguousArray<String> {
+      "c" // expected-warning {{string literal is unused}}
+      "d" // expected-warning {{string literal is unused}}
+  }
+}
+
+extension Array {
+  init(@SimpleArrayBuilder build1: () -> Self) {
+    self = build1()
+  }
+  
+  init(@SimpleArrayBuilder build2: () -> [Element]) {
+      self = build2()
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> Array<Self.Element>) {
+      self = build3()
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> ContiguousArray<Element>) { // expected-error {{unable to infer generic arguments for result builder @SimpleArrayBuilder}}
+      self = Array(build3())
+  }
+}
+
+extension Set {
+  init(@CollectionBuilder build: () -> Self) {
+    self = build()
+  }
+  
+  init(@CollectionBuilder build2: () -> [Element]) {
+    self = Set(build2())
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> Self) { // expected-error {{unable to infer generic arguments for result builder @SimpleArrayBuilder}}
+    self = build3()
+  }
+}
+
+extension Array {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+  }
+}
+
+extension Dictionary {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock(_ elements: (Key, Value)...) -> Dictionary {
+      Dictionary(elements, uniquingKeysWith: { $1 })
+    }
+  }
+}
+
+func testNonGenericResultBuildersInGenericTypeExtensions() {
+  @Array.Builder
+  var elements: [String] {
+    "foo"
+    "bar"
+  }
+  
+  @Array.Builder // expected-error {{unable to infer generic arguments for result builder @Array.Builder}}
+  var set: Set<String> {
+    "foo" // expected-warning {{string literal is unused}}
+    "bar" // expected-warning {{string literal is unused}}
+  }
+  
+  @Dictionary.Builder
+  var dictionary: [String: String] {
+    ("foo", "bar")
+    ("baaz", "quux")
+  }
+  
+  @Dictionary.Builder // expected-error {{unable to infer generic arguments for result builder @Dictionary.Builder}}
+  var dictionary2: [(String, String)] {
+    ("foo", "bar") // expected-warning {{expression of type '(String, String)' is unused}}
+    ("baaz", "quux") // expected-warning {{expression of type '(String, String)' is unused}}
+  }
+}
