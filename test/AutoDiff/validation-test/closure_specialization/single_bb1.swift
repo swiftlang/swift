@@ -23,8 +23,10 @@ import StdlibUnittest
 import Glibc
 #elseif canImport(Android)
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
-import Foundation
+#error("Unsupported platform")
 #endif
 
 var AutoDiffClosureSpecSingleBBTests = TestSuite("AutoDiffClosureSpecSingleBB")
