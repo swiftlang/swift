@@ -1244,11 +1244,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
   }
 
-  // Non-copyable and non-escaping types do not implicitly conform to
-  // any other protocols.
-  if (hasSuppressedConformances)
-    return;
-
   // Don't do any more for synthesized FileUnits.
   if (file->getKind() == FileUnitKind::Synthesized)
     return;
@@ -1257,8 +1252,30 @@ void NominalTypeDecl::prepareConformanceTable() const {
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (attr->isSuppressed())
       continue;
-    addSynthesized(attr->getProtocol());
+
+    auto proto = attr->getProtocol();
+    // If the type is ~Copyable or ~Escapable, check that proto has the same
+    // suppressed conformances.
+    auto protoInverses = proto->getInverseRequirements();
+    bool canConformToProto =
+        llvm::all_of(inverses, [&](InvertibleProtocolKind ip) {
+          bool containsInverseReq =
+              llvm::any_of(protoInverses, [&](const InverseRequirement &ir) {
+                return ir.getKind() == ip;
+              });
+          ASSERT(containsInverseReq &&
+                 "this synthesized conformance is invalid");
+          return containsInverseReq;
+        });
+
+    if (canConformToProto)
+      addSynthesized(proto);
   }
+
+  // Non-copyable and non-escaping types do not implicitly conform to
+  // any other protocols.
+  if (hasSuppressedConformances)
+    return;
 
   // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
