@@ -1977,11 +1977,15 @@ ConstraintSystem::selectDisjunction() {
     // when nothing concrete is known about them, let's reset the score
     // and compare purely based on number of choices.
     if (isFirstOperator != isSecondOperator) {
-      if (isFirstOperator && firstFavorings.IsSpeculative)
+      if (isFirstOperator && firstFavorings.IsSpeculative) {
+        ASSERT(firstScore.has_value());
         firstScore = 0;
+      }
 
-      if (isSecondOperator && secondFavorings.IsSpeculative)
+      if (isSecondOperator && secondFavorings.IsSpeculative) {
+        ASSERT(secondScore.has_value());
         secondScore = 0;
+      }
     }
 
     // Rank based on scores only if both disjunctions are supported.
