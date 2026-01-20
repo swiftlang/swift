@@ -12,10 +12,10 @@
 
 // CHECK-STD: enum std {
 // CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = std.char_traits<CChar>.char_type
+// CHECK-STRING:     typealias value_type = CChar
 // CHECK-STRING:   }
 // CHECK-STRING:   struct basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>> : CxxMutableRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = std.char_traits<CWideChar>.char_type
+// CHECK-STRING:     typealias value_type = CWideChar
 // CHECK-STRING:   }
 
 // CHECK-TO-STRING:   static func to_string(_ __val: Int32) -> std{{(.__cxx11)?}}.string
