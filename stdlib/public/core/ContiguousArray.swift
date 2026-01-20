@@ -1153,8 +1153,7 @@ extension ContiguousArray {
   /// - Parameters:
   ///   - capacity: The number of elements to allocate
   ///     space for in the new array.
-  ///   - initializer: A closure that initializes elements and sets the count
-  ///     of the new array.
+  ///   - initializer: A closure that initializes the elements of the new array.
   ///     - Parameters:
   ///       - span: An `OutputSpan` covering uninitialized memory with
   ///         space for the specified number of elements.
@@ -1187,7 +1186,7 @@ extension ContiguousArray {
   }
 
   /// Grows the array to have enough capacity for the specified number of
-  /// elements, then calls the closure with an OutputSpan covering the array's
+  /// elements, then calls the closure with an output span covering the array's
   /// uninitialized memory.
   ///
   /// Inside the closure, initialize elements by appending to `span`. It
@@ -1212,6 +1211,9 @@ extension ContiguousArray {
       _ span: inout OutputSpan<Element>
     ) throws(E) -> Void
   ) throws(E) {
+    _precondition(
+      uninitializedCount >= 0, "uninitializedCount must not be negative"
+    )
     // Ensure uniqueness, mutability, and sufficient storage.
     _reserveCapacityImpl(
       minimumCapacity: self.count + uninitializedCount, growForAppend: true
