@@ -96,7 +96,6 @@ public func withTaskCancellationHandler<Return, Failure>(
        onCancel handler: @Sendable () -> Void,
        isolation: isolated (any Actor)?,
      ) async rethrows -> T)
-@_silgen_name("$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF")
 func __abi_withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,

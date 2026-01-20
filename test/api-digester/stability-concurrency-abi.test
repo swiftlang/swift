@@ -82,7 +82,6 @@ Protocol SerialExecutor has added inherited protocol SendableMetatype
 // #isolation adoption for cancellation handlers; old APIs are kept ABI compatible
 Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func __abi_withTaskCancellationHandler(operation:onCancel:isolation:)
 Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.__abi_withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
-Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func _isolatedParam_withTaskCancellationHandler(operation:onCancel:isolation:)
 
 // AsyncStream.init(unfolding:onCancel:) uses @_silgen_name to preserve mangling after adding @preconcurrency.
 Constructor AsyncStream.init(unfolding:onCancel:) has mangled name changing from 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<@Sendable () -> ()>) -> Swift.AsyncStream<A>' to 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<() -> ()>) -> Swift.AsyncStream<A>'
