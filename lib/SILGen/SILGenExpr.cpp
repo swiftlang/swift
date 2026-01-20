@@ -2021,7 +2021,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   // nonisolated(nonsending) or @Sendable in the constraint evaluator.
   //
   // The reason why we need to evaluate this especially is that otherwise we
-  // generate multiple
+  // generate multiple conversion thunks.
 
   bool needsSendableConversion = false;
   if (auto *subCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
@@ -2042,11 +2042,11 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   }
 
   // Check if the only difference in between our destType and srcType is our
-  // isolation.
+  // isolation and optionally Sendable.
   if (!subExprType->hasExtInfo() || !destType->hasExtInfo() ||
-      destType->withIsolation(subExprType->getIsolation()) != subExprType) {
+      destType->withIsolation(subExprType->getIsolation())
+      ->withSendable(subExprType->isSendable()) != subExprType)
     return RValue();
-  }
 
   // Ok, we know that our underlying types are the same. Lets try to emit.
   auto *declRef = dyn_cast<DeclRefExpr>(subExpr);
@@ -2105,9 +2105,10 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
       cast<FunctionType>(subCvt->getType()->getCanonicalType());
 
   // Src type should be isNonIsolatedCaller and they should only differ in
-  // isolation.
+  // isolation or sendability.
   if (!subCvtType->getIsolation().isNonIsolatedCaller() ||
-      subCvtType->withIsolation(destType->getIsolation()) != destType)
+      subCvtType->withIsolation(destType->getIsolation())
+              ->withSendable(destType->isSendable()) != destType)
     return RValue();
 
   // Grab our decl ref/its decl and make sure that our decl is actually caller
