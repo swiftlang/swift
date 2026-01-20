@@ -473,7 +473,7 @@ public:
   /// The type will be scheduled for serialization if necessary.,
   ///
   /// \returns The ID for the given type in this module.
-  ClangTypeID addClangTypeRef(const clang::Type *ty);
+  ClangTypeID addClangTypeRef(const clang::Type *ty, bool forFunction = false);
 
   /// Records the use of the given DeclBaseName.
   ///
