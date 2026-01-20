@@ -356,14 +356,14 @@ extension GUID: @retroactive CustomStringConvertible {
   public var description: String {
     var buffer: RPC_CSTR!
     defer {
-      RpcStringFreeA(&buffer)
+      unsafe RpcStringFreeA(&buffer)
     }
 
-    withUnsafePointer(to: self) { uuidAddress in
-      let status = UuidToStringA(uuidAddress, &buffer)
+    unsafe withUnsafePointer(to: self) { uuidAddress in
+      let status = unsafe UuidToStringA(uuidAddress, &buffer)
       assert(status == RPC_S_OK, "Could not create the string representation of a GUID: \(status)")
     }
 
-    return String(cString: buffer)
+    return unsafe String(cString: buffer)
   }
 }
