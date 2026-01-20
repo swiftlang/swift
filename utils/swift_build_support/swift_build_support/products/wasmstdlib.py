@@ -193,7 +193,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
         lit_test_paths = [
-            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded',
+            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded', 'AutoDiff',
             # TODO(katei): Enable all interpreter tests
             'Interpreter/enum.swift',
         ]
