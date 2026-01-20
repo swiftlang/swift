@@ -1991,11 +1991,6 @@ ConstraintSystem::selectDisjunction() {
     unsigned numSecondFavored =
         secondScore.value_or(0) ? secondFavorings.FavoredChoices.size() : 0;
 
-    if (numFirstFavored == numSecondFavored) {
-      if (firstActive != secondActive)
-        return firstActive < secondActive;
-    }
-
     numFirstFavored = numFirstFavored ? numFirstFavored : firstActive;
     numSecondFavored = numSecondFavored ? numSecondFavored : secondActive;
 
