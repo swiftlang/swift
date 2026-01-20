@@ -959,8 +959,9 @@ void BindingSet::addBinding(PotentialBinding binding) {
           });
 
       if (inferredCGFloat != Bindings.end()) {
-        Bindings.erase(inferredCGFloat);
-        Bindings.insert(inferredCGFloat->withType(type));
+        auto newBinding = inferredCGFloat->withType(type);
+        (void)Bindings.erase(inferredCGFloat);
+        Bindings.insert(newBinding);
         return;
       }
     }
@@ -1048,8 +1049,9 @@ void BindingSet::determineLiteralCoverage() {
       literal.setCoveredBy(binding->getSource());
 
       if (adjustedTy) {
-        Bindings.erase(binding);
-        Bindings.insert(binding->withType(adjustedTy));
+        auto newBinding = binding->withType(adjustedTy);
+        (void)Bindings.erase(binding);
+        Bindings.insert(newBinding);
       }
 
       break;
@@ -1380,7 +1382,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
       return std::make_pair(false, Type());
 
     if (isCoveredBy(type, CS)) {
-      return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
+      return std::make_pair(true, requiresUnwrap ? type : Type());
     }
 
     // Can't unwrap optionals if there is `ExpressibleByNilLiteral`
