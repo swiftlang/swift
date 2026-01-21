@@ -1,0 +1,20 @@
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes %s
+// REQUIRES: tools-release,no_asan,asserts
+
+struct T {}
+struct F {}
+
+func not(_: T) -> F { fatalError() }
+func not(_: F) -> T { fatalError() }
+
+func test() {
+  let _ = { x -> T in
+%for i in range(0, N):
+    not(
+%end
+    x
+%for i in range(0, N):
+    )
+%end
+  }
+}
