@@ -286,7 +286,7 @@ struct RefCountBitOffsets<8> {
   //IsDeiniting + StrongExtraRefCount + UseSlowRC
   static const size_t IsUniqueShift = 32;
   static const size_t IsUniqueBitCount = 32;
-  static const uint32_t IsUniqueMask = maskForField(IsUnique);
+  static const uint64_t IsUniqueMask = maskForField(IsUnique);
 };
 
 // 32-bit inline
