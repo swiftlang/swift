@@ -34,6 +34,7 @@ class AbstractFunctionDecl;
 class FunctionTypeRepr;
 class LifetimeDependentTypeRepr;
 struct LifetimeDependenceInfoFunctionTypeRequestData;
+struct LifetimeDependenceInfoClosureExprRequestData;
 class SILParameterInfo;
 class SILResultInfo;
 
@@ -343,8 +344,8 @@ public:
   /// explicit lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers. Most closure expressions lack an explicit result
   /// type, so one must also be supplied.
-  static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ClosureExpr *ce,
-                                                             Type resultTy);
+  static std::optional<ArrayRef<LifetimeDependenceInfo>>
+  get(LifetimeDependenceInfoClosureExprRequestData const &data);
 
   /// Builds LifetimeDependenceInfo from a function type.
   ///
@@ -352,7 +353,7 @@ public:
   /// AnyFunctionType::Param, which is defined in Types.h. Including that header
   /// in this one would create a cycle.
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-  get(LifetimeDependenceInfoFunctionTypeRequestData &data);
+  get(LifetimeDependenceInfoFunctionTypeRequestData const &data);
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

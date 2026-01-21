@@ -437,8 +437,8 @@ private:
     }
   }
 
-  static auto collectParameterInfo(ParameterList const *params,
-                                   DeclContext *DC) {
+  static auto collectAFDParameterInfo(ParameterList const *params,
+                                      DeclContext *DC) {
     SmallVector<ParamInfo, 4> parameterInfos;
     for (auto *param : *params) {
       parameterInfos.emplace_back(
@@ -448,9 +448,23 @@ private:
     return parameterInfos;
   }
 
+  static auto collectClosureParameterInfo(LifetimeDependenceInfoClosureExprRequestData const &data) {
+    SmallVector<ParamInfo, 4> parameterInfos;
+    ParameterList const &parameterList = *data.expr->getParameters();
+    assert(parameterList.size() == data.parameters.size());
+    for (auto i : range(data.parameters.size())) {
+      auto *paramDecl = parameterList[i];
+      auto &param = data.parameters[i];
+      parameterInfos.emplace_back(
+        param, paramDecl->getLoc(),
+        data.expr->mapTypeIntoEnvironment(param.getPlainType()));
+    }
+    return parameterInfos;
+  }
+
 public:
   LifetimeDependenceChecker(AbstractFunctionDecl *afd)
-      : parameterInfos(collectParameterInfo(afd->getParameters(), afd)),
+      : parameterInfos(collectAFDParameterInfo(afd->getParameters(), afd)),
         afd(afd), ctx(afd->getDeclContext()->getASTContext()),
         sourceFile(afd->getParentSourceFile()),
         resultIndex(getResultIndex(afd)),
@@ -489,21 +503,21 @@ public:
     returnLoc = resultTypeRepr ? resultTypeRepr->getLoc() : afd->getLoc();
   }
 
-  LifetimeDependenceChecker(ClosureExpr *ce, Type resultType)
-      : parameterInfos(collectParameterInfo(ce->getParameters(), ce)),
-        afd(nullptr), ctx(ce->getParent()->getASTContext()),
-        sourceFile(ce->getParentSourceFile()), resultTy(resultType),
-        resultIndex(getResultIndex(ce)),
+  LifetimeDependenceChecker(LifetimeDependenceInfoClosureExprRequestData const &data)
+      : parameterInfos(collectClosureParameterInfo(data)),
+        afd(nullptr), ctx(data.expr->getParent()->getASTContext()),
+        sourceFile(data.expr->getParentSourceFile()), resultTy(data.resultType),
+        resultIndex(getResultIndex(data.expr)),
         depBuilder(/*sourceIndexCap*/ resultIndex),
-        isImplicit(ce->isImplicit()), isInit(false),
+        isImplicit(data.expr->isImplicit()), isInit(false),
         hasUnsafeNonEscapableResult(
-            ce->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()),
+            data.expr->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()),
         implicitSelfParamInfo(std::nullopt) {
-    collectLifetimeEntries(ce->getAttrs());
-    if (ce->hasExplicitResultType()) {
-      returnLoc = ce->getExplicitResultTypeRepr()->getLoc();
+    collectLifetimeEntries(data.expr->getAttrs());
+    if (data.expr->hasExplicitResultType()) {
+      returnLoc = data.expr->getExplicitResultTypeRepr()->getLoc();
     } else {
-      returnLoc = ce->getLoc();
+      returnLoc = data.expr->getLoc();
     }
   }
 
@@ -1664,13 +1678,14 @@ LifetimeDependenceInfo::get(ValueDecl *decl) {
 }
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-LifetimeDependenceInfo::get(ClosureExpr *ce, Type resultTy) {
-  return LifetimeDependenceChecker(ce, resultTy).checkClosure();
+LifetimeDependenceInfo::get(
+    LifetimeDependenceInfoClosureExprRequestData const &data) {
+  return LifetimeDependenceChecker(data).checkClosure();
 }
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfo::get(
-    LifetimeDependenceInfoFunctionTypeRequestData &data) {
+    LifetimeDependenceInfoFunctionTypeRequestData const &data) {
   auto [funcRepr, params, resultType, lifetimeAttributes, dc] = data;
   return LifetimeDependenceChecker(funcRepr, params, resultType,
                                    lifetimeAttributes, dc)

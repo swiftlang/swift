@@ -5329,6 +5329,7 @@ private:
 /// printing.
 struct LifetimeDependenceInfoClosureExprRequestData {
   ClosureExpr *expr;
+  ArrayRef<AnyFunctionType::Param> parameters;
   Type resultType;
   bool
   operator==(LifetimeDependenceInfoClosureExprRequestData const &other) const {

@@ -2690,7 +2690,7 @@ namespace {
 
       if (auto lifetimeDeps = evaluateOrFatal(
               CS.getASTContext().evaluator,
-              LifetimeDependenceInfoClosureExprRequest{{closure, resultTy}})) {
+              LifetimeDependenceInfoClosureExprRequest{{closure, closureParams, resultTy}})) {
         extInfo = extInfo.withLifetimeDependencies(*lifetimeDeps);
       }
 

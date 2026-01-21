@@ -3149,7 +3149,7 @@ std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoClosureExprRequest::evaluate(
     Evaluator &evaluator,
     LifetimeDependenceInfoClosureExprRequestData data) const {
-  return LifetimeDependenceInfo::get(data.expr, data.resultType);
+  return LifetimeDependenceInfo::get(data);
 }
 
 ArrayRef<IfConfigClauseRangeInfo> SourceFile::getIfConfigClauseRanges() const {
