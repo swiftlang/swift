@@ -17,6 +17,7 @@
 
 #include "swift/shims/Visibility.h"
 
+#if defined(__has_feature) && __has_feature(cxx_thread_local)
 extern "C" {
 thread_local void * _Nullable _swift_exclusivity_single_threaded;
 
@@ -30,3 +31,4 @@ void _swift_setExclusivityTLS(void * _Nullable newValue) {
   _swift_exclusivity_single_threaded = newValue;
 }
 }
+#endif
