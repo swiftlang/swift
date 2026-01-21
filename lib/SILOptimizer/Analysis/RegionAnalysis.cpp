@@ -1672,12 +1672,26 @@ struct PartitionOpBuilder {
     }
   }
 
-  void addAssign(SILValue destValue, Operand *srcOperand) {
+  void addAssignFresh(ArrayRef<TrackableValue> values) {
+    if (values.empty())
+      return;
+
+    auto first = values.front();
+    currentInstPartitionOps->emplace_back(
+        PartitionOp::AssignFresh(first.getID(), currentInst));
+
+    for (auto value : values.drop_front()) {
+      currentInstPartitionOps->emplace_back(PartitionOp::AssignFreshAssign(
+          value.getID(), first.getID(), currentInst));
+    }
+  }
+
+  void addAssign(TrackableValue destValue, Operand *srcOperand) {
     assert(valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
     Element srcID = lookupValueID(srcOperand->get());
-    if (lookupValueID(destValue) == srcID) {
+    if (destValue.getID() == srcID) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs()
                                << "    Skipping assign since tgt and src have "
                                   "the same representative.\n");
@@ -1686,9 +1700,8 @@ struct PartitionOpBuilder {
       return;
     }
 
-    currentInstPartitionOps->emplace_back(
-        PartitionOp::Assign(lookupValueID(destValue),
-                            lookupValueID(srcOperand->get()), srcOperand));
+    currentInstPartitionOps->emplace_back(PartitionOp::Assign(
+        destValue.getID(), lookupValueID(srcOperand->get()), srcOperand));
   }
 
   void addSend(TrackableValue value, Operand *op) {
@@ -2195,7 +2208,7 @@ public:
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
     SmallVector<std::pair<Operand *, TrackableValue>, 8> assignOperands;
-    SmallVector<SILValue, 8> assignResults;
+    SmallVector<TrackableValue, 8> directResultTVs;
 
     // A helper we use to emit an unknown patten error if our merge is
     // invalid. This ensures we guarantee that if we find an actor merge error,
@@ -2280,21 +2293,20 @@ public:
           if (!nonSendableValue->second) {
             builder.addUnknownPatternError(result);
           }
-          assignResults.push_back(
-              nonSendableValue->first.getRepresentative().getValue());
+          directResultTVs.push_back(nonSendableValue->first);
         }
       } else {
         if (auto lookupResult = tryToTrackValue(result)) {
           if (lookupResult->value.isSendable())
             continue;
           auto value = lookupResult->value;
-          assignResults.push_back(value.getRepresentative().getValue());
+          directResultTVs.push_back(value);
         }
       }
     }
 
     // If we do not have any non sendable results, return early.
-    if (assignResults.empty()) {
+    if (directResultTVs.empty()) {
       // If we did not have any non-Sendable results and we did have
       // non-Sendable operands and we are supposed to mark value as actor
       // derived, introduce a fake element so we just propagate the actor
@@ -2316,14 +2328,14 @@ public:
     // If we do not have any non-Sendable srcs, then all of our results get one
     // large fresh region.
     if (assignOperands.empty()) {
-      builder.addAssignFresh(assignResults);
+      builder.addAssignFresh(directResultTVs);
       return;
     }
 
     // Otherwise, we need to assign all of the results to be in the same region
     // as the operands. Without losing generality, we just use the first
     // non-Sendable one.
-    for (auto result : assignResults) {
+    for (auto result : directResultTVs) {
       builder.addAssign(result, assignOperands.front().first);
     }
   }
