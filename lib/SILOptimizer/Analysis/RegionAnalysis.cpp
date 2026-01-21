@@ -782,6 +782,31 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
   return {iter.first->first, iter.first->second};
 }
 
+TrackableValue
+RegionAnalysisValueMap::getRepresentativeValueForValueFromOverwrittenMemory(
+    Operand *op) const {
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.try_emplace(
+      op, TrackableValueState(equivalenceClassValuesToState.size()));
+
+  // If we did not insert, just return the already stored value.
+  if (!iter.second) {
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Otherwise, wire up the value.
+  auto id = iter.first->second.getID();
+  self->stateIndexToEquivalenceClass[id] = op;
+
+  // Then we need to lookup the state of the original memory so that we can
+  // transfer it over... unfortunately causing us to do a potential lookup and
+  // potential iterator invalidation. So we need to do a 3rd lookup...
+  auto originalMemory = getTrackableValue(op->get());
+  auto iter2 = self->equivalenceClassValuesToState.find(op);
+  iter2->getSecond() = originalMemory.value.getValueState().getWithNewID(id);
+  return {iter2->getFirst(), iter2->getSecond()};
+}
+
 bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
   assert(getTrackableValue(value).value.isNonSendable() &&
          "Can only accept non-Sendable values");
@@ -1645,6 +1670,7 @@ struct PartitionOpBuilder {
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
 
   Element getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
+  Element getEltForOverwrittenMemoryLocation(Operand *overwrittingUse);
 
   void addAssignFresh(TrackableValue value) {
     if (value.isSendable())
@@ -1668,7 +1694,22 @@ struct PartitionOpBuilder {
     }
   }
 
-  void addAssign(TrackableValue destValue, Operand *srcOperand) {
+  /// Assign to \p srcOperand to \p destValue as a direct result. This means
+  /// that the destValue can either be an address or object but in either case
+  /// must be a new SSA value. It is incorrect to use this API to assign into an
+  /// SSA value that is a separate memory address produced by a different
+  /// instruction.
+  ///
+  /// Ok:
+  ///
+  /// struct_extract // object.
+  /// pack_element_get // produces a new address that must be tracked
+  /// separately.
+  ///
+  /// Bad:
+  ///
+  /// alloc_stack
+  void addAssignDirectResult(TrackableValue destValue, Operand *srcOperand) {
     assert(valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
@@ -1682,8 +1723,45 @@ struct PartitionOpBuilder {
       return;
     }
 
-    currentInstPartitionOps->emplace_back(PartitionOp::Assign(
+    currentInstPartitionOps->emplace_back(PartitionOp::AssignDirect(
         destValue.getID(), lookupValueID(srcOperand->get()), srcOperand));
+  }
+
+  /// Assign \p srcOperand to the memory location \p destOperand points to as an
+  /// indirect result.
+  ///
+  /// This is used when one is assigning to a memory location that was created
+  /// by a different instruction. We will regardless of init/assign always
+  /// create a new value for the old value that was potentially in the memory
+  /// location originally. If there wasn't a value there then we know that we
+  /// are just creating a new region for the value. We could in the future more
+  /// exactly track memory value initialization and destruction in the
+  /// dataflow. But for now we do not, so there isn't any harm.
+  ///
+  /// Example:
+  ///
+  ///   %0 = alloc_stack
+  ///   store %newValue to [init] %0
+  void addAssignIndirectResult(Operand *destOperand, Operand *srcOperand) {
+    assert(valueHasID(destOperand->get(), /*dumpIfHasNoID=*/true) &&
+           "dest value of assignment should have already been encountered");
+    assert(valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
+           "source value of assignment should already have been encountered");
+
+    Element destID = lookupValueID(destOperand->get());
+    Element srcID = lookupValueID(srcOperand->get());
+    if (destID == srcID) {
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Skipping assign since tgt and src have "
+                                  "the same representative.\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Rep ID: %%" << srcID.num << ".\n");
+      return;
+    }
+
+    currentInstPartitionOps->emplace_back(PartitionOp::AssignIndirect(
+        destID, srcID, getEltForOverwrittenMemoryLocation(destOperand),
+        srcOperand));
   }
 
   void addSend(TrackableValue value, Operand *op) {
@@ -2317,7 +2395,7 @@ public:
     // as the operands. Without losing generality, we just use the first
     // non-Sendable one.
     for (auto result : directResultTVs) {
-      builder.addAssign(result, sourceOperandTVPairs.front().first);
+      builder.addAssignDirectResult(result, sourceOperandTVPairs.front().first);
     }
   }
 
@@ -3219,6 +3297,13 @@ public:
 
 Element PartitionOpBuilder::lookupValueID(SILValue value) {
   return translator->lookupValueID(value);
+}
+
+Element PartitionOpBuilder::getEltForOverwrittenMemoryLocation(
+    Operand *overwrittingUse) {
+  return translator->getValueMap()
+      .getRepresentativeValueForValueFromOverwrittenMemory(overwrittingUse)
+      .getID();
 }
 
 Element PartitionOpBuilder::getActorIntroducingRepresentative(
