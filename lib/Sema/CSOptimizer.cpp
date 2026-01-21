@@ -1960,8 +1960,11 @@ ConstraintSystem::selectDisjunction() {
     unsigned firstActive = first->countActiveNestedConstraints();
     unsigned secondActive = second->countActiveNestedConstraints();
 
-    if (firstActive == 1 || secondActive == 1)
-      return secondActive != 1;
+    // A disjunction where all choices have been disabled allows us
+    // to immediately fail. A disjunction with one choice is a
+    // forced move.
+    if ((firstActive <= 1) || (secondActive <= 1))
+      return firstActive < secondActive;
 
     if (auto preference = isPreferable(*this, first, second))
       return preference.value();
