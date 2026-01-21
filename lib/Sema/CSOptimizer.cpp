@@ -1316,16 +1316,20 @@ static void determineBestChoicesInContext(
 
     auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
     if (!argumentList)
-      return;
+      continue;
 
+    bool inCodeCompletion = false;
     for (const auto &argument : *argumentList) {
       if (auto *expr = argument.getExpr()) {
         // Directly `<#...#>` or has one inside.
         if (isa<CodeCompletionExpr>(expr) ||
             cs.containsIDEInspectionTarget(expr))
-          return;
+          inCodeCompletion = true;
       }
     }
+
+    if (inCodeCompletion)
+      continue;
 
     // This maintains an "old hack" behavior where overloads
     // of `OverloadedDeclRef` calls were favored purely
