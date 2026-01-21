@@ -540,9 +540,23 @@ void updateProcessWideFrontendCounters(
     C.MaxMallocUsage = ru.ri_lifetime_max_phys_footprint;
     return;
   }
+#elif defined(_WIN32)
+  ULONG64 CycleTime;
+  if (QueryProcessCycleTime(GetCurrentProcess(), &CycleTime)) {
+    C.NumCyclesExecuted = CycleTime;
+  }
+
+  PROCESS_MEMORY_COUNTERS_EX PMC;
+  PMC.cb = sizeof(PMC);
+  if (GetProcessMemoryInfo(GetCurrentProcess(),
+                           reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&PMC),
+                           sizeof(PMC))) {
+    C.MaxMallocUsage = PMC.PeakWorkingSetSize;
+  }
+  return;
 #endif
 
-  // FIXME: Do something useful when the above API is not available.
+  // FIXME: Do something useful when the above APIs are not available.
 }
 
 static inline void
