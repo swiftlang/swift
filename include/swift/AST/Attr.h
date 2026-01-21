@@ -3780,12 +3780,11 @@ public:
 
   /// Add a constructed DeclAttribute to this list.
   void add(DeclAttribute *Attr, const Decl *D = nullptr) {
-    if (D && !Attr->canAppearOnDecl(D)) {
-      Attr->setInvalid();
-    } else {
-      Attr->Next = DeclAttrs;
-      DeclAttrs = Attr;
+    if (D) {
+      ASSERT(Attr->canAppearOnDecl(D));
     }
+    Attr->Next = DeclAttrs;
+    DeclAttrs = Attr;
   }
 
   /// Add multiple constructed DeclAttributes to this list.

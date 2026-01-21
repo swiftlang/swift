@@ -83,7 +83,8 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
   if (*expected) {
     attr = willCreate();
     attr->setAddedByAccessNote();
-    VD->addAttribute(attr);
+    if (attr->canAppearOnDecl(VD))
+      VD->addAttribute(attr);
 
     // Arrange for us to emit a remark about this attribute after type checking
     // has ensured it's valid.
