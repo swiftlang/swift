@@ -33,6 +33,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     endif()
 
     foreach(impl ${EMBEDDED_SWIFT_EXCLUSIVITY_IMPLEMENTATIONS})
+      # C11 thread-local does not work with -none- triples.
+      if ("${impl}" MATCHES "C11ThreadLocal")
+        if("${triple}" MATCHES "-none-")
+            continue()
+        endif()
+      endif()
+
       add_swift_target_library_single(
         embedded-exclusivity-${impl}-${mod}
         swiftExclusivity${impl}
