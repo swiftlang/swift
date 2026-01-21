@@ -373,11 +373,15 @@ extension GUID: @retroactive LosslessStringConvertible {
     let guid: GUID? = unsafe description.withCString { description in
       unsafe withUnsafeTemporaryAllocation(of: GUID.self, capacity: 1) { guid in
         let guid = guid.baseAddress!
-        if RPC_S_OK == unsafe UuidFromStringA(description, guid) {
-          return guid.move()
-        } else {
+
+        // We don't actually mutate `description`, but UuidFromStringA() takes a
+        // mutable pointer, so we must cast it.
+        let description = unsafe UnsafeMutablePointer(mutating: description)
+        guard unsafe RPC_S_OK == UuidFromStringA(description, guid) else {
           return nil
         }
+
+        return guid.move()
       }
     }
     if let guid {
