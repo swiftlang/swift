@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Borrow.h"
+#include "swift/Runtime/Metadata.h"
 
 namespace swift {
 
@@ -31,7 +32,7 @@ size_t swift_getBorrowSize(const Metadata *referent) {
     return referent->vw_size();
 
   case BorrowRepresentation::Pointer:
-    return sizeof(size_t);
+    return $sBpWV.getSize();
   }
 }
 
@@ -43,7 +44,19 @@ size_t swift_getBorrowStride(const Metadata *referent) {
     return referent->vw_stride();
 
   case BorrowRepresentation::Pointer:
-    return sizeof(size_t);
+    return $sBpWV.getStride();
+  }
+}
+
+size_t swift_getBorrowExtraInhabitants(const Metadata *referent) {
+  auto rep = swift_getBorrowRepresentation(referent);
+
+  switch (rep) {
+  case BorrowRepresentation::Inline:
+    return referent->vw_getNumExtraInhabitants();
+
+  case BorrowRepresentation::Pointer:
+    return $sBpWV.getNumExtraInhabitants();
   }
 }
 
@@ -55,7 +68,7 @@ size_t swift_getBorrowAlignment(const Metadata *referent) {
     return referent->vw_alignment();
 
   case BorrowRepresentation::Pointer:
-    return alignof(size_t);
+    return $sBpWV.getAlignment();
   }
 }
 

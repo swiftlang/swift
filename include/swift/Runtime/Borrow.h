@@ -27,9 +27,8 @@ enum BorrowRepresentation {
 BorrowRepresentation swift_getBorrowRepresentation(const Metadata *referent);
 
 size_t swift_getBorrowSize(const Metadata *referent);
-
 size_t swift_getBorrowStride(const Metadata *referent);
-
+size_t swift_getBorrowExtraInhabitants(const Metadata *referent);
 size_t swift_getBorrowAlignment(const Metadata *referent);
 
 SWIFT_RUNTIME_EXPORT

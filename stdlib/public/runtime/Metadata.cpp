@@ -2073,19 +2073,17 @@ borrow_assignWithTake(OpaqueValue *dest, OpaqueValue *src,
 static OpaqueValue *borrow_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                             ValueBuffer *src,
                                                             const Metadata *metatype) {
-  // if (metatype->getValueWitnesses()->isValueInline()) {
-  //   return vector_initializeWithCopy(
-  //     generic_projectBuffer<true>(dest, metatype),
-  //     generic_projectBuffer<true>(src, metatype),
-  //     metatype);
-  // }
+  if (metatype->getValueWitnesses()->isValueInline()) {
+    return borrow_initializeWithCopy(
+      generic_projectBuffer<true>(dest, metatype),
+      generic_projectBuffer<true>(src, metatype),
+      metatype);
+  }
   
-  // auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  // *reinterpret_cast<HeapObject**>(dest) = srcReference;
-  // swift_retain(srcReference);
-  // return generic_projectBuffer<false>(dest, metatype);
-  // FIXME
-  return nullptr;
+  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
+  *reinterpret_cast<HeapObject**>(dest) = srcReference;
+  swift_retain(srcReference);
+  return generic_projectBuffer<false>(dest, metatype);
 }
 
 static unsigned
@@ -2158,11 +2156,15 @@ BorrowCacheEntry::tryInitialize(Metadata *metadata,
             MetadataDependency(referent, MetadataState::LayoutComplete)};
   }
 
-  // We can derive the array's layout from the element's.
   Data.ValueWitnesses = &Witnesses;
 
+  // The borrow's layout is dependent on whether the referent is bitwise
+  // borrowable or not. If it is, then we take on all of the witnesses as the
+  // referent type. Otherwise, the representation is a pointer so take the
+  // witnesses from 'Builtin.RawPointer'
   Witnesses.size = swift_getBorrowSize(referent);
   Witnesses.stride = swift_getBorrowStride(referent);
+  Witnesses.extraInhabitantCount = swift_getBorrowExtraInhabitants(referent);
 
   auto borrowAlignment = swift_getBorrowAlignment(referent);
   auto isInline = ValueWitnessTable::isValueInline(/* isBitwiseTakeable */ true,
@@ -2175,10 +2177,6 @@ BorrowCacheEntry::tryInitialize(Metadata *metadata,
                     .withBitwiseBorrowable(true)
                     .withCopyable(true)
                     .withInlineStorage(isInline);
-
-  // We get extra inhabitants from the first element.
-                    // FIXME
-  // Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
   
   // Copy in the value witnesses.
 #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
