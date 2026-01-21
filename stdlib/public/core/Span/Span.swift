@@ -507,9 +507,10 @@ extension Span where Element: BitwiseCopyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
+  @_alwaysEmitIntoClient
+  @unsafe
   public var bytes: RawSpan {
     @lifetime(copy self)
-    @_alwaysEmitIntoClient
     get {
       let rawSpan = RawSpan(_elements: self)
       return unsafe _overrideLifetime(rawSpan, copying: self)
