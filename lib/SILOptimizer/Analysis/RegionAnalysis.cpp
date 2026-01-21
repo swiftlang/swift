@@ -2188,10 +2188,10 @@ public:
   /// element isolation of disconnected. NOTE: The results will still be in the
   /// region of the non-Sendable arguments so at the region level they will have
   /// the same value.
-  template <typename TargetRange, typename SourceRange>
+  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
   void
-  translateSILMultiAssign(const TargetRange &directResultValues,
-                          const SourceRange &sourceValues,
+  translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
+                          const SourceValueRangeTy &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
     SmallVector<std::pair<Operand *, TrackableValue>, 8> assignOperands;
