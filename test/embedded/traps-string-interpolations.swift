@@ -42,10 +42,10 @@ public func test5(i: Int) {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %.not = icmp eq i64 %0, 42
 // CHECK-NEXT:   br i1 %.not, label %1, label %2
-// CHECK-EMPTY: 
+// CHECK-EMPTY:
 // CHECK-NEXT: 1:
 // CHECK-NEXT:   ret void
-// CHECK-EMPTY: 
+// CHECK-EMPTY:
 // CHECK-NEXT: 2:
 // CHECK-NEXT:   tail call void asm sideeffect ""
 // CHECK-NEXT:   tail call void @llvm.trap()

@@ -4282,3 +4282,32 @@ func rdar_118059326_example2(_ path: String) {
   _ = consume decoded // expected-note {{consumed}}
   borrowVal(decoded) // expected-note {{used}}
 }
+
+struct rdar_167469090_NC: ~Copyable {
+    var s: String
+}
+
+struct rdar_167469090_S: ~Copyable {
+    let a: rdar_167469090_NC?
+    let b: rdar_167469090_NC?
+    let c: rdar_167469090_NC?
+
+    var computed: Bool {
+        a == nil && b == nil && c == nil
+    }
+
+    var string: String { // expected-error {{'self' is borrowed and cannot be consumed}}
+        let s = if computed { // expected-note {{consumed here}}
+            "computed"
+        } else if let a { // expected-note {{consumed here}}
+            "a: \(a.s)"
+        } else {
+            "unknown"
+        }
+        if let c {
+            return s + ": " + c.s
+        } else {
+            return s
+        }
+    }
+}

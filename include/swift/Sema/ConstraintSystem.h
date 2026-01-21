@@ -1701,7 +1701,8 @@ public:
   /// \param locator Locator used to describe the location of this expression.
   ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator);
+  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator,
+                     DeclContext &dc);
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.

@@ -1079,7 +1079,7 @@ extension ContiguousArray {
 }
 
 extension ContiguousArray {
-  /// Creates an array with the specified capacity, then calls the given
+  /// Creates an array with the specified capacity, and then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
   ///
   /// Inside the closure, set the `initializedCount` parameter to the number of
@@ -1111,11 +1111,134 @@ extension ContiguousArray {
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws(E) -> Void
   ) throws(E) {
-    self = try unsafe ContiguousArray(Array(
-      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
-      initializingWithTypedThrowsInitializer: initializer))
+    var firstElementAddress: UnsafeMutablePointer<Element>
+    unsafe (self, firstElementAddress) =
+      unsafe ContiguousArray._allocateUninitialized(unsafeUninitializedCapacity)
+
+    var initializedCount = 0
+    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: firstElementAddress, count: unsafeUninitializedCapacity)
+    defer {
+      _precondition(
+        initializedCount <= unsafeUninitializedCapacity,
+        "Initialized count set to greater than specified capacity."
+      )
+      unsafe _precondition(
+        buffer.baseAddress == firstElementAddress,
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )
+      // Update self.count even if initializer throws an error.
+      self._buffer.mutableCount = initializedCount
+      _endMutation()
+    }
+    try unsafe initializer(&buffer, &initializedCount)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ContiguousArray {
+  /// Creates an array with the specified capacity, and then calls the given
+  /// closure with an output span covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to the `OutputSpan`.
+  /// The `OutputSpan` keeps track of memory's initialization state, ensuring
+  /// safety. Its `count` at the end of the closure will become the `count` of
+  /// the newly-initialized array.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the `OutputSpan` passed to the closure will cover
+  ///   exactly the number of elements requested.
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes the elements of the new array.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of elements.
+  @_alwaysEmitIntoClient
+  public init<E: Error>(
+    capacity: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    self = ContiguousArray(_uninitializedCount: capacity)
+    var initializedCount = 0
+    defer {
+      // Update self.count even if initializer throws an error,
+      // but only when `self` is not the empty singleton.
+      if capacity > 0 {
+        _buffer.mutableCount = initializedCount
+      }
+      _endMutation()
+    }
+
+    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
+      start: _buffer.firstElementAddress, count: capacity
+    )
+    var span = unsafe OutputSpan<Element>(buffer: buffer, initializedCount: 0)
+    try initializer(&span)
+    // no need to finalize in the `defer` block: if `initializer` throws,
+    // the elements will be deinitialized by the `OutputSpan`'s deinit.
+    initializedCount = unsafe span.finalize(for: buffer)
   }
 
+  /// Grows the array to have enough capacity for the specified number of
+  /// elements, then calls the closure with an output span covering the array's
+  /// uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to `span`. It
+  /// ensures safety by keeping track of the initialization state of the memory
+  /// At the end of the closure, `span`'s `count` elements will have been
+  /// appended to the array.
+  ///
+  /// If the closure throws an error, the items appended until that point
+  /// will remain in the array.
+  ///
+  /// - Parameters:
+  ///   - uninitializedCount: The number of new elements the array should have
+  ///     space for.
+  ///   - initializer: A closure that initializes new elements.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of additional elements.
+  @_alwaysEmitIntoClient
+  public mutating func append<E: Error>(
+    addingCapacity uninitializedCount: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    _precondition(
+      uninitializedCount >= 0, "uninitializedCount must not be negative"
+    )
+    // Ensure uniqueness, mutability, and sufficient storage.
+    _reserveCapacityImpl(
+      minimumCapacity: self.count + uninitializedCount, growForAppend: true
+    )
+    let pointer = unsafe _buffer.mutableFirstElementAddress
+    let buffer = unsafe UnsafeMutableBufferPointer(
+      start: unsafe pointer.advanced(by: count),
+      count: uninitializedCount
+    )
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+
+    defer {
+      let initializedCount = unsafe span.finalize(for: buffer)
+      span = OutputSpan()
+
+      // Update mutableCount even when `initializer` throws an error.
+      _buffer.mutableCount += initializedCount
+      _endMutation()
+    }
+
+    try initializer(&span)
+  }
+}
+
+extension ContiguousArray {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)

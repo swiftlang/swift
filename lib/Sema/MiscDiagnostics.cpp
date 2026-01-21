@@ -735,41 +735,35 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+      auto *ParentExpr = Parent.getAsExpr();
 
-      if (auto *ParentExpr = Parent.getAsExpr()) {
-        if (ParentExpr->isValidParentOfTypeExpr(E))
-          return;
+      if (ParentExpr && ParentExpr->isValidParentOfTypeExpr(E))
+        return;
 
-        // In Swift < 6 warn about
-        // - plain type name passed as an argument to a subscript, dynamic
-        //   subscript, or ObjC literal since it used to be accepted.
-        // - member type expressions rooted on non-identifier types, e.g.
-        //   '[X].Y' since they used to be accepted without the '.self'.
-        if (!Ctx.isLanguageModeAtLeast(6)) {
-          if (isa<SubscriptExpr>(ParentExpr) ||
-              isa<DynamicSubscriptExpr>(ParentExpr) ||
-              isa<ObjectLiteralExpr>(ParentExpr)) {
-            auto *argList = ParentExpr->getArgs();
-            assert(argList);
-            if (argList->isUnlabeledUnary())
-              behavior = DiagnosticBehavior::Warning;
-          } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
-            if (auto *QualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
-                    TE->getTypeRepr())) {
-              if (!isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot())) {
-                behavior = DiagnosticBehavior::Warning;
-              }
-            }
+      // In Swift < 6 warn about
+      // - plain type name passed as an argument to a subscript, dynamic
+      //   subscript, or ObjC literal since it used to be accepted.
+      // - member type expressions rooted on non-identifier types, e.g.
+      //   '[X].Y' since they used to be accepted without the '.self'.
+      bool downgradeToWarningUntil6 = false;
+      if (!Ctx.isLanguageModeAtLeast(6)) {
+        if (ParentExpr && (isa<SubscriptExpr>(ParentExpr) ||
+                           isa<DynamicSubscriptExpr>(ParentExpr) ||
+                           isa<ObjectLiteralExpr>(ParentExpr))) {
+          auto *argList = ParentExpr->getArgs();
+          assert(argList);
+          downgradeToWarningUntil6 = argList->isUnlabeledUnary();
+        } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
+          if (auto *QualIdentTR =
+                  dyn_cast_or_null<QualifiedIdentTypeRepr>(TE->getTypeRepr())) {
+            downgradeToWarningUntil6 =
+                !isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot());
           }
         }
       }
 
-      // Is this a protocol metatype?
-      Ctx.Diags
-          .diagnose(E->getStartLoc(), diag::value_of_metatype_type,
-                    behavior == DiagnosticBehavior::Warning)
-          .limitBehavior(behavior);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .warnUntilLanguageModeIf(downgradeToWarningUntil6, 6);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -5395,13 +5389,17 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     /// Returns true iff the collection upcast coercion is an Optional-to-Any
     /// coercion.
-    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
-                                   conversion) {
-      if (!conversion.OrigValue || !conversion.Conversion)
+    bool isOptionalToAnyCoercion(ClosureExpr *conversion) {
+      if (!conversion)
         return false;
 
-      auto srcType = conversion.OrigValue->getType();
-      auto destType = conversion.Conversion->getType();
+      auto fnType = conversion->getType()->getAs<FunctionType>();
+      if (!fnType)
+        return false;
+
+      assert(fnType->getNumParams() == 1);
+      auto srcType = fnType->getParams()[0].getPlainType();
+      auto destType = fnType->getResult();
       return isOptionalToAnyCoercion(srcType, destType);
     }
 
@@ -5547,10 +5545,13 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // We're handling the coercion of the entire collection, so we don't need
       // to re-visit a nested ErasureExpr for the value.
-      if (auto conversionExpr = valueConversion.Conversion)
+      if (valueConversion) {
+        Expr *body = valueConversion->getSingleExpressionBody();
         if (auto *erasureExpr =
-              findErasureExprThroughOptionalInjections(conversionExpr))
+                findErasureExprThroughOptionalInjections(body)) {
           IgnoredExprs.insert(erasureExpr);
+        }
+      }
 
       if (coercion.shouldSuppressDiagnostic() ||
           !isOptionalToAnyCoercion(valueConversion))
@@ -6495,7 +6496,8 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (!ctx.isLanguageModeAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
+    diagnoseExprAvailability(E, const_cast<DeclContext *>(DC),
+                             /*preconcurrency=*/false);
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);

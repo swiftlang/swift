@@ -154,10 +154,7 @@ extension MutableRawSpan {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = unsafe _pointer, _count > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    return try unsafe body(.init(start: pointer, count: _count))
+    try unsafe body(.init(start: _pointer, count: _count))
   }
 
   @_alwaysEmitIntoClient
@@ -165,10 +162,7 @@ extension MutableRawSpan {
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = unsafe _pointer, _count > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    return try unsafe body(.init(start: pointer, count: _count))
+    try unsafe body(.init(start: _pointer, count: _count))
   }
 }
 

@@ -536,7 +536,7 @@ struct ClassWithOperatorStarAvailable {
   int value;
 
 public:
-  int &operator*() { return value; }
+  const int &operator*() const { return value; }
 };
 
 struct DerivedClassWithOperatorStarAvailable : ClassWithOperatorStarAvailable {
@@ -546,7 +546,8 @@ struct ClassWithOperatorStarUnavailable {
   int value;
 
 public:
-  int &operator*() __attribute__((availability(swift, unavailable))) {
+  const int &operator*() const
+      __attribute__((availability(swift, unavailable))) {
     return value;
   }
 };
@@ -578,6 +579,23 @@ public:
 struct ClassWithOperatorEqualsParamUnnamed {
   bool operator==(const ClassWithOperatorEqualsParamUnnamed &) const {
     return false;
+  }
+};
+
+struct ClassWithTemplatedOperatorStar {
+  template <typename T> T operator*() const { return "bogus"; }
+};
+
+struct ClassWithDefaultTemplatedOperatorStar {
+  template <typename T = int> T operator*() const { return 42; }
+};
+
+struct HasOperatorReturningAuto {
+  auto operator*() const {
+    struct Inner {
+      int x = 123;
+    };
+    return Inner();
   }
 };
 

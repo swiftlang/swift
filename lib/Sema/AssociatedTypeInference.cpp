@@ -439,26 +439,31 @@ static bool isAsyncSequenceFailure(AssociatedTypeDecl *assocType) {
   return assocType->getName() == assocType->getASTContext().Id_Failure;
 }
 
-static Type resolveTypeWitnessViaParameterizedProtocol(
-    Type t, AssociatedTypeDecl *assocType) {
+static void resolveTypeWitnessViaParameterizedProtocol(
+    Type t, SourceLoc inheritedLoc, AssociatedTypeDecl *assocType,
+    SmallVectorImpl<std::pair<Type, SourceLoc>>
+        &fromParameterizedProtocolType) {
   if (auto *pct = t->getAs<ProtocolCompositionType>()) {
     for (auto member : pct->getMembers()) {
-      if (auto result = resolveTypeWitnessViaParameterizedProtocol(
-            member, assocType)) {
-        return result;
-      }
+      resolveTypeWitnessViaParameterizedProtocol(
+          member, inheritedLoc, assocType, fromParameterizedProtocolType);
     }
   } else if (auto *ppt = t->getAs<ParameterizedProtocolType>()) {
     auto *proto = ppt->getProtocol();
     unsigned i = 0;
     for (auto *otherAssocType : proto->getPrimaryAssociatedTypes()) {
-      if (otherAssocType->getName() == assocType->getName())
-        return ppt->getArgs()[i];
+      if (otherAssocType->getName() == assocType->getName()) {
+        auto typeWitness = ppt->getArgs()[i];
+        if (!llvm::any_of(fromParameterizedProtocolType,
+                          [&](const std::pair<Type, SourceLoc> &pair) -> bool {
+                            return pair.first->isEqual(typeWitness);
+                          })) {
+          fromParameterizedProtocolType.push_back({typeWitness, inheritedLoc});
+        }
+      }
       ++i;
     }
   }
-
-  return Type();
 }
 
 /// Attempt to resolve a type witness via member name lookup.
@@ -480,17 +485,15 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 
   // Look for a parameterized protocol type in the conformance context's
   // inheritance clause.
-  bool deducedFromParameterizedProtocolType = false;
+  SmallVector<std::pair<Type, SourceLoc>, 2> fromParameterizedProtocolType;
   auto inherited = (isa<NominalTypeDecl>(dc)
                     ? cast<NominalTypeDecl>(dc)->getInherited()
                     : cast<ExtensionDecl>(dc)->getInherited());
   for (auto index : inherited.getIndices()) {
     if (auto inheritedTy = inherited.getResolvedType(index)) {
-      if (auto typeWitness = resolveTypeWitnessViaParameterizedProtocol(
-            inheritedTy, assocType)) {
-        recordTypeWitness(conformance, assocType, typeWitness, nullptr);
-        deducedFromParameterizedProtocolType = true;
-      }
+      resolveTypeWitnessViaParameterizedProtocol(
+          inheritedTy, inherited.getEntry(index).getLoc(), assocType,
+          fromParameterizedProtocolType);
     }
   }
 
@@ -507,11 +510,6 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   dc->lookupQualified(dc->getSelfNominalTypeDecl(), assocType->createNameRef(),
                       dc->getSelfNominalTypeDecl()->getLoc(), subOptions,
                       candidates);
-
-  // If there aren't any candidates, we're done.
-  if (candidates.empty()) {
-    return ResolveWitnessResult::Missing;
-  }
 
   // Determine which of the candidates is viable.
   SmallVector<LookupTypeResultEntry, 2> viable;
@@ -598,7 +596,26 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     }
   }
 
-  if (!deducedFromParameterizedProtocolType) {
+  // Diagnose ambiguity when fromParameterizedProtocolType.size() > 1
+  if (fromParameterizedProtocolType.size() > 1) {
+    ctx.addDelayedConformanceDiag(
+        conformance, true,
+        [assocType, fromParameterizedProtocolType](
+            NormalProtocolConformance *conformance) {
+          auto &diags = assocType->getASTContext().Diags;
+          diags.diagnose(
+              conformance->getLoc(),
+              diag::ambiguous_associated_type_from_parameterized_protocols,
+              assocType, conformance->getProtocol());
+          for (const auto &pair : fromParameterizedProtocolType) {
+            diags.diagnose(
+                pair.second,
+                diag::associated_type_candidate_from_parameterized_protocol);
+          }
+        });
+  }
+
+  if (fromParameterizedProtocolType.empty()) {
     // If there are no viable witnesses, and all nonviable candidates came from
     // protocol extensions, treat this as "missing".
     if (viable.empty() &&
@@ -623,14 +640,29 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   } else {
     // We deduced the type witness from a parameterized protocol type, so just
     // make sure there was nothing else.
-    if (viable.size() == 1 &&
-        isa<TypeAliasDecl>(viable[0].Member) &&
-        viable[0].Member->isSynthesized()) {
-      // We found the type alias synthesized above.
+    if (viable.empty()) {
+      // There was nothing else. Record the type witness, which will
+      // synthesize the type alias.
+      recordTypeWitness(conformance, assocType,
+                        fromParameterizedProtocolType[0].first,
+                        /*typeDecl=*/nullptr);
+      return ResolveWitnessResult::Success;
+    }
+
+    if (viable.size() == 1 && isa<TypeAliasDecl>(viable[0].Member) &&
+        viable[0].Member->getDeclaredInterfaceType()->isEqual(
+            fromParameterizedProtocolType[0].first)) {
+      // We found another type alias with the same underlying type,
+      // which is okay.
+      recordTypeWitness(conformance, assocType,
+                        fromParameterizedProtocolType[0].first,
+                        viable[0].Member);
       return ResolveWitnessResult::Success;
     }
 
     // Otherwise fall through.
+    recordTypeWitness(conformance, assocType,
+                      ErrorType::get(ctx), nullptr);
   }
 
   // If we had multiple viable types, diagnose the ambiguity.
@@ -1341,8 +1373,10 @@ public:
 
     // If we already have an interface type, don't bother trying to
     // avoid a cycle.
-    if (witness->hasInterfaceType())
+    if (witness->hasInterfaceType()) {
+      LLVM_DEBUG(llvm::errs() << "Already has an interface type\n");
       return false;
+    }
 
     // We call checkForPotentailCycle() multiple times with
     // different witnesses.
@@ -4011,6 +4045,8 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
     case ResolveWitnessResult::Missing:
       // We did not find the witness via name lookup. Try to derive
       // it below.
+      LLVM_DEBUG(llvm::dbgs() << "Associated type " << assocType->getName()
+                              << " will be inferred\n";);
       break;
     }
 

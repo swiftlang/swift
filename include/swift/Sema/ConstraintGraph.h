@@ -48,8 +48,7 @@ class TypeVariableBinding;
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
-  explicit ConstraintGraphNode(ConstraintGraph &CG, TypeVariableType *typeVar)
-      : CG(CG), TypeVar(typeVar) {}
+  explicit ConstraintGraphNode(ConstraintGraph &CG, TypeVariableType *typeVar);
 
   ConstraintGraphNode(const ConstraintGraphNode&) = delete;
   ConstraintGraphNode &operator=(const ConstraintGraphNode&) = delete;
@@ -62,6 +61,7 @@ public:
   void initTypeVariable(TypeVariableType *typeVar) {
     ASSERT(!TypeVar);
     TypeVar = typeVar;
+    Potential.TypeVar = typeVar;
   }
 
   /// Retrieve the set of constraints that mention this type variable.

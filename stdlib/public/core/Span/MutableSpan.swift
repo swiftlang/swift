@@ -391,15 +391,13 @@ extension MutableSpan where Element: ~Copyable {
   >(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = unsafe _pointer, count > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    // bind memory by hand to sidestep alignment concerns
-    let binding = Builtin.bindMemory(
-      pointer._rawValue, count._builtinWordValue, Element.self
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: _count
     )
-    defer { Builtin.rebindMemory(pointer._rawValue, binding) }
-    return try unsafe body(.init(start: .init(pointer._rawValue), count: count))
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> Result in
+      try unsafe body(buffer)
+    }
   }
 }
 
@@ -422,8 +420,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: (_count == 0) ? nil : _pointer,
-      count: _count &* MemoryLayout<Element>.stride
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe body(bytes)
   }

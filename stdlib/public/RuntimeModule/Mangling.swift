@@ -40,7 +40,7 @@ internal import BacktracingImpl.Runtime
 /// - Throws: When the demangling fails for any reason.
 /// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(SwiftStdlib 6.3, *)
 public func demangle(_ mangledName: String) throws(DemanglingError) -> String {
   var demangledLength: size_t = 0
 
@@ -82,7 +82,7 @@ public func demangle(_ mangledName: String) throws(DemanglingError) -> String {
 /// - Throws: When the demangling failed entirely, and the output span will not have been written to.
 /// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(SwiftStdlib 6.3, *)
 public func demangle(
   _ mangledName: borrowing UTF8Span,
   into output: inout OutputSpan<UTF8.CodeUnit>
@@ -117,7 +117,7 @@ public func demangle(
 }
 
 /// Error thrown to indicate failure to demangle a Swift symbol.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(SwiftStdlib 6.3, *)
 public enum DemanglingError: Error {
   /// Demangling resulted in truncating the result. The payload value is the
   /// number of bytes necessary for a full demangle.

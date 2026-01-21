@@ -16,6 +16,7 @@
 
 import Swift
 
+@available(Backtracing 6.2, *)
 enum CompactBacktraceFormat {
   /// Tells us what size of machine words were used when generating the
   /// backtrace.
@@ -617,6 +618,7 @@ enum CompactBacktraceFormat {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension CompactBacktraceFormat.Instruction: Comparable {
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.rawValue < rhs.rawValue
@@ -626,6 +628,7 @@ extension CompactBacktraceFormat.Instruction: Comparable {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension CompactBacktraceFormat.Instruction {
   func decoded() -> CompactBacktraceFormat.DecodedInstruction? {
     switch self {

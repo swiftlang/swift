@@ -462,7 +462,8 @@ suite.test("withUnsafeBufferPointer")
 
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBufferPointer {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -491,7 +492,8 @@ suite.test("withUnsafeBytes()")
 
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBytes {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }

@@ -1765,12 +1765,10 @@ public:
                             CanType existentialType,
                             SGFContext C = SGFContext());
 
-  RValue emitCollectionConversion(SILLocation loc,
-                                  FuncDecl *fn,
-                                  CanType fromCollection,
-                                  CanType toCollection,
-                                  ManagedValue mv,
-                                  SGFContext C);
+  RValue emitCollectionConversion(SILLocation loc, FuncDecl *fn,
+                                  CanType fromCollection, CanType toCollection,
+                                  ManagedValue mv, ClosureExpr *keyConversion,
+                                  ClosureExpr *valueConversion, SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -2862,9 +2860,10 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  InitializationPtr
-  emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
-                                   bool generateDebugInfo = true);
+  InitializationPtr emitPatternBindingInitialization(
+      Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
+      ProfileCounter numTrueTaken = ProfileCounter(),
+      ProfileCounter numFalseTaken = ProfileCounter());
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.

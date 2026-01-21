@@ -290,7 +290,8 @@ suite.test("withUnsafeBytes()")
 
     let emptySpan = RawSpan(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBytes {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }

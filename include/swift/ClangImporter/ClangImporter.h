@@ -639,8 +639,8 @@ public:
   resolveStableSerializationPath(
                             const StableSerializationPath &path) const override;
 
-  bool isSerializable(const clang::Type *type,
-                      bool checkCanonical) const override;
+  SerializableInfo isSerializable(const clang::Type *type,
+                                  bool checkCanonical) const override;
 
   clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,
@@ -958,6 +958,9 @@ public:
   /// metadata for cases of (nested) inheritance.
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
       : access(computeAccess(prev, base)) {}
+
+  /// Initialize an instance of this class at a particular given access level.
+  ClangInheritanceInfo(clang::AccessSpecifier access) : access(access) {}
 
   /// Whether this info represents a case of nested private inheritance.
   bool isNestedPrivate() const { return !access.has_value(); }

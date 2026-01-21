@@ -4453,8 +4453,13 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
-        if (check.getKind() == CheckKind::AccessStrict)
-          diagKind = diag::witness_not_accessible_strict_check;
+        if (check.getKind() == CheckKind::AccessStrict) {
+          if (witness->getASTContext().LangOpts.hasFeature(
+                  Feature::StrictAccessControl))
+            diagKind = diag::witness_not_accessible_strict_check;
+          else
+            diagKind = diag::witness_not_accessible_strict_check_warn;
+        }
         bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;

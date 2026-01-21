@@ -1382,7 +1382,7 @@ function Get-Dependencies {
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
-      $FileExtension = if ($SCCache.URL -match '/[^/]+(\..+)$') { $Matches[1] } else {
+      $FileExtension = if ($SCCache.URL -match '\.(?:tar\.\w+|zip)$') { $Matches[0] } else {
           throw "Invalid sccache URL"
       }
       DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion$FileExtension" $SCCache.SHA256
@@ -1875,11 +1875,6 @@ function Build-CMakeProject {
             "-Xclang-linker", "--sysroot", "-Xclang-linker", $AndroidSysroot,
             "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
           )
-
-          # FIXME(compnerd) remove this once we have the early swift-driver
-          if ($SwiftSDK) {
-            $SwiftFlags += @("-Xclang-linker", "-L", "-Xclang-linker", [IO.Path]::Combine($SwiftSDK, "usr", "lib", "swift", "android", $Platform.Architecture.LLVMName))
-          }
 
           $SwiftFlags += if ($DebugInfo) { @("-g") } else { @("-gnone") }
 

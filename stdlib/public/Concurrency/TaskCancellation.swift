@@ -74,10 +74,28 @@ import Swift
 /// Therefore, if a cancellation handler must acquire a lock, other code should
 /// not cancel tasks or resume continuations while holding that lock.
 @available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+nonisolated(nonsending)
+public func withTaskCancellationHandler<Return, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  onCancel handler: sending () -> Void
+) async throws(Failure) -> Return {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+  return try await operation()
+}
+
 #if !$Embedded
-@backDeployed(before: SwiftStdlib 6.0)
-#endif
-public func withTaskCancellationHandler<T>(
+@available(SwiftStdlib 6.0, *)
+@usableFromInline
+@abi(func withTaskCancellationHandler<T>(
+       operation: () async throws -> T,
+       onCancel handler: @Sendable () -> Void,
+       isolation: isolated (any Actor)?,
+     ) async rethrows -> T)
+func __abi_withTaskCancellationHandler<T>(
   operation: () async throws -> T,
   onCancel handler: @Sendable () -> Void,
   isolation: isolated (any Actor)? = #isolation
@@ -93,6 +111,7 @@ public func withTaskCancellationHandler<T>(
 #endif
   return try await operation()
 }
+#endif
 
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful

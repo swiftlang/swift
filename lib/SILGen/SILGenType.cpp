@@ -624,7 +624,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    SGM.useConformance(ProtocolConformanceRef(conformance));
+    SGM.useConformance(nullptr, ProtocolConformanceRef(conformance));
   }
 
   Witness getWitness(ValueDecl *decl) {
@@ -695,7 +695,7 @@ public:
     auto assocConformance =
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
-    SGM.useConformance(assocConformance);
+    SGM.useConformance(nullptr, assocConformance);
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), assocConformance});
   }

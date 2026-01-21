@@ -389,8 +389,20 @@ class Container {
     init(value: Int) {}
   }
 
+  func test<T>(_: T.Type) {}
+  
   func someFunc() {
     let _ = [Container.NestedType]()  // ok
     let _ = [Self.NestedType]()  // ok
+
+    _ = Self.NestedType // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{24-24=.self}}
+    let _ = Self.NestedType // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{28-28=.self}}
+    test(Self.NestedType) // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{25-25=.self}}
   }
 }
