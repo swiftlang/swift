@@ -186,3 +186,27 @@ struct S8 {
     didSet {} // expected-error {{'didSet' cannot be provided together with a 'borrow' accessor}}
   }
 }
+
+// Borrow and mutate accessors with 'lazy' properties
+struct S9 {
+  var _i: Int = 0
+
+  lazy var i: Int { // expected-error {{'lazy' cannot be used on a computed property}}
+                    // expected-error@-1 {{lazy properties must have an initializer}}
+    borrow {
+      return _i
+    }
+  }
+}
+
+struct S10 {
+  var _i: Int = 0
+
+  lazy var i: Int { // expected-error {{'lazy' cannot be used on a computed property}}
+                    // expected-error@-1 {{lazy properties must have an initializer}}
+    borrow {
+      return _i
+    }
+  }
+}
+

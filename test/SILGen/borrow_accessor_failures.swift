@@ -259,3 +259,23 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
   }
 }
 
+// Borrow and mutate accessor using lazy properties
+struct ExampleWithLazyProp {
+  private lazy var _cachedResult: Int = {
+    return expensiveComputation()
+  }()
+
+  var result: Int {
+    mutating borrow {
+      return _cachedResult // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+    }
+    mutate {
+      return &_cachedResult // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
+    }
+  }
+
+  private func expensiveComputation() -> Int {
+    return (1...1000).reduce(0, +)
+  }
+}
+
