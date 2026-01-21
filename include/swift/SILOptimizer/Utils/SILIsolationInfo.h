@@ -575,6 +575,12 @@ private:
   /// E.x.: Builtin.RawPointer and Builtin.NativeObject
   ///
   /// TODO: Fix the type checker.
+  ///
+  /// NOTE: It is assumed that type is /not/ an interface type. We assert inside
+  /// as such.
+  ///
+  /// NOTE: We assume that if type is a generic environment, it is the one
+  /// associated with \p fn. It cannot just be a random function.
   static bool isNonSendableType(SILType type, SILFunction *fn);
 
   static bool isSendableType(SILType type, SILFunction *fn) {
