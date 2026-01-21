@@ -2078,9 +2078,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
         SWIFT_ONONE_SUPPORT);
   }
 
-  Opts.EnableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_enable_constraint_solver_performance_hacks);
-
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 

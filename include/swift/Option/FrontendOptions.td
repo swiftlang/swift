@@ -919,9 +919,6 @@ def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overl
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
-def enable_constraint_solver_performance_hacks : Flag<["-"], "enable-constraint-solver-performance-hacks">,
-  HelpText<"Enable all the old hacks in the constraint solver">;
-
 def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
   HelpText<"Enable operator designated types">;
