@@ -546,7 +546,10 @@ public:
       : stateOrAlias(original)
     {
     }
-    
+
+    AddressableBuffer(const AddressableBuffer &other) = delete;
+    AddressableBuffer &operator=(const AddressableBuffer &other) = delete;
+
     AddressableBuffer(AddressableBuffer &&other)
       : stateOrAlias(other.stateOrAlias)
     {
