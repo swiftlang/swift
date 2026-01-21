@@ -967,7 +967,7 @@ class RefCounts {
     if (bits.isUniquelyReferenced()) {
       //isUniquelyReferenced checks useSlowRC, and hasSideTable will be false if
       //useSlowRC is true. So if we are here then we know hasSideTable is false.
-      return bits.isUniquelyReferenced();
+      return true;
     }
     
     auto hasSide = bits.hasSideTable();
