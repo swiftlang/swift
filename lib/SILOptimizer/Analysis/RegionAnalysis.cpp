@@ -2226,8 +2226,6 @@ public:
 
       // Perform our lookup result.
       if (auto lookupResult = tryToTrackValue(src)) {
-        auto value = lookupResult->value;
-
         // If our value is non-Sendable require it and if we have a base and
         // that base is non-Sendable, require that as well.
         //
@@ -2240,6 +2238,8 @@ public:
         if (requireSrcValues) {
           builder.addRequire(*lookupResult);
         }
+
+        auto value = lookupResult->value;
 
         // If our value was actually Sendable, skip it, we do not want to merge
         // anything.
