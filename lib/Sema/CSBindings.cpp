@@ -1478,7 +1478,7 @@ static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
 /// to a given type i.e. is the given type is Double or Optional<..> this
 /// function is going to return true because CGFloat could be converted
 /// to a Double and non-optional value could be injected into an optional.
-static bool hasConversions(Type type) {
+bool swift::constraints::inference::hasConversions(Type type) {
   if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
     return true;
 
