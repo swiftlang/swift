@@ -276,6 +276,9 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return {Flags::Kind::ModifyCoroutine, true};
     case AccessorKind::DistributedGet:
       return {Flags::Kind::Getter, false};
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      return {Flags::Kind::Method, false};
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"

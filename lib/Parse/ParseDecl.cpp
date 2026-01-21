@@ -7984,6 +7984,8 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::YieldingBorrow:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return true;
 
   case AccessorKind::Address:
@@ -7997,11 +7999,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
 
   case AccessorKind::Init:
     return forSIL;
-
-  // TODO: Add support for borrow/mutate constraints in protocols
-  case AccessorKind::Borrow:
-  case AccessorKind::Mutate:
-    return false;
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -8249,7 +8246,8 @@ bool Parser::parseAccessorAfterIntroducer(
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
-    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension)) {
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension) &&
+        !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
                                             /*underscored*/ false));
@@ -8408,7 +8406,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      diagnose(Loc, diag::expected_getreadset_in_protocol);
+      auto diag = diag::expected_getreadset_in_protocol;
+      if (Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
+        diag = diag::expected_getreadborrowsetmutate_in_protocol;
+      }
+      diagnose(Loc, diag);
       continue;
     }
 

@@ -517,7 +517,8 @@ static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
   case swift::OpaqueReadOwnership::KIND:                      \
     return uint8_t(serialization::OpaqueReadOwnership::KIND);
   CASE(Owned)
-  CASE(Borrowed)
+  CASE(YieldingBorrow)
+  CASE(Borrow)
   CASE(OwnedOrBorrowed)
 #undef CASE
   }

@@ -840,6 +840,18 @@ bool SILDeclRef::isBorrowAccessor() const {
   return false;
 }
 
+static bool canSerializeSynthesizedBorrowingAccessors(SILDeclRef declRef) {
+  if (!declRef.isBorrowAccessor() && !declRef.isMutateAccessor()) {
+    return true;
+  }
+  auto *decl = cast<AccessorDecl>(declRef.getDecl());
+  assert(decl->hasForcedStaticDispatch());
+  if (!decl->getStorage()->isResilient()) {
+    return true;
+  }
+  return false;
+}
+
 /// True if the function should be treated as transparent.
 bool SILDeclRef::isTransparent() const {
   if (isEnumElement())
@@ -994,12 +1006,18 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (isEnumElement())
     return IsSerialized;
 
-  // 'read' and 'modify' accessors synthesized on-demand are serialized if
-  // visible outside the module.
-  if (auto fn = dyn_cast<FuncDecl>(d))
-    if (!isClangImported() &&
-        fn->hasForcedStaticDispatch())
+  // Accessors synthesized on-demand are serialized if visible outside the
+  // module.
+  // FIXME: `FuncDecl::hasForcedStaticDispatch` is set on accessors that are
+  // synthesized because of a requirement and are not an opaque accessor for
+  // their storage. These accessors can only be accessed via protocol witnesses
+  // and should be serialized only when the protocol witness is serialized
+  // (protocol is public and we are in a non-resilient module).
+  if (auto fn = dyn_cast<FuncDecl>(d)) {
+    if (!isClangImported() && fn->hasForcedStaticDispatch() &&
+        canSerializeSynthesizedBorrowingAccessors(*this))
       return IsSerialized;
+  }
 
   if (isForeignToNativeThunk())
     return IsSerialized;

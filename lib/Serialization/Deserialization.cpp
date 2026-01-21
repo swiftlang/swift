@@ -3229,7 +3229,8 @@ getActualOpaqueReadOwnership(unsigned rawKind) {
   case serialization::OpaqueReadOwnership::KIND: \
     return swift::OpaqueReadOwnership::KIND;
   CASE(Owned)
-  CASE(Borrowed)
+  CASE(YieldingBorrow)
+  CASE(Borrow)
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
