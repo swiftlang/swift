@@ -874,6 +874,368 @@ static bool isSubclassOf(Type candidateType, Type superclassType) {
   return superclassDecl->isSuperclassOf(subclassDecl);
 }
 
+enum class MatchFlag {
+  OnParam = 0x01,
+  Literal = 0x02,
+  ExactOnly = 0x04,
+  DisableCGFloatDoubleConversion = 0x08,
+  StringInterpolation = 0x10,
+};
+
+using MatchOptions = OptionSet<MatchFlag>;
+
+// Perform a limited set of checks to determine whether the candidate
+// could possibly match the parameter type:
+//
+// - Equality
+// - Protocol conformance(s)
+// - Optional injection
+// - Superclass conversion
+// - Array-to-pointer conversion
+// - Value to existential conversion
+// - Existential opening
+// - Exact match on top-level types
+//
+// In situations when it's not possible to determine whether a candidate
+// type matches a parameter type (i.e. when partially resolved generic
+// types are matched) this function is going to produce \c std::nullopt
+// instead of `0` that indicates "not a match".
+static std::optional<unsigned>
+scoreCandidateMatch(ConstraintSystem &cs,
+                    GenericSignature genericSig, ValueDecl *choice,
+                    std::optional<unsigned> paramIdx, Type candidateType,
+                    Type paramType, MatchOptions options) {
+  auto isCGFloatDoubleConversionSupported = [&options]() {
+    // CGFloat <-> Double conversion is supposed only while
+    // match argument candidates to parameters.
+    return options.contains(MatchFlag::OnParam) &&
+           !options.contains(MatchFlag::DisableCGFloatDoubleConversion);
+  };
+
+  // Allow CGFloat -> Double widening conversions between
+  // candidate argument types and parameter types. This would
+  // make sure that Double is always preferred over CGFloat
+  // when using literals and ranking supported disjunction
+  // choices. Narrowing conversion (Double -> CGFloat) should
+  // be delayed as much as possible.
+  if (isCGFloatDoubleConversionSupported()) {
+    if (candidateType->isCGFloat() && paramType->isDouble()) {
+      return options.contains(MatchFlag::Literal) ? 20 : 90;
+    }
+  }
+
+  if (options.contains(MatchFlag::ExactOnly)) {
+    // If an exact match is requested favor only `[...]` to `Array<...>`
+    // since everything else is going to increase to score.
+    if (options.contains(MatchFlag::Literal)) {
+      if (isUnboundArrayType(candidateType))
+        return paramType->isArray() ? 30 : 0;
+
+      if (isUnboundDictionaryType(candidateType))
+        return cs.isDictionaryType(paramType) ? 30 : 0;
+    }
+
+    if (!candidateType->isEqual(paramType))
+      return 0;
+    return options.contains(MatchFlag::Literal) ? 30 : 100;
+  }
+
+  // Exact match between candidate and parameter types.
+  if (candidateType->isEqual(paramType)) {
+    return options.contains(MatchFlag::Literal) ? 30 : 100;
+  }
+
+  if (options.contains(MatchFlag::Literal)) {
+    if (paramType->hasTypeParameter() ||
+        paramType->isAnyExistentialType()) {
+      // Attempt to match literal default to generic parameter.
+      // This helps to determine whether there are any generic
+      // overloads that are a possible match.
+      auto score =
+          scoreCandidateMatch(cs, genericSig, choice, paramIdx, candidateType,
+                              paramType, options - MatchFlag::Literal);
+      if (score == 0)
+        return 0;
+
+      // Optional injection lowers the score for operators to match
+      // pre-optimizer behavior.
+      return choice->isOperator() && paramType->getOptionalObjectType()
+                  ? 20
+                  : 30;
+    } else {
+      // Integer and floating-point literals can match any parameter
+      // type that conforms to `ExpressibleBy{Integer, Float}Literal`
+      // protocol. Since this assessment is done in isolation we don't
+      // lower the score even though this would be a non-default binding
+      // for a literal.
+      if (candidateType->isInt() &&
+          TypeChecker::conformsToKnownProtocol(
+              paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
+        return 30;
+
+      if (candidateType->isDouble() &&
+          TypeChecker::conformsToKnownProtocol(
+              paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
+        return 30;
+
+      if (candidateType->isBool() &&
+          TypeChecker::conformsToKnownProtocol(
+              paramType, KnownProtocolKind::ExpressibleByBooleanLiteral))
+        return 30;
+
+      if (candidateType->isString()) {
+        auto literalProtocol =
+            options.contains(MatchFlag::StringInterpolation)
+                ? KnownProtocolKind::ExpressibleByStringInterpolation
+                : KnownProtocolKind::ExpressibleByStringLiteral;
+
+        if (TypeChecker::conformsToKnownProtocol(paramType,
+                                                 literalProtocol))
+          return 30;
+      }
+
+      // Check if the other side conforms to `ExpressibleByArrayLiteral`
+      // protocol (in some way). We want an overly optimistic result
+      // here to avoid under-favoring.
+      if (candidateType->isArray() &&
+          TypeChecker::conformsToKnownProtocol(
+              paramType, KnownProtocolKind::ExpressibleByArrayLiteral))
+        return 30;
+
+      // Check if the other side conforms to
+      // `ExpressibleByDictionaryLiteral` protocol (in some way).
+      // We want an overly optimistic result here to avoid under-favoring.
+      if (candidateType->isDictionary() &&
+          TypeChecker::conformsToKnownProtocol(
+              paramType, KnownProtocolKind::ExpressibleByDictionaryLiteral))
+        return 30;
+    }
+
+    return 0;
+  }
+
+  // Check whether match would require optional injection.
+  {
+    SmallVector<Type, 2> candidateOptionals;
+    SmallVector<Type, 2> paramOptionals;
+
+    candidateType =
+        candidateType->lookThroughAllOptionalTypes(candidateOptionals);
+    paramType = paramType->lookThroughAllOptionalTypes(paramOptionals);
+
+    if (!candidateOptionals.empty() || !paramOptionals.empty()) {
+      auto requiresOptionalInjection = [&]() {
+        return paramOptionals.size() > candidateOptionals.size();
+      };
+
+      // Can match i.e. Int? to Int or T to Int?
+      if ((paramOptionals.empty() &&
+           paramType->is<GenericTypeParamType>()) ||
+          paramOptionals.size() >= candidateOptionals.size()) {
+        auto score = scoreCandidateMatch(cs, genericSig, choice, paramIdx,
+                                         candidateType, paramType, options);
+
+        if (score > 0) {
+          // Injection lowers the score slightly to comply with
+          // old behavior where exact matches on operator parameter
+          // types were always preferred.
+          if (choice->isOperator() && requiresOptionalInjection())
+            return score.value() - 10;
+        }
+
+        return score;
+      }
+
+      // Optionality mismatch.
+      return 0;
+    }
+  }
+
+  // Candidate could be converted to a superclass.
+  if (isSubclassOf(candidateType, paramType))
+    return 100;
+
+  // Possible Array<T> -> Unsafe*Pointer conversion.
+  if (options.contains(MatchFlag::OnParam)) {
+    if (candidateType->isArray() &&
+        paramType->getAnyPointerElementType())
+      return 100;
+  }
+
+  // If both argument and parameter are tuples of the same arity,
+  // it's a match.
+  {
+    if (auto *candidateTuple = candidateType->getAs<TupleType>()) {
+      auto *paramTuple = paramType->getAs<TupleType>();
+      if (paramTuple &&
+          candidateTuple->getNumElements() == paramTuple->getNumElements())
+        return 100;
+    }
+  }
+
+  if (paramType->isAnyExistentialType()) {
+    // If the parameter is `Any` we assume that all candidates are
+    // convertible to it, which makes it a perfect match. The solver
+    // would then decide whether erasing to an existential is preferable.
+    if (paramType->isAny())
+      return 100;
+
+    // If the parameter is `Any.Type` we assume that all metatype
+    // candidates are convertible to it.
+    if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
+      if (EMT->getExistentialInstanceType()->isAny() &&
+          (candidateType->is<ExistentialMetatypeType>() ||
+           candidateType->is<MetatypeType>()))
+        return 100;
+    }
+  }
+
+  // Check if a candidate could be matched to a parameter by
+  // an existential opening.
+  if (options.contains(MatchFlag::OnParam) &&
+      candidateType->getMetatypeInstanceType()->isExistentialType()) {
+    if (auto *genericParam = paramType->getMetatypeInstanceType()
+                                 ->getAs<GenericTypeParamType>()) {
+      if (canOpenExistentialAt(choice, *paramIdx, genericParam,
+                               candidateType->getMetatypeInstanceType())) {
+        // Lower the score slightly for operators to make sure that
+        // concrete overloads are always preferred over generic ones.
+        return choice->isOperator() ? 90 : 100;
+      }
+    }
+  }
+
+  // Check protocol requirement(s) if this parameter is a
+  // generic parameter type.
+  if (genericSig && paramType->isTypeParameter()) {
+    // Light-weight check if cases where `checkRequirements` is not
+    // applicable.
+    auto checkProtocolRequirementsOnly = [&]() -> unsigned {
+      auto protocolRequirements =
+          genericSig->getRequiredProtocols(paramType);
+      if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
+            return bool(cs.lookupConformance(candidateType, protocol));
+          })) {
+        if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
+          auto *paramDecl = GP->getDecl();
+          if (paramDecl && paramDecl->isOpaqueType())
+            return 100;
+        }
+        return 70;
+      }
+
+      return 0;
+    };
+
+    // If candidate is not fully resolved or is matched against a
+    // dependent member type (i.e. `Self.T`), let's check conformances
+    // only and lower the score.
+    if (candidateType->hasTypeVariable() ||
+        candidateType->hasUnboundGenericType() ||
+        paramType->is<DependentMemberType>()) {
+      return checkProtocolRequirementsOnly();
+    }
+
+    // Cannot match anything but generic type parameters here.
+    if (!paramType->is<GenericTypeParamType>())
+      return std::nullopt;
+
+    bool hasUnsatisfiableRequirements = false;
+    SmallVector<Requirement, 4> requirements;
+
+    for (const auto &requirement : genericSig.getRequirements()) {
+      if (hasUnsatisfiableRequirements)
+        break;
+
+      llvm::SmallPtrSet<GenericTypeParamType *, 2> toExamine;
+
+      auto recordReferencesGenericParams = [&toExamine](Type type) {
+        type.visit([&toExamine](Type innerTy) {
+          if (auto *GP = innerTy->getAs<GenericTypeParamType>())
+            toExamine.insert(GP);
+        });
+      };
+
+      recordReferencesGenericParams(requirement.getFirstType());
+
+      if (requirement.getKind() != RequirementKind::Layout)
+        recordReferencesGenericParams(requirement.getSecondType());
+
+      if (llvm::any_of(toExamine, [&](GenericTypeParamType *GP) {
+            return paramType->isEqual(GP);
+          })) {
+        requirements.push_back(requirement);
+        // If requirement mentions other generic parameters
+        // `checkRequirements` would because we don't have
+        // candidate substitutions for anything but the current
+        // parameter type.
+        hasUnsatisfiableRequirements |= toExamine.size() > 1;
+      }
+    }
+
+    // If there are no requirements associated with the generic
+    // parameter or dependent member type it could match any type.
+    if (requirements.empty())
+      return 70;
+
+    // If some of the requirements cannot be satisfied, because
+    // they reference other generic parameters, for example:
+    // `<T, U, where T.Element == U.Element>`, let's perform a
+    // light-weight check instead of skipping this overload choice.
+    if (hasUnsatisfiableRequirements)
+      return checkProtocolRequirementsOnly();
+
+    // If the candidate type is fully resolved, let's check all of
+    // the requirements that are associated with the corresponding
+    // parameter, if all of them are satisfied this candidate is
+    // an exact match.
+    auto result = checkRequirements(
+        requirements,
+        [&paramType, &candidateType](SubstitutableType *type) -> Type {
+          if (type->isEqual(paramType))
+            return candidateType;
+          return ErrorType::get(type);
+        },
+        SubstOptions(std::nullopt));
+
+    // Concrete operator overloads are always more preferable to
+    // generic ones if there are exact or subtype matches, for
+    // everything else the solver should try both concrete and
+    // generic and disambiguate during ranking.
+    if (result == CheckRequirementsResult::Success)
+      return choice->isOperator() ? 90 : 100;
+
+    return 0;
+  }
+
+  // Parameter is generic, let's check whether top-level
+  // types match i.e. Array<Element> as a parameter.
+  //
+  // This is slightly better than all of the conformances matching
+  // because the parameter is concrete and could split the system.
+  if (paramType->hasTypeParameter()) {
+    auto *candidateDecl = candidateType->getAnyNominal();
+    auto *paramDecl = paramType->getAnyNominal();
+
+    // Conservatively we need to make sure that this is not worse
+    // than matching against a generic parameter with or without
+    // requirements.
+    if (candidateDecl && paramDecl && candidateDecl == paramDecl) {
+      // If the candidate it not yet fully resolved, let's lower the
+      // score slightly to avoid over-favoring generic overload choices.
+      if (candidateType->hasTypeVariable())
+        return 80;
+
+      // If the candidate is fully resolved we need to treat this
+      // as we would generic parameter otherwise there is a risk
+      // of skipping some of the valid choices.
+      return choice->isOperator() ? 90 : 100;
+    }
+  }
+
+  return 0;
+}
+
 /// Given a set of disjunctions, attempt to determine
 /// favored choices in the current context.
 static void determineBestChoicesInContext(
@@ -1227,370 +1589,6 @@ static void determineBestChoicesInContext(
                                 /*allow fixes*/ false, listener, std::nullopt);
     };
 
-    enum class MatchFlag {
-      OnParam = 0x01,
-      Literal = 0x02,
-      ExactOnly = 0x04,
-      DisableCGFloatDoubleConversion = 0x08,
-      StringInterpolation = 0x10,
-    };
-
-    using MatchOptions = OptionSet<MatchFlag>;
-
-    // Perform a limited set of checks to determine whether the candidate
-    // could possibly match the parameter type:
-    //
-    // - Equality
-    // - Protocol conformance(s)
-    // - Optional injection
-    // - Superclass conversion
-    // - Array-to-pointer conversion
-    // - Value to existential conversion
-    // - Existential opening
-    // - Exact match on top-level types
-    //
-    // In situations when it's not possible to determine whether a candidate
-    // type matches a parameter type (i.e. when partially resolved generic
-    // types are matched) this function is going to produce \c std::nullopt
-    // instead of `0` that indicates "not a match".
-    std::function<std::optional<unsigned>(GenericSignature, ValueDecl *,
-                                          std::optional<unsigned>, Type, Type,
-                                          MatchOptions)>
-        scoreCandidateMatch =
-            [&](GenericSignature genericSig, ValueDecl *choice,
-                std::optional<unsigned> paramIdx, Type candidateType,
-                Type paramType, MatchOptions options) -> std::optional<unsigned> {
-      auto isCGFloatDoubleConversionSupported = [&options]() {
-        // CGFloat <-> Double conversion is supposed only while
-        // match argument candidates to parameters.
-        return options.contains(MatchFlag::OnParam) &&
-               !options.contains(MatchFlag::DisableCGFloatDoubleConversion);
-      };
-
-      // Allow CGFloat -> Double widening conversions between
-      // candidate argument types and parameter types. This would
-      // make sure that Double is always preferred over CGFloat
-      // when using literals and ranking supported disjunction
-      // choices. Narrowing conversion (Double -> CGFloat) should
-      // be delayed as much as possible.
-      if (isCGFloatDoubleConversionSupported()) {
-        if (candidateType->isCGFloat() && paramType->isDouble()) {
-          return options.contains(MatchFlag::Literal) ? 20 : 90;
-        }
-      }
-
-      if (options.contains(MatchFlag::ExactOnly)) {
-        // If an exact match is requested favor only `[...]` to `Array<...>`
-        // since everything else is going to increase to score.
-        if (options.contains(MatchFlag::Literal)) {
-          if (isUnboundArrayType(candidateType))
-            return paramType->isArray() ? 30 : 0;
-
-          if (isUnboundDictionaryType(candidateType))
-            return cs.isDictionaryType(paramType) ? 30 : 0;
-        }
-
-        if (!candidateType->isEqual(paramType))
-          return 0;
-        return options.contains(MatchFlag::Literal) ? 30 : 100;
-      }
-
-      // Exact match between candidate and parameter types.
-      if (candidateType->isEqual(paramType)) {
-        return options.contains(MatchFlag::Literal) ? 30 : 100;
-      }
-
-      if (options.contains(MatchFlag::Literal)) {
-        if (paramType->hasTypeParameter() ||
-            paramType->isAnyExistentialType()) {
-          // Attempt to match literal default to generic parameter.
-          // This helps to determine whether there are any generic
-          // overloads that are a possible match.
-          auto score =
-              scoreCandidateMatch(genericSig, choice, paramIdx, candidateType,
-                                  paramType, options - MatchFlag::Literal);
-          if (score == 0)
-            return 0;
-
-          // Optional injection lowers the score for operators to match
-          // pre-optimizer behavior.
-          return choice->isOperator() && paramType->getOptionalObjectType()
-                      ? 20
-                      : 30;
-        } else {
-          // Integer and floating-point literals can match any parameter
-          // type that conforms to `ExpressibleBy{Integer, Float}Literal`
-          // protocol. Since this assessment is done in isolation we don't
-          // lower the score even though this would be a non-default binding
-          // for a literal.
-          if (candidateType->isInt() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
-            return 30;
-
-          if (candidateType->isDouble() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
-            return 30;
-
-          if (candidateType->isBool() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByBooleanLiteral))
-            return 30;
-
-          if (candidateType->isString()) {
-            auto literalProtocol =
-                options.contains(MatchFlag::StringInterpolation)
-                    ? KnownProtocolKind::ExpressibleByStringInterpolation
-                    : KnownProtocolKind::ExpressibleByStringLiteral;
-
-            if (TypeChecker::conformsToKnownProtocol(paramType,
-                                                     literalProtocol))
-              return 30;
-          }
-
-          // Check if the other side conforms to `ExpressibleByArrayLiteral`
-          // protocol (in some way). We want an overly optimistic result
-          // here to avoid under-favoring.
-          if (candidateType->isArray() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByArrayLiteral))
-            return 30;
-
-          // Check if the other side conforms to
-          // `ExpressibleByDictionaryLiteral` protocol (in some way).
-          // We want an overly optimistic result here to avoid under-favoring.
-          if (candidateType->isDictionary() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByDictionaryLiteral))
-            return 30;
-        }
-
-        return 0;
-      }
-
-      // Check whether match would require optional injection.
-      {
-        SmallVector<Type, 2> candidateOptionals;
-        SmallVector<Type, 2> paramOptionals;
-
-        candidateType =
-            candidateType->lookThroughAllOptionalTypes(candidateOptionals);
-        paramType = paramType->lookThroughAllOptionalTypes(paramOptionals);
-
-        if (!candidateOptionals.empty() || !paramOptionals.empty()) {
-          auto requiresOptionalInjection = [&]() {
-            return paramOptionals.size() > candidateOptionals.size();
-          };
-
-          // Can match i.e. Int? to Int or T to Int?
-          if ((paramOptionals.empty() &&
-               paramType->is<GenericTypeParamType>()) ||
-              paramOptionals.size() >= candidateOptionals.size()) {
-            auto score = scoreCandidateMatch(genericSig, choice, paramIdx,
-                                             candidateType, paramType, options);
-
-            if (score > 0) {
-              // Injection lowers the score slightly to comply with
-              // old behavior where exact matches on operator parameter
-              // types were always preferred.
-              if (choice->isOperator() && requiresOptionalInjection())
-                return score.value() - 10;
-            }
-
-            return score;
-          }
-
-          // Optionality mismatch.
-          return 0;
-        }
-      }
-
-      // Candidate could be converted to a superclass.
-      if (isSubclassOf(candidateType, paramType))
-        return 100;
-
-      // Possible Array<T> -> Unsafe*Pointer conversion.
-      if (options.contains(MatchFlag::OnParam)) {
-        if (candidateType->isArray() &&
-            paramType->getAnyPointerElementType())
-          return 100;
-      }
-
-      // If both argument and parameter are tuples of the same arity,
-      // it's a match.
-      {
-        if (auto *candidateTuple = candidateType->getAs<TupleType>()) {
-          auto *paramTuple = paramType->getAs<TupleType>();
-          if (paramTuple &&
-              candidateTuple->getNumElements() == paramTuple->getNumElements())
-            return 100;
-        }
-      }
-
-      if (paramType->isAnyExistentialType()) {
-        // If the parameter is `Any` we assume that all candidates are
-        // convertible to it, which makes it a perfect match. The solver
-        // would then decide whether erasing to an existential is preferable.
-        if (paramType->isAny())
-          return 100;
-
-        // If the parameter is `Any.Type` we assume that all metatype
-        // candidates are convertible to it.
-        if (auto *EMT = paramType->getAs<ExistentialMetatypeType>()) {
-          if (EMT->getExistentialInstanceType()->isAny() &&
-              (candidateType->is<ExistentialMetatypeType>() ||
-               candidateType->is<MetatypeType>()))
-            return 100;
-        }
-      }
-
-      // Check if a candidate could be matched to a parameter by
-      // an existential opening.
-      if (options.contains(MatchFlag::OnParam) &&
-          candidateType->getMetatypeInstanceType()->isExistentialType()) {
-        if (auto *genericParam = paramType->getMetatypeInstanceType()
-                                     ->getAs<GenericTypeParamType>()) {
-          if (canOpenExistentialAt(choice, *paramIdx, genericParam,
-                                   candidateType->getMetatypeInstanceType())) {
-            // Lower the score slightly for operators to make sure that
-            // concrete overloads are always preferred over generic ones.
-            return choice->isOperator() ? 90 : 100;
-          }
-        }
-      }
-
-      // Check protocol requirement(s) if this parameter is a
-      // generic parameter type.
-      if (genericSig && paramType->isTypeParameter()) {
-        // Light-weight check if cases where `checkRequirements` is not
-        // applicable.
-        auto checkProtocolRequirementsOnly = [&]() -> unsigned {
-          auto protocolRequirements =
-              genericSig->getRequiredProtocols(paramType);
-          if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
-                return bool(cs.lookupConformance(candidateType, protocol));
-              })) {
-            if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
-              auto *paramDecl = GP->getDecl();
-              if (paramDecl && paramDecl->isOpaqueType())
-                return 100;
-            }
-            return 70;
-          }
-
-          return 0;
-        };
-
-        // If candidate is not fully resolved or is matched against a
-        // dependent member type (i.e. `Self.T`), let's check conformances
-        // only and lower the score.
-        if (candidateType->hasTypeVariable() ||
-            candidateType->hasUnboundGenericType() ||
-            paramType->is<DependentMemberType>()) {
-          return checkProtocolRequirementsOnly();
-        }
-
-        // Cannot match anything but generic type parameters here.
-        if (!paramType->is<GenericTypeParamType>())
-          return std::nullopt;
-
-        bool hasUnsatisfiableRequirements = false;
-        SmallVector<Requirement, 4> requirements;
-
-        for (const auto &requirement : genericSig.getRequirements()) {
-          if (hasUnsatisfiableRequirements)
-            break;
-
-          llvm::SmallPtrSet<GenericTypeParamType *, 2> toExamine;
-
-          auto recordReferencesGenericParams = [&toExamine](Type type) {
-            type.visit([&toExamine](Type innerTy) {
-              if (auto *GP = innerTy->getAs<GenericTypeParamType>())
-                toExamine.insert(GP);
-            });
-          };
-
-          recordReferencesGenericParams(requirement.getFirstType());
-
-          if (requirement.getKind() != RequirementKind::Layout)
-            recordReferencesGenericParams(requirement.getSecondType());
-
-          if (llvm::any_of(toExamine, [&](GenericTypeParamType *GP) {
-                return paramType->isEqual(GP);
-              })) {
-            requirements.push_back(requirement);
-            // If requirement mentions other generic parameters
-            // `checkRequirements` would because we don't have
-            // candidate substitutions for anything but the current
-            // parameter type.
-            hasUnsatisfiableRequirements |= toExamine.size() > 1;
-          }
-        }
-
-        // If there are no requirements associated with the generic
-        // parameter or dependent member type it could match any type.
-        if (requirements.empty())
-          return 70;
-
-        // If some of the requirements cannot be satisfied, because
-        // they reference other generic parameters, for example:
-        // `<T, U, where T.Element == U.Element>`, let's perform a
-        // light-weight check instead of skipping this overload choice.
-        if (hasUnsatisfiableRequirements)
-          return checkProtocolRequirementsOnly();
-
-        // If the candidate type is fully resolved, let's check all of
-        // the requirements that are associated with the corresponding
-        // parameter, if all of them are satisfied this candidate is
-        // an exact match.
-        auto result = checkRequirements(
-            requirements,
-            [&paramType, &candidateType](SubstitutableType *type) -> Type {
-              if (type->isEqual(paramType))
-                return candidateType;
-              return ErrorType::get(type);
-            },
-            SubstOptions(std::nullopt));
-
-        // Concrete operator overloads are always more preferable to
-        // generic ones if there are exact or subtype matches, for
-        // everything else the solver should try both concrete and
-        // generic and disambiguate during ranking.
-        if (result == CheckRequirementsResult::Success)
-          return choice->isOperator() ? 90 : 100;
-
-        return 0;
-      }
-
-      // Parameter is generic, let's check whether top-level
-      // types match i.e. Array<Element> as a parameter.
-      //
-      // This is slightly better than all of the conformances matching
-      // because the parameter is concrete and could split the system.
-      if (paramType->hasTypeParameter()) {
-        auto *candidateDecl = candidateType->getAnyNominal();
-        auto *paramDecl = paramType->getAnyNominal();
-
-        // Conservatively we need to make sure that this is not worse
-        // than matching against a generic parameter with or without
-        // requirements.
-        if (candidateDecl && paramDecl && candidateDecl == paramDecl) {
-          // If the candidate it not yet fully resolved, let's lower the
-          // score slightly to avoid over-favoring generic overload choices.
-          if (candidateType->hasTypeVariable())
-            return 80;
-
-          // If the candidate is fully resolved we need to treat this
-          // as we would generic parameter otherwise there is a risk
-          // of skipping some of the valid choices.
-          return choice->isOperator() ? 90 : 100;
-        }
-      }
-
-      return 0;
-    };
-
     // The choice with the best score.
     unsigned bestScore = 0;
     SmallVector<std::pair<Constraint *, unsigned>, 2> favoredChoices;
@@ -1728,12 +1726,14 @@ static void determineBestChoicesInContext(
 
               // The specifier for a candidate only matters for `inout` check.
               auto candidateScore =
-                  scoreCandidateMatch(genericSig, decl, paramIdx,
+                  scoreCandidateMatch(cs, genericSig, decl, paramIdx,
                                       candidate.type->getWithoutSpecifierType(),
                                       paramType, options);
 
-              if (!candidateScore)
+              if (!candidateScore) {
+                ASSERT(false);
                 continue;
+              }
 
               if (candidateScore > 0) {
                 bestCandidateScore =
@@ -1772,7 +1772,7 @@ static void determineBestChoicesInContext(
           if (canUseContextualResultTypes &&
               (score > 0 || !hasArgumentCandidates)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
-                  return scoreCandidateMatch(genericSig, decl,
+                  return scoreCandidateMatch(cs, genericSig, decl,
                                              /*paramIdx=*/std::nullopt,
                                              overloadType->getResult(),
                                              candidateResultTy,
