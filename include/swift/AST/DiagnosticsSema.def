@@ -3323,6 +3323,11 @@ NOTE(protocol_witness_mutation_modifier_conflict,none,
      (SelfAccessKind))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
+
+ERROR(protocol_witness_borrow_mutate_conflict, none,
+      "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
+      (StringRef))
+
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
 NOTE(protocol_witness_rethrows_by_conformance_conflict,none,
