@@ -551,10 +551,13 @@ public:
     AddressableBuffer &operator=(const AddressableBuffer &other) = delete;
 
     AddressableBuffer(AddressableBuffer &&other)
-      : stateOrAlias(other.stateOrAlias)
+      : stateOrAlias(other.stateOrAlias), insertPoint(other.insertPoint),
+        cleanupPoints(std::move(other.cleanupPoints))
     {
+      // Make sure we clear out the state on `other` since we don't want its
+      // destructor to do anything.
       other.stateOrAlias = (State*)nullptr;
-      cleanupPoints.swap(other.cleanupPoints);
+      other.insertPoint = nullptr;
     }
     
     AddressableBuffer &operator=(AddressableBuffer &&other) {
