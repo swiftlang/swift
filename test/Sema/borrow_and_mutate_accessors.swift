@@ -170,3 +170,19 @@ public struct S7 : Q { // expected-error{{type 'S7' does not conform to protocol
     }
   }
 }
+
+// Borrow and mutate accessors with property observers
+struct S8 {
+  var _i: Int
+
+  var i: Int {
+    borrow {
+      return _i
+    }
+    mutate {
+      return &_i
+    }
+    willSet {} // expected-error {{'willSet' cannot be provided together with a 'borrow' accessor}}
+    didSet {} // expected-error {{'didSet' cannot be provided together with a 'borrow' accessor}}
+  }
+}
