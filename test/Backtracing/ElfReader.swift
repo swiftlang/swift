@@ -3,7 +3,7 @@
 // RUN: %target-clang -x c -Wno-unused-command-line-argument -g %S/Inputs/fib.c -o %t/fib-no-uuid
 // RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib-gnu -g %S/Inputs/fib.c -o %t/fib-compress-gnu
 // RUN: %target-clang -x c -Wno-unused-command-line-argument -Wl,--build-id -Wl,--compress-debug-sections=zlib -g %S/Inputs/fib.c -o %t/fib-compress-zlib
-// RUN: %target-build-swift %s -parse-as-library -g -o %t/ElfReader
+// RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -g -o %t/ElfReader
 // RUN: %target-run %t/ElfReader %t/fib | %FileCheck %s
 // RUN: %target-run %t/ElfReader %t/fib-no-uuid | %FileCheck %s --check-prefix NOUUID
 // RUN: %target-run %t/ElfReader %t/fib-compress-gnu | %FileCheck %s --check-prefix CMPGNU

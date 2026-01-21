@@ -257,31 +257,8 @@ private struct FunctionSpecializations {
         return argOp.value
       }
     }
-    let specializedCallee = builder.createFunctionRef(originalToSpecialized[callee]!)
+    apply.replace(withCallTo: originalToSpecialized[callee]!, arguments: newArgs, context)
 
-    switch apply {
-    case let applyInst as ApplyInst:
-      let newApply = builder.createApply(function: specializedCallee, applyInst.substitutionMap, arguments: newArgs, isNonThrowing: applyInst.isNonThrowing)
-      applyInst.replace(with: newApply, context)
-    case let partialAp as PartialApplyInst:
-      let newApply = builder.createPartialApply(function: specializedCallee, substitutionMap:
-                                                partialAp.substitutionMap,
-                                                capturedArguments: newArgs,
-                                                calleeConvention: partialAp.calleeConvention,
-                                                hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
-                                                isOnStack: partialAp.isOnStack)
-      partialAp.replace(with: newApply, context)
-    case let tryApply as TryApplyInst:
-      builder.createTryApply(function: specializedCallee, tryApply.substitutionMap, arguments: newArgs,
-                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock)
-      context.erase(instruction: tryApply)
-    case let beginApply as BeginApplyInst:
-      let newApply = builder.createBeginApply(function: specializedCallee, beginApply.substitutionMap,
-                                              arguments: newArgs)
-      beginApply.replace(with: newApply, context)
-    default:
-      fatalError("unknown apply")
-    }
     // It is important to delete the dead `function_ref`. Otherwise it will still reference the original
     // function which prevents deleting it in the mandatory-allocbox-to-stack pass.
     if fri.uses.isEmpty {

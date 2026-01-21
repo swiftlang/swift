@@ -363,7 +363,7 @@ protected:
     } else {
       Expr *buildBlockResult = buildBlockVarRef.get();
       // Otherwise, it's a top-level brace and we need to synthesize
-      // a call to `buildFialBlock` if supported.
+      // a call to `buildFinalBlock` if supported.
       if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
         buildBlockResult =
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
@@ -1053,9 +1053,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
 
     case SolutionResult::Kind::TooComplex:
       reportSolutionsToSolutionCallback(salvagedResult);
-      func->diagnose(diag::expression_too_complex)
-        .highlight(func->getBodySourceRange());
-      salvagedResult.markAsDiagnosed();
+      cs.diagnoseTooComplex(func->getLoc(), salvagedResult);
       return nullptr;
     }
 

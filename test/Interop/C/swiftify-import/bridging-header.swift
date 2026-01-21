@@ -16,6 +16,9 @@ imports for TMP_DIR/test.swift:
 	_StringProcessing
 	_SwiftConcurrencyShims
 	_Concurrency
+	A
+	B
+	C
 imports for __ObjC.foo:
 imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 	__ObjC
@@ -25,21 +28,73 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<Int32>) {
-    let len = Int32(exactly: p.count)!
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<a_t>, _ x: UnsafeMutablePointer<no_module_record_t>!) {
+    let len = no_module_t(exactly: p.count)!
     return unsafe p.withUnsafeBufferPointer { _pPtr in
-      return unsafe foo(len, _pPtr.baseAddress!)
+      return unsafe foo(len, _pPtr.baseAddress!, x)
     }
 }
 ------------------------------
 
 //--- test.swift
-func test(s: Span<CInt>) {
-  foo(s)
+import A
+import B
+import C
+
+func test(s: Span<a_t>, x: UnsafeMutablePointer<no_module_record_t>) {
+  unsafe foo(s, x)
+}
+
+func test2(p: UnsafeMutablePointer<CInt>, len: CInt, y: UnsafeMutablePointer<b_t>) {
+  unsafe bar(len, p, y)
+}
+
+func test3(p: UnsafeMutablePointer<CInt>, len: CInt, z: UnsafeMutablePointer<c_t>) {
+  unsafe baz(len, p, z)
 }
 
 //--- bridging.h
 #include <ptrcheck.h>
 #include <lifetimebound.h>
 
-void foo(int len, const int * __counted_by(len) p __noescape);
+#include "no-module.h"
+#include "a.h"
+#include "c.h"
+
+struct no_module_record_t;
+void foo(no_module_t len, const a_t * __counted_by(len) p __noescape, struct no_module_record_t *x);
+
+struct b_t;
+void bar(int len, const int * __counted_by(len) p __noescape, struct b_t *y);
+
+void baz(int len, const int * __counted_by(len) p __noescape, struct c_t *z);
+
+//--- no-module.h
+typedef int no_module_t;
+struct no_module_record_t {
+  int placeholder;
+};
+
+//--- a.h
+typedef int a_t;
+
+//--- b.h
+struct b_t {
+  int placeholder;
+};
+
+//--- c.h
+struct c_t {
+  int placeholder;
+};
+
+//--- module.modulemap
+module A {
+  header "a.h"
+}
+module B {
+  header "b.h"
+}
+module C {
+  header "c.h"
+}

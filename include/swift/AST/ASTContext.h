@@ -272,6 +272,7 @@ class ASTContext final {
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
+      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
@@ -298,6 +299,7 @@ public:
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
+      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -1029,12 +1031,6 @@ public:
   /// Availability macros parsed from the command line arguments.
   const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
-  /// Test support utility for loading a platform remap file
-  /// in case an SDK is not specified to the compilation.
-  const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
-  getAuxiliaryDarwinPlatformRemapInfo(
-      clang::DarwinSDKInfo::OSEnvPair Kind) const;
-
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -1554,9 +1550,9 @@ public:
   ///
   /// This is usually the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
-  /// check for isSwiftVersionAtLeast(5).
-  bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
-    return LangOpts.isSwiftVersionAtLeast(major, minor);
+  /// check for isLanguageModeAtLeast(5).
+  bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
+    return LangOpts.isLanguageModeAtLeast(major, minor);
   }
 
   /// Check whether it's important to respect access control restrictions

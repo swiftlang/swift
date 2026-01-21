@@ -78,15 +78,14 @@ void SILVTable::updateVTableCache(const Entry &entry) {
 void SILVTable::replaceEntries(ArrayRef<Entry> newEntries) {
   auto entries = getMutableEntries();
   ASSERT(newEntries.size() <= entries.size());
-  for (unsigned i = 0; i < entries.size(); ++i) {
-    entries[i].getImplementation()->decrementRefCount();
-    if (i < newEntries.size()) {
-      entries[i] = newEntries[i];
-      entries[i].getImplementation()->incrementRefCount();
-      updateVTableCache(entries[i]);
-    } else {
-      removeFromVTableCache(entries[i]);
-    }
+  for (Entry &entry : getMutableEntries()) {
+    entry.getImplementation()->decrementRefCount();
+    removeFromVTableCache(entry);
+  }
+  for (unsigned i = 0; i < newEntries.size(); ++i) {
+    entries[i] = newEntries[i];
+    entries[i].getImplementation()->incrementRefCount();
+    updateVTableCache(entries[i]);
   }
   NumEntries = newEntries.size();
 }

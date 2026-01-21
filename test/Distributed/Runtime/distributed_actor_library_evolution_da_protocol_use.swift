@@ -1,3 +1,4 @@
+// REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: concurrency

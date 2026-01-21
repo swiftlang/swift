@@ -30,6 +30,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -206,6 +207,7 @@ public:
   IGNORED_ATTR(AllowFeatureSuppression)
   IGNORED_ATTR(PreInverseGenerics)
   IGNORED_ATTR(Safe)
+  IGNORED_ATTR(Warn)
 #undef IGNORED_ATTR
 
   void visitABIAttr(ABIAttr *attr) {
@@ -301,6 +303,32 @@ public:
           .fixItRemove(attr->getRange());
       D->getAttrs().removeAttribute(attr);
       return;
+    }
+
+    // Can't have both @_owned and @_borrwed on the same decl.
+    if (D->getAttrs().hasAttribute<OwnedAttr>()) {
+      diagnose(attr->getLocation(), diag::borrowed_and_owned,
+               ASD)
+          .fixItRemove(attr->getRange());
+      D->getAttrs().removeAttribute(attr);
+    }
+  }
+
+  void visitOwnedAttr(OwnedAttr *attr) {
+    assert(!D->hasClangNode() && "@_owned on imported declaration?");
+
+    auto *ASD = cast<AbstractStorageDecl>(D);
+
+    // Ensure it defines a 'get' for read accesses.
+    //
+    // The only known use-case for this attribute is for getters returning
+    // noncopyable types that want to override the resilient '_read' that is
+    // always generated, exposing 'get' that returns an owned value.
+    if (!ASD->getAccessor(AccessorKind::Get)) {
+      diagnose(attr->getLocation(), diag::owned_non_getter,
+               ASD)
+          .fixItRemove(attr->getRange());
+      D->getAttrs().removeAttribute(attr);
     }
   }
 
@@ -1309,7 +1337,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilFutureSwiftVersion();
+                .warnUntilFutureLanguageMode();
           }
         }
       }
@@ -1408,7 +1436,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     // Forbid stored properties marked SPI in frozen types.
     if (auto property = dyn_cast<VarDecl>(VD)) {
       if (auto NTD = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
-        if (property->isLayoutExposedToClients() && !NTD->isSPI()) {
+        if (property->isLayoutExposedToClients() == ExportedLevel::Exported && !NTD->isSPI()) {
           diagnoseAndRemoveAttr(attr,
                                 diag::spi_attribute_on_frozen_stored_properties,
                                 VD);
@@ -2201,7 +2229,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
 
     if (candidates.empty()) {
       auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      bool shouldError = ctx.isSwiftVersionAtLeast(futureVersion);
+      bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
 
       // Diagnose as an error in resilient modules regardless of language
       // version since this will break the swiftinterface. Don't diagnose
@@ -2216,7 +2244,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
                   requiredAccessScope.requiredAccessForDiagnostics(),
                   /*isForSetter=*/false, /*useDefaultAccess=*/false,
                   /*updateAttr=*/false);
-      diag.warnUntilSwiftVersionIf(!shouldError, futureVersion);
+      diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
 
       if (shouldError) {
         attr->setInvalid();
@@ -3034,7 +3062,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated,
              applicationMainKind)
-      .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
 
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated_use_attr_main)
@@ -3483,7 +3511,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::specialize_attr_only_generic_param_req,
-												 attr->isPublic());
+                         attr->isPublic());
       hadError = true;
       continue;
     }
@@ -3496,8 +3524,8 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),
                          attr->isPublic() ?
-												 diag::specialized_attr_unsupported_kind_of_req :
-												 diag::specialize_attr_unsupported_kind_of_req);
+                         diag::specialized_attr_unsupported_kind_of_req :
+                         diag::specialize_attr_unsupported_kind_of_req);
       hadError = true;
       break;
 
@@ -3505,7 +3533,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
       if (specializedReq.getSecondType()->isTypeParameter()) {
         ctx.Diags.diagnose(attr->getLocation(),
                            diag::specialize_attr_non_concrete_same_type_req,
-													 attr->isPublic());
+                           attr->isPublic());
         hadError = true;
       }
       break;
@@ -3549,7 +3577,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
     ctx.Diags.diagnose(attr->getLocation(),
                        diag::specialize_attr_missing_constraint,
                        paramTy->getName(),
-											 attr->isPublic());
+                       attr->isPublic());
   }
 }
 
@@ -3568,15 +3596,17 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
 
   if (!trailingWhereClause) {
     // Report a missing "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_missing_where_clause,
-						 attr->isPublic());
+    diagnose(attr->getLocation(),
+             diag::specialize_missing_where_clause,
+             attr->isPublic());
     return;
   }
 
   if (trailingWhereClause->getRequirements().empty()) {
     // Report an empty "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_empty_where_clause,
-						 attr->isPublic());
+    diagnose(attr->getLocation(),
+             diag::specialize_empty_where_clause,
+             attr->isPublic());
     return;
   }
 
@@ -3590,6 +3620,12 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
   }
 
   (void)attr->getSpecializedSignature(FD);
+
+  // Force resolution of interface types written in requirements here to check
+  // that generic types satisfy generic requirements, and so on.
+  WhereClauseOwner(FD, attr)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 GenericSignature
@@ -3699,7 +3735,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
 
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
-    if (Ctx.isSwiftVersionAtLeast(4,2))
+    if (Ctx.isLanguageModeAtLeast(4, 2))
       diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline,
                             VD);
     return;
@@ -5051,12 +5087,6 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
   // @_implementationOnly on types only applies to non-public types.
   if (isa<NominalTypeDecl>(D)) {
-    if (!Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-        !Ctx.LangOpts.hasFeature(Feature::CheckImplementationOnlyStrict)) {
-      diagnoseAndRemoveAttr(attr, diag::implementation_only_on_types_feature);
-      return;
-    }
-
     auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
@@ -5627,7 +5657,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     // properties of Objective-C protocols.
     auto D = diag::ownership_invalid_in_protocols;
     Diags.diagnose(attr->getLocation(), D, ownershipKind)
-        .warnUntilSwiftVersion(5)
+        .warnUntilLanguageMode(5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
@@ -6119,11 +6149,13 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   case AccessorKind::Set:
     return DescriptiveDeclKind::Setter;
   case AccessorKind::Read:
-  case AccessorKind::Read2:
     return DescriptiveDeclKind::ReadAccessor;
+  case AccessorKind::YieldingBorrow:
+    return DescriptiveDeclKind::YieldingBorrowAccessor;
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
     return DescriptiveDeclKind::ModifyAccessor;
+  case AccessorKind::YieldingMutate:
+    return DescriptiveDeclKind::YieldingMutateAccessor;
   case AccessorKind::WillSet:
     return DescriptiveDeclKind::WillSet;
   case AccessorKind::DidSet:
@@ -6153,6 +6185,8 @@ enum class AbstractFunctionDeclLookupErrorKind {
   CandidateWrongTypeContext,
   /// Lookup candidate does not have the requested accessor.
   CandidateMissingAccessor,
+  /// Candidate accessor type is not supported
+  CandidateUnsupportedAccessor,
   /// Lookup candidate is a protocol requirement.
   CandidateProtocolRequirement,
   /// Lookup candidate could be resolved to an `AbstractFunctionDecl`.
@@ -6228,6 +6262,21 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
       // candidate. Otherwise, use the getter by default.
       auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
       candidate = asd->getOpaqueAccessor(accessorKind);
+      // A `.borrow`/`.mutate` specifier also matches a yielding borrow/mutate
+      // If we find a yielding version, patch up the provided funcNameWithLoc
+      if (!candidate) {
+        if (accessorKind == AccessorKind::Borrow) {
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingBorrow);
+          if (candidate) {
+            maybeAccessorKind = AccessorKind::YieldingBorrow;
+          }
+        } else if (accessorKind == AccessorKind::Mutate) {
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingMutate);
+          if (candidate) {
+            maybeAccessorKind = AccessorKind::YieldingMutate;
+          }
+        }
+      }
       // Error if candidate is missing the requested accessor.
       if (!candidate) {
         invalidCandidates.push_back(
@@ -6240,6 +6289,15 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     else if (maybeAccessorKind.has_value()) {
       invalidCandidates.push_back(
           {decl, LookupErrorKind::CandidateMissingAccessor});
+      continue;
+    }
+    // Error if we're looking for an accessor and
+    // the matching accessor isn't a supported kind.
+    if (maybeAccessorKind.has_value() &&
+        maybeAccessorKind != AccessorKind::Get &&
+        maybeAccessorKind != AccessorKind::Set) {
+      invalidCandidates.push_back(
+          {decl, LookupErrorKind::CandidateUnsupportedAccessor});
       continue;
     }
     // Error if candidate is not a `AbstractFunctionDecl`.
@@ -6307,6 +6365,13 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
         diags.diagnose(invalidCandidate,
                        diag::autodiff_attr_original_decl_missing_accessor,
                        invalidCandidate, accessorDeclKind);
+        break;
+      }
+      case AbstractFunctionDeclLookupErrorKind::CandidateUnsupportedAccessor: {
+        auto accessorKind = maybeAccessorKind.value_or(AccessorKind::Get);
+        diags.diagnose(invalidCandidate,
+                       diag::derivative_attr_unsupported_accessor_kind,
+                       getAccessorDescriptiveDeclKind(accessorKind));
         break;
       }
       case AbstractFunctionDeclLookupErrorKind::CandidateProtocolRequirement:
@@ -7133,19 +7198,6 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     derivativeTypeCtx = derivative->getParent();
   assert(derivativeTypeCtx);
 
-  // Diagnose unsupported original accessor kinds.
-  // Currently, only getters and setters are supported.
-  if (originalName.AccessorKind.has_value()) {
-    if (*originalName.AccessorKind != AccessorKind::Get &&
-        *originalName.AccessorKind != AccessorKind::Set) {
-      attr->setInvalid();
-      diags.diagnose(
-          originalName.Loc, diag::derivative_attr_unsupported_accessor_kind,
-          getAccessorDescriptiveDeclKind(*originalName.AccessorKind));
-      return true;
-    }
-  }
-
   // Look up original function.
   auto *originalAFD = findAutoDiffOriginalFunctionDecl(
       attr, baseType, originalName, derivativeTypeCtx, lookupOptions,
@@ -7887,10 +7939,9 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
     auto value = cast<ValueDecl>(D);
     ActorIsolation isolation = getActorIsolation(value);
     if (isolation.isActorIsolated()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::sendable_isolated_sync_function,
-          isolation, value)
-        .warnUntilSwiftVersion(6);
+      diagnoseAndRemoveAttr(attr, diag::sendable_isolated_sync_function,
+                            isolation, value)
+          .warnUntilLanguageMode(6);
     }
   }
   // Prevent Sendable Attr from being added to methods of non-sendable types
@@ -7974,13 +8025,13 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
           if (var->hasAttachedPropertyWrapper()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-              .warnUntilSwiftVersionIf(attr->isImplicit(), 6)
-              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+                .warnUntilLanguageModeIf(attr->isImplicit(), 6)
+                .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-              .warnUntilSwiftVersion(6)
-              .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+                .warnUntilLanguageMode(6)
+                .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
@@ -8060,7 +8111,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (!ctor->hasAsync()) {
           // the isolation for a synchronous init cannot be `nonisolated`.
           diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
-            .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           return;
         }
       }
@@ -8186,7 +8237,7 @@ void AttributeChecker::visitInheritActorContextAttr(
     diagnose(attr->getLocation(),
              diag::inherit_actor_context_only_on_sending_or_Sendable_params,
              attr)
-        .warnUntilFutureSwiftVersion();
+        .warnUntilFutureLanguageMode();
   }
 
   // Either `async` or `@isolated(any)`.
@@ -8195,7 +8246,7 @@ void AttributeChecker::visitInheritActorContextAttr(
         attr,
         diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
         attr)
-        .warnUntilFutureSwiftVersion();
+        .warnUntilFutureLanguageMode();
   }
 }
 
@@ -8279,7 +8330,7 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
     bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
         .str() == "_Concurrency";
     auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
-    diag.warnUntilSwiftVersion(6);
+    diag.warnUntilLanguageMode(6);
     diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
     replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
@@ -8662,7 +8713,7 @@ public:
                    diag::isolated_parameter_closure_combined_global_actor_attr,
                    param->getName())
               .fixItRemove(attr->getRangeWithAt())
-              .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           attr->setInvalid();
           break; // don't need to complain about this more than once.
         }

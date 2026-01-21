@@ -27,7 +27,9 @@ import ArrayOfPOD
 import ArrayOfRef
 import ArrayRemoveAll
 import ArraySetElement
+import ArraySliceTests
 import ArraySubscript
+import ArrayTests
 import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
@@ -53,6 +55,7 @@ import Chars
 import ClassArrayGetter
 import CodableTest
 import Combos
+import ContiguousArrayTests
 import CountAlgo
 import CreateObjects
 // rdar://128520766
@@ -75,6 +78,7 @@ import DictionaryBridgeToObjC
 import DictionaryCompactMapValues
 import DictionaryCopy
 import DictionaryGroup
+import DictionaryIdentical
 import DictionaryKeysContains
 import DictionaryLiteralTest
 import DictionaryOfAnyHashableStrings
@@ -179,6 +183,7 @@ import RomanNumbers
 import SIMDRandomMask
 import SIMDReduceInteger
 import SequenceAlgos
+import SetIdentical
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -229,7 +234,9 @@ register(ArrayOfPOD.benchmarks)
 register(ArrayOfRef.benchmarks)
 register(ArrayRemoveAll.benchmarks)
 register(ArraySetElement.benchmarks)
+register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
+register(ArrayTests.benchmarks)
 register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
@@ -254,6 +261,7 @@ register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
+register(ContiguousArrayTests.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(CreateObjects.benchmarks)
@@ -277,6 +285,7 @@ register(DictionaryBridgeToObjC.benchmarks)
 register(DictionaryCompactMapValues.benchmarks)
 register(DictionaryCopy.benchmarks)
 register(DictionaryGroup.benchmarks)
+register(DictionaryIdentical.benchmarks)
 register(DictionaryKeysContains.benchmarks)
 register(DictionaryLiteralTest.benchmarks)
 register(DictionaryOfAnyHashableStrings.benchmarks)
@@ -382,6 +391,7 @@ register(RomanNumbers.benchmarks)
 register(SIMDRandomMask.benchmarks)
 register(SIMDReduceInteger.benchmarks)
 register(SequenceAlgos.benchmarks)
+register(SetIdentical.benchmarks)
 register(SetTests.benchmarks)
 register(SevenBoom.benchmarks)
 register(Sim2DArray.benchmarks)

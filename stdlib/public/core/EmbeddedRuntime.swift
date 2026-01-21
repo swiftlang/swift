@@ -67,7 +67,7 @@ public struct ClassMetadata {
     _ContiguousArrayStorage can be promoted to __StaticArrayStorage with the HeapObject header emitted directly by the
     compiler and refcount field directly set to immortalRefCount | doNotFreeBit (see irgen::emitConstantObject).
 
-  Tne immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
+  The immortalRefCount is additionally also used as a placeholder value for objects (heap-allocated or stack-allocated)
   when they're currently inside their deinit(). This is done to prevent further retains and releases inside deinit from
   triggering deinitialization again, without the need to reserve another bit for this purpose. Retains and releases in
   deinit() are allowed, as long as they are balanced at the end, i.e. the object is not escaped (user's responsibility)
@@ -150,7 +150,7 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
 }
 
 @c
-public func swift_coroFrameAlloc(_ size: Int, _ type: UInt) -> UnsafeMutableRawPointer? {
+public func swift_coroFrameAlloc(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
   return unsafe alignedAlloc(
     size: size,
     alignment: _swift_MinAllocationAlignment)
@@ -432,7 +432,7 @@ func isValidPointerForNativeRetain(object: Builtin.RawPointer) -> Bool {
   #if _pointerBitWidth(_64)
   if unsafe (objectBits & HeapObject.immortalObjectPointerBit) != 0 { return false }
   #endif
-  
+
   return true
 }
 
@@ -650,20 +650,6 @@ fileprivate func storeRelaxed(_ atomic: UnsafeMutablePointer<Int>, newValue: Int
   Builtin.atomicstore_monotonic_Word(atomic._rawValue, newValue._builtinWordValue)
 }
 
-/// Exclusivity checking
-
-@c
-public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
-  // TODO: Add actual exclusivity checking.
-}
-
-@c
-public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
-  // TODO: Add actual exclusivity checking.
-}
-
-
-
 // Once
 
 @c
@@ -749,4 +735,20 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
   unsafe print(message)
+}
+
+// CXX Exception Personality
+
+public typealias _Unwind_Action = CInt
+public typealias _Unwind_Reason_Code = CInt
+
+@c @used
+public func _swift_exceptionPersonality(
+  version: CInt,
+  actions: _Unwind_Action,
+  exceptionClass: UInt64,
+  exceptionObject: UnsafeMutableRawPointer,
+  context: UnsafeMutableRawPointer
+) -> _Unwind_Reason_Code {
+  fatalError("C++ exception handling detected but the Embedded Swift runtime does not support exceptions")
 }

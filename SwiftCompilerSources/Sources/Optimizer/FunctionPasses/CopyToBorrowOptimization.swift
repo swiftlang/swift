@@ -53,27 +53,37 @@ let copyToBorrowOptimization = FunctionPass(name: "copy-to-borrow-optimization")
     return
   }
 
+  var changed = false
+
   for inst in function.instructions {
     switch inst {
     case let load as LoadInst:
-      optimize(load: load, context)
+      if optimize(load: load, context) {
+        changed = true
+      }
     case let copy as CopyValueInst:
-      optimize(copy: copy, context)
+      if optimize(copy: copy, context) {
+        changed = true
+      }
     default:
       break
     }
   }
+
+  if changed {
+    updateBorrowedFrom(in: function, context)
+  }
 }
 
-private func optimize(load: LoadInst, _ context: FunctionPassContext) {
+private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
   if load.loadOwnership != .copy {
-    return
+    return false
   }
 
   var collectedUses = Uses(context)
   defer { collectedUses.deinitialize() }
   if !collectedUses.collectUses(of: load) {
-    return
+    return false
   }
 
   if mayWrite(toAddressOf: load,
@@ -81,21 +91,22 @@ private func optimize(load: LoadInst, _ context: FunctionPassContext) {
               usersInDeadEndBlocks: collectedUses.usersInDeadEndBlocks,
               context)
   {
-    return
+    return false
   }
 
   load.replaceWithLoadBorrow(collectedUses: collectedUses)
+  return true
 }
 
-private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) {
+private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bool {
   if copy.fromValue.ownership != .guaranteed {
-    return
+    return false
   }
 
   var collectedUses = Uses(context)
   defer { collectedUses.deinitialize() }
   if !collectedUses.collectUses(of: copy) {
-    return
+    return false
   }
 
   var liverange = InstructionRange(begin: copy, context)
@@ -104,10 +115,11 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) {
   liverange.insert(contentsOf: collectedUses.usersInDeadEndBlocks)
 
   if !liverange.isFullyContainedIn(borrowScopeOf: copy.fromValue.lookThroughForwardingInstructions) {
-    return
+    return false
   }
 
   remove(copy: copy, collectedUses: collectedUses, liverange: liverange)
+  return true
 }
 
 private struct Uses {

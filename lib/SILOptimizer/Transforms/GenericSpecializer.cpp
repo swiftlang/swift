@@ -107,17 +107,6 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
       if (!Callee)
         continue;
 
-      // TODO: Enable GenericSpecializer for borrow accessors in OSSA
-      // Currently disabled since GenericSpecializer generates store_borrow to a
-      // temporary stack location and returns a projection from the
-      // store_borrow. This does not work for borrow accessors that return the
-      // projection from within the store_borrow scope.
-      if (F.hasOwnership() &&
-          (Callee->getConventions().hasAddressResult() ||
-           Callee->getConventions().hasGuaranteedResult())) {
-        continue;
-      }
-
       FunctionBuilder.getModule().performOnceForPrespecializedImportedExtensions(
         [&FunctionBuilder](AbstractFunctionDecl *pre) {
         transferSpecializeAttributeTargets(FunctionBuilder.getModule(), FunctionBuilder,
@@ -172,6 +161,19 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
 
         recursivelyDeleteTriviallyDeadInstructions(AI, true);
         Changed = true;
+      }
+      // Specialization might create new references to conformances.
+      // A specialized init_existential_ref might now refer to a concrete
+      // conformance.
+      // In Embedded swift protocol witness tables are emitted lazily. Therefore
+      // deserialization of the sil_witness_table becomes mandatory if it is
+      // referenced because we can't rely on it being defined in the originating
+      // module.
+      if (isMandatory &&
+          FunctionBuilder.getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        for (SILFunction *NewF : reverse(NewFunctions)) {
+          FunctionBuilder.getModule().linkFunction(NewF, SILModule::LinkingMode::LinkNormal);
+        }
       }
 
       if (auto *sft = dyn_cast<SILFunctionTransform>(transform)) {

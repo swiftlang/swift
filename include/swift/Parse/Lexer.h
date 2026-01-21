@@ -39,7 +39,6 @@ namespace swift {
   template<typename ...T> struct Diag;
 
 enum class CommentRetentionMode {
-  None,
   AttachToNextToken,
   ReturnAsTokens,
 };
@@ -185,7 +184,7 @@ public:
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
-      CommentRetentionMode RetainComments = CommentRetentionMode::None);
+      CommentRetentionMode RetainComments = CommentRetentionMode::AttachToNextToken);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,

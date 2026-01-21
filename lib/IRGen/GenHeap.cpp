@@ -423,12 +423,11 @@ void irgen::emitDeallocatePartialClassInstance(IRGenFunction &IGF,
 
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createDtorFn(IRGenModule &IGM,
-                                    const HeapLayout &layout) {
-  llvm::Function *fn =
-    llvm::Function::Create(IGM.DeallocatingDtorTy,
-                           llvm::Function::PrivateLinkage,
-                           "objectdestroy", &IGM.Module);
+static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
+                                    const llvm::Twine &layoutName) {
+  llvm::Function *fn = llvm::Function::Create(
+      IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
+      "__swift_" + layoutName + "_destructor", &IGM.Module);
   auto attrs = IGM.constructInitialAttributes();
   IGM.addSwiftSelfAttributes(attrs, 0);
   fn->setAttributes(attrs);
@@ -556,11 +555,12 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
 
 llvm::Constant *
 HeapLayout::getPrivateMetadata(IRGenModule &IGM,
-                               llvm::Constant *captureDescriptor) const {
+                               llvm::Constant *captureDescriptor,
+                               const llvm::Twine &name) const {
   if (!privateMetadata)
-    privateMetadata = buildPrivateMetadata(IGM, *this, createDtorFn(IGM, *this),
-                                           captureDescriptor,
-                                           MetadataKind::HeapLocalVariable);
+    privateMetadata = buildPrivateMetadata(
+        IGM, *this, createDtorFn(IGM, *this, name), captureDescriptor,
+        MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
 
@@ -573,7 +573,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
     return IGM.RefCountedNull;
   }
 
-  llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
+  llvm::Value *metadata =
+      layout.getPrivateMetadata(IGM, captureDescriptor, name);
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -1000,7 +1001,7 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
   FunctionPointer function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getNativeStrongRetainDirectFunctionPointer();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongRetainFunctionPointer();
@@ -1265,7 +1266,7 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getNativeStrongReleaseDirectFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getNativeStrongReleaseFn();
@@ -1373,7 +1374,7 @@ void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getBridgeObjectStrongRetainDirectFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getBridgeObjectStrongRetainFn();
@@ -1387,7 +1388,7 @@ void IRGenFunction::emitBridgeStrongRelease(llvm::Value *value,
   llvm::Constant *function;
   if (atomicity == Atomicity::Atomic &&
       IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRuntime)
+      getOptions().EnableSwiftDirectRetainRelease)
     function = IGM.getBridgeObjectStrongReleaseDirectFn();
   else if (atomicity == Atomicity::Atomic)
     function = IGM.getBridgeObjectStrongReleaseFn();

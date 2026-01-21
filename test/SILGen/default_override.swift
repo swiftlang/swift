@@ -52,7 +52,7 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseC9openFieldxvyTwd'
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s16default_override8OpenBaseC9openFieldxvxTwd
@@ -83,7 +83,7 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseC9openFieldxvxTwd'
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
@@ -121,7 +121,7 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseCyxqd___AA0C0OmtcluiyTwd'
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd
@@ -157,39 +157,39 @@ open class OpenBase<T> {
 // CHECK:         abort_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd'
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public var publicField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public subscript<U>(_ u: U, _ _: Public.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   var internalField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   subscript<U>(_ u: U, _ _: Internal.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
@@ -197,50 +197,50 @@ open class OpenBase<T> {
 
 public class PublicBase<T> {
   open var openField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   open subscript<U>(_ u: U, _ _: Open.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public var publicField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public subscript<U>(_ u: U, _ _: Public.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   var internalField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   subscript<U>(_ u: U, _ _: Internal.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
@@ -248,76 +248,76 @@ public class PublicBase<T> {
 
 class InternalBase<T> {
   open var openField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   open subscript<U>(_ u: U, _ _: Open.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public var publicField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   public subscript<U>(_ u: U, _ _: Public.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   var internalField: T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
   subscript<U>(_ u: U, _ _: Internal.Type) -> T {
-    read {
+    yielding borrow {
       Builtin.int_trap()
     }
-    modify {
+    yielding mutate {
       Builtin.int_trap()
     }
   }
 }
 
 // CHECK-LABEL: sil_default_override_table OpenBase {
-// CHECK-NEXT:    #OpenBase.openField!read2
+// CHECK-NEXT:    #OpenBase.openField!yielding_borrow
 // CHECK-SAME:        #OpenBase.openField!read
 // CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseC9openFieldxvyTwd
-// CHECK-NEXT:    #OpenBase.openField!modify2
+// CHECK-NEXT:    #OpenBase.openField!yielding_mutate
 // CHECK-SAME:        #OpenBase.openField!modify
 // CHECK-SAME:        <T> (OpenBase<T>) -> () -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseC9openFieldxvxTwd
-// CHECK-NEXT:    #OpenBase.subscript!read2
+// CHECK-NEXT:    #OpenBase.subscript!yielding_borrow
 // CHECK-SAME:        #OpenBase.subscript!read
 // CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluiyTwd
-// CHECK-NEXT:    #OpenBase.subscript!modify2
+// CHECK-NEXT:    #OpenBase.subscript!yielding_mutate
 // CHECK-SAME:        #OpenBase.subscript!modify
 // CHECK-SAME:        <T><U> (OpenBase<T>) -> (U, Open.Type) -> ()
 // CHECK-SAME:        @$s16default_override8OpenBaseCyxqd___AA0C0OmtcluixTwd
-// CHECK-NOT:     #OpenBase.publicField!read2
-// CHECK-NOT:     #OpenBase.publicField!modify2
-// CHECK-NOT:     #OpenBase.subscript!read2: #OpenBase.subscript!read: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
-// CHECK-NOT:     #OpenBase.subscript!modify2: #OpenBase.subscript!modify: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
+// CHECK-NOT:     #OpenBase.publicField!yielding_borrow
+// CHECK-NOT:     #OpenBase.publicField!yielding_mutate
+// CHECK-NOT:     #OpenBase.subscript!yielding_borrow: #OpenBase.subscript!read: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
+// CHECK-NOT:     #OpenBase.subscript!yielding_mutate: #OpenBase.subscript!modify: <T><U> (OpenBase<T>) -> (U, Public.Type) -> ()
 // CHECK-NEXT:  }
 
 // CHECK-NOT: sil_default_override_table PublicBase {

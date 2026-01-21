@@ -74,12 +74,14 @@ add_library(swiftCore
   EmptyCollection.swift
   EnumeratedSequence.swift
   Equatable.swift
+  Exclusivity.swift
   ErrorType.swift
   ExistentialCollection.swift
   Filter.swift
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
+  FloatingPointFromString.swift
   FloatingPointToString.swift
   Hashable.swift
   AnyHashable.swift # ORDER DEPENDENCY

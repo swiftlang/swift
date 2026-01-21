@@ -394,10 +394,6 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
                                     preparedOverload);
   }
 
-  bool shouldUnwrapVanishingTuples() const {
-    return false;
-  }
-
   bool shouldDesugarTypeAliases() const {
     return true;
   }
@@ -1496,8 +1492,15 @@ void ConstraintSystem::openGenericRequirement(
   switch (kind) {
   case RequirementKind::Conformance: {
     auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should
-    // skip.
+    // Determine whether this is the protocol 'Self' constraint we should skip.
+    //
+    // NOTE: At first glance it seems like this is just an optimization to avoid
+    // adding a redundant constraint, but it is in fact load bearing for
+    // DistributedActor since we can form a conformance to Actor in
+    // GetDistributedActorAsActorConformanceRequest despite the fact that
+    // DistributedActor does not require Actor conformance (although conforming
+    // types are guaranteed to have the witnesses). So a conformance check in
+    // that case would fail.
     if (skipProtocolSelfConstraint && protoDecl == outerDC &&
         protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
       return;
@@ -2439,33 +2442,58 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     // don't which at the moment, so let's allow its type to be l-value.
     auto memberTy = createTypeVariable(keyPathLoc, TVO_CanBindToLValue |
                                                        TVO_CanBindToNoEscape);
-    // Attempt to lookup a member with a give name in the root type and
-    // assign result to the leaf type of the keypath.
-    bool isSubscriptRef = locator->isSubscriptMemberRef();
-    DeclNameRef memberName = isSubscriptRef
-                           ? DeclNameRef::createSubscript()
-                           // FIXME: Should propagate name-as-written through.
-                           : DeclNameRef(choice.getName());
 
-    // Check the current depth of applied dynamic member lookups, if we've
-    // exceeded the limit then record a fix and set a hole for the member.
-    unsigned lookupDepth = [&]() {
-      auto path = keyPathLoc->getPath();
-      auto iter = path.begin();
-      (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
-      return path.end() - iter;
-    }();
-    if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
-      (void)recordFix(TooManyDynamicMemberLookups::create(
-          *this, DeclNameRef(choice.getName()), locator));
-      recordTypeVariablesAsHoles(memberTy);
-    } else {
-      addValueMemberConstraint(
-          LValueType::get(rootTy), memberName, memberTy, useDC,
-          isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
-                         : FunctionRefInfo::unappliedBaseName(),
-          /*outerAlternatives=*/{}, keyPathLoc);
-    }
+    bool isSubscriptRef = locator->isSubscriptMemberRef();
+    auto addMemberConstraint = [&]() {
+      // Attempt to lookup a member with a give name in the root type and
+      // assign result to the leaf type of the keypath.
+      DeclNameRef memberName =
+          isSubscriptRef ? DeclNameRef::createSubscript()
+                         // FIXME: Should propagate name-as-written through.
+                         : DeclNameRef(choice.getName());
+
+      // Check the current depth of applied dynamic member lookups, if we've
+      // exceeded the limit then record a fix and set a hole for the member.
+      unsigned lookupDepth = [&]() {
+        auto path = keyPathLoc->getPath();
+        auto iter = path.begin();
+        (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
+        return path.end() - iter;
+      }();
+      if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
+        (void)recordFix(TooManyDynamicMemberLookups::create(
+            *this, DeclNameRef(choice.getName()), locator));
+        recordTypeVariablesAsHoles(memberTy);
+      } else {
+        addValueMemberConstraint(
+            LValueType::get(rootTy), memberName, memberTy, useDC,
+            isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
+                           : FunctionRefInfo::unappliedBaseName(),
+            /*outerAlternatives=*/{}, keyPathLoc);
+      }
+    };
+
+    // If we're doing a subscript lookup and have a dynamic member base we need
+    // to add the applicable function first since solving the member constraint
+    // requires the constraint to be available for recursive cases since it may
+    // retire it. We can't yet do this in the general case since the simplifying
+    // of the applicable fn in CSGen is currently load-bearing for existential
+    // opening.
+    // FIXME: Once existential opening is no longer sensitive to solving
+    // order, we ought to be able to just always record the applicable fn as
+    // an unsolved constraint before the member.
+    auto delayMemberConstraint =
+        isSubscriptRef && simplifyType(rootTy)
+                              ->getRValueType()
+                              ->getMetatypeInstanceType()
+                              ->eraseDynamicSelfType()
+                              ->hasDynamicMemberLookupAttribute();
+    if (!delayMemberConstraint)
+      addMemberConstraint();
+    SWIFT_DEFER {
+      if (delayMemberConstraint)
+        addMemberConstraint();
+    };
 
     // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
@@ -3098,7 +3126,7 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
           // method without any applications at all, which would get
           // miscompiled into a function with undefined behavior. Warn for
           // source compatibility.
-          bool isWarning = !getASTContext().isSwiftVersionAtLeast(5);
+          bool isWarning = !getASTContext().isLanguageModeAtLeast(5);
           (void)recordFix(
               AllowInvalidPartialApplication::create(isWarning, *this, locator));
         } else if (level == 1) {

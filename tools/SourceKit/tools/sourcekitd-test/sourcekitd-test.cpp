@@ -1616,15 +1616,13 @@ static void getSemanticInfoImpl(sourcekitd_variant_t Info) {
 
 static void getSemanticInfoImplAfterDocUpdate(sourcekitd_variant_t EditOrOpen,
                                               sourcekitd_variant_t DocUpdate) {
+  // FIXME: currently we only return annotations once, so depending on thread
+  // ordering, the open/edit or update may contain them. Really we should
+  // switch everything to pull based to remove races like this.
   if (sourcekitd_variant_dictionary_get_uid(EditOrOpen, KeyDiagnosticStage) ==
-      SemaDiagnosticStage) {
-    // FIXME: currently we only return annotations once, so if the original edit
-    // or open request was slow enough, it may "take" the annotations. If that
-    // is fixed, we can skip checking the diagnostic stage and always use the
-    // DocUpdate variant.
-    assert(sourcekitd_variant_get_type(sourcekitd_variant_dictionary_get_value(
-               DocUpdate, KeyAnnotations)) == SOURCEKITD_VARIANT_TYPE_NULL);
-
+          SemaDiagnosticStage &&
+      sourcekitd_variant_get_type(sourcekitd_variant_dictionary_get_value(
+          DocUpdate, KeyAnnotations)) == SOURCEKITD_VARIANT_TYPE_NULL) {
     getSemanticInfoImpl(EditOrOpen);
   } else {
     getSemanticInfoImpl(DocUpdate);

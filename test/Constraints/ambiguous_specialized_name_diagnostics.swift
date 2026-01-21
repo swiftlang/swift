@@ -38,10 +38,10 @@ import A
 import B
 
 func test() {
-  _ = S<Int>(t: 42) // expected-error {{ambiguous use of 'init(t:)'}}
+  _ = S<Int>(t: 42) // expected-error {{ambiguous use of 'S'}}
 
-  S<Int>(t: 42).test() // expected-error {{ambiguous use of 'init(t:)'}}
+  S<Int>(t: 42).test() // expected-error {{ambiguous use of 'S'}}
 
   S<Int>.staticFn()
-  // expected-error@-1 {{ambiguous use of 'staticFn()'}}
+  // expected-error@-1 {{ambiguous use of 'S'}}
 }

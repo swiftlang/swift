@@ -212,6 +212,12 @@ public:
     const_cast<Pattern *>(this)->forEachNode(f2);
   }
 
+  /// Return true if this pattern is a top-level refutable pattern. This avoids
+  /// recursing into non-semantic patterns and things like tuples. This is
+  /// unlikely to be the correct thing to check in general, `isRefutablePattern`
+  /// includes checks for sub-patterns.
+  bool isSingleRefutablePattern() const;
+
   /// Return true if this pattern (or a subpattern) is refutable.
   bool isRefutablePattern() const;
 

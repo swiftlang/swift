@@ -19,47 +19,47 @@
 
 /// Public import or non-resilient modules
 // RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -swift-version 5 -enable-library-evolution -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-public.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-public.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-internal.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
 
 /// Foundation is imported from a different file
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-not-imported-fileA.swift \
 // RUN:   %t/inlinable-not-imported-fileB.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
 // RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -swift-version 5 -enable-library-evolution -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-not-imported-fileA.swift \
 // RUN:   %t/inlinable-not-imported-fileB.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
 
 /// Foundation is imported via a transitive dependency
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-imported-transitive.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
 
 /// Any non-inlinable uses
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/non-inlinable-public.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/non-inlinable-ioi.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/non-inlinable-internal.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/non-inlinable-not-imported-fileA.swift \
 // RUN:   %t/non-inlinable-not-imported-fileB.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -module-name main -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   %t/non-inlinable-not-imported-fileA.swift \
 // RUN:   %t/non-inlinable-not-imported-fileB.swift > %t/main.sil
@@ -69,16 +69,16 @@
 // CHECK-NOT-OPTIMIZED-NOT: $NSError
 
 /// Implementation-only import
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   %t/inlinable-ioi.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-NOT-OPTIMIZED --input-file %t/main.sil %s
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   %t/inlinable-ioi.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-NOT-OPTIMIZED --input-file %t/main.sil %s
 
 /// Internal import from resilient module
-// RUN: %target-swift-frontend -emit-module -emit-sil -I%t \
+// RUN: %target-swift-frontend -emit-module -emit-sil -I%t -Xllvm -sil-disable-pass=simplify-destroy_value \
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   %t/inlinable-internal.swift > %t/main.sil
 // RUN: %FileCheck --check-prefix CHECK-NOT-OPTIMIZED --input-file %t/main.sil %s

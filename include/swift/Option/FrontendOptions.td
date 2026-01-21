@@ -295,6 +295,9 @@ def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
 def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
   HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
 
+def dependency_scan_remarks : Flag<["-"], "Rdependency-scan">,
+  HelpText<"Emit remarks for various steps taken by the dependency scanner.">;
+
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
@@ -1250,7 +1253,7 @@ def disable_callee_allocated_coro_abi : Flag<["-"], "disable-callee-allocated-co
 def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-annotation">,
   HelpText<"Enable cond_fail message annotation. Will serialize a .o.yaml file per .o file.">;
 
-def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
+def disable_cond_fail_message_annotation : Flag<["-"], "disable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
 
 def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
@@ -1580,10 +1583,6 @@ def scanner_output_dir: Separate<["-"], "scanner-output-dir">,
 def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
   HelpText<"Write generated output from scanner for debugging purpose">,
   Flags<[HelpHidden]>;
-
-def platform_availability_inheritance_map_path
-  : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,
-    HelpText<"Path of the platform inheritance platform map">;
 
 def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
   HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;

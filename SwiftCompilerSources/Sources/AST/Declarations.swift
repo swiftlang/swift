@@ -26,7 +26,7 @@ public class Decl: CustomStringConvertible, Hashable {
   /// The parent DeclContext.
   final public var parentDeclContext: DeclContext? {
     if let decl = bridged.getParent().decl {
-      return decl as! DeclContext
+      return (decl as! DeclContext)
     }
     if let bridgedDeclContext = BridgedDeclContext(bridged: bridged.getDeclContext()) {
       // A DeclContext which is not a Decl.
@@ -128,10 +128,13 @@ final public class ClassDecl: NominalTypeDecl {
   final public var destructor: DestructorDecl {
     bridged.Class_getDestructor().getAs(DestructorDecl.self)
   }
+
+  public var isForeign: Bool { bridged.Class_isForeign() }
 }
 
 final public class ProtocolDecl: NominalTypeDecl {
   public var requiresClass: Bool { bridged.ProtocolDecl_requiresClass() }
+  public var isMarkerProtocol: Bool { bridged.ProtocolDecl_isMarkerProtocol() }
 }
 
 final public class BuiltinTupleDecl: NominalTypeDecl {}
@@ -179,10 +182,12 @@ final public class ParamDecl: VarDecl {
 final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 
 public class AbstractFunctionDecl: ValueDecl, GenericContext {
-  public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
+  final public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
 }
 
-final public class ConstructorDecl: AbstractFunctionDecl {}
+final public class ConstructorDecl: AbstractFunctionDecl {
+  public var isInheritable: Bool { bridged.Constructor_isInheritable() }
+}
 
 final public class DestructorDecl: AbstractFunctionDecl {
   final public var isIsolated: Bool { bridged.Destructor_isIsolated() }
@@ -198,6 +203,7 @@ final public class EnumElementDecl: ValueDecl {
   public var hasAssociatedValues: Bool { bridged.EnumElementDecl_hasAssociatedValues() }
   public var parameterList: ParameterList { ParameterList(bridged: bridged.EnumElementDecl_getParameterList()) }
   public var name: StringRef { StringRef(bridged: bridged.EnumElementDecl_getNameStr()) }
+  public var parentEnum: EnumDecl { self.parentDeclContext as! EnumDecl }
 
   public static func create(
     declContext: DeclContext,

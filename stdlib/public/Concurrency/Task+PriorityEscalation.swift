@@ -101,11 +101,33 @@ extension UnsafeCurrentTask {
 /// - Parameters:
 ///   - operation: the operation during which to listen for priority escalation
 ///   - handler: handler to invoke, concurrently to `operation`,
-///              when priority escalation happens
+///              when priority escalation happens.
+///              The first argument is the old priority (before escalation),
+///              and the second argument is the new escalated priority.
 /// - Returns: the value returned by `operation`
 /// - Throws: when the `operation` throws an error
+@_alwaysEmitIntoClient
 @available(SwiftStdlib 6.2, *)
-public func withTaskPriorityEscalationHandler<T, E>(
+public nonisolated(nonsending) func withTaskPriorityEscalationHandler<T, E>(
+  operation: nonisolated(nonsending)  () async throws(E) -> T,
+  onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void
+) async throws(E) -> T {
+  return try await __withTaskPriorityEscalationHandler0(
+    operation: operation,
+    onPriorityEscalated: {
+      handler(TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
+    })
+}
+
+@available(SwiftStdlib 6.2, *)
+@abi(
+  func withTaskPriorityEscalationHandler<T, E>(
+    operation: () async throws(E) -> T,
+    onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void,
+    isolation: isolated (any Actor)?
+  ) async throws(E) -> T
+)
+public func _isolatedParameter_withTaskPriorityEscalationHandler<T, E>(
   operation: () async throws(E) -> T,
   onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void,
   isolation: isolated (any Actor)? = #isolation
@@ -120,16 +142,34 @@ public func withTaskPriorityEscalationHandler<T, E>(
 // Method necessary in order to avoid the handler0 to be destroyed too eagerly.
 @available(SwiftStdlib 6.2, *)
 @_alwaysEmitIntoClient
-func __withTaskPriorityEscalationHandler0<T, E>(
-  operation: () async throws(E) -> T,
-  onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void,
-  isolation: isolated (any Actor)? = #isolation
+nonisolated(nonsending) func __withTaskPriorityEscalationHandler0<T, E>(
+  operation: nonisolated(nonsending) () async throws(E) -> T,
+  onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void
 ) async throws(E) -> T {
+#if $BuiltinConcurrencyStackNesting
   let record =
     unsafe Builtin.taskAddPriorityEscalationHandler(handler: handler0)
   defer {
     unsafe Builtin.taskRemovePriorityEscalationHandler(record: record)
   }
+#else
+  let record = unsafe _taskAddPriorityEscalationHandler(handler: handler0)
+  defer { unsafe _taskRemovePriorityEscalationHandler(record: record) }
+#endif
 
   return try await operation()
 }
+
+@usableFromInline
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_addPriorityEscalationHandler")
+func _taskAddPriorityEscalationHandler(
+  handler: (/* oldPriority: */UInt8, /* newPriority: */UInt8) -> Void
+) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_removePriorityEscalationHandler")
+func _taskRemovePriorityEscalationHandler(
+  record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+)

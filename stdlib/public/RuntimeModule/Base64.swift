@@ -119,6 +119,7 @@ fileprivate func reverse(at char: UTF8.CodeUnit) -> UInt8? {
 }
 
 @_spi(Base64)
+@available(Backtracing 6.2, *)
 public struct Base64Encoder<S: Sequence>: Sequence
   where S.Element == UInt8
 {
@@ -214,6 +215,7 @@ public struct Base64Encoder<S: Sequence>: Sequence
 }
 
 @_spi(Base64)
+@available(Backtracing 6.2, *)
 public struct Base64Decoder<S: Sequence>: Sequence
   where S.Element == UTF8.CodeUnit
 {

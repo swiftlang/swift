@@ -27,11 +27,14 @@
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
+#include "swift/Basic/WarningGroupBehavior.h"
 
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #endif
+
+#include <utility>
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -83,6 +86,7 @@ enum class RequirementReprKind : unsigned;
 }
 
 struct BridgedASTType;
+struct BridgedASTTypeArray;
 class BridgedCanType;
 class BridgedASTContext;
 class BridgedLangOptions;
@@ -346,8 +350,11 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  BRIDGED_INLINE bool Class_isForeign() const;
   BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
+  BRIDGED_INLINE bool ProtocolDecl_isMarkerProtocol() const;
   BRIDGED_INLINE bool AbstractFunction_isOverridden() const;
+  BRIDGED_INLINE bool Constructor_isInheritable() const;
   BRIDGED_INLINE bool Destructor_isIsolated() const;
   BRIDGED_INLINE bool EnumElementDecl_hasAssociatedValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedParameterList
@@ -1147,10 +1154,35 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
+SWIFT_NAME("BridgedWarnAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
+BridgedWarnAttr
+BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+                             swift::SourceLoc atLoc,
+                             swift::SourceRange range,
+                             swift::Identifier diagGroupName,
+                             swift::WarningGroupBehavior behavior,
+                             BridgedStringRef reason);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonSendableKind {
   BridgedNonSendableKindSpecific,
   BridgedNonSendableKindAssumed,
 };
+
+SWIFT_NAME("BridgedWarningGroupBehaviorRule.getGroupName(self:)")
+BridgedStringRef BridgedWarningGroupBehaviorRule_getGroupName(BridgedWarningGroupBehaviorRule rule);
+
+SWIFT_NAME("BridgedWarningGroupBehaviorRule.getBehavior(self:)")
+swift::WarningGroupBehavior
+BridgedWarningGroupBehaviorRule_getBehavior(BridgedWarningGroupBehaviorRule rule);
+
+
+SWIFT_NAME("getDiagnosticGroupLinksCount()")
+SwiftInt
+BridgedDiagnosticGroupLinks_getCount();
+
+SWIFT_NAME("getDiagnosticGroupLink(at:)")
+std::pair<BridgedStringRef, BridgedStringRef>
+BridgedDiagnosticGroupLinks_getLink(SwiftInt index);
 
 SWIFT_NAME("BridgedNonSendableAttr.createParsed(_:atLoc:range:kind:)")
 BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
@@ -2985,6 +3017,22 @@ struct BridgedASTType {
     ObjC
   };
 
+  enum class FunctionTypeRepresentation {
+    Thick = 0,
+    Block,
+    Thin,
+    CFunctionPointer,
+    Method = 8,
+    ObjCMethod,
+    WitnessMethod,
+    Closure,
+    CXXMethod,
+    KeyPathAccessorGetter,
+    KeyPathAccessorSetter,
+    KeyPathAccessorEquals,
+    KeyPathAccessorHash
+  };
+
   swift::TypeBase * _Nullable type;
 
   BRIDGED_INLINE swift::Type unbridged() const;
@@ -3028,6 +3076,7 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getOptionalType() const;
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isOptional() const;
   BRIDGED_INLINE bool isBuiltinType() const;
@@ -3047,6 +3096,7 @@ struct BridgedASTType {
   BRIDGED_INLINE BridgedOptionalInt getValueOfIntegerType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getInvocationGenericSignatureOfFunctionType() const;
+  BRIDGED_INLINE FunctionTypeRepresentation getFunctionTypeRepresentation() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapOutOfEnvironment() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType
@@ -3060,6 +3110,8 @@ struct BridgedASTType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
+  BoundGenericType_getGenericArgs() const;
 };
 
 class BridgedCanType {

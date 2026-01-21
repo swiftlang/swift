@@ -61,11 +61,13 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -519,9 +521,9 @@ struct ASTContext::Implementation {
   /// Mapping from property declarations to the backing variable types.
   llvm::DenseMap<const VarDecl *, Type> PropertyWrapperBackingVarTypes;
 
-  /// A mapping from the backing storage of a property that has a wrapper
-  /// to the original property with the wrapper.
-  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalWrappedProperties;
+  /// A mapping from the backing storage of a property that has a wrapper or
+  /// is `lazy` to the original property.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalVarsForBackingStorage;
 
   /// The builtin initializer witness for a literal. Used when building
   /// LiteralExprs in fully-checked AST.
@@ -795,7 +797,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &serializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags,
+    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -810,7 +812,7 @@ ASTContext *ASTContext::get(
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, casOpts, serializationOpts,
-                 SourceMgr, Diags, std::move(OutputBackend));
+                 SourceMgr, Diags, DarwinSDKInfo, std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -819,7 +821,7 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &SerializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags,
+    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
@@ -865,6 +867,12 @@ ASTContext::ASTContext(
     Id_StringProcessing
   };
   StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
+
+  if (DarwinSDKInfo)
+    getImpl().SDKInfo.emplace(
+        std::make_unique<clang::DarwinSDKInfo>(*DarwinSDKInfo));
+  else
+    getImpl().SDKInfo.emplace();
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -917,7 +925,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(DefaultAssociatedConformanceWitnesses);
   SIZE_AND_BYTES(DefaultTypeRequestCaches);
   SIZE_AND_BYTES(PropertyWrapperBackingVarTypes);
-  SIZE_AND_BYTES(OriginalWrappedProperties);
+  SIZE_AND_BYTES(OriginalVarsForBackingStorage);
   SIZE_AND_BYTES(BuiltinInitWitness);
   SIZE_AND_BYTES(OriginalBodySourceRanges);
   SIZE_AND_BYTES(NextMacroDiscriminator);
@@ -2836,15 +2844,19 @@ bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
   llvm::VersionTuple underlyingVersionInfo;
-  if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
-                           versionInfo, underlyingVersionInfo))
-    return false;
+  bool canImport =
+      canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
+                          versionInfo, underlyingVersionInfo);
 
-  SmallString<64> fullModuleName;
-  moduleName.getString(fullModuleName);
-  
-  addSucceededCanImportModule(fullModuleName, versionInfo, underlyingVersionInfo);
-  return true;
+  // If found an import or resolved an version, recorded the module.
+  if (canImport || !versionInfo.empty() || !underlyingVersionInfo.empty()) {
+    SmallString<64> fullModuleName;
+    moduleName.getString(fullModuleName);
+
+    addSucceededCanImportModule(fullModuleName, versionInfo,
+                                underlyingVersionInfo);
+  }
+  return canImport;;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
@@ -4182,7 +4194,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // NOTE: it's important that we check if it's a convenience init only after
     // confirming it's not semantically final, or else there can be a request
     // evaluator cycle to determine the init kind for actors, which are final.
-    if (Ctx.isSwiftVersionAtLeast(5)) {
+    if (Ctx.isLanguageModeAtLeast(5)) {
       if (wantDynamicSelf)
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
           if (!classDecl->isSemanticallyFinal() && CD->isConvenienceInit())
@@ -6086,6 +6098,11 @@ GenericEnvironment *GenericEnvironment::forPrimary(GenericSignature signature) {
 /// outer substitutions.
 GenericEnvironment *GenericEnvironment::forOpaqueType(
     OpaqueTypeDecl *opaque, SubstitutionMap subs) {
+  // Don't preserve sugar if we have type variables, because this leads to
+  // excessive solver arena memory usage.
+  if (subs.getRecursiveProperties().hasTypeVariable())
+    subs = subs.getCanonical();
+
   auto &ctx = opaque->getASTContext();
 
   auto properties = ArchetypeType::archetypeProperties(
@@ -6971,6 +6988,21 @@ SILLayout *SILLayout::get(ASTContext &C,
   return newLayout;
 }
 
+SILLayout *
+SILLayout::withMutable(ASTContext &ctx,
+                       std::initializer_list<std::pair<unsigned, bool>>
+                           fieldIndexMutabilityUpdatePairs) const {
+  // Copy the fields, setting the mutable field to newMutable.
+  SmallVector<SILField, 8> newFields;
+  llvm::copy(getFields(), std::back_inserter(newFields));
+  for (auto p : fieldIndexMutabilityUpdatePairs) {
+    newFields[p.first].setIsMutable(p.second);
+  }
+
+  return SILLayout::get(ctx, getGenericSignature(), newFields,
+                        capturesGenericEnvironment());
+}
+
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
@@ -7005,6 +7037,23 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
                                      LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
+}
+
+CanSILBoxType
+SILBoxType::withMutable(ASTContext &ctx,
+                        std::initializer_list<std::pair<unsigned, bool>>
+                            fieldIndexMutabilityUpdatePairs) const {
+  return SILBoxType::get(
+      ctx, getLayout()->withMutable(ctx, fieldIndexMutabilityUpdatePairs),
+      getSubstitutions());
+}
+
+ArrayRef<SILField> SILBoxType::getFields() const {
+  return getLayout()->getFields();
+}
+
+bool SILBoxType::isFieldMutable(unsigned index) const {
+  return getFields()[index].isMutable();
 }
 
 LayoutConstraint
@@ -7066,9 +7115,8 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 
-  ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalWrappedProperties.count(this) > 0);
-  auto original = ctx.getImpl().OriginalWrappedProperties[this];
+  auto *original = getOriginalVarForBackingStorage();
+  ASSERT(original);
   if (!kind)
     return original;
 
@@ -7086,8 +7134,24 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
 void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   Bits.VarDecl.IsPropertyWrapperBackingProperty = true;
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
-  ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
+  assert(ctx.getImpl().OriginalVarsForBackingStorage.count(this) == 0);
+  ctx.getImpl().OriginalVarsForBackingStorage[this] = originalProperty;
+}
+
+void VarDecl::setLazyStorageFor(VarDecl *VD) {
+  Bits.VarDecl.IsLazyStorageProperty = true;
+  ASTContext &ctx = getASTContext();
+  ASSERT(ctx.getImpl().OriginalVarsForBackingStorage.count(this) == 0);
+  ctx.getImpl().OriginalVarsForBackingStorage[this] = VD;
+}
+
+VarDecl *VarDecl::getOriginalVarForBackingStorage() const {
+  const auto &map = getASTContext().getImpl().OriginalVarsForBackingStorage;
+  auto iter = map.find(this);
+  if (iter == map.end())
+    return nullptr;
+
+  return iter->second;
 }
 
 #ifndef NDEBUG
@@ -7180,40 +7244,7 @@ bool ASTContext::isASCIIString(StringRef s) const {
 }
 
 clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
-  if (!getImpl().SDKInfo) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(*SourceMgr.getFileSystem(),
-                                                  SearchPathOpts.SDKPath);
-    if (!SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-                              // Ignore the error for now..
-                            });
-      getImpl().SDKInfo.emplace();
-    } else if (!*SDKInfoOrErr) {
-      getImpl().SDKInfo.emplace();
-    } else {
-      getImpl().SDKInfo.emplace(std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
-    }
-  }
-
   return getImpl().SDKInfo->get();
-}
-
-const clang::DarwinSDKInfo::RelatedTargetVersionMapping
-*ASTContext::getAuxiliaryDarwinPlatformRemapInfo(clang::DarwinSDKInfo::OSEnvPair Kind) const {
-  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-            *llvm::vfs::getRealFileSystem(),
-            *SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
-    if (!SDKInfoOrErr || !*SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-        // Ignore the error for now..
-      });
-    }
-    return (*SDKInfoOrErr)->getVersionMapping(Kind);
-  }
-  return nullptr;
 }
 
 /// The special Builtin.TheTupleType, which parents tuple extensions and

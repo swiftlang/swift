@@ -65,6 +65,7 @@ final class FinalMainActorIsolatedKlass {
 func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) {}
 func useValueAsync<T>(_ x: T) async {}
+func useValueNoncopyable<T : ~Copyable>(_ x: borrowing T) {}
 @concurrent func useValueAsyncConcurrent<T>(_ x: T) async {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
@@ -90,11 +91,17 @@ struct SendableGenericStruct : Sendable {
   var x = SendableKlass()
 }
 
+struct NoncopyableStructNonsendable : ~Copyable {
+  var x = NonSendableKlass()
+}
+
 enum MyEnum<T> {
     case none
     indirect case some(NonSendableKlass)
     case more(T)
 }
+
+func nonescapingAsyncClosure(_ x: () async -> ()) {}
 
 ////////////////////////////
 // MARK: Actor Self Tests //
@@ -498,6 +505,16 @@ extension MyActor {
 
     // But this will error since we race.
     closure() // expected-note {{access can happen concurrently}}
+  }
+}
+
+func testNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
+  let x = NoncopyableStructNonsendable()
+  let _ = {
+    nonescapingAsyncClosure { @MainActor in
+      useValueNoncopyable(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
   }
 }
 
@@ -1777,7 +1794,7 @@ extension MyActor {
 func nonSendableAllocBoxConsumingParameter(x: consuming SendableKlass) async throws {
   try await withThrowingTaskGroup(of: Void.self) { group in
     group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which is accessible to code in the current task}}
+      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which remains modifiable by code in the current task}}
     }
 
     try await group.waitForAll()
@@ -1790,7 +1807,7 @@ func nonSendableAllocBoxConsumingVar() async throws {
 
   try await withThrowingTaskGroup(of: Void.self) { group in
     group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which is accessible to code in the current task}}
+      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which remains modifiable by code in the current task}}
     }
 
     try await group.waitForAll()
@@ -1848,7 +1865,7 @@ func testFunctionIsNotEmpty(input: SendableKlass) async throws {
   var result: [SendableKlass] = []
   try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
     taskGroup.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which is accessible to code in the current task}}
+      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which remains modifiable by code in the current task}}
     }
   }
 }

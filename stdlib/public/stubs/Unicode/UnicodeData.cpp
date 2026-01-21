@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/shims/UnicodeData.h"
+#include "UnicodeData.h"
 #include <stdint.h>
 
 // Every 4 byte chunks of data that we need to hash (in this case only ever

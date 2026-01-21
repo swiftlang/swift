@@ -64,14 +64,16 @@ void simple_display(llvm::raw_ostream &out,
                     const ClangDirectLookupDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc);
 
-/// This matches SwiftLookupTable::SingleEntry;
-using SingleEntry = llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                                       clang::ModuleMacro *>;
+/// This matches SwiftLookupTable::SingleEntry
+using ClangDirectLookupEntry =
+    llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                       clang::ModuleMacro *>;
+
 /// Uses the appropriate SwiftLookupTable to find a set of clang decls given
 /// their name.
 class ClangDirectLookupRequest
     : public SimpleRequest<ClangDirectLookupRequest,
-                           SmallVector<SingleEntry, 4>(
+                           SmallVector<ClangDirectLookupEntry, 4>(
                                ClangDirectLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
@@ -81,8 +83,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SmallVector<SingleEntry, 4> evaluate(Evaluator &evaluator,
-                                       ClangDirectLookupDescriptor desc) const;
+  SmallVector<ClangDirectLookupEntry, 4>
+  evaluate(Evaluator &evaluator, ClangDirectLookupDescriptor desc) const;
 };
 
 /// The input type for a namespace member lookup request.
@@ -500,7 +502,7 @@ struct CustomRefCountingOperationResult {
 
   CustomRefCountingOperationResultKind kind;
   ValueDecl *operation;
-  std::string name;
+  StringRef name;
 };
 
 class CustomRefCountingOperation
@@ -531,10 +533,6 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
   ClangImporter::Implementation *impl;
-  // Only explicitly ~Escapable annotated types are considered ~Escapable.
-  // This is for backward compatibility, so we continue to import aggregates
-  // containing pointers as Escapable types.
-  bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
     return llvm::hash_combine(desc.type);
@@ -542,7 +540,7 @@ struct EscapabilityLookupDescriptor final {
 
   friend bool operator==(const EscapabilityLookupDescriptor &lhs,
                          const EscapabilityLookupDescriptor &rhs) {
-    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
+    return lhs.type == rhs.type;
   }
 
   friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
@@ -575,15 +573,7 @@ SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 // When a reference type is copied, the pointer’s value is copied rather than
 // the object’s storage. This means reference types can be imported as
 // copyable to Swift, even when they are non-copyable in C++.
-enum class CxxValueSemanticsKind {
-  Unknown,
-  Copyable,
-  MoveOnly,
-  // A record that is either not copyable/movable or not destructible.
-  MissingLifetimeOperation,
-  // A record that has no copy and no move operations
-  UnavailableConstructors,
-};
+enum class CxxValueSemanticsKind { Unknown, Copyable, MoveOnly };
 
 struct CxxValueSemanticsDescriptor final {
   const clang::Type *type;

@@ -333,10 +333,6 @@ namespace swift {
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
 
-    /// The C++ interoperability source compatibility version. Defaults
-    /// to the Swift language version.
-    version::Version cxxInteropCompatVersion;
-
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
     std::optional<version::Version> FormalCxxInteropMode;
@@ -748,16 +744,9 @@ namespace swift {
     ///
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
-    /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    /// check for isLanguageModeAtLeast(5).
+    bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
-    }
-
-    /// Whether the C++ interoperability compatibility version is at least
-    /// 'major'.
-    bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                          unsigned minor = 0) const {
-      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.
@@ -1147,10 +1136,6 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
-
-    /// Whether the importer should skip SafeInteropWrappers, even though the
-    /// feature is enabled.
-    bool DisableSafeInteropWrappers = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

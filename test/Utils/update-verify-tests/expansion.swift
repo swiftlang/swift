@@ -39,6 +39,14 @@
 // RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested.swift
 // RUN: %diff %t/nested.swift %t/nested.swift.expected
 
+// RUN: not %target-swift-frontend-verify -I %t -plugin-path %swift-plugin-dir -typecheck %t/unparsed.swift 2>%t/output.txt -Rmacro-expansions
+// RUN: not %update-verify-tests < %t/output.txt | %FileCheck --check-prefix CHECK-UNPARSED %s
+
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/escaped.swift 2>%t/output.txt -Rmacro-expansions
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/escaped.swift -Rmacro-expansions
+// RUN: %diff %t/escaped.swift %t/escaped.swift.expected
+
 //--- single.swift
 @attached(peer, names: overloaded)
 macro unstringifyPeer(_ s: String) =
@@ -129,9 +137,9 @@ func foo(_ x: Int) {
 }
 """)
   //expected-expansion@+5:14{{
-    //   expected-error@3  {{cannot find 'b' in scope; did you mean 'x'?}}
     //   expected-note@1   2{{'x' declared here}}
     //   expected-error@2   {{cannot find 'a' in scope; did you mean 'x'?}}
+    //   expected-error@3  {{cannot find 'b' in scope; did you mean 'x'?}}
   //}}
 func foo() {}
 
@@ -237,4 +245,63 @@ func bar(_ y: Int) {
 //   expected-error@10{{argument passed to call that takes no arguments}}
 // }}
 func bar() {}
+
+//--- unparsed.h
+// CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR{{/|\\}}unparsed.h
+void foo(int len, int *p) __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"))")));
+
+//--- module.modulemap
+module UnparsedClang {
+  header "unparsed.h"
+  export *
+}
+
+//--- unparsed.swift
+import UnparsedClang
+
+func bar() {
+  let a: CInt = 1
+  var b: CInt = 13
+  foo(a, &b)
+}
+
+//--- escaped.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("""
+func foo(_ x: Int) {
+    let a = "\\(x)"
+    let b = "\\(x)"
+}
+""")
+// NB: DiagnosticVerifier interprets "\\(x)" as "\(x)"
+// expected-expansion@+3:30{{
+//   expected-remark@2{{macro content: |let a = "\\(x)"|}}
+// }}
+func foo() { let _ = "\(2)" }
+
+//--- escaped.swift.expected
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1 6{{in expansion of macro 'unstringifyPeer' on global function 'foo()' here}}
+@unstringifyPeer("""
+func foo(_ x: Int) {
+    let a = "\\(x)"
+    let b = "\\(x)"
+}
+""")
+// NB: DiagnosticVerifier interprets "\\(x)" as "\(x)"
+// expected-expansion@+8:30{{
+//   expected-remark@1{{macro content: |func foo(_ x: Int) {|}}
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+//   expected-remark@2{{macro content: |    let a = "\\(x)"|}}
+//   expected-warning@3{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+//   expected-remark@3{{macro content: |    let b = "\\(x)"|}}
+//   expected-remark@4{{macro content: |}|}}
+// }}
+func foo() { let _ = "\(2)" }
 

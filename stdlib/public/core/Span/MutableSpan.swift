@@ -89,6 +89,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(borrow start)
   public init(
     _unsafeStart start: UnsafeMutablePointer<Element>,
@@ -267,8 +268,13 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   /// Construct a MutableRawSpan over the memory represented by this span
   ///
+  /// Mutating `self` through this property is unsafe because
+  /// it is possible to mutate a byte so as to produce an invalid
+  /// bit pattern in the corresponding instance of `Element`.
+  ///
   /// - Returns: a MutableRawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+  @unsafe
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
     mutating get {
@@ -295,10 +301,12 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       _checkIndex(position)
       return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       _checkIndex(position)
@@ -317,9 +325,11 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
+    @_transparent
     unsafeAddress {
       unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
+    @_transparent
     @lifetime(self: copy self)
     unsafeMutableAddress {
       unsafe _unsafeAddressOfElement(unchecked: position)
@@ -381,15 +391,13 @@ extension MutableSpan where Element: ~Copyable {
   >(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = unsafe _pointer, count > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    // bind memory by hand to sidestep alignment concerns
-    let binding = Builtin.bindMemory(
-      pointer._rawValue, count._builtinWordValue, Element.self
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: _count
     )
-    defer { Builtin.rebindMemory(pointer._rawValue, binding) }
-    return try unsafe body(.init(start: .init(pointer._rawValue), count: count))
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> Result in
+      try unsafe body(buffer)
+    }
   }
 }
 
@@ -412,8 +420,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: (_count == 0) ? nil : _pointer,
-      count: _count &* MemoryLayout<Element>.stride
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe body(bytes)
   }

@@ -178,6 +178,7 @@
       "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
+      "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
       "FloatingPointToString.swift",
       "FloatingPointTypes.swift",
@@ -276,7 +277,8 @@
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
     "InlineArray.swift",
-    "_InlineArray.swift"
+    "_InlineArray.swift",
+    "Exclusivity.swift"
   ],
   "Result": [
     "Result.swift"

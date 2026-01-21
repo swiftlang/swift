@@ -779,9 +779,9 @@ bool swift::isRepresentableInLanguage(
       Reason.describe(accessor);
       return false;
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
                             diag::objc_coroutine_accessor)
           .limitBehavior(behavior);
@@ -1531,9 +1531,9 @@ shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit,
       switch (accessor->getAccessorKind()) {
       case AccessorKind::DidSet:
       case AccessorKind::Modify:
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
       case AccessorKind::WillSet:
       case AccessorKind::Init:
       case AccessorKind::DistributedGet:
@@ -2542,6 +2542,9 @@ namespace {
         auto opposite = (*this)(rightDecl, leftDecl);
         if (normal != opposite)
           return normal;
+
+        leftContext = leftContext->getParent();
+        rightContext = rightContext->getParent();
       }
 
       // Final tiebreaker: Kind
@@ -2890,7 +2893,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
                                      diagInfo.first, diagInfo.second,
                                      origDiagInfo.first, origDiagInfo.second,
                                      conflict.selector);
-      diag.warnUntilSwiftVersionIf(breakingInSwift5, 6);
+      diag.warnUntilLanguageModeIf(breakingInSwift5, 6);
 
       // Temporarily soften selector conflicts in objcImpl extensions; we're
       // seeing some that are caused by ObjCImplementationChecker improvements.
@@ -3049,10 +3052,11 @@ bool swift::diagnoseObjCCategoryConflicts(SourceFile &sf) {
           if (implCat != catToCheck)
             bestCat = implCat;
 
-        Ctx.Diags.diagnose(catToCheck, diag::objc_redecl_category_name,
-                           catToCheck->hasClangNode(),
-                           bestCat->hasClangNode(), catName)
-          .warnUntilSwiftVersion(6);
+        Ctx.Diags
+            .diagnose(catToCheck, diag::objc_redecl_category_name,
+                      catToCheck->hasClangNode(), bestCat->hasClangNode(),
+                      catName)
+            .warnUntilLanguageMode(6);
 
         Ctx.Diags.diagnose(bestCat, diag::invalid_redecl_prev_name, catName);
       }

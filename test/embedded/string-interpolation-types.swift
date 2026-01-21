@@ -3,7 +3,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 @main
@@ -15,9 +15,9 @@ struct Main {
     print("static string: \("string" as StaticString)")
     // CHECK: static string: string
 
-    print("integers: \(42) \(-42) \(0xffffffff)")
+    print("integers: \(42) \(-42) \(UInt(0xffffffff))")
     // CHECK: integers: 42 -42 4294967295
-    
+
     print("booleans: \(true) \(false)")
     // CHECK: booleans: true false
   }

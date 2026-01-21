@@ -1386,7 +1386,7 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
   // that is we have a specialized generic type, we have decided for code size
   // reasons to continue using "generic" value witness table functions i.e the
   // same once used for runtime instantiated generic metadata.
-  if (!IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (!IGM.isEmbeddedWithExistentials()) {
     auto *nomDecl = abstractType->getNominalOrBoundGenericNominal();
     if (abstractType->isSpecialized() && nomDecl) {
       CanType concreteFormalType = getFormalTypeInPrimaryContext(abstractType);
@@ -1540,8 +1540,8 @@ ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              bool isPattern,
                                              bool relativeReference) {
   // See if we can use a prefab witness table from the runtime.
-  if (!isPattern &&
-      !IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  auto hasEmbeddedWithExistentials = IGM.isEmbeddedWithExistentials();
+  if (!isPattern && !hasEmbeddedWithExistentials) {
     if (auto known = getAddrOfKnownValueWitnessTable(IGM, abstractType,
                                                      relativeReference)) {
       return known;
@@ -1549,7 +1549,7 @@ ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
   }
 
   // There might already be a definition emitted in embedded mode.
-  if (IGM.Context.LangOpts.hasFeature(Feature::EmbeddedExistentials)) {
+  if (hasEmbeddedWithExistentials) {
     auto addr = IGM.getAddrOfValueWitnessTable(abstractType);
     if (!cast<llvm::GlobalVariable>(addr)->isDeclaration()) {
       return {addr, ConstantReference::Direct};

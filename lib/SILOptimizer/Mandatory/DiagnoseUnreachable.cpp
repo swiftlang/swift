@@ -1099,7 +1099,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
     return false;
 
   BasicBlockSet Reachable(&F);
-  SmallVector<SILBasicBlock*, 128> Worklist;
+  SmallVector<SILBasicBlock*, 8> Worklist;
   Worklist.push_back(&F.front());
   Reachable.insert(&F.front());
   unsigned numReachableBlocks = 1;

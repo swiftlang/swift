@@ -115,6 +115,8 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 // should be in the -Onone pass pipeline and the prepare optimizations pipeline.
 static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
+
+  P.addMarkNeverWrittenMutableClosureBoxesAsImmutable();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addReferenceBindingTransform();
   P.addNestedSemanticFunctionCheck();
@@ -265,6 +267,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
+  P.addEmbeddedWitnessCallSpecialization();
 
   P.addMandatoryDestroyHoisting();
 
@@ -527,7 +530,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // of embedded Swift.
   if (!P.getOptions().EmbeddedSwift) {
     P.addGenericSpecializer();
-    // P.addPackSpecialization();
+    P.addPackSpecialization();
     // Run devirtualizer after the specializer, because many
     // class_method/witness_method instructions may use concrete types now.
     P.addDevirtualizer();
@@ -599,6 +602,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addRedundantPhiElimination();
   P.addCSE();
   P.addDCE();
+  P.addDeadAccessScopeElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
   P.addEarlyCodeMotion();
@@ -892,6 +896,10 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().AssumeSingleThreaded) {
     P.addAssumeSingleThreaded();
   }
+
+  // Needs to run again at the end of the pipeline (after all de-virtualizations
+  // are done) in case an optimization pass de-virtualizes a witness method call.
+  P.addEmbeddedWitnessCallSpecialization();
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();

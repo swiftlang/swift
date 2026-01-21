@@ -1415,3 +1415,17 @@ func test_implicit_result_conversions() {
     return // Ok
   }
 }
+
+// Random example reduced from swift-build which tripped an assert not
+// previously covered by our test suite
+do {
+  struct S {
+    var x: [Int: [String]] = [:]
+  }
+
+  let s = [S]()
+
+  let _: [Int: Set<String>] = s.map(\.x)
+      .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
+      .mapValues { Set($0) }
+}

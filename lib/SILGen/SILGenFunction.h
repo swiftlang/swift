@@ -1765,12 +1765,10 @@ public:
                             CanType existentialType,
                             SGFContext C = SGFContext());
 
-  RValue emitCollectionConversion(SILLocation loc,
-                                  FuncDecl *fn,
-                                  CanType fromCollection,
-                                  CanType toCollection,
-                                  ManagedValue mv,
-                                  SGFContext C);
+  RValue emitCollectionConversion(SILLocation loc, FuncDecl *fn,
+                                  CanType fromCollection, CanType toCollection,
+                                  ManagedValue mv, ClosureExpr *keyConversion,
+                                  ClosureExpr *valueConversion, SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -2862,9 +2860,10 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  InitializationPtr
-  emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
-                                   bool generateDebugInfo = true);
+  InitializationPtr emitPatternBindingInitialization(
+      Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
+      ProfileCounter numTrueTaken = ProfileCounter(),
+      ProfileCounter numFalseTaken = ProfileCounter());
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.
@@ -3206,6 +3205,22 @@ public:
       llvm::function_ref<void(SILValue indexWithinComponent,
                               SILValue packExpansionIndex, SILValue packIndex)>
           emitBody);
+
+  /// Emit an operation for each element of a pack expansion component of
+  /// a pack, automatically projecting and managing ownership of it properly
+  /// for each iteration.
+  ///
+  /// The projection and management does not itself generate control flow and
+  /// so can be safely composed with further projection and management.
+  void emitPackForEach(SILLocation loc,
+                       ManagedValue inputPackAddr,
+                       CanPackType inputFormalPackType,
+                       unsigned inputComponentIndex,
+                       GenericEnvironment *openedElementEnv,
+                       SILType inputEltTy,
+                       llvm::function_ref<void(SILValue indexWithinComponent,
+                                               SILValue expansionPackIndex,
+                                               ManagedValue input)> emitBody);
 
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of

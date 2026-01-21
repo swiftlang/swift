@@ -286,23 +286,41 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
   // For other cases, process the paths normally
   std::vector<SupplementaryOutputPaths> outputPaths;
   unsigned i = 0;
-  bool hadError = InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &input) -> bool {
-        if (auto suppPaths = computeOutputPathsForOneInput(
-                OutputFiles[i], (*pathsFromUser)[i], input)) {
-          ++i;
-          outputPaths.push_back(*suppPaths);
-          return false;
-        }
-        return true;
-      });
+  bool hadError = false;
+
+  // In multi-threaded WMO with supplementary output file map, we have paths
+  // for all inputs, so process them all through computeOutputPathsForOneInput
+  if (!InputsAndOutputs.hasPrimaryInputs() && OutputFiles.size() > 1 &&
+      pathsFromUser->size() == InputsAndOutputs.inputCount()) {
+    hadError = InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
+      if (auto suppPaths = computeOutputPathsForOneInput(
+              OutputFiles[i], (*pathsFromUser)[i], input)) {
+        ++i;
+        outputPaths.push_back(*suppPaths);
+        return false;
+      }
+      return true;
+    });
+  } else {
+    // Standard path: process inputs that produce supplementary output
+    hadError = InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+        [&](const InputFile &input) -> bool {
+          if (auto suppPaths = computeOutputPathsForOneInput(
+                  OutputFiles[i], (*pathsFromUser)[i], input)) {
+            ++i;
+            outputPaths.push_back(*suppPaths);
+            return false;
+          }
+          return true;
+        });
+  }
   if (hadError)
     return std::nullopt;
 
-  // In WMO mode compute supplementary output paths for optimization record
-  // data (opt-remarks). We need one path per LLVMModule that will be created as
-  // part of wmo.
-  if (!InputsAndOutputs.hasPrimaryInputs()) {
+  // In WMO mode without supplementary output file map, compute supplementary
+  // output paths for optimization records for inputs beyond the first one.
+  if (!InputsAndOutputs.hasPrimaryInputs() && OutputFiles.size() > 1 &&
+      pathsFromUser->size() != InputsAndOutputs.inputCount()) {
     unsigned i = 0;
     InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
       // First input is already computed.
@@ -448,8 +466,9 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.APIDescriptorOutputPath = (*apiDescriptorOutput)[moduleIndex];
     sop.ConstValuesOutputPath = (*constValuesOutput)[moduleIndex];
     sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[moduleIndex];
-    sop.YAMLOptRecordPath = (*optRecordOutput)[moduleIndex];
-    sop.BitstreamOptRecordPath = (*optRecordOutput)[moduleIndex];
+    // Optimization record paths are per-file in multi-threaded WMO, like IR
+    sop.YAMLOptRecordPath = (*optRecordOutput)[i];
+    sop.BitstreamOptRecordPath = (*optRecordOutput)[i];
     sop.SILOutputPath = (*silOutput)[silOutputIndex];
     sop.LLVMIROutputPath = (*irOutput)[i];
     result.push_back(sop);
@@ -478,18 +497,28 @@ SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
       paths.emplace_back();
     return paths;
   }
-  // Special handling for SIL and IR output paths: allow multiple paths per file
-  // type
-  else if ((pathID == options::OPT_sil_output_path ||
-            pathID == options::OPT_ir_output_path) &&
+  // Special handling for IR and optimization record output paths: allow multiple paths per file
+  // type. Note: SIL is NOT included here because in WMO mode, SIL is generated once
+  // per module, not per source file.
+  else if ((pathID == options::OPT_ir_output_path ||
+            pathID == options::OPT_save_optimization_record_path) &&
            paths.size() > N) {
-    // For parallel compilation, we can have multiple SIL/IR output paths
+    // For parallel compilation, we can have multiple IR/opt-record output paths
     // so return all the paths.
     return paths;
   }
 
-  if (paths.empty())
+  if (paths.empty()) {
+    // For IR and optimization records in multi-threaded WMO, we need one entry per input file.
+    // Check if WMO is enabled and we have multiple output files (multi-threaded WMO).
+    if ((pathID == options::OPT_ir_output_path ||
+         pathID == options::OPT_save_optimization_record_path) &&
+        Args.hasArg(options::OPT_whole_module_optimization) &&
+        OutputFiles.size() > 1) {
+      return std::vector<std::string>(OutputFiles.size(), std::string());
+    }
     return std::vector<std::string>(N, std::string());
+  }
 
   Diags.diagnose(SourceLoc(), diag::error_wrong_number_of_arguments,
                  Args.getLastArg(pathID)->getOption().getPrefixedName(), N,
@@ -863,6 +892,29 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
       });
   if (hadError)
     return std::nullopt;
+
+  // In multi-threaded WMO mode, we need to read supplementary output paths
+  // for all inputs beyond the first one (which was already processed above).
+  // Entries in the map are optional, so if an input is missing, the regular
+  // WMO path generation logic will handle it.
+  if (!InputsAndOutputs.hasPrimaryInputs() && OutputFiles.size() > 1) {
+    InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
+      // Skip the first input, which was already processed above
+      if (InputsAndOutputs.firstInput().getFileName() == input.getFileName()) {
+        return false;
+      }
+
+      // Check if this input has an entry in the supplementary output file map
+      const TypeToPathMap *mapForInput =
+          OFM->getOutputMapForInput(input.getFileName());
+      if (mapForInput) {
+        // Entry exists, use it
+        outputPaths.push_back(createFromTypeToPathMap(mapForInput));
+      }
+      // If no entry exists, skip - the regular WMO logic will generate paths
+      return false;
+    });
+  }
 
   return outputPaths;
 }

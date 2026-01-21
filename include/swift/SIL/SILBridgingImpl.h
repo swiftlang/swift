@@ -41,6 +41,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SIL/SILConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -396,6 +397,10 @@ bool BridgedType::isExactSuperclassOf(BridgedType t) const {
 
 bool BridgedType::isMarkedAsImmortal() const {
   return unbridged().isMarkedAsImmortal();
+}
+
+bool BridgedType::isHeapObjectReferenceType() const {
+  return unbridged().isHeapObjectReferenceType();
 }
 
 bool BridgedType::isAddressableForDeps(BridgedFunction f) const {
@@ -1291,6 +1296,11 @@ BridgedCanType BridgedInstruction::InitExistentialRefInst_getFormalConcreteType(
 BridgedConformanceArray BridgedInstruction::InitExistentialAddrInst_getConformances() const {
   return {getAs<swift::InitExistentialAddrInst>()->getConformances()};
 }
+
+BridgedCanType BridgedInstruction::InitExistentialAddrInst_getFormalConcreteType() const {
+  return getAs<swift::InitExistentialAddrInst>()->getFormalConcreteType();
+}
+
 bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
   switch (getAs<swift::OpenExistentialAddrInst>()->getAccessKind()) {
     case swift::OpenedExistentialAccess::Immutable: return true;
@@ -3210,6 +3220,10 @@ void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstr
 
 void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   inst.unbridged()->clone(beforeInst.unbridged());
+}
+
+void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
+  swift::salvageDebugInfo(inst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {

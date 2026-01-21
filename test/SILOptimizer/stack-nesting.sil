@@ -281,3 +281,31 @@ bb5:
   dealloc_stack %d
   br bb4
 }
+
+// We only re-order b and c. We leave a alone.
+// CHECK-LABEL: sil [ossa] @test_simple_non_nested
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-LABEL: // end sil function 'test_simple_non_nested'
+sil [ossa] @test_simple_non_nested : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack [non_nested] $Int
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  integer_literal $Builtin.Int32, 2
+  dealloc_stack %a
+  dealloc_stack %b
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 3
+  %ret = tuple ()
+  return %ret : $()
+}

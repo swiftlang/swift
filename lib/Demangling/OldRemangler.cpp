@@ -451,6 +451,11 @@ ManglingError Remangler::mangleAsyncRemoved(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleRepresentationChanged(Node *node, unsigned depth) {
+  Buffer << "r";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDroppedArgument(Node *node, unsigned depth) {
   Buffer << "t" << node->getIndex();
   return ManglingError::Success;
@@ -1342,7 +1347,7 @@ ManglingError Remangler::mangleReadAccessor(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "r", ctx, depth + 1);
 }
 
-ManglingError Remangler::mangleRead2Accessor(Node *node, EntityContext &ctx,
+ManglingError Remangler::mangleYieldingBorrowAccessor(Node *node, EntityContext &ctx,
                                              unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "y", ctx, depth + 1);
 }
@@ -1352,7 +1357,7 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "M", ctx, depth + 1);
 }
 
-ManglingError Remangler::mangleModify2Accessor(Node *node, EntityContext &ctx,
+ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
 }

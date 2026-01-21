@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -26,6 +26,8 @@ class CliArguments(argparse.Namespace):
     source_root: Path
     use_submodules: bool
     verbose: bool
+    command: Optional[Any]
+    max_retries: int
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -129,6 +131,14 @@ repositories.
             action="store_true",
         )
         parser.add_argument(
+            "--max-retries",
+            help="Maximum number of times update-checkout will retry if the"
+            " cloning of any repository failed. 0 for no retries, -1 for"
+            " unlimited retries.",
+            type=int,
+            default=0,
+        )
+        parser.add_argument(
             "-j",
             "--jobs",
             type=int,
@@ -153,4 +163,8 @@ repositories.
             help="Increases the script's verbosity.",
             action="store_true",
         )
+
+        subparsers = parser.add_subparsers(dest='command')
+        subparsers.add_parser('status', help='Print the status of all the repositories')
+
         return parser.parse_args()

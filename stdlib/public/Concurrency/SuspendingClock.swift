@@ -101,7 +101,7 @@ extension SuspendingClock: Clock {
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(StdlibDeploymentTarget 6.2, *) {
+    if #available(StdlibDeploymentTarget 6.3, *) {
       try await Task._sleep(until: deadline,
                             tolerance: tolerance,
                             clock: self)

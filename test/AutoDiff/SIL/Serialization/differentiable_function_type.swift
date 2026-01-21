@@ -4,12 +4,12 @@
 
 // https://github.com/apple/swift/issues/54526
 // Workaround because import declarations are not preserved in .sib files.
-// RUN: sed -e 's/import Swift$/import Swift; import _Differentiation/' %t/tmp.sil > %t/tmp_fixed.sil
+// RUN: echo "import _Differentiation" > %t/tmp_preamble
+// RUN: cat %t/tmp_preamble %t/tmp.sil > %t/tmp_fixed.sil
 // RUN: %target-sil-opt -sil-print-types %t/tmp_fixed.sil -module-name main -emit-sorted-sil | %FileCheck %s
 
-// `shell` is required only to run `sed` as a
-// https://github.com/apple/swift/issues/54526 workaround.
-// REQUIRES: shell
+
+// UNSUPPORTED: OS=wasip1
 
 sil_stage raw
 

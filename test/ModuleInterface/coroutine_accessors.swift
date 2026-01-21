@@ -22,10 +22,10 @@ var _i: Int = 0
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 public var i: Int {
-  read {
+  yielding borrow {
     yield _i
   }
-  modify {
+  yielding mutate {
     yield &_i
   }
 }

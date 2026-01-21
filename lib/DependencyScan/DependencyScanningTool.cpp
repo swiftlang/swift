@@ -267,8 +267,7 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 }
 
 DependencyScanningTool::DependencyScanningTool()
-    : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      Alloc(), Saver(Alloc) {}
+    : ScanningService(std::make_unique<SwiftDependencyScanningService>()) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,

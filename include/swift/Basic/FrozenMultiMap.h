@@ -294,6 +294,30 @@ public:
     assert(isFrozen() && "Can only call this in map mode");
     return storage.end();
   }
+
+  typename std::reverse_iterator<typename VectorStorage::iterator>
+  vector_rbegin() {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.rbegin();
+  }
+
+  typename std::reverse_iterator<typename VectorStorage::iterator>
+  vector_rend() {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.rend();
+  }
+
+  typename std::reverse_iterator<typename VectorStorage::const_iterator>
+  vector_rbegin() const {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.rbegin();
+  }
+
+  typename std::reverse_iterator<typename VectorStorage::const_iterator>
+  vector_rend() const {
+    assert(isFrozen() && "Can only call this in map mode");
+    return storage.rend();
+  }
 };
 
 template <typename Key, typename Value, typename Storage>

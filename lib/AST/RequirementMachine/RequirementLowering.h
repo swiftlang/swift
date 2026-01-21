@@ -83,6 +83,8 @@ bool performConcreteContraction(
     SmallVectorImpl<RequirementError> &errors,
     bool debug);
 
+Type stripBoundDependentMemberTypes(Type t);
+
 } // end namespace rewriting
 
 } // end namespace swift

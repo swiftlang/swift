@@ -735,41 +735,35 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+      auto *ParentExpr = Parent.getAsExpr();
 
-      if (auto *ParentExpr = Parent.getAsExpr()) {
-        if (ParentExpr->isValidParentOfTypeExpr(E))
-          return;
+      if (ParentExpr && ParentExpr->isValidParentOfTypeExpr(E))
+        return;
 
-        // In Swift < 6 warn about
-        // - plain type name passed as an argument to a subscript, dynamic
-        //   subscript, or ObjC literal since it used to be accepted.
-        // - member type expressions rooted on non-identifier types, e.g.
-        //   '[X].Y' since they used to be accepted without the '.self'.
-        if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
-          if (isa<SubscriptExpr>(ParentExpr) ||
-              isa<DynamicSubscriptExpr>(ParentExpr) ||
-              isa<ObjectLiteralExpr>(ParentExpr)) {
-            auto *argList = ParentExpr->getArgs();
-            assert(argList);
-            if (argList->isUnlabeledUnary())
-              behavior = DiagnosticBehavior::Warning;
-          } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
-            if (auto *QualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
-                    TE->getTypeRepr())) {
-              if (!isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot())) {
-                behavior = DiagnosticBehavior::Warning;
-              }
-            }
+      // In Swift < 6 warn about
+      // - plain type name passed as an argument to a subscript, dynamic
+      //   subscript, or ObjC literal since it used to be accepted.
+      // - member type expressions rooted on non-identifier types, e.g.
+      //   '[X].Y' since they used to be accepted without the '.self'.
+      bool downgradeToWarningUntil6 = false;
+      if (!Ctx.isLanguageModeAtLeast(6)) {
+        if (ParentExpr && (isa<SubscriptExpr>(ParentExpr) ||
+                           isa<DynamicSubscriptExpr>(ParentExpr) ||
+                           isa<ObjectLiteralExpr>(ParentExpr))) {
+          auto *argList = ParentExpr->getArgs();
+          assert(argList);
+          downgradeToWarningUntil6 = argList->isUnlabeledUnary();
+        } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
+          if (auto *QualIdentTR =
+                  dyn_cast_or_null<QualifiedIdentTypeRepr>(TE->getTypeRepr())) {
+            downgradeToWarningUntil6 =
+                !isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot());
           }
         }
       }
 
-      // Is this a protocol metatype?
-      Ctx.Diags
-          .diagnose(E->getStartLoc(), diag::value_of_metatype_type,
-                    behavior == DiagnosticBehavior::Warning)
-          .limitBehavior(behavior);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .warnUntilLanguageModeIf(downgradeToWarningUntil6, 6);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -1897,7 +1891,7 @@ public:
 
     // Prior to Swift 6, use the old validation logic.
     auto &ctx = inClosure->getASTContext();
-    if (!ctx.isSwiftVersionAtLeast(6))
+    if (!ctx.isLanguageModeAtLeast(6))
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
@@ -2282,7 +2276,7 @@ public:
 
   bool shouldRecordClosure(const AbstractClosureExpr *E) {
     // Record all closures in Swift 6 mode.
-    if (Ctx.isSwiftVersionAtLeast(6))
+    if (Ctx.isLanguageModeAtLeast(6))
       return true;
 
     // Only record closures requiring self qualification prior to Swift 6
@@ -2298,7 +2292,7 @@ public:
     std::optional<unsigned> warnUntilVersion;
     // Prior to Swift 6, we may need to downgrade to a warning for compatibility
     // with the 5.10 diagnostic behavior.
-    if (!Ctx.isSwiftVersionAtLeast(6) &&
+    if (!Ctx.isLanguageModeAtLeast(6) &&
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
@@ -2306,12 +2300,12 @@ public:
     // macro to preserve compatibility with the Swift 6 diagnostic behavior
     // where we previously skipped diagnosing.
     auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+    if (!Ctx.isLanguageModeAtLeast(futureVersion) && isInMacro())
       warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
-      diag.warnUntilSwiftVersion(*warnUntilVersion);
+      diag.warnUntilLanguageMode(*warnUntilVersion);
 
     return diag;
   }
@@ -2370,7 +2364,7 @@ public:
 
     if (memberLoc.isValid()) {
       const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
-      if (Ctx.isSwiftVersionAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+      if (Ctx.isLanguageModeAtLeast(6) && selfDRE && selfDRE->getDecl()) {
         parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
             selfDRE->getDecl(), selfDRE->getType(), ACE);
       }
@@ -2559,8 +2553,9 @@ public:
     // insert 'self,'. If it wasn't a valid entry, then we will at least not
     // be introducing any new errors/warnings...
     const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-    const auto nextAfterBracket = Lexer::getTokenAtLocation(
-        Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
+    const auto nextAfterBracket =
+        Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
+                                  CommentRetentionMode::AttachToNextToken);
     if (nextAfterBracket.getLoc() != brackets.End)
       diag.fixItInsertAfter(brackets.Start, "self, ");
     else
@@ -2581,8 +2576,8 @@ public:
     // opening brace of the closure, we may need to pad the fix-it
     // with a space.
     const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
-    const auto next = Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
-                                                CommentRetentionMode::None);
+    const auto next = Lexer::getTokenAtLocation(
+        Ctx.SourceMgr, nextLoc, CommentRetentionMode::AttachToNextToken);
     std::string trailing = next.getLoc() == nextLoc ? " " : "";
 
     diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
@@ -4962,9 +4957,9 @@ public:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:
-          case AccessorKind::Read2:
+          case AccessorKind::YieldingBorrow:
           case AccessorKind::Modify:
-          case AccessorKind::Modify2:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Init:
           case AccessorKind::Borrow:
           case AccessorKind::Mutate:
@@ -5394,13 +5389,17 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     /// Returns true iff the collection upcast coercion is an Optional-to-Any
     /// coercion.
-    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
-                                   conversion) {
-      if (!conversion.OrigValue || !conversion.Conversion)
+    bool isOptionalToAnyCoercion(ClosureExpr *conversion) {
+      if (!conversion)
         return false;
 
-      auto srcType = conversion.OrigValue->getType();
-      auto destType = conversion.Conversion->getType();
+      auto fnType = conversion->getType()->getAs<FunctionType>();
+      if (!fnType)
+        return false;
+
+      assert(fnType->getNumParams() == 1);
+      auto srcType = fnType->getParams()[0].getPlainType();
+      auto destType = fnType->getResult();
       return isOptionalToAnyCoercion(srcType, destType);
     }
 
@@ -5484,7 +5483,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // Do not warn on coercions from implicitly unwrapped optionals
       // for Swift versions less than 5.
-      if (!Ctx.isSwiftVersionAtLeast(5) &&
+      if (!Ctx.isLanguageModeAtLeast(5) &&
           hasImplicitlyUnwrappedResult(subExpr))
         return;
 
@@ -5546,10 +5545,13 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // We're handling the coercion of the entire collection, so we don't need
       // to re-visit a nested ErasureExpr for the value.
-      if (auto conversionExpr = valueConversion.Conversion)
+      if (valueConversion) {
+        Expr *body = valueConversion->getSingleExpressionBody();
         if (auto *erasureExpr =
-              findErasureExprThroughOptionalInjections(conversionExpr))
+                findErasureExprThroughOptionalInjections(body)) {
           IgnoredExprs.insert(erasureExpr);
+        }
+      }
 
       if (coercion.shouldSuppressDiagnostic() ||
           !isOptionalToAnyCoercion(valueConversion))
@@ -6491,10 +6493,11 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   diagnoseComparisonWithNaN(E, DC);
-  if (!ctx.isSwiftVersionAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
+    diagnoseExprAvailability(E, const_cast<DeclContext *>(DC),
+                             /*preconcurrency=*/false);
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);

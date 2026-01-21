@@ -931,7 +931,7 @@ func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) 
 // CHECK-LABEL: define{{.*}} void @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
 // CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU_{{(.ptrauth)?}}", ptr null)
 // CHECK: [[CONTEXT:%.*]] = call{{.*}} @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata, i32 0, i32 2), i64 32, i64 7)
-// CHECK: [[RESULT_2:%.*]] = call {{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU0_TA", ptr [[CONTEXT]])
+// CHECK: [[RESULT_2:%.*]] = call {{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
 // CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{.*}}, ptr [[RESULT]], ptr [[RESULT_2]])
 nonisolated(nonsending) func testTaskAddCancellationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
   let result = Builtin.taskAddCancellationHandler {}
@@ -951,7 +951,7 @@ nonisolated(nonsending) func testTaskRemoveCancellationHandler(_ x: UnsafeRawPoi
 // CHECK-LABEL: define {{.*}}void @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
 // CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU_{{(.ptrauth)?}}", ptr null)
 // CHECK: [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.3, i32 0, i32 2), i64 32, i64 7)
-// CHECK: [[RESULT_2:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU0_TA", ptr [[CONTEXT]])
+// CHECK: [[RESULT_2:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
 // CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{%.*}}, ptr [[RESULT]], ptr [[RESULT_2]])
 nonisolated(nonsending) func testTaskAddPriorityEscalationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
   let result = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in

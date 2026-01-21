@@ -37,6 +37,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InFlightSubstitution.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -472,9 +474,9 @@ namespace {
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
-    RValue visitCollectionUpcastConversionExpr(
-             CollectionUpcastConversionExpr *E,
-             SGFContext C);
+    RValue
+    visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
+                                        SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitPackElementExpr(PackElementExpr *E, SGFContext C);
@@ -498,6 +500,9 @@ namespace {
     RValue
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
+
+    /// Helper to emit a value of arbitrary type in an unreachable codepath.
+    RValue emitUnreachableValue(SILLocation loc, CanType ty);
 
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
@@ -1295,7 +1300,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
   // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
-  bool shouldWrapInOptional = !(SGF.getASTContext().LangOpts.isSwiftVersionAtLeast(5));
+  bool shouldWrapInOptional = !(SGF.getASTContext().isLanguageModeAtLeast(5));
   
   auto &optTL = SGF.getTypeLowering(E->getType());
 
@@ -1528,12 +1533,10 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
 
-RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
-                                                FuncDecl *fn,
-                                                CanType fromCollection,
-                                                CanType toCollection,
-                                                ManagedValue mv,
-                                                SGFContext C) {
+RValue SILGenFunction::emitCollectionConversion(
+    SILLocation loc, FuncDecl *fn, CanType fromCollection, CanType toCollection,
+    ManagedValue mv, ClosureExpr *keyConversion, ClosureExpr *valueConversion,
+    SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
   auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
@@ -1548,7 +1551,98 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
   auto subMap =
     SubstitutionMap::get(genericSig, replacementTypes,
                          LookUpConformanceInModule());
-  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
+
+  SmallVector<ManagedValue, 3> args = { mv };
+  unsigned argIndex = 1;
+  for (ClosureExpr *closure : {keyConversion, valueConversion}) {
+    if (!closure) {
+      continue;
+    }
+
+    CanType origParamType = fn->getParameters()
+                                ->get(argIndex)
+                                ->getInterfaceType()
+                                ->getCanonicalType();
+    CanType substParamType = origParamType.subst(subMap)->getCanonicalType();
+
+    // Ensure that the closure has the appropriate type.
+    AbstractionPattern origParam(
+        fn->getGenericSignature().getCanonicalSignature(), origParamType);
+
+    auto paramConversion = Conversion::getSubstToOrig(
+        origParam, substParamType, getLoweredType(closure->getType()),
+        getLoweredType(origParam, substParamType));
+
+    auto value = emitConvertedRValue(closure, paramConversion);
+    args.push_back(value);
+    argIndex++;
+  }
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, C);
+}
+
+static bool needsCustomConversion(ClosureExpr *closure) {
+  assert(closure);
+
+  Expr *body = closure->getSingleExpressionBody();
+  assert(body);
+
+  ParameterList const *params = closure->getParameters();
+  assert(params->size() == 1);
+  const ParamDecl *param = params->get(0);
+
+  auto isOrigValue = [=](Expr *E) -> bool {
+    if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+      return DRE->getDecl() == param;
+    }
+    return false;
+  };
+
+  if (isOrigValue(body)) {
+    return false;
+  }
+
+  if (auto conv = dyn_cast<ImplicitConversionExpr>(body)) {
+    if (isa<ForeignObjectConversionExpr>(conv)) {
+      if (auto B2O = dyn_cast<BridgeToObjCExpr>(conv->getSubExpr())) {
+        conv = B2O;
+      }
+    }
+    if (isOrigValue(conv->getSubExpr())) {
+      switch (conv->getKind()) {
+        case ExprKind::Erasure:
+        case ExprKind::DerivedToBase:
+        case ExprKind::ArchetypeToSuper:
+        case ExprKind::AnyHashableErasure:
+        case ExprKind::MetatypeConversion:
+        case ExprKind::BridgeFromObjC:
+        case ExprKind::BridgeToObjC:
+        case ExprKind::InjectIntoOptional:
+          return false;
+        case ExprKind::FunctionConversion:
+          return true;
+        case ExprKind::CollectionUpcastConversion: {
+          auto upcast = cast<CollectionUpcastConversionExpr>(conv);
+          if (upcast->getKeyConversion() && needsCustomConversion(upcast->getKeyConversion())) {
+            return true;
+          }
+          return needsCustomConversion(upcast->getValueConversion());
+        }
+        case ExprKind::DestructureTuple: {
+          return false;
+        }
+        default: {
+          llvm_unreachable("unsupported collection element conversion");
+        }
+      }
+    }
+  }
+  if (auto OE = dyn_cast<OpenExistentialExpr>(body)) {
+    if (isOrigValue(OE->getExistentialValue())) {
+      return false;
+    }
+  }
+  return true;
 }
 
 RValue RValueEmitter::
@@ -1566,18 +1660,37 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 
   // Get the intrinsic function.
   FuncDecl *fn = nullptr;
+  ClosureExpr *keyConversion = nullptr;
+  ClosureExpr *valueConversion = nullptr;
   if (fromCollection->isArray()) {
-    fn = SGF.SGM.getArrayForceCast(loc);
+    if (needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getArrayWitnessCast(loc);
+      valueConversion = E->getValueConversion();
+    } else {
+      fn = SGF.SGM.getArrayForceCast(loc);
+    }
   } else if (fromCollection->isDictionary()) {
-    fn = SGF.SGM.getDictionaryUpCast(loc);
+    if (needsCustomConversion(E->getKeyConversion()) ||
+        needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getDictionaryWitnessCast(loc);
+      keyConversion = E->getKeyConversion();
+      valueConversion = E->getValueConversion();
+    } else {
+      fn = SGF.SGM.getDictionaryUpCast(loc);
+    }
   } else if (fromCollection->isSet()) {
-    fn = SGF.SGM.getSetUpCast(loc);
+    if (needsCustomConversion(E->getValueConversion())) {
+      fn = SGF.SGM.getSetWitnessCast(loc);
+      valueConversion = E->getValueConversion();
+    } else {
+      fn = SGF.SGM.getSetUpCast(loc);
+    }
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
-                                      mv, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection, mv,
+                                      keyConversion, valueConversion, C);
 }
 
 RValue
@@ -1839,9 +1952,11 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   } else if (isAnyClosureExpr(semanticExpr)) {
     if (auto init = C.getAsConversion()) {
       auto conv = init->getConversion();
-      auto origParamType = conv.getBridgingOriginalInputType();
-      if (origParamType.isClangType())
-        destFnType = origParamType.getClangType();
+      if (conv.isBridging()) {
+        auto origParamType = conv.getBridgingOriginalInputType();
+        if (origParamType.isClangType())
+          destFnType = origParamType.getClangType();
+      }
     }
     (void)emitAnyClosureExpr(
         SGF, semanticExpr, [&](AbstractClosureExpr *closure) {
@@ -2014,7 +2129,7 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   // nonisolated(nonsending) or @Sendable in the constraint evaluator.
   //
   // The reason why we need to evaluate this especially is that otherwise we
-  // generate multiple
+  // generate multiple conversion thunks.
 
   bool needsSendableConversion = false;
   if (auto *subCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
@@ -2035,11 +2150,11 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   }
 
   // Check if the only difference in between our destType and srcType is our
-  // isolation.
+  // isolation and optionally Sendable.
   if (!subExprType->hasExtInfo() || !destType->hasExtInfo() ||
-      destType->withIsolation(subExprType->getIsolation()) != subExprType) {
+      destType->withIsolation(subExprType->getIsolation())
+      ->withSendable(subExprType->isSendable()) != subExprType)
     return RValue();
-  }
 
   // Ok, we know that our underlying types are the same. Lets try to emit.
   auto *declRef = dyn_cast<DeclRefExpr>(subExpr);
@@ -2098,9 +2213,10 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
       cast<FunctionType>(subCvt->getType()->getCanonicalType());
 
   // Src type should be isNonIsolatedCaller and they should only differ in
-  // isolation.
+  // isolation or sendability.
   if (!subCvtType->getIsolation().isNonIsolatedCaller() ||
-      subCvtType->withIsolation(destType->getIsolation()) != destType)
+      subCvtType->withIsolation(destType->getIsolation())
+              ->withSendable(destType->isSendable()) != destType)
     return RValue();
 
   // Grab our decl ref/its decl and make sure that our decl is actually caller
@@ -2134,6 +2250,32 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
         SILType::getPrimitiveObjectType(funcType->withSendable(true)));
   }
   return RValue(SGF, e, destType, result);
+}
+
+RValue RValueEmitter::emitUnreachableValue(SILLocation loc, CanType ty) {
+  ASSERT(!SGF.B.hasValidInsertionPoint() && "Must be unreachable");
+
+  // Continue code generation in a block with no predecessors.
+  // Whatever code is emitted here is guaranteed to be removed by SIL passes.
+  SGF.B.emitBlock(SGF.createBasicBlock());
+
+  // Since the type is uninhabited, use a SILUndef of so that we can return
+  // some sort of RValue from this API.
+  auto &lowering = SGF.getTypeLowering(ty);
+  auto loweredTy = lowering.getLoweredType();
+  auto undef = SILUndef::get(SGF.F, loweredTy);
+
+  // Create an alloc initialized with contents from the undefined addr type.
+  // It seems pack addresses do not satisfy isPlusOneOrTrivial, so we need an
+  // actual allocation.
+  if (loweredTy.isAddress()) {
+    auto resultAddr = SGF.emitTemporaryAllocation(loc, loweredTy);
+    SGF.emitSemanticStore(loc, undef, resultAddr, lowering, IsInitialization);
+    return RValue(SGF, loc, ty, SGF.emitManagedRValueWithCleanup(resultAddr));
+  }
+
+  // Otherwise, if it's not an address, just emit the undef value itself.
+  return RValue(SGF, loc, ty, ManagedValue::forRValueWithoutOwnership(undef));
 }
 
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
@@ -2176,8 +2318,6 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // TODO: Move this up when we can emit closures directly with C calling
   // convention.
   auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
-
-
 
   // Look through `as` type ascriptions that don't induce bridging too.
   while (auto subCoerce = dyn_cast<CoerceExpr>(subExpr)) {
@@ -2254,45 +2394,52 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       return rv;
   }
 
-  // Break the conversion into three stages:
-  // 1) changing the representation from foreign to native
-  // 2) changing the signature within the representation
-  // 3) changing the representation from native to foreign
-  //
-  // We only do one of 1) or 3), but we have to do them in the right order
-  // with respect to 2).
-
-  CanAnyFunctionType stage1Type = srcType;
-  CanAnyFunctionType stage2Type = destType;
-
-  switch(srcType->getRepresentation()) {
-  case AnyFunctionType::Representation::Swift:
-  case AnyFunctionType::Representation::Thin:
-    // Source is native, so we can convert signature first.
-    stage2Type = adjustFunctionType(destType, srcType->getRepresentation(),
-                                    srcType->getClangTypeInfo());
-    break;
-  case AnyFunctionType::Representation::Block:
-  case AnyFunctionType::Representation::CFunctionPointer:
-    // Source is foreign, so do the representation change first.
-    stage1Type = adjustFunctionType(srcType, destType->getRepresentation(),
-                                    destType->getClangTypeInfo());
-  }
-
+  // First emit the actual underlying subexpression.
   auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
 
-  if (srcType != stage1Type)
-    result = convertFunctionRepresentation(SGF, e, result, srcType, stage1Type);
+  // Then perform the conversion as appropriate. We use different strategies
+  // depending on if our srcType is foreign/native.
+  //
+  // 1. If we have a foreign function, we first perform an optional conversion
+  // to native and then change the signature within the representation (which
+  // could be native or foreign).
+  //
+  // 2. If we have a native function, we first perform an optional conversion to
+  // foreign and then change the signature within the representation (which
+  // could be native or foreign).
 
-  if (stage1Type != stage2Type) {
-    result = SGF.emitTransformedValue(e, result, stage1Type, stage2Type,
-                                      SGFContext());
+  switch (srcType->getRepresentation()) {
+  case AnyFunctionType::Representation::Swift:
+  case AnyFunctionType::Representation::Thin: {
+    // Source is native, so we can convert signature first.
+    auto adjustedDestType = adjustFunctionType(
+        destType, srcType->getRepresentation(), srcType->getClangTypeInfo());
+    if (srcType != adjustedDestType) {
+      result = SGF.emitTransformedValue(e, result, srcType, adjustedDestType,
+                                        SGFContext());
+    }
+    if (adjustedDestType != destType) {
+      result = convertFunctionRepresentation(SGF, e, result, adjustedDestType,
+                                             destType);
+    }
+    return RValue(SGF, e, result);
   }
-
-  if (stage2Type != destType)
-    result = convertFunctionRepresentation(SGF, e, result, stage2Type, destType);
-
-  return RValue(SGF, e, result);
+  case AnyFunctionType::Representation::Block:
+  case AnyFunctionType::Representation::CFunctionPointer: {
+    // Source is foreign, so do the representation change first.
+    auto adjustedSrcType = adjustFunctionType(
+        srcType, destType->getRepresentation(), destType->getClangTypeInfo());
+    if (srcType != adjustedSrcType) {
+      result = convertFunctionRepresentation(SGF, e, result, srcType,
+                                             adjustedSrcType);
+    }
+    if (adjustedSrcType != destType) {
+      result = SGF.emitTransformedValue(e, result, adjustedSrcType, destType,
+                                        SGFContext());
+    }
+    return RValue(SGF, e, result);
+  }
+  }
 }
 
 RValue RValueEmitter::visitCovariantFunctionConversionExpr(
@@ -2401,8 +2548,20 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
     return emitUndefRValue(loc, getASTContext().getAnyHashableType());
 
   // Construct the substitution for T: Hashable.
-  auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      conformance.getProtocol(), type, conformance);
+  auto subMap = SubstitutionMap::get(convertFn->getGenericSignature(), type,
+    [&](InFlightSubstitution &ifs,
+        Type ty,
+        ProtocolDecl *proto) -> ProtocolConformanceRef {
+      switch (*proto->getKnownProtocolKind()) {
+      case KnownProtocolKind::Hashable:
+        return conformance;
+      case KnownProtocolKind::Copyable:
+      case KnownProtocolKind::Escapable:
+        return lookupConformance(type, proto);
+      default:
+        llvm_unreachable("no other conformances should be involved");
+      }
+    });
 
   return emitApplyOfLibraryIntrinsic(loc, convertFn, subMap, value, C);
 }
@@ -2660,28 +2819,7 @@ RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
   // Emit the expression, followed by an unreachable.
   SGF.emitIgnoredExpr(E->getSubExpr());
   SGF.B.createUnreachable(E);
-
-  // Continue code generation in a block with no predecessors.
-  // Whatever code is emitted here is guaranteed to be removed by SIL passes.
-  SGF.B.emitBlock(SGF.createBasicBlock());
-
-  // Since the type is uninhabited, use a SILUndef of so that we can return
-  // some sort of RValue from this API.
-  auto &lowering = SGF.getTypeLowering(E->getType());
-  auto loweredTy = lowering.getLoweredType();
-  auto undef = SILUndef::get(SGF.F, loweredTy);
-
-  // Create an alloc initialized with contents from the undefined addr type.
-  // It seems pack addresses do not satisfy isPlusOneOrTrivial, so we need an
-  // actual allocation.
-  if (loweredTy.isAddress()) {
-    auto resultAddr = SGF.emitTemporaryAllocation(E, loweredTy);
-    SGF.emitSemanticStore(E, undef, resultAddr, lowering, IsInitialization);
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(resultAddr));
-  }
-
-  // Otherwise, if it's not an address, just emit the undef value itself.
-  return RValue(SGF, E, ManagedValue::forRValueWithoutOwnership(undef));
+  return emitUnreachableValue(E, E->getType()->getCanonicalType());
 }
 
 static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation loc) {
@@ -3477,7 +3615,21 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 
 RValue RValueEmitter::
 visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  if (auto *undefinedFn = SGF.getASTContext().getUndefinedEditorPlaceholder()) {
+    auto args = SGF.emitSourceLocationArgs(E->getLoc(), E);
+    SGF.emitApplyOfLibraryIntrinsic(E, undefinedFn, SubstitutionMap(),
+                                    {
+                                        args.filenameStartPointer,
+                                        args.filenameLength,
+                                        args.filenameIsAscii,
+                                        args.line,
+                                    },
+                                    SGFContext());
+  } else {
+    SGF.B.createUnconditionalFail(E, "attempt to evaluate editor placeholder");
+  }
+  SGF.B.createUnreachable(E);
+  return emitUnreachableValue(E, E->getType()->getCanonicalType());
 }
 
 RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {

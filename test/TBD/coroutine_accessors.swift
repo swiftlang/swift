@@ -16,11 +16,11 @@ public struct S {}
 public protocol P {
   associatedtype A
 
-  var s: S { read set }
-  var s2: S { read set }
+  var s: S { yielding borrow set }
+  var s2: S { yielding borrow set }
 }
 
 public protocol Q : P {
-  override var s: S { read set }
-  var s2: S { read set }
+  override var s: S { yielding borrow set }
+  var s2: S { yielding borrow set }
 }

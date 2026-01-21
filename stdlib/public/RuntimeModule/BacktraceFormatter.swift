@@ -30,6 +30,7 @@ internal import Musl
 
 /// A backtrace formatting theme.
 @_spi(Formatting)
+@available(Backtracing 6.2, *)
 public protocol BacktraceFormattingTheme {
   func frameIndex(_ s: String) -> String
   func programCounter(_ s: String) -> String
@@ -48,6 +49,7 @@ public protocol BacktraceFormattingTheme {
   func imagePath(_ s: String) -> String
 }
 
+@available(Backtracing 6.2, *)
 extension BacktraceFormattingTheme {
   public func frameIndex(_ s: String) -> String { return s }
   public func programCounter(_ s: String) -> String { return s }
@@ -70,6 +72,7 @@ extension BacktraceFormattingTheme {
 ///
 /// This is used by chaining modifiers, e.g. .theme(.color).showSourceCode().
 @_spi(Formatting)
+@available(Backtracing 6.2, *)
 public struct BacktraceFormattingOptions {
   var _theme: BacktraceFormattingTheme = BacktraceFormatter.Themes.plain
   var _showSourceCode: Bool = false
@@ -360,6 +363,7 @@ private func measure<S: StringProtocol>(_ s: S) -> Int {
 }
 
 /// Pad the given string to the given width using spaces.
+@available(Backtracing 6.2, *)
 private func pad(_ s: String, to width: Int,
                  aligned alignment: BacktraceFormatter.Alignment = .left)
   -> String {
@@ -442,6 +446,7 @@ private func rtrim<S: StringProtocol>(_ s: S) -> S.SubSequence {
 
 /// Responsible for formatting backtraces.
 @_spi(Formatting)
+@available(Backtracing 6.2, *)
 public struct BacktraceFormatter {
 
   /// The formatting options to apply when formatting data.

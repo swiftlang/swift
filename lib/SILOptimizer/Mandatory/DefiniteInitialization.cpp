@@ -622,7 +622,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(const SILBasicBlock *BB) {
   // Lazily compute reachability, so we only have to do it in the case of an
   // error.
   if (BlocksReachableFromEntry.empty()) {
-    SmallVector<const SILBasicBlock*, 128> Worklist;
+    SmallVector<const SILBasicBlock*, 8> Worklist;
     Worklist.push_back(&BB->getParent()->front());
     BlocksReachableFromEntry.insert(Worklist.back());
     
@@ -1194,13 +1194,14 @@ void LifetimeChecker::doIt() {
 
   // All of the indirect results marked as "out" have to be fully initialized
   // before their lifetime ends.
-  if (TheMemory.isOut()) {
+  if (TheMemory.isOut() &&
+      !TheMemory.getType().isEmptyTuple(TheMemory.getFunction())) {
     auto diagnoseMissingInit = [&]() {
       std::string propertyName;
-      auto *property = TheMemory.getPathStringToElement(0, propertyName);
+      TheMemory.getPathStringToElement(0, propertyName);
       diagnose(Module, F.getLocation(),
                diag::ivar_not_initialized_by_init_accessor,
-               property->getName());
+               StringRef("'" + propertyName + "'"));
       EmittedErrorLocs.push_back(TheMemory.getLoc());
     };
 
@@ -1793,13 +1794,13 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::Get:
         case AccessorKind::DistributedGet:
         case AccessorKind::Read:
-        case AccessorKind::Read2:
+        case AccessorKind::YieldingBorrow:
         case AccessorKind::Address:
         case AccessorKind::Borrow:
           return false;
         case AccessorKind::Set:
         case AccessorKind::Modify:
-        case AccessorKind::Modify2:
+        case AccessorKind::YieldingMutate:
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:

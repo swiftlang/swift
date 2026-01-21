@@ -21,7 +21,11 @@ public func publicFuncInAModule() {
 @usableFromInline
 internal func internalFuncInAModule() {
   some_c_api()
+  _ = globalVariable
 }
+
+@_extern(c)
+var globalVariable: Int
 
 // BEGIN Main.swift
 

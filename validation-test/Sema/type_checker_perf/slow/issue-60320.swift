@@ -8,6 +8,8 @@ func *(_: Double, _: MyType) -> MyType {}
 // func *(_: MyType, _: Double) -> MyType {}
 func +(_: MyType, _: MyType) -> MyType {}
 
+// Invalid expression, because there is no (MyType, Double) overload of /
+
 func slow() {
   let d: Double
   let state: MyType
@@ -16,7 +18,6 @@ func slow() {
   let k3: MyType
   let k4: MyType
 
-  // This is invalid because of the missing overload commented out above
   let result = state + (1.0/6) * (k1 + 2*k2 + 2*k3 + k4) * d
   // expected-error@-1 {{reasonable}}
 }

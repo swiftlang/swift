@@ -1121,7 +1121,6 @@ namespace {
                 base.getType().getObjectType(),
                 SGF.getASTContext().AllocateCopy(conformances));
       } else {
-        assert(getSubstFormalType()->isBridgeableObjectType());
         ref = SGF.B.createInitExistentialRef(
                 loc,
                 base.getType().getObjectType(),
@@ -3444,9 +3443,9 @@ namespace {
       }
 
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
       case AccessorKind::Modify:
-      case AccessorKind::Modify2: {
+      case AccessorKind::YieldingMutate: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
                                        AccessKind, Storage, Subs,
@@ -5750,6 +5749,7 @@ SILGenFunction::tryEmitProjectedLValue(SILLocation loc, LValue &&src,
   for (auto component = src.begin(); component != src.end(); component++) {
     if (component->get()->getKind() != PathComponent::BorrowMutateKind &&
         component->get()->getKind() != PathComponent::StructElementKind &&
+        component->get()->getKind() != PathComponent::RefElementKind &&
         component->get()->getKind() != PathComponent::TupleElementKind &&
         component->get()->getKind() != PathComponent::ValueKind) {
       return std::nullopt;

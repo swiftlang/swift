@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 1 --end 15 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-expression-time-threshold=1 -Xfrontend=-verify
+// RUN: %scale-test --begin 1 --end 15 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-scope-threshold=1000 -Xfrontend=-verify
 // REQUIRES: asserts, no_asan
 
 // https://github.com/apple/swift/issues/43386

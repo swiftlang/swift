@@ -688,6 +688,9 @@ func r23641896() {
 
 }
 
+extension Array {
+  fileprivate mutating func appendLocal(_ newElement: Element) {}
+}
 
 // <rdar://problem/23718859> QoI: Incorrectly flattening ((Int,Int)) argument list to (Int,Int) when printing note
 func test17875634() {
@@ -695,7 +698,7 @@ func test17875634() {
   var row = 1
   var col = 2
   
-  match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
+  match.appendLocal(row, col)  // expected-error {{instance method 'appendLocal' expects a single parameter of type '(Int, Int)'}} {{21-21=(}} {{29-29=)}}
 }
 
 // <https://github.com/apple/swift/pull/1205> Improved diagnostics for enums with associated values
@@ -1472,14 +1475,12 @@ func testUnwrapFixIts(x: Int?) throws {
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{11-11=!}}
   foo(y: x ?? 0) 
 
-  let _ = x < 2 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{12-12= ?? <#default value#>}}
-  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{12-12=!}}
+  let _ = x < 2 // expected-error {{binary operator '<' cannot be applied to operands of type 'Int?' and 'Int'}}
+  // expected-note@-1 {{overloads for '<' exist with these partially matching parameter lists: (Int, Int)}}
   let _ = x ?? 0 < 2
 
-  let _ = 2 < x // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{16-16= ?? <#default value#>}}
-  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{16-16=!}}
+  let _ = 2 < x // expected-error {{binary operator '<' cannot be applied to operands of type 'Int' and 'Int?'}}
+  // expected-note@-1 {{overloads for '<' exist with these partially matching parameter lists: (Int, Int)}}
   let _ = 2 < x ?? 0
 
   let _: Int = (.optionalIntMember) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
@@ -1497,9 +1498,8 @@ func testUnwrapFixIts(x: Int?) throws {
   // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{36-36=!}}
   let _ = try (.optionalThrowsMember ?? 0) + 1
 
-  let _ = .optionalIntMember?.bitWidth > 0 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
-  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{39-39= ?? <#default value#>}}
-  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{11-11=(}} {{39-39=)!}}
+  let _ = .optionalIntMember?.bitWidth > 0 // expected-error {{binary operator '>' cannot be applied to operands of type 'Int?' and 'Int'}}
+  // expected-note@-1 {{overloads for '>' exist with these partially matching parameter lists: (Int, Int)}}
   let _ = (.optionalIntMember?.bitWidth)! > 0
   let _ = .optionalIntMember?.bitWidth ?? 0 > 0
 

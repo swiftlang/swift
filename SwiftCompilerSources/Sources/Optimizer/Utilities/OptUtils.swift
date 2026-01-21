@@ -241,6 +241,47 @@ extension FullApplySite {
   }
 }
 
+extension ApplySite {
+  func replace(withCallTo callee: Function, arguments newArguments: [Value], _ context: some MutatingContext) {
+    let builder = Builder(before: self, context)
+    let calleeRef = builder.createFunctionRef(callee)
+
+    switch self {
+    case let applyInst as ApplyInst:
+      let newApply = builder.createApply(function: calleeRef,
+                                         applyInst.substitutionMap,
+                                         arguments: newArguments,
+                                         isNonThrowing: applyInst.isNonThrowing)
+      applyInst.replace(with: newApply, context)
+
+    case let partialAp as PartialApplyInst:
+      let newApply = builder.createPartialApply(function: calleeRef,
+                                                substitutionMap: partialAp.substitutionMap,
+                                                capturedArguments: newArguments,
+                                                calleeConvention: partialAp.calleeConvention,
+                                                hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
+                                                isOnStack: partialAp.isOnStack)
+      partialAp.replace(with: newApply, context)
+
+    case let tryApply as TryApplyInst:
+      builder.createTryApply(function: calleeRef,
+                             tryApply.substitutionMap,
+                             arguments: newArguments,
+                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock)
+      context.erase(instruction: tryApply)
+
+    case let beginApply as BeginApplyInst:
+      let newApply = builder.createBeginApply(function: calleeRef,
+                                              beginApply.substitutionMap,
+                                              arguments: newArguments)
+      beginApply.replace(with: newApply, context)
+
+    default:
+      fatalError("unknown apply")
+    }
+  }
+}
+
 extension Builder {
   static func insert(after inst: Instruction, _ context: some MutatingContext, insertFunc: (Builder) -> ()) {
     Builder.insert(after: inst, location: inst.location, context, insertFunc: insertFunc)
@@ -1010,8 +1051,8 @@ func isCastSupportedInEmbeddedSwift(from sourceType: Type,
     return false
   }
 
-  // Tuple?
-  if !destType.isStruct && !destType.isClass && !destType.isEnum {
+  if !destType.isStruct && !destType.isClass && !destType.isEnum &&
+      !destType.isTuple && !destType.isLoweredFunction {
     return false
   }
 

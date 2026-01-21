@@ -15,13 +15,14 @@ import platform
 import re
 import sys
 import traceback
-from multiprocessing import freeze_support
-from typing import Any, Dict, Hashable, Optional, Set, List, Tuple, Union
+from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git, GitException
+from .git_command import Git, GitException, is_any_repository_locked
+from .retry import exponential_retry
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
+from .commands import status
 
 
 SCRIPT_FILE = Path(__file__).absolute()
@@ -351,30 +352,44 @@ def get_scheme_map(
     return None
 
 
-def _is_any_repository_locked(pool_args: List[UpdateArguments]) -> Set[str]:
-    """Returns the set of locked repositories.
+def _check_missing_clones(
+    args: CliArguments, config: Dict[str, Any], scheme_map: Dict[str, Any]
+):
+    """
+    Verify that all repositories defined in the scheme map are present in the
+    source root directory. If a repository is missing—and not explicitly skipped—
+    the user is prompted to re-run the script with the `--clone` option.
 
-    A repository is considered to be locked if its .git directory contains a
-    file ending in ".lock".
+    This function also respects per-repository platform restrictions: if the
+    current platform is not listed for a repo, that repo is ignored.
 
     Args:
-        pool_args (List[Any]): List of arguments passed to the
-        `update_single_repository` function.
+        args (CliArguments): Parsed CLI arguments.
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`.
+        scheme_map (Dict[str, str] | None): map of repo names to branches to check out.
 
     Returns:
-        Set[str]: The names of the locked repositories if any.
+        Prints a warning if any required repository is missing.
     """
 
-    repos = [(x.source_root, x.repo_name) for x in pool_args]
-    locked_repositories = set()
-    for source_root, repo_name in repos:
-        dot_git_path = source_root.joinpath(repo_name, ".git")
-        if not dot_git_path.exists() or not dot_git_path.is_dir():
+    directory_contents = {path.name for path in args.source_root.iterdir()}
+    current_platform = platform.system()
+
+    for repo in scheme_map:
+        repo_config = config["repos"].get(repo, {})
+
+        if (
+            "platforms" in repo_config
+            and current_platform not in repo_config["platforms"]
+        ):
             continue
-        for file in dot_git_path.iterdir():
-            if file.suffix == ".lock":
-                locked_repositories.add(repo_name)
-    return locked_repositories
+
+        if repo not in directory_contents and repo not in args.skip_repository_list:
+            print(
+                "You don't have all swift sources. "
+                "Call this script with --clone to get them."
+            )
+            return
 
 
 def _move_llvm_project_to_first_index(
@@ -438,7 +453,7 @@ def update_all_repositories(
         )
         pool_args.append(my_args)
 
-    locked_repositories: set[str] = _is_any_repository_locked(pool_args)
+    locked_repositories = is_any_repository_locked(pool_args)
     if len(locked_repositories) > 0:
         return skipped_repositories, [
             Exception(f"'{repo_name}' is locked by git. Cannot update it.")
@@ -585,6 +600,7 @@ def obtain_all_additional_swift_sources(
 
         new_args = AdditionalSwiftSourcesArguments(
             args=args,
+            source_root=args.source_root,
             repo_name=repo_name,
             repo_info=repo_info,
             repo_branch=repo_branch,
@@ -650,8 +666,9 @@ def repo_hashes(args: CliArguments, config: Dict[str, Any]) -> Dict[str, str]:
 
 def print_repo_hashes(args: CliArguments, config: Dict[str, Any]):
     repos = repo_hashes(args, config)
+    max_length = max(len(name) for name in repos.keys())
     for repo_name, repo_hash in sorted(repos.items(), key=lambda x: x[0]):
-        print("{:<35}: {:<35}".format(repo_name, repo_hash))
+        print(f"{repo_name:<{max_length + 1}}: {repo_hash}")
 
 
 def merge_no_duplicates(
@@ -768,8 +785,10 @@ def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]
 
 
 def main() -> int:
-    freeze_support()
     args = CliArguments.parse_args()
+
+    if args.command == "status":
+        return status.StatusCommand(args).run()
 
     if not args.scheme:
         if args.reset_to_remote:
@@ -818,64 +837,68 @@ def main() -> int:
 
     scheme_map = get_scheme_map(config, scheme_name)
 
-    clone_results = None
-    skip_repo_list = []
-    if args.clone or args.clone_with_ssh:
-        skip_repo_list = skip_list_for_platform(config, args.all_repositories)
-        skip_repo_list.extend(args.skip_repository_list)
-        skipped_repositories, clone_results = obtain_all_additional_swift_sources(
-            args, config, scheme_name, skip_repo_list
-        )
-        SkippedReason.print_skipped_repositories(skipped_repositories, "clone")
+    @exponential_retry(max_retries=args.max_retries)
+    def do_checkout() -> int:
+        nonlocal config, scheme_map
+        clone_results = None
+        skip_repo_list = []
+        if args.clone or args.clone_with_ssh:
+            skip_repo_list = skip_list_for_platform(config, args.all_repositories)
+            skip_repo_list.extend(args.skip_repository_list)
+            skipped_repositories, clone_results = obtain_all_additional_swift_sources(
+                args, config, scheme_name, skip_repo_list
+            )
+            SkippedReason.print_skipped_repositories(skipped_repositories, "clone")
 
-    swift_repo_path = args.source_root.joinpath("swift")
-    if "swift" not in skip_repo_list and swift_repo_path.exists():
-        # Check if `swift` repo itself needs to switch to a cross-repo branch.
-        branch_name, cross_repo = get_branch_for_repo(
-            swift_repo_path, config, "swift", scheme_name, scheme_map, cross_repos_pr
-        )
-
-        if cross_repo:
-            Git.run(
-                swift_repo_path, ["checkout", branch_name], echo=True, prefix="[swift] "
+        swift_repo_path = args.source_root.joinpath("swift")
+        if "swift" not in skip_repo_list and swift_repo_path.exists():
+            # Check if `swift` repo itself needs to switch to a cross-repo branch.
+            branch_name, cross_repo = get_branch_for_repo(
+                swift_repo_path,
+                config,
+                "swift",
+                scheme_name,
+                scheme_map,
+                cross_repos_pr,
             )
 
-            # Re-read the config after checkout.
-            config = {}
-            for config_path in args.configs:
-                with open(config_path) as f:
-                    config = merge_config(config, json.load(f))
-            validate_config(config)
-            scheme_map = get_scheme_map(config, scheme_name)
+            if cross_repo:
+                Git.run(
+                    swift_repo_path,
+                    ["checkout", branch_name],
+                    echo=True,
+                    prefix="[swift] ",
+                )
 
-    if args.dump_hashes:
-        dump_repo_hashes(args, config)
-        return 0
+                # Re-read the config after checkout.
+                config = {}
+                for config_path in args.configs:
+                    with open(config_path) as f:
+                        config = merge_config(config, json.load(f))
+                validate_config(config)
+                scheme_map = get_scheme_map(config, scheme_name)
 
-    if args.dump_hashes_config:
-        dump_repo_hashes(args, config, args.dump_hashes_config)
-        return 0
+        if args.dump_hashes:
+            dump_repo_hashes(args, config)
+            sys.exit(0)
 
-    # Quick check whether somebody is calling update in an empty directory
-    directory_contents = args.source_root.iterdir()
-    if not (
-        "cmark" in directory_contents
-        or "llvm" in directory_contents
-        or "clang" in directory_contents
-    ):
-        print(
-            "You don't have all swift sources. "
-            "Call this script with --clone to get them."
+        if args.dump_hashes_config:
+            dump_repo_hashes(args, config, args.dump_hashes_config)
+            sys.exit(0)
+
+        _check_missing_clones(args=args, config=config, scheme_map=scheme_map)
+
+        skipped_repositories, update_results = update_all_repositories(
+            args, config, scheme_name, scheme_map, cross_repos_pr
         )
+        SkippedReason.print_skipped_repositories(skipped_repositories, "update")
 
-    skipped_repositories, update_results = update_all_repositories(
-        args, config, scheme_name, scheme_map, cross_repos_pr
-    )
-    SkippedReason.print_skipped_repositories(skipped_repositories, "update")
+        fail_count = 0
+        fail_count += ParallelRunner.check_results(clone_results, "CLONE")
+        fail_count += ParallelRunner.check_results(update_results, "UPDATE")
+        return fail_count
 
-    fail_count = 0
-    fail_count += ParallelRunner.check_results(clone_results, "CLONE")
-    fail_count += ParallelRunner.check_results(update_results, "UPDATE")
+    fail_count = do_checkout()
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:

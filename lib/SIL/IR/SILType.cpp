@@ -213,6 +213,20 @@ bool SILType::isEmpty(const SILFunction &F) const {
   return false;
 }
 
+bool SILType::isEmptyTuple(const SILFunction &F) const {
+  if (auto tupleTy = getAs<TupleType>()) {
+    // A tuple is empty if it either has no elements or if all elements are
+    // empty.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!getTupleElementType(idx).isEmptyTuple(F))
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
@@ -1019,6 +1033,20 @@ SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) const 
                               f->getModule().Types, field);
 }
 
+SILType SILBoxType::getFieldType(SILFunction &fn, unsigned index) {
+  return ::getSILBoxFieldType(fn.getTypeExpansionContext(), this,
+                              fn.getModule().Types, index);
+}
+
+SILBoxType::SILFieldToSILTypeRange
+SILBoxType::getSILFieldTypes(SILFunction &fn) {
+  auto transform = [this, &fn](unsigned index) {
+    return getFieldType(fn, index);
+  };
+  return llvm::map_range(range(getNumFields()),
+                         SILFieldIndexToSILTypeTransform(transform));
+}
+
 SILType
 SILType::getSingletonAggregateFieldType(SILModule &M,
                                         ResilienceExpansion expansion) const {
@@ -1119,10 +1147,8 @@ bool SILType::isEscapable(const SILFunction &function) const {
   // TODO: Support ~Escapable in parameter packs.
   //
   // Treat all other SIL-specific types as Escapable.
-  if (isa<SILBlockStorageType,
-          SILBoxType,
-          SILPackType,
-          SILTokenType>(ty)) {
+  if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
+      isa<SILPackType>(ty) || isa<SILTokenType>(ty)) {
     return true;
   }
   return ty->isEscapable();
@@ -1157,10 +1183,8 @@ bool SILType::isMoveOnly(bool orWrapped) const {
     return false;
 
   // Treat all other SIL-specific types as Copyable.
-  if (isa<SILBlockStorageType,
-          SILBoxType,
-          SILPackType,
-          SILTokenType>(ty)) {
+  if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
+      isa<SILPackType>(ty) || isa<SILTokenType>(ty)) {
     return false;
   }
 

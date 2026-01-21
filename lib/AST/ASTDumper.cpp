@@ -260,6 +260,12 @@ std::string typeUSR(Type type) {
   if (!type)
     return "";
 
+  if (type->is<ModuleType>()) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
   if (type->hasArchetype()) {
     type = type->mapTypeOutOfEnvironment();
   }
@@ -279,6 +285,13 @@ std::string typeUSR(Type type) {
 std::string declTypeUSR(const ValueDecl *D) {
   if (!D)
     return "";
+
+  if (isa<ModuleDecl>(D)) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
 
   std::string usr;
   llvm::raw_string_ostream os(usr);
@@ -326,8 +339,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
-  case ReadImplKind::Read2:
-    return "read2_coroutine";
+  case ReadImplKind::YieldingBorrow:
+    return "yielding_borrow";
   case ReadImplKind::Borrow:
     return "borrow";
   }
@@ -350,8 +363,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
-  case WriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case WriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case WriteImplKind::Mutate:
     return "mutate";
   }
@@ -370,8 +383,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
-  case ReadWriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case ReadWriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
@@ -1471,7 +1484,11 @@ namespace {
         printFlag(value.isLocalCapture(), "is_local_capture");
         printFlag(value.isDynamicSelfMetadata(), "is_dynamic_self_metadata");
         if (auto *D = value.getDecl()) {
-          printRec(D, Label::always("decl"));
+          // We print the decl ref, not the full decl, to avoid infinite
+          // recursion when a function captures itself (and also because
+          // those decls are already printed elsewhere, so we don't need to
+          // print what could be a very large amount of information twice).
+          printDeclRefField(D, Label::always("decl"));
         }
         if (auto *E = value.getExpr()) {
           printRec(E, Label::always("expr"));
@@ -1896,10 +1913,8 @@ namespace {
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, Label label) {
-      if (P->isAsyncLet()) {
-        printCommon(P, "async_let ", label);
-      }
       printCommon(P, "pattern_any", label);
+      printFlag(P->isAsyncLet(), "async_let", DeclModifierColor);
       printFoot();
     }
     void visitTypedPattern(TypedPattern *P, Label label) {
@@ -3953,10 +3968,10 @@ public:
     printCommon(E, "collection_upcast_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     if (auto keyConversion = E->getKeyConversion()) {
-      printRec(keyConversion.Conversion, Label::always("key_conversion"));
+      printRec(keyConversion, Label::always("key_conversion"));
     }
     if (auto valueConversion = E->getValueConversion()) {
-      printRec(valueConversion.Conversion, Label::always("value_conversion"));
+      printRec(valueConversion, Label::always("value_conversion"));
     }
     printFoot();
   }
@@ -4412,9 +4427,6 @@ public:
       printRec(TyR, Label::optional("placeholder_type_repr"));
     if (ExpTyR && ExpTyR != TyR) {
       printRec(ExpTyR, Label::optional("type_repr_for_expansion"));
-    }
-    if (auto *SE = E->getSemanticExpr()) {
-      printRec(SE, Label::always("semantic_expr"));
     }
     printFoot();
   }
@@ -5094,6 +5106,7 @@ public:
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
+  TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
   TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
@@ -5596,6 +5609,31 @@ public:
     if (Attr->hasMessage()) {
       printFieldQuoted(Attr->Message, Label::always("message"));
     }
+    printFoot();
+  }
+                         
+  void visitWarnAttr(WarnAttr *Attr, Label label) {
+    printCommon(Attr, "warn", label);
+    auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
+    printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
+                  Label::always("diagGroupID:"));
+    switch (Attr->DiagnosticBehavior) {
+    case WarningGroupBehavior::None:
+    case WarningGroupBehavior::AsWarning:
+      printFieldRaw([&](raw_ostream &out) { out << "warning"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::AsError:
+      printFieldRaw([&](raw_ostream &out) { out << "error"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::Ignored:
+        printFieldRaw([&](raw_ostream &out) { out << "ignored"; },
+                      Label::always("as:"));
+        break;
+    }
+    if (Attr->Reason)
+      printFieldQuoted(Attr->Reason, Label::always("reason:"));
     printFoot();
   }
 };

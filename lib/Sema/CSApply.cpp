@@ -445,12 +445,15 @@ namespace {
     bool SuppressDiagnostics;
 
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 std::optional<SyntacticElementTarget> target,
-                 bool suppressDiagnostics)
-        : ctx(cs.getASTContext()), cs(cs),
-          dc(target ? target->getDeclContext() : cs.DC),
+                 SyntacticElementTarget target, bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs), dc(target.getDeclContext()),
           solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
+
+    ExprRewriter(ConstraintSystem &cs, Solution &solution, DeclContext &dc,
+                 bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs), dc(&dc), solution(solution),
+          target(std::nullopt), SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -1047,8 +1050,7 @@ namespace {
         // "T.init(...)" -- pretend it has two argument lists like
         // a real '.' call.
         if (isa<ConstructorDecl>(member) &&
-            isa<CallExpr>(prev) &&
-            isa<TypeExpr>(cast<CallExpr>(prev)->getFn())) {
+            isa<CallExpr>(prev)) {
           assert(maxArgCount == 2);
           return 2;
         }
@@ -3749,7 +3751,7 @@ namespace {
       //
       // The result is that in Swift 5, 'try?' avoids producing nested optionals.
       
-      if (!ctx.LangOpts.isSwiftVersionAtLeast(5)) {
+      if (!ctx.isLanguageModeAtLeast(5)) {
         // Nothing to do for Swift 4 and earlier!
         return simplifyExprType(expr);
       }
@@ -4316,7 +4318,7 @@ namespace {
       // be an optional type, leave any extra optionals on the source in place.
       // Only apply the latter condition in Swift 5 mode to best preserve
       // compatibility with Swift 4.1's casting behaviour.
-      if (isBridgeToAnyObject || (ctx.isSwiftVersionAtLeast(5) &&
+      if (isBridgeToAnyObject || (ctx.isLanguageModeAtLeast(5) &&
                                   destValueType->canDynamicallyBeOptionalType(
                                       /*includeExistential*/ false))) {
         auto destOptionalsCount = destOptionals.size() - destExtraOptionals;
@@ -4530,7 +4532,7 @@ namespace {
         Expr *sub = expr->getSubExpr();
         auto subLoc =
             cs.getConstraintLocator(sub, ConstraintLocator::CoercionOperand);
-        sub = solution.coerceToType(sub, expr->getCastType(), subLoc);
+        sub = solution.coerceToType(sub, expr->getCastType(), subLoc, *dc);
         if (!sub)
           return nullptr;
 
@@ -4782,34 +4784,7 @@ namespace {
     }
     
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-      simplifyExprType(E);
-      auto valueType = cs.getType(E);
-
-      // Synthesize a call to _undefined() of appropriate type.
-      FuncDecl *undefinedDecl = ctx.getUndefined();
-      if (!undefinedDecl) {
-        ctx.Diags.diagnose(E->getLoc(), diag::missing_undefined_runtime);
-        return nullptr;
-      }
-      DeclRefExpr *fnRef = new (ctx) DeclRefExpr(undefinedDecl, DeclNameLoc(),
-                                                 /*Implicit=*/true);
-      fnRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
-
-      StringRef msg = "attempt to evaluate editor placeholder";
-      Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
-                                                  /*implicit*/true);
-
-      auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {argExpr});
-      Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, argList);
-
-      auto resultTy = TypeChecker::typeCheckExpression(
-          callExpr, dc, /*contextualInfo=*/{valueType, CTP_CannotFail});
-      assert(resultTy && "Conversion cannot fail!");
-      (void)resultTy;
-
-      cs.cacheExprTypes(callExpr);
-      E->setSemanticExpr(callExpr);
-      return E;
+      return simplifyExprType(E);
     }
 
     Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
@@ -5822,7 +5797,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     concatLabels(labels, toLabelStr);
 
     using namespace version;
-    if (ctx.isSwiftVersionAtLeast(Version::getFutureMajorLanguageVersion())) {
+    if (ctx.isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion())) {
       ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
                          fromLabelStr, toLabelStr);
     } else {
@@ -6189,7 +6164,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
     // Both the caller and the allee are in the same module.
     if (dc->getParentModule() == decl->getModuleContext()) {
-      return !dc->getASTContext().isSwiftVersionAtLeast(6);
+      return !dc->getASTContext().isLanguageModeAtLeast(6);
     }
 
     // If we cannot figure out where the callee came from, let's conservatively
@@ -6366,7 +6341,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
         // to be used by value if parameter would return a function
         // type (it just needs to get wrapped into autoclosure expr),
         // otherwise argument must always form a call.
-        return ctx.isSwiftVersionAtLeast(5);
+        return ctx.isLanguageModeAtLeast(5);
       }
 
       return true;
@@ -6734,11 +6709,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
   return rewriter.coerceToType(element, destType, locator);
 }
 
-static CollectionUpcastConversionExpr::ConversionPair
-buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
-                             Type srcType, Type destType,
-                             bool bridged, ConstraintLocatorBuilder locator,
-                             unsigned typeArgIndex) {
+static ConversionPair buildOpaqueElementConversion(
+    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
+    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
   // Build the conversion.
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
@@ -6751,6 +6724,69 @@ buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
       opaque);
 
   return { opaque, conversion };
+}
+
+static ClosureExpr *buildClosureElementConversion(
+    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
+    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
+  // Build the conversion.
+  auto &cs = rewriter.getConstraintSystem();
+  ASTContext &Context = cs.getASTContext();
+
+  DeclContext *declContext = rewriter.dc;
+
+  DeclAttributes attributes;
+  SourceRange bracketRange;
+  VarDecl *capturedSelfDecl = nullptr;
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+  TypeExpr *thrownType = nullptr;
+  SourceLoc arrowLoc;
+  TypeExpr *explicitResultType = nullptr;
+  SourceLoc inLoc;
+
+  ClosureExpr *closure = new (Context) ClosureExpr(
+      attributes, bracketRange, capturedSelfDecl, nullptr, asyncLoc, throwsLoc,
+      thrownType, arrowLoc, inLoc, explicitResultType, declContext);
+  closure->setImplicit(true);
+  closure->setIsConversionClosure(true);
+
+  Identifier ident = Context.getDollarIdentifier(0);
+  ParamDecl *param = new (Context) ParamDecl(
+      SourceLoc(), SourceLoc(), Identifier(), SourceLoc(), ident, closure);
+
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(srcType->mapTypeOutOfEnvironment());
+  param->setImplicit();
+
+  ParameterList *params =
+      ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
+  closure->setParameterList(params);
+
+  auto srcExp = rewriter.cs.cacheType(
+      new (Context) DeclRefExpr(param, DeclNameLoc(srcRange.Start), true,
+                                AccessSemantics::Ordinary, srcType));
+
+  Expr *conversion = buildElementConversion(
+      rewriter, srcRange, srcType, destType, bridged,
+      locator.withPathElement(LocatorPathElt::GenericArgument(typeArgIndex)),
+      srcExp);
+
+  auto *RS = ReturnStmt::createImplicit(Context, conversion);
+  ASTNode bodyNode(RS);
+  auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
+  closure->setBody(BS);
+
+  auto closureParam = AnyFunctionType::Param(srcType);
+  auto extInfo =
+      FunctionType::ExtInfo().withNoEscape().withSendable().withoutIsolation();
+  auto *fnTy = FunctionType::get(ArrayRef(closureParam), destType, extInfo);
+  closure->setType(fnTy);
+
+  closure->setCaptureInfo(CaptureInfo::empty());
+
+  rewriter.cs.cacheType(closure);
+  return closure;
 }
 
 void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
@@ -6887,10 +6923,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
   // Build the first value conversion.
   auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
   auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
-  auto conv =
-    buildOpaqueElementConversion(*this, expr->getLoc(),
-                                 fromArgs[0], toArgs[0],
-                                 bridged, locator, 0);
+  auto conv = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[0],
+                                            toArgs[0], bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (toType->isArray() || ConstraintSystem::isSetType(toType)) {
@@ -6902,10 +6936,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 =
-    buildOpaqueElementConversion(*this, expr->getLoc(),
-                                 fromArgs[1], toArgs[1],
-                                 bridged, locator, 1);
+  auto conv2 = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[1],
+                                             toArgs[1], bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
@@ -6987,7 +7019,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Use the requirements of any parameterized protocols to build out fake
   // argument conversions that can be used to infer opaque types.
-  SmallVector<CollectionUpcastConversionExpr::ConversionPair, 4> argConversions;
+  SmallVector<ConversionPair, 4> argConversions;
 
   auto fromConstraintType = fromInstanceType;
   if (auto existential = fromConstraintType->getAs<ExistentialType>())
@@ -7120,8 +7152,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // ```
       //
       // See also: https://github.com/apple/swift/issues/49345
-      if (ctx.isSwiftVersionAtLeast(4) &&
-          !ctx.isSwiftVersionAtLeast(5)) {
+      if (ctx.isLanguageModeAtLeast(4) &&
+          !ctx.isLanguageModeAtLeast(5)) {
         auto obj1 = fromType->getOptionalObjectType();
         auto obj2 = toType->getOptionalObjectType();
 
@@ -9259,7 +9291,8 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
 
   auto locator = cs.getConstraintLocator(
       target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
-  initializer = solution.coerceToType(initializer, initType, locator);
+  initializer = solution.coerceToType(initializer, initType, locator,
+                                      *rewriter.getCurrentDC());
   if (!initializer)
     return std::nullopt;
 
@@ -9452,17 +9485,18 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
   if (!optPatternType->isEqual(nextResultType)) {
     OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
         stmt->getInLoc(), nextResultType->getOptionalObjectType(),
-        /*isPlaceholder=*/true);
-    Expr *convertElementExpr = elementExpr;
-    if (TypeChecker::typeCheckExpression(convertElementExpr, dc,
-                                         /*contextualInfo=*/
-                                         {info.initType, CTP_CoerceOperand})
-            .isNull()) {
+        /*isPlaceholder=*/false);
+    cs.cacheExprTypes(elementExpr);
+
+    auto *loc = cs.getConstraintLocator(parsedSequence,
+                                        ConstraintLocator::SequenceElementType);
+    auto *convertExpr = solution.coerceToType(elementExpr, info.initType, loc,
+                                              *rewriter.getCurrentDC());
+    if (!convertExpr)
       return std::nullopt;
-    }
-    elementExpr->setIsPlaceholder(false);
+
     stmt->setElementExpr(elementExpr);
-    stmt->setConvertElementExpr(convertElementExpr);
+    stmt->setConvertElementExpr(convertExpr);
   }
 
   // Get the conformance of the sequence type to the Sequence protocol.
@@ -9616,7 +9650,6 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     case CTP_SubscriptAssignSource:
     case CTP_Condition:
     case CTP_WrappedProperty:
-    case CTP_CannotFail:
     case CTP_SingleValueStmtBranch:
       result.setExpr(rewrittenExpr);
       break;
@@ -9927,10 +9960,10 @@ ConstraintSystem::applySolution(Solution &solution,
   return resultTarget;
 }
 
-Expr *
-Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
+Expr *Solution::coerceToType(Expr *expr, Type toType,
+                             ConstraintLocator *locator, DeclContext &dc) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, std::nullopt, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, dc, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;

@@ -10,6 +10,7 @@ swift_compiler_sources(Optimizer
   AllocBoxToStack.swift
   AssumeSingleThreaded.swift
   AsyncDemotion.swift
+  AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift
   ConstantCapturePropagation.swift
   CleanupDebugSteps.swift
@@ -17,10 +18,12 @@ swift_compiler_sources(Optimizer
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
   CopyToBorrowOptimization.swift
+  DeadAccessScopeElimination.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
+  EmbeddedWitnessCallSpecialization.swift
   InitializeStaticGlobals.swift
   LetPropertyLowering.swift
   LifetimeDependenceDiagnostics.swift

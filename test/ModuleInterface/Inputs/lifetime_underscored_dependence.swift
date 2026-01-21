@@ -77,3 +77,15 @@ extension Container {
     }
   }
 }
+
+public struct RigidArray : ~Copyable {
+  @usableFromInline let _ptr: UnsafeRawBufferPointer
+
+  public var span: RawSpan {
+    @_lifetime(borrow self)
+    get {
+      return RawSpan(_unsafeBytes: _ptr)
+    }
+  }
+}
+

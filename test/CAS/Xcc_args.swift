@@ -8,16 +8,8 @@
 // RUN:   -Xcc -I%t/empty.hmap -module-load-mode prefer-serialized \
 // RUN:   -file-compilation-dir %t
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shims.cmd
-// RUN: %swift_frontend_plain @%t/shims.cmd
+// RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:_Macro > %t/Macro.cmd
-// RUN: %swift_frontend_plain @%t/Macro.cmd
-
-// RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
-
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: %FileCheck %s --input-file=%t/MyApp.cmd
 
 // CHECK: "-direct-clang-cc1-module-build"
@@ -27,11 +19,10 @@
 // CHECK-NOT: -ivfsoverlay
 // CHECK-NOT: -fmodule-map-file
 
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
+// RUN:   -swift-version 5 -module-name Test \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/test.swift @%t/MyApp.cmd
 
 //--- test.swift

@@ -47,3 +47,8 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr,
                                            __swift_size_t nitems) {
   return fwrite(ptr, size, nitems, stdout);
 }
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_fputs_stderr(const char *str) {
+  fputs(str, stderr);
+}

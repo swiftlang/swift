@@ -301,13 +301,16 @@ SWIFT_REQUEST(TypeChecker, RequirementRequest,
               Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
               Cached, HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, StructuralRequirementsRequest,
-              ArrayRef<StructuralRequirement>(ProtocolDecl *), Cached,
+              (std::pair<ArrayRef<StructuralRequirement>, ArrayRef<InverseRequirement>>(ProtocolDecl *)), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, TypeAliasRequirementsRequest,
               ArrayRef<Requirement>(ProtocolDecl *), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, ProtocolDependenciesRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
+              HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, ProtocolInversesRequest,
+              ArrayRef<InverseRequirement>(ProtocolDecl *), Cached,
               HasNearestLocation)
 SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
               RequirementSignature(ProtocolDecl *), SeparatelyCached,
@@ -333,11 +336,16 @@ SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest,
               ArrayRef<Decl *>(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StoredPropertiesRequest,
               ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InitializablePropertiesRequest,
+              ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InitAccessorPropertiesRequest,
               ArrayRef<VarDecl *>(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MemberwiseInitPropertiesRequest,
-              ArrayRef<VarDecl *>(NominalTypeDecl *),
+              ArrayRef<VarDecl *>(NominalTypeDecl *, MemberwiseInitKind),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, MemberwiseInitMaxAccessLevel,
+              AccessLevel(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StructuralTypeRequest, Type(TypeAliasDecl *), Cached,
               NoLocationInfo)
@@ -389,7 +397,7 @@ SWIFT_REQUEST(TypeChecker, AreAllStoredPropertiesDefaultInitableRequest,
 SWIFT_REQUEST(TypeChecker, HasUserDefinedDesignatedInitRequest,
               bool(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasMemberwiseInitRequest,
-              bool(StructDecl *), Cached, NoLocationInfo)
+              bool(StructDecl *, MemberwiseInitKind), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, BraceHasExplicitReturnStmtRequest,
               bool(const BraceStmt *),
               Cached, NoLocationInfo)
@@ -429,7 +437,8 @@ SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMemberwiseInitRequest,
-              ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
+              ConstructorDecl *(NominalTypeDecl *, MemberwiseInitKind),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveEffectiveMemberwiseInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasDefaultInitRequest,
