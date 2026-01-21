@@ -1917,12 +1917,6 @@ static std::optional<bool> isPreferable(ConstraintSystem &cs,
 
 std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
 ConstraintSystem::selectDisjunction() {
-  if (performanceHacksEnabled()) {
-    if (auto *disjunction = selectDisjunctionWithHacks())
-      return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
-    return std::nullopt;
-  }
-
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
