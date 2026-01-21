@@ -2207,7 +2207,7 @@ public:
                           const SourceValueRangeTy &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
-    SmallVector<std::pair<Operand *, TrackableValue>, 8> assignOperands;
+    SmallVector<std::pair<Operand *, TrackableValue>, 8> sourceOperandTVPairs;
     SmallVector<TrackableValue, 8> directResultTVs;
 
     // A helper we use to emit an unknown patten error if our merge is
@@ -2248,7 +2248,7 @@ public:
         if (value.isSendable())
           continue;
 
-        assignOperands.push_back({srcOperand, value});
+        sourceOperandTVPairs.push_back({srcOperand, value});
         auto originalMergedInfo = mergedInfo;
         (void)originalMergedInfo;
         if (mergedInfo)
@@ -2278,8 +2278,9 @@ public:
     }
 
     // Merge all srcs.
-    for (unsigned i = 1; i < assignOperands.size(); i++) {
-      builder.addMerge(assignOperands[i - 1].second, assignOperands[i].first);
+    for (unsigned i = 1; i < sourceOperandTVPairs.size(); i++) {
+      builder.addMerge(sourceOperandTVPairs[i - 1].second,
+                       sourceOperandTVPairs[i].first);
     }
 
     for (SILValue result : directResultValues) {
@@ -2316,10 +2317,10 @@ public:
       // isolationInfo since we want to do this regardless of whether or not we
       // passed in a specific isolation info unlike earlier when processing
       // actual results.
-      if (assignOperands.size() && resultIsolationInfoOverride) {
+      if (sourceOperandTVPairs.size() && resultIsolationInfoOverride) {
         builder.addActorIntroducingInst(
-            assignOperands.back().second.getRepresentative().getValue(),
-            assignOperands.back().first, resultIsolationInfoOverride);
+            sourceOperandTVPairs.back().second.getRepresentative().getValue(),
+            sourceOperandTVPairs.back().first, resultIsolationInfoOverride);
       }
 
       return;
@@ -2327,7 +2328,7 @@ public:
 
     // If we do not have any non-Sendable srcs, then all of our results get one
     // large fresh region.
-    if (assignOperands.empty()) {
+    if (sourceOperandTVPairs.empty()) {
       builder.addAssignFresh(directResultTVs);
       return;
     }
@@ -2336,7 +2337,7 @@ public:
     // as the operands. Without losing generality, we just use the first
     // non-Sendable one.
     for (auto result : directResultTVs) {
-      builder.addAssign(result, assignOperands.front().first);
+      builder.addAssign(result, sourceOperandTVPairs.front().first);
     }
   }
 
