@@ -265,8 +265,6 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
-// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
-// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT:   var value: Int32
 // CHECK-NEXT:   var pointee: Int32
 // CHECK-NEXT: }

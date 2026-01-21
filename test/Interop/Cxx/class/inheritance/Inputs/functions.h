@@ -26,6 +26,10 @@ struct Base {
       __attribute__((swift_attr("import_unsafe"))) {
     return "Base::rvalueThisInBase";
   }
+  inline void refQualifierOverloads() & {}
+  inline void refQualifierOverloads() const & {}
+  inline void refQualifierOverloads() && {}
+  inline void refQualifierOverloads() const && {}
   // TODO: if these are unnamed we hit an (unrelated) SILGen bug. Same for
   // subscripts.
   inline const char *takesArgsInBase(int a, int b, int c) const
