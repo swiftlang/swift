@@ -1654,24 +1654,6 @@ struct PartitionOpBuilder {
         PartitionOp::AssignFresh(id, currentInst));
   }
 
-  void addAssignFresh(ArrayRef<SILValue> values) {
-    if (values.empty())
-      return;
-
-    auto first = lookupValueID(values.front());
-    currentInstPartitionOps->emplace_back(
-        PartitionOp::AssignFresh(first, currentInst));
-
-    auto transformedCollection =
-        makeTransformRange(values.drop_front(), [&](SILValue value) {
-          return lookupValueID(value);
-        });
-    for (auto id : transformedCollection) {
-      currentInstPartitionOps->emplace_back(
-          PartitionOp::AssignFreshAssign(id, first, currentInst));
-    }
-  }
-
   void addAssignFresh(ArrayRef<TrackableValue> values) {
     if (values.empty())
       return;
@@ -3819,7 +3801,7 @@ PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
 
   // NOTE: To prevent an additional reinitialization by the canned AssignFresh
   // code, we do our own assign fresh and return special.
-  builder.addAssignFresh(v->first.getRepresentative().getValue());
+  builder.addAssignFresh(v->first);
   return TranslationSemantics::Special;
 }
 
