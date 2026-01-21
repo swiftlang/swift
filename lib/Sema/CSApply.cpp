@@ -445,12 +445,15 @@ namespace {
     bool SuppressDiagnostics;
 
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 std::optional<SyntacticElementTarget> target,
-                 bool suppressDiagnostics)
-        : ctx(cs.getASTContext()), cs(cs),
-          dc(target ? target->getDeclContext() : cs.DC),
+                 SyntacticElementTarget target, bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs), dc(target.getDeclContext()),
           solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
+
+    ExprRewriter(ConstraintSystem &cs, Solution &solution, DeclContext &dc,
+                 bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs), dc(&dc), solution(solution),
+          target(std::nullopt), SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -4529,7 +4532,7 @@ namespace {
         Expr *sub = expr->getSubExpr();
         auto subLoc =
             cs.getConstraintLocator(sub, ConstraintLocator::CoercionOperand);
-        sub = solution.coerceToType(sub, expr->getCastType(), subLoc);
+        sub = solution.coerceToType(sub, expr->getCastType(), subLoc, *dc);
         if (!sub)
           return nullptr;
 
@@ -6706,11 +6709,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
   return rewriter.coerceToType(element, destType, locator);
 }
 
-static CollectionUpcastConversionExpr::ConversionPair
-buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
-                             Type srcType, Type destType,
-                             bool bridged, ConstraintLocatorBuilder locator,
-                             unsigned typeArgIndex) {
+static ConversionPair buildOpaqueElementConversion(
+    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
+    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
   // Build the conversion.
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
@@ -6723,6 +6724,69 @@ buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
       opaque);
 
   return { opaque, conversion };
+}
+
+static ClosureExpr *buildClosureElementConversion(
+    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
+    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
+  // Build the conversion.
+  auto &cs = rewriter.getConstraintSystem();
+  ASTContext &Context = cs.getASTContext();
+
+  DeclContext *declContext = rewriter.dc;
+
+  DeclAttributes attributes;
+  SourceRange bracketRange;
+  VarDecl *capturedSelfDecl = nullptr;
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+  TypeExpr *thrownType = nullptr;
+  SourceLoc arrowLoc;
+  TypeExpr *explicitResultType = nullptr;
+  SourceLoc inLoc;
+
+  ClosureExpr *closure = new (Context) ClosureExpr(
+      attributes, bracketRange, capturedSelfDecl, nullptr, asyncLoc, throwsLoc,
+      thrownType, arrowLoc, inLoc, explicitResultType, declContext);
+  closure->setImplicit(true);
+  closure->setIsConversionClosure(true);
+
+  Identifier ident = Context.getDollarIdentifier(0);
+  ParamDecl *param = new (Context) ParamDecl(
+      SourceLoc(), SourceLoc(), Identifier(), SourceLoc(), ident, closure);
+
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(srcType->mapTypeOutOfEnvironment());
+  param->setImplicit();
+
+  ParameterList *params =
+      ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
+  closure->setParameterList(params);
+
+  auto srcExp = rewriter.cs.cacheType(
+      new (Context) DeclRefExpr(param, DeclNameLoc(srcRange.Start), true,
+                                AccessSemantics::Ordinary, srcType));
+
+  Expr *conversion = buildElementConversion(
+      rewriter, srcRange, srcType, destType, bridged,
+      locator.withPathElement(LocatorPathElt::GenericArgument(typeArgIndex)),
+      srcExp);
+
+  auto *RS = ReturnStmt::createImplicit(Context, conversion);
+  ASTNode bodyNode(RS);
+  auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
+  closure->setBody(BS);
+
+  auto closureParam = AnyFunctionType::Param(srcType);
+  auto extInfo =
+      FunctionType::ExtInfo().withNoEscape().withSendable().withoutIsolation();
+  auto *fnTy = FunctionType::get(ArrayRef(closureParam), destType, extInfo);
+  closure->setType(fnTy);
+
+  closure->setCaptureInfo(CaptureInfo::empty());
+
+  rewriter.cs.cacheType(closure);
+  return closure;
 }
 
 void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
@@ -6859,10 +6923,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
   // Build the first value conversion.
   auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
   auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
-  auto conv =
-    buildOpaqueElementConversion(*this, expr->getLoc(),
-                                 fromArgs[0], toArgs[0],
-                                 bridged, locator, 0);
+  auto conv = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[0],
+                                            toArgs[0], bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (toType->isArray() || ConstraintSystem::isSetType(toType)) {
@@ -6874,10 +6936,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 =
-    buildOpaqueElementConversion(*this, expr->getLoc(),
-                                 fromArgs[1], toArgs[1],
-                                 bridged, locator, 1);
+  auto conv2 = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[1],
+                                             toArgs[1], bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
@@ -6959,7 +7019,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Use the requirements of any parameterized protocols to build out fake
   // argument conversions that can be used to infer opaque types.
-  SmallVector<CollectionUpcastConversionExpr::ConversionPair, 4> argConversions;
+  SmallVector<ConversionPair, 4> argConversions;
 
   auto fromConstraintType = fromInstanceType;
   if (auto existential = fromConstraintType->getAs<ExistentialType>())
@@ -9231,7 +9291,8 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
 
   auto locator = cs.getConstraintLocator(
       target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
-  initializer = solution.coerceToType(initializer, initType, locator);
+  initializer = solution.coerceToType(initializer, initType, locator,
+                                      *rewriter.getCurrentDC());
   if (!initializer)
     return std::nullopt;
 
@@ -9429,7 +9490,8 @@ applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
 
     auto *loc = cs.getConstraintLocator(parsedSequence,
                                         ConstraintLocator::SequenceElementType);
-    auto *convertExpr = solution.coerceToType(elementExpr, info.initType, loc);
+    auto *convertExpr = solution.coerceToType(elementExpr, info.initType, loc,
+                                              *rewriter.getCurrentDC());
     if (!convertExpr)
       return std::nullopt;
 
@@ -9898,10 +9960,10 @@ ConstraintSystem::applySolution(Solution &solution,
   return resultTarget;
 }
 
-Expr *
-Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
+Expr *Solution::coerceToType(Expr *expr, Type toType,
+                             ConstraintLocator *locator, DeclContext &dc) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, std::nullopt, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, dc, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;
