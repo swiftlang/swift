@@ -3,6 +3,8 @@
 // RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
 
+// UNSUPPORTED: OS=wasip1
+
 // BCANALYZER-NOT: UnknownCode
 
 import _Differentiation
