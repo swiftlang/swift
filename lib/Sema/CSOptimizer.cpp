@@ -1236,6 +1236,589 @@ scoreCandidateMatch(ConstraintSystem &cs,
   return 0;
 }
 
+static DisjunctionInfo computeDisjunctionInfo(
+    ConstraintSystem &cs,
+    SmallVectorImpl<Constraint *> &disjunctions, unsigned index,
+    llvm::DenseMap<Constraint *, DisjunctionInfo> &result) {
+  auto *disjunction = disjunctions[index];
+
+  // If this is a compiler synthesized disjunction, mark it as supported
+  // and record all of the previously favored choices. Such disjunctions
+  // include - explicit coercions, IUO references,injected implicit
+  // initializers for CGFloat<->Double conversions and restrictions with
+  // multiple choices.
+  if (disjunction->countFavoredNestedConstraints() > 0) {
+    DisjunctionInfoBuilder info(/*score=*/200);
+    for (auto *choice : disjunction->getNestedConstraints()) {
+      if (choice->isFavored())
+        info.addFavoredChoice(choice);
+    }
+    return info.build();
+  }
+
+  auto applicableFn =
+      getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
+
+  if (applicableFn.isNull()) {
+    auto *locator = disjunction->getLocator();
+    if (auto expr = getAsExpr(locator->getAnchor())) {
+      auto *parentExpr = cs.getParentExpr(expr);
+      // Look through optional evaluation, so
+      // we can cover expressions like `a?.b + 2`.
+      if (isExpr<OptionalEvaluationExpr>(parentExpr))
+        parentExpr = cs.getParentExpr(parentExpr);
+
+      if (parentExpr) {
+        // If this is a chained member reference or a direct operator
+        // argument it could be prioritized since it helps to establish
+        // context for other calls i.e. `(a.)b + 2` if `a` and/or `b`
+        // are disjunctions they should be preferred over `+`.
+        switch (parentExpr->getKind()) {
+        case ExprKind::Binary:
+        case ExprKind::PrefixUnary:
+        case ExprKind::PostfixUnary:
+        case ExprKind::UnresolvedDot: {
+          llvm::SmallVector<Constraint *, 2> favoredChoices;
+          // Favor choices that don't require application.
+          llvm::copy_if(
+              disjunction->getNestedConstraints(),
+              std::back_inserter(favoredChoices), [](Constraint *choice) {
+                auto *decl = getOverloadChoiceDecl(choice);
+                return decl &&
+                       !decl->getInterfaceType()->is<AnyFunctionType>();
+              });
+          return DisjunctionInfoBuilder(/*score=*/100, favoredChoices).build();
+        }
+
+        default:
+          break;
+        }
+      }
+    }
+
+    return DisjunctionInfo();
+  }
+
+  auto argFuncType =
+      applicableFn.get()->getFirstType()->getAs<FunctionType>();
+
+  auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
+  ASSERT(argumentList != nullptr);
+
+  for (const auto &argument : *argumentList) {
+    if (auto *expr = argument.getExpr()) {
+      // Directly `<#...#>` or has one inside.
+      if (isa<CodeCompletionExpr>(expr) ||
+          cs.containsIDEInspectionTarget(expr))
+        return DisjunctionInfo();
+    }
+  }
+
+  // This maintains an "old hack" behavior where overloads
+  // of `OverloadedDeclRef` calls were favored purely
+  // based on arity of arguments and parameters matching.
+  {
+    llvm::TinyPtrVector<Constraint *> favoredChoices;
+    findFavoredChoicesBasedOnArity(cs, disjunction, argumentList,
+                                   [&favoredChoices](Constraint *choice) {
+                                     favoredChoices.push_back(choice);
+                                   });
+
+    if (!favoredChoices.empty()) {
+      return DisjunctionInfoBuilder(/*score=*/1, favoredChoices).build();
+    }
+  }
+
+  // Preserves old behavior where, for unary calls, the solver
+  // would not consider choices that didn't match on the number
+  // of parameters (regardless of defaults) and only exact
+  // matches were favored.
+  if (auto info = preserveFavoringOfUnlabeledUnaryArgument(cs, disjunction,
+                                                           argumentList)) {
+    return info.value();
+  }
+
+  if (!isSupportedDisjunction(disjunction))
+    return DisjunctionInfo();
+
+  SmallVector<FunctionType::Param, 8> argsWithLabels;
+  {
+    argsWithLabels.append(argFuncType->getParams().begin(),
+                          argFuncType->getParams().end());
+    FunctionType::relabelParams(argsWithLabels, argumentList);
+  }
+
+  struct ArgumentCandidate {
+    Type type;
+    // The candidate type is derived from a literal expression.
+    bool fromLiteral : 1;
+    // The candidate type is derived from a call to an
+    // initializer i.e. `Double(...)`.
+    bool fromInitializerCall : 1;
+
+    ArgumentCandidate(Type type, bool fromLiteral = false,
+                      bool fromInitializerCall = false)
+        : type(type), fromLiteral(fromLiteral),
+          fromInitializerCall(fromInitializerCall) {}
+  };
+
+  // Determine whether there are any non-speculative choices
+  // in the given set of candidates. Speculative choices are
+  // literals or types inferred from initializer calls.
+  auto anyNonSpeculativeCandidates =
+      [&](ArrayRef<ArgumentCandidate> candidates) {
+        // If there is only one (non-CGFloat) candidate inferred from
+        // an initializer call we don't consider this a speculation.
+        //
+        // CGFloat inference is always speculative because of the
+        // implicit conversion between Double and CGFloat.
+        if (llvm::count_if(candidates, [&](const auto &candidate) {
+              return candidate.fromInitializerCall &&
+                     !candidate.type->isCGFloat();
+            }) == 1)
+          return true;
+
+        // If there are no non-literal and non-initializer-inferred types
+        // in the list, consider this is a speculation.
+        return llvm::any_of(candidates, [&](const auto &candidate) {
+          return !candidate.fromLiteral && !candidate.fromInitializerCall;
+        });
+      };
+
+  auto anyNonSpeculativeResultTypes = [](ArrayRef<Type> results) {
+    return llvm::any_of(results, [](Type resultTy) {
+      // Double and CGFloat are considered speculative because
+      // there exists an implicit conversion between them and
+      // preference is based on score impact in the overall solution.
+      return !(resultTy->isDouble() || resultTy->isCGFloat());
+    });
+  };
+
+  SmallVector<SmallVector<ArgumentCandidate, 2>, 2>
+      argumentCandidates;
+  argumentCandidates.resize(argFuncType->getNumParams());
+
+  llvm::TinyPtrVector<Type> resultTypes;
+
+  bool hasArgumentCandidates = false;
+  bool isOperator = isOperatorDisjunction(disjunction);
+
+  for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
+    const auto &param = argFuncType->getParams()[i];
+    auto argType = cs.simplifyType(param.getPlainType());
+
+    SmallVector<Type, 2> optionals;
+    // i.e. `??` operator could produce an optional type
+    // so `test(<<something>> ?? 0) could result in an optional
+    // argument that wraps a type variable. It should be possible
+    // to infer bindings from underlying type variable and restore
+    // optionality.
+    if (argType->hasTypeVariable()) {
+      if (auto *typeVar = argType->lookThroughAllOptionalTypes(optionals)
+                              ->getAs<TypeVariableType>())
+        argType = typeVar;
+    }
+
+    SmallVector<ArgumentCandidate, 2> types;
+    if (auto *typeVar = argType->getAs<TypeVariableType>()) {
+      auto bindingSet = cs.getBindingsFor(typeVar);
+
+      // We need to have a notion of "complete" binding set before
+      // we can allow inference from generic parameters and ternary,
+      // otherwise we'd make a favoring decision that might not be
+      // correct i.e. `v ?? (<<cond>> ? nil : o)` where `o` is `Int`.
+      // `getBindingsFor` doesn't currently infer transitive bindings
+      // which means that for a ternary we'd only have a single
+      // binding - `Int` which could lead to favoring overload of
+      // `??` and has non-optional parameter on the right-hand side.
+      if (typeVar->getImpl().getGenericParameter() ||
+          typeVar->getImpl().isTernary())
+        continue;
+
+      auto restoreOptionality = [](Type type, unsigned numOptionals) {
+        for (unsigned i = 0; i != numOptionals; ++i)
+          type = type->wrapInOptionalType();
+        return type;
+      };
+
+      for (const auto &binding : bindingSet.Bindings) {
+        auto type = restoreOptionality(binding.BindingType, optionals.size());
+        types.push_back({type});
+      }
+
+      for (const auto &literal : bindingSet.Literals) {
+        if (literal.hasDefaultType()) {
+          // Add primary default type
+          auto type = restoreOptionality(literal.getDefaultType(),
+                                         optionals.size());
+          types.push_back({type,
+                           /*fromLiteral=*/true});
+        }
+      }
+
+      // Help situations like `1 + {Double, CGFloat}(...)` by inferring
+      // a type for the second operand of `+` based on a type being
+      // constructed.
+      if (typeVar->getImpl().isFunctionResult()) {
+        auto *resultLoc = typeVar->getImpl().getLocator();
+
+        if (auto type = inferTypeOfArithmeticOperatorChain(
+                cs, resultLoc->getAnchor())) {
+          types.push_back({type, /*fromLiteral=*/true});
+        }
+
+        auto binding =
+            inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
+
+        if (auto instanceTy = binding.getPointer()) {
+          types.push_back({instanceTy,
+                           /*fromLiteral=*/false,
+                           /*fromInitializerCall=*/true});
+
+          if (binding.getInt())
+            types.push_back({instanceTy->wrapInOptionalType(),
+                             /*fromLiteral=*/false,
+                             /*fromInitializerCall=*/true});
+        }
+      }
+    } else {
+      types.push_back({argType, /*fromLiteral=*/false});
+    }
+
+    argumentCandidates[i].append(types);
+    hasArgumentCandidates |= !types.empty();
+  }
+
+  auto resultType = cs.simplifyType(argFuncType->getResult());
+  if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
+    auto bindingSet = cs.getBindingsFor(typeVar);
+
+    // `??` operator is overloaded on optionality of its result. When the
+    // first argument matches exactly, the ranking is going to be skewed
+    // towards selecting an overload choice that returns a non-optional type.
+    // This is not always correct i.e. when operator is involved in optional
+    // chaining. To avoid producing an incorrect favoring, let's skip the this
+    // disjunction when constraints associated with result type indicate
+    // that it should be optional.
+    //
+    // Simply adding it as a binding won't work because if the second argument
+    // is non-optional the overload that returns `T?` would still have a lower
+    // score.
+    if (!bindingSet.hasViableBindings() &&
+        !bindingSet.isDirectHole() &&
+        isNilCoalescingOperator(disjunction)) {
+      auto &cg = cs.getConstraintGraph();
+      if (llvm::any_of(cg[typeVar].getConstraints(),
+                       [&typeVar](Constraint *constraint) {
+                         if (constraint->getKind() !=
+                             ConstraintKind::OptionalObject)
+                           return false;
+                         return constraint->getFirstType()->isEqual(typeVar);
+                       })) {
+        return DisjunctionInfo();
+      }
+    }
+
+    for (const auto &binding : bindingSet.Bindings) {
+      resultTypes.push_back(binding.BindingType);
+    }
+
+    // Infer bindings for each side of a ternary condition.
+    bindingSet.forEachAdjacentVariable(
+        [&cs, &resultTypes](TypeVariableType *adjacentVar) {
+          auto *adjacentLoc = adjacentVar->getImpl().getLocator();
+          // This is one of the sides of a ternary operator.
+          if (adjacentLoc->directlyAt<TernaryExpr>()) {
+            auto adjacentBindings = cs.getBindingsFor(adjacentVar);
+
+            for (const auto &binding : adjacentBindings.Bindings)
+              resultTypes.push_back(binding.BindingType);
+          }
+        });
+  } else {
+    resultTypes.push_back(resultType);
+  }
+
+  // Determine whether all of the argument candidates are speculative (i.e.
+  // literals). This information is going to be used later on when we need to
+  // decide how to score a matching choice.
+  bool onlySpeculativeArgumentCandidates =
+      hasArgumentCandidates &&
+      llvm::none_of(
+          indices(argFuncType->getParams()), [&](const unsigned argIdx) {
+            return anyNonSpeculativeCandidates(argumentCandidates[argIdx]);
+          });
+
+  bool canUseContextualResultTypes =
+      isOperator && !isStandardComparisonOperator(disjunction);
+
+  // Match arguments to the given overload choice.
+  auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
+    -> std::optional<MatchCallArgumentResult> {
+    auto *decl = choice.getDeclOrNull();
+    assert(decl);
+
+    auto hasAppliedSelf =
+        decl->hasCurriedSelf() &&
+        doesMemberRefApplyCurriedSelf(choice.getBaseType(), decl);
+
+    ParameterListInfo paramListInfo(overloadType->getParams(), decl,
+                                    hasAppliedSelf);
+
+    MatchCallArgumentListener listener;
+    return matchCallArguments(argsWithLabels, overloadType->getParams(),
+                              paramListInfo,
+                              argumentList->getFirstTrailingClosureIndex(),
+                              /*allow fixes*/ false, listener, std::nullopt);
+  };
+
+  // The choice with the best score.
+  unsigned bestScore = 0;
+  SmallVector<std::pair<Constraint *, unsigned>, 2> favoredChoices;
+
+  forEachDisjunctionChoice(
+      cs, disjunction,
+      [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
+        GenericSignature genericSig;
+        {
+          if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+            genericSig = GF->getGenericSignature();
+          } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+            genericSig = SD->getGenericSignature();
+          }
+        }
+
+        auto matchings =
+            matchArguments(choice->getOverloadChoice(), overloadType);
+        if (!matchings)
+          return;
+
+        // Require exact matches only if all of the arguments
+        // are literals and there are no usable contextual result
+        // types that could help narrow favored choices.
+        bool favorExactMatchesOnly =
+            onlySpeculativeArgumentCandidates &&
+            (!canUseContextualResultTypes || resultTypes.empty());
+
+        // This is important for SIMD operators in particular because
+        // a lot of their overloads have same-type requires to a concrete
+        // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
+        if (genericSig) {
+          overloadType = overloadType->getReducedType(genericSig)
+                             ->castTo<FunctionType>();
+        }
+
+        unsigned score = 0;
+        unsigned numDefaulted = 0;
+        for (unsigned paramIdx = 0, n = overloadType->getNumParams();
+             paramIdx != n; ++paramIdx) {
+          const auto &param = overloadType->getParams()[paramIdx];
+
+          auto argIndices = matchings->parameterBindings[paramIdx];
+          switch (argIndices.size()) {
+          case 0:
+            // Current parameter is defaulted, mark and continue.
+            ++numDefaulted;
+            continue;
+
+          case 1:
+            // One-to-one match between argument and parameter.
+            break;
+
+          default:
+            // Cannot deal with multiple possible matchings at the moment.
+            return;
+          }
+
+          auto argIdx = argIndices.front();
+
+          // Looks like there is nothing know about the argument.
+          if (argumentCandidates[argIdx].empty())
+            continue;
+
+          const auto paramFlags = param.getParameterFlags();
+
+          // If parameter is variadic we cannot compare because we don't know
+          // real arity.
+          if (paramFlags.isVariadic())
+            continue;
+
+          auto paramType = param.getPlainType();
+
+          if (paramFlags.isAutoClosure())
+            paramType = paramType->castTo<AnyFunctionType>()->getResult();
+
+          // FIXME: Let's skip matching function types for now
+          // because they have special rules for e.g. Concurrency
+          // (around @Sendable) and @convention(c).
+          if (paramType->lookThroughAllOptionalTypes()->is<FunctionType>())
+            continue;
+
+          // The idea here is to match the parameter type against
+          // all of the argument candidate types and pick the best
+          // match (i.e. exact equality one).
+          //
+          // If none of the candidates match exactly and they are
+          // all bound concrete types, we consider this is mismatch
+          // at this parameter position and remove the overload choice
+          // from consideration.
+          unsigned bestCandidateScore = 0;
+          llvm::BitVector mismatches(argumentCandidates[argIdx].size());
+
+          for (unsigned candidateIdx :
+               indices(argumentCandidates[argIdx])) {
+            // If one of the candidates matched exactly there is no reason
+            // to continue checking.
+            if (bestCandidateScore == 100)
+              break;
+
+            auto candidate = argumentCandidates[argIdx][candidateIdx];
+
+            // `inout` parameter accepts only l-value argument.
+            if (paramFlags.isInOut() && !candidate.type->is<LValueType>()) {
+              mismatches.set(candidateIdx);
+              continue;
+            }
+
+            MatchOptions options(MatchFlag::OnParam);
+            if (candidate.fromLiteral)
+              options |= MatchFlag::Literal;
+            if (favorExactMatchesOnly)
+              options |= MatchFlag::ExactOnly;
+
+            // Disable CGFloat -> Double conversion for unary operators.
+            //
+            // Some of the unary operators, i.e. prefix `-`, don't have
+            // CGFloat variants and expect generic `FloatingPoint` overload
+            // to match CGFloat type. Let's not attempt `CGFloat` -> `Double`
+            // conversion for unary operators because it always leads
+            // to a worse solutions vs. generic overloads.
+            if (n == 1 && decl->isOperator())
+              options |= MatchFlag::DisableCGFloatDoubleConversion;
+
+            // Disable implicit CGFloat -> Double widening conversion if
+            // argument is an explicit call to `CGFloat` initializer.
+            if (candidate.type->isCGFloat() &&
+                candidate.fromInitializerCall)
+              options |= MatchFlag::DisableCGFloatDoubleConversion;
+
+            if (isExpr<InterpolatedStringLiteralExpr>(
+                    argumentList->getExpr(argIdx)
+                        ->getSemanticsProvidingExpr()))
+              options |= MatchFlag::StringInterpolation;
+
+            // The specifier for a candidate only matters for `inout` check.
+            auto candidateScore =
+                scoreCandidateMatch(cs, genericSig, decl, paramIdx,
+                                    candidate.type->getWithoutSpecifierType(),
+                                    paramType, options);
+
+            if (!candidateScore) {
+              ASSERT(false);
+              continue;
+            }
+
+            if (candidateScore > 0) {
+              bestCandidateScore =
+                  std::max(bestCandidateScore, candidateScore.value());
+              continue;
+            }
+
+            if (!candidate.type->hasTypeVariable())
+              mismatches.set(candidateIdx);
+          }
+
+          // If none of the candidates for this parameter matched, let's
+          // drop this overload from any further consideration.
+          if (mismatches.all())
+            return;
+
+          score += bestCandidateScore;
+        }
+
+        // An overload whether all of the parameters are defaulted
+        // that's called without arguments.
+        if (numDefaulted == overloadType->getNumParams())
+          return;
+
+        // Average the score to avoid disfavoring disjunctions with fewer
+        // parameters.
+        score /= (overloadType->getNumParams() - numDefaulted);
+
+        // If one of the result types matches exactly, that's a good
+        // indication that overload choice should be favored.
+        //
+        // It's only safe to match result types of operators
+        // because regular functions/methods/subscripts and
+        // especially initializers could end up with a lot of
+        // favored overloads because on the result type alone.
+        if (canUseContextualResultTypes &&
+            (score > 0 || !hasArgumentCandidates)) {
+          if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
+                return scoreCandidateMatch(cs, genericSig, decl,
+                                           /*paramIdx=*/std::nullopt,
+                                           overloadType->getResult(),
+                                           candidateResultTy,
+                                           /*options=*/{}) > 0;
+              })) {
+            score += 100;
+          }
+        }
+
+        if (score > 0) {
+          // Nudge the score slightly to prefer concrete homogeneous
+          // arithmetic operators.
+          //
+          // This is an opportunistic optimization based on the operator
+          // use patterns where homogeneous operators are the most
+          // heavily used ones.
+          if (isArithmeticOperator(decl) &&
+              overloadType->getNumParams() == 2) {
+            auto resultTy = overloadType->getResult();
+            if (!resultTy->hasTypeParameter() &&
+                llvm::all_of(overloadType->getParams(),
+                             [&resultTy](const auto &param) {
+                               return param.getPlainType()->isEqual(resultTy);
+                             }))
+              score += 1;
+          }
+
+          favoredChoices.push_back({choice, score});
+          bestScore = std::max(bestScore, score);
+        }
+      });
+
+  if (cs.isDebugMode()) {
+    llvm::errs().indent(cs.solverState->getCurrentIndent())
+        << "<<< Disjunction "
+        << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
+               PrintOptions::forDebugging())
+        << " with score " << bestScore << "\n";
+  }
+
+  // Determine if the score and favoring decisions here are
+  // based only on "speculative" sources i.e. inference from
+  // literals.
+  //
+  // This information is going to be used by the disjunction
+  // selection algorithm to prevent over-eager selection of
+  // the operators over unsupported non-operator declarations.
+  bool isSpeculative = onlySpeculativeArgumentCandidates &&
+                       (!canUseContextualResultTypes ||
+                        !anyNonSpeculativeResultTypes(resultTypes));
+
+  DisjunctionInfoBuilder info(/*score=*/bestScore);
+
+  info.setSpeculative(isSpeculative);
+
+  for (const auto &choice : favoredChoices) {
+    if (choice.second == bestScore)
+      info.addFavoredChoice(choice.first);
+  }
+
+  return info.build();
+}
+
 /// Given a set of disjunctions, attempt to determine
 /// favored choices in the current context.
 static void determineBestChoicesInContext(
@@ -1243,604 +1826,10 @@ static void determineBestChoicesInContext(
     llvm::DenseMap<Constraint *, DisjunctionInfo> &result) {
   unsigned bestOverallScore = 0;
 
-  auto recordResult = [&bestOverallScore, &result](Constraint *disjunction,
-                                                   DisjunctionInfo &&info) {
+  for (auto index : indices(disjunctions)) {
+    auto info = computeDisjunctionInfo(cs, disjunctions, index, result);
     bestOverallScore = std::max(bestOverallScore, info.Score.value_or(0));
-    result.try_emplace(disjunction, info);
-  };
-
-  for (auto *disjunction : disjunctions) {
-    // If this is a compiler synthesized disjunction, mark it as supported
-    // and record all of the previously favored choices. Such disjunctions
-    // include - explicit coercions, IUO references,injected implicit
-    // initializers for CGFloat<->Double conversions and restrictions with
-    // multiple choices.
-    if (disjunction->countFavoredNestedConstraints() > 0) {
-      DisjunctionInfoBuilder info(/*score=*/200);
-      for (auto *choice : disjunction->getNestedConstraints()) {
-        if (choice->isFavored())
-          info.addFavoredChoice(choice);
-      }
-      recordResult(disjunction, info.build());
-      continue;
-    }
-
-    auto applicableFn =
-        getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
-
-    if (applicableFn.isNull()) {
-      auto *locator = disjunction->getLocator();
-      if (auto expr = getAsExpr(locator->getAnchor())) {
-        auto *parentExpr = cs.getParentExpr(expr);
-        // Look through optional evaluation, so
-        // we can cover expressions like `a?.b + 2`.
-        if (isExpr<OptionalEvaluationExpr>(parentExpr))
-          parentExpr = cs.getParentExpr(parentExpr);
-
-        if (parentExpr) {
-          // If this is a chained member reference or a direct operator
-          // argument it could be prioritized since it helps to establish
-          // context for other calls i.e. `(a.)b + 2` if `a` and/or `b`
-          // are disjunctions they should be preferred over `+`.
-          switch (parentExpr->getKind()) {
-          case ExprKind::Binary:
-          case ExprKind::PrefixUnary:
-          case ExprKind::PostfixUnary:
-          case ExprKind::UnresolvedDot: {
-            llvm::SmallVector<Constraint *, 2> favoredChoices;
-            // Favor choices that don't require application.
-            llvm::copy_if(
-                disjunction->getNestedConstraints(),
-                std::back_inserter(favoredChoices), [](Constraint *choice) {
-                  auto *decl = getOverloadChoiceDecl(choice);
-                  return decl &&
-                         !decl->getInterfaceType()->is<AnyFunctionType>();
-                });
-            recordResult(
-                disjunction,
-                DisjunctionInfoBuilder(/*score=*/100, favoredChoices).build());
-            continue;
-          }
-
-          default:
-            break;
-          }
-        }
-      }
-
-      continue;
-    }
-
-    auto argFuncType =
-        applicableFn.get()->getFirstType()->getAs<FunctionType>();
-
-    auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
-    if (!argumentList)
-      continue;
-
-    bool inCodeCompletion = false;
-    for (const auto &argument : *argumentList) {
-      if (auto *expr = argument.getExpr()) {
-        // Directly `<#...#>` or has one inside.
-        if (isa<CodeCompletionExpr>(expr) ||
-            cs.containsIDEInspectionTarget(expr))
-          inCodeCompletion = true;
-      }
-    }
-
-    if (inCodeCompletion)
-      continue;
-
-    // This maintains an "old hack" behavior where overloads
-    // of `OverloadedDeclRef` calls were favored purely
-    // based on arity of arguments and parameters matching.
-    {
-      llvm::TinyPtrVector<Constraint *> favoredChoices;
-      findFavoredChoicesBasedOnArity(cs, disjunction, argumentList,
-                                     [&favoredChoices](Constraint *choice) {
-                                       favoredChoices.push_back(choice);
-                                     });
-
-      if (!favoredChoices.empty()) {
-        recordResult(
-            disjunction,
-            DisjunctionInfoBuilder(/*score=*/1, favoredChoices).build());
-        continue;
-      }
-    }
-
-    // Preserves old behavior where, for unary calls, the solver
-    // would not consider choices that didn't match on the number
-    // of parameters (regardless of defaults) and only exact
-    // matches were favored.
-    if (auto info = preserveFavoringOfUnlabeledUnaryArgument(cs, disjunction,
-                                                             argumentList)) {
-      recordResult(disjunction, std::move(info.value()));
-      continue;
-    }
-
-    if (!isSupportedDisjunction(disjunction))
-      continue;
-
-    SmallVector<FunctionType::Param, 8> argsWithLabels;
-    {
-      argsWithLabels.append(argFuncType->getParams().begin(),
-                            argFuncType->getParams().end());
-      FunctionType::relabelParams(argsWithLabels, argumentList);
-    }
-
-    struct ArgumentCandidate {
-      Type type;
-      // The candidate type is derived from a literal expression.
-      bool fromLiteral : 1;
-      // The candidate type is derived from a call to an
-      // initializer i.e. `Double(...)`.
-      bool fromInitializerCall : 1;
-
-      ArgumentCandidate(Type type, bool fromLiteral = false,
-                        bool fromInitializerCall = false)
-          : type(type), fromLiteral(fromLiteral),
-            fromInitializerCall(fromInitializerCall) {}
-    };
-
-    // Determine whether there are any non-speculative choices
-    // in the given set of candidates. Speculative choices are
-    // literals or types inferred from initializer calls.
-    auto anyNonSpeculativeCandidates =
-        [&](ArrayRef<ArgumentCandidate> candidates) {
-          // If there is only one (non-CGFloat) candidate inferred from
-          // an initializer call we don't consider this a speculation.
-          //
-          // CGFloat inference is always speculative because of the
-          // implicit conversion between Double and CGFloat.
-          if (llvm::count_if(candidates, [&](const auto &candidate) {
-                return candidate.fromInitializerCall &&
-                       !candidate.type->isCGFloat();
-              }) == 1)
-            return true;
-
-          // If there are no non-literal and non-initializer-inferred types
-          // in the list, consider this is a speculation.
-          return llvm::any_of(candidates, [&](const auto &candidate) {
-            return !candidate.fromLiteral && !candidate.fromInitializerCall;
-          });
-        };
-
-    auto anyNonSpeculativeResultTypes = [](ArrayRef<Type> results) {
-      return llvm::any_of(results, [](Type resultTy) {
-        // Double and CGFloat are considered speculative because
-        // there exists an implicit conversion between them and
-        // preference is based on score impact in the overall solution.
-        return !(resultTy->isDouble() || resultTy->isCGFloat());
-      });
-    };
-
-    SmallVector<SmallVector<ArgumentCandidate, 2>, 2>
-        argumentCandidates;
-    argumentCandidates.resize(argFuncType->getNumParams());
-
-    llvm::TinyPtrVector<Type> resultTypes;
-
-    bool hasArgumentCandidates = false;
-    bool isOperator = isOperatorDisjunction(disjunction);
-
-    for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
-      const auto &param = argFuncType->getParams()[i];
-      auto argType = cs.simplifyType(param.getPlainType());
-
-      SmallVector<Type, 2> optionals;
-      // i.e. `??` operator could produce an optional type
-      // so `test(<<something>> ?? 0) could result in an optional
-      // argument that wraps a type variable. It should be possible
-      // to infer bindings from underlying type variable and restore
-      // optionality.
-      if (argType->hasTypeVariable()) {
-        if (auto *typeVar = argType->lookThroughAllOptionalTypes(optionals)
-                                ->getAs<TypeVariableType>())
-          argType = typeVar;
-      }
-
-      SmallVector<ArgumentCandidate, 2> types;
-      if (auto *typeVar = argType->getAs<TypeVariableType>()) {
-        auto bindingSet = cs.getBindingsFor(typeVar);
-
-        // We need to have a notion of "complete" binding set before
-        // we can allow inference from generic parameters and ternary,
-        // otherwise we'd make a favoring decision that might not be
-        // correct i.e. `v ?? (<<cond>> ? nil : o)` where `o` is `Int`.
-        // `getBindingsFor` doesn't currently infer transitive bindings
-        // which means that for a ternary we'd only have a single
-        // binding - `Int` which could lead to favoring overload of
-        // `??` and has non-optional parameter on the right-hand side.
-        if (typeVar->getImpl().getGenericParameter() ||
-            typeVar->getImpl().isTernary())
-          continue;
-
-        auto restoreOptionality = [](Type type, unsigned numOptionals) {
-          for (unsigned i = 0; i != numOptionals; ++i)
-            type = type->wrapInOptionalType();
-          return type;
-        };
-
-        for (const auto &binding : bindingSet.Bindings) {
-          auto type = restoreOptionality(binding.BindingType, optionals.size());
-          types.push_back({type});
-        }
-
-        for (const auto &literal : bindingSet.Literals) {
-          if (literal.hasDefaultType()) {
-            // Add primary default type
-            auto type = restoreOptionality(literal.getDefaultType(),
-                                           optionals.size());
-            types.push_back({type,
-                             /*fromLiteral=*/true});
-          }
-        }
-
-        // Help situations like `1 + {Double, CGFloat}(...)` by inferring
-        // a type for the second operand of `+` based on a type being
-        // constructed.
-        if (typeVar->getImpl().isFunctionResult()) {
-          auto *resultLoc = typeVar->getImpl().getLocator();
-
-          if (auto type = inferTypeOfArithmeticOperatorChain(
-                  cs, resultLoc->getAnchor())) {
-            types.push_back({type, /*fromLiteral=*/true});
-          }
-
-          auto binding =
-              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
-
-          if (auto instanceTy = binding.getPointer()) {
-            types.push_back({instanceTy,
-                             /*fromLiteral=*/false,
-                             /*fromInitializerCall=*/true});
-
-            if (binding.getInt())
-              types.push_back({instanceTy->wrapInOptionalType(),
-                               /*fromLiteral=*/false,
-                               /*fromInitializerCall=*/true});
-          }
-        }
-      } else {
-        types.push_back({argType, /*fromLiteral=*/false});
-      }
-
-      argumentCandidates[i].append(types);
-      hasArgumentCandidates |= !types.empty();
-    }
-
-    auto resultType = cs.simplifyType(argFuncType->getResult());
-    if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
-      auto bindingSet = cs.getBindingsFor(typeVar);
-
-      // `??` operator is overloaded on optionality of its result. When the
-      // first argument matches exactly, the ranking is going to be skewed
-      // towards selecting an overload choice that returns a non-optional type.
-      // This is not always correct i.e. when operator is involved in optional
-      // chaining. To avoid producing an incorrect favoring, let's skip the this
-      // disjunction when constraints associated with result type indicate
-      // that it should be optional.
-      //
-      // Simply adding it as a binding won't work because if the second argument
-      // is non-optional the overload that returns `T?` would still have a lower
-      // score.
-      if (!bindingSet.hasViableBindings() &&
-          !bindingSet.isDirectHole() &&
-          isNilCoalescingOperator(disjunction)) {
-        auto &cg = cs.getConstraintGraph();
-        if (llvm::any_of(cg[typeVar].getConstraints(),
-                         [&typeVar](Constraint *constraint) {
-                           if (constraint->getKind() !=
-                               ConstraintKind::OptionalObject)
-                             return false;
-                           return constraint->getFirstType()->isEqual(typeVar);
-                         })) {
-          continue;
-        }
-      }
-
-      for (const auto &binding : bindingSet.Bindings) {
-        resultTypes.push_back(binding.BindingType);
-      }
-
-      // Infer bindings for each side of a ternary condition.
-      bindingSet.forEachAdjacentVariable(
-          [&cs, &resultTypes](TypeVariableType *adjacentVar) {
-            auto *adjacentLoc = adjacentVar->getImpl().getLocator();
-            // This is one of the sides of a ternary operator.
-            if (adjacentLoc->directlyAt<TernaryExpr>()) {
-              auto adjacentBindings = cs.getBindingsFor(adjacentVar);
-
-              for (const auto &binding : adjacentBindings.Bindings)
-                resultTypes.push_back(binding.BindingType);
-            }
-          });
-    } else {
-      resultTypes.push_back(resultType);
-    }
-
-    // Determine whether all of the argument candidates are speculative (i.e.
-    // literals). This information is going to be used later on when we need to
-    // decide how to score a matching choice.
-    bool onlySpeculativeArgumentCandidates =
-        hasArgumentCandidates &&
-        llvm::none_of(
-            indices(argFuncType->getParams()), [&](const unsigned argIdx) {
-              return anyNonSpeculativeCandidates(argumentCandidates[argIdx]);
-            });
-
-    bool canUseContextualResultTypes =
-        isOperator && !isStandardComparisonOperator(disjunction);
-
-    // Match arguments to the given overload choice.
-    auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
-			-> std::optional<MatchCallArgumentResult> {
-      auto *decl = choice.getDeclOrNull();
-      assert(decl);
-
-      auto hasAppliedSelf =
-          decl->hasCurriedSelf() &&
-          doesMemberRefApplyCurriedSelf(choice.getBaseType(), decl);
-
-      ParameterListInfo paramListInfo(overloadType->getParams(), decl,
-                                      hasAppliedSelf);
-
-      MatchCallArgumentListener listener;
-      return matchCallArguments(argsWithLabels, overloadType->getParams(),
-                                paramListInfo,
-                                argumentList->getFirstTrailingClosureIndex(),
-                                /*allow fixes*/ false, listener, std::nullopt);
-    };
-
-    // The choice with the best score.
-    unsigned bestScore = 0;
-    SmallVector<std::pair<Constraint *, unsigned>, 2> favoredChoices;
-
-    forEachDisjunctionChoice(
-        cs, disjunction,
-        [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
-          GenericSignature genericSig;
-          {
-            if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-              genericSig = GF->getGenericSignature();
-            } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-              genericSig = SD->getGenericSignature();
-            }
-          }
-
-          auto matchings =
-              matchArguments(choice->getOverloadChoice(), overloadType);
-          if (!matchings)
-            return;
-
-          // Require exact matches only if all of the arguments
-          // are literals and there are no usable contextual result
-          // types that could help narrow favored choices.
-          bool favorExactMatchesOnly =
-              onlySpeculativeArgumentCandidates &&
-              (!canUseContextualResultTypes || resultTypes.empty());
-
-          // This is important for SIMD operators in particular because
-          // a lot of their overloads have same-type requires to a concrete
-          // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-          if (genericSig) {
-            overloadType = overloadType->getReducedType(genericSig)
-                               ->castTo<FunctionType>();
-          }
-
-          unsigned score = 0;
-          unsigned numDefaulted = 0;
-          for (unsigned paramIdx = 0, n = overloadType->getNumParams();
-               paramIdx != n; ++paramIdx) {
-            const auto &param = overloadType->getParams()[paramIdx];
-
-            auto argIndices = matchings->parameterBindings[paramIdx];
-            switch (argIndices.size()) {
-            case 0:
-              // Current parameter is defaulted, mark and continue.
-              ++numDefaulted;
-              continue;
-
-            case 1:
-              // One-to-one match between argument and parameter.
-              break;
-
-            default:
-              // Cannot deal with multiple possible matchings at the moment.
-              return;
-            }
-
-            auto argIdx = argIndices.front();
-
-            // Looks like there is nothing know about the argument.
-            if (argumentCandidates[argIdx].empty())
-              continue;
-
-            const auto paramFlags = param.getParameterFlags();
-
-            // If parameter is variadic we cannot compare because we don't know
-            // real arity.
-            if (paramFlags.isVariadic())
-              continue;
-
-            auto paramType = param.getPlainType();
-
-            if (paramFlags.isAutoClosure())
-              paramType = paramType->castTo<AnyFunctionType>()->getResult();
-
-            // FIXME: Let's skip matching function types for now
-            // because they have special rules for e.g. Concurrency
-            // (around @Sendable) and @convention(c).
-            if (paramType->lookThroughAllOptionalTypes()->is<FunctionType>())
-              continue;
-
-            // The idea here is to match the parameter type against
-            // all of the argument candidate types and pick the best
-            // match (i.e. exact equality one).
-            //
-            // If none of the candidates match exactly and they are
-            // all bound concrete types, we consider this is mismatch
-            // at this parameter position and remove the overload choice
-            // from consideration.
-            unsigned bestCandidateScore = 0;
-            llvm::BitVector mismatches(argumentCandidates[argIdx].size());
-
-            for (unsigned candidateIdx :
-                 indices(argumentCandidates[argIdx])) {
-              // If one of the candidates matched exactly there is no reason
-              // to continue checking.
-              if (bestCandidateScore == 100)
-                break;
-
-              auto candidate = argumentCandidates[argIdx][candidateIdx];
-
-              // `inout` parameter accepts only l-value argument.
-              if (paramFlags.isInOut() && !candidate.type->is<LValueType>()) {
-                mismatches.set(candidateIdx);
-                continue;
-              }
-
-              MatchOptions options(MatchFlag::OnParam);
-              if (candidate.fromLiteral)
-                options |= MatchFlag::Literal;
-              if (favorExactMatchesOnly)
-                options |= MatchFlag::ExactOnly;
-
-              // Disable CGFloat -> Double conversion for unary operators.
-              //
-              // Some of the unary operators, i.e. prefix `-`, don't have
-              // CGFloat variants and expect generic `FloatingPoint` overload
-              // to match CGFloat type. Let's not attempt `CGFloat` -> `Double`
-              // conversion for unary operators because it always leads
-              // to a worse solutions vs. generic overloads.
-              if (n == 1 && decl->isOperator())
-                options |= MatchFlag::DisableCGFloatDoubleConversion;
-
-              // Disable implicit CGFloat -> Double widening conversion if
-              // argument is an explicit call to `CGFloat` initializer.
-              if (candidate.type->isCGFloat() &&
-                  candidate.fromInitializerCall)
-                options |= MatchFlag::DisableCGFloatDoubleConversion;
-
-              if (isExpr<InterpolatedStringLiteralExpr>(
-                      argumentList->getExpr(argIdx)
-                          ->getSemanticsProvidingExpr()))
-                options |= MatchFlag::StringInterpolation;
-
-              // The specifier for a candidate only matters for `inout` check.
-              auto candidateScore =
-                  scoreCandidateMatch(cs, genericSig, decl, paramIdx,
-                                      candidate.type->getWithoutSpecifierType(),
-                                      paramType, options);
-
-              if (!candidateScore) {
-                ASSERT(false);
-                continue;
-              }
-
-              if (candidateScore > 0) {
-                bestCandidateScore =
-                    std::max(bestCandidateScore, candidateScore.value());
-                continue;
-              }
-
-              if (!candidate.type->hasTypeVariable())
-                mismatches.set(candidateIdx);
-            }
-
-            // If none of the candidates for this parameter matched, let's
-            // drop this overload from any further consideration.
-            if (mismatches.all())
-              return;
-
-            score += bestCandidateScore;
-          }
-
-          // An overload whether all of the parameters are defaulted
-          // that's called without arguments.
-          if (numDefaulted == overloadType->getNumParams())
-            return;
-
-          // Average the score to avoid disfavoring disjunctions with fewer
-          // parameters.
-          score /= (overloadType->getNumParams() - numDefaulted);
-
-          // If one of the result types matches exactly, that's a good
-          // indication that overload choice should be favored.
-          //
-          // It's only safe to match result types of operators
-          // because regular functions/methods/subscripts and
-          // especially initializers could end up with a lot of
-          // favored overloads because on the result type alone.
-          if (canUseContextualResultTypes &&
-              (score > 0 || !hasArgumentCandidates)) {
-            if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
-                  return scoreCandidateMatch(cs, genericSig, decl,
-                                             /*paramIdx=*/std::nullopt,
-                                             overloadType->getResult(),
-                                             candidateResultTy,
-                                             /*options=*/{}) > 0;
-                })) {
-              score += 100;
-            }
-          }
-
-          if (score > 0) {
-            // Nudge the score slightly to prefer concrete homogeneous
-						// arithmetic operators.
-            //
-            // This is an opportunistic optimization based on the operator
-            // use patterns where homogeneous operators are the most
-            // heavily used ones.
-            if (isArithmeticOperator(decl) &&
-                overloadType->getNumParams() == 2) {
-              auto resultTy = overloadType->getResult();
-              if (!resultTy->hasTypeParameter() &&
-                  llvm::all_of(overloadType->getParams(),
-                               [&resultTy](const auto &param) {
-                                 return param.getPlainType()->isEqual(resultTy);
-                               }))
-                score += 1;
-            }
-
-            favoredChoices.push_back({choice, score});
-            bestScore = std::max(bestScore, score);
-          }
-        });
-
-    if (cs.isDebugMode()) {
-
-      llvm::errs().indent(cs.solverState->getCurrentIndent())
-          << "<<< Disjunction "
-          << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
-                 PrintOptions::forDebugging())
-          << " with score " << bestScore << "\n";
-    }
-
-    bestOverallScore = std::max(bestOverallScore, bestScore);
-
-    // Determine if the score and favoring decisions here are
-    // based only on "speculative" sources i.e. inference from
-    // literals.
-    //
-    // This information is going to be used by the disjunction
-    // selection algorithm to prevent over-eager selection of
-    // the operators over unsupported non-operator declarations.
-    bool isSpeculative = onlySpeculativeArgumentCandidates &&
-                         (!canUseContextualResultTypes ||
-                          !anyNonSpeculativeResultTypes(resultTypes));
-
-    DisjunctionInfoBuilder info(/*score=*/bestScore);
-
-    info.setSpeculative(isSpeculative);
-
-    for (const auto &choice : favoredChoices) {
-      if (choice.second == bestScore)
-        info.addFavoredChoice(choice.first);
-    }
-
-    recordResult(disjunction, info.build());
+    result.try_emplace(disjunctions[index], info);
   }
 
   if (cs.isDebugMode() && bestOverallScore > 0) {
