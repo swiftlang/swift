@@ -2007,6 +2007,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 namespace swift {
 namespace regionanalysisimpl {
 
+static void
+getPartitionOpsForInstruction(PartitionOpTranslator *translator,
+                              SILInstruction *inst,
+                              std::vector<PartitionOp> &foundPartitionOps);
+
 /// PartitionOpTranslator is responsible for performing the translation from
 /// SILInstructions to PartitionOps. Not all SILInstructions have an effect on
 /// the region partition, and some have multiple effects - such as an
@@ -2025,7 +2030,9 @@ namespace regionanalysisimpl {
 ///       that reduce lists of PartitionOps to smaller, equivalent lists
 class PartitionOpTranslator {
   friend PartitionOpBuilder;
-
+  friend void(getPartitionOpsForInstruction)(PartitionOpTranslator *,
+                                             SILInstruction *,
+                                             std::vector<PartitionOp> &);
   SILFunction *function;
 
   /// The initial partition of the entry block.
@@ -3295,6 +3302,13 @@ public:
 } // namespace regionanalysisimpl
 } // namespace swift
 
+void regionanalysisimpl::getPartitionOpsForInstruction(
+    PartitionOpTranslator *translator, SILInstruction *inst,
+    std::vector<PartitionOp> &foundPartitionOps) {
+  translator->builder.initialize(foundPartitionOps);
+  translator->translateSILInstruction(inst);
+}
+
 Element PartitionOpBuilder::lookupValueID(SILValue value) {
   return translator->lookupValueID(value);
 }
@@ -4473,4 +4487,32 @@ static FunctionTest
                               llvm::outs() << '\n';
                             });
 
+// Arguments:
+// - SILInstruction: the instruction that we are lowering.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest PartitionOpsTest(
+    "sil_regionanalysis_partitionoptranslation",
+    [](auto &function, auto &arguments, auto &test) {
+      llvm::BumpPtrAllocator allocator;
+      IsolationHistory::Factory historyFactory(allocator);
+      SendingOperandSetFactory ptrSetFactory(allocator);
+      SendingOperandToStateMap sendingOperandToStateMap(historyFactory);
+      RegionAnalysisValueMap valueMap(&function);
+      PartitionOpTranslator translator(
+          &function,
+          test.template getAnalysis<PostOrderAnalysis>()->get(&function),
+          valueMap, historyFactory);
+
+      auto *valueInst = arguments.takeInstruction();
+      assert(valueInst);
+      std::vector<PartitionOp> blockPartitionOps;
+      getPartitionOpsForInstruction(&translator, valueInst, blockPartitionOps);
+      // First dump the value map.
+      valueMap.print(llvm::outs());
+      // Then dump the instructions.
+      for (auto &partitionOp : blockPartitionOps) {
+        partitionOp.print(llvm::outs());
+      }
+    });
 } // namespace swift::test

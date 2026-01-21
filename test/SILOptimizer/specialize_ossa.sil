@@ -1712,10 +1712,3 @@ bb0(%0 : @guaranteed $String):
   %13 = tuple ()
   return %13
 }
-
-
-
-
-
-
-
