@@ -3520,7 +3520,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 // underlying region.
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
 CONSTANT_TRANSLATION(BorrowedFromInst, LookThrough)
-CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
@@ -4042,6 +4041,14 @@ PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
   translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitBeginDeallocRefInst(BeginDeallocRefInst *bdr) {
+  assert(isStaticallyLookThroughInst(bdr) && "Out of sync");
+  translateSILLookThrough(SILValue(bdr), bdr->getReference());
+  translateSILRequire(bdr->getAllocation());
   return TranslationSemantics::Special;
 }
 
