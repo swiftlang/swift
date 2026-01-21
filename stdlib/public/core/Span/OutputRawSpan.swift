@@ -67,18 +67,22 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// The number of initialized bytes in this span.
   @_alwaysEmitIntoClient
-  public var byteCount: Int { _count }
+  @_semantics("fixed_storage.get_count")
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// The number of additional bytes that can be appended to this span.
   @_alwaysEmitIntoClient
+  @_transparent
   public var freeCapacity: Int { capacity &- _count }
 
   /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isFull: Bool { _count == capacity }
 }
 
@@ -237,6 +241,7 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
+  @_transparent
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
@@ -248,6 +253,7 @@ extension OutputRawSpan {
 
   /// Exclusively borrow the underlying initialized memory for mutation.
   @_alwaysEmitIntoClient
+  @_transparent
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
     mutating get {
@@ -286,6 +292,7 @@ extension OutputRawSpan {
   /// this is an unsafe operation. Violating the invariants of `OutputRawSpan`
   /// may result in undefined behavior.
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, R: ~Copyable>(
     _ body: (
