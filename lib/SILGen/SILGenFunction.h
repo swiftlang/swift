@@ -558,11 +558,10 @@ public:
     }
     
     AddressableBuffer &operator=(AddressableBuffer &&other) {
-      if (auto state = stateOrAlias.dyn_cast<State*>()) {
-        delete state;
+      if (&other != this) {
+        this->~AddressableBuffer();
+        new (this) AddressableBuffer(std::move(other));
       }
-      stateOrAlias = other.stateOrAlias;
-      cleanupPoints.swap(other.cleanupPoints);
       return *this;
     }
 
