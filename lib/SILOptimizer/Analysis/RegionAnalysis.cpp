@@ -1745,16 +1745,14 @@ struct PartitionOpBuilder {
 
   /// Mark \p value artifically as being part of an actor-isolated region by
   /// introducing a new fake actor introducing representative and merging them.
-  void addActorIntroducingInst(SILValue sourceValue, Operand *sourceOperand,
+  void addActorIntroducingInst(TrackableValue sourceValue,
+                               Operand *sourceOperand,
                                SILIsolationInfo actorIsolation) {
-    assert(valueHasID(sourceValue, /*dumpIfHasNoID=*/true) &&
-           "merged values should already have been encountered");
-
     auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
     currentInstPartitionOps->emplace_back(
-        PartitionOp::Merge(lookupValueID(sourceValue), elt, sourceOperand));
+        PartitionOp::Merge(sourceValue.getID(), elt, sourceOperand));
   }
 
   void addRequire(TrackableValueLookupResult value);
@@ -2318,9 +2316,9 @@ public:
       // passed in a specific isolation info unlike earlier when processing
       // actual results.
       if (sourceOperandTVPairs.size() && resultIsolationInfoOverride) {
-        builder.addActorIntroducingInst(
-            sourceOperandTVPairs.back().second.getRepresentative().getValue(),
-            sourceOperandTVPairs.back().first, resultIsolationInfoOverride);
+        builder.addActorIntroducingInst(sourceOperandTVPairs.back().second,
+                                        sourceOperandTVPairs.back().first,
+                                        resultIsolationInfoOverride);
       }
 
       return;
@@ -2909,7 +2907,9 @@ public:
 
       if (resultIsolationInfoOverride && !srcCollection.empty()) {
         using std::begin;
-        builder.addActorIntroducingInst(dest, *begin(srcCollection), resultIsolationInfoOverride);
+        builder.addActorIntroducingInst(destResult->value,
+                                        *begin(srcCollection),
+                                        resultIsolationInfoOverride);
       }
     }
 
