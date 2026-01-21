@@ -1250,6 +1250,8 @@ static DisjunctionInfo computeDisjunctionInfo(
   if (disjunction->countFavoredNestedConstraints() > 0) {
     DisjunctionInfoBuilder info(/*score=*/200);
     for (auto *choice : disjunction->getNestedConstraints()) {
+      if (choice->isDisabled())
+        continue;
       if (choice->isFavored())
         info.addFavoredChoice(choice);
     }
