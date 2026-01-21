@@ -1931,6 +1931,8 @@ ConstraintSystem::selectDisjunction() {
   if (disjunctions.empty())
     return std::nullopt;
 
+  pruneDisjunctions(disjunctions);
+
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
 
