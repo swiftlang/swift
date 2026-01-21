@@ -2412,11 +2412,3 @@ void ConstraintSystem::forEachExpr(
 
   expr->walk(ChildWalker(*this, callback));
 }
-
-bool ModuleHasTypeCheckerPerformanceHacksEnabledRequest::evaluate(
-    Evaluator &evaluator, const ModuleDecl *module) const {
-  auto name = module->getRealName().str();
-  return module->getASTContext().blockListConfig.hasBlockListAction(
-      name, BlockListKeyKind::ModuleName,
-      BlockListAction::ShouldUseTypeCheckerPerfHacks);
-}
