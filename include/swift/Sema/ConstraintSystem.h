@@ -1966,6 +1966,10 @@ enum class ConstraintSystemFlags {
 
   /// Enable old type-checker performance hacks.
   EnablePerformanceHacks = 0x80,
+
+  /// When set, bindings from subtypes are going to be propagated
+  /// up to their supertypes as they become available.
+  EnableTransitiveInference = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2533,6 +2537,7 @@ private:
     }
   };
 
+public:
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -2617,6 +2622,7 @@ private:
     SmallVector<Constraint *, 4> activeConstraints;
   };
 
+private:
   class CacheExprTypes : public ASTWalker {
     Expr *RootExpr;
     ConstraintSystem &CS;
