@@ -21,15 +21,6 @@ struct Struct {
   }
 
   var k2: Klass {
-    mutating borrow { // expected-error{{mutating ownership modifier is not yet supported on a 'borrow' accessor}}
-      return _k
-    }
-    nonmutating mutate { // expected-error{{nonmutating ownership modifier is not yet supported on a 'mutate' accessor}}
-      return &_k // expected-error{{'&' may only be used to pass an argument to inout parameter}}
-    }
-  }
-
-  var k3: Klass {
     nonmutating borrow {
       return _k
     }

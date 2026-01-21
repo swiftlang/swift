@@ -746,20 +746,6 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
           attr, diag::consuming_invalid_borrow_mutate_accessor,
           getAccessorNameForDiagnostic(accessor, /*article*/ true));
     }
-    if (attrModifier == SelfAccessKind::NonMutating &&
-        accessor->isMutateAccessor()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::ownership_modifier_unsupported_borrow_mutate_accessor,
-          attr->getAttrName(),
-          getAccessorNameForDiagnostic(accessor, /*article*/ true));
-    }
-    if (attrModifier == SelfAccessKind::Mutating &&
-        accessor->isBorrowAccessor()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::ownership_modifier_unsupported_borrow_mutate_accessor,
-          attr->getAttrName(),
-          getAccessorNameForDiagnostic(accessor, /*article*/ true));
-    }
   }
 }
 
