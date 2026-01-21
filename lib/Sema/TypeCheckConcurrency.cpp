@@ -23,6 +23,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticGroups.h"
@@ -6144,8 +6145,12 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
         nominalTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl();
       }
       if (nominalTypeDecl &&
-          sendableConformanceRequiresNonisolated(nominalTypeDecl))
-        return { };
+          sendableConformanceRequiresNonisolated(nominalTypeDecl)) {
+        InferredActorIsolation isolation{
+            ActorIsolation::forNonisolated(/*unsafe=*/false), /*source=*/{}};
+        return {
+            {isolation, /*overridenValue=*/nullptr, /*overridenIsolation=*/{}}};
+      }
 
       if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
           isa<AbstractStorageDecl>(value) ||
@@ -8506,8 +8511,15 @@ ActorIsolation swift::inferConformanceIsolation(
         return *attrIsolation;
 
       // If we're defaulting to main-actor isolation, use that.
-      if (getDefaultIsolationForContext(dc) == DefaultIsolation::MainActor)
+      if (getDefaultIsolationForContext(dc) == DefaultIsolation::MainActor) {
+        // If type is `nonisolated` it means that defaulting didn't apply it
+        // it (i.e. due to direct conformance to a `Sendable` protocol), and
+        // it doesn't apply to extensions as well.
+        if (nominalIsolation.isNonisolated())
+          return nominalIsolation;
+
         return ActorIsolation::forMainActor(ctx);
+      }
     }
 
     return ActorIsolation::forNonisolated(false);
