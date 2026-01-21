@@ -262,6 +262,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   /// - Returns: a RawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
   @_transparent
+  @unsafe
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
