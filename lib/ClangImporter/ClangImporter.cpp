@@ -9105,7 +9105,9 @@ swift::importer::getCxxRefConventionWithAttrs(const clang::Decl *decl) {
     return result;
 
   const clang::Type *returnTy = nullptr;
-  if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(decl))
+  if (const auto *ctor = dyn_cast<clang::CXXConstructorDecl>(decl))
+    returnTy = ctor->getParent()->getTypeForDecl();
+  else if (const auto *func = llvm::dyn_cast<clang::FunctionDecl>(decl))
     returnTy = func->getReturnType().getTypePtrOrNull();
   else if (const auto *method = llvm::dyn_cast<clang::ObjCMethodDecl>(decl))
     returnTy = method->getReturnType().getTypePtrOrNull();

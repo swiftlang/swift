@@ -47,6 +47,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -6353,7 +6354,10 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 
 static bool isReturningFRT(const clang::NamedDecl *ND,
                            clang::QualType &outReturnType, ASTContext &Ctx) {
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
+  if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
+    outReturnType =
+        CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+  else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     outReturnType = FD->getReturnType();
   else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
     outReturnType = MD->getReturnType();
@@ -6397,8 +6401,8 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
       return false;
 
     if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
-        // Ownership attrs are not yet supported for ctors and dtors if FRTs
+      if (isa<clang::CXXDestructorDecl>(methodDecl))
+        // Ownership attrs are not yet supported for dtors if FRTs
         return false;
 
       if (methodDecl->isOverloadedOperator())

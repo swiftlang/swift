@@ -5,6 +5,7 @@
 
 class RefCountedBase {
 public:
+  SWIFT_RETURNS_RETAINED
   RefCountedBase() : _refCount(1) { printf("created\n"); }
 
 protected:
