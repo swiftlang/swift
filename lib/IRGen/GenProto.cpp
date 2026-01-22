@@ -4421,6 +4421,8 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
     IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
 
+  auto authInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, fnType);
+
   auto helperFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
     fnName, IGM.Int8PtrTy, {witnessTableTy},
     [&](IRGenFunction &subIGF) {
@@ -4431,10 +4433,13 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
     auto slot = slotForLoadOfOpaqueWitness(subIGF, wtable,
                                            index.forProtocolWitnessTable(),
                                            true);
+
     llvm::Value *witnessFnPtr = emitWTableSlotLoad(subIGF, wtable, member, slot,
                                                    true);
+    auto witnessFnPtrSigned =
+        emitPointerAuthSign(subIGF, witnessFnPtr, authInfo);
 
-    subIGF.Builder.CreateRet(witnessFnPtr);
+    subIGF.Builder.CreateRet(witnessFnPtrSigned);
 
   }, true /*noinline*/));
 
@@ -4443,7 +4448,7 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   auto fn = IGF.Builder.CreateBitCast(call, IGM.PtrTy);
-  return FunctionPointer::createUnsigned(fnType, fn, signature, true);
+  return FunctionPointer::createSigned(fnType, fn, authInfo, signature);
 }
 
 FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
