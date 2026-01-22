@@ -62,6 +62,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Expr.h"
@@ -3665,22 +3666,23 @@ namespace {
                  "checkBridgingAttrs called with a clang::NamedDecl which is "
                  "neither clang::FunctionDecl nor clang::ObjCMethodDecl");
 
+      const clang::RecordDecl *recordDecl = nullptr;
+      if (auto *cd = dyn_cast<clang::CXXConstructorDecl>(decl)) {
+        recordDecl = cd->getParent();
+      } else {
+        auto retType = isa<clang::FunctionDecl>(decl)
+                           ? cast<clang::FunctionDecl>(decl)->getReturnType()
+                           : cast<clang::ObjCMethodDecl>(decl)->getReturnType();
+
+        if (retType->isPointerType() || retType->isReferenceType())
+          retType = retType->getPointeeType();
+
+        if (auto *recType = retType->getAs<clang::RecordType>())
+          recordDecl = recType->getDecl();
+      }
+
       auto attrInfo = importer::ReturnOwnershipInfo(decl);
-
       HeaderLoc loc(decl->getLocation());
-      const auto retType =
-          isa<clang::FunctionDecl>(decl)
-              ? cast<clang::FunctionDecl>(decl)->getReturnType()
-              : cast<clang::ObjCMethodDecl>(decl)->getReturnType();
-      clang::QualType pointeeType = retType;
-      if (retType->isPointerType() || retType->isReferenceType()) {
-        pointeeType = retType->getPointeeType();
-      }
-
-      clang::RecordDecl *recordDecl = nullptr;
-      if (const auto *recordType = pointeeType->getAs<clang::RecordType>()) {
-        recordDecl = recordType->getDecl();
-      }
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
           !hasImmortalAttrs(recordDecl)) {

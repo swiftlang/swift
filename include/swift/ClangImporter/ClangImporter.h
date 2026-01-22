@@ -733,7 +733,6 @@ struct ReturnOwnershipInfo {
     return hasReturnsRetained && hasReturnsUnretained;
   }
 
-private:
   bool hasReturnsRetained = false;
   bool hasReturnsUnretained = false;
 };
