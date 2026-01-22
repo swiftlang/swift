@@ -7984,7 +7984,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::YieldingBorrow:
-  case AccessorKind::YieldingMutate:
   case AccessorKind::Borrow:
   case AccessorKind::Mutate:
     return true;
@@ -7995,6 +7994,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
     return false;
 
   case AccessorKind::Init:
