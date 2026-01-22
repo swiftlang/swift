@@ -1,14 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o -enforce-exclusivity=checked
 
-// Single-threaded exclusivity checking implementation
-// RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivitySingleThreaded
+// Multi-threaded exclusivity checking implementation (that uses C11 thread_local).
+// RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivityC11ThreadLocal
 // RUN: %target-run %t/a.out 2>&1| %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+
+// UNSUPPORTED: OS=wasip1
 
 struct NC: ~Copyable {
   var i: Int = 1
