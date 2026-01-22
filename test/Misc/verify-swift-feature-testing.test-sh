@@ -31,6 +31,8 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/Concurrency/approachable_concurrency.swift"),
     # Uses a script that hides usage of the CoroutineAccessor feature.
     pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
+    # Uses a special -experimental-features flag for the rth utility
+    pathlib.Path("validation-test/Evolution/test_protocol_add_reparented_seq.swift"),
 ]
 
 ENABLE_FEATURE_RE = re.compile(

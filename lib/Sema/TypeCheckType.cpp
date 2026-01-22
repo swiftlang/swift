@@ -3615,9 +3615,18 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     if (ty->hasError())
       return ty;
 
-    // Only a protocol can declare it's been @reparented.
+    // The protocol declaring it's been reparented can't be @objc
+    if (auto *proto = getDeclContext()->getSelfProtocolDecl()) {
+      if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
+        diagnoseInvalid(repr, attr->getAtLoc(),
+                        diag::typeattr_invalid_for_objc_protocol, attr, proto);
+      }
+    }
+
+    // Only a protocol's extension can declare it's been @reparented.
     if (!options.is(TypeResolverContext::Inherited) ||
-        !getDeclContext()->getSelfProtocolDecl()) {
+        !getDeclContext()->getSelfProtocolDecl() ||
+        !isa<ExtensionDecl>(getDeclContext())) {
       diagnoseInvalid(repr, attr->getAtLoc(),
                       diag::typeattr_not_protocol_inheritance_clause, attr)
           .fixItRemove(attr->getSourceRange());

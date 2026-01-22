@@ -23,14 +23,12 @@ public protocol SeedEater {
   var seedKinds: Kind { get }
 }
 
-public protocol Bird : @reparented SeedEater {
+public protocol Bird {
   func eat(_ food: Int) -> Int
 }
 
-extension Bird {
+extension Bird : @reparented SeedEater where Kind == Int {
   public func eatSeed(_ food: Int) -> Int { return eat(food + libraryVersion()) }
-
-  public typealias Kind = Int
 
   public var seedKinds: Int {
     get { return libraryVersion() }

@@ -2316,6 +2316,13 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
     // Objective-C protocols
     if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
 
+    // Associated types defined within reparentable protocols Q
+    // are not overridden by one defined in any reparented ones P, i.e.,
+    // if P was reparented by Q, then P's associated type serves as the anchor.
+    // We skip processing any protocols further inherited by the reparentable.
+    if (inheritedProto->getAttrs().hasAttribute<ReparentableAttr>())
+      return TypeWalker::Action::SkipNode;
+
     // Look for associated types with the same name.
     bool foundAny = false;
     if (auto found = inheritedProto->getAssociatedType(assocType->getName())) {

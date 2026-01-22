@@ -34,7 +34,7 @@ class ResilienceTest(object):
 
     def __init__(self, target_build_swift, target_run, target_codesign,
                  target_nm, tmp_dir, test_dir, test_src, lib_prefix,
-                 lib_suffix, additional_compile_flags, triple,
+                 lib_suffix, additional_compile_flags, experimental_features, triple,
                  backward_deployment, no_symbol_diff, skip_application_back_deploy):
         self.target_build_swift = shlex.split(target_build_swift)
         self.target_run = shlex.split(target_run)
@@ -47,6 +47,9 @@ class ResilienceTest(object):
         self.lib_suffix = lib_suffix
         self.additional_compile_flags = shlex.split(additional_compile_flags)
         self.triple = triple
+
+        self.experimental_features = \
+          [item for s in experimental_features.split(',') for item in ["-enable-experimental-feature", s]]
 
         self.before_dir = os.path.join(self.tmp_dir, 'before')
         self.after_dir = os.path.join(self.tmp_dir, 'after')
@@ -103,6 +106,7 @@ class ResilienceTest(object):
 
             command = self.target_build_swift + \
                 self.additional_compile_flags + \
+                self.experimental_features + \
                 compiler_flags
             verbose_print_command(command)
             returncode = subprocess.call(command)
@@ -257,6 +261,7 @@ def main():
     parser.add_argument('--lib-prefix', required=True)
     parser.add_argument('--lib-suffix', required=True)
     parser.add_argument('--additional-compile-flags', default='')
+    parser.add_argument('--experimental-features', default='')
     parser.add_argument('--backward-deployment', default=False,
                         action='store_true')
     parser.add_argument('--skip-application-back-deploy', default=False,
@@ -273,6 +278,7 @@ def main():
                                      args.t, args.S, args.s, args.lib_prefix,
                                      args.lib_suffix,
                                      args.additional_compile_flags,
+                                     args.experimental_features,
                                      args.triple,
                                      args.backward_deployment,
                                      args.no_symbol_diff,

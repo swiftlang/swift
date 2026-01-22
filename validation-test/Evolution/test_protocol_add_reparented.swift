@@ -1,5 +1,6 @@
 // RUN: %target-resilience-test --skip-application-back-deploy --additional-compile-flags '-enable-experimental-feature Reparenting'
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_Reparenting
 
 import StdlibUnittest
 import protocol_add_reparented
@@ -24,10 +25,14 @@ struct Plus100Eagle: Bird {
   func eat(_ food: Int) -> Int { return food }
 
   public func eatSeed(_ food: Int) -> Int { return eat(food + libraryVersion() + 100) }
-  public typealias Kind = Int
-  public var seedKinds: Int {
-    get { return libraryVersion() + 100 }
+  public typealias Kind = UInt
+  public var seedKinds: UInt {
+    get { return UInt(libraryVersion() + 100) }
   }
+}
+
+extension UInt: @retroactive AsInt {
+  public func asInt() -> Int { return Int(self) }
 }
 #endif
 

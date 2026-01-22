@@ -1475,6 +1475,55 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   return result;
 }
 
+// Some protocols have self conformances and/or reparented conformances.
+// ProtocolDecl's do not use the ConformanceTable. Instead, this function serves
+// to create all of the ProtocolConformance's for a protocol.
+static std::vector<ProtocolConformance *>
+createProtocolToProtocolConformances(ProtocolDecl *protocol) {
+  auto &ctx = protocol->getASTContext();
+  std::vector<ProtocolConformance *> conformances;
+
+  if (protocol->requiresSelfConformanceWitnessTable()) {
+    conformances.push_back(ctx.getSelfConformance(protocol));
+  }
+
+  // Search extensions of the protocol for reparented conformances.
+  for (auto *ext : protocol->getExtensions()) {
+    // No valid reparentings can appear outside the protocol's module.
+    if (ext->getModuleContext() != protocol->getModuleContext())
+      continue;
+
+    auto inheritedTypes = InheritedTypes(ext);
+    for (unsigned i : inheritedTypes.getIndices()) {
+      auto const &entry = inheritedTypes.getEntry(i);
+      if (!entry.isReparented())
+        continue;
+
+      // We may not have already validated the inherited entry.
+      Type inheritedTy =
+          inheritedTypes.getResolvedType(i, TypeResolutionStage::Structural);
+
+      auto baseTy = inheritedTy->getAs<ProtocolType>();
+      if (!baseTy)
+        continue;
+
+      auto baseProto = baseTy->getDecl();
+      assert(baseProto);
+
+      // We say that 'Self' is what conforms to the inherited entry.
+      auto conformingType = protocol->getDeclaredInterfaceType();
+      auto *conf = ctx.getNormalConformance(
+          conformingType, baseTy->getDecl(), entry.getLoc(),
+          entry.getTypeRepr(), /*dc=*/ext, ProtocolConformanceState::Incomplete,
+          ProtocolConformanceFlags::Reparented);
+
+      conformances.push_back(conf);
+    }
+  }
+
+  return conformances;
+}
+
 std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const IterableDeclContext *IDC) const {
@@ -1486,50 +1535,21 @@ LookupAllConformancesInContextRequest::evaluate(
   }
 
   // Protocols only have self-conformances or reparented conformances.
-  // They do not use the ConformanceTable.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     auto &ctx = protocol->getASTContext();
-    std::vector<ProtocolConformance *> conformances;
 
-    InheritedTypes inherited(protocol);
-    for (auto const &entry : inherited.getEntries()) {
-      if (!entry.isReparented())
-        continue;
-
-      if (entry.isNull() || entry.isError())
-        continue;
-
-      auto baseTy = entry.getType()->getAs<ProtocolType>();
-      if (!baseTy)
-        continue;
-
-
-      DeclContext *dc = protocol;
-
-      // FIXME: To satisfy IRGen, assign the decl context of this conformance
-      // to an arbitrary extension of the protocol, for now, until we possibly
-      // make @reparented required in a specific extension.
-      dc = protocol->getLastExtension();
-      ASSERT(dc);
-
-      // FIXME: should this really be CanGenericTypeParamType::getType(0, 0, ctx); ?
-      auto conformingType = protocol->getDeclaredInterfaceType();
-
-      auto *conf = ctx.getNormalConformance(
-          conformingType, baseTy->getDecl(),
-          entry.getLoc(), entry.getTypeRepr(), dc,
-          ProtocolConformanceState::Incomplete,
-          ProtocolConformanceFlags::Reparented);
-
-      assert(conf->isConformanceOfProtocol());
-      conformances.push_back(conf);
+    // All extensions have the same conformances as the protocol itself;
+    // there are no conditionally inherited protocols or conditional
+    // protocol-to-protocol conformances.
+    //
+    // This short-cut avoids needless work searching extensions repeatedly,
+    // as protocols are not using the ConformanceTable for bookkeeping.
+    if (isa<ExtensionDecl>(IDC)) {
+      return evaluateOrDefault(
+          ctx.evaluator, LookupAllConformancesInContextRequest{protocol}, {});
     }
 
-    if (protocol->requiresSelfConformanceWitnessTable()) {
-      conformances.push_back(ctx.getSelfConformance(protocol));
-    }
-
-    return conformances;
+    return createProtocolToProtocolConformances(protocol);
   }
 
   // Record all potential conformances.

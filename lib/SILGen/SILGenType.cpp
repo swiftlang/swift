@@ -1098,7 +1098,7 @@ public:
           SILWitnessTable::BaseProtocolWitness{baseProto, conf});
 
       // Ensure the witness table is emitted for this conformance.
-      SGM.useConformance(ProtocolConformanceRef(conf));
+      SGM.useConformance(/*inst=*/nullptr, ProtocolConformanceRef(conf));
       return;
     }
 

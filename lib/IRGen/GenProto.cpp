@@ -1437,9 +1437,18 @@ public:
                         llvm::Value **typeMetadataCache) const override {
     auto conformingType = Conformance->getType()->getCanonicalType();
 
-    if (isa<NormalProtocolConformance>(Conformance)) {
+    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(Conformance)) {
       conformingType = conformingType->getReducedType(
         Conformance->getGenericSignature());
+
+      // For reparented conformances, we need to replace generic type parameters
+      // with archetypes, as the type conforming to this new parent protocol
+      // is whatever runtime type conforms to the child protocol.
+      if (normalConf->isReparented()) {
+        conformingType = normalConf->getDeclContext()
+                             ->mapTypeIntoEnvironment(conformingType)
+                             ->getCanonicalType();
+      }
     }
 
     // If we're looking up a dependent type, we can't cache the result.
@@ -1766,7 +1775,7 @@ public:
         return;
       }
 
-      // For associated type witnesses for reparented conformances,
+      // For associated type witnesses of reparented conformances,
       // the metadata is relative to the protocol itself, rather than
       // found in the conforming type's metadata.
       bool inProtocolContext = Conformance.isReparented();
@@ -1808,6 +1817,16 @@ public:
         ConformanceInContext.getAssociatedConformance(
           requirement.getAssociation(),
           requirement.getAssociatedRequirement());
+
+      // Map the conformance into the reparented conformance's environment, to
+      // replace type parameters with archetypes.
+      if (ConformanceInContext.isReparented()) {
+        auto *genericEnv = ConformanceInContext.getDeclContext()
+                               ->getGenericEnvironmentOfContext();
+        auto newConf = associatedConformance
+                           .subst(genericEnv->getForwardingSubstitutionMap());
+        associatedConformance = newConf;
+      }
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedConformance
@@ -2314,14 +2333,21 @@ namespace {
           condReqs.push_back(condReq);
         }
       }
-      if (condReqs.empty()) {
+      if (condReqs.empty() || Conformance->isReparented()) {
         // For a protocol P that conforms to another protocol, introduce a
         // conditional requirement for that P's Self: P. This aligns with
         // SILWitnessTable::enumerateWitnessTableConditionalConformances().
         if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
-          auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
+          auto selfType = selfProto->getASTContext().TheSelfType;
           condReqs.emplace_back(RequirementKind::Conformance, selfType,
                                    selfProto->getDeclaredInterfaceType());
+
+          // Maintain canonical ordering.
+          llvm::array_pod_sort(
+              condReqs.begin(), condReqs.end(),
+              [](const Requirement *lhs, const Requirement *rhs) -> int {
+                return lhs->compare(*rhs);
+              });
         }
 
         if (condReqs.empty() && inverses.empty())
