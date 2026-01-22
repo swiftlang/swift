@@ -396,6 +396,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// The representation for a position in `Span`.
@@ -508,8 +509,9 @@ extension Span where Element: BitwiseCopyable {
 extension Span where Element: BitwiseCopyable {
 
   public var bytes: RawSpan {
-    @lifetime(copy self)
     @_alwaysEmitIntoClient
+    @_transparent
+    @lifetime(copy self)
     get {
       let rawSpan = RawSpan(_elements: self)
       return unsafe _overrideLifetime(rawSpan, copying: self)
@@ -694,6 +696,7 @@ extension Span where Element: ~Copyable  {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -728,6 +731,7 @@ extension Span where Element: BitwiseCopyable {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {

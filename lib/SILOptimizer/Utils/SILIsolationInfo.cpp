@@ -1652,6 +1652,20 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
   if (type.isSendable(fn))
     return false;
 
+  // See if we have an immutable box that contains only Sendable things. In such
+  // a case, we treat the box itself as Sendable.
+  //
+  // One example of such a type is a Sendable noncopyable let that is captured
+  // by an escaping closure.
+  if (auto *boxTy = type.getASTType()->getAs<SILBoxType>();
+      boxTy &&
+      llvm::all_of(range(boxTy->getNumFields()), [&](unsigned index) -> bool {
+        return !boxTy->isFieldMutable(index) &&
+               isSendableType(boxTy->getFieldType(*fn, index), fn);
+      })) {
+    return false;
+  }
+
   // Grab out behavior. If it is none, then we have a type that we want to treat
   // as non-Sendable.
   auto behavior = type.getConcurrencyDiagnosticBehavior(fn);
@@ -1866,6 +1880,39 @@ static FunctionTest
                                                           llvm::outs());
                               llvm::outs() << "\n";
                             });
+
+// Test: sil_isolation_info_is_sendable
+//
+// Checks whether a SILValue is considered Sendable by the region-based
+// isolation analysis. This is different from sil_isolation_info_inference which
+// returns the *isolation* of a value (task-isolated, actor-isolated, etc.).
+//
+// Use this test to verify Sendable inference for:
+// - Box types (alloc_box), especially immutable boxes with Sendable contents
+// - Values where Sendability affects region analysis but not isolation
+//
+// Arguments:
+// - SILValue: value to run SILIsolationInfo::isSendable upon
+//
+// Output format:
+//   Input Value: <SIL instruction>
+//   IsSendable: yes|no
+//
+// Example usage in .sil test:
+//   specify_test "sil_isolation_info_is_sendable @trace[0]"
+//   %0 = alloc_box ${ let MyActor }
+//   debug_value [trace] %0
+//   // CHECK: IsSendable: yes
+static FunctionTest
+    IsSendableInference("sil_isolation_info_is_sendable",
+                        [](auto &function, auto &arguments, auto &test) {
+                          auto value = arguments.takeValue();
+
+                          bool isSendable = SILIsolationInfo::isSendable(value);
+                          llvm::outs() << "Input Value: " << *value;
+                          llvm::outs() << "IsSendable: "
+                                       << (isSendable ? "yes\n" : "no\n");
+                        });
 
 // Arguments:
 // - SILValue: first value to merge

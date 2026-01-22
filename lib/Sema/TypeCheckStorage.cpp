@@ -1050,7 +1050,7 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
         break;
       }
     }
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::YieldingBorrow;
   };
 
   if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
@@ -1059,17 +1059,17 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
       for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
         if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
           // A scoped lifetime dependence borrows its source.
-          return OpaqueReadOwnership::Borrowed;
+          return OpaqueReadOwnership::YieldingBorrow;
         }
       }
     }
   }
 
   if (storage->getAccessor(AccessorKind::YieldingBorrow))
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::YieldingBorrow;
 
   if (storage->getAccessor(AccessorKind::Borrow))
-    return OpaqueReadOwnership::Borrowed;
+    return OpaqueReadOwnership::Borrow;
 
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
@@ -2447,6 +2447,48 @@ synthesizeYieldingMutateCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
 }
 
 static std::pair<BraceStmt *, bool>
+synthesizeBorrowAndMutateAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
+  // TODO: Handle property wrappers, property observers
+  auto storage = accessor->getStorage();
+
+  ProtocolDecl *proto = llvm::dyn_cast_if_present<ProtocolDecl>(
+      accessor->getStorage()->getDeclContext()->getAsDecl());
+  auto target = proto ? TargetImpl::Ordinary : TargetImpl::Implementation;
+
+  // Build a reference to the storage.
+  Expr *ref = buildStorageReference(
+      accessor, storage, target,
+      /*isUsedForGetAccess=*/true,
+      /*isUsedForSetAccess=*/accessor->getAccessorKind() ==
+          AccessorKind::Mutate,
+      ctx);
+  if (ref != nullptr) {
+    // Wrap it with an `&` marker if this is a mutate.
+    ref = maybeWrapInOutExpr(ref, ctx);
+  }
+
+  SmallVector<ASTNode, 2> body;
+  if (ref != nullptr) {
+    body.push_back(ReturnStmt::createImplicit(ctx, ref));
+  }
+
+  SourceLoc loc =
+      accessor->getLoc().isValid() ? accessor->getLoc() : storage->getLoc();
+  return {BraceStmt::create(ctx, loc, body, loc, true),
+          /*isTypeChecked=*/true};
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeBorrowAccessorBody(AccessorDecl *borrow, ASTContext &ctx) {
+  return synthesizeBorrowAndMutateAccessorBody(borrow, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
+synthesizeMutateAccessorBody(AccessorDecl *mutate, ASTContext &ctx) {
+  return synthesizeBorrowAndMutateAccessorBody(mutate, ctx);
+}
+
+static std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
   auto &ctx = accessor->getASTContext();
@@ -2474,6 +2516,12 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   case AccessorKind::YieldingMutate:
     return synthesizeYieldingMutateCoroutineBody(accessor, ctx);
 
+  case AccessorKind::Borrow:
+    return synthesizeBorrowAccessorBody(accessor, ctx);
+
+  case AccessorKind::Mutate:
+    return synthesizeMutateAccessorBody(accessor, ctx);
+
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
@@ -2482,12 +2530,6 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
 
   case AccessorKind::Init:
     llvm_unreachable("init accessor not yet implemented");
-
-  case AccessorKind::Borrow:
-    llvm_unreachable("borrow accessor is not yet implemented");
-
-  case AccessorKind::Mutate:
-    llvm_unreachable("mutate accessor is not yet implemented");
   }
   llvm_unreachable("bad synthesized function kind");
 }
@@ -2628,14 +2670,18 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       params, Type(), storage->getDeclContext());
   setter->setSynthesized();
 
+  if (!storage->requiresOpaqueAccessor(AccessorKind::Set))
+    setter->setForcedStaticDispatch(true);
+
   if (isMutating)
     setter->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     setter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
-  // All mutable storage requires a setter.
-  assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
-  
+  // All mutable storage without a mutate accessor requires a setter.
+  assert(storage->requiresOpaqueAccessor(AccessorKind::Set) ||
+         storage->getAccessor(AccessorKind::Mutate));
+
   // Copy availability from the accessor we'll synthesize the setter from.
   SmallVector<const Decl *, 2> asAvailableAs;
 
@@ -2757,6 +2803,56 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 }
 
 static AccessorDecl *
+createBorrowMutateAccessorPrototype(AbstractStorageDecl *storage,
+                                    AccessorKind kind, ASTContext &ctx) {
+  SourceLoc loc = storage->getLoc();
+
+  auto dc = storage->getDeclContext();
+
+  // The forwarding index parameters.
+  auto *params = buildIndexForwardingParamList(storage, {}, ctx);
+
+  auto *accessor = AccessorDecl::create(
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, Type(), dc);
+  accessor->setSynthesized();
+
+  // TODO: Update self access kind when ownership variations are introduced for
+  // borrow and mutate accessors.
+  if (kind == AccessorKind::Mutate) {
+    accessor->setSelfAccessKind(SelfAccessKind::Mutating);
+  } else {
+    accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
+  }
+
+  if (!storage->requiresOpaqueAccessor(kind))
+    accessor->setForcedStaticDispatch(true);
+
+  // Make sure the coroutine is available enough to access
+  // the storage.
+  SmallVector<const Decl *, 2> asAvailableAs;
+  asAvailableAs.push_back(storage);
+
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
+  }
+
+  AvailabilityInference::applyInferredAvailableAttrs(accessor, asAvailableAs);
+
+  // A mutate accessor should have the same SPI visibility as the setter.
+  if (kind == AccessorKind::Mutate) {
+    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set))
+      applyInferredSPIAccessControlAttr(accessor, setter, ctx);
+  }
+
+  finishImplicitAccessor(accessor, ctx);
+
+  return accessor;
+}
+
+static AccessorDecl *
 createReadCoroutinePrototype(AbstractStorageDecl *storage,
                              ASTContext &ctx) {
   return createCoroutineAccessorPrototype(storage, AccessorKind::Read, ctx);
@@ -2776,6 +2872,18 @@ createModifyCoroutinePrototype(AbstractStorageDecl *storage,
 static AccessorDecl *
 createYieldingMutateCoroutinePrototype(AbstractStorageDecl *storage, ASTContext &ctx) {
   return createCoroutineAccessorPrototype(storage, AccessorKind::YieldingMutate, ctx);
+}
+
+static AccessorDecl *createBorrowAccessorPrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createBorrowMutateAccessorPrototype(storage, AccessorKind::Borrow,
+                                             ctx);
+}
+
+static AccessorDecl *createMutateAccessorPrototype(AbstractStorageDecl *storage,
+                                                   ASTContext &ctx) {
+  return createBorrowMutateAccessorPrototype(storage, AccessorKind::Mutate,
+                                             ctx);
 }
 
 AccessorDecl *
@@ -2812,6 +2920,12 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 
   case AccessorKind::YieldingMutate:
     return createYieldingMutateCoroutinePrototype(storage, ctx);
+
+  case AccessorKind::Borrow:
+    return createBorrowAccessorPrototype(storage, ctx);
+
+  case AccessorKind::Mutate:
+    return createMutateAccessorPrototype(storage, ctx);
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
@@ -3003,6 +3117,10 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     if (protoDecl->isObjC())
       return false;
 
+  if (storage->getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -3141,13 +3259,13 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
   case AccessorKind::Modify:
   case AccessorKind::YieldingMutate:
   case AccessorKind::Init:
-    break;
   case AccessorKind::Borrow:
+  case AccessorKind::Mutate:  
+    break;
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-  case AccessorKind::Mutate:
     llvm_unreachable("bad synthesized function kind");
   }
 
@@ -4168,6 +4286,14 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     }
     if (storage->getParsedAccessor(AccessorKind::YieldingBorrow)) {
       readImpl = ReadImplKind::YieldingBorrow;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Mutate)) {
+      readImpl = ReadImplKind::Borrow;
+      writeImpl = WriteImplKind::Mutate;
+      readWriteImpl = ReadWriteImplKind::Mutate;
+    }
+    if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+      readImpl = ReadImplKind::Borrow;
     }
 
     StorageImplInfo info(readImpl, writeImpl, readWriteImpl);

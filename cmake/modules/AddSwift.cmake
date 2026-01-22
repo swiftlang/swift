@@ -61,13 +61,18 @@ function(_is_lto_enabled option out_var)
   endif()
 endfunction()
 
+# Not every compiler supports -fno-lto (MSVC, for example).
+check_cxx_compiler_flag("-fno-lto" CXX_COMPILER_SUPPORTS_FNO_LTO)
+
 function(_compute_lto_flag option out_var)
   _is_lto_enabled("${option}" _lto_enabled)
   if (_lto_enabled)
     string(TOLOWER "${option}" lowercase_option)
     set(${out_var} "-flto=${lowercase_option}" PARENT_SCOPE)
-  else()
+  elseif (CXX_COMPILER_SUPPORTS_FNO_LTO)
     set(${out_var} "-fno-lto" PARENT_SCOPE)
+  else()
+    set(${out_var} "" PARENT_SCOPE)
   endif()
 endfunction()
 

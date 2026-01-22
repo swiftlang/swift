@@ -1867,19 +1867,33 @@ static void determineBestChoicesInContext(
         << "Best overall score = " << bestOverallScore << '\n';
 
     for (auto *disjunction : disjunctions) {
-      auto &entry = result[disjunction];
+      auto found = result.find(disjunction);
+
       getLogger(/*extraIndent=*/4)
           << "[Disjunction '"
           << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
-                 PO)
-          << "' with score = " << entry.Score.value_or(0) << '\n';
+                 PO);
 
-      for (const auto *choice : entry.FavoredChoices) {
-        auto &log = getLogger(/*extraIndent=*/6);
+      if (found != result.end()) {
+        auto &entry = found->second;
+        if (entry.Score.has_value()) {
+          getLogger(/*extraIndent=*/4)
+              << "' with score = " << entry.Score.value_or(0) << '\n';
+        } else {
+          getLogger(/*extraIndent=*/4)
+              << "' without score\n";
+        }
 
-        log << "- ";
-        choice->print(log, &cs.getASTContext().SourceMgr);
-        log << '\n';
+        for (const auto *choice : entry.FavoredChoices) {
+          auto &log = getLogger(/*extraIndent=*/6);
+
+          log << "- ";
+          choice->print(log, &cs.getASTContext().SourceMgr);
+          log << '\n';
+        }
+      } else {
+        getLogger(/*extraIndent=*/4)
+            << "' unsupported\n";
       }
 
       getLogger(/*extraIdent=*/4) << "]\n";
