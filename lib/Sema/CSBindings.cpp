@@ -622,9 +622,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     ASSERT(inserted);
   }
 
-  llvm::SmallDenseSet<Constraint *> seenDefaults;
+  llvm::SmallDenseSet<Type> seenDefaults;
   for (auto *constraint : Defaults) {
-    bool inserted = seenDefaults.insert(constraint).second;
+    bool inserted = seenDefaults.insert(constraint->getSecondType()).second;
     ASSERT(inserted);
   }
 
@@ -672,7 +672,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       if (def->getKind() == ConstraintKind::FallbackType)
         continue;
 
-      if (!seenDefaults.insert(def).second)
+      if (!seenDefaults.insert(def->getSecondType()).second)
         continue;
 
       addDefault(def);
@@ -2164,15 +2164,23 @@ void PotentialBindings::infer(Constraint *constraint) {
   }
 
   case ConstraintKind::Defaultable:
-  case ConstraintKind::FallbackType:
+  case ConstraintKind::FallbackType: {
     // Defaults and fallbacks are applicable only to the types
     // they are associated with. Defaults could be transferred
     // to supertypes but that happens separately.
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
+    auto newDefault = constraint->getSecondType();
+    // Don't record duplicate default types.
+    if (llvm::any_of(Defaults, [&](Constraint *existingDefault) {
+          return existingDefault->getSecondType()->isEqual(newDefault);
+        }))
+      break;
+
     recordDefault(constraint);
     break;
+  }
 
   // For now let's avoid inferring protocol requirements from
   // this constraint, but in the future we could do that to
