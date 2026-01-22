@@ -1503,25 +1503,37 @@ LookupAllConformancesInContextRequest::evaluate(
       if (!baseTy)
         continue;
 
+      auto baseProto = baseTy->getDecl();
+      assert(baseProto);
 
-      DeclContext *dc = protocol;
 
-      // FIXME: To satisfy IRGen, assign the decl context of this conformance
-      // to an arbitrary extension of the protocol, for now, until we possibly
-      // make @reparented required in a specific extension.
-      dc = protocol->getLastExtension();
-      ASSERT(dc);
+      // FIXME: It'd be better if we simply required people to write the
+      //        @reparented relationship on a specific extension, and then
+      //        check if it's unconstrained.
+      //        It's not so simple to synthesize an unconstrained extension
+      //        of a protocol, given SuppressedAssociatedTypesWithDefaults,
+      //        and we can't call ExtensionDecl::isConstrainedExtension here,
+      //        as it'll trigger a request cycle.
+      DeclContext *dc = protocol->getLastExtension();
+      if (!dc) {
+#if DID_A_FULL_CLEAN_AND_REBUILD_BECAUSE_THATS_WHAT_IT_TAKES_TO_ADD_A_DIAGNOSTIC
+        ctx.Diags.diagnose(entry.getLoc(),
+                           diag::reparented_missing_unconstrained_extension,
+                           protocol, baseProto);
+#else
+        ASSERT(dc && "Missing unconstrained extension");
+#endif
+        continue;
+      }
 
-      // FIXME: should this really be CanGenericTypeParamType::getType(0, 0, ctx); ?
+      // We say that 'Self' is what conforms to the inherited entry.
       auto conformingType = protocol->getDeclaredInterfaceType();
-
       auto *conf = ctx.getNormalConformance(
           conformingType, baseTy->getDecl(),
           entry.getLoc(), entry.getTypeRepr(), dc,
           ProtocolConformanceState::Incomplete,
           ProtocolConformanceFlags::Reparented);
 
-      assert(conf->isConformanceOfProtocol());
       conformances.push_back(conf);
     }
 

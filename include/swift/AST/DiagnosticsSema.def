@@ -6090,6 +6090,10 @@ ERROR(typeattr_reparented_requires_reparentable_protocol,none,
       "%0 cannot apply to %1 unless it is declared to be '@reparentable'",
       (const TypeAttribute *, const TypeDecl *))
 
+ERROR(reparented_missing_unconstrained_extension,none,
+      "An unconstrained extension of %0 must be declared when @reparented by %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
+
 WARNING(unchecked_conformance_not_special,none,
       "'@unchecked' conformance to %0 has no meaning", (Type))
 WARNING(restate_unchecked_sendable,none,
