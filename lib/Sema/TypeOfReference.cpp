@@ -41,7 +41,7 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-#define DEBUG_TYPE "ConstraintSystem"
+#define DEBUG_TYPE "TypeOfReference"
 
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
@@ -2919,6 +2919,12 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
       choice, useDC, locator, &builder);
 
+  LLVM_DEBUG(
+    llvm::dbgs() << "------------\n";
+    builder.dump(llvm::dbgs(), *this);
+    llvm::dbgs() << "------------\n");
+
+  ASSERT(PreparingOverload);
   PreparingOverload = false;
 
   size_t count = builder.Changes.size();
@@ -3271,5 +3277,92 @@ void ConstraintSystem::verifyThatArgumentIsHashable(unsigned index,
         ConstraintKind::ConformsTo, argType,
         hashable->getDeclaredInterfaceType(),
         getConstraintLocator(locator, LocatorPathElt::TupleElement(index)));
+  }
+}
+
+void PreparedOverloadChange::dump(llvm::raw_ostream &out,
+                                  ConstraintSystem &cs,
+                                  unsigned indent) const {
+  PrintOptions PO = PrintOptions::forDebugging();
+  out.indent(indent);
+
+  switch (Kind) {
+  case AddedTypeVariable:
+    out << "(AddedTypeVariable ";
+    TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case AddedConstraint:
+    out << "(AddedConstraint ";
+    TheConstraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << ")\n";
+    break;
+
+  case AddedBindConstraint:
+    out << "(AddedBindConstraint ";
+    Bind.FirstType->print(out, PO);
+    out << " ";
+    Bind.SecondType->print(out, PO);
+    out << ")\n";
+    break;
+
+  case OpenedTypes: {
+    out << "(OpenedTypes";
+    for (unsigned i = 0, e = Replacements.Count; i < e; ++i) {
+      out << " ";
+      auto openedType = Replacements.Data[i];
+      openedType.first->print(out, PO);
+      out << " -> ";
+      openedType.second->print(out, PO);
+    }
+    out << ")\n";
+    break;
+  }
+
+  case OpenedExistentialType:
+    out << "(OpenedExistentialType ";
+    TheExistential->print(out, PO);
+    out << ")\n";
+    break;
+
+  case OpenedPackExpansionType:
+    out << "(OpenedPackExpansionType ";
+    PackExpansion.TheExpansion->print(out, PO);
+    out << " ";
+    PackExpansion.TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case AppliedPropertyWrapper:
+    out << "(AppliedPropertyWrapper ";
+    PropertyWrapper.WrapperType->print(out, PO);
+    out << " ";
+    out << unsigned(PropertyWrapper.InitKind);
+    out << ")\n";
+    break;
+
+  case AddedFix:
+    out << "(AddedFix ";
+    Fix.TheFix->print(out);
+    out << ")\n";
+    break;
+
+  case RecordedNodeType:
+    out << "(RecordedNodeType at ";
+    Node.Node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
+    out << " ";
+    Node.TheType->print(out, PO);
+    out << ")\n";
+    break;
+  }
+}
+
+void PreparedOverloadBuilder::dump(llvm::raw_ostream &out,
+                                  ConstraintSystem &cs,
+                                  unsigned indent) const {
+  for (const auto &change : Changes) {
+    change.dump(out, cs, indent);
   }
 }
