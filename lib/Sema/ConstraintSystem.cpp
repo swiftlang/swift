@@ -4238,7 +4238,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   std::optional<OverloadChoice> choice;
   Type rawFnType;
   auto *calleeLocator = getCalleeLocator(argLocator);
-
   if (auto overload = getOverloadChoiceIfAvailable(calleeLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
@@ -4247,27 +4246,24 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   } else {
     // If we didn't resolve an overload for the callee, we should be dealing
     // with a call of an arbitrary function expr.
-    if (auto *call = getAsExpr<CallExpr>(anchor)) {
-      rawFnType = getType(call->getFn());
+    auto *call = castToExpr<CallExpr>(anchor);
+    rawFnType = getType(call->getFn());
 
-      // If callee couldn't be resolved due to expression
-      // issues e.g. it's a reference to an invalid member
-      // let's just return here.
-      if (simplifyType(rawFnType)->is<ErrorType>())
-        return std::nullopt;
-
-      // A tuple construction is spelled in the AST as a function call, but
-      // is really more like a tuple conversion.
-      if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
-        if (metaTy->getInstanceType()->is<TupleType>())
-          return std::nullopt;
-      }
-
-      assert(!shouldHaveDirectCalleeOverload(call) &&
-               "Should we have resolved a callee for this?");
-    } else {
+    // If callee couldn't be resolved due to expression
+    // issues e.g. it's a reference to an invalid member
+    // let's just return here.
+    if (simplifyType(rawFnType)->is<ErrorType>())
       return std::nullopt;
+
+    // A tuple construction is spelled in the AST as a function call, but
+    // is really more like a tuple conversion.
+    if (auto metaTy = simplifyType(rawFnType)->getAs<MetatypeType>()) {
+      if (metaTy->getInstanceType()->is<TupleType>())
+        return std::nullopt;
     }
+
+    assert(!shouldHaveDirectCalleeOverload(call) &&
+             "Should we have resolved a callee for this?");
   }
 
   // Try to resolve the function type by loading lvalues and looking through
