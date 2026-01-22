@@ -1475,6 +1475,12 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
+  // Attributes that are not permitted to appear should not be printed
+  for (auto *attr : attrs) {
+    if (!attr->canAppearOnDecl(D))
+      scope.Options.ExcludeAttrList.push_back(attr->getKind());
+  }
+
   attrs.print(Printer, Options, D);
 }
 
