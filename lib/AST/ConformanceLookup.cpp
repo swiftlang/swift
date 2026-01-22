@@ -872,6 +872,20 @@ swift::checkConformanceWithoutContext(Type type, ProtocolDecl *proto,
   return lookupResult;
 }
 
+bool swift::collectRequiredTypesForInverseConformance(
+  Type type, ProtocolDecl *proto,
+  SmallVectorImpl<Type> &requiredInterfaceTypes) {
+
+  assert(requiredInterfaceTypes.empty());
+
+  Requirement req(RequirementKind::Conformance, type,
+                  proto->getDeclaredInterfaceType());
+  bool success =
+    collectRequiredTypesForInvertibleProtocol({req}, proto,
+                                              requiredInterfaceTypes);
+  return success;
+}
+
 ///
 /// Sendable checking utility
 ///
