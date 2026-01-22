@@ -1008,7 +1008,7 @@ namespace swift {
 
     /// Enable experimental optimization to disable contradictory disjunction
     /// choices.
-    bool SolverPruneDisjunctions = false;
+    bool SolverPruneDisjunctions = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.
