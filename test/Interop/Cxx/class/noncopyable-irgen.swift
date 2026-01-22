@@ -8,6 +8,8 @@
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST6- -D TEST6
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST7-%target-os-family- -verify-additional-prefix TEST7-%target-os- -D TEST7 -Xcc -DTEST7 -Xcc -std=c++20 -verify-ignore-unrelated
 
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
+
 //--- Inputs/module.modulemap
 module Test {
     header "noncopyable.h"
