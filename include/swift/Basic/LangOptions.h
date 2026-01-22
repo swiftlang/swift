@@ -990,9 +990,6 @@ namespace swift {
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
 
-    /// Enable old constraint system performance hacks.
-    bool EnableConstraintSolverPerformanceHacks = false;
-
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
 
