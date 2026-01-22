@@ -20,7 +20,7 @@ void * _Nonnull _swift_stdlib_threadLocalStorageGet(void);
 
 #if !defined(__swift_embedded__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nullable _swift_getExclusivityTLSImpl();
+void * _Nullable _swift_getExclusivityTLSImpl(void);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setExclusivityTLSImpl(void * _Nullable newValue);
@@ -28,7 +28,7 @@ void _swift_setExclusivityTLSImpl(void * _Nullable newValue);
 
 #if defined(__swift_embedded__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nullable _swift_getExclusivityTLS();
+void * _Nullable _swift_getExclusivityTLS(void);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setExclusivityTLS(void * _Nullable newValue);
@@ -44,14 +44,14 @@ void _swift_setExclusivityTLS(void * _Nullable newValue);
 
 #define SWIFT_RUNTIME_EXCLUSIVITY_KEY __PTK_FRAMEWORK_SWIFT_KEY7
 
-static inline void * _Nullable * _Nonnull _swift_getExclusivityTLSPointer() {
+static inline void * _Nullable * _Nonnull _swift_getExclusivityTLSPointer(void) {
   unsigned long tsd;
   __asm__ ("mrs %0, TPIDRRO_EL0" : "=r" (tsd));
   void **base = (void **)tsd;
   return &base[SWIFT_RUNTIME_EXCLUSIVITY_KEY];
 }
 
-static inline void * _Nullable _swift_getExclusivityTLS() {
+static inline void * _Nullable _swift_getExclusivityTLS(void) {
   return *_swift_getExclusivityTLSPointer();
 }
 
@@ -61,7 +61,7 @@ static inline void _swift_setExclusivityTLS(void * _Nullable newValue) {
 
 #else
 
-static inline void * _Nullable _swift_getExclusivityTLS() {
+static inline void * _Nullable _swift_getExclusivityTLS(void) {
   return _swift_getExclusivityTLSImpl();
 }
 
