@@ -5532,22 +5532,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
-    : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
-                           bool(const ModuleDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 class AvailabilityDomainForDeclRequest
     : public SimpleRequest<AvailabilityDomainForDeclRequest,
                            std::optional<AvailabilityDomain>(ValueDecl *),

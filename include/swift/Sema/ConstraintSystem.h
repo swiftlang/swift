@@ -1964,9 +1964,6 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
-
-  /// Enable old type-checker performance hacks.
-  EnablePerformanceHacks = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2466,74 +2463,6 @@ public:
       SynthesizedConformances;
 
 private:
-  /// Describe the candidate expression for partial solving.
-  /// This class used by shrink & solve methods which apply
-  /// variation of directional path consistency algorithm in attempt
-  /// to reduce scopes of the overload sets (disjunctions) in the system.
-  class Candidate {
-    Expr *E;
-    DeclContext *DC;
-    llvm::BumpPtrAllocator &Allocator;
-
-    // Contextual Information.
-    Type CT;
-    ContextualTypePurpose CTP;
-
-  public:
-    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
-              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
-
-    /// Return underlying expression.
-    Expr *getExpr() const { return E; }
-
-    /// Try to solve this candidate sub-expression
-    /// and re-write it's OSR domains afterwards.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    ///
-    /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
-
-    /// Apply solutions found by solver as reduced OSR sets for
-    /// for current and all of it's sub-expressions.
-    ///
-    /// \param solutions The solutions found by running solver on the
-    /// this candidate expression.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    void applySolutions(
-        llvm::SmallVectorImpl<Solution> &solutions,
-        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
-
-    /// Check if attempt at solving of the candidate makes sense given
-    /// the current conditions - number of shrunk domains which is related
-    /// to the given candidate over the total number of disjunctions present.
-    static bool
-    isTooComplexGiven(ConstraintSystem *const cs,
-                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
-      SmallVector<Constraint *, 8> disjunctions;
-      cs->collectDisjunctions(disjunctions);
-
-      unsigned unsolvedDisjunctions = disjunctions.size();
-      for (auto *disjunction : disjunctions) {
-        auto *locator = disjunction->getLocator();
-        if (!locator)
-          continue;
-
-        if (auto *OSR = getAsExpr<OverloadSetRefExpr>(locator->getAnchor())) {
-          if (shrunkExprs.count(OSR) > 0)
-            --unsolvedDisjunctions;
-        }
-      }
-
-      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
-      return unsolvedDisjunctions >= 10;
-    }
-  };
-
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -3488,12 +3417,6 @@ public:
   /// \c CodeCompletionExpr.
   bool isForCodeCompletion() const {
     return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
-  }
-
-  /// Check whether old type-checker performance hacks has been explicitly
-  /// enabled.
-  bool performanceHacksEnabled() const {
-    return Options.contains(ConstraintSystemFlags::EnablePerformanceHacks);
   }
 
   /// Log and record the application of the fix. Return true iff any
@@ -5347,23 +5270,11 @@ private:
   /// \returns true if an error occurred, false otherwise.
   bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
-  /// Find reduced domains of disjunction constraints for given
-  /// expression, this is achieved to solving individual sub-expressions
-  /// and combining resolving types. Such algorithm is called directional
-  /// path consistency because it goes from children to parents for all
-  /// related sub-expressions taking union of their domains.
-  ///
-  /// \param expr The expression to find reductions for.
-  void shrink(Expr *expr);
-
   /// Pick a disjunction from the InactiveConstraints list.
   ///
   /// \returns The selected disjunction and a set of it's favored choices.
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
-
-  /// The old method that is only used when performance hacks are enabled.
-  Constraint *selectDisjunctionWithHacks();
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///
@@ -5555,11 +5466,6 @@ public:
   /// \returns true if solution cannot be applied.
   bool applySolutionToBody(TapExpr *tapExpr,
                            SyntacticElementTargetRewriter &rewriter);
-
-  /// Reorder the disjunctive clauses for a given expression to
-  /// increase the likelihood that a favored constraint will be successfully
-  /// resolved before any others.
-  void optimizeConstraints(Expr *e);
 
   /// Set the current sub-expression (of a multi-statement closure, etc) for
   /// the purposes of diagnosing "reasonable time" errors.
