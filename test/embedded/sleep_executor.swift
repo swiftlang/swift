@@ -12,20 +12,20 @@
 import _Concurrency
 
 @available(SwiftStdlib 6.3, *)
-final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
+final class TestExecutor: TaskExecutor, SchedulingExecutor, SerialExecutor, @unchecked Sendable {
   var asScheduling: SchedulingExecutor? {
     return self
   }
 
-  public func enqueue(_ _job: consuming ExecutorJob) {
-    fatalError()
+  public func enqueue(_ job: consuming ExecutorJob) {
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 
-  public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
+  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    fatalError()
+    job.runSynchronously(on: self.asUnownedSerialExecutor())
   }
 }
 
