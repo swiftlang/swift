@@ -1357,7 +1357,10 @@ namespace {
     void printIsolation(const ActorIsolation &isolation) {
       switch (isolation) {
       case ActorIsolation::Unspecified:
+        printFlag(true, "unspecified_isolation", CapturesColor);
+        break;
       case ActorIsolation::NonisolatedUnsafe:
+        printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
 
       case ActorIsolation::Nonisolated:
