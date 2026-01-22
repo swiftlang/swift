@@ -2181,8 +2181,15 @@ final public class MakeAddrBorrowInst
 final public class DereferenceAddrBorrowInst
   : SingleValueInstruction, UnaryInstruction {}
 
-final public class InitBorrowAddrInst
-  : Instruction {}
+final public class InitBorrowAddrInst: Instruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+
+  public var referent: Value {
+    operands[1].value
+  }
+}
 
 final public class DereferenceBorrowAddrInst
   : SingleValueInstruction, UnaryInstruction {}
