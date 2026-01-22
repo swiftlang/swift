@@ -4503,6 +4503,27 @@ namespace {
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
+      // If the return type is a templated class, instantiate it. This must
+      // happen before we import the name of the method, as the name is affected
+      // by safety/unsafety of the return type. The safety detection logic
+      // (`IsSafeUseOfCxxDecl`) relies on the class being instantiated.
+      if (auto *returnedTmpl =
+              dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                  desugarIfElaborated(decl->getReturnType())->getAsTagDecl());
+          returnedTmpl && !returnedTmpl->getDefinition()) {
+        Impl.getClangSema().InstantiateClassTemplateSpecialization(
+            decl->getLocation(),
+            const_cast<clang::ClassTemplateSpecializationDecl *>(returnedTmpl),
+            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
+        // N.B. InstantiateClassTemplateSpecialization() returns true if it
+        //      encountered an error while instantiating the returned template.
+        //      Even if it does, we don't bail out here, and defer error
+        //      handling to later. This is because that handler may involve
+        //      things like import a method and mark it as unavailable, rather
+        //      than simply not import it at all.
+      }
+
       // The static `operator ()` introduced in C++ 23 is still callable as an
       // instance operator in C++, and we want to preserve the ability to call
       // it as an instance method in Swift as well for source compatibility.
