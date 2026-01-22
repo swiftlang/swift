@@ -529,10 +529,18 @@ FrontendStatsTracer::~FrontendStatsTracer()
     Reporter->saveAnyFrontendStatsEvents(*this, false);
 }
 
+static int64_t getCurrentTimeInMicroseconds() {
+  return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+static const int64_t processStartTimeMicroseconds = getCurrentTimeInMicroseconds();
+
 // Copy any interesting process-wide resource accounting stats to
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
     UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
+  C.WallClockMicroseconds = getCurrentTimeInMicroseconds() - processStartTimeMicroseconds;
+
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
   if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
