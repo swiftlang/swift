@@ -57,9 +57,11 @@
 #include "Field.h"
 #include "FixedTypeInfo.h"
 #include "ForeignClassMetadataVisitor.h"
+#include "FunctionMetadataVisitor.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenDecl.h"
+#include "GenHeap.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
 #include "GenStruct.h"
@@ -76,7 +78,6 @@
 #include "StructLayout.h"
 #include "StructMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
-#include "FunctionMetadataVisitor.h"
 
 #include "GenMeta.h"
 
@@ -1936,7 +1937,8 @@ namespace {
 
       setCommonFlags(flags);
       flags.setHasLayoutString(hasLayoutString);
-      
+      flags.setHasExtendedFlags(true);
+
       return flags.getOpaqueValue();
     }
 
@@ -2021,6 +2023,7 @@ namespace {
 
       setCommonFlags(flags);
       flags.setHasLayoutString(hasLayoutString);
+      flags.setHasExtendedFlags(true);
 
       return flags.getOpaqueValue();
     }
@@ -2177,7 +2180,9 @@ namespace {
         flags.class_setResilientSuperclassReferenceKind(
                                             ResilientSuperClassRef->getKind());
       }
-      
+
+      flags.setHasExtendedFlags(true);
+
       return flags.getOpaqueValue();
     }
 
@@ -4301,6 +4306,8 @@ namespace {
     // later turned into !type metadata attributes.
     SmallVector<std::pair<Size, SILDeclRef>, 8> VTableEntriesForVFE;
 
+    std::optional<std::optional<uint64_t>> typedMallocTypeId;
+
   public:
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              ConstantStructBuilder &builder,
@@ -4477,6 +4484,26 @@ namespace {
       auto metadata = asImpl().getSuperclassMetadata(superclass);
       assert(metadata);
       B.add(metadata);
+    }
+
+    std::optional<uint64_t> getTypedMallocTypeId() {
+      if (!typedMallocTypeId) {
+        typedMallocTypeId =
+            FieldLayout.computeTypedMallocTypeDescriptor(IGM, getLoweredType());
+      }
+
+      return *typedMallocTypeId;
+    }
+
+    void addExtendedFlags() {
+      uint64_t flags = 0;
+      // Has typed malloc type id
+      flags |= getTypedMallocTypeId() ? 1 : 0;
+      B.addInt64(flags);
+    }
+    void addTypedMallocTypeId() {
+      auto mallocId = getTypedMallocTypeId();
+      B.addInt64(mallocId.value_or(0));
     }
 
     llvm::Constant *emitLayoutString() {
@@ -5874,6 +5901,8 @@ namespace {
 
     using Base::Base;
 
+    std::optional<std::optional<uint64_t>> typedMallocTypeId;
+
   public:
     SILType getLoweredType() {
       return IGM.getLoweredType(Target->getDeclaredTypeInContext());
@@ -5891,6 +5920,14 @@ namespace {
         emitInitializeValueMetadata(IGF, Target, metadata,
                                     /*vwt mutable*/true, collector);
       });
+    }
+
+    std::optional<uint64_t> getTypedMallocTypeId() {
+      if (!typedMallocTypeId) {
+        llvm::SmallVector<SILType, 1> types = {getLoweredType()};
+        typedMallocTypeId = irgen::computeTypedMallocTypeDescriptor(IGM, types);
+      }
+      return *typedMallocTypeId;
     }
   };
 }
@@ -5912,10 +5949,11 @@ namespace {
   protected:
     ConstantStructBuilder &B;
     using NominalDecl = StructDecl;
-    using super::IGM;
-    using super::Target;
     using super::asImpl;
     using super::getLoweredType;
+    using super::getTypedMallocTypeId;
+    using super::IGM;
+    using super::Target;
 
     StructMetadataBuilderBase(IRGenModule &IGM, StructDecl *theStruct,
                               ConstantStructBuilder &B)
@@ -6005,6 +6043,18 @@ namespace {
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }
+    }
+
+    void addExtendedFlags() {
+      uint64_t flags = 0;
+      // Has typed malloc type id
+      flags |= getTypedMallocTypeId() ? 1 : 0;
+      B.addInt64(flags);
+    }
+
+    void addTypedMallocTypeId() {
+      auto mallocId = getTypedMallocTypeId();
+      B.addInt64(mallocId.value_or(0));
     }
 
     void addFieldOffset(VarDecl *var) {
@@ -6517,9 +6567,10 @@ namespace {
     using NominalDecl = EnumDecl;
     ConstantStructBuilder &B;
     using super::asImpl;
+    using super::getLoweredType;
+    using super::getTypedMallocTypeId;
     using super::IGM;
     using super::Target;
-    using super::getLoweredType;
 
     EnumMetadataBuilderBase(IRGenModule &IGM, EnumDecl *theEnum,
                             ConstantStructBuilder &B)
@@ -6587,6 +6638,18 @@ namespace {
       } else {
         B.addNullPointer(IGM.Int8PtrTy);
       }
+    }
+
+    void addExtendedFlags() {
+      uint64_t flags = 0;
+      // Has typed malloc type id
+      flags |= getTypedMallocTypeId() ? 1 : 0;
+      B.addInt64(flags);
+    }
+
+    void addTypedMallocTypeId() {
+      auto mallocId = getTypedMallocTypeId();
+      B.addInt64(mallocId.value_or(0));
     }
 
     void addValueWitnessTable() {
@@ -7063,6 +7126,9 @@ namespace {
     void addLayoutStringPointer() {
       B.addNullPointer(IGM.Int8PtrTy);
     }
+
+    void addExtendedFlags() { B.addInt64(0); }
+    void addTypedMallocTypeId() { B.addInt64(0); }
 
     void addValueWitnessTable() {
       assert(!getTargetType()->isForeignReferenceType());

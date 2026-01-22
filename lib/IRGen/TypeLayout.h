@@ -16,6 +16,7 @@
 #include "FixedTypeInfo.h"
 #include "TypeInfo.h"
 #include "swift/SIL/SILType.h"
+#include "llvm/ADT/BitmaskEnum.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/Debug.h"
 
@@ -53,6 +54,29 @@ enum class ScalarKind : uint8_t {
   ThickFunc,
   ExistentialReference,
   CustomReference,
+};
+
+LLVM_ENABLE_BITMASK_ENUMS_IN_NAMESPACE();
+// Represent properties of (a region of) the memory layout of a type.
+enum class TypedMemoryLayoutSemantics : uint16_t {
+  None = 0,
+  DataPointer = 1 << 0,
+  StructPointer = 1 << 1,
+  ImmutablePointer = 1 << 2,
+  AnonymousPointer = 1 << 3,
+  ReferenceCount = 1 << 4,
+  ResourceHandle = 1 << 5,
+  SpatialBounds = 1 << 6,
+  TaintedData = 1 << 7,
+  GenericData = 1 << 8,
+
+  LLVM_MARK_AS_BITMASK_ENUM(/* LargestFlag = */ GenericData)
+};
+
+struct LayoutSemanticsSpan {
+  uint64_t Offset;
+  uint64_t Width;
+  TypedMemoryLayoutSemantics Semantics;
 };
 
 /// Convert a ReferenceCounting into the appropriate Scalar reference
@@ -119,6 +143,10 @@ public:
                                        GenericSignature genericSig) const;
   virtual bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                               GenericSignature genericSig) const;
+
+  virtual bool computeLayoutSemantics(
+      IRGenModule &IGM, uint64_t currentOffset,
+      llvm::SmallVectorImpl<LayoutSemanticsSpan> &layoutProperties) const;
 
   virtual void destroy(IRGenFunction &IGF, Address addr) const;
 
@@ -218,6 +246,10 @@ public:
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
 
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
+
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
   void assignWithCopy(IRGenFunction &IGF, Address dest,
@@ -281,6 +313,10 @@ public:
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
 
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
+
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
   void assignWithCopy(IRGenFunction &IGF, Address dest,
@@ -340,6 +376,10 @@ public:
                                GenericSignature genericSig) const override;
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
+
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -409,6 +449,10 @@ public:
                                GenericSignature genericSig) const override;
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
+
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -535,6 +579,10 @@ public:
                                GenericSignature genericSig) const override;
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
+
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
 
   void destroy(IRGenFunction &IGF, Address addr) const override;
 
@@ -716,6 +764,10 @@ public:
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
 
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
+
   std::optional<const FixedTypeInfo *> getFixedTypeInfo() const override;
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -782,6 +834,10 @@ public:
                                GenericSignature genericSig) const override;
   bool refCountString(IRGenModule &IGM, LayoutStringBuilder &B,
                       GenericSignature genericSig) const override;
+
+  bool computeLayoutSemantics(IRGenModule &IGM, uint64_t currentOffset,
+                              llvm::SmallVectorImpl<LayoutSemanticsSpan>
+                                  &layoutProperties) const override;
 
   std::optional<const FixedTypeInfo *> getFixedTypeInfo() const override;
 

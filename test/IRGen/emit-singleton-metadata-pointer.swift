@@ -3,9 +3,9 @@
 // CHECK: @"$s4main23PrivateNongenericStructVMn" =
 // CHECK-SAME: hidden constant <{ i32, i32, i32, i32, i32, i32, i32, i32 }>
 // -- flags: struct, unique, has singleton metadata pointer
-// CHECK-SAME: <{ i32 524369,
+// CHECK-SAME: <{ i32 2621521,
 // -- 32-bit relative pointer to metadata
-// CHECK-64-SAME: i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s4main23PrivateNongenericStructVMf", i32 0, i32 2) to i64)
-// CHECK-32-SAME: i32 sub (i32 ptrtoint (ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s4main23PrivateNongenericStructVMf", i32 0, i32 2) to i32)
+// CHECK-64-SAME: i32 trunc (i64 sub (i64 ptrtoint (ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s4main23PrivateNongenericStructVMf", i32 0, i32 4) to i64)
+// CHECK-32-SAME: i32 sub (i32 ptrtoint (ptr getelementptr inbounds (<{ {{.*}} }>, ptr @"$s4main23PrivateNongenericStructVMf", i32 0, i32 4) to i32)
 
 internal struct PrivateNongenericStruct {}

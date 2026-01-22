@@ -409,44 +409,27 @@ static void jobInvoke(void *obj, void *unused, uint32_t flags) {
 static const unsigned long dispatchSwiftObjectType = 1;
 
 static FullMetadata<DispatchClassMetadata> jobHeapMetadata = {
-  {
-    {
-      /*type layout*/ nullptr,
-    },
-    {
-      &destroyJob
-    },
-    {
-      /*value witness table*/ nullptr
-    }
-  },
-  {
-    MetadataKind::Job,
-    dispatchSwiftObjectType,
-    jobInvoke
-  }
-};
+    {{
+         /*extended flags*/ {},
+         /*typed malloc type id*/ 0,
+     },
+     {
+         /*type layout*/ nullptr,
+     },
+     {&destroyJob},
+     {/*value witness table*/ nullptr}},
+    {MetadataKind::Job, dispatchSwiftObjectType, jobInvoke}};
 
 /// Heap metadata for an asynchronous task.
 static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
-  {
-    {
-      /*type layout*/ nullptr
-    },
-    {
-      &destroyTask
-    },
-    {
-      /*value witness table*/ nullptr
-    }
-  },
-  {
-    MetadataKind::Task,
-    dispatchSwiftObjectType,
-    jobInvoke
-  }
-};
-
+    {{
+         /*extended flags*/ {},
+         /*typed malloc type id*/ 0,
+     },
+     {/*type layout*/ nullptr},
+     {&destroyTask},
+     {/*value witness table*/ nullptr}},
+    {MetadataKind::Task, dispatchSwiftObjectType, jobInvoke}};
 
 const void *const swift::_swift_concurrency_debug_jobMetadata =
     static_cast<Metadata *>(&jobHeapMetadata);

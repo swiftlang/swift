@@ -103,6 +103,8 @@
 //   CHECK-apple-SAME: global 
 // CHECK-unknown-SAME: constant
 //         CHECK-SAME: <{ 
+//         CHECK-SAME:   i64,
+//         CHECK-SAME:   i64,
 //         CHECK-SAME:   ptr
 //         CHECK-SAME:   ptr, 
 //                   :   [[INT]], 
@@ -124,6 +126,8 @@
 //         CHECK-SAME:   [[INT]], 
 //         CHECK-SAME:   ptr
 //         CHECK-SAME: }> <{ 
+//         CHECK-SAME:   i64
+//         CHECK-SAME:   i64
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]CfD
 //         CHECK-SAME:   $sBoWV
 //   CHECK-apple-SAME:   $s4main5Value[[UNIQUE_ID_1]]CyAA9Argument1ACLLCySiGGMM
@@ -141,16 +145,16 @@
 //         CHECK-SAME:   i32 {{(24|12)}}, 
 //         CHECK-SAME:   i16 {{(7|3)}}, 
 //         CHECK-SAME:   i16 0, 
-//   CHECK-apple-SAME:   i32 {{(128|76)}}, 
-// CHECK-unknown-SAME:   i32 104,
-//         CHECK-SAME:   i32 {{(24|12)}}, 
+//   CHECK-apple-SAME:   i32 {{(144|92)}},
+// CHECK-unknown-SAME:   i32 120,
+//         CHECK-SAME:   i32 {{(40|28)}},
 //                   :   $s4main5Value[[UNIQUE_ID_1]]CMn
 //         CHECK-SAME:   ptr null, 
 //         CHECK-SAME:   ptr getelementptr inbounds (
 //         CHECK-SAME:     %swift.full_heapmetadata, 
 //         CHECK-SAME:     $s4main9Argument1[[UNIQUE_ID_1]]CySiGMf
 //         CHECK-SAME:     i32 0, 
-//         CHECK-SAME:     i32 3
+//         CHECK-SAME:     i32 5
 //         CHECK-SAME:   ), 
 //         CHECK-SAME:   [[INT]] {{(16|8)}}, 
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]C5firstADyxGx_tcfC
