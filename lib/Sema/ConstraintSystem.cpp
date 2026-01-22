@@ -1434,7 +1434,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
           pattern = isp->getSubPattern()->getSemanticsProvidingPattern();
         }
       }
-      if (pattern && pattern->isRefutablePattern()) {
+      if (pattern &&
+          pattern->isRefutablePattern(/*allowIsPatternCoercion*/ true)) {
         return false;
       }
 

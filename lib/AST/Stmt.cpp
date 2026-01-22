@@ -475,7 +475,8 @@ DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
-  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+  return getGuardExpr() == nullptr &&
+         !getPattern()->isRefutablePattern(/*allowIsPatternCoercion*/ true);
 }
 
 bool DoCatchStmt::isSyntacticallyExhaustive() const {

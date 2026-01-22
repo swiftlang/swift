@@ -646,7 +646,8 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
     // If they wrote a "x?" pattern, they probably meant "if let x".
     // Check for this and recover nicely if they wrote that.
     if (auto *OSP = dyn_cast<OptionalSomePattern>(Body)) {
-      if (!OSP->getSubPattern()->isRefutablePattern()) {
+      if (!OSP->getSubPattern()->isRefutablePattern(
+              /*allowIsPatternCoercion*/ false)) {
         Context.Diags.diagnose(OSP->getStartLoc(),
                                diag::iflet_implicitly_unwraps)
           .highlight(OSP->getSourceRange())
@@ -658,7 +659,7 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
     // If the pattern bound is some other refutable pattern, then they
     // probably meant:
     //   if case let <pattern> =
-    if (Body->isRefutablePattern()) {
+    if (Body->isRefutablePattern(/*allowIsPatternCoercion*/ false)) {
       Context.Diags.diagnose(P->getLoc(), diag::iflet_pattern_matching)
         .fixItInsert(P->getLoc(), "case ");
       return P;

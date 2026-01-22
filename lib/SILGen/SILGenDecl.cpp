@@ -1893,7 +1893,8 @@ InitializationPtr SILGenFunction::emitPatternBindingInitialization(
     ProfileCounter numTrueTaken, ProfileCounter numFalseTaken) {
   // We only currently support PGO for single top-level refutable patterns
   // since we don't track counters for individual refutable bits.
-  if (!P->getSemanticsProvidingPattern()->isSingleRefutablePattern()) {
+  if (!P->getSemanticsProvidingPattern()->isSingleRefutablePattern(
+          /*allowIsPatternCoercion*/ false)) {
     numTrueTaken = ProfileCounter();
     numFalseTaken = ProfileCounter();
   }

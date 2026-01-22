@@ -912,8 +912,8 @@ typeCheckPatternBindingStmtConditionElement(StmtConditionElement &elt,
   bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
   elt.setPattern(pattern);
   elt.setInitializer(init);
-  
-  isFalsable |= pattern->isRefutablePattern();
+
+  isFalsable |= pattern->isRefutablePattern(/*allowIsPatternCoercion*/ true);
   return hadError;
 }
 

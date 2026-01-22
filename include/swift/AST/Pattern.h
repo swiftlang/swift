@@ -218,10 +218,18 @@ public:
   /// recursing into non-semantic patterns and things like tuples. This is
   /// unlikely to be the correct thing to check in general, `isRefutablePattern`
   /// includes checks for sub-patterns.
-  bool isSingleRefutablePattern() const;
+  bool isSingleRefutablePattern(bool allowIsPatternCoercion) const;
 
   /// Return true if this pattern (or a subpattern) is refutable.
-  bool isRefutablePattern() const;
+  ///
+  /// \param allowIsPatternCoercion If true, allow IsPattern to be treated as
+  /// irrefutable if its cast is determined to be a coercion.
+  /// FIXME: This behavior is currently broken since the 'coercion' is
+  /// implemented using a runtime cast which cannot properly handle things like
+  /// function type subtyping. We ought to properly implement coercion handling
+  /// such that it matches what we do for expressions.
+  /// https://github.com/swiftlang/swift/issues/86705
+  bool isRefutablePattern(bool allowIsPatternCoercion) const;
 
   bool isNeverDefaultInitializable() const;
 
