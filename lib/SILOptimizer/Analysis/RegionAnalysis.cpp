@@ -4496,8 +4496,6 @@ static FunctionTest PartitionOpsTest(
     [](auto &function, auto &arguments, auto &test) {
       llvm::BumpPtrAllocator allocator;
       IsolationHistory::Factory historyFactory(allocator);
-      SendingOperandSetFactory ptrSetFactory(allocator);
-      SendingOperandToStateMap sendingOperandToStateMap(historyFactory);
       RegionAnalysisValueMap valueMap(&function);
       PartitionOpTranslator translator(
           &function,
