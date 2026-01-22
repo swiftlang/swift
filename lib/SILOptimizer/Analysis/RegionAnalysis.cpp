@@ -15,31 +15,22 @@
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
-#include "swift/Basic/ImmutablePointerSet.h"
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockData.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PatternMatch.h"
-#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
-#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -1885,7 +1876,7 @@ enum class TranslationSemantics {
 
 } // namespace
 
-namespace llvm {
+namespace {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               TranslationSemantics semantics) {
@@ -1931,7 +1922,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-} // namespace llvm
+} // namespace
 
 namespace swift {
 namespace regionanalysisimpl {
