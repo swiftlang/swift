@@ -5,48 +5,48 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 public class Klass {
- var _i: Int = 0
+  var _i: Int = 0
+  init(i: Int) { _i = i }
 }
 
 public struct NonTrivial: CustomStringConvertible {
   public var k: Klass
   public var description: String { k._i.description }
+  init(i: Int) { k = Klass(i: i) }
 }
 
 protocol P {
- var id: NonTrivial {yielding borrow yielding mutate}
+  var id: NonTrivial {yielding borrow yielding mutate}
 }
 
 public struct S: P {
- public var _id: NonTrivial
+  public var _id: NonTrivial
 
- public var id: NonTrivial {
-  yielding borrow {
-   yield _id
+  public var id: NonTrivial {
+    yielding borrow {
+      yield _id
+    }
+    yielding mutate {
+      yield &_id
+    }
   }
-  yielding mutate {
-   yield &_id
-  }
- }
 }
 
 func main() {
-  let k = Klass()
-  let n = NonTrivial(k: k)
-  let s = S(_id: n)
+  var s = S(_id: NonTrivial(i: 0))
 
   print("Test 1: \(s.id)")
   // CHECK: Test 1: 0
 
-  s.id.k._i = 12
+  s.id = NonTrivial(i: 12)
   print("Test 2: \(s.id)")
   // CHECK: Test 2: 12
 
-  let p = s as P
+  var p = s as P
   print("Test 3: \(p.id)")
   // CHECK: Test 3: 12
 
-  p.id.k._i = 47
+  p.id = NonTrivial(i: 47)
   print("Test 4: \(p.id)")
   // CHECK: Test 4: 47
 }
