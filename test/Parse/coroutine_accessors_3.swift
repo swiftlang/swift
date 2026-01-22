@@ -4,6 +4,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: swift_feature_CoroutineAccessors'
+
 public class Klass {
   var _i: Int = 0
   init(i: Int) { _i = i }
@@ -15,8 +17,11 @@ public struct NonTrivial: CustomStringConvertible {
   init(i: Int) { k = Klass(i: i) }
 }
 
+// Note: `yielding mutate` is explicitly not supported
+// in protocols by SE-0474.
+// But `set` can be synthesized.
 protocol P {
-  var id: NonTrivial {yielding borrow yielding mutate}
+  var id: NonTrivial {yielding borrow set}
 }
 
 public class C: P {
@@ -45,12 +50,12 @@ func main() {
   print("Test 2: \(c.id)")
   // CHECK: Test 2: 12
 
-  let p = c as P
-  print("Test 3: \(c.id)")
+  var p = c as P
+  print("Test 3: \(p.id)")
   // CHECK: Test 3: 12
 
   p.id = NonTrivial(i: 47)
-  print("Test 4: \(c.id)")
+  print("Test 4: \(p.id)")
   // CHECK: Test 4: 47
 }
 
