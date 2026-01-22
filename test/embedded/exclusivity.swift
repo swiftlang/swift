@@ -22,7 +22,7 @@ struct Main {
   // CHECK: 4main
   static func main() {
     // DYNAMIC: call void @swift_beginAccess
-    // STATIC-ONLY-NOT: call void @swift_beginAccess
+    // STATIC-ONLY-NOT: @swift_beginAccess
     o = MyClass()
     o!.handler = { print("no captures") }
     o!.foo() // CHECK: no captures

@@ -720,6 +720,13 @@ func _embeddedReportFatalError(prefix: StaticString, message: StaticString) {
 }
 
 @inline(never)
+func _embeddedReportFatalError(prefix: StaticString, message: UnsafeBufferPointer<UInt8>) {
+  print(prefix, terminator: "")
+  if message.count > 0 { print(": ", terminator: "") }
+  unsafe print(message)
+}
+
+@inline(never)
 func _embeddedReportFatalErrorInFile(prefix: StaticString, message: StaticString, file: StaticString, line: UInt) {
   print(file, terminator: ":")
   print(line, terminator: ": ")
@@ -735,6 +742,38 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
   unsafe print(message)
+}
+
+extension Access.Action {
+  func printName() {
+    switch self {
+    case .read:
+      print("read", terminator: "")
+    case .modify:
+      print("modify", terminator: "")
+    }
+  }
+}
+
+@inline(never)
+func _embeddedReportExclusivityViolation(
+  oldAction: Access.Action, oldPC: UnsafeRawPointer?,
+  newAction: Access.Action, newPC: UnsafeRawPointer?,
+  pointer: UnsafeRawPointer
+) {
+  print("Simultaneous access to 0x", terminator: "")
+  printAsHex(Int(bitPattern: pointer), terminator: "")
+  print(", but modification requires exclusive access")
+
+  print("Previous access (a ", terminator: "")
+  oldAction.printName()
+  print(") started at 0x", terminator: "")
+  printAsHex(Int(bitPattern: oldPC))
+
+  print("Current access (a ", terminator: "")
+  newAction.printName()
+  print(") started at 0x", terminator: "")
+  printAsHex(Int(bitPattern: newPC))
 }
 
 // CXX Exception Personality
