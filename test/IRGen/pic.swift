@@ -6,7 +6,7 @@
 // XFAIL: OS=linux-androideabi && CPU=armv7
 // UNSUPPORTED: OS=linux-gnu, CPU=wasm32
 
-// RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-sdk-name %s
+// RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-abi -check-prefix=%target-cpu-%target-abi-%target-sdk-name %s
 
 var global: Int = 0
 
@@ -25,25 +25,25 @@ public func use_global() -> Int {
 // armv7-LABEL: {{_?}}$s4main10use_globalSiyF:
 // Check for the runtime memory enforcement call. The global address may be
 // materialized in a different register prior to that call.
-// armv7:         bl {{_?}}swift_beginAccess
-// armv7-iphoneos:         movw [[R_ADR:r.*]], :lower16:(_$s4main6globalSivp-([[PIC_0:L.*]]+4))
-// armv7-iphoneos:         movt [[R_ADR]], :upper16:(_$s4main6globalSivp-([[PIC_0]]+4))
-// armv7-iphoneos:       [[PIC_0]]:{{$}}
-// armv7-iphoneos:         ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
+// armv7-SYSV:         bl {{_?}}swift_beginAccess
+// armv7-SYSV-iphoneos:         movw [[R_ADR:r.*]], :lower16:(_$s4main6globalSivp-([[PIC_0:L.*]]+4))
+// armv7-SYSV-iphoneos:         movt [[R_ADR]], :upper16:(_$s4main6globalSivp-([[PIC_0]]+4))
+// armv7-SYSV-iphoneos:       [[PIC_0]]:{{$}}
+// armv7-SYSV-iphoneos:         ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
 
-// armv7-android:          ldr [[R_ADR:r.*]], .LCPI[[PIC_0:[0-9]_[0-9]]]
-// armv7-android:        .LPC[[PIC_0]]:{{$}}
-// armv7-android:          add [[R_ADR]], pc
-// armv7-android:          bl {{_?}}swift_endAccess
-// armv7-android:        .LCPI[[PIC_0]]:{{$}}
-// armv7-android:     	   .long	($s4main6globalSivp)-(.LPC[[PIC_0]]+8)
+// armv7-SYSV-android:          ldr [[R_ADR:r.*]], .LCPI[[PIC_0:[0-9]_[0-9]]]
+// armv7-SYSV-android:        .LPC[[PIC_0]]:{{$}}
+// armv7-SYSV-android:          add [[R_ADR]], pc
+// armv7-SYSV-android:          bl {{_?}}swift_endAccess
+// armv7-SYSV-android:        .LCPI[[PIC_0]]:{{$}}
+// armv7-SYSV-android:     	   .long	($s4main6globalSivp)-(.LPC[[PIC_0]]+8)
 
-// armv7-linux:          ldr [[R_ADR:r.*]], .LCPI[[PIC_0:[0-9]_[0-9]]]
-// armv7-linux:        .LPC[[PIC_0]]:{{$}}
-// armv7-linux:          add [[R_ADR]], pc
-// armv7-linux:          bl {{_?}}swift_endAccess
-// armv7-linux:        .LCPI[[PIC_0]]:{{$}}
-// armv7-linux:     	   .long	($s4main6globalSivp)-(.LPC[[PIC_0]]+8)
+// armv7-SYSV-linux:          ldr [[R_ADR:r.*]], .LCPI[[PIC_0:[0-9]_[0-9]]]
+// armv7-SYSV-linux:        .LPC[[PIC_0]]:{{$}}
+// armv7-SYSV-linux:          add [[R_ADR]], pc
+// armv7-SYSV-linux:          bl {{_?}}swift_endAccess
+// armv7-SYSV-linux:        .LCPI[[PIC_0]]:{{$}}
+// armv7-SYSV-linux:     	   .long	($s4main6globalSivp)-(.LPC[[PIC_0]]+8)
 
 
 // armv7s-LABEL: {{_?}}$s4main10use_globalSiyF:
@@ -73,15 +73,23 @@ public func use_global() -> Int {
 // arm64:        ldr x0, [sp, #16]
 
 // aarch64-LABEL: $s4main10use_globalSiyF:
-// aarch64:         bl swift_beginAccess
-// aarch64-windows: adrp [[REG1:x[0-9]+]], ($s4main6globalSivp@PAGE)
-// aarch64-linux:   adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
-// aarch64-android: adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
-// aarch64:         add [[REG1]], [[REG1]], :lo12:($s4main6globalSivp)
-// aarch64:         ldr [[REG2:x[0-9]+]], {{\[}}[[REG1]]{{\]}}
-// aarch64:         str [[REG2]], [sp]
-// aarch64:         bl swift_endAccess
-// aarch64:         ldr x0, [sp]
+// aarch64-SYSV:         bl swift_beginAccess
+// aarch64-SYSV-linux:   adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
+// aarch64-SYSV-android: adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
+// aarch64-SYSV:         add [[REG1]], [[REG1]], :lo12:($s4main6globalSivp)
+// aarch64-SYSV:         ldr [[REG2:x[0-9]+]], {{\[}}[[REG1]]{{\]}}
+// aarch64-SYSV:         str [[REG2]], [sp]
+// aarch64-SYSV:         bl swift_endAccess
+// aarch64-SYSV:         ldr x0, [sp]
+
+// aarch64-WIN:          adrp [[REG1:x[0-9]+]], $s4main6globalSivp
+// aarch64-WIN:          add  [[REG1]], [[REG1]], :lo12:$s4main6globalSivp
+// aarch64-WIN:          str  [[REG1]], [sp]
+// aarch64-WIN:          adrp [[REG2:x[0-9]+]], __imp_swift_beginAccess
+// aarch64-WIN:          ldr  [[REG2]], [[[REG2]], :lo12:__imp_swift_beginAccess]
+// aarch64-WIN:          blr  [[REG2]]
+// aarch64-WIN:          ldr  [[REG3:x[0-9]+]], [sp]
+// aarch64-WIN:          ldr  [[REG4:x[0-9]+]], [[[REG3]]]
 
 // The following checks are temporarily disabled. See rdar://problem/42909618
 // arm64e-LABEL: _$s4main10use_globalSiyF:
