@@ -1474,6 +1474,15 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       if (witness.Member == D)
         addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, witness.Requirement);
     }
+
+    // For ObjC methods, also check if this satisfies an optional protocol
+    // requirement from an inherited conformance.
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      for (auto Req : findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/false)) {
+        addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Req);
+      }
+    }
+
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
       if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||
