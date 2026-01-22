@@ -1526,7 +1526,7 @@ bool swift::swift_isUniquelyReferenced_nonNull(const void *object) {
     return false;
 
   if (!usesNativeSwiftReferenceCounting_nonNull(object)) {
-    return isUniquelyReferenced(id_const_cast(object));
+    return false; //isUniquelyReferenced(id_const_cast(object));
   }
 #endif
   return swift_isUniquelyReferenced_nonNull_native(
