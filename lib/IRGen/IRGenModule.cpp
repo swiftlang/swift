@@ -2393,6 +2393,18 @@ bool IRGenModule::isConcurrencyAvailable() {
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 
+bool IRGenModule::isTypedAllocationAvailable() {
+  if (!Triple.isOSDarwin() || Triple.isBridgeOS()) {
+    // Typed allocation is not available on non-apple platforms
+    // and bridgeOS
+    return false;
+  }
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(
+      ctx.getTypedAllocationAvailability());
+}
+
 /// Pretend the other files that drivers/build systems expect exist by
 /// creating empty files. Used by UseSingleModuleLLVMEmission when
 /// num-threads > 0.
