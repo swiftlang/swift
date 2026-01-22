@@ -413,11 +413,12 @@ def _check_git_config(
             continue
 
         for config_key, expected_value in git_configs.items():
-            output = subprocess.check_output(
+            output = subprocess.run(
                 ["git", "-C", str(repo_path), "config", "--get", config_key],
                 text=True,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
-            )
+            ).stdout
             if expected_value not in output:
                 print(
                     f"[WARNING] '{repo}' was not cloned with "
