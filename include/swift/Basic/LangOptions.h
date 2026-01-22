@@ -1008,6 +1008,10 @@ namespace swift {
 
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
+
+    /// Enable experimental optimization to disable contradictory disjunction
+    /// choices.
+    bool SolverPruneDisjunctions = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

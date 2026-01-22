@@ -5365,6 +5365,8 @@ private:
   /// The old method that is only used when performance hacks are enabled.
   Constraint *selectDisjunctionWithHacks();
 
+  void pruneDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
+
   /// Pick a conjunction from the InactiveConstraints list.
   ///
   /// \returns The selected conjunction.
