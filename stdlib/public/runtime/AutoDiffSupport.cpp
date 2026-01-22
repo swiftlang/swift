@@ -27,21 +27,15 @@ static void destroyLinearMapContext(SWIFT_CONTEXT HeapObject *obj) {
 
 /// Heap metadata for a linear map context.
 static FullMetadata<HeapMetadata> linearMapContextHeapMetadata = {
-  {
-    {
-      /*type layout*/ nullptr,
-    },
-    {
-      &destroyLinearMapContext
-    },
-    {
-      /*value witness table*/ nullptr
-    }
-  },
-  {
-    MetadataKind::Opaque
-  }
-};
+    {{
+         /*typed malloc type id*/ 0,
+     },
+     {
+         /*type layout*/ nullptr,
+     },
+     {&destroyLinearMapContext},
+     {/*value witness table*/ nullptr}},
+    {MetadataKind::Opaque}};
 
 AutoDiffLinearMapContext::AutoDiffLinearMapContext()
     : HeapObject(&linearMapContextHeapMetadata) {

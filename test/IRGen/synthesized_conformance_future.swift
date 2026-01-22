@@ -47,7 +47,8 @@ public func equality() {
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf", 
     // CHECK-SAME:     i32 0,
-    // CHECK-SAME:     i32 2
+
+    // CHECK-SAME:     i32 3
     // CHECK-SAME:   ),
     // CHECK-SAME:   ptr [[Struct_Equatable]]
     // CHECK-SAME: )
@@ -59,7 +60,8 @@ public func equality() {
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future4EnumOySiGMf",
     // CHECK-SAME:     i32 0,
-    // CHECK-SAME:     i32 2
+
+    // CHECK-SAME:     i32 3
     // CHECK-SAME:   ), 
     // CHECK-SAME:   ptr [[Enum_Equatable]]
     // CHECK-SAME: )
@@ -76,7 +78,7 @@ public func encodable() {
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future6StructVySiGMf", 
     // CHECK-SAME:     i32 0, 
-    // CHECK-SAME:     i32 2
+    // CHECK-SAME:     i32 3
     // CHECK-SAME:   ), 
     // CHECK-SAME:   ptr [[Struct_Encodable]]
     // CHECK-SAME: )
@@ -88,7 +90,8 @@ public func encodable() {
     // CHECK-SAME:     %swift.full_type,
     // CHECK-SAME:     ptr @"$s30synthesized_conformance_future4EnumOySiGMf"
     // CHECK-SAME:     i32 0,
-    // CHECK-SAME:     i32 2
+
+    // CHECK-SAME:     i32 3
     // CHECK-SAME:   ),
     // CHECK-SAME:   ptr [[Enum_Encodable]]
     // CHECK-SAME: )

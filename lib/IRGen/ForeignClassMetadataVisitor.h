@@ -35,6 +35,7 @@ public:
     : super(IGM), Target(target) {}
 
   void layout() {
+    asImpl().addTypedMallocTypeId();
     asImpl().addLayoutStringPointer();
     super::layout();
     asImpl().addNominalTypeDescriptor();
@@ -61,6 +62,7 @@ protected:
 
 public:
   void addMetadataFlags() { addPointer(); }
+  void addTypedMallocTypeId() { addInt64(); }
   void addLayoutStringPointer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
@@ -71,6 +73,7 @@ private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
+  void addInt64() { NextOffset += Size(8); }
 };
 
 template <class Impl>
@@ -85,6 +88,7 @@ public:
       : super(IGM), Target(target) {}
 
   void layout() {
+    asImpl().addTypedMallocTypeId();
     asImpl().addLayoutStringPointer();
     super::layout();
     asImpl().addNominalTypeDescriptor();

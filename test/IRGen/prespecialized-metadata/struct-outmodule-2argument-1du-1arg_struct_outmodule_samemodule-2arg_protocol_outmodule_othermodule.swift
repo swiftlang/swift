@@ -45,7 +45,7 @@ import Argument
 // CHECK-SAME:       %swift.full_type,
 // CHECK-SAME:       $s6Module11OneArgumentVyAA7IntegerVAeA1P0C0yHCg_GMN
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 2
+// CHECK-SAME:       i32 3
 // CHECK-SAME:     ),
 // CHECK-SAME:     $s6Module11OneArgumentVyAA7IntegerVAeA1P0C0yHCg_GMJ
 // CHECK-SAME:   )

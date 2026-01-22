@@ -68,13 +68,13 @@ public func single_concrete() {
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf"
 // CHECK-SAME:        i32 0,
-// CHECK-SAME:        i32 2
+// CHECK-SAME:        i32 3
 // CHECK-SAME:      ),
 // CHECK-SAME:      ptr getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf"
 // CHECK-SAME:        i32 0,
-// CHECK-SAME:        i32 2
+// CHECK-SAME:        i32 3
 // CHECK-SAME:      ),
 // CHECK-SAME:      ptr [[Single_P1]]
 // CHECK-SAME:    )
@@ -103,7 +103,7 @@ public func single_concrete() {
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:          ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMf"
 // CHECK-SAME:        i32 0,
-// CHECK-SAME:        i32 2
+// CHECK-SAME:        i32 3
 // CHECK-SAME:      ),
 // CHECK-SAME:      ptr [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )
@@ -239,6 +239,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-SAME:      %X,
 // CHECK-SAME:        ptr getelementptr inbounds (
 // CHECK-SAME:          <{
+// CHECK-SAME:            i64,
 // CHECK-SAME:            ptr,
 // CHECK-SAME:            ptr,
 // CHECK-SAME:            i64,
@@ -247,7 +248,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-SAME:          }>,
 // CHECK-SAME:          ptr @"$s42conditional_conformance_basic_conformances4IsP3VMf",
 // CHECK-SAME:          i32 0,
-// CHECK-SAME:          i32 2
+// CHECK-SAME:          i32 3
 // CHECK-SAME:      )
 // CHECK-SAME:    )
 // CHECK:    [[Double_TYPE:%[0-9]+]] = extractvalue %swift.metadata_response [[Double_TYPE_Response]], 0
@@ -283,13 +284,13 @@ public func double_concrete_concrete() {
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMf"
 // CHECK-SAME:        i32 0,
-// CHECK-SAME:        i32 2
+// CHECK-SAME:        i32 3
 // CHECK-SAME:      ),
 // CHECK-SAME:      ptr getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMf"
 // CHECK-SAME:        i32 0,
-// CHECK-SAME:        i32 2
+// CHECK-SAME:        i32 3
 // CHECK-SAME:      ),
 // CHECK-SAME:      ptr [[Double_P1]]
 // CHECK-SAME:    )
@@ -319,7 +320,7 @@ public func double_concrete_concrete() {
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr  @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMf"
 // CHECK-SAME:        i32 0,
-// CHECK-SAME:        i32 2
+// CHECK-SAME:        i32 3
 // CHECK-SAME:      ),
 // CHECK-SAME:      ptr [[CONDITIONAL_REQUIREMENTS]]
 // CHECK-SAME:    )

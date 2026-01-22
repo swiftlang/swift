@@ -106,13 +106,13 @@ func makeGenericMetatypes() {
   // CHECK-SAME:     %swift.full_type,
   // CHECK-SAME:     ptr @"$s17generic_metatypes6OneArgVyAA3FooVGMf",
   // CHECK-SAME:     i32 0, 
-  // CHECK-SAME:     i32 2
+  // CHECK-SAME:     i32 3
   // CHECK-SAME:   ), 
   // CHECK-SAME:   ptr getelementptr inbounds (
   // CHECK-SAME:     %swift.full_type, 
   // CHECK-SAME:     ptr @"$s17generic_metatypes6OneArgVyAA3FooVGMf",
   // CHECK-SAME:     i32 0, 
-  // CHECK-SAME:     i32 2
+  // CHECK-SAME:     i32 3
   // CHECK-SAME:   )
   // CHECK-SAME: )
   genericMetatype(OneArg<Foo>.self)
