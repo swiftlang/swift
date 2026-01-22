@@ -1272,8 +1272,9 @@ ERROR(module_not_compiled_with_library_evolution,none,
       (Identifier, Identifier))
 GROUPED_WARNING(implementation_only_requires_library_evolution,
         ImplementationOnlyDeprecated,none,
-        "using '@_implementationOnly' without enabling library evolution "
-        "for %0 may lead to instability during execution",
+        "safely use '@_implementationOnly' without library evolution "
+        "by setting '-enable-experimental-feature CheckImplementationOnly' "
+        "for %0",
         (Identifier))
 GROUPED_WARNING(implementation_only_deprecated,
         ImplementationOnlyDeprecated,none,

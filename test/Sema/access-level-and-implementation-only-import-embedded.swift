@@ -18,7 +18,7 @@
 // REQUIRES: embedded_stdlib_cross_compiling
 
 @_implementationOnly internal import directs
-// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+// expected-warning @-1 {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 // expected-note @-2 11 {{struct 'StructFromDirect' imported as 'internal' from 'directs' here}}
 // expected-note @-3 6 {{initializer 'init()' imported as 'internal' from 'directs' here}}
 import indirects
@@ -174,9 +174,9 @@ public struct ExposedLayoutPublic {
   // expected-error @-1 {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
   // expected-note @-2 {{struct 'StructFromDirect' is imported by this file as 'internal' from 'directs'}}
 
-  private var privateField: StructFromDirect
+  private var privateField: StructFromDirect // expected-warning {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 }
 
 private struct ExposedLayoutPrivate {
-  private var privateField: StructFromDirect
+  private var privateField: StructFromDirect // expected-warning {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 }
