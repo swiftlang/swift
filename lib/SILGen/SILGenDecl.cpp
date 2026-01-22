@@ -1099,7 +1099,7 @@ class RefutablePatternInitialization : public Initialization {
 public:
   RefutablePatternInitialization(RefutablePatternInitInfo initInfo)
       : initInfo(initInfo) {
-    assert(initInfo.failureDest.isValid() &&
+    ASSERT(initInfo.failureDest.isValid() &&
            "Refutable patterns can only exist in failable conditions");
   }
 
