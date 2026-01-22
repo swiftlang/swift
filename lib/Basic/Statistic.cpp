@@ -533,6 +533,8 @@ FrontendStatsTracer::~FrontendStatsTracer()
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
     UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
+  C.WallClockMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
   if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
