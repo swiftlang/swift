@@ -4,7 +4,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_feature_CoroutineAccessors'
+// REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: executable_test
 
 public class Klass {
   var _i: Int = 0
