@@ -508,9 +508,13 @@ extension Span where Element: BitwiseCopyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
+  /// Construct a raw span over the memory represented by this span.
+  ///
+  /// - Returns: a RawSpan over the memory represented by this span
+  @_alwaysEmitIntoClient
+  @_transparent
+  @unsafe
   public var bytes: RawSpan {
-    @_alwaysEmitIntoClient
-    @_transparent
     @lifetime(copy self)
     get {
       let rawSpan = RawSpan(_elements: self)
