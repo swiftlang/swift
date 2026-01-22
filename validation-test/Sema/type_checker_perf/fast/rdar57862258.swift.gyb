@@ -1,0 +1,12 @@
+// RUN: %scale-test --begin 1 --end 7 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+let s: String? = nil
+
+func slow() {
+  print(s
+%for i in range(0, N):
+      ?? s
+%end
+      ?? "")
+}
