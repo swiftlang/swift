@@ -19,7 +19,7 @@
 // REQUIRES: embedded_stdlib_cross_compiling
 
 @_implementationOnly import directs
-// expected-warning @-1 {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+// expected-warning @-1 {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 @_spi(S) @_spiOnly import indirects
 
 internal func localInternalFunc() {} // expected-note {{global function 'localInternalFunc()' is not '@usableFromInline' or public}}
@@ -212,9 +212,9 @@ public func legalAccessToIndirect(arg: StructFromIndirect = StructFromIndirect()
 public struct ExposedLayoutPublic {
   public var publicField: StructFromDirect // expected-error {{cannot use struct 'StructFromDirect' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; 'directs' has been imported as implementation-only}}
 
-  private var privateField: StructFromDirect // FIXME should error
+  private var privateField: StructFromDirect // expected-warning {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 }
 
 private struct ExposedLayoutPrivate {
-  private var privateField: StructFromDirect // FIXME should error
+  private var privateField: StructFromDirect // expected-warning {{cannot use struct 'StructFromDirect' in a property declaration member of a type not marked '@_implementationOnly'; 'directs' has been imported as implementation-only}}
 }

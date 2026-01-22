@@ -2810,8 +2810,7 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
     return ExportedLevel::None;
 
   auto M = getDeclContext()->getParentModule();
-  if (getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     // Non-resilient module expose layouts by default.
     return ExportedLevel::ImplicitlyExported;
   } else {
