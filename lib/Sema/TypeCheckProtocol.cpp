@@ -4500,20 +4500,26 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto diagKind = protoForcesAccess
                           ? diag::witness_not_accessible_proto
                           : diag::witness_not_accessible_type;
-        if (check.getKind() == CheckKind::AccessStrict) {
-          if (witness->getASTContext().LangOpts.hasFeature(
-                  Feature::StrictAccessControl))
-            diagKind = diag::witness_not_accessible_strict_check;
-          else
-            diagKind = diag::witness_not_accessible_strict_check_warn;
-        }
         bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;
-        diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
-                       diagKind, getProtocolRequirementKind(requirement),
-                       witness, isSetter, requiredAccess,
-                       protoAccessScope.accessLevelForDiagnostics(), proto);
+        if (check.getKind() == CheckKind::AccessStrict) {
+          // Strict Access Control violation requires a different diagnostics
+          diagKind = diag::witness_not_accessible_strict_check;
+          diags
+              .diagnose(getLocForDiagnosingWitness(conformance, witness),
+                        diagKind, getProtocolRequirementKind(requirement),
+                        witness, isSetter, requiredAccess,
+                        protoAccessScope.accessLevelForDiagnostics(), proto)
+              .warnUntilFutureLanguageModeIf(
+                  !DC->getASTContext().LangOpts.hasFeature(
+                      Feature::StrictAccessControl));
+        } else {
+          diags.diagnose(getLocForDiagnosingWitness(conformance, witness),
+                         diagKind, getProtocolRequirementKind(requirement),
+                         witness, isSetter, requiredAccess,
+                         protoAccessScope.accessLevelForDiagnostics(), proto);
+        }
 
         auto *decl = dyn_cast<AbstractFunctionDecl>(witness);
         if (decl && decl->isSynthesized())
