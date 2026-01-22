@@ -115,9 +115,9 @@
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-unknown-windows-msvc -enable-experimental-cxx-interop %s 2>&1 | %FileCheck -check-prefix WINDOWS-cxx-interop %s
 
 // Check reading the SDKSettings.json from an SDK
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15 %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/MacOSX10.15.4.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4 %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.9 -sdk %S/Inputs/NonExistent.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_UNVERSIONED %s
 
 // Check arm64 macOS first deployment version adjustment.
 // RUN: %swiftc_driver -sdk "" -driver-print-jobs -target arm64-apple-macosx10.15.1 %s 2>&1 | %FileCheck -check-prefix MACOS_11_0 %s
