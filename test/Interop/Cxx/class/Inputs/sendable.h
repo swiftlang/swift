@@ -37,3 +37,9 @@ struct DerivedPrivatelyFromHasPrivatePointerField : private HasPrivatePointerFie
 struct DerivedProtectedFromHasPublicPointerField : protected HasPublicPointerField {};
 struct DerivedProtectedFromHasPublicNonSendableField : protected HasPublicNonSendableField {};
 struct DerivedProtectedFromHasPrivatePointerField : protected HasPrivatePointerField {};
+
+class SendableKlass final {
+public:
+  void test() const {
+  }
+} __attribute__((swift_attr("~Copyable"))) __attribute__((swift_attr("@Sendable")));
