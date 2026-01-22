@@ -192,3 +192,72 @@ func getGeneric<T : ~Escapable>(_outValue: inout T, _ inValue: T)  {
   _outValue = inValue
 }
 
+// =============================================================================
+// Depenencies on conditionally Escapable parameters
+// =============================================================================
+
+@_lifetime(copy t)
+func unrelatedTypeParameter<T: ~Escapable, U: ~Escapable>(t: T, u: U) -> U { u }
+
+@_lifetime(copy t) // OK
+func sameTypeParameter<T: ~Escapable>(t: T) -> T { t }
+
+struct NE1<T: ~Escapable>: ~Escapable {
+  var t: T
+}
+
+extension NE1: Escapable where T: Escapable {}
+
+@_lifetime(copy ne) // OK
+func conditionalNESource<T: ~Escapable>(ne: NE1<T>) -> T {
+  ne.t
+}
+
+@_lifetime(copy t) // OK
+func conditionalNEDest<T: ~Escapable>(t: T) -> NE1<T> {
+  NE1(t: t)
+}
+
+struct NE2<T: ~Escapable>: ~Escapable {
+  var t: T
+}
+
+extension NE2: Escapable where T: Escapable {}
+
+@_lifetime(copy ne) // OK
+func conditionalNESourceDest<T: ~Escapable>(ne: NE1<T>) -> NE2<T> {
+  NE2(t: ne.t)
+}
+
+@_lifetime(copy ne) // OK
+func conditionalNENestedSource<T: ~Escapable>(ne: NE1<NE1<T>>) -> NE2<T> {
+  NE2(t: ne.t.t)
+}
+
+@_lifetime(copy ne) // OK
+func specializedNESource(ne: NE1<NE>) -> NE { ne.t }
+
+@_lifetime(copy ne) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                    // expected-note@-1{{use '@_lifetime(borrow ne)' instead}}
+func specializedESource(ne: NE1<Int>) -> NE { NE() }
+
+@_lifetime(copy ne) // OK
+func specializedNEDest(ne: NE) -> NE1<NE> { NE1(t: ne) }
+
+@_lifetime(copy ne) // expected-error{{invalid lifetime dependence on an Escapable result}}
+func specializedEDest(ne: NE) -> NE1<Int> { NE1(t: 3) }
+
+@_lifetime(copy ne) // OK
+func specializedNESourceDest(ne: NE1<NE>) -> NE2<NE> {
+  NE2<NE>(t: ne.t)
+}
+
+@_lifetime(copy ne) // OK
+func optionalUnwrap(ne: NE?) -> NE { ne! }
+
+@_lifetime(copy ne) // OK
+func optionalWrap(ne: NE) -> NE? { ne }
+
+@_lifetime(copy a) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(borrow a)' instead}}
+func optionalEscapableUnwrap(a: Int?) -> NE { NE() }
