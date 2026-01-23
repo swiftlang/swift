@@ -930,7 +930,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
   switch (argumentConvention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
-      requireBitsSetForArgument(bits, &argumentOp);
+      requireBitsSet(bits, argumentOp.get(), applyInst);
       locations.clearBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -939,6 +939,8 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
+      requireBitsSet(bits, argumentOp.get(), applyInst);
+      break;
     case SILArgumentConvention::Indirect_Inout:
       requireBitsSetForArgument(bits, &argumentOp);
       break;
