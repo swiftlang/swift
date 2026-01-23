@@ -2685,7 +2685,7 @@ function Build-CURL([Hashtable] $Platform) {
       CURL_CA_SEARCH_SAFE = "NO";
       CURL_CLANG_TIDY = "NO";
       CURL_CODE_COVERAGE = "NO";
-      CURL_DEFAULT_SSL_BACKEND = "schannel";
+      # CURL_DEFAULT_SSL_BACKEND = if ($Platform.OS -eq [OS]::Windows) { "schannel" } else { "" };
       CURL_DISABLE_ALTSVC = "NO";
       CURL_DISABLE_AWS = "YES";
       CURL_DISABLE_BASIC_AUTH = "NO";
