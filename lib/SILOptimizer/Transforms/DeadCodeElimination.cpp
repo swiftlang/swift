@@ -24,7 +24,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -149,7 +148,6 @@ class DCE {
   BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
-  DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
 
   // Maps instructions which produce a failing condition (like overflow
@@ -219,10 +217,8 @@ class DCE {
   void endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt);
 
 public:
-  DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT,
-      DeadEndBlocks *deadEndBlocks)
-      : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT),
-        deadEndBlocks(deadEndBlocks) {}
+  DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT)
+      : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT) {}
 
   /// The entry point to the transformation.
   bool run() {
@@ -996,7 +992,6 @@ public:
     PostDominanceInfo *PDT = PDA->get(F);
 
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *DEA = getAnalysis<DeadEndBlocksAnalysis>();
 
     // If we have a function that consists of nothing but a
     // structurally infinite loop like:
@@ -1005,7 +1000,7 @@ public:
     if (!PDT->getRootNode())
       return;
 
-    DCE dce(F, PDT, DA->get(F), DEA->get(F));
+    DCE dce(F, PDT, DA->get(F));
     if (dce.run()) {
       using InvalidationKind = SILAnalysis::InvalidationKind;
       unsigned Inv = InvalidationKind::Instructions;
