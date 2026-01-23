@@ -2489,6 +2489,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     // signature. Even if we recover, print as a warning the errors we skip.
     if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
+        baseModule->findUnderlyingClangModule() &&
+        foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
       // Print the error as a warning and notify of the recovery attempt.
       llvm::handleAllErrors(std::move(error),

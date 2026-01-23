@@ -14,19 +14,10 @@
 // RUN:   | %FileCheck --check-prefixes CHECK,CHECK-MOVED %s
 // CHECK-MOVED: LibWithXRef.swiftmodule:1:1: error: reference to type 'MyType' broken by a context change; 'MyType' was expected to be in 'A', but now a candidate is found only in 'B'
 
-/// Force working around the broken modularization to get a result and no errors.
-// RUN: %target-swift-frontend -emit-sil %t/LibWithXRef.swiftmodule -module-name LibWithXRef -I %t \
+/// The enabled by default workaround doesn't apply (no -disable-workaround-broken-modules)
+// RUN: not %target-swift-frontend -emit-sil %t/LibWithXRef.swiftmodule -module-name LibWithXRef -I %t \
 // RUN:   -diagnostic-style llvm 2>&1 \
-// RUN:   | %FileCheck --check-prefixes CHECK-WORKAROUND %s
-// CHECK-WORKAROUND: LibWithXRef.swiftmodule:1:1: warning: reference to type 'MyType' broken by a context change; 'MyType' was expected to be in 'A', but now a candidate is found only in 'B'
-// CHECK-WORKAROUND-NEXT: A.MyType
-// CHECK-WORKAROUND-NEXT: ^
-// CHECK-WORKAROUND: note: the type was expected to be found in module 'A' at '
-// CHECK-WORKAROUND-SAME: A.swiftmodule'
-// CHECK-WORKAROUND: note: the type was actually found in module 'B' at '
-// CHECK-WORKAROUND-SAME: B.swiftmodule'
-// CHECK-WORKAROUND: note: attempting to recover from the previous modularization issue
-// CHECK-WORKAROUND: func foo() -> some Proto
+// RUN:   | %FileCheck --check-prefixes CHECK-MOVED %s
 
 /// Change MyType into a function.
 // RUN: %target-swift-frontend %t/LibTypeChanged.swift -emit-module-path %t/A.swiftmodule -module-name A
@@ -45,7 +36,7 @@
 /// Remove MyType from all imported modules.
 // RUN: %target-swift-frontend %t/Empty.swift -emit-module-path %t/A.swiftmodule -module-name A
 // RUN: %target-swift-frontend %t/Empty.swift -emit-module-path %t/B.swiftmodule -module-name B
-// RUN: not %target-swift-frontend -emit-sil %t/LibWithXRef.swiftmodule -module-name LibWithXRef -I %t -diagnostic-style llvm -disable-workaround-broken-modules 2>&1 \
+// RUN: not %target-swift-frontend -emit-sil %t/LibWithXRef.swiftmodule -module-name LibWithXRef -I %t -diagnostic-style llvm 2>&1 \
 // RUN:   | %FileCheck --check-prefixes CHECK,CHECK-NOT-FOUND %s
 // CHECK-NOT-FOUND: LibWithXRef.swiftmodule:1:1: error: reference to type 'MyType' broken by a context change; 'MyType' is not found, it was expected to be in 'A'
 
