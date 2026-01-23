@@ -1081,8 +1081,7 @@ NOTE(modularization_issue_side_effect_type_error,none,
      (DeclName))
 
 NOTE(modularization_issue_worked_around,none,
-     "attempting forced recovery enabled by "
-     "-experimental-force-workaround-broken-modules",
+     "attempting to recover from the previous modularization issue",
      ())
 
 ERROR(modularization_issue_conformance_xref_error,none,
