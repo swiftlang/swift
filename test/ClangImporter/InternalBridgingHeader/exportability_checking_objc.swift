@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/main.swift \
 // RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
 // RUN:   -internal-import-bridging-header %t/objc-bridging-header.h \
-// RUN:   -swift-version 6
+// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution-
 
 // Test with a precompiled bridging header.
 // RUN: %target-swift-frontend -emit-pch -o %t/objc-bridging-header.pch \
@@ -15,7 +15,13 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)-typecheck %t/main.swift \
 // RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
 // RUN:   -internal-import-bridging-header %t/objc-bridging-header.pch \
-// RUN:   -swift-version 6
+// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution-
+
+// Test library-evolution differences.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/main.swift \
+// RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
+// RUN:   -internal-import-bridging-header %t/objc-bridging-header.h \
+// RUN:   -swift-version 6 -enable-library-evolution
 
 // REQUIRES: objc_interop
 
@@ -65,15 +71,17 @@ private class HiddenClass {
 // expected-note @-1 2 {{class 'HiddenClass' is not '@usableFromInline' or public}}
 // expected-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
 // expected-note @-3 3 {{type declared here}}
-// expected-note @-4 7 {{class declared here}}
+// expected-note @-4 2 {{class declared here}}
+// expected-non-library-evolution-note @-5 5 {{class declared here}}
 }
 
 @_implementationOnly
 private struct HiddenLayout {
 // expected-note @-1 2 {{struct 'HiddenLayout' is not '@usableFromInline' or public}}
 // expected-note @-2 1 {{initializer 'init()' is not '@usableFromInline' or public}}
-// expected-note @-3 9 {{struct declared here}}
-// expected-note @-4 4 {{type declared here}}
+// expected-note @-3 4 {{type declared here}}
+// expected-note @-4 3 {{struct declared here}}
+// expected-non-library-evolution-note @-5 6 {{struct declared here}}
 }
 
 public enum ExposedEnumPublic {
@@ -91,9 +99,10 @@ private enum ExposedEnumPrivate {
 
 @_implementationOnly
 private enum HiddenEnum {
-// expected-note @-1 6 {{enum declared here}}
-// expected-note @-2 2 {{enum 'HiddenEnum' is not '@usableFromInline' or public}}
-// expected-note @-3 2 {{type declared here}}
+// expected-note @-1 2 {{enum 'HiddenEnum' is not '@usableFromInline' or public}}
+// expected-note @-2 2 {{type declared here}}
+// expected-note @-3 2 {{enum declared here}}
+// expected-non-library-evolution-note @-4 4 {{enum declared here}}
   case A
 // expected-note @-1 {{enum case 'A' is not '@usableFromInline' or public}}
   case B
@@ -115,8 +124,9 @@ private protocol ExposedProtocolPrivate {
 @_implementationOnly
 private protocol HiddenProtocol {
 // expected-note @-1 {{protocol 'HiddenProtocol' is not '@usableFromInline' or public}}
-// expected-note @-2 9 {{protocol declared here}}
-// expected-note @-3 4 {{type declared here}}
+// expected-note @-2 4 {{type declared here}}
+// expected-note @-3 3 {{protocol declared here}}
+// expected-non-library-evolution-note @-4 6 {{protocol declared here}}
 }
 
 @_spi(S) public struct SPIStruct {}
@@ -318,40 +328,40 @@ public struct ExposedLayoutFrozenUser {
 public struct ExposedLayoutPublicUser {
 
   private var ta: TA
-  // expected-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
 
   public var publicField: RestrictedType
   // expected-error @-1 {{property cannot be declared public because its type uses an internal type}}
   // expected-note @-2 {{struct 'RestrictedType' is imported by this file as 'internal' from bridging header}}
 
   private var privateField: RestrictedType
-  // expected-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var ca: ExposedClassPublic
   private var cb: ExposedClassInternal
   private var cc: ExposedClassPrivate
   private var cd: HiddenClass
-  // expected-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var pp: RestrictedProtocol
-  // expected-error @-1 {{cannot use protocol 'RestrictedProtocol' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{cannot use protocol 'RestrictedProtocol' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
@@ -364,33 +374,33 @@ public struct ExposedLayoutPublicUser {
 internal struct ExposedLayoutInternalUser {
 
   private var ta: TA
-// expected-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
 
   private var privateField: RestrictedType
-  // expected-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var ca: ExposedClassPublic
   private var cb: ExposedClassInternal
   private var cc: ExposedClassPrivate
   private var cd: HiddenClass
-  // expected-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
@@ -403,33 +413,33 @@ internal struct ExposedLayoutInternalUser {
 private struct ExposedLayoutPrivateUser {
 
   private var ta: TA
-  // expected-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
 
   private var privateField: RestrictedType
-  // expected-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var ca: ExposedClassPublic
   private var cb: ExposedClassInternal
   private var cc: ExposedClassPrivate
   private var cd: HiddenClass
-  // expected-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use class 'HiddenClass' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   private func privateFunc(h: HiddenLayout) {}
   // expected-embedded-error @-1 {{struct 'HiddenLayout' cannot be used in an embedded function not marked '@export(interface)' because 'HiddenLayout' is marked '@_implementationOnly'}}
@@ -503,50 +513,50 @@ public enum PublicEnumUser {
 }
 
 internal enum InternalEnumUser {
-    case a(RestrictedType) // expected-error {{cannot use struct 'RestrictedType' in an associated value of an enum not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+    case a(RestrictedType) // expected-non-library-evolution-error {{cannot use struct 'RestrictedType' in an associated value of an enum not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 
     case e(ExposedLayoutPublic)
     case c(ExposedLayoutInternal)
     case d(ExposedLayoutPrivate) // expected-error {{enum case in an internal enum uses a private type}}
-    case b(HiddenLayout) // expected-error {{cannot use struct 'HiddenLayout' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+    case b(HiddenLayout) // expected-non-library-evolution-error {{cannot use struct 'HiddenLayout' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 
     case ce(ExposedClassPublic)
     case cc(ExposedClassInternal)
     case cd(ExposedClassPrivate) // expected-error {{enum case in an internal enum uses a private type}}
-    case cb(HiddenClass) // expected-error {{cannot use class 'HiddenClass' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
+    case cb(HiddenClass) // expected-non-library-evolution-error {{cannot use class 'HiddenClass' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate) // expected-error {{enum case in an internal enum uses a private type}}
-    case i(HiddenProtocol) // expected-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+    case i(HiddenProtocol) // expected-non-library-evolution-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
     // expected-error @-1 {{enum case in an internal enum uses a private type}}
 
     case ta(TA)
-    // expected-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+    // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because it was imported via the internal bridging header}}
 }
 
 private enum PrivateEnumUser {
-    case a(RestrictedType) // expected-error {{cannot use struct 'RestrictedType' in an associated value of an enum not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+    case a(RestrictedType) // expected-non-library-evolution-error {{cannot use struct 'RestrictedType' in an associated value of an enum not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 
     case e(ExposedLayoutPublic)
     case c(ExposedLayoutInternal)
     case d(ExposedLayoutPrivate)
-    case b(HiddenLayout) // expected-error {{cannot use struct 'HiddenLayout' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+    case b(HiddenLayout) // expected-non-library-evolution-error {{cannot use struct 'HiddenLayout' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
     case ce(ExposedClassPublic)
     case cc(ExposedClassInternal)
     case cd(ExposedClassPrivate)
-    case cb(HiddenClass) // expected-error {{cannot use class 'HiddenClass' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
+    case cb(HiddenClass) // expected-non-library-evolution-error {{cannot use class 'HiddenClass' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenClass' is marked '@_implementationOnly'}}
 
     case f(ExposedProtocolPublic)
     case g(ExposedProtocolInternal)
     case h(ExposedProtocolPrivate)
-    case i(HiddenProtocol) // expected-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+    case i(HiddenProtocol) // expected-non-library-evolution-error {{cannot use protocol 'HiddenProtocol' in an associated value of an enum not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
     case ta(TA)
-    // expected-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+    // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in an associated value of an enum not marked '@_implementationOnly' because it was imported via the internal bridging header}}
 }
 
 @_implementationOnly
@@ -606,30 +616,30 @@ open class OpenClassUser {
   public init() { fatalError() }
 
   private var ta: TA
-  // expected-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{'TA' aliases '__ObjC.RestrictedType' and cannot be used in a property declaration member of a type not marked '@_implementationOnly' because it was imported via the internal bridging header}}
 
   public var publicField: RestrictedType
   // expected-error @-1 {{property cannot be declared public because its type uses an internal type}}
   // expected-note @-2 {{struct 'RestrictedType' is imported by this file as 'internal' from bridging header}}
 
   private var privateField: RestrictedType
-  // expected-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'RestrictedType' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
   private var a: ExposedLayoutPublic
   private var aa: ExposedLayoutInternal
   private var b: ExposedLayoutPrivate
   private var c: HiddenLayout
-  // expected-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use struct 'HiddenLayout' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenLayout' is marked '@_implementationOnly'}}
 
   private var d: ExposedEnumPublic
   private var e: ExposedEnumPrivate
   private var f: HiddenEnum
-  // expected-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use enum 'HiddenEnum' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenEnum' is marked '@_implementationOnly'}}
 
   private var g: ExposedProtocolPublic
   private var h: ExposedProtocolInternal
   private var i: ExposedProtocolPrivate
   private var j: HiddenProtocol
-  // expected-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
+  // expected-non-library-evolution-error @-1 {{cannot use protocol 'HiddenProtocol' in a property declaration member of a type not marked '@_implementationOnly'; 'HiddenProtocol' is marked '@_implementationOnly'}}
 
   @export(interface)
   private func privateFunc(h: HiddenLayout) {}
@@ -773,11 +783,11 @@ public protocol PublicProtocol : RestrictedProtocol {
 }
 
 internal protocol InternalProtocol : RestrictedProtocol {
-// expected-error @-1 {{cannot use protocol 'RestrictedProtocol' here; it was imported via the internal bridging header}}
+// expected-non-library-evolution-error @-1 {{cannot use protocol 'RestrictedProtocol' here; it was imported via the internal bridging header}}
 }
 
 private protocol PrivateProtocol : RestrictedProtocol {
-// expected-error @-1 {{cannot use protocol 'RestrictedProtocol' here; it was imported via the internal bridging header}}
+// expected-non-library-evolution-error @-1 {{cannot use protocol 'RestrictedProtocol' here; it was imported via the internal bridging header}}
 }
 
 @_implementationOnly

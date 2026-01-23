@@ -592,9 +592,6 @@ WARNING(embedded_dynamic_exclusivity_staging,none,
 ERROR(package_cmo_requires_library_evolution, none,
         "Library evolution must be enabled for Package CMO", ())
 
-WARNING(internal_bridging_header_without_library_evolution,none,
-        "using internal bridging headers without library evolution can cause instability", ())
-
 ERROR(error_invalid_clang_header_access_level, none,
       "invalid minimum clang header access level '%0'; chose from "
       "'public'|'package'|'internal'",
