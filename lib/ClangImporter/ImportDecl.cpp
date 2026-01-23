@@ -2442,7 +2442,7 @@ namespace {
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
       for (auto m : decl->decls()) {
-        if (isa<clang::AccessSpecDecl>(m)) {
+        if (isa<clang::AccessSpecDecl, clang::StaticAssertDecl>(m)) {
           // The presence of AccessSpecDecls themselves does not influence
           // whether we can generate a member-wise initializer.
           continue;
