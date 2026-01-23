@@ -15,3 +15,6 @@ let classEmptyPublicSection = ClassEmptyPublicSection(varPrivate: 42) // expecte
 let classPublicAndPrivate1 = ClassPrivateAndPublic(varPublic: 23)  // expected-error {{argument passed to call that takes no arguments}}
 let classPublicAndPrivate2 = ClassPrivateAndPublic(varPrivate: 42, varPublic: 23)  // expected-error {{argument passed to call that takes no arguments}}
 let classWithUnimportedMemberFunction = ClassWithUnimportedMemberFunction(varPublic: 42)
+
+let _ = ClassWithStaticAssert(x: 6, y: 7)
+let _ = ClassWithStaticAssert2(x: 6, y: 7)
