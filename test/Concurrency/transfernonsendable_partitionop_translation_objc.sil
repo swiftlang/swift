@@ -1,0 +1,153 @@
+// RUN: %target-sil-opt -enable-objc-interop --test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: objc_interop
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// This test file contains Objective-C interop instructions that require
+// Objective-C runtime support and are not available on all platforms.
+
+import Builtin
+import Swift
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+// Objective-C class that can be called via objc_method
+@objc class ObjCNonSendableClass {
+  @objc func instanceMethod() -> ObjCNonSendableClass
+  @objc class func classMethod() -> ObjCNonSendableClass
+  @objc func method() -> ()
+}
+
+@objc class ObjCDerivedClass : ObjCNonSendableClass {
+  @objc override func instanceMethod() -> ObjCNonSendableClass
+}
+
+sil @objc_instance_impl : $@convention(method) (@guaranteed ObjCNonSendableClass) -> @owned ObjCNonSendableClass
+sil @objc_class_impl : $@convention(method) (@objc_metatype ObjCNonSendableClass.Type) -> @owned ObjCNonSendableClass
+sil @objc_derived_impl : $@convention(method) (@guaranteed ObjCDerivedClass) -> @owned ObjCNonSendableClass
+
+//===----------------------------------------------------------------------===//
+// MARK: Objective-C Method Dispatch
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test {{.*}} on test_objc_method_instance: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $ObjCNonSendableClass      // users: %2, %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = objc_method %0 : $ObjCNonSendableClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass // user: %2
+// CHECK-NEXT: require %%0:   %1 = objc_method %0 : $ObjCNonSendableClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass // user: %2
+// CHECK-NEXT: assign_direct %%1 = %%0:   %1 = objc_method %0 : $ObjCNonSendableClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass // user: %2
+// CHECK-NEXT: end running test 1 of 1 on test_objc_method_instance: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_objc_method_instance : $@convention(thin) (@guaranteed ObjCNonSendableClass) -> () {
+bb0(%0 : @guaranteed $ObjCNonSendableClass):
+  %method = objc_method %0 : $ObjCNonSendableClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %result = apply %method(%0) : $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass
+  destroy_value %result : $ObjCNonSendableClass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_objc_method_class: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $@thick ObjCNonSendableClass.Type // user: %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = thick_to_objc_metatype %0 : $@thick ObjCNonSendableClass.Type to $@objc_metatype ObjCNonSendableClass.Type // users: %3, %2
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = objc_method %1 : $@objc_metatype ObjCNonSendableClass.Type, #ObjCNonSendableClass.classMethod!foreign : (ObjCNonSendableClass.Type) -> () -> ObjCNonSendableClass, $@convention(objc_method) (@objc_metatype ObjCNonSendableClass.Type) -> @autoreleased ObjCNonSendableClass // user: %3
+// CHECK-NEXT: assign_fresh %%2:   %2 = objc_method %1 : $@objc_metatype ObjCNonSendableClass.Type, #ObjCNonSendableClass.classMethod!foreign : (ObjCNonSendableClass.Type) -> () -> ObjCNonSendableClass, $@convention(objc_method) (@objc_metatype ObjCNonSendableClass.Type) -> @autoreleased ObjCNonSendableClass // user: %3
+// CHECK-NEXT: end running test 1 of 1 on test_objc_method_class: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_objc_method_class : $@convention(thin) (@thick ObjCNonSendableClass.Type) -> () {
+bb0(%0 : $@thick ObjCNonSendableClass.Type):
+  %objc_meta = thick_to_objc_metatype %0 : $@thick ObjCNonSendableClass.Type to $@objc_metatype ObjCNonSendableClass.Type
+  %method = objc_method %objc_meta : $@objc_metatype ObjCNonSendableClass.Type, #ObjCNonSendableClass.classMethod!foreign : (ObjCNonSendableClass.Type) -> () -> ObjCNonSendableClass, $@convention(objc_method) (@objc_metatype ObjCNonSendableClass.Type) -> @autoreleased ObjCNonSendableClass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %result = apply %method(%objc_meta) : $@convention(objc_method) (@objc_metatype ObjCNonSendableClass.Type) -> @autoreleased ObjCNonSendableClass
+  destroy_value %result : $ObjCNonSendableClass
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Objective-C Super Method Dispatch
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test {{.*}} on test_objc_super_method: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $ObjCDerivedClass          // users: %2, %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = objc_super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass // user: %3
+// CHECK-NEXT: require %%0:   %1 = objc_super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass // user: %3
+// CHECK-NEXT: assign_direct %%1 = %%0:   %1 = objc_super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass // user: %3
+// CHECK-NEXT: end running test 1 of 1 on test_objc_super_method: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_objc_super_method : $@convention(thin) (@guaranteed ObjCDerivedClass) -> () {
+bb0(%0 : @guaranteed $ObjCDerivedClass):
+  %method = objc_super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.instanceMethod!foreign : (ObjCNonSendableClass) -> () -> ObjCNonSendableClass, $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %upcast = upcast %0 : $ObjCDerivedClass to $ObjCNonSendableClass
+  %result = apply %method(%upcast) : $@convention(objc_method) (ObjCNonSendableClass) -> @autoreleased ObjCNonSendableClass
+  destroy_value %result : $ObjCNonSendableClass
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Swift Super Method Dispatch
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test {{.*}} on test_super_method: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $ObjCDerivedClass          // users: %2, %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.method : (ObjCNonSendableClass) -> () -> (), $@convention(method) (@guaranteed ObjCNonSendableClass) -> () // user: %3
+// CHECK-NEXT: require %%0:   %1 = super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.method : (ObjCNonSendableClass) -> () -> (), $@convention(method) (@guaranteed ObjCNonSendableClass) -> () // user: %3
+// CHECK-NEXT: assign_direct %%1 = %%0:   %1 = super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.method : (ObjCNonSendableClass) -> () -> (), $@convention(method) (@guaranteed ObjCNonSendableClass) -> () // user: %3
+// CHECK-NEXT: end running test 1 of 1 on test_super_method: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_super_method : $@convention(thin) (@guaranteed ObjCDerivedClass) -> () {
+bb0(%0 : @guaranteed $ObjCDerivedClass):
+  %method = super_method %0 : $ObjCDerivedClass, #ObjCNonSendableClass.method : (ObjCNonSendableClass) -> () -> (), $@convention(method) (@guaranteed ObjCNonSendableClass) -> ()
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %upcast = upcast %0 : $ObjCDerivedClass to $ObjCNonSendableClass
+  %result = apply %method(%upcast) : $@convention(method) (@guaranteed ObjCNonSendableClass) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: ObjC Metatype Conversions
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test {{.*}} on test_thick_to_objc_metatype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $@thick ObjCNonSendableClass.Type // user: %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = thick_to_objc_metatype %0 : $@thick ObjCNonSendableClass.Type to $@objc_metatype ObjCNonSendableClass.Type
+// CHECK-NEXT: end running test 1 of 1 on test_thick_to_objc_metatype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_thick_to_objc_metatype : $@convention(thin) (@thick ObjCNonSendableClass.Type) -> () {
+bb0(%0 : $@thick ObjCNonSendableClass.Type):
+  %objc_meta = thick_to_objc_metatype %0 : $@thick ObjCNonSendableClass.Type to $@objc_metatype ObjCNonSendableClass.Type
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// CHECK-LABEL: begin running test {{.*}} on test_objc_to_thick_metatype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $@objc_metatype ObjCNonSendableClass.Type // user: %1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = objc_to_thick_metatype %0 : $@objc_metatype ObjCNonSendableClass.Type to $@thick ObjCNonSendableClass.Type
+// CHECK-NEXT: end running test 1 of 1 on test_objc_to_thick_metatype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_objc_to_thick_metatype : $@convention(thin) (@objc_metatype ObjCNonSendableClass.Type) -> () {
+bb0(%0 : $@objc_metatype ObjCNonSendableClass.Type):
+  %thick_meta = objc_to_thick_metatype %0 : $@objc_metatype ObjCNonSendableClass.Type to $@thick ObjCNonSendableClass.Type
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  %r = tuple ()
+  return %r : $()
+}
+
+// Need a declaration for super_method test
+sil [ossa] @$s4main16ObjCNonSendableClassC6methodyyF : $@convention(method) (@guaranteed ObjCNonSendableClass) -> ()

@@ -1270,6 +1270,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     llvm_unreachable(
         "All forward definitions of local archetypes should be resolved");
 
+  // The de-serialized SIL is assumed to be in a correct state.
+  fn->setNeedBreakInfiniteLoops(false);
+  fn->setNeedCompleteLifetimes(false);
+
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
@@ -1329,6 +1333,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       fArg->setClosureCapture(isClosureCapture);
       bool isFormalParameterPack = (Args[I + 1] >> 17) & 0x1;
       fArg->setFormalParameterPack(isFormalParameterPack);
+      bool isInferredImmutable = (Args[I + 1] >> 18) & 0x1;
+      fArg->setInferredImmutable(isInferredImmutable);
       Arg = fArg;
     } else {
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
@@ -1805,11 +1811,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto usesMoveableValueDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
+    auto inferredImmutable = (Attr >> 4) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
         std::nullopt, hasDynamicLifetime, reflection,
         usesMoveableValueDebugInfo,
-        /*skipVarDeclAssert*/ false, pointerEscape);
+        /*skipVarDeclAssert*/ false, pointerEscape, inferredImmutable);
     break;
   }
   case SILInstructionKind::AllocStackInst: {

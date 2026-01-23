@@ -39,6 +39,10 @@
 #include "llvm/Support/Casting.h"
 #include <fstream>
 
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+#error "Building the compiler without Swift sources is not supported anymore"
+#endif
+
 using namespace swift;
 
 llvm::cl::opt<bool> SILPrintAll(
@@ -1437,7 +1441,7 @@ void SwiftPassInvocation::finishedModulePassRun() {
   ASSERT(!function && transform && "not running a module pass");
   if (changeNotifications != 0) {
     ASSERT((changeNotifications & ~SILContext::NotificationKind::FunctionTables) == 0
-           && "a module pass must change the SIL of a function");
+           && "a module pass must not change the SIL of a function");
     passManager->invalidateFunctionTables();
     changeNotifications = SILContext::NotificationKind::Nothing;
   }
@@ -1447,18 +1451,21 @@ void SwiftPassInvocation::finishedModulePassRun() {
 
 void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
   ASSERT(!this->function && !this->transform && "a pass is already running");
+  ASSERT(!silCombiner && "didn't clear silCombiner backlink");
   this->transform = transform;
   this->function = transform->getFunction();
+  ASSERT(!this->function->needBreakInfiniteLoops() && "didn't break infinite loops in previous module pass");
+  ASSERT(!this->function->needCompleteLifetimes() && "didn't complete lifetimes in previous module pass");
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
   ASSERT(function && transform && "not running a function pass");
   ASSERT((changeNotifications & SILContext::NotificationKind::FunctionTables) == 0
          && "a function pass must not change function tables");
-  if (changeNotifications != SILContext::NotificationKind::Nothing) {
-    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
-  }
-  changeNotifications = SILContext::NotificationKind::Nothing;
+  ASSERT(!function->needBreakInfiniteLoops() && "didn't break infinite loops");
+  ASSERT(!function->needCompleteLifetimes() && "didn't complete lifetimes");
+
+  updateAnalysis();
 
   insertedPhisBySSAUpdater.clear();
   if (ssaUpdater) {
@@ -1468,7 +1475,15 @@ void SwiftPassInvocation::finishedFunctionPassRun() {
 
   function = nullptr;
   transform = nullptr;
+  silCombiner = nullptr;
   verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::updateAnalysis() {
+  if (changeNotifications != SILContext::NotificationKind::Nothing) {
+    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
+  }
+  changeNotifications = SILContext::NotificationKind::Nothing;
 }
 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {

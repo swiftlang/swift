@@ -21,7 +21,7 @@ class UIView {
   init() { fatalError() }
 }
 
-// This is invalid, because there is no one-argument form of reduce()
+// Invalid expression, because there is no one-argument form of reduce()
 
 class SomeViewController: UIViewController {
     private func updatePreferredContentSize() {

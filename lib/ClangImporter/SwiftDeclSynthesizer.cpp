@@ -3180,13 +3180,21 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     clang::QualType funcTypeToSynth =
         clangCtx.getFunctionType(cxxRecordPtrTy, paramTypes, EPI);
 
+    auto methodBeginLoc = selectedCtorDecl->getBeginLoc(),
+         methodEndLoc = selectedCtorDecl->getEndLoc(),
+         methodNameLoc = selectedCtorDecl->getNameInfo().getLoc();
+
+    if (methodBeginLoc.isInvalid() || methodEndLoc.isInvalid() ||
+        methodNameLoc.isInvalid())
+      methodBeginLoc = methodEndLoc = methodNameLoc = cxxRecordDeclLoc;
+
     clang::CXXMethodDecl *synthCxxMethodDecl = clang::CXXMethodDecl::Create(
         clangCtx, const_cast<clang::CXXRecordDecl *>(cxxRecordDecl),
-        cxxRecordDeclLoc,
-        clang::DeclarationNameInfo(funcNameToSynth, cxxRecordDeclLoc),
+        methodBeginLoc,
+        clang::DeclarationNameInfo(funcNameToSynth, methodNameLoc),
         funcTypeToSynth, clangCtx.getTrivialTypeSourceInfo(funcTypeToSynth),
         clang::SC_Static, /*UsesFPIntrin=*/false, /*isInline=*/true,
-        clang::ConstexprSpecKind::Unspecified, cxxRecordDeclLoc);
+        clang::ConstexprSpecKind::Unspecified, methodEndLoc);
     assert(
         synthCxxMethodDecl &&
         "Unable to synthesize static factory for c++ foreign reference type");
@@ -3200,9 +3208,14 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         std::string dummyName = "__unnamed_param_" + std::to_string(i);
         paramIdent = &clangIdents.get(dummyName);
       }
+      auto paramBeginLoc = origParam->getBeginLoc(),
+           paramEndLoc = origParam->getEndLoc();
+      if (paramBeginLoc.isInvalid() || paramEndLoc.isInvalid())
+        paramBeginLoc = paramEndLoc = cxxRecordDeclLoc;
+
       auto *param = clang::ParmVarDecl::Create(
-          clangCtx, synthCxxMethodDecl, cxxRecordDeclLoc, cxxRecordDeclLoc,
-          paramIdent, origParam->getType(),
+          clangCtx, synthCxxMethodDecl, paramBeginLoc, paramEndLoc, paramIdent,
+          origParam->getType(),
           clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
           clang::SC_None, /*DefArg=*/nullptr);
       param->setIsUsed();
@@ -3210,10 +3223,14 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     }
     synthCxxMethodDecl->setParams(synthParams);
 
-    if (!hasImmortalAttrs(cxxRecordDecl)) {
+    auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);
+    if (attrInfo.hasReturnsRetained)
       synthCxxMethodDecl->addAttr(
           clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
-    }
+
+    if (attrInfo.hasReturnsUnretained)
+      synthCxxMethodDecl->addAttr(
+          clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
 
     std::string swiftInitStr = "init(";
     for (unsigned i = 0; i < ctorParamCount; ++i) {
@@ -3233,13 +3250,13 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
       clang::QualType paramTy = param->getType();
       clang::QualType exprTy = paramTy.getNonReferenceType();
       clang::Expr *argExpr = clang::DeclRefExpr::Create(
-          clangCtx, clang::NestedNameSpecifierLoc(), cxxRecordDeclLoc, param,
-          /*RefersToEnclosingVariableOrCapture=*/false, cxxRecordDeclLoc,
-          exprTy, clang::VK_LValue);
+          clangCtx, clang::NestedNameSpecifierLoc(), param->getBeginLoc(),
+          param, /*RefersToEnclosingVariableOrCapture=*/false,
+          param->getEndLoc(), exprTy, clang::VK_LValue);
       if (paramTy->isRValueReferenceType()) {
         argExpr = clangSema
                       .BuildCXXNamedCast(
-                          cxxRecordDeclLoc, clang::tok::kw_static_cast,
+                          clang::SourceLocation(), clang::tok::kw_static_cast,
                           clangCtx.getTrivialTypeSourceInfo(paramTy), argExpr,
                           clang::SourceRange(), clang::SourceRange())
                       .get();
@@ -3248,19 +3265,19 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     }
     llvm::SmallVector<clang::Expr *, 4> ctorArgsToAdd;
 
-    if (clangSema.CompleteConstructorCall(selectedCtorDecl, cxxRecordTy,
-                                          ctorArgs, cxxRecordDeclLoc,
-                                          ctorArgsToAdd))
+    if (clangSema.CompleteConstructorCall(
+            selectedCtorDecl, cxxRecordTy, ctorArgs,
+            selectedCtorDecl->getLocation(), ctorArgsToAdd))
       continue;
 
     clang::ExprResult synthCtorExprResult = clangSema.BuildCXXConstructExpr(
-        cxxRecordDeclLoc, cxxRecordTy, selectedCtorDecl,
+        clang::SourceLocation(), cxxRecordTy, selectedCtorDecl,
         /*Elidable=*/false, ctorArgsToAdd,
         /*HadMultipleCandidates=*/false,
         /*IsListInitialization=*/false,
         /*IsStdInitListInitialization=*/false,
         /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
-        clang::SourceRange(cxxRecordDeclLoc, cxxRecordDeclLoc));
+        clang::SourceRange());
     assert(!synthCtorExprResult.isInvalid() &&
            "Unable to synthesize constructor expression for c++ foreign "
            "reference type");
@@ -3270,20 +3287,23 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
         clang::SourceRange(), /*UseGlobal=*/false, clang::SourceLocation(), {},
         clang::SourceLocation(), clang::SourceRange(), cxxRecordTy,
         clangCtx.getTrivialTypeSourceInfo(cxxRecordTy), std::nullopt,
-        clang::SourceRange(cxxRecordDeclLoc, cxxRecordDeclLoc), synthCtorExpr);
+        cxxRecordDeclLoc, synthCtorExpr);
+    // NOTE: ^ some valid location is needed here because BuildCXXNew uses that
+    //       to determine the CXXNewInitializationStyle
     assert(
         !synthNewExprResult.isInvalid() &&
         "Unable to synthesize `new` expression for c++ foreign reference type");
     auto *synthNewExpr = cast<clang::CXXNewExpr>(synthNewExprResult.get());
 
-    clang::ReturnStmt *synthRetStmt = clang::ReturnStmt::Create(
-        clangCtx, cxxRecordDeclLoc, synthNewExpr, /*NRVOCandidate=*/nullptr);
+    clang::ReturnStmt *synthRetStmt =
+        clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
+                                  synthNewExpr, /*NRVOCandidate=*/nullptr);
     assert(synthRetStmt && "Unable to synthesize return statement for "
                            "static factory of c++ foreign reference type");
 
     clang::CompoundStmt *synthFuncBody = clang::CompoundStmt::Create(
-        clangCtx, {synthRetStmt}, clang::FPOptionsOverride(), cxxRecordDeclLoc,
-        cxxRecordDeclLoc);
+        clangCtx, {synthRetStmt}, clang::FPOptionsOverride(),
+        clang::SourceLocation(), clang::SourceLocation());
     assert(synthRetStmt && "Unable to synthesize function body for static "
                            "factory of c++ foreign reference type");
 

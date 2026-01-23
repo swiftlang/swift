@@ -106,6 +106,10 @@ void TestRunner::run() {
     printTestLifetime(/*begin=*/false, /*index=*/index, /*size=*/size, name,
                       argumentStrings);
   }
+  // Assume that tests take care themselves of leaving the SIL in a correct
+  // state (otherwise the verifier will complain anyway).
+  getFunction()->setNeedBreakInfiniteLoops(false);
+  getFunction()->setNeedCompleteLifetimes(false);
 }
 
 //===----------------------------------------------------------------------===//

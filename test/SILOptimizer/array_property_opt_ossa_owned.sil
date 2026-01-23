@@ -21,10 +21,7 @@ enum MyBool{
 class MyClass {
 }
 
-sil public_external [ossa] [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool {
-bb0(%0: @owned $MyArray<MyClass>):
-  unreachable
-}
+sil public_external [ossa] [_semantics "array.props.isNativeTypeChecked"] @arrayPropertyIsNative : $@convention(method) (@owned MyArray<MyClass>) -> Bool
 
 // CHECK-LABEL: sil [ossa] @load_within_loop : 
 // CHECK: bb1:

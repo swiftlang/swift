@@ -590,4 +590,13 @@ struct ClassWithDefaultTemplatedOperatorStar {
   template <typename T = int> T operator*() const { return 42; }
 };
 
+struct HasOperatorReturningAuto {
+  auto operator*() const {
+    struct Inner {
+      int x = 123;
+    };
+    return Inner();
+  }
+};
+
 #endif

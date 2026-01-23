@@ -147,6 +147,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_STATIC_STDLIB:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', 'TRUE')
+        # Install clang builtin headers only, not the full clang resource dir including libs
+        self.cmake_options.define('SWIFT_STDLIB_INSTALL_ONLY_CLANG_RESOURCE_HEADERS:BOOL', 'TRUE')
         # TODO: Turn off library evolution once we establish a good way to teach
         # libraries including swift-testing whether to use the stable ABI.
         self.cmake_options.define('SWIFT_STDLIB_STABLE_ABI:BOOL', 'TRUE')
@@ -192,7 +194,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
         lit_test_paths = [
-            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded',
+            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded', 'AutoDiff',
             # TODO(katei): Enable all interpreter tests
             'Interpreter/enum.swift',
         ]

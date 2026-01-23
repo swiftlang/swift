@@ -30,14 +30,19 @@ void ApplySite::insertAfterApplication(
   case ApplySiteKind::BeginApplyInst:
     SmallVector<EndApplyInst *, 2> endApplies;
     SmallVector<AbortApplyInst *, 2> abortApplies;
+    SmallVector<EndBorrowInst *, 2> endBorrows;
     auto *bai = cast<BeginApplyInst>(getInstruction());
-    bai->getCoroutineEndPoints(endApplies, abortApplies);
+    bai->getCoroutineEndPoints(endApplies, abortApplies, &endBorrows);
     for (auto *eai : endApplies) {
       SILBuilderWithScope builder(std::next(eai->getIterator()));
       func(builder);
     }
     for (auto *aai : abortApplies) {
       SILBuilderWithScope builder(std::next(aai->getIterator()));
+      func(builder);
+    }
+    for (auto *ebi : endBorrows) {
+      SILBuilderWithScope builder(std::next(ebi->getIterator()));
       func(builder);
     }
     return;

@@ -517,7 +517,8 @@ static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
   case swift::OpaqueReadOwnership::KIND:                      \
     return uint8_t(serialization::OpaqueReadOwnership::KIND);
   CASE(Owned)
-  CASE(Borrowed)
+  CASE(YieldingBorrow)
+  CASE(Borrow)
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
@@ -670,18 +671,25 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
   return TypesToSerialize.addRef(typeToSerialize);
 }
 
-serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
+serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty,
+                                                       bool forFunction) {
   if (!ty) return 0;
 
   // Try to serialize the non-canonical type, but fall back to the
   // canonical type if necessary.
   auto loader = getASTContext().getClangModuleLoader();
   bool isSerializable;
-  if (loader->isSerializable(ty, false)) {
+  auto info = loader->isSerializable(ty, false);
+  if (info.Serializable) {
+    if (forFunction && info.HasSwiftDecl)
+      return 0;
     isSerializable = true;
   } else if (!ty->isCanonicalUnqualified()) {
     ty = ty->getCanonicalTypeInternal().getTypePtr();
-    isSerializable = loader->isSerializable(ty, false);
+    info = loader->isSerializable(ty, false);
+    if (forFunction && info.HasSwiftDecl)
+      return 0;
+    isSerializable = info.Serializable;
   } else {
     isSerializable = false;
   }
@@ -6023,7 +6031,8 @@ public:
         shouldSerializeClangType = false;
     }
     auto clangType = shouldSerializeClangType
-                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType(),
+                                             /*forFunction=*/true)
                          : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());

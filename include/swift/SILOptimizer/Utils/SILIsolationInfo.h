@@ -568,24 +568,40 @@ public:
   /// SILIsolationInfo.
   static SILIsolationInfo getFunctionIsolation(SILFunction *fn);
 
-  /// A helper that is used to ensure that we treat certain builtin values as
-  /// non-Sendable that the AST level otherwise thinks are non-Sendable.
+private:
+  /// A helper that defines at the SIL level what we considered Sendable.
   ///
-  /// E.x.: Builtin.RawPointer and Builtin.NativeObject
-  ///
-  /// TODO: Fix the type checker.
+  /// NOTE: This can differ from the AST in certain cases since we treat certain
+  /// builtin values such as Builtin.RawPointer and Builtin.NativeObject as
+  /// non-Sendable even though they are considered Sendable by the AST today.
   static bool isNonSendableType(SILType type, SILFunction *fn);
 
   static bool isSendableType(SILType type, SILFunction *fn) {
     return !isNonSendableType(type, fn);
   }
 
-  static bool isNonSendableType(SILValue value) {
-    return isNonSendableType(value->getType(), value->getFunction());
+public:
+  /// Returns true if \p value is a Sendable value.
+  ///
+  /// NOTE: This can use value based information to determine sendable for
+  /// values that are from a type perspective non-SEndable. E.x.: a
+  /// non-payloaded case of a non-Sendable enum.
+  static bool isSendable(SILValue value);
+
+  /// Returns true if \p value is a non-Sendable value.
+  ///
+  /// NOTE: This just invokes isSendable and inverts the results.
+  static bool isNonSendable(SILValue value) { return !isSendable(value); }
+
+  static bool boxContainsOnlySendableFields(AllocBoxInst *abi) {
+    return boxTypeContainsOnlySendableFields(abi->getBoxType(),
+                                             abi->getFunction());
   }
 
-  static bool isSendableType(SILValue value) {
-    return !isNonSendableType(value);
+  static bool boxTypeContainsOnlySendableFields(CanSILBoxType boxType,
+                                                SILFunction *fn) {
+    return llvm::all_of(boxType->getSILFieldTypes(*fn),
+                        [&](SILType type) { return isSendableType(type, fn); });
   }
 
   bool hasSameIsolation(ActorIsolation actorIsolation) const;

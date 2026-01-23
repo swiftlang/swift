@@ -1357,7 +1357,10 @@ namespace {
     void printIsolation(const ActorIsolation &isolation) {
       switch (isolation) {
       case ActorIsolation::Unspecified:
+        printFlag(true, "unspecified_isolation", CapturesColor);
+        break;
       case ActorIsolation::NonisolatedUnsafe:
+        printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
 
       case ActorIsolation::Nonisolated:
@@ -3968,10 +3971,10 @@ public:
     printCommon(E, "collection_upcast_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     if (auto keyConversion = E->getKeyConversion()) {
-      printRec(keyConversion.Conversion, Label::always("key_conversion"));
+      printRec(keyConversion, Label::always("key_conversion"));
     }
     if (auto valueConversion = E->getValueConversion()) {
-      printRec(valueConversion.Conversion, Label::always("value_conversion"));
+      printRec(valueConversion, Label::always("value_conversion"));
     }
     printFoot();
   }

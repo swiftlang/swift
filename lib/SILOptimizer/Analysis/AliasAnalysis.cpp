@@ -113,7 +113,7 @@ void BridgedAliasAnalysis::registerAnalysis(InitFn initFn,
 
 MemoryBehavior AliasAnalysis::computeMemoryBehavior(SILInstruction *toInst, SILValue addr) {
   if (getMemEffectsFunction) {
-    return (MemoryBehavior)getMemEffectsFunction({PM->getSwiftPassInvocation()},
+    return (MemoryBehavior)getMemEffectsFunction({PM->getSwiftPassInvocation()->getCurrent()},
                                                  {this},
                                                  {addr},
                                                  {toInst->asSILNode()});
@@ -123,21 +123,21 @@ MemoryBehavior AliasAnalysis::computeMemoryBehavior(SILInstruction *toInst, SILV
 
 bool AliasAnalysis::isObjectReleasedByInst(SILValue obj, SILInstruction *inst) {
   if (isObjReleasedFunction) {
-    return isObjReleasedFunction({PM->getSwiftPassInvocation()}, {this}, {obj}, {inst->asSILNode()});
+    return isObjReleasedFunction({PM->getSwiftPassInvocation()->getCurrent()}, {this}, {obj}, {inst->asSILNode()});
   }
   return true;
 }
 
 bool AliasAnalysis::isAddrVisibleFromObject(SILValue addr, SILValue obj) {
   if (isAddrVisibleFromObjFunction) {
-    return isAddrVisibleFromObjFunction({PM->getSwiftPassInvocation()}, {this}, {addr}, {obj});
+    return isAddrVisibleFromObjFunction({PM->getSwiftPassInvocation()->getCurrent()}, {this}, {addr}, {obj});
   }
   return true;
 }
 
 bool AliasAnalysis::mayAlias(SILValue lhs, SILValue rhs) {
   if (mayAliasFunction) {
-    return mayAliasFunction({PM->getSwiftPassInvocation()}, {this}, {lhs}, {rhs});
+    return mayAliasFunction({PM->getSwiftPassInvocation()->getCurrent()}, {this}, {lhs}, {rhs});
   }
   return true;
 }

@@ -86,6 +86,7 @@ entry(%0 : @unowned $<B> { var B } <A>):
 // CHECK-LABEL: sil hidden [ossa] @EE_box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <τ_0_0> { let τ_0_0 } <Int>) -> ()
 sil hidden [ossa] @EE_box_ownership : $@convention(thin) (@owned { var Int }, @guaranteed <T> { let T } <Int>) -> () {
 entry(%0 : @owned ${ var Int }, %1 : @guaranteed $<T> { let T } <Int>):
+  destroy_value [dead_end] %0
   unreachable
 }
 

@@ -31,6 +31,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1075,6 +1076,12 @@ public:
         Inv |= (unsigned)InvalidationKind::Branches;
       }
       invalidateAnalysis(SILAnalysis::InvalidationKind(Inv));
+      if (dce.mustInvalidateBranches()) {
+        if (F->needBreakInfiniteLoops())
+          breakInfiniteLoops(getPassManager(), F);
+        if (F->needCompleteLifetimes())
+          completeAllLifetimes(getPassManager(), F);
+      }
     }
   }
 };

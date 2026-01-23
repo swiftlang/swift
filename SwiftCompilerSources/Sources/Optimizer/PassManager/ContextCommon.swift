@@ -49,7 +49,6 @@ extension Context {
 
 extension MutatingContext {
   func notifyInvalidatedStackNesting() { bridgedPassContext.notifyInvalidatedStackNesting() }
-  var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
 
   func tryOptimizeApplyOfPartialApply(closure: PartialApplyInst) -> Bool {
     if bridgedPassContext.tryOptimizeApplyOfPartialApply(closure.bridged) {

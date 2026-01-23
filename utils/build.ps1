@@ -2661,6 +2661,7 @@ function Build-CURL([Hashtable] $Platform) {
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      _CURL_PREFILL = "YES";
       BROTLI_INCLUDE_DIR = "$SourceCache\brotli\c\include";
       BROTLICOMMON_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
         "$(Get-ProjectBinaryCache $Platform brotli)\brotlicommon.lib"
@@ -2673,17 +2674,24 @@ function Build-CURL([Hashtable] $Platform) {
         "$(Get-ProjectBinaryCache $Platform brotli)\libbrotlidec.a"
       }
       BUILD_CURL_EXE = "NO";
+      BUILD_EXAMPLES = "NO";
       BUILD_LIBCURL_DOCS = "NO";
       BUILD_MISC_DOCS = "NO";
+      BUILD_STATIC_LIBS = "YES";
+      CURL_BROTLI = "YES";
       CURL_CA_BUNDLE = "none";
       CURL_CA_FALLBACK = "NO";
       CURL_CA_PATH = "none";
-      CURL_BROTLI = "YES";
+      CURL_CA_SEARCH_SAFE = "NO";
+      CURL_CLANG_TIDY = "NO";
+      CURL_CODE_COVERAGE = "NO";
+      CURL_DEFAULT_SSL_BACKEND = "schannel";
       CURL_DISABLE_ALTSVC = "NO";
       CURL_DISABLE_AWS = "YES";
       CURL_DISABLE_BASIC_AUTH = "NO";
       CURL_DISABLE_BEARER_AUTH = "NO";
       CURL_DISABLE_BINDLOCAL = "NO";
+      CURL_DISABLE_CA_SEARCH = "YES";
       CURL_DISABLE_COOKIES = "NO";
       CURL_DISABLE_DICT = "YES";
       CURL_DISABLE_DIGEST_AUTH = "NO";
@@ -2698,6 +2706,7 @@ function Build-CURL([Hashtable] $Platform) {
       CURL_DISABLE_HTTP = "NO";
       CURL_DISABLE_HTTP_AUTH = "NO";
       CURL_DISABLE_IMAP = "YES";
+      CURL_DISABLE_IPFS = "YES";
       CURL_DISABLE_KERBEROS_AUTH = "NO";
       CURL_DISABLE_LDAP = "YES";
       CURL_DISABLE_LDAPS = "YES";
@@ -2706,11 +2715,13 @@ function Build-CURL([Hashtable] $Platform) {
       CURL_DISABLE_NEGOTIATE_AUTH = "NO";
       CURL_DISABLE_NETRC = "NO";
       CURL_DISABLE_NTLM = "NO";
+      CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG = "YES";
       CURL_DISABLE_PARSEDATE = "NO";
       CURL_DISABLE_POP3 = "YES";
       CURL_DISABLE_PROGRESS_METER = "YES";
       CURL_DISABLE_PROXY = "NO";
       CURL_DISABLE_RTSP = "YES";
+      CURL_DISABLE_SHA512_256 = "NO";
       CURL_DISABLE_SHUFFLE_DNS = "YES";
       CURL_DISABLE_SMB = "YES";
       CURL_DISABLE_SMTP = "YES";
@@ -2719,15 +2730,22 @@ function Build-CURL([Hashtable] $Platform) {
       CURL_DISABLE_TELNET = "YES";
       CURL_DISABLE_TFTP = "YES";
       CURL_DISABLE_VERBOSE_STRINGS = "NO";
+      CURL_DISABLE_WEBSOCKETS = "NO";
+      CURL_ENABLE_EXPORT_TARGET = "YES";
+      CURL_ENABLE_SSL = "YES";
       CURL_LTO = "NO";
-      CURL_USE_BEARSSL = "NO";
+      CURL_STATIC_CRT = "NO";
       CURL_USE_GNUTLS = "NO";
+      CURL_USE_GSASL = "NO";
       CURL_USE_GSSAPI = "NO";
       CURL_USE_LIBPSL = "NO";
       CURL_USE_LIBSSH = "NO";
       CURL_USE_LIBSSH2 = "NO";
+      CURL_USE_LIBUV = "NO";
       CURL_USE_MBEDTLS = "NO";
       CURL_USE_OPENSSL = "NO";
+      CURL_USE_PKGCONFIG = "NO";
+      CURL_USE_RUSTLS = "NO";
       CURL_USE_SCHANNEL = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_USE_WOLFSSL = "NO";
       CURL_WINDOWS_SSPI = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
@@ -2741,16 +2759,21 @@ function Build-CURL([Hashtable] $Platform) {
       ENABLE_THREADED_RESOLVER = "NO";
       ENABLE_UNICODE = "YES";
       ENABLE_UNIX_SOCKETS = "NO";
-      ENABLE_WEBSOCKETS = "YES";
       HAVE_POLL_FINE = "NO";
+      USE_APPLE_IDN = "NO";
+      USE_APPLE_SECTRUST = "NO";
       USE_ECH = "NO";
       USE_HTTPSRR = "NO";
       USE_IDN2 = "NO";
-      USE_MSH3 = "NO";
+      USE_IPV6 = "YES";
+      USE_LIBIDN2 = "NO";
+      USE_LIBRTMP = "NO";
       USE_NGHTTP2 = "NO";
       USE_NGTCP2 = "NO";
       USE_QUICHE = "NO";
+      USE_OPENSSL = "NO";
       USE_OPENSSL_QUIC = "NO";
+      USE_SSLS_EXPORT = "NO";
       USE_WIN32_IDN = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LARGE_FILES = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
@@ -2811,6 +2834,13 @@ function Test-Runtime([Hashtable] $Platform) {
     throw "LIT test utilities not found in $CompilersBinaryCache\bin"
   }
 
+  $PlatformDefines = @{}
+  if ($Platform.OS -eq [OS]::Android) {
+    $PlatformDefines += @{
+      SWIFT_ANDROID_API_LEVEL = "$AndroidAPILevel";
+    }
+  }
+
   Invoke-IsolatingEnvVars {
     # Filter known issues when testing on Windows
     Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
@@ -2822,13 +2852,13 @@ function Test-Runtime([Hashtable] $Platform) {
       -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
-      -Defines @{
+      -Defines ($PlatformDefines + @{
         SWIFT_INCLUDE_TESTS = "YES";
         SWIFT_INCLUDE_TEST_BINARIES = "YES";
         SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
         SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
         LLVM_LIT_ARGS = "-vv";
-      }
+      })
   }
 }
 

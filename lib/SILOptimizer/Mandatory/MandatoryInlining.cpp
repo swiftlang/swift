@@ -21,9 +21,11 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -819,7 +821,7 @@ static SILInstruction *tryDevirtualizeApplyHelper(SILPassManager *pm, FullApplyS
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation *pi,
                          SILFunction *F,
                          FullApplySite AI, DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
@@ -852,6 +854,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
   SmallVector<SILValue, 32> FullArgs;
   bool invalidatedStackNesting = false;
 
+  SwiftPassInvocation *nestedPi = pi->initializeNestedSwiftPassInvocation(F);
+
   // Visiting blocks in reverse order avoids revisiting instructions after block
   // splitting, which would be quadratic.
   for (auto BI = F->rbegin(), BE = F->rend(), nextBB = BI; BI != BE;
@@ -874,7 +878,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
       // *NOTE* If devirtualization succeeds, devirtInst may not be InnerAI,
       // but a casted result of InnerAI or even a block argument due to
       // abstraction changes when calling the witness or class method.
-      auto *devirtInst = tryDevirtualizeApplyHelper(pm, InnerAI, CHA);
+      auto *devirtInst = tryDevirtualizeApplyHelper(pi->getPassManager(), InnerAI, CHA);
       // If devirtualization succeeds, make sure we record that this function
       // changed.
       if (devirtInst != InnerAI.getInstruction())
@@ -899,7 +903,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
 
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(
-              FuncBuilder, pm, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
+              FuncBuilder, nestedPi, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
               CurrentInliningSet, CHA, changedFunctions, whatToInline)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
@@ -912,6 +916,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
           diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
                    diag::note_while_inlining);
         }
+        pi->deinitializeNestedSwiftPassInvocation();
         return false;
       }
 
@@ -1031,6 +1036,20 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
     changedFunctions.insert(F);
   }
 
+  if (F->isDefinition()) {
+    removeUnreachableBlocks(*F);
+
+    if (F->needBreakInfiniteLoops())
+      breakInfiniteLoops(pi->getPassManager(), F);
+
+    if (F->needCompleteLifetimes()) {
+      pi->getPassManager()->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+      completeAllLifetimes(pi->getPassManager(), F);
+    }
+
+  }
+  pi->deinitializeNestedSwiftPassInvocation();
+
   // Keep track of full inlined functions so we don't waste time recursively
   // reprocessing them.
   FullyInlinedSet.insert(F);
@@ -1078,7 +1097,8 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.wasDeserializedCanonical())
         continue;
 
-      runOnFunctionRecursively(FuncBuilder, getPassManager(), &F, FullApplySite(),
+      runOnFunctionRecursively(FuncBuilder, getPassManager()->getSwiftPassInvocation(),
+                               &F, FullApplySite(),
                                FullyInlinedSet, SetFactory,
                                SetFactory.getEmptySet(), CHA, changedFunctions,
                                whatToInline);

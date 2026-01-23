@@ -269,6 +269,9 @@ ERROR(static_var_decl_global_scope,none,
       (StaticSpellingKind))
 ERROR(expected_getreadset_in_protocol,none,
       "expected 'get', 'yielding borrow', or 'set' in a protocol property", ())
+ERROR(expected_getreadborrowsetmutate_in_protocol,none,
+      "expected get, 'yielding borrow', borrow, set or mutate in a protocol property", ())
+
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
       "here; use extension instead", (StringRef))
@@ -314,7 +317,7 @@ ERROR(missing_reading_accessor,none,
       (unsigned, StringRef))
 ERROR(missing_borrow_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
-      "a 'borrow' accessor, getter, addressor or 'yielding borrow' accessor",
+      "a 'borrow' accessor",
       (unsigned, StringRef))
 ERROR(observing_accessor_conflicts_with_accessor,none,
       "%select{'willSet'|'didSet'}0 cannot be provided together with %1",

@@ -907,6 +907,7 @@ bb1(%13 : $()):
   return %8 : $XandIntClass
 
 bb2(%17 : $Error):
+  destroy_value [dead_end] %8
   unreachable
 }
 

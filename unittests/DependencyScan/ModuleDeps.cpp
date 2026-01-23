@@ -16,6 +16,7 @@
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "clang/Frontend/SerializedDiagnosticReader.h"
 #include "clang/Frontend/SerializedDiagnostics.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
@@ -321,13 +322,11 @@ public func funcA() { }\n"));
   // Generate command line
   std::vector<std::string> CommandStr = {
       TestPathStr,
-      std::string("-I ") + SwiftDirPath,
-      std::string("-I ") + StdLibDir.str().str(),
-      std::string("-I ") + ShimsLibDir.str().str(),
-      "-serialize-diagnostics-path",
-      SerializedDiagnosticsOutputPath,
-      "-module-name",
-      "testSerializedDiagnosticOutput"};
+      "-I", SwiftDirPath,
+      "-I", StdLibDir.str().str(),
+      "-I", ShimsLibDir.str().str(),
+      "-serialize-diagnostics-path", SerializedDiagnosticsOutputPath,
+      "-module-name", "testSerializedDiagnosticOutput"};
   // On Windows we need to add an extra escape for path separator characters
   // because otherwise the command line tokenizer will treat them as escape
   // characters.
@@ -361,10 +360,31 @@ public func funcA() { }\n"));
   auto DiagnosticsReader = DiagnosticChecker();
   auto ReadError = DiagnosticsReader.readDiagnostics(SerializedDiagnosticsOutputPath);
   ASSERT_FALSE(ReadError);
-  ASSERT_TRUE(DiagnosticsReader.errorMessages.size() == 1);
-  ASSERT_TRUE(DiagnosticsReader.warningMessages.size() == 1);
-  ASSERT_TRUE(DiagnosticsReader.errorMessages.front() == "This is an error");
-  ASSERT_TRUE(DiagnosticsReader.warningMessages.front() == "This is a warning");
+  ASSERT_EQ(DiagnosticsReader.errorMessages.size(), static_cast<size_t>(1));
+  ASSERT_EQ(DiagnosticsReader.warningMessages.size(), static_cast<size_t>(1));
+  EXPECT_EQ(DiagnosticsReader.errorMessages.front(), "This is an error");
+  EXPECT_EQ(DiagnosticsReader.warningMessages.front(), "This is a warning");
+}
+
+TEST_F(ScanTest, TestEscapedCommandLine) {
+  llvm::ErrorOr<swiftscan_string_ref_t> information =
+      getTargetInfo({
+                      "-sdk",
+#if defined(_WIN32)
+                      "    C:\\Program Files\\Swift\\Platforms\\Windows.platform\\Developer\\SDKs\\Windows.sdk\\usr\\include",
+#else
+                      "C:\\\\Program\\ Files\\\\Swift\\\\Platforms\\\\Windows.platform\\\\Developer\\\\SDKs\\\\Windows.sdk\\\\usr\\\\include",
+#endif
+                    },
+                    "swiftc");
+  ASSERT_TRUE(information);
+  llvm::StringRef Result{static_cast<const char *>(information->data),
+                         information->length};
+  ASSERT_NE(Result, llvm::StringRef{});
+  llvm::Expected<llvm::json::Value> V = llvm::json::parse(Result);
+  ASSERT_TRUE(static_cast<bool>(V));
+  ASSERT_EQ(V->getAsObject()->getObject("paths")->getString("sdkPath"),
+            "C:\\Program Files\\Swift\\Platforms\\Windows.platform\\Developer\\SDKs\\Windows.sdk\\usr\\include");
 }
 
 // Disabled due to rdar://165014838

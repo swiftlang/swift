@@ -543,6 +543,7 @@ bb7:
   br bb1(%4 : $FirstSecondThirdEnum<Klass>)
 
 bb4a(%unused : @owned $FakeOptional<Klass>):
+  destroy_value [dead_end] %unused
   unreachable
 
 bb8:
@@ -591,6 +592,7 @@ bb7:
   br bb1(%4 : $FirstSecondThirdEnum<Klass>)
 
 bb4a(%unused : @owned $FakeOptional<Klass>):
+  destroy_value [dead_end] %unused
   unreachable
 
 bb8:

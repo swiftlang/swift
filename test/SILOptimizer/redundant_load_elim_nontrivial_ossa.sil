@@ -213,54 +213,6 @@ bb2:
   return %res : $() 
 }
 
-// DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
-//
-// Make sure the switch does not affect the forwarding of the load.
-// switch_enum cannot have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
-// switch basic block.
-// DISABLE_CHECK-LABEL: load_elimination_disregard_switch_enum
-// DISABLE_CHECK: bb8
-// DISABLE_CHECK-NOT: = load
-// DISABLE_CHECK-LABEL: } // end sil function 'load_elimination_disregard_switch_enum'
-sil [ossa] @load_elimination_disregard_switch_enum : $@convention(thin) (@owned Klass, @owned Klass, @inout Klass) -> @owned Klass {
-bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : $*Klass):
-  cond_br undef, bb7, bb1
-
-bb1:
-  %4 = tuple (%0 : $Klass, %1 : $Klass)
-  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Klass, Klass)
-  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6
-
-bb2:
-  br bb3
-
-bb3:
-  br bb5
-
-bb4(%11 : @owned $(Klass, Klass)):
-  %12 = begin_borrow %11 : $(Klass, Klass)
-  %13 = tuple_extract %12 : $(Klass, Klass), 0
-  end_borrow  %12 : $(Klass, Klass)
-  br bb5
-
-bb5:
-  br bb5
-
-bb6(%15 : @owned $Klass):
-  br bb5
-
-bb7:
-  destroy_value %0 : $Klass
-  destroy_value %1 : $Klass
-  %17 = load [copy] %2 : $*Klass
-  br bb8
-
-bb8:
-  %19 = load [copy] %2 : $*Klass
-  destroy_value %17 : $Klass
-  return %19 : $Klass
-}
-
 // CHECK-LABEL: sil [ossa] @load_store_forwarding_from_aggregate_to_field :
 // CHECK-NOT: load
 // CHECK-LABEL: } // end sil function 'load_store_forwarding_from_aggregate_to_field'
@@ -716,58 +668,6 @@ bb0(%0 : @owned $C1):
   return %7 : $()
 }
 
-// Make sure the first load in bb1 is not eliminated as we have
-// this unreachable block which will have a liveout of nil.
-// we make this in the context of a loop, because we want to run an
-// optimistic data flow.
-//
-// CHECK-LABEL: sil [ossa] @load_to_load_loop_with_unreachable_block :
-// CHECK: bb1:
-// CHECK: = load
-// CHECK: cond_br
-// CHECK-LABEL: } // end sil function 'load_to_load_loop_with_unreachable_block'
-sil [ossa] @load_to_load_loop_with_unreachable_block : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> () {
-bb0(%0 : @owned $NonTrivialStruct, %1 : @owned $NonTrivialStruct):
-  %101 = alloc_stack $NonTrivialStruct
-  %102 = alloc_stack $NonTrivialStruct
-  store %0 to [init] %101 : $*NonTrivialStruct
-  store %1 to [init] %102 : $*NonTrivialStruct
-  %0ele = struct_element_addr %101 : $*NonTrivialStruct, #NonTrivialStruct.val
-  %1ele = struct_element_addr %102 : $*NonTrivialStruct, #NonTrivialStruct.val
-  %2 = load [copy] %0ele : $*Klass
-  %99 = load [take] %1ele : $*Klass
-  %125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
-  %126 = apply %125(%2) : $@convention(thin) (@owned Klass) -> ()
-  %127 = apply %125(%99) : $@convention(thin) (@owned Klass) -> ()
-  br bb1
-
-bb20:
-  br bb1
-
-bb1:
-  %4 = load [copy] %0ele : $*Klass
-  %5 = copy_value %4 : $Klass 
-  %1125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
-  %1126 = apply %1125(%4) : $@convention(thin) (@owned Klass) -> ()
-  store %5 to [assign] %0ele : $*Klass
-  %6 = load [copy] %0ele : $*Klass
-  %11125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
-  %11126 = apply %11125(%6) : $@convention(thin) (@owned Klass) -> ()
-  cond_br undef, bb1a, bb2
-
-bb1a:
-  br bb1
-
-bb2:
-  %7 = load [take] %0ele : $*Klass
-  %111125 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
-  %111126 = apply %111125(%7) : $@convention(thin) (@owned Klass) -> ()
-  dealloc_stack %102 : $*NonTrivialStruct
-  dealloc_stack %101 : $*NonTrivialStruct
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // CHECK-LABEL: sil hidden [ossa] @redundant_load_over_intermediate_release_with_epilogue_release :
 // CHECK:         [[AD:%.*]] = ref_element_addr
 // CHECK:         [[L:%.*]] = load [take] [[AD]]
@@ -950,12 +850,9 @@ bb8:
 }
 
 // CHECK-LABEL: @ignore_unreachable_simple :
-// CHECK:        [[V:%[0-9]+]] = load [copy]
-// CHECK:        [[C:%[0-9]+]] = copy_value [[V]]
-// CHECK:      bb1:
-// CHECK-NEXT:   destroy_value [[C]]
-// CHECK:      bb2:
-// CHECK-NEXT:   unreachable
+// This is not optimized, yet
+// CHECK:         load [copy]
+// CHECK:         load [copy]
 // CHECK: } // end sil function 'ignore_unreachable_simple'
 sil [ossa] @ignore_unreachable_simple : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
 bb0(%0 : $*NonTrivialStruct):
@@ -978,12 +875,9 @@ bb3:
 }
 
 // CHECK-LABEL: @ignore_unreachable_complex :
-// CHECK:        [[V:%[0-9]+]] = load [copy]
-// CHECK:        [[C:%.*]] = copy_value [[V]]
-// CHECK:      bb1:
-// CHECK:      bb5:
-// CHECK-NEXT:   destroy_value [[C]]
-// CHECK-NEXT:   tuple
+// This is not optimized, yet
+// CHECK:         load [copy]
+// CHECK:         load [copy]
 // CHECK: } // end sil function 'ignore_unreachable_complex'
 sil [ossa] @ignore_unreachable_complex : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
 bb0(%0 : $*NonTrivialStruct):

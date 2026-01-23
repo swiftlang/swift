@@ -919,9 +919,6 @@ def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overl
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
-def enable_constraint_solver_performance_hacks : Flag<["-"], "enable-constraint-solver-performance-hacks">,
-  HelpText<"Enable all the old hacks in the constraint solver">;
-
 def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
   HelpText<"Enable operator designated types">;
@@ -1541,20 +1538,6 @@ def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
-
-def enable_ossa_complete_lifetimes :
-  Flag<["-"], "enable-ossa-complete-lifetimes">,
-  HelpText<"Require linear OSSA lifetimes after SILGen">;
-def disable_ossa_complete_lifetimes :
-  Flag<["-"], "disable-ossa-complete-lifetimes">,
-  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
-
-def enable_ossa_verify_complete :
-  Flag<["-"], "enable-ossa-verify-complete">,
-  HelpText<"Verify linear OSSA lifetimes after SILGen">;
-def disable_ossa_verify_complete :
-  Flag<["-"], "disable-ossa-verify-complete">,
-  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
 
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,

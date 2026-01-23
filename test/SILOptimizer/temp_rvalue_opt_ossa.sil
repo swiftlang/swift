@@ -1,4 +1,4 @@
-
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-temp-rvalue-elimination | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
 // REQUIRES: swift_in_compiler
@@ -1787,6 +1787,25 @@ bb1:
 bb2:
   destroy_addr %4
   dealloc_stack %4
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @dealloc_stack_between_load_and_store :
+// CHECK:         %4 = load [take] %2
+// CHECK-NEXT:    dealloc_stack %2
+// CHECK-NEXT:    store %4 to [init] %1
+// CHECK-LABEL: } // end sil function 'dealloc_stack_between_load_and_store'
+sil [ossa] @dealloc_stack_between_load_and_store : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack $AnyObject
+  %2 = alloc_stack [lexical] $AnyObject
+  store %0 to [init] %2
+  %4 = load [take] %2
+  dealloc_stack %2
+  store %4 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
   %9 = tuple ()
   return %9
 }

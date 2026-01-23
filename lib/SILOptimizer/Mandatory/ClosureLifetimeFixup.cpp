@@ -1523,6 +1523,9 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
           StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;
       }
       invalidateAnalysis(analysisInvalidationKind(modifiedCFG));
+
+      // TODO: it would be more efficient to just complete the closure values.
+      completeAllLifetimes(PM, getFunction());
     }
     LLVM_DEBUG(getFunction()->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache()));
 

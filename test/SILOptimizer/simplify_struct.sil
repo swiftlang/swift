@@ -186,6 +186,9 @@ bb0(%0 : @owned $String, %1 : $Int):
 // CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
 // CHECK-NEXT:    fix_lifetime [[B]]
 // CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    struct
+// CHECK-NEXT:    destroy_value [dead_end]
 // CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function 'incomplete_lifetimes'
 sil [ossa] @incomplete_lifetimes : $@convention(thin) (@owned String, Int) -> () {
@@ -196,6 +199,8 @@ bb0(%0 : @owned $String, %1 : $Int):
   %5 = struct_extract %3, #S.b
   fix_lifetime %4
   fix_lifetime %5
+  end_borrow %3
+  destroy_value [dead_end] %2
   unreachable
 }
 

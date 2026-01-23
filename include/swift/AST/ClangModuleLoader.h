@@ -266,6 +266,11 @@ public:
   virtual const clang::Decl *
   resolveStableSerializationPath(const StableSerializationPath &path) const = 0;
 
+  struct SerializableInfo {
+    bool Serializable;
+    bool HasSwiftDecl;
+  };
+
   /// Determine whether the given type is serializable.
   ///
   /// If \c checkCanonical is true, checks the canonical type,
@@ -288,8 +293,8 @@ public:
   /// least, it's probably best to use conservative predicates
   /// that work both ways so that language behavior doesn't differ
   /// based on subtleties like the target module interface format.
-  virtual bool isSerializable(const clang::Type *type,
-                              bool checkCanonical) const = 0;
+  virtual SerializableInfo isSerializable(const clang::Type *type,
+                                          bool checkCanonical) const = 0;
 
   virtual clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,

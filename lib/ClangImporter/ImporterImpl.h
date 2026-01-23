@@ -1364,7 +1364,8 @@ public:
   /// Note that this will only check the requested sugaring of the given
   /// type (depending on \c checkCanonical); the canonical type may be
   /// serializable even if the non-canonical type is not, or vice-versa.
-  bool isSerializable(clang::QualType type, bool checkCanonical);
+  ClangModuleLoader::SerializableInfo isSerializable(clang::QualType type,
+                                                     bool checkCanonical);
 
   /// Try to find a stable Swift serialization path for the given Clang
   /// declaration.

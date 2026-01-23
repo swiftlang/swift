@@ -27,6 +27,7 @@ class CliArguments(argparse.Namespace):
     use_submodules: bool
     verbose: bool
     command: Optional[Any]
+    max_retries: int
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -128,6 +129,14 @@ repositories.
             help="Check out adjacent repositories to match timestamp of "
             " current swift checkout.",
             action="store_true",
+        )
+        parser.add_argument(
+            "--max-retries",
+            help="Maximum number of times update-checkout will retry if the"
+            " cloning of any repository failed. 0 for no retries, -1 for"
+            " unlimited retries.",
+            type=int,
+            default=0,
         )
         parser.add_argument(
             "-j",

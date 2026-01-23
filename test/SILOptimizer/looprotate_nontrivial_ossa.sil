@@ -244,6 +244,7 @@ bb8:
   br bb1
 
 bb9:
+  destroy_value [dead_end] %0
   unreachable
 }
 

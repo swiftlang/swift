@@ -1003,22 +1003,30 @@ void SILModule::verifyOwnership() const {
     return;
 
   for (const SILFunction &function : *this) {
-    std::unique_ptr<DeadEndBlocks> deBlocks;
-    if (!getOptions().OSSAVerifyComplete) {
-      deBlocks =
-        std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&function));
-    }
-    function.verifyOwnership(deBlocks.get());
+#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
+    function.verifyOwnership();
+#else
+    DeadEndBlocks deBlocks(const_cast<SILFunction *>(&function));
+    function.verifyOwnership(&deBlocks);
+#endif
   }
 }
 
 void SILFunction::verifyOwnership() const {
+#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
+  verifyOwnership(nullptr);
+#else
   auto deBlocks =
       std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(this));
   verifyOwnership(deBlocks.get());
+#endif
 }
 
 void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
+#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
+  deadEndBlocks = nullptr;
+#endif
+
   if (!getModule().getOptions().VerifySILOwnership)
     return;
 

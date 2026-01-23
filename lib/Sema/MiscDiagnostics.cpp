@@ -47,6 +47,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -5389,13 +5390,17 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     /// Returns true iff the collection upcast coercion is an Optional-to-Any
     /// coercion.
-    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
-                                   conversion) {
-      if (!conversion.OrigValue || !conversion.Conversion)
+    bool isOptionalToAnyCoercion(ClosureExpr *conversion) {
+      if (!conversion)
         return false;
 
-      auto srcType = conversion.OrigValue->getType();
-      auto destType = conversion.Conversion->getType();
+      auto fnType = conversion->getType()->getAs<FunctionType>();
+      if (!fnType)
+        return false;
+
+      assert(fnType->getNumParams() == 1);
+      auto srcType = fnType->getParams()[0].getPlainType();
+      auto destType = fnType->getResult();
       return isOptionalToAnyCoercion(srcType, destType);
     }
 
@@ -5541,10 +5546,13 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // We're handling the coercion of the entire collection, so we don't need
       // to re-visit a nested ErasureExpr for the value.
-      if (auto conversionExpr = valueConversion.Conversion)
+      if (valueConversion) {
+        Expr *body = valueConversion->getSingleExpressionBody();
         if (auto *erasureExpr =
-              findErasureExprThroughOptionalInjections(conversionExpr))
+                findErasureExprThroughOptionalInjections(body)) {
           IgnoredExprs.insert(erasureExpr);
+        }
+      }
 
       if (coercion.shouldSuppressDiagnostic() ||
           !isOptionalToAnyCoercion(valueConversion))
@@ -6346,7 +6354,10 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 
 static bool isReturningFRT(const clang::NamedDecl *ND,
                            clang::QualType &outReturnType, ASTContext &Ctx) {
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
+  if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
+    outReturnType =
+        CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+  else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     outReturnType = FD->getReturnType();
   else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
     outReturnType = MD->getReturnType();
@@ -6390,8 +6401,8 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
       return false;
 
     if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
-        // Ownership attrs are not yet supported for ctors and dtors if FRTs
+      if (isa<clang::CXXDestructorDecl>(methodDecl))
+        // Ownership attrs are not yet supported for dtors if FRTs
         return false;
 
       if (methodDecl->isOverloadedOperator())
@@ -6489,7 +6500,8 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (!ctx.isLanguageModeAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
+    diagnoseExprAvailability(E, const_cast<DeclContext *>(DC),
+                             /*preconcurrency=*/false);
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);

@@ -162,6 +162,15 @@ tests.test("HexFloats") {
 
   expectParse("0x.000001", 5.9604645e-08)
   expectParse("0x1p-150", 0.0)
+  expectParse("0x0.0000010000000000000000000000p-126", 0.0)
+  expectParse("0x0.00000100000000000000000000000000000000000000000000000000000000000000000000000000000000000001p-126", Float32.leastNonzeroMagnitude)
+  expectParse("0x0.00000100000000001p-126", Float32.leastNonzeroMagnitude)
+  expectParse("0x0.0000010000000000000001p-126", Float32.leastNonzeroMagnitude)
+  expectParse("0x0.0000010000000000000002p-126", Float32.leastNonzeroMagnitude)
+  expectParse("0x0.0000010000000000000004p-126", Float32.leastNonzeroMagnitude)
+  expectParse("0x0.0000010000000000000008p-126", Float32.leastNonzeroMagnitude)
+  expectParse("0x0.000001000000000000001p-126", Float32.leastNonzeroMagnitude)
+
   expectParse("0x1p-149", Float32.leastNonzeroMagnitude)
   expectParse("0x1p-149", Float32(bitPattern:1))
   expectParse("0x1p-148", Float32(bitPattern:2))

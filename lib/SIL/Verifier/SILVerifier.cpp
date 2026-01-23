@@ -3107,11 +3107,13 @@ public:
   void checkImplicitActorToOpaqueIsolationCastInst(
       ImplicitActorToOpaqueIsolationCastInst *igi) {
     if (F.hasOwnership()) {
-      require(igi->getValue()->getOwnershipKind() == OwnershipKind::Guaranteed,
+      require(igi->getValue()->getOwnershipKind().isCompatibleWith(
+                  OwnershipKind::Guaranteed),
               "implicitactor_to_optionalactor_cast's operand should have "
               "guaranteed ownership");
-      require(igi->getOwnershipKind() == OwnershipKind::Guaranteed,
-              "result value should have guaranteed ownership");
+      require(
+          igi->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed),
+          "result value should have guaranteed ownership");
     }
 
     require(igi->getValue()->getType() ==
@@ -7422,7 +7424,7 @@ public:
   }
 
   void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
+    if (!isCompleteOSSA) {
       DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));

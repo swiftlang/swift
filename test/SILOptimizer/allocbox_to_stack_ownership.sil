@@ -468,6 +468,7 @@ bb0(%0 : $Int):
   %6 = copy_value %5 : $@callee_owned () -> ()
   apply %6() : $@callee_owned () -> ()
   destroy_value %5 : $@callee_owned () -> ()
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -990,6 +991,7 @@ bb0(%0 : $Int):
 bb1:
   %as2 = alloc_stack $Bool
   dealloc_stack %as2 : $*Bool
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:
@@ -1086,6 +1088,7 @@ bb0(%0 : $Int):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:
@@ -1117,6 +1120,7 @@ bb0(%0 : $Int):
 bb1:
   %as1 = alloc_stack $Bool
   %as2 = alloc_stack $Bool
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:
@@ -1240,21 +1244,28 @@ sil @getC : $@convention(thin) () -> (@owned C)
 // CHECK-NOT:     dealloc_stack
 // CHECK-LABEL: } // end sil function 'leak_to_inf_loop_1'
 sil [ossa] @leak_to_inf_loop_1 : $@convention(thin) (@owned C) -> () {
-entry(%c : @owned $C):
+bb0(%c : @owned $C):
   %box = alloc_box ${ var C }
   %c_addr = project_box %box, 0
   store %c to [init] %c_addr
   %copy = copy_value %box
   destroy_value %box
-  br loop
+  br bb1
 
-loop:
+bb1:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   %c_old = load [take] %c_addr
   store %c2 to [init] %c_addr
   destroy_value %c_old
-  br loop
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value [dead_end] %copy
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @leak_to_inf_loop_2 : {{.*}} {
@@ -1267,30 +1278,37 @@ loop:
 // CHECK-NOT:     dealloc_stack
 // CHECK-LABEL: } // end sil function 'leak_to_inf_loop_2'
 sil [ossa] @leak_to_inf_loop_2 : $@convention(thin) (@owned C) -> () {
-entry(%c : @owned $C):
+bb0(%c : @owned $C):
   %box = alloc_box ${ var C }
   %c_addr = project_box %box, 0
   store %c to [init] %c_addr
   %copy = copy_value %box
   destroy_value %box
-  cond_br undef, exit, to_loop
+  cond_br undef, bb1, bb2
 
-exit:
+bb1:
   destroy_value %copy
   return undef : $()
 
-to_loop:
+bb2:
   %copy2 = copy_value %copy
   destroy_value %copy
-  br loop
+  br bb3
 
-loop:
+bb3:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   %c_old = load [take] %c_addr
   store %c2 to [init] %c_addr
   destroy_value %c_old
-  br loop
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb3
+
+bb5:
+  destroy_value [dead_end] %copy2
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @leak_to_inf_loop_3 : {{.*}} {
@@ -1298,46 +1316,59 @@ loop:
 // CHECK-NOT:     dealloc_stack
 // CHECK-LABEL: } // end sil function 'leak_to_inf_loop_3'
 sil [ossa] @leak_to_inf_loop_3 : $@convention(thin) (@owned C) -> () {
-entry(%c : @owned $C):
+bb0(%c : @owned $C):
   %box = alloc_box ${ var C }
   %c_addr = project_box %box, 0
   store %c to [init] %c_addr
-  br to_loop
+  br bb1
 
-to_loop:
+bb1:
   %copy = copy_value %box
   destroy_value %box
-  br loop
+  br bb2
 
-loop:
+bb2:
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   %c_old = load [take] %c_addr
   store %c2 to [init] %c_addr
   destroy_value %c_old
-  br loop
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb2
+
+bb4:
+  destroy_value [dead_end] %copy
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @dealloc_box_before_loop
 // CHECK:         dealloc_stack
 // CHECK-LABEL: } // end sil function 'dealloc_box_before_loop'
 sil [ossa] @dealloc_box_before_loop : $@convention(thin) (@owned C) -> () {
-entry(%c : @owned $C):
+bb0(%c : @owned $C):
   %box = alloc_box ${ var C }
   %c_addr = project_box %box, 0
   store %c to [init] %c_addr
-  cond_br undef, exit, to_loop
+  cond_br undef, bb1, bb2
 
-exit:
+bb1:
   destroy_value %box
   return undef : $()
 
-to_loop:
+bb2:
   dealloc_box %box
-  br loop
+  br bb3
 
-loop:
-  br loop
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb3
+
+bb5:
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @alloc_box_in_deadend_loop
@@ -1345,17 +1376,23 @@ loop:
 // CHECK:         dealloc_stack
 // CHECK-LABEL: } // end sil function 'alloc_box_in_deadend_loop'
 sil [ossa] @alloc_box_in_deadend_loop : $@convention(thin) () -> () {
-entry:
-  br loop
+bb0:
+  br bb1
 
-loop:
+bb1:
   %box = alloc_box ${ var C }
   %c_addr = project_box %box, 0
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
   %c = apply %getC() : $@convention(thin) () -> (@owned C)
   store %c to [init] %c_addr
   destroy_value %box
-  br loop
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @alloc_box_in_exiting_loop
@@ -1374,37 +1411,44 @@ loop:
 // CHECK-NOT:     dealloc_stack
 // CHECK-LABEL: } // end sil function 'alloc_box_in_exiting_loop'
 sil [ossa] @alloc_box_in_exiting_loop : $@convention(thin) () -> () {
-entry:
-  br exiting_loop
+bb0:
+  br bb1
 
-exiting_loop:
+bb1:
   %box = alloc_box ${ var C }
   %c_addr = project_box %box, 0
   %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
   %c = apply %getC() : $@convention(thin) () -> (@owned C)
   store %c to [init] %c_addr
-  cond_br undef, exit, latch
+  cond_br undef, bb4, bb2
 
-latch:
-  cond_br undef, backedge, to_infinite_loop
+bb2:
+  cond_br undef, bb3, bb5
 
-backedge:
+bb3:
   destroy_value %box
-  br exiting_loop
+  br bb1
 
-exit:
+bb4:
   destroy_value %box
   return undef : $()
 
-to_infinite_loop:
-  br infinite_loop
+bb5:
+  br bb6
 
-infinite_loop:
+bb6:
   %c2 = apply %getC() : $@convention(thin) () -> (@owned C)
   store %c2 to [assign] %c_addr
   %copy = copy_value %box
   destroy_value %copy
-  br infinite_loop
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb6
+
+bb8:
+  destroy_value [dead_end] %box
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @alloc_box_in_deadend_loop_with_another_deadend
@@ -1419,20 +1463,21 @@ infinite_loop:
 // CHECK-NOT:     dealloc_stack
 // CHECK-LABEL: } // end sil function 'alloc_box_in_deadend_loop_with_another_deadend'
 sil [ossa] @alloc_box_in_deadend_loop_with_another_deadend : $@convention(thin) () -> () {
-entry:
-  br loop
+bb0:
+  br bb1
 
-loop:
+bb1:
   %box = alloc_box ${ var C }
-  cond_br undef, backedge, die
+  cond_br undef, bb2, bb3
 
-backedge:
+bb2:
   destroy_value %box
-  br loop
+  br bb1
 
-die:
+bb3:
   %copy = copy_value %box
   destroy_value %copy
+  destroy_value [dead_end] %box
   unreachable
 }
 
