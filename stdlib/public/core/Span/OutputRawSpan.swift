@@ -212,6 +212,7 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// Appends the given value's bytes to this span's bytes.
   @_alwaysEmitIntoClient
+  @unsafe
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(_ value: T, as type: T.Type) {
     _precondition(
@@ -223,6 +224,7 @@ extension OutputRawSpan {
 
   /// Appends the given value's bytes repeatedly to this span's bytes.
   @_alwaysEmitIntoClient
+  @unsafe
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(
     repeating repeatedValue: T, count: Int, as type: T.Type
