@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-O) | %FileCheck %s
 
 // REQUIRES: executable_test
 
