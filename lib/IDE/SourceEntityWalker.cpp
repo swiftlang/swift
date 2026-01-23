@@ -25,10 +25,10 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
-#include "clang/Basic/Module.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/Module.h"
 
 using namespace swift;
 
@@ -458,8 +458,33 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return Action::Stop();
     }
 
-    if (!SE->getArgs()->walk(*this))
-      return Action::Stop();
+    // For regular subscripts (not dynamic member lookups), the index expressions
+    // are always read, regardless of how the subscript is being used (read or write).
+    // Do not propagate a write access kind into the subscript arguments.
+    // However, for dynamic member lookup subscripts, the argument represents
+    // a member being accessed, so it should reflect the access kind.
+    bool isKeyPathDynamicMemberLookup = false;
+    if (auto *SD = dyn_cast_or_null<SubscriptDecl>(SubscrD)) {
+      // Check if the base type has @dynamicMemberLookup
+      Type baseType = SE->getBase()->getType();
+      if (baseType) {
+        baseType = baseType->getWithoutSpecifierType();
+        if (baseType->hasDynamicMemberLookupAttribute() &&
+            isValidKeyPathDynamicMemberLookup(SD)) {
+          isKeyPathDynamicMemberLookup = true;
+        }
+      }
+    }
+
+    if (!isKeyPathDynamicMemberLookup) {
+      llvm::SaveAndRestore<std::optional<AccessKind>>
+          C(this->OpAccess, std::nullopt);
+      if (!SE->getArgs()->walk(*this))
+        return Action::Stop();
+    } else {
+      if (!SE->getArgs()->walk(*this))
+        return Action::Stop();
+    }
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))
