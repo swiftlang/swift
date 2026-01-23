@@ -11448,7 +11448,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
-        result.getFavoredIndex(), /*requiresFix=*/false,
+        /*requiresFix=*/false,
         [&](unsigned, const OverloadChoice &choice) {
           return fixMemberRef(*this, baseTy, member, choice, locator);
         });
@@ -11474,7 +11474,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                          result.ViableCandidates);
 
       generateOverloadConstraints(
-          candidates, memberTy, outerAlternatives, useDC, locator, std::nullopt,
+          candidates, memberTy, outerAlternatives, useDC, locator,
           /*requiresFix=*/!treatAsViable,
           [&](unsigned, const OverloadChoice &) {
             return treatAsViable ? nullptr
@@ -11489,7 +11489,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // and disable them by default, they'd get picked up in the "salvage" mode.
     generateOverloadConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
-        /*favoredChoice=*/std::nullopt, /*requiresFix=*/true,
+        /*requiresFix=*/true,
         [&](unsigned idx, const OverloadChoice &choice) {
           return fixMemberRef(*this, baseTy, member, choice, locator,
                               result.UnviableReasons[idx]);
