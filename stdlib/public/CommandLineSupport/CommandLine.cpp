@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <climits>
 #include <cstdarg>
@@ -22,11 +23,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include <errno.h>
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Win32.h"
 
 #include "swift/shims/GlobalObjects.h"
@@ -38,6 +41,11 @@
 #include <Windows.h>
 #include <shellapi.h>
 #pragma comment(lib, "shell32.lib")
+#endif
+
+#if defined(__OpenBSD__)
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 // Backing storage for overrides of `Swift.CommandLine.arguments`.
@@ -534,3 +542,173 @@ static char **swift::getUnsafeArgvArgc(int *outArgLen) {
 template <typename F>
 static void swift::enumerateUnsafeArgv(const F& body) { }
 #endif
+
+#pragma mark - CommandLine.executablePath
+
+namespace swift {
+/// A C++ string that can contain an executable path.
+#if defined(_WIN32)
+using ExecutablePath = std::basic_string<
+  WCHAR, std::char_traits<WCHAR>, cxx_allocator<WCHAR>
+>;
+#else
+using ExecutablePath = std::basic_string<
+  char, std::char_traits<char>, cxx_allocator<char>
+>;
+#endif
+
+/// A platform-specific implementation of `_swift_stdlib_withExecutablePath()`.
+///
+/// - Returns: The path to the current executable according to the operating
+///   system as a UTF-8 C++ string, or `""` if we couldn't get the path.
+static ExecutablePath getExecutablePath(void);
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_stdlib_withExecutablePath(
+  void SWIFT_CC(swift) (* body)(
+    const ExecutablePath::value_type *path,
+    SWIFT_CONTEXT void *context
+  ),
+  SWIFT_CONTEXT void *context
+) {
+  return (* body)(getExecutablePath().c_str(), context);
+}
+
+#if defined(__APPLE__) && false
+// CommandLine.executablePath is implemented in Swift on Darwin so it can be
+// back-deployed. Here is a reference C implementation.
+extern "C" int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
+
+ExecutablePath getExecutablePath(void) {
+  // _NSGetExecutablePath() returns non-zero if the provided buffer is too small
+  // and updates its *bufsize argument to the required value. Call it once to
+  // get the buffer size before allocating.
+  uint32_t byteCount = 0;
+  (void)_NSGetExecutablePath(nullptr, &byteCount);
+
+  ExecutablePath result(byteCount, '\0');
+  if (0 == _NSGetExecutablePath(result.data(), &byteCount)) {
+    return result;
+  }
+
+  return "";
+}
+#elif defined(__linux__) || defined(__ANDROID__)
+ExecutablePath getExecutablePath(void) {
+  size_t byteCount = PATH_MAX;
+  while (true) {
+    ExecutablePath result(byteCount, '\0');
+    auto byteCountRead = readlink("/proc/self/exe", result.data(), byteCount);
+    if (byteCountRead < 0) {
+      // Could not get the path to the current executable. This process might
+      // not have read permissions.
+      return "";
+    } else if (static_cast<size_t>(byteCountRead) < byteCount) {
+      return result;
+    }
+    byteCount += PATH_MAX; // add more space and try again
+  }
+}
+#elif defined(_WIN32)
+ExecutablePath getExecutablePath(void) {
+  DWORD charCount = MAX_PATH;
+  while (true) {
+    ExecutablePath result(charCount, L'\0');
+    SetLastError(ERROR_SUCCESS);
+    (void)GetModuleFileNameW(nullptr, result.data(), charCount);
+    switch (GetLastError()) {
+    case ERROR_SUCCESS:
+      return result;
+    case ERROR_INSUFFICIENT_BUFFER:
+      charCount += MAX_PATH; // add more space and try again
+      break;
+    default:
+      // Some other error prevented getting the path.
+      return L"";
+    }
+  }
+}
+#elif defined(__FreeBSD__)
+ExecutablePath getExecutablePath(void) {
+  int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
+  size_t bufferCount = 0;
+  if (0 != sysctl(mib, std::size(mib), nullptr, &bufferCount, nullptr, 0)) {
+    ExecutablePath result(bufferCount, '\0');
+    if (0 == sysctl(mib, std::size(mib), result.data(), &bufferCount, nullptr, 0)) {
+      return result;
+    }
+  }
+
+  return "";
+}
+#elif defined(__OpenBSD__)
+/// Storage for ``captureEarlyCWD()``.
+static std::atomic<const char *> earlyCWD { nullptr };
+
+/// At process start (before `main()` is called), capture the current working
+/// directory.
+///
+/// This function is necessary on OpenBSD so that we can (as correctly as
+/// possible) resolve the executable path when the first argument is a relative
+/// path (which can occur when manually invoking an executable at the shell).
+__attribute__((__constructor__(101), __used__))
+static void captureEarlyCWD(void) {
+  if (const char *cwd = getcwd(nullptr, 0)) {
+    earlyCWD.store(cwd);
+  }
+}
+
+/// Test if a (potential) executable path refers to an actual executable file on
+/// disk.
+///
+/// We only perform this test on OpenBSD (rather than everywhere) because we
+/// construct executable paths from relatively weak sources on OpenBSD. This
+/// check is not meant to be secure or authoritative, but simply serves to
+/// eliminate patently bad constructed paths.
+static bool checkExecutablePath(const char *executablePath) {
+  struct stat s;
+  if (0 == stat(executablePath, &s) && !S_ISDIR(s.st_mode)) {
+    return (s.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0;
+  }
+  return false;
+}
+
+ExecutablePath getExecutablePath(void) {
+  ExecutablePath result;
+
+  int argc = 0;
+  char **argv = getUnsafeArgvArgc(&argc);
+  if (argv && argc > 0) {
+    // OpenBSD does not have API to get a path to the running executable. Use
+    // argv[0]. We do a basic sniff test for a path-like string.
+    if (argv[0][0] == '/') {
+      // The first character was a slash, so we'll assume that argv[0] is an
+      // absolute path.
+      result = argv[0];
+      if (checkExecutablePath(result.c_str())) {
+        return result;
+      }
+    } else {
+      // There's a slash _after_ the first character _or_ there's no slash at
+      // all. Assume it's a relative path and prepend it with the early CWD.
+      if (const char *cwd = earlyCWD.load()) {
+        result = cwd;
+        result += '/';
+        result += argv[0];
+        if (checkExecutablePath(result.c_str())) {
+          return result;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+#else // Add your favorite OS's executable path getter here.
+ExecutablePath getExecutablePath(void) {
+  swift::fatalError(
+    0,
+    "Fatal error: Executable path not available on this platform.\n");
+}
+#endif
+}

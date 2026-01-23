@@ -1175,3 +1175,6 @@ Added: __swift_runtime_demangle_allocate
 // New SPI for dynamic exclusivity checking.
 Added: __swift_exclusivityAccessGetParent
 Added: __swift_exclusivityAccessSetNext
+
+// SE-NNNN: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSSgvpZMV
