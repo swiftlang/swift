@@ -5192,7 +5192,7 @@ ERROR(isolated_any_conversion_to_synchronous_func,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
-WARNING(implicit_weak_to_strong_capture,none,
+ERROR(implicit_weak_to_strong_capture,none,
         "%0 ownership of capture %base1 differs from implicitly-captured strong reference in outer scope",
         (ReferenceOwnership, const VarDecl *))
 NOTE(implicit_weak_to_strong_capture_loc,none,

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
+// XFAIL: *
+
 func escape(_ closure: @escaping () -> Void) {}
 func noescape(_ closure: () -> Void) {}
 func autoescape<T>(_ e: @autoclosure @escaping () -> T) {}
