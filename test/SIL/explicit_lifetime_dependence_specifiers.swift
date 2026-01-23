@@ -15,7 +15,7 @@ struct NE: ~Escapable {}
 // CHECK-LABEL: typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: NE, _ ne2: NE) -> NE
 typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: NE, _ ne2: NE) -> NE
 // CHECK-LABEL: typealias UnnamedLifetimeType = @_lifetime(copy 0) (NE, NE) -> NE
-typealias UnnamedLifetimeType = @_lifetime(copy 1) (NE, NE) -> NE
+typealias UnnamedLifetimeType = @_lifetime(copy 0) (NE, NE) -> NE
 // CHECK-LABEL: typealias ImmortalLifetimeType = @_lifetime(immortal) (NE) -> NE
 typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: NE) -> NE
 
