@@ -169,10 +169,15 @@ extension Sequence {
 
 // MARK: Conformances
 
-//@available(SwiftStdlib 6.3, *)
-extension Span: BorrowingSequence, BorrowingIteratorProtocol {
+@available(SwiftStdlib 6.3, *)
+extension Span: BorrowingSequence, BorrowingIteratorProtocol where Element: ~Copyable {
   public typealias Element = Element
 
+  @_lifetime(borrow self)
+  public func makeBorrowingIterator() -> Self {
+    self
+  }
+  
   @_lifetime(&self)
   @_lifetime(self: copy self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
@@ -182,7 +187,15 @@ extension Span: BorrowingSequence, BorrowingIteratorProtocol {
   }
 }
 
-//@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.3, *)
+extension MutableSpan: BorrowingSequence where Element: ~Copyable {
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<Element> {
+    self.span
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
 extension RawSpan: BorrowingSequence {
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<UInt8> {
@@ -190,7 +203,16 @@ extension RawSpan: BorrowingSequence {
   }
 }
 
-//@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.3, *)
+extension MutableRawSpan: BorrowingSequence {
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<UInt8> {
+    let bytes = self.bytes
+    return unsafe _overrideLifetime(bytes._span, borrowing: self)
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
 extension Array: BorrowingSequence {
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<Element> {
@@ -198,10 +220,32 @@ extension Array: BorrowingSequence {
   }
 }
 
-//@available(SwiftStdlib 6.3, *)
-extension InlineArray: BorrowingSequence {
+@available(SwiftStdlib 6.3, *)
+extension InlineArray: BorrowingSequence where Element: ~Copyable {
+  public typealias BorrowingIterator = Span<Element>
+  
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<Element> {
     self.span
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension UnsafeBufferPointer: @unsafe BorrowingSequence where Element: ~Copyable {
+  public typealias BorrowingIterator = Span<Element>
+  
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<Element> {
+    unsafe self.span
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension UnsafeMutableBufferPointer: @unsafe BorrowingSequence where Element: ~Copyable {
+  public typealias BorrowingIterator = Span<Element>
+  
+  @lifetime(borrow self)
+  public func makeBorrowingIterator() -> Span<Element> {
+    unsafe self.span
   }
 }
