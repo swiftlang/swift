@@ -97,18 +97,24 @@ private func hoistDestroys(of value: Value, endAccesses: Stack<EndAccessInst>, _
 private func insertNewDestroys(of value: Value, in liverange: Liverange) -> InstructionSet {
   var aliveDestroys = InstructionSet(liverange.context)
 
+  // The liverange, excluding regions which end up in `destroy_value [dead_end]`.
+  var nonDeadEndRange = BasicBlockRange(begin: value.parentBlock, liverange.context)
+  defer { nonDeadEndRange.deinitialize() }
+  nonDeadEndRange.insert(contentsOf: value.uses.users(ofType: DestroyValueInst.self)
+                                          .filter{ !$0.isDeadEnd }.map { $0.parentBlock })
+
   if liverange.nonDestroyingUsers.isEmpty {
     // Handle the corner case where the value has no use at all (beside the destroy).
-    immediatelyDestroy(value: value, ifIn: liverange, &aliveDestroys)
+    immediatelyDestroy(value: value, ifIn: liverange, &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
     return aliveDestroys
   }
   // Insert new destroys at the end of the pruned liverange.
   for user in liverange.nonDestroyingUsers {
-    insertDestroy(of: value, after: user, ifIn: liverange, &aliveDestroys)
+    insertDestroy(of: value, after: user, ifIn: liverange, &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
   }
   // Also, we need new destroys at exit edges from the pruned liverange.
   for exitInst in liverange.prunedLiverange.exits {
-    insertDestroy(of: value, before: exitInst, ifIn: liverange, &aliveDestroys)
+    insertDestroy(of: value, before: exitInst, ifIn: liverange, &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
   }
   return aliveDestroys
 }
@@ -124,7 +130,8 @@ private func removeOldDestroys(of value: Value, ignoring: InstructionSet, _ cont
 private func insertDestroy(of value: Value,
                            before insertionPoint: Instruction,
                            ifIn liverange: Liverange,
-                           _ aliveDestroys: inout InstructionSet
+                           _ aliveDestroys: inout InstructionSet,
+                           nonDeadEndRange: BasicBlockRange
 ) {
   guard liverange.isOnlyInExtendedLiverange(insertionPoint) else {
     return
@@ -134,29 +141,39 @@ private func insertDestroy(of value: Value,
     return
   }
   let builder = Builder(before: insertionPoint, liverange.context)
-  let newDestroy = builder.createDestroyValue(operand: value)
+  let newDestroy = builder.createDestroyValue(
+                     operand: value,
+                     isDeadEnd: !nonDeadEndRange.inclusiveRangeContains(insertionPoint.parentBlock))
   aliveDestroys.insert(newDestroy)
 }
 
 private func insertDestroy(of value: Value,
                            after insertionPoint: Instruction,
                            ifIn liverange: Liverange,
-                           _ aliveDestroys: inout InstructionSet
+                           _ aliveDestroys: inout InstructionSet,
+                           nonDeadEndRange: BasicBlockRange
 ) {
   if let next = insertionPoint.next {
-    insertDestroy(of: value, before: next, ifIn: liverange, &aliveDestroys)
+    insertDestroy(of: value, before: next, ifIn: liverange, &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
   } else {
     for succ in insertionPoint.parentBlock.successors {
-      insertDestroy(of: value, before: succ.instructions.first!, ifIn: liverange, &aliveDestroys)
+      insertDestroy(of: value, before: succ.instructions.first!, ifIn: liverange,
+                    &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
     }
   }
 }
 
-private func immediatelyDestroy(value: Value, ifIn liverange: Liverange, _ aliveDestroys: inout InstructionSet) {
+private func immediatelyDestroy(value: Value,
+                                ifIn liverange: Liverange,
+                                _ aliveDestroys: inout InstructionSet,
+                                nonDeadEndRange: BasicBlockRange
+) {
   if let arg = value as? Argument {
-    insertDestroy(of: value, before: arg.parentBlock.instructions.first!, ifIn: liverange, &aliveDestroys)
+    insertDestroy(of: value, before: arg.parentBlock.instructions.first!, ifIn: liverange,
+                  &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
   } else {
-    insertDestroy(of: value, after: value.definingInstruction!, ifIn: liverange, &aliveDestroys)
+    insertDestroy(of: value, after: value.definingInstruction!, ifIn: liverange,
+                  &aliveDestroys, nonDeadEndRange: nonDeadEndRange)
   }
 }
 
@@ -246,7 +263,9 @@ private extension Stack where Element == Instruction {
     var users = Stack<Instruction>(context)
 
     var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: false, visitInnerUses: true, context) {
-      if $0.instruction is DestroyValueInst, $0.value == value {
+      if $0.instruction is DestroyValueInst,
+         $0.value == value
+      {
         return .continueWalk
       }
       users.append($0.instruction)

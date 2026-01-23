@@ -81,16 +81,29 @@ bool BridgedDeadEndBlocksAnalysis::isDeadEnd(BridgedBasicBlock block) const {
 //                      BridgedDomTree, BridgedPostDomTree
 //===----------------------------------------------------------------------===//
 
+inline llvm::DomTreeNodeBase<swift::SILBasicBlock> *getDomNode(BridgedBasicBlock block, swift::DominanceInfo *di) {
+  auto *node = di->getNode(block.unbridged());
+  ASSERT(node && "missing dominance node for block");
+  return node;
+}
+
 bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
   return di->dominates(dominating.unbridged(), dominated.unbridged());
 }
 
 SwiftInt BridgedDomTree::getNumberOfChildren(BridgedBasicBlock bb) const {
-  return di->getNode(bb.unbridged())->getNumChildren();
+  return getDomNode(bb, di)->getNumChildren();
 }
 
 BridgedBasicBlock BridgedDomTree::getChildAt(BridgedBasicBlock bb, SwiftInt index) const {
-  return {di->getNode(bb.unbridged())->begin()[index]->getBlock()};
+  return {getDomNode(bb, di)->begin()[index]->getBlock()};
+}
+
+OptionalBridgedBasicBlock BridgedDomTree::getImmediateDominator(BridgedBasicBlock block) const {
+  if (auto *parentNode = getDomNode(block, di)->getIDom()) {
+    return {parentNode->getBlock()};
+  }
+  return {nullptr};
 }
 
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
@@ -161,6 +174,10 @@ void BridgedPassContext::notifyDependencyOnBodyOf(BridgedFunction otherFunction)
   // Currently `otherFunction` is ignored. We could design a more accurate dependency system
   // in the pass manager, which considers the actual function. But it's probaboly not worth the effort.
   invocation->getPassManager()->setDependingOnCalleeBodies();
+}
+
+void BridgedPassContext::updateAnalysis() const {
+  invocation->updateAnalysis();
 }
 
 bool BridgedPassContext::hadError() const {
@@ -314,6 +331,22 @@ bool BridgedPassContext::getNeedFixStackNesting() const {
   return invocation->getNeedFixStackNesting();
 }
 
+bool BridgedPassContext::getNeedBreakInfiniteLoops() const {
+  return invocation->getFunction()->needBreakInfiniteLoops();
+}
+
+void BridgedPassContext::setNeedBreakInfiniteLoops(bool value) const {
+  invocation->getFunction()->setNeedBreakInfiniteLoops(value);
+}
+
+bool BridgedPassContext::getNeedCompleteLifetimes() const {
+  return invocation->getFunction()->needCompleteLifetimes();
+}
+
+void BridgedPassContext::setNeedCompleteLifetimes(bool value) const {
+  invocation->getFunction()->setNeedCompleteLifetimes(value);
+}
+
 bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction inst) const {
   swift::SILPassManager *pm = invocation->getPassManager();
   return pm->continueWithNextSubpassRun(
@@ -349,6 +382,13 @@ bool BridgedPassContext::enableMergeableTraps() const {
 bool BridgedPassContext::hasFeature(BridgedFeature feature) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getASTContext().LangOpts.hasFeature(swift::Feature(feature));
+}
+
+bool BridgedPassContext::shouldRemoveCondFail(BridgedStringRef message, BridgedStringRef function) const {
+  if (invocation->getPassManager()->getModule()->getOptions().RemoveRuntimeAsserts)
+    return true;
+
+  return swift::shouldRemoveCondFail(message.unbridged(), function.unbridged());
 }
 
 bool BridgedPassContext::enableMoveInoutStackProtection() const {

@@ -354,17 +354,19 @@ bb0(%0 : @guaranteed $Klass):
 
 // CHECK-LABEL: sil [ossa] @test_extend_lifetime : {{.*}} {
 // CHECK:       bb0([[K:%[^,]+]] :
-// CHECK:         br [[LOOP:bb[0-9]+]]
-// CHECK:       [[LOOP]]:
-// CHECK:         extend_lifetime [[K]]
-// CHECK:         br [[LOOP]]
+// CHECK:         br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    extend_lifetime [[K]]
 // CHECK-LABEL: } // end sil function 'test_extend_lifetime'
 sil [ossa] @test_extend_lifetime : $@convention(thin) (@owned Klass) -> () {
 entry(%k : @owned $Klass):
   br bb1
 bb1:
   extend_lifetime %k : $Klass
-  br bb1
+  br bb2
+bb2:
+  destroy_value [dead_end] %k
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @test_destroy_value : {{.*}} {

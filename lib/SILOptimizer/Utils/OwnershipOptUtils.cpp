@@ -21,6 +21,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -1960,9 +1961,18 @@ void BridgedUtilities::registerPhiUpdater(UpdateFunctionFn updateAllGuaranteedPh
   replacePhisWithIncomingValuesFunction = replacePhisWithIncomingValuesFn;
 }
 
+static BridgedOptimizerUtilities::UpdateLifetimeFunctionFn completeAllLifetimesFunction;
+static BridgedOptimizerUtilities::UpdateLifetimeValuesFn completeLifetimeFunction;
+
+void BridgedOptimizerUtilities::registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
+                                                           UpdateLifetimeValuesFn completeLifetimeFn) {
+  completeAllLifetimesFunction = completeAllLifetimesFn;
+  completeLifetimeFunction = completeLifetimeFn;
+}
+
 void swift::updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f) {
   if (updateAllGuaranteedPhisFunction)
-    updateAllGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, {f});
+    updateAllGuaranteedPhisFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f});
 }
 
 void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
@@ -1973,7 +1983,7 @@ void swift::updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> 
   for (SILPhiArgument *phi : phis) {
     bridgedPhis.push_back({phi});
   }
-  updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+  updateGuaranteedPhisFunction({pm->getSwiftPassInvocation()->getCurrent()}, ArrayRef(bridgedPhis));
 }
 
 void swift::replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis) {
@@ -1984,7 +1994,7 @@ void swift::replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArg
   for (SILPhiArgument *phi : phis) {
     bridgedPhis.push_back({phi});
   }
-  replacePhisWithIncomingValuesFunction({pm->getSwiftPassInvocation()}, ArrayRef(bridgedPhis));
+  replacePhisWithIncomingValuesFunction({pm->getSwiftPassInvocation()->getCurrent()}, ArrayRef(bridgedPhis));
 }
 
 bool swift::hasOwnershipOperandsOrResults(SILInstruction *inst) {
@@ -2000,4 +2010,28 @@ bool swift::hasOwnershipOperandsOrResults(SILInstruction *inst) {
       return true;
   }
   return false;
+}
+
+void swift::completeAllLifetimes(SILPassManager *pm, SILFunction *f, bool includeTrivialVars) {
+  if (completeAllLifetimesFunction) {
+    completeAllLifetimesFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f}, includeTrivialVars);
+  } else {
+    // If SwiftCompilerSources are not enabled or in SourceKit unit tests
+    f->setNeedCompleteLifetimes(false);
+  }
+}
+
+void swift::completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, ArrayRef<SILInstruction *> deadEnds) {
+  if (completeLifetimeFunction) {
+    llvm::SmallVector<BridgedValue, 32> bridgedValues;
+    for (SILValue v : values) {
+      bridgedValues.push_back({v});
+    }
+    llvm::SmallVector<BridgedInstruction, 4> bridgedEnds;
+    for (SILInstruction *i : deadEnds) {
+      bridgedEnds.push_back(i->asSILNode());
+    }
+    completeLifetimeFunction({pm->getSwiftPassInvocation()->getCurrent()},
+                             ArrayRef(bridgedValues), ArrayRef(bridgedEnds));
+  }
 }

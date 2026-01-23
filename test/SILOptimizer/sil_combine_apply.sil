@@ -1042,7 +1042,7 @@ bb3:
 sil [_semantics "array.uninitialized"] [ossa] @adoptStorage : $@convention(thin) (@owned _ContiguousArrayStorage<Any>, Int) -> (@owned Array<Any>, UnsafeMutablePointer<Any>)
 
 // CHECK-LABEL: sil [ossa] @dont_remove_dead_adopt_storage :
-// CHECK-NOT:     destroy_value
+// CHECK-NOT:     destroy_value %
 // CHECK-LABEL: } // end sil function 'dont_remove_dead_adopt_storage'
 sil [ossa] @dont_remove_dead_adopt_storage : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -1053,6 +1053,13 @@ bb0(%0 : $Int):
   // Array buffer is not initialized due to dead-end loop -> will lead to crash if buffer is destroyed here
   br bb1
 bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
   br bb1
+
+bb3:
+  destroy_value [dead_end] %4
+  unreachable
 }
 

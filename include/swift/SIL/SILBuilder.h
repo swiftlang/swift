@@ -2663,6 +2663,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   UnreachableInst *createUnreachable(SILLocation Loc) {
+    if (F->hasOwnership()) {
+      // Notify the current pass that lifetimes may have been cut off at the
+      // `unreachable` which must be completed again.
+      F->setNeedCompleteLifetimes();
+    }
     return insertTerminator(new (getModule())
                                 UnreachableInst(getSILDebugLocation(Loc)));
   }

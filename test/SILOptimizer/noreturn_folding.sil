@@ -66,6 +66,7 @@ bb1(%2 : $Never):
 
 bb2(%5 : @owned $Error):
   %6 = builtin "unexpectedError"(%5 : $Error) : $()
+  destroy_value [dead_end] %5
   unreachable
 }
 

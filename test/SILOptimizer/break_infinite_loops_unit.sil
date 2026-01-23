@@ -1,0 +1,169 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: sil [ossa] @simple_infinite_loop :
+// CHECK:       bb1:
+// CHECK-NEXT:    %1 = builtin "infinite_loop_true_condition"()
+// CHECK-NEXT:    cond_br %1, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'simple_infinite_loop'
+sil [ossa] @simple_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "break_infinite_loops"
+  br bb1
+
+bb1:
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @loop_with_phi :
+// CHECK:       bb1(%2 : $Builtin.Int32):
+// CHECK-NEXT:    %3 = builtin "infinite_loop_true_condition"()
+// CHECK-NEXT:    cond_br %3, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb1(%2)
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'loop_with_phi'
+sil [ossa] @loop_with_phi : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  specify_test "break_infinite_loops"
+  br bb1(%0)
+
+bb1(%1 : $Builtin.Int32):
+  br bb1(%1)
+}
+
+// CHECK-LABEL: sil [ossa] @more_complex_cfg :
+// CHECK:       bb2:
+// CHECK-NEXT:    %3 = builtin "infinite_loop_true_condition"()
+// CHECK-NEXT:    cond_br %3, bb3, bb4
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb2
+// CHECK:       bb4:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb5:
+// CHECK-NEXT:    br bb2
+// CHECK:       } // end sil function 'more_complex_cfg'
+sil [ossa] @more_complex_cfg : $@convention(thin) () -> () {
+bb0:
+  specify_test "break_infinite_loops"
+  cond_br undef, bb1, bb3
+
+bb1:
+  %r = tuple ()
+  return %r
+
+bb2:
+  br bb2
+
+bb3:
+  br bb2
+}
+
+// CHECK-LABEL: sil [ossa] @two_infinite_loops :
+// CHECK:       bb3:
+// CHECK-NEXT:    %4 = builtin "infinite_loop_true_condition"()
+// CHECK-NEXT:    cond_br %4, bb4, bb5
+// CHECK:       bb4:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb5:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb7:
+// CHECK-NEXT:    %9 = builtin "infinite_loop_true_condition"()
+// CHECK-NEXT:    cond_br %9, bb8, bb9
+// CHECK:       bb8:
+// CHECK-NEXT:    br bb7
+// CHECK:       bb9:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'two_infinite_loops'
+sil [ossa] @two_infinite_loops : $@convention(thin) () -> () {
+bb0:
+  specify_test "break_infinite_loops"
+  cond_br undef, bb1, bb6
+
+bb1:
+  %r = tuple ()
+  return %r
+
+bb2:
+  br bb3
+
+bb3:
+  br bb3
+
+bb4:
+  br bb5
+
+bb5:
+  br bb5
+
+bb6:
+  cond_br undef, bb2, bb4
+}
+
+// CHECK-LABEL: sil [ossa] @nested_infinite_loop :
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb5
+// CHECK:       bb2:
+// CHECK-NEXT:    %2 = builtin "infinite_loop_true_condition"()
+// CHECK-NEXT:    cond_br %2, bb3, bb4
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb1
+// CHECK:       bb4:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb5:
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'nested_infinite_loop'
+sil [ossa] @nested_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "break_infinite_loops"
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @no_infinite_loop :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'no_infinite_loop'
+sil [ossa] @no_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "break_infinite_loops"
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  unreachable
+}
+
+// CHECK-LABEL: sil @non_ossa :
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'non_ossa'
+sil @non_ossa : $@convention(thin) () -> () {
+bb0:
+  specify_test "break_infinite_loops"
+  br bb1
+
+bb1:
+  br bb1
+}
+

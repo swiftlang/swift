@@ -97,6 +97,7 @@ bb1(%5 : @guaranteed $X):
 
 bb2(%10 : @guaranteed $P):
   fix_lifetime %10 : $P
+  end_borrow %1
   destroy_value %0: $X
   unreachable
 }

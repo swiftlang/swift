@@ -139,22 +139,6 @@ bb3:
   return %r : $()
 }
 
-sil [ossa] @test_unreachable_block : $@convention(thin) (@owned T) -> () {
-bb0(%0 : @owned $T):
-  %2 = alloc_stack $T
-  store %0 to [init] %2 : $*T
-  br bb2
-
-bb1:
-  br bb2
-
-bb2:
-  destroy_addr %2 : $*T
-  dealloc_stack %2 : $*T
-  %r = tuple ()
-  return %r : $()
-}
-
 sil [ossa] @test_mixed_cfg_merge : $@convention(thin) (@owned T, Int) -> () {
 bb0(%0 : @owned $T, %1 : $Int):
   %2 = alloc_stack $Mixed
@@ -380,6 +364,7 @@ bb3:
 
 // An inconsistent state is allowed at unreachable blocks.
 bb4(%23 : @owned $Error):
+  destroy_value [dead_end] %23
   unreachable
 
 bb5(%43 : @owned $Error):
