@@ -1865,15 +1865,8 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
       std::make_pair(AccessScope::getPublic(), false));
 
   bool isSetter = false;
-  if (match.Witness->isAccessibleFrom(requiredAccessLevel.getDeclContext(),
-                                      /*forConformance=*/true) &&
-      !match.Witness->isAccessibleFrom(requiredAccessLevel.getDeclContext(),
-                                       /*forConformance=*/false)) {
-    return RequirementCheck(CheckKind::AccessStrict, requiredAccessLevel,
-                            isSetter);
-  }
   if (checkWitnessAccess(DC, requirement, match.Witness, &isSetter))
-    return RequirementCheck(CheckKind::Access, requiredAccessLevel, isSetter);
+    return RequirementCheck(requiredAccessLevel, isSetter);
 
   if (mustBeUsableFromInline) {
     bool witnessIsUsableFromInline = match.Witness->getFormalAccessScope(
@@ -4421,7 +4414,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     switch (check.getKind()) {
     case CheckKind::Success:
       break;
-    case CheckKind::AccessStrict:
+
     case CheckKind::Access: {
       // Swift 4.2 relaxed some rules for protocol witness matching.
       //
@@ -4450,16 +4443,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         auto protoAccessScope = proto->getFormalAccessScope(DC);
         bool protoForcesAccess =
           requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
-        auto diagKind = protoForcesAccess
-                          ? diag::witness_not_accessible_proto
-                          : diag::witness_not_accessible_type;
-        if (check.getKind() == CheckKind::AccessStrict) {
-          if (witness->getASTContext().LangOpts.hasFeature(
-                  Feature::StrictAccessControl))
-            diagKind = diag::witness_not_accessible_strict_check;
-          else
-            diagKind = diag::witness_not_accessible_strict_check_warn;
-        }
+        auto diagKind = protoForcesAccess ? diag::witness_not_accessible_proto
+                                          : diag::witness_not_accessible_type;
         bool isSetter = check.isForSetterAccess();
 
         auto &diags = DC->getASTContext().Diags;
