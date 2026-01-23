@@ -32,6 +32,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -6713,6 +6714,15 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    for (const auto &dependence : info.getLifetimeDependencies()) {
+      // Lifetime entries are attached to dependencies generated from explicit
+      // @_lifetime attributes. Print only these entries.
+      if (auto *entry = dependence.getEntry()) {
+        Printer.printAttrName("@_lifetime");
+        Printer << entry->getString() << " ";
+      }
+    }
+
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
@@ -6899,8 +6909,7 @@ public:
   }
 
   void visitAnyFunctionTypeParams(
-      ArrayRef<AnyFunctionType::Param> Params, bool printLabels,
-      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
+      ArrayRef<AnyFunctionType::Param> Params, bool printLabels) {
     Printer << "(";
 
     for (unsigned i = 0, e = Params.size(); i != e; ++i) {
@@ -6920,7 +6929,7 @@ public:
         Printer.printName(Param.getLabel(),
                           PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
-      } else if (Options.AlwaysTryPrintParameterLabels &&
+      } else if ((Options.AlwaysTryPrintParameterLabels || printLabels) &&
                  Param.hasInternalLabel() &&
                  !Param.getInternalLabel().hasDollarPrefix()) {
         // We didn't have an external parameter label but were requested to
@@ -6933,8 +6942,6 @@ public:
                           PrintNameContext::FunctionParameterLocal);
         Printer << ": ";
       }
-
-      Printer.printLifetimeDependenceAt(lifetimeDependencies, i);
 
       auto type = Param.getPlainType();
       if (Param.isVariadic()) {
@@ -6950,6 +6957,32 @@ public:
     Printer << ")";
   }
 
+  /// Determine whether function type T has any explicit @_lifetime attributes
+  /// that use parameter identifiers/names.
+  static bool hasLabelledLifetimes(AnyFunctionType const *T) {
+    if (!T->hasExtInfo())
+      return false;
+    
+    return llvm::any_of(
+        T->getExtInfo().getLifetimeDependencies(),
+        [](const LifetimeDependenceInfo &dependence) {
+          auto *entry = dependence.getEntry();
+          if (!entry)
+            return false;
+          
+          if (entry->getTargetDescriptor().has_value() &&
+              entry->getTargetDescriptor()->getDescriptorKind() ==
+                  LifetimeDescriptor::DescriptorKind::Named)
+            return true;
+          
+          return llvm::any_of(
+              entry->getSources(), [](const LifetimeDescriptor &source) {
+                return source.getDescriptorKind() ==
+                       LifetimeDescriptor::DescriptorKind::Named;
+              });
+        });
+  }
+
   void visitFunctionType(FunctionType *T,
                          NonRecursivePrintOptions nrOptions) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
@@ -6960,8 +6993,12 @@ public:
     printFunctionExtInfo(T, nrOptions);
 
     // If we're stripping argument labels from types, do it when printing.
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ false,
-                               T->getLifetimeDependencies());
+    //
+    // If the type has explicit @_lifetime attributes that use parameter
+    // names/labels, the labels must be printed.
+
+    visitAnyFunctionTypeParams(T->getParams(),
+                               /*printLabels*/ hasLabelledLifetimes(T));
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
@@ -6985,8 +7022,6 @@ public:
     if (T->hasExtInfo() && T->hasSendingResult()) {
       Printer.printKeyword("sending ", Options);
     }
-
-    Printer.printLifetimeDependence(T->getLifetimeDependenceForResult());
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
@@ -7021,8 +7056,7 @@ public:
                           PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true,
-                               T->getLifetimeDependencies());
+    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true);
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
@@ -7798,7 +7832,7 @@ void AnyFunctionType::printParams(ArrayRef<AnyFunctionType::Param> Params,
   // TODO: Handle lifetime dependence printing here
   TypePrinter(Printer, PO)
       .visitAnyFunctionTypeParams(Params,
-                                  /*printLabels*/ true, {});
+                                  /*printLabels*/ true);
 }
 
 std::string
