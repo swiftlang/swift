@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o -enforce-exclusivity=checked
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o -enforce-exclusivity=checked -enable-experimental-feature EmbeddedDynamicExclusivity
 
 // Single-threaded exclusivity checking implementation
 // RUN: %target-clang %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip -lswiftExclusivitySingleThreaded
@@ -9,6 +9,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_EmbeddedDynamicExclusivity
 
 struct NC: ~Copyable {
   var i: Int = 1
