@@ -159,15 +159,20 @@ class Target {
     while next != 0 {
       let t = try reader.fetch(from: next, as: thread.self)
 
+      print("fetched thread id: \(t.tid)")
+
       next = t.next
 
       guard let ucontext
               = try? reader.fetch(from: t.uctx, as: ucontext_t.self) else {
+                print("unable to fetch context for \(t.uctx) address")
 	// This can happen if a thread is in an uninterruptible wait
         continue
       }
 
       let context = HostContext.fromHostMContext(ucontext.uc_mcontext)
+
+      print("fetched thread context, pc: \(String(context.programCounter, radix: 16)), fp: \(String(context.framePointer, radix: 16))")
       let backtrace = try Backtrace.capture(from: context,
                                             using: reader,
                                             images: images,

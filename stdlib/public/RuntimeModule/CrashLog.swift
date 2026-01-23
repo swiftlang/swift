@@ -437,6 +437,7 @@ extension CrashLog {
 
     public mutating func symbolicate(
         allThreads: Bool = false,
+        platform: Backtrace.SymbolicationPlatform,
         options: Backtrace.SymbolicationOptions = .default) {
 
         let images = imageMap()
@@ -446,7 +447,9 @@ extension CrashLog {
             let backtrace: Backtrace = thread.backtrace(architecture: architecture, images: images)
 
             if let symbolicatedBacktrace = backtrace.symbolicated(
-                with: images, options: options) {
+                with: images,
+                platform: platform,
+                options: options) {
 
                 thread.updateWithBacktrace(symbolicatedBacktrace: symbolicatedBacktrace)
             }

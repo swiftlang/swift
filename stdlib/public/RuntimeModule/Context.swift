@@ -315,6 +315,7 @@ extension arm_gprs {
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    print("getting X86_64Context...")
     return X86_64Context(with: mcontext as! mcontext_t)
   }
   #endif
@@ -500,6 +501,7 @@ extension arm_gprs {
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    print("getting I386Context...")
     return I386Context(with: mcontext as! mcontext_t)
   }
   #endif
@@ -711,24 +713,30 @@ extension arm_gprs {
   }
   #elseif os(Linux) && arch(arm64)
   init(with mctx: mcontext_t) {
+    print("fault_address:\(String(mctx.fault_address, radix: 16))", terminator: " ")
+
     withUnsafeMutablePointer(to: &gprs._x) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 32){ to in
         withUnsafePointer(to: mctx.regs) {
           $0.withMemoryRebound(to: UInt64.self, capacity: 31) { from in
             for n in 0..<31 {
               to[n] = from[n]
+              print("x:[\(n)]:\(String(from[n], radix: 16))", terminator: " ")
             }
           }
         }
 
-	to[31] = UInt64(mctx.sp)
+	      to[31] = UInt64(mctx.sp)
+        print("sp:\(String(mctx.sp, radix: 16))", terminator: " ")
       }
     }
     gprs.pc = UInt64(mctx.pc)
+              print("pc:\(String(mctx.pc, radix: 16))", terminator: " ")
     gprs.valid = 0x1ffffffff
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    print("getting ARM64Context...")
     return ARM64Context(with: mcontext as! mcontext_t)
   }
   #endif
@@ -893,6 +901,7 @@ extension arm_gprs {
   }
 
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    print("getting ARMContext...")
     return ARMContext(with: mcontext as! mcontext_t)
   }
   #endif
