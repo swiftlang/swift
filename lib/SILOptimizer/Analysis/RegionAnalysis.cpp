@@ -773,6 +773,31 @@ TrackableValue RegionAnalysisValueMap::getActorIntroducingRepresentative(
   return {iter.first->first, iter.first->second};
 }
 
+TrackableValue
+RegionAnalysisValueMap::getRepresentativeValueForValueFromOverwrittenMemory(
+    Operand *op) const {
+  auto *self = const_cast<RegionAnalysisValueMap *>(this);
+  auto iter = self->equivalenceClassValuesToState.try_emplace(
+      op, TrackableValueState(equivalenceClassValuesToState.size()));
+
+  // If we did not insert, just return the already stored value.
+  if (!iter.second) {
+    return {iter.first->first, iter.first->second};
+  }
+
+  // Otherwise, wire up the value.
+  auto id = iter.first->second.getID();
+  self->stateIndexToEquivalenceClass[id] = op;
+
+  // Then we need to lookup the state of the original memory so that we can
+  // transfer it over... unfortunately causing us to do a potential lookup and
+  // potential iterator invalidation. So we need to do a 3rd lookup...
+  auto originalMemory = getTrackableValue(op->get());
+  auto iter2 = self->equivalenceClassValuesToState.find(op);
+  iter2->getSecond() = originalMemory.value.getValueState().getWithNewID(id);
+  return {iter2->getFirst(), iter2->getSecond()};
+}
+
 bool RegionAnalysisValueMap::valueHasID(SILValue value, bool dumpIfHasNoID) {
   assert(getTrackableValue(value).value.isNonSendable() &&
          "Can only accept non-Sendable values");
@@ -1636,6 +1661,7 @@ struct PartitionOpBuilder {
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
 
   Element getActorIntroducingRepresentative(SILIsolationInfo actorIsolation);
+  Element getEltForOverwrittenMemoryLocation(Operand *overwrittingUse);
 
   void addAssignFresh(TrackableValue value) {
     if (value.isSendable())
@@ -1645,30 +1671,41 @@ struct PartitionOpBuilder {
         PartitionOp::AssignFresh(id, currentInst));
   }
 
-  void addAssignFresh(ArrayRef<SILValue> values) {
+  void addAssignFresh(ArrayRef<TrackableValue> values) {
     if (values.empty())
       return;
 
-    auto first = lookupValueID(values.front());
+    auto first = values.front();
     currentInstPartitionOps->emplace_back(
-        PartitionOp::AssignFresh(first, currentInst));
+        PartitionOp::AssignFresh(first.getID(), currentInst));
 
-    auto transformedCollection =
-        makeTransformRange(values.drop_front(), [&](SILValue value) {
-          return lookupValueID(value);
-        });
-    for (auto id : transformedCollection) {
-      currentInstPartitionOps->emplace_back(
-          PartitionOp::AssignFreshAssign(id, first, currentInst));
+    for (auto value : values.drop_front()) {
+      currentInstPartitionOps->emplace_back(PartitionOp::AssignFreshAssign(
+          value.getID(), first.getID(), currentInst));
     }
   }
 
-  void addAssign(SILValue destValue, Operand *srcOperand) {
+  /// Assign to \p srcOperand to \p destValue as a direct result. This means
+  /// that the destValue can either be an address or object but in either case
+  /// must be a new SSA value. It is incorrect to use this API to assign into an
+  /// SSA value that is a separate memory address produced by a different
+  /// instruction.
+  ///
+  /// Ok:
+  ///
+  /// struct_extract // object.
+  /// pack_element_get // produces a new address that must be tracked
+  /// separately.
+  ///
+  /// Bad:
+  ///
+  /// alloc_stack
+  void addAssignDirectResult(TrackableValue destValue, Operand *srcOperand) {
     assert(valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
     Element srcID = lookupValueID(srcOperand->get());
-    if (lookupValueID(destValue) == srcID) {
+    if (destValue.getID() == srcID) {
       REGIONBASEDISOLATION_LOG(llvm::dbgs()
                                << "    Skipping assign since tgt and src have "
                                   "the same representative.\n");
@@ -1677,9 +1714,45 @@ struct PartitionOpBuilder {
       return;
     }
 
-    currentInstPartitionOps->emplace_back(
-        PartitionOp::Assign(lookupValueID(destValue),
-                            lookupValueID(srcOperand->get()), srcOperand));
+    currentInstPartitionOps->emplace_back(PartitionOp::AssignDirect(
+        destValue.getID(), lookupValueID(srcOperand->get()), srcOperand));
+  }
+
+  /// Assign \p srcOperand to the memory location \p destOperand points to as an
+  /// indirect result.
+  ///
+  /// This is used when one is assigning to a memory location that was created
+  /// by a different instruction. We will regardless of init/assign always
+  /// create a new value for the old value that was potentially in the memory
+  /// location originally. If there wasn't a value there then we know that we
+  /// are just creating a new region for the value. We could in the future more
+  /// exactly track memory value initialization and destruction in the
+  /// dataflow. But for now we do not, so there isn't any harm.
+  ///
+  /// Example:
+  ///
+  ///   %0 = alloc_stack
+  ///   store %newValue to [init] %0
+  void addAssignIndirectResult(Operand *destOperand, Operand *srcOperand) {
+    assert(valueHasID(destOperand->get(), /*dumpIfHasNoID=*/true) &&
+           "dest value of assignment should have already been encountered");
+    assert(valueHasID(srcOperand->get(), /*dumpIfHasNoID=*/true) &&
+           "source value of assignment should already have been encountered");
+
+    Element destID = lookupValueID(destOperand->get());
+    Element srcID = lookupValueID(srcOperand->get());
+    if (destID == srcID) {
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Skipping assign since tgt and src have "
+                                  "the same representative.\n");
+      REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                               << "    Rep ID: %%" << srcID.num << ".\n");
+      return;
+    }
+
+    currentInstPartitionOps->emplace_back(PartitionOp::AssignIndirect(
+        destID, srcID, getEltForOverwrittenMemoryLocation(destOperand),
+        srcOperand));
   }
 
   void addSend(TrackableValue value, Operand *op) {
@@ -1723,16 +1796,14 @@ struct PartitionOpBuilder {
 
   /// Mark \p value artifically as being part of an actor-isolated region by
   /// introducing a new fake actor introducing representative and merging them.
-  void addActorIntroducingInst(SILValue sourceValue, Operand *sourceOperand,
+  void addActorIntroducingInst(TrackableValue sourceValue,
+                               Operand *sourceOperand,
                                SILIsolationInfo actorIsolation) {
-    assert(valueHasID(sourceValue, /*dumpIfHasNoID=*/true) &&
-           "merged values should already have been encountered");
-
     auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
     currentInstPartitionOps->emplace_back(
-        PartitionOp::Merge(lookupValueID(sourceValue), elt, sourceOperand));
+        PartitionOp::Merge(sourceValue.getID(), elt, sourceOperand));
   }
 
   void addRequire(TrackableValueLookupResult value);
@@ -1927,6 +1998,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 namespace swift {
 namespace regionanalysisimpl {
 
+static void
+getPartitionOpsForInstruction(PartitionOpTranslator *translator,
+                              SILInstruction *inst,
+                              std::vector<PartitionOp> &foundPartitionOps);
+
 /// PartitionOpTranslator is responsible for performing the translation from
 /// SILInstructions to PartitionOps. Not all SILInstructions have an effect on
 /// the region partition, and some have multiple effects - such as an
@@ -1945,7 +2021,9 @@ namespace regionanalysisimpl {
 ///       that reduce lists of PartitionOps to smaller, equivalent lists
 class PartitionOpTranslator {
   friend PartitionOpBuilder;
-
+  friend void(getPartitionOpsForInstruction)(PartitionOpTranslator *,
+                                             SILInstruction *,
+                                             std::vector<PartitionOp> &);
   SILFunction *function;
 
   /// The initial partition of the entry block.
@@ -2179,14 +2257,14 @@ public:
   /// element isolation of disconnected. NOTE: The results will still be in the
   /// region of the non-Sendable arguments so at the region level they will have
   /// the same value.
-  template <typename TargetRange, typename SourceRange>
+  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
   void
-  translateSILMultiAssign(const TargetRange &directResultValues,
-                          const SourceRange &sourceValues,
+  translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
+                          const SourceValueRangeTy &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
-    SmallVector<std::pair<Operand *, TrackableValue>, 8> assignOperands;
-    SmallVector<SILValue, 8> assignResults;
+    SmallVector<std::pair<Operand *, TrackableValue>, 8> sourceOperandTVPairs;
+    SmallVector<TrackableValue, 8> directResultTVs;
 
     // A helper we use to emit an unknown patten error if our merge is
     // invalid. This ensures we guarantee that if we find an actor merge error,
@@ -2206,8 +2284,6 @@ public:
 
       // Perform our lookup result.
       if (auto lookupResult = tryToTrackValue(src)) {
-        auto value = lookupResult->value;
-
         // If our value is non-Sendable require it and if we have a base and
         // that base is non-Sendable, require that as well.
         //
@@ -2221,12 +2297,14 @@ public:
           builder.addRequire(*lookupResult);
         }
 
+        auto value = lookupResult->value;
+
         // If our value was actually Sendable, skip it, we do not want to merge
         // anything.
         if (value.isSendable())
           continue;
 
-        assignOperands.push_back({srcOperand, value});
+        sourceOperandTVPairs.push_back({srcOperand, value});
         auto originalMergedInfo = mergedInfo;
         (void)originalMergedInfo;
         if (mergedInfo)
@@ -2256,8 +2334,9 @@ public:
     }
 
     // Merge all srcs.
-    for (unsigned i = 1; i < assignOperands.size(); i++) {
-      builder.addMerge(assignOperands[i - 1].second, assignOperands[i].first);
+    for (unsigned i = 1; i < sourceOperandTVPairs.size(); i++) {
+      builder.addMerge(sourceOperandTVPairs[i - 1].second,
+                       sourceOperandTVPairs[i].first);
     }
 
     for (SILValue result : directResultValues) {
@@ -2271,21 +2350,20 @@ public:
           if (!nonSendableValue->second) {
             builder.addUnknownPatternError(result);
           }
-          assignResults.push_back(
-              nonSendableValue->first.getRepresentative().getValue());
+          directResultTVs.push_back(nonSendableValue->first);
         }
       } else {
         if (auto lookupResult = tryToTrackValue(result)) {
           if (lookupResult->value.isSendable())
             continue;
           auto value = lookupResult->value;
-          assignResults.push_back(value.getRepresentative().getValue());
+          directResultTVs.push_back(value);
         }
       }
     }
 
     // If we do not have any non sendable results, return early.
-    if (assignResults.empty()) {
+    if (directResultTVs.empty()) {
       // If we did not have any non-Sendable results and we did have
       // non-Sendable operands and we are supposed to mark value as actor
       // derived, introduce a fake element so we just propagate the actor
@@ -2295,10 +2373,10 @@ public:
       // isolationInfo since we want to do this regardless of whether or not we
       // passed in a specific isolation info unlike earlier when processing
       // actual results.
-      if (assignOperands.size() && resultIsolationInfoOverride) {
-        builder.addActorIntroducingInst(
-            assignOperands.back().second.getRepresentative().getValue(),
-            assignOperands.back().first, resultIsolationInfoOverride);
+      if (sourceOperandTVPairs.size() && resultIsolationInfoOverride) {
+        builder.addActorIntroducingInst(sourceOperandTVPairs.back().second,
+                                        sourceOperandTVPairs.back().first,
+                                        resultIsolationInfoOverride);
       }
 
       return;
@@ -2306,16 +2384,16 @@ public:
 
     // If we do not have any non-Sendable srcs, then all of our results get one
     // large fresh region.
-    if (assignOperands.empty()) {
-      builder.addAssignFresh(assignResults);
+    if (sourceOperandTVPairs.empty()) {
+      builder.addAssignFresh(directResultTVs);
       return;
     }
 
     // Otherwise, we need to assign all of the results to be in the same region
     // as the operands. Without losing generality, we just use the first
     // non-Sendable one.
-    for (auto result : assignResults) {
-      builder.addAssign(result, assignOperands.front().first);
+    for (auto result : directResultTVs) {
+      builder.addAssignDirectResult(result, sourceOperandTVPairs.front().first);
     }
   }
 
@@ -2887,7 +2965,9 @@ public:
 
       if (resultIsolationInfoOverride && !srcCollection.empty()) {
         using std::begin;
-        builder.addActorIntroducingInst(dest, *begin(srcCollection), resultIsolationInfoOverride);
+        builder.addActorIntroducingInst(destResult->value,
+                                        *begin(srcCollection),
+                                        resultIsolationInfoOverride);
       }
     }
 
@@ -3213,8 +3293,22 @@ public:
 } // namespace regionanalysisimpl
 } // namespace swift
 
+void regionanalysisimpl::getPartitionOpsForInstruction(
+    PartitionOpTranslator *translator, SILInstruction *inst,
+    std::vector<PartitionOp> &foundPartitionOps) {
+  translator->builder.initialize(foundPartitionOps);
+  translator->translateSILInstruction(inst);
+}
+
 Element PartitionOpBuilder::lookupValueID(SILValue value) {
   return translator->lookupValueID(value);
+}
+
+Element PartitionOpBuilder::getEltForOverwrittenMemoryLocation(
+    Operand *overwrittingUse) {
+  return translator->getValueMap()
+      .getRepresentativeValueForValueFromOverwrittenMemory(overwrittingUse)
+      .getID();
 }
 
 Element PartitionOpBuilder::getActorIntroducingRepresentative(
@@ -3431,7 +3525,6 @@ CONSTANT_TRANSLATION(TupleInst, Assign)
 // underlying region.
 CONSTANT_TRANSLATION(BeginAccessInst, LookThrough)
 CONSTANT_TRANSLATION(BorrowedFromInst, LookThrough)
-CONSTANT_TRANSLATION(BeginDeallocRefInst, LookThrough)
 CONSTANT_TRANSLATION(BridgeObjectToRefInst, LookThrough)
 CONSTANT_TRANSLATION(CopyValueInst, LookThrough)
 CONSTANT_TRANSLATION(ExplicitCopyValueInst, LookThrough)
@@ -3797,7 +3890,7 @@ PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
 
   // NOTE: To prevent an additional reinitialization by the canned AssignFresh
   // code, we do our own assign fresh and return special.
-  builder.addAssignFresh(v->first.getRepresentative().getValue());
+  builder.addAssignFresh(v->first);
   return TranslationSemantics::Special;
 }
 
@@ -3953,6 +4046,14 @@ PartitionOpTranslator::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   assert(isStaticallyLookThroughInst(mdi) && "Out of sync");
   translateSILLookThrough(mdi->getResults(), mdi->getValue());
   translateSILRequire(mdi->getBase());
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitBeginDeallocRefInst(BeginDeallocRefInst *bdr) {
+  assert(isStaticallyLookThroughInst(bdr) && "Out of sync");
+  translateSILLookThrough(SILValue(bdr), bdr->getReference());
+  translateSILRequire(bdr->getAllocation());
   return TranslationSemantics::Special;
 }
 
@@ -4377,4 +4478,30 @@ static FunctionTest
                               llvm::outs() << '\n';
                             });
 
+// Arguments:
+// - SILInstruction: the instruction that we are lowering.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest PartitionOpsTest(
+    "sil_regionanalysis_partitionoptranslation",
+    [](auto &function, auto &arguments, auto &test) {
+      llvm::BumpPtrAllocator allocator;
+      IsolationHistory::Factory historyFactory(allocator);
+      RegionAnalysisValueMap valueMap(&function);
+      PartitionOpTranslator translator(
+          &function,
+          test.template getAnalysis<PostOrderAnalysis>()->get(&function),
+          valueMap, historyFactory);
+
+      auto *valueInst = arguments.takeInstruction();
+      assert(valueInst);
+      std::vector<PartitionOp> blockPartitionOps;
+      getPartitionOpsForInstruction(&translator, valueInst, blockPartitionOps);
+      // First dump the value map.
+      valueMap.print(llvm::outs());
+      // Then dump the instructions.
+      for (auto &partitionOp : blockPartitionOps) {
+        partitionOp.print(llvm::outs());
+      }
+    });
 } // namespace swift::test
