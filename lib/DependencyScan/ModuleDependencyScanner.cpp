@@ -326,9 +326,10 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
-  auto clangModuleDependencies =
-      clangScanningTool.computeDependenciesByNameWithContext(
-          moduleName.str(), alreadySeenModules, lookupModuleOutput);
+  auto clangModuleDependencies = clangScanningTool.getModuleDependencies(
+      moduleName.str(), clangScanningModuleCommandLineArgs,
+      clangScanningWorkingDirectoryPath, alreadySeenModules,
+      lookupModuleOutput);
   if (!clangModuleDependencies) {
     llvm::handleAllErrors(
         clangModuleDependencies.takeError(),
