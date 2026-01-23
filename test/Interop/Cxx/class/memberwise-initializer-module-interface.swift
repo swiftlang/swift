@@ -52,3 +52,15 @@
 // CHECK-NEXT:   init(varPublic: Int32)
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
+// CHECK-NEXT: struct ClassWithStaticAssert {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(x: Int32, y: Int32)
+// CHECK-NEXT:   var x: Int32
+// CHECK-NEXT:   var y: Int32
+// CHECK-NEXT: }
+// CHECK-NEXT: struct ClassWithStaticAssert2 {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(x: Int32, y: Int32)
+// CHECK-NEXT:   var x: Int32
+// CHECK-NEXT:   var y: Int32
+// CHECK-NEXT: }
