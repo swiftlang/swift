@@ -2708,7 +2708,10 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
                 Address(srcReferenceAddr, IGM.RefCountedPtrTy,
                         srcBuffer.getAlignment()));
             IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
-            IGF.emitNativeStrongRelease(destReference,
+            if (IGF.IGM.isEmbeddedWithExistentials()) {
+              IGF.emitReleaseBox(destReference);
+            } else
+              IGF.emitNativeStrongRelease(destReference,
                                         IGF.getDefaultAtomicity());
             IGF.Builder.CreateStore(
                 srcReference, Address(destReferenceAddr, IGM.RefCountedPtrTy,
@@ -2835,7 +2838,10 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
             {
               ConditionalDominanceScope domScope(IGF);
               // swift_release(tmpRef)
-              IGF.emitNativeStrongRelease(destReference,
+              if (IGF.IGM.isEmbeddedWithExistentials()) {
+                IGF.emitReleaseBox(destReference);
+              } else
+                IGF.emitNativeStrongRelease(destReference,
                                           IGF.getDefaultAtomicity());
               Builder.CreateBr(doneBB);
             }
