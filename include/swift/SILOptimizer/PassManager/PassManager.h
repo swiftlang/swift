@@ -454,11 +454,11 @@ private:
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F,
-                    int passIdx = -1);
+                    int passIdx = -1, bool skipNewline = false);
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, unsigned TransIdx,
-                    SILFunction *F = nullptr);
+                    SILFunction *F = nullptr, bool skipNewline = false);
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.
