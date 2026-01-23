@@ -8083,31 +8083,41 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
   }
 #define ACCESSOR_KEYWORD(KEYWORD)
 
-// Support the old `read` and `modify` spellings used before SE-0474 was
-// finalized.  Include a warning guiding people to the final spellings.
-// The complicated condition here is to try to deal gracefully with
-// existing code that has a function called `read` or `modify` that
-// takes a closure and invokes it from within a default getter.
-#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)              \
-  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
-    if (!P.Context.LangOpts.hasFeature(Feature::FEATURE)) {                    \
-      if (featureUnavailable)                                                  \
-        *featureUnavailable = true;                                            \
-      if (isFirstAccessor) {                                                   \
-        Status.setIsParseError();                                              \
-        return Status;                                                         \
-      }                                                                        \
-    }                                                                          \
-    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,                   \
-               #YIELDING_KEYWORD, #KEYWORD);                                   \
-    Kind = AccessorKind::ID;                                                   \
-  }
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
   }
 #include "swift/AST/AccessorKinds.def"
 
+  // Support the old `read` and `modify` spellings used before SE-0474 was
+  // finalized:
+  // * Support them in interface files, to avoid breaking .swiftinterface
+  //   while we transition to the new spellings.  (The compiler continued
+  //   to write `read`/`modify` to interfaces while we transitioned.)
+  // * Support them in Swift code ONLY IF the user has explicitly opted
+  //   into the CoroutineAccessors flag.
+  // TODO: After CoroutineAccessors gets turned on by default, we should
+  // ONLY accept these in interface files.
+  // TODO: Someday in the future (after 2026), we can stop accepting these
+  // entirely.  Accepting them in interface files is a temporary
+  // compatibility bridge to avoid immediate breakage during the switch
+  // to the new terminology.
+  else if (P.Tok.getRawText() == "read"
+	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
+	       "borrow", "read");
+    Kind = AccessorKind::YieldingBorrow;
+  }
+  else if (P.Tok.getRawText() == "modify"
+	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
+	       "mutate", "modify");
+    Kind = AccessorKind::YieldingMutate;
+  }
+  // Support `yielding borrow` and `yielding mutate`
   else if (P.Tok.getRawText() == "yielding") {
     // If there's a "yielding" token, see if this is
     // "yielding mutate" or "yielding borrow"
