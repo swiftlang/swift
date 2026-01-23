@@ -9581,6 +9581,7 @@ ModuleFile::maybeReadLifetimeDependence() {
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
+      nullptr,
       hasInheritLifetimeParamIndices
           ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
           : nullptr,
@@ -9590,5 +9591,6 @@ ModuleFile::maybeReadLifetimeDependence() {
       targetIndex, isImmortal,
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
-          : nullptr);
+          : nullptr,
+      nullptr);
 }

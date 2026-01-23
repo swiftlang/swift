@@ -358,6 +358,13 @@ extension FunctionConvention {
       self.hasSelfParam = hasSelfParameter
     }
 
+    public var entry: BridgedLifetimeEntry? {
+      if !bridged.hasEntry() {
+        return nil
+      }
+      return bridged.getEntry()
+    }
+
     public var startIndex: Int { 0 }
 
     public var endIndex: Int { paramCount }

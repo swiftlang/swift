@@ -2099,7 +2099,7 @@ namespace {
         ++resultIndex;
       }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, resultIndex,
+      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, nullptr, resultIndex,
                                               /*isImmortal*/ true);
       lifetimeDependencies.push_back(immortalLifetime);
       Impl.SwiftContext.evaluator.cacheOutput(
@@ -4209,6 +4209,7 @@ namespace {
         SmallBitVector dependenciesOfRet(returnIdx);
         dependenciesOfRet[result->getSelfIndex()] = true;
         lifetimeDependencies.push_back(LifetimeDependenceInfo(
+            nullptr,
             nullptr, IndexSubset::get(Impl.SwiftContext, dependenciesOfRet),
             returnIdx,
             /*isImmortal*/ false));
@@ -4279,7 +4280,7 @@ namespace {
       auto &ASTContext = result->getASTContext();
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
+      LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, nullptr, 0,
                                               /*isImmortal*/ true);
       if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
         lifetimeDependencies.push_back(immortalLifetime);
@@ -4368,13 +4369,14 @@ namespace {
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
       for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(inheritedDepVec.any() ? IndexSubset::get(Impl.SwiftContext,
+        lifetimeDependencies.push_back(LifetimeDependenceInfo(nullptr, inheritedDepVec.any() ? IndexSubset::get(Impl.SwiftContext,
                                    inheritedDepVec): nullptr, nullptr, idx, /*isImmortal=*/false));
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
           scopedLifetimeParamIndicesForReturn.any())
         lifetimeDependencies.push_back(LifetimeDependenceInfo(
+            nullptr,
             inheritLifetimeParamIndicesForReturn.any()
                 ? IndexSubset::get(Impl.SwiftContext,
                                    inheritLifetimeParamIndicesForReturn)

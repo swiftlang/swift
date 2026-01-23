@@ -2931,7 +2931,8 @@ static CanSILFunctionType getSILFunctionType(
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
       if (formalDeps.isImmortal()) {
-        return LifetimeDependenceInfo(nullptr, nullptr,
+        return LifetimeDependenceInfo(nullptr,
+                                      nullptr, nullptr,
                                       target, /*immortal*/ true);
       }
       
@@ -2966,7 +2967,8 @@ static CanSILFunctionType getSILFunctionType(
       // entirely (such as if they were of `()` type), then there is effectively
       // no dependency, leaving behind an immortal value.
       if (!inheritIndicesSet && !scopeIndicesSet) {
-        return LifetimeDependenceInfo(nullptr, nullptr, target,
+        return LifetimeDependenceInfo(nullptr,
+                                      nullptr, nullptr, target,
                                       /*immortal*/ true);
       }
       
@@ -2984,7 +2986,8 @@ static CanSILFunctionType getSILFunctionType(
         ? IndexSubset::get(TC.Context, condAddressableDeps)
         : nullptr;
       
-      return LifetimeDependenceInfo(inheritIndicesSet,
+      return LifetimeDependenceInfo(nullptr,
+                                    inheritIndicesSet,
                                     scopeIndicesSet,
                                     target, /*immortal*/ false,
                                     addressableSet,

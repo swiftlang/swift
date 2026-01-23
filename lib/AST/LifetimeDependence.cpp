@@ -272,12 +272,12 @@ struct LifetimeDependenceBuilder {
   struct TargetDeps {
     SmallBitVector inheritIndices;
     SmallBitVector scopeIndices;
-    bool hasAnnotation;
+    LifetimeEntry *entry;
     bool isImmortal = false;
 
-    TargetDeps(bool hasAnnotation, unsigned capacity)
+    TargetDeps(LifetimeEntry *entry, unsigned capacity)
         : inheritIndices(capacity), scopeIndices(capacity),
-          hasAnnotation(hasAnnotation) {}
+          entry(entry) {}
 
     bool empty() const {
       return !(isImmortal || inheritIndices.any() || scopeIndices.any());
@@ -327,8 +327,9 @@ public:
     return getTargetDepsOrNull(targetIndex) != nullptr;
   }
 
-  TargetDeps *createAnnotatedTargetDeps(unsigned targetIndex) {
-    auto iterAndInserted = depsArray.try_emplace(targetIndex, true,
+  TargetDeps *createAnnotatedTargetDeps(unsigned targetIndex, LifetimeEntry *entry) {
+    assert(nullptr != entry);
+    auto iterAndInserted = depsArray.try_emplace(targetIndex, entry,
                                                  sourceIndexCap);
     if (!iterAndInserted.second)
       return nullptr;
@@ -339,9 +340,9 @@ public:
   // Check this before diagnosing any broken inference to avoid diagnosing a
   // target that has an explicit annotation.
   TargetDeps *getInferredTargetDeps(unsigned targetIndex) {
-    auto iter = depsArray.try_emplace(targetIndex, false, sourceIndexCap).first;
+    auto iter = depsArray.try_emplace(targetIndex, nullptr, sourceIndexCap).first;
     auto &deps = iter->second;
-    return deps.hasAnnotation ? nullptr : &deps;
+    return deps.entry ? nullptr : &deps;
   }
 
   void inferDependency(unsigned targetIndex, unsigned sourceIndex,
@@ -386,6 +387,7 @@ public:
                && "cannot combine immortal lifetime with parameter dependency");
       }
       lifetimeDependencies.push_back(LifetimeDependenceInfo{
+          /*entry*/ deps.entry,
           /*inheritLifetimeParamIndices*/ inheritIndices,
           /*scopeLifetimeParamIndices*/ scopeIndices, targetIndex,
           /*isImmortal*/ deps.isImmortal});
@@ -961,7 +963,7 @@ protected:
         }
         targetIndex = resultIndex;
       }
-      TargetDeps *deps = depBuilder.createAnnotatedTargetDeps(targetIndex);
+      TargetDeps *deps = depBuilder.createAnnotatedTargetDeps(targetIndex, entry);
       if (deps == nullptr) {
         diagnose(entry->getLoc(),
                  diag::lifetime_dependence_duplicate_target);
@@ -1724,7 +1726,8 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
     }
     case LifetimeDescriptor::DescriptorKind::Named: {
       assert(source.isImmortal());
-      return LifetimeDependenceInfo(/*inheritLifetimeParamIndices*/ nullptr,
+      return LifetimeDependenceInfo(/*entry*/ lifetimeDependentRepr->getLifetimeEntry(),
+                                    /*inheritLifetimeParamIndices*/ nullptr,
                                     /*scopeLifetimeParamIndices*/ nullptr,
                                     targetIndex,
                                     /*isImmortal*/ true);
@@ -1736,6 +1739,7 @@ static std::optional<LifetimeDependenceInfo> checkSILTypeModifiers(
   }
 
   return LifetimeDependenceInfo(
+    lifetimeDependentRepr->getLifetimeEntry(),
     inheritLifetimeParamIndices.any()
     ? IndexSubset::get(ctx, inheritLifetimeParamIndices)
     : nullptr,

@@ -188,6 +188,8 @@ public:
 };
 
 class LifetimeDependenceInfo {
+  // The lifetime entry this info was generated from, if any.
+  LifetimeEntry *entry;
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
   llvm::PointerIntPair<IndexSubset *, 1, bool>
@@ -197,13 +199,14 @@ class LifetimeDependenceInfo {
   unsigned targetIndex;
 
 public:
-  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
+  LifetimeDependenceInfo(LifetimeEntry *entry,
+                         IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
                          unsigned targetIndex, bool isImmortal,
-                         // set during SIL type lowering
-                         IndexSubset *addressableParamIndices = nullptr,
-                         IndexSubset *conditionallyAddressableParamIndices = nullptr)
-      : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
+                         IndexSubset *addressableParamIndices,
+                         IndexSubset *conditionallyAddressableParamIndices)
+      : entry(entry),
+        inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
         addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
         conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
@@ -238,12 +241,25 @@ public:
     }
   }
 
+  /// Constructor overload that defaults addressableParamIndices and
+  /// conditionallyAddressableParamIndices to nullptr, to be set during SIL
+  /// lowering.
+  LifetimeDependenceInfo(LifetimeEntry *entry,
+                         IndexSubset *inheritLifetimeParamIndices,
+                         IndexSubset *scopeLifetimeParamIndices,
+                         unsigned targetIndex, bool isImmortal)
+      : LifetimeDependenceInfo(entry, inheritLifetimeParamIndices,
+                               scopeLifetimeParamIndices, targetIndex,
+                               isImmortal, nullptr, nullptr) {}
+
   operator bool() const { return !empty(); }
 
   bool empty() const {
     return !isImmortal() && inheritLifetimeParamIndices == nullptr &&
            scopeLifetimeParamIndices == nullptr;
   }
+
+  LifetimeEntry *getEntry() const { return entry; }
 
   bool isImmortal() const { return addressableParamIndicesAndImmortal.getInt(); }
 

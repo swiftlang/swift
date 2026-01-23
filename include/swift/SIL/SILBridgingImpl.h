@@ -172,7 +172,8 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 //===----------------------------------------------------------------------===//
 
 BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
-    : inheritLifetimeParamIndices(info.getInheritIndices()),
+    : entry(info.getEntry()),
+      inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
       addressableParamIndices(info.getAddressableIndices()),
       conditionallyAddressableParamIndices(
@@ -191,6 +192,15 @@ BridgedLifetimeDependenceInfoArray::at(SwiftInt index) const {
 bool BridgedLifetimeDependenceInfo::empty() const {
   return !immortal && inheritLifetimeParamIndices == nullptr &&
          scopeLifetimeParamIndices == nullptr;
+}
+
+bool BridgedLifetimeDependenceInfo::hasEntry() const {
+  return entry != nullptr;
+}
+
+BridgedLifetimeEntry BridgedLifetimeDependenceInfo::getEntry() const {
+  assert(hasEntry());
+  return entry;
 }
 
 bool BridgedLifetimeDependenceInfo::checkInherit(SwiftInt index) const {
