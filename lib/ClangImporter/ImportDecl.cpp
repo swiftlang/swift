@@ -9200,7 +9200,9 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   // can see if we should synthesize a Sendable conformance.
   if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl)) {
     auto sendability = nominal->getAttrs().getEffectiveSendableAttr();
-    if (isa_and_nonnull<SendableAttr>(sendability)) {
+    if (auto *sendable = dyn_cast_or_null<SendableAttr>(sendability)) {
+      // Remove the original `Sendable` attribute we are about to replace.
+      nominal->getAttrs().removeAttribute(sendable);
       addSynthesizedProtocolAttrs(nominal, {KnownProtocolKind::Sendable},
                                   /*isUnchecked=*/true);
     }
