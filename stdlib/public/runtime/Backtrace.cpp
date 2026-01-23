@@ -1566,15 +1566,20 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
   char *end = cmdline_buf + sizeof(cmdline_buf);
   const char **parg = backtracer_argv;
 
+#define PUT(ch)                                 \
+  do {                                          \
+    if (ptr == end)                             \
+      return false;                             \
+    *ptr++ = ch;                                \
+  } while(0)
+
   while (*parg) {
     const char *argument = *parg++;
     int slashCount = 0;
     bool quoted = false;
 
     if (ptr > cmdline_buf) {
-      if (ptr == end)
-        return false;
-      *ptr++ = ' ';
+      PUT(' ');
     }
 
     // Check if the argument contains spaces; if it does, we have to quote it
@@ -1588,9 +1593,7 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
     }
 
     if (quoted) {
-      if (ptr == end)
-        return false;
-      *ptr++ = '"';
+      PUT('"');
     }
 
     pt2 = argument;
@@ -1609,12 +1612,8 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
           while (ptr < pend)
             *ptr++ = '\\';
           slashCount = 0;
-          if (ptr == end)
-            return false;
-          *ptr++ = '\\';
-          if (ptr == end)
-            return false;
-          *ptr++ = '"';
+          PUT('\\');
+          PUT('"');
         }
         break;
       default:
@@ -1625,9 +1624,7 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
           while (ptr < pend)
             *ptr++ = '\\';
           slashCount = 0;
-          if (ptr == end)
-            return false;
-          *ptr++ = ch;
+          PUT(ch);
         }
         break;
       }
@@ -1640,9 +1637,7 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
           return false;
         while (ptr < pend)
           *ptr++ = '\\';
-        if (ptr == end)
-          return false;
-        *ptr++ = '"';
+        PUT('"');
       } else {
         char *pend = ptr + slashCount;
         if (end - ptr < slashCount)
@@ -1651,16 +1646,16 @@ static bool flattenCommandLine(char *buffer, size_t buflen,
           *ptr++ = '\\';
       }
     } else if (quoted) {
-      if (ptr == end)
-        return false;
-      *ptr++ = '"';
+      PUT('"');
     }
 
     if (ptr == end)
       return false;
   }
 
-  *ptr++ = '\0';
+  PUT('\0');
+
+#undef PUT
 
   return true;
 }
