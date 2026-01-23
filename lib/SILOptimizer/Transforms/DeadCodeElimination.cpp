@@ -51,11 +51,6 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though end_lifetime has side-effects, it can be DCE'ed if it does not
-  // have useful dependencies/reverse dependencies
-  if (isa<EndLifetimeInst>(I))
-    return false;
-
   if (isa<UnconditionalCheckedCastInst>(I)) {
     return false;
   }
@@ -382,16 +377,6 @@ void DCE::markLive() {
         break;
       }
       case SILInstructionKind::BorrowedFromInst: {
-        addReverseDependency(I.getOperand(0), &I);
-        break;
-      }
-      case SILInstructionKind::EndLifetimeInst: {
-        if (I.getOperand(0)->getType().isAddress()) {
-          // DCE cannot reason about values in memory.
-          markInstructionLive(&I);
-          break;
-        }
-        // The instruction is live only if it's operand value is also live
         addReverseDependency(I.getOperand(0), &I);
         break;
       }
