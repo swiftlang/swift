@@ -87,40 +87,11 @@ bb3:
   return %6 : $()
 }
 
-// For now until the proper unreachable pruning code is committed for
-// SILCombine, we should not dce dead instructions in unreachable code.
-
-// CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// CHECK: bb0
-// CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
-// CHECK-LABEL: } // end sil function 'dead_inst_elimination_ignore_unreachable'
-sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int64, 24
-  br bb2
-
-bb1:
-  %1 = integer_literal $Builtin.Int64, 48
-  br bb2
-
-bb2:
-  %2 = tuple()
-  return %2 : $()
-}
-
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil [ossa] @exit : $@convention(thin) () -> Never {
-bb0:
-  br bb1
-
-bb1:
-  br bb1
-}
+sil [ossa] @exit : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
 // CHECK: store
@@ -1367,3 +1338,27 @@ bb0(%0 : $Pair<x, y>):
   %4 = tuple (%2, %3)
   return %4
 }
+
+// CHECK-LABEL: sil [ossa] @dead_end_block : {{.*}} {
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'dead_end_block'
+sil [ossa] @dead_end_block : $@convention(thin) (Builtin.RawPointer) -> @owned B {
+bb0(%0 : $Builtin.RawPointer):
+  %4 = raw_pointer_to_ref %0 to $E
+  %5 = copy_value %4
+  %6 = upcast %5 to $B
+  fix_lifetime %6
+  destroy_value %6
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %14 = raw_pointer_to_ref %0 to $E
+  %15 = copy_value %14
+  %16 = upcast %15 to $B
+  return %16
+}
+

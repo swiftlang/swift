@@ -460,8 +460,8 @@ public struct Builder {
   }
 
   @discardableResult
-  public func createDestroyValue(operand: Value) -> DestroyValueInst {
-    return notifyNew(bridged.createDestroyValue(operand.bridged).getAs(DestroyValueInst.self))
+  public func createDestroyValue(operand: Value, isDeadEnd: Bool = false) -> DestroyValueInst {
+    return notifyNew(bridged.createDestroyValue(operand.bridged, isDeadEnd).getAs(DestroyValueInst.self))
   }
 
   @discardableResult
@@ -472,6 +472,11 @@ public struct Builder {
   @discardableResult
   public func createEndLifetime(of value: Value) -> EndLifetimeInst {
     return notifyNew(bridged.createEndLifetime(value.bridged).getAs(EndLifetimeInst.self))
+  }
+
+  @discardableResult
+  public func createExtendLifetime(of value: Value) -> ExtendLifetimeInst {
+    return notifyNew(bridged.createExtendLifetime(value.bridged).getAs(ExtendLifetimeInst.self))
   }
 
   @discardableResult

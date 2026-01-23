@@ -190,14 +190,14 @@ bb2:
   return %r : $()
 }
 
-// CHECK-LABEL: sil [ossa] @handleUnreachableBlock : $@convention(method) @async (@guaranteed MyActor) -> () {
-// CHECK:       bb0(%0 : @guaranteed $MyActor):
+// CHECK-LABEL: sil @handleUnreachableBlock : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : $MyActor):
 // CHECK-NEXT:    hop_to_executor
 // CHECK:       bb2:
 // CHECK-NOT:     hop_to_executor
 // CHECK:       } // end sil function 'handleUnreachableBlock'
-sil [ossa] @handleUnreachableBlock : $@convention(method) @async (@guaranteed MyActor) -> () {
-bb0(%0 : @guaranteed $MyActor):
+sil @handleUnreachableBlock : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : $MyActor):
   hop_to_executor %0 : $MyActor
   %f = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
   apply %f(%0) : $@convention(method) (@guaranteed MyActor) -> ()

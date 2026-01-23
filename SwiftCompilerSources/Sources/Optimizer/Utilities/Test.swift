@@ -54,8 +54,11 @@ public func registerOptimizerTests() {
   registerFunctionTests(
     addressOwnershipLiveRangeTest,
     argumentConventionsTest,
+    breakInfiniteLoopsTest,
+    domtreeTest,
     getAutoDiffSpecializationInfoTest,
     interiorLivenessTest,
+    lifetimeComletionTest,
     lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,

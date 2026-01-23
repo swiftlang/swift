@@ -64,7 +64,6 @@ func test1() throws {
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]
 // CHECK:     [[ERROR]]([[T0:%.*]] : $any Error):
-// CHECK-NEXT:  strong_release [[T0]]
 // CHECK-NEXT:  unreachable
 func test2() {
   rethrower(nonthrower)

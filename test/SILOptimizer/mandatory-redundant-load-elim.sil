@@ -582,7 +582,13 @@ bb2:
   %4 = function_ref @nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   end_borrow %3 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
   br bb2
+
+bb4:
+  unreachable
 }
 
 // load_borrow is currently not optimized
@@ -1304,7 +1310,13 @@ bb2:
   %4 = function_ref @nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
   br bb2
+
+bb4:
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @load_copy_loop_promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {

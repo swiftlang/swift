@@ -112,7 +112,14 @@ func runSimplification(on function: Function, _ context: FunctionPassContext,
   if context.needFixStackNesting {
     context.fixStackNesting(in: function)
   }
-  
+
+  if context.needBreakInfiniteLoops {
+    breakInfiniteLoops(in: function, context)
+  }
+  if context.needCompleteLifetimes {
+    completeLifetimes(in: function, context)
+  }
+
   return changed
 }
 

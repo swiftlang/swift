@@ -56,6 +56,10 @@ struct Options {
     _bridged.hasFeature(feature)
   }
 
+  func shouldRemoveCondFail(withMessage message: StringRef, inFunction: StringRef) -> Bool {
+    _bridged.shouldRemoveCondFail(message._bridged, inFunction._bridged)
+  }
+
   // The values for the assert_configuration call are:
   // 0: Debug
   // 1: Release

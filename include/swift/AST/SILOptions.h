@@ -191,12 +191,6 @@ public:
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 
-  /// Introduce linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = true;
-
-  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
-  bool OSSAVerifyComplete = false;
-
   /// Enable pack metadata stack "promotion".
   ///
   /// More accurately, enable skipping mandatory heapification of pack metadata

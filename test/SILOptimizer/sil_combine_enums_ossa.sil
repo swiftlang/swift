@@ -57,6 +57,7 @@ bb1:                                              // Preds: bb0
   return %16 : $Int                               // id: %20
 
 bb2:                                              // Preds: bb0
+  destroy_value [dead_end] %5
   unreachable                                     // id: %23
 }
 
@@ -308,6 +309,7 @@ bb1:
 
 bb2:
   cond_fail %2 : $Builtin.Int1
+  destroy_value [dead_end] %0
   unreachable
 }
 

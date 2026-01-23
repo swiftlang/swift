@@ -289,8 +289,6 @@ private extension LoadingInstruction {
       return true
 
     case .copy, .take:
-      let deadEndBlocks = context.deadEndBlocks
-
       // The liverange of the value has an "exit", i.e. a path which doesn't lead to the load,
       // it means that we would have to insert a destroy on that exit to satisfy ownership rules.
       // But an inserted destroy also means that we would need to insert copies of the value which
@@ -312,21 +310,7 @@ private extension LoadingInstruction {
       //   bb2:
       //     end_borrow %b
       //
-      if liverange.hasExits(deadEndBlocks) {
-        return false
-      }
-
-      // Handle a corner case: if the load is in an infinite loop, the liverange doesn't have an exit,
-      // but we still would need to insert a copy. For example:
-      //
-      //     store %1 to [init] %addr
-      //     br bb1
-      //   bb1:
-      //     %2 = load [copy] %addr   // would need to insert a copy here
-      //    br bb1                    // no exit from the liverange
-      //
-      // For simplicity, we don't handle this in OSSA.
-      if deadEndBlocks.isDeadEnd(parentBlock) {
+      if liverange.hasExits {
         return false
       }
       return true
@@ -335,8 +319,9 @@ private extension LoadingInstruction {
 }
 
 private func replace(load: LoadingInstruction, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
+  let ownership = load.ownership
   var ssaUpdater = SSAUpdater(function: load.parentFunction,
-                              type: load.type, ownership: load.ownership, context)
+                              type: load.type, ownership: ownership, context)
 
   for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock
@@ -764,12 +749,10 @@ private struct Liverange {
   ///   bb2:
   ///     ...                 // exit
   ///
-  func hasExits(_ deadEndBlocks: DeadEndBlocksAnalysis) -> Bool {
+  var hasExits: Bool {
     for block in containingBlocks {
       for succ in block.successors {
-        if succ != endBlock,
-           (!worklist.hasBeenPushed(succ) || beginBlocks.contains(succ)),
-           !deadEndBlocks.isDeadEnd(succ) {
+        if succ != endBlock, (!worklist.hasBeenPushed(succ) || beginBlocks.contains(succ)) {
           return true
         }
       }

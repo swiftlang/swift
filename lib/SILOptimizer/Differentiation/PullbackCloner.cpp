@@ -38,6 +38,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -2847,6 +2848,13 @@ bool PullbackCloner::Implementation::run() {
     builder.createDeallocStack(pbLoc, alloc);
   }
   builder.createReturn(pbLoc, joinElements(retElts, builder, pbLoc));
+
+  if (!errorOccurred) {
+    auto *pm = &getContext().getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&pullback);
+    completeAllLifetimes(pm, &pullback);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
+  }
 
 #ifndef NDEBUG
   bool leakFound = false;
