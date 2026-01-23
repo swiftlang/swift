@@ -562,6 +562,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(TildeSendable, false)
 /// Allow use of protocol typed values in Embedded mode (`Any` and friends)
 EXPERIMENTAL_FEATURE(EmbeddedExistentials, true)
 
+/// Allow enabling dynamic exclusivity in Embedded Swift.
+EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
+
 /// Allow use of the 'anyAppleOS' availability domain.
 EXPERIMENTAL_FEATURE(AnyAppleOSAvailability, true)
 
