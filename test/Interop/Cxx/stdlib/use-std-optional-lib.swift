@@ -1,6 +1,6 @@
 // RUN: %target-build-swift %s -emit-module -emit-library -cxx-interoperability-mode=default -module-name OptionalLib -emit-module-path %t/artifacts/OptionalLib.swiftmodule -I %S/Inputs -O
 
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
+// XFAIL: OS=linux-androideabi
 
 import StdOptional
 import CxxStdlib

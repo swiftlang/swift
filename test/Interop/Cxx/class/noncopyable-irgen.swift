@@ -8,8 +8,6 @@
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST6- -D TEST6
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST7-%target-os-family- -verify-additional-prefix TEST7-%target-os- -D TEST7 -Xcc -DTEST7 -Xcc -std=c++20 -verify-ignore-unrelated
 
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
-
 //--- Inputs/module.modulemap
 module Test {
     header "noncopyable.h"
@@ -46,9 +44,10 @@ struct OwnsT {
     // expected-TEST1-note@-5 {{annotate a type with SWIFT_COPYABLE_IF(<T>) in C++ to specify that the type is Copyable if <T> is Copyable}}
     // expected-TEST7-DARWIN-error@-6 {{call to implicitly-deleted copy constructor of 'std::unique_ptr<int>'}}
     // expected-TEST7-linux-android-error@-7 {{call to implicitly-deleted copy constructor of 'std::unique_ptr<int>'}}
-    // expected-TEST7-linux-gnu-error@-8 {{call to deleted constructor of 'std::unique_ptr<int>'}}
-    // expected-TEST7-DARWIN-note@-9 {{in instantiation of member function 'OwnsT<std::unique_ptr<int>>::OwnsT' requested here}}
-    // expected-TEST7-LINUX-note@-10 {{in instantiation of member function 'OwnsT<std::unique_ptr<int>>::OwnsT' requested here}}
+    // expected-TEST7-linux-androideabi-error@-8 {{call to implicitly-deleted copy constructor of 'std::unique_ptr<int>'}}
+    // expected-TEST7-linux-gnu-error@-9 {{call to deleted constructor of 'std::unique_ptr<int>'}}
+    // expected-TEST7-DARWIN-note@-10 {{in instantiation of member function 'OwnsT<std::unique_ptr<int>>::OwnsT' requested here}}
+    // expected-TEST7-LINUX-note@-11 {{in instantiation of member function 'OwnsT<std::unique_ptr<int>>::OwnsT' requested here}}
     OwnsT(OwnsT&& other) {}
 };
 
