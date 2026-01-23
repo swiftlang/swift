@@ -104,19 +104,19 @@
 // Check reading the SDKSettings.json from an SDK and using it to map Catalyst
 // SDK version information.
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_ZIPPERED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_ZIPPERED %s
 // MACOS_10_15_ZIPPERED: -target-sdk-version 10.15
 // MACOS_10_15_ZIPPERED: -target-variant-sdk-version 13.1
 // MACOS_10_15_ZIPPERED: -platform_version macos 10.14.0 10.15.0
 // MACOS_10_15_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.1.0
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_ZIPPERED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_ZIPPERED %s
 // MACOS_10_15_4_ZIPPERED: -target-sdk-version 10.15.4
 // MACOS_10_15_4_ZIPPERED: -target-variant-sdk-version 13.4
 // MACOS_10_15_4_ZIPPERED: -platform_version macos 10.14.0 10.15.4
 // MACOS_10_15_4_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.4.0
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target-variant x86_64-apple-macosx10.14 -target x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.versioned.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_REVERSE_ZIPPERED %s
+// RUN: %swiftc_driver -sdk "" -driver-print-jobs -target-variant x86_64-apple-macosx10.14 -target x86_64-apple-ios13.1-macabi -sdk %S/Inputs/MacOSX10.15.4.sdk %s 2>&1 | %FileCheck -check-prefix MACOS_10_15_4_REVERSE_ZIPPERED %s
 // MACOS_10_15_4_REVERSE_ZIPPERED: -target-sdk-version 13.4
 // MACOS_10_15_4_REVERSE_ZIPPERED: -target-variant-sdk-version 10.15.4
 // MACOS_10_15_4_REVERSE_ZIPPERED: -platform_version mac-catalyst 13.1.0 13.4.0
