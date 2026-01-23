@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature Lifetimes
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature Lifetimes -enable-experimental-feature ClosureLifetimes
 
 // REQUIRES: swift_feature_Lifetimes
 

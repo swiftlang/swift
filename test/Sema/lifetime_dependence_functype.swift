@@ -29,7 +29,7 @@ func applyTransfer(ne: NE, transfer: (NE) ->  NE) -> NE {
 }
 
 func testTransfer(nc: consuming NC) {
-  let transferred = applyTransfer(ne: nc.ne, transfer: transfer) // expected-error{{does not conform to expected type 'Escapable'}} e/xpected-error{{cannot convert value of type '(NE) -> @_lifetime(copy 0) NE' to expected argument type '(NE) -> NE'}}
+  let transferred = applyTransfer(ne: nc.ne, transfer: transfer) // OK
 
   _ = consume nc
   _ = transfer(transferred)
@@ -45,7 +45,7 @@ func applyBorrow(nc: borrowing NC, borrow: (borrowing NC) -> NE) -> NE {
 }
 
 func testBorrow(nc: consuming NC) {
-  let borrowed = applyBorrow(nc: nc, borrow: borrow) // expected-error{{does not conform to expected type 'Escapable'}} ex/pected-error{{cannot convert value of type '(borrowing NC) -> @_lifetime(borrow 0) NE' to expected argument type '(borrowing NC) -> NE}}
+  let borrowed = applyBorrow(nc: nc, borrow: borrow) // OK
   _ = consume nc
   _ = transfer(borrowed)
 }

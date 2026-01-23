@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend %s \
 // RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
 // RUN: -enable-experimental-feature Lifetimes \
+// RUN: -enable-experimental-feature ClosureLifetimes \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes
@@ -10,7 +11,7 @@ struct NE: ~Escapable {}
 // CHECK-LABEL: typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
 typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
 
-// CHECK-LABEL: func takeImplicitNestedType(f: (@_lifetime(copy 0) @_lifetime(1: copy 1) (NE, inout NE) -> NE, consuming NE, inout NE) -> NE)
+// CHECK-LABEL: func takeImplicitNestedType(f: ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE)
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence14takeNestedType1fyAA2NEVA2E_AEztXE_AEnAEztXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callee_guaranteed (@guaranteed NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE, @owned NE, @lifetime(copy 2) @inout NE) -> @lifetime(copy 1) @owned NE) -> () {
 func takeImplicitNestedType(f: ImplicitNestedType) {}
