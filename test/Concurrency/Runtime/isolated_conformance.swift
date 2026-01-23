@@ -7,6 +7,8 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+@_spi(ExperimentalCustomExecutors) import _Concurrency
+
 protocol P {
   func f()
 }
