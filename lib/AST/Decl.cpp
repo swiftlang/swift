@@ -12484,10 +12484,21 @@ void swift::simple_display(llvm::raw_ostream &out, const GenericParamList *GPL) 
 
 StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
+  #define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return #KEYWORD;
 #define ACCESSOR(ID, KEYWORD)
 #include "swift/AST/AccessorKinds.def"
+
+    // Transitional terminology.  Let's use this for a little
+    // while to ease the transition.  (Both forms are parsed
+    // correctly, this just changes what gets written into
+    // .swiftinterface files.)
+    case AccessorKind::YieldingBorrow: return "read";
+    case AccessorKind::YieldingMutate: return "modify";
+    // TODO: Switch to the final terminology before shipping...
+    // case AccessorKind::YieldingBorrow: return "yielding borrow";
+    // case AccessorKind::YieldingMutate: return "yielding mutate";
   }
   llvm_unreachable("bad accessor kind");
 }
