@@ -151,7 +151,6 @@ class DCE {
   PostDominanceInfo *PDT;
   DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
-  SmallBlotSetVector<SILValue, 8> valuesToComplete;
 
   // Maps instructions which produce a failing condition (like overflow
   // builtins) to the actual cond_fail instructions which handle the failure.
@@ -661,13 +660,6 @@ void DCE::endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt) {
 
   assert(op->isLifetimeEnding());
 
-  // If DCE is going to delete the block in which we have to insert a
-  // compensating lifetime end, let complete lifetimes utility handle it.
-  if (!LiveBlocks.contains(insertPt->getParent())) {
-    valuesToComplete.insert(lookThroughBorrowedFromDef(value));
-    return;
-  }
-
   SILBuilderWithScope builder(insertPt);
   if (value->getOwnershipKind() == OwnershipKind::Owned) {
     auto *destroy = builder.createDestroyValue(
@@ -763,12 +755,6 @@ bool DCE::removeDead() {
           InstModCallbacks()
               .onCreateNewInst([&](auto *inst) { markInstructionLive(inst); })
               .onDelete([&](auto *inst) {
-                for (auto result : inst->getResults()) {
-                  result = lookThroughBorrowedFromDef(result);
-                  if (valuesToComplete.count(result)) {
-                    valuesToComplete.erase(result);
-                  }
-                }
                 inst->replaceAllUsesOfAllResultsWithUndef();
                 if (isa<ApplyInst>(inst))
                   CallsChanged = true;
@@ -823,12 +809,6 @@ bool DCE::removeDead() {
           }
         }
       }
-      for (auto result : Inst->getResults()) {
-        result = lookThroughBorrowedFromDef(result);
-        if (valuesToComplete.count(result)) {
-          valuesToComplete.erase(result);
-        }
-      }
       Inst->replaceAllUsesOfAllResultsWithUndef();
 
       if (isa<ApplyInst>(Inst))
@@ -837,14 +817,6 @@ bool DCE::removeDead() {
       Inst->eraseFromParent();
       Changed = true;
     }
-  }
-
-  OSSACompleteLifetime completion(F, *deadEndBlocks);
-  for (auto value : valuesToComplete) {
-    if (!value.has_value())
-      continue;
-    completion.completeOSSALifetime(*value,
-                                    OSSACompleteLifetime::Boundary::Liveness);
   }
 
   return Changed;
