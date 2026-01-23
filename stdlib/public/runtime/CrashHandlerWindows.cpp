@@ -117,7 +117,7 @@ LONG callWithAltStack(EXCEPTION_POINTERS *arg,
   asm volatile (
     "    str sp, [%3, -16]!; \
          mov sp, %3;         \
-         jsr %2;             \
+         bl  %2;             \
          ldr sp, [sp];       \
     "
     : "=r" (result)

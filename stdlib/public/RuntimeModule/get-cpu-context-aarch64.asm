@@ -17,7 +17,7 @@
         AREA |.text|, CODE, READONLY, ARM64
         EXPORT _swift_get_cpu_context
 
-;; On entry, rax contains the pointer to the arm64_gprs
+;; On entry, x8 contains the pointer to the arm64_gprs
 _swift_get_cpu_context PROC PUBLIC
         stp  x0,  x1, [x8, #0x00]
         stp  x2,  x3, [x8, #0x10]
@@ -39,7 +39,7 @@ _swift_get_cpu_context PROC PUBLIC
         str x30,      [x8, #0x100]
         mov  x1, #0x1ffffffff
         str  x1,      [x8, #0x108]
-        ret
+        blr
 _swift_get_cpu_context ENDP
 
         END

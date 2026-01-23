@@ -579,8 +579,7 @@ Generate a backtrace for the parent process.
       currentThread = target!.crashingThreadNdx
     }
 
-    // Grab the current wall clock time; if clock_gettime() fails, get a
-    // lower resolution version instead.
+    // Grab the current wall clock time
     now = Timestamp.wallTime
 
     // Set up the output stream
