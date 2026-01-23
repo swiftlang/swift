@@ -2020,6 +2020,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.SolverScopeThreshold);
   setUnsignedIntegerArgument(OPT_solver_trail_threshold_EQ,
                              Opts.SolverTrailThreshold);
+  setUnsignedIntegerArgument(OPT_solver_shuffle_disjunctions_EQ,
+                             Opts.ShuffleDisjunctionSeed);
+  setUnsignedIntegerArgument(OPT_solver_shuffle_choices_EQ,
+                             Opts.ShuffleDisjunctionChoicesSeed);
 
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=

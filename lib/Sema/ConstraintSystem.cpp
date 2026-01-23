@@ -47,6 +47,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
 #include <cmath>
+#include <random>
 
 using namespace swift;
 using namespace constraints;
@@ -4023,6 +4024,11 @@ void ConstraintSystem::generateOverloadConstraints(
     auto *choice = Constraint::createBindOverload(*this, type, choices[index],
                                                   useDC, fix, locator);
     constraints.push_back(choice);
+  }
+
+  if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionChoicesSeed) {
+    std::mt19937 g(seed);
+    std::shuffle(constraints.begin(), constraints.end(), g);
   }
 }
 
