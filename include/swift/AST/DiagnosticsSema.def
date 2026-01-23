@@ -5193,10 +5193,10 @@ ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
 WARNING(implicit_weak_to_strong_capture,none,
-      "%0 ownership of capture %base1 differs from implicitly-captured strong reference in outer scope",
-      (ReferenceOwnership, const VarDecl *))
+        "%0 ownership of capture %base1 differs from implicitly-captured strong reference in outer scope",
+        (ReferenceOwnership, const VarDecl *))
 NOTE(implicit_weak_to_strong_capture_loc,none,
-     "%base0 implicitly captured here",(const Decl *))
+     "%base0 implicitly strongly captured here",(const Decl *))
 NOTE(implicit_weak_to_strong_capture_add_capture_list_item,none,
      "add %base0 as a capture list item to silence",(const Decl *))
 NOTE(implicit_weak_to_strong_capture_assign_to_silence,none,
