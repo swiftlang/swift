@@ -39,6 +39,10 @@
 #include "llvm/Support/Casting.h"
 #include <fstream>
 
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+#error "Building the compiler without Swift sources is not supported anymore"
+#endif
+
 using namespace swift;
 
 llvm::cl::opt<bool> SILPrintAll(
