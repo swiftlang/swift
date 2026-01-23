@@ -3,6 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s
 
 // REQUIRES: concurrency
+// REQUIRES: PTRSIZE=64
 
 func use<T>(_ t: T) {}
 func forceSplit() async {
