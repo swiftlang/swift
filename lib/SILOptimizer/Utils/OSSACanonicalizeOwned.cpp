@@ -409,8 +409,6 @@ void OSSACanonicalizeOwned::extendLivenessToDeinitBarriers() {
         });
   } else {
     for (auto destroy : destroys) {
-      if (destroy->getOperand(0) != getCurrentDef())
-        continue;
       ends.push_back(destroy);
     }
   }
