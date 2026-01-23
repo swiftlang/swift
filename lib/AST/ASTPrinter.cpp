@@ -6909,7 +6909,7 @@ public:
   }
 
   void visitAnyFunctionTypeParams(
-      ArrayRef<AnyFunctionType::Param> Params, bool printLabels) {
+      ArrayRef<AnyFunctionType::Param> Params, bool printLabels, bool printInternalLabels = false) {
     Printer << "(";
 
     for (unsigned i = 0, e = Params.size(); i != e; ++i) {
@@ -6929,7 +6929,7 @@ public:
         Printer.printName(Param.getLabel(),
                           PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
-      } else if ((Options.AlwaysTryPrintParameterLabels || printLabels) &&
+      } else if ((Options.AlwaysTryPrintParameterLabels || printInternalLabels) &&
                  Param.hasInternalLabel() &&
                  !Param.getInternalLabel().hasDollarPrefix()) {
         // We didn't have an external parameter label but were requested to
@@ -6998,7 +6998,7 @@ public:
     // names/labels, the labels must be printed.
 
     visitAnyFunctionTypeParams(T->getParams(),
-                               /*printLabels*/ hasLabelledLifetimes(T));
+                               /*printLabels*/ false, /*printInternalLabels*/ hasLabelledLifetimes(T));
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
