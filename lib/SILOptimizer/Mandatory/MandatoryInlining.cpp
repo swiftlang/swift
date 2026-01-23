@@ -77,6 +77,16 @@ enum class MandatoryInlining_t {
   inlineAlways
 };
 
+static bool isLexicalPartialApply(PartialApplyInst *pai) {
+  for (Operand *use : pai->getUses()) {
+    if (auto *mv = dyn_cast<MoveValueInst>(use->getUser())) {
+      if (mv->isLexical())
+        return true;
+    }
+  }
+  return false;
+}
+
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -94,6 +104,8 @@ static  bool fixupReferenceCounts(
   // We assume that we were passed a slice of our actual argument array. So we
   // can use this to copy if we need to.
   assert(captureArgConventions.size() == capturedArgs.size());
+
+  bool isLexical = isLexicalPartialApply(pai);
 
   // FIXME: Can we cache this in between inlining invocations?
   DeadEndBlocks deadEndBlocks(pai->getFunction());
@@ -162,6 +174,24 @@ static  bool fixupReferenceCounts(
     }
 
     case ParameterConvention::Direct_Guaranteed: {
+      if (isLexical && v->getOwnershipKind() == OwnershipKind::Owned) {
+        // If the result of the `partial_apply` is lexical we must make sure
+        // to make its captured arguments lexical. Otherwise the argument
+        // lifetimes may be shortened after inlining because the (lexical)
+        //`partial_apply` is not there anymore to keep the arguments alive.
+        auto *mv = SILBuilderWithScope(pai).createMoveValue(loc, v, IsLexical);
+        for (Operand *use : v->getUses()) {
+          if (use->getUser() == pai) {
+            ASSERT(use->isLifetimeEnding() &&
+                   "an escaping partial_apply must consume its arguments");
+            use->set(mv);
+            v = mv;
+            break;
+          }
+        }
+        ASSERT(v == mv && "partial_apply doesn't use its captured argument");
+      }
+
       // If we have a direct_guaranteed value, the value is being taken by the
       // partial_apply at +1, but we are going to invoke the value at +0. So we
       // need to copy/borrow the value before the pai and then
