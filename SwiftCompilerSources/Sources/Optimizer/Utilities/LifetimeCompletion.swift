@@ -103,7 +103,7 @@ func completeLifetime(of value: Value,
       completeBorrowScope(of: bf, getDeadEnd: getDeadEnd, context)
     } else if let beginBorrow = BeginBorrowValue(value) {
       switch beginBorrow {
-      case .beginBorrow, .loadBorrow:
+      case .beginBorrow, .loadBorrow, .dereferenceBorrow:
         completeBorrowScope(of: value, getDeadEnd: getDeadEnd, context)
       case .uncheckOwnershipConversion:
         // `unchecked_ownership_conversion` has this weird requirement that either it has no `end_borrow`s
