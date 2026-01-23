@@ -217,7 +217,7 @@ class TestImplicitWeakToStrongCaptures {
 
     // Captures in nested types should not trigger the warning
     escape {
-      struct S {
+      struct LocalType {
         func foo() {
           _ = { [weak globalObject] in
             _ = globalObject

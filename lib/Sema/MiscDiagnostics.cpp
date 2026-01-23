@@ -2710,8 +2710,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
         return;
 
       // If the capture item Decl has strong ownership, remember it for later
-      auto ownership = getDeclOwnership(VD);
-      if (ownership == ReferenceOwnership::Strong) {
+      if (getDeclOwnership(VD) == ReferenceOwnership::Strong) {
         EscapingStrongCaptureDecls.insert(VD);
         return;
       }
@@ -2745,18 +2744,17 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       if (PBD->getEqualLoc(0).isValid())
         return;
 
-      diagnoseCaptureIfNeeded(VD, referentVarDecl, ownership);
+      diagnoseCaptureIfNeeded(VD, referentVarDecl);
     }
 
     /// Diagnose the capture list binding `itemDecl` that refers to
     /// `itemReferent` if appropriate.
     ///
-    /// \param itemDecl: The capture list item decl that may need to be
-    /// diagnosed \param itemReferent: The referent to which the capture list
-    /// item refers \param itemDeclOwnership: The `ReferenceOwnership` of
-    /// `itemDecl`
-    void diagnoseCaptureIfNeeded(VarDecl *itemDecl, ValueDecl *itemReferent,
-                                 ReferenceOwnership itemDeclOwnership) {
+    /// \param itemDecl The capture list item decl that may need to be
+    /// diagnosed. This must have less than strong `ReferenceOwnership`.
+    /// \param itemReferent The referent to which the capture list
+    /// item refers.
+    void diagnoseCaptureIfNeeded(VarDecl *itemDecl, VarDecl *itemReferent) {
       // If an escaping closure contains the 'weakified' referent, as an
       // explicit strong capture list item then we don't need to diagnose
       // anything. We rely on the AST walk visiting ancestor DCs before
@@ -2775,6 +2773,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       DeclContext *itemReferentDC = itemReferent->getDeclContext();
       std::optional<AbstractClosureExpr *> outermostCapturingClosure;
 
+      ASSERT(!EscapingClosureStack.empty()); // should have bailed earlier
       while (currentDC && currentDC != itemReferentDC) {
         SWIFT_DEFER { currentDC = currentDC->getParent(); };
 
@@ -2788,6 +2787,9 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
       // No outer capturing closure found, so don't diagnose
       if (!outermostCapturingClosure)
         return;
+
+      const auto itemDeclOwnership = getDeclOwnership(itemDecl);
+      ASSERT(isLessThanStrongOwnership(itemDeclOwnership));
 
       // We found something to diagnose.
       Ctx.Diags.diagnose(itemDecl->getLoc(),
@@ -2838,7 +2840,7 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
     PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
       if (auto ACE = dyn_cast<AbstractClosureExpr>(E))
         if (isEscapingClosure(ACE)) {
-          assert(EscapingClosureStack.size() > 0);
+          ASSERT(!EscapingClosureStack.empty());
           EscapingClosureStack.pop_back();
         }
 
