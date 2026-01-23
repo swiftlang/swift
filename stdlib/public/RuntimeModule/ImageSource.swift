@@ -137,7 +137,7 @@ struct ImageSource: CustomStringConvertible {
       self.bytes = chunk
     }
 
-    convenience init(path: String) throws {
+    convenience init(path: String, alternativePaths: [String]) throws {
       #if os(Windows)
       let hFile =
         path.withCString(encodedAs: UTF16.self) { lpwszPath in
@@ -184,6 +184,25 @@ struct ImageSource: CustomStringConvertible {
                   start: base, count: size))
       #else
       let fd = _swift_open(path, O_RDONLY, 0)
+
+      if fd < 0 {
+        let filePathCharacter: Character = "/" // non windows path separator
+
+        // we didn't find the image in question at the path it originally ran at
+        // so we will now check for the image at various alternative paths
+        if let imageBaseName = path.split(separator: filePathCharacter).last {
+          for alternativePath in alternativePaths {
+            let alternativeFullPath =
+              alternativePath + String(filePathCharacter) + imageBaseName
+            fd = _swift_open(alternativeFullPath, O_RDONLY, 0)
+            if fd >= 0 {
+              // we found a match
+              break
+            }
+          }
+        }
+      }
+
       if fd < 0 {
         throw ImageSourceError.posixError(_swift_get_errno())
       }
@@ -385,9 +404,11 @@ struct ImageSource: CustomStringConvertible {
               isMappedImage: isMappedImage, path: path)
   }
 
-  /// Initialise with a mapped file
-  init(path: String) throws {
-    self.init(storage: try Storage(path: path),
+  /// Initialise with a mapped file (this is currently used by Linux)
+  init(path: String, alternativePaths: [String] = []) throws {
+    self.init(storage: try Storage(
+                  path: path,
+                  alternativePaths: alternativePaths),
               isMappedImage: false, path: path)
   }
 
