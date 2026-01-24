@@ -3253,18 +3253,20 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
 
 ManglingError Remangler::mangleAttachedMacro(Node *node, unsigned depth,
                                              StringRef mangledChar) {
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
+  unsigned idx = 0;
+  while (idx + 1 < node->getNumChildren()) {
+    RETURN_IF_ERROR(mangleChildNode(node, idx, depth));
+    idx += 1;
+  }
   Buffer << "fM" << mangledChar;
-  return mangleChildNode(node, 3, depth + 1);
+  return mangleChildNode(node, idx, depth);
 }
 
 #define FREESTANDING_MACRO_ROLE(Name, Description)
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)    \
 ManglingError Remangler::mangle##Name##AttachedMacroExpansion( \
     Node *node, unsigned depth) {                              \
-  return mangleAttachedMacro(node, depth, MangledChar);        \
+  return mangleAttachedMacro(node, depth + 1, MangledChar);    \
 }
 #include "swift/Basic/MacroRoles.def"
 
