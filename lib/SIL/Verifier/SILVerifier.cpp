@@ -2377,9 +2377,9 @@ public:
             "operand of abort_apply must be a begin_apply");
     auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
-    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
-                AI->getFunction()->getASTContext().LangOpts.hasFeature(
-                    Feature::CoroutineAccessorsUnwindOnCallerError),
+    // `abort_apply` is valid for legacy `_read`/`_modify` accessors
+    // It is never valid for `yielding borrow`/`yielding mutate`
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine(),
             "abort_apply of callee-allocated yield-once coroutine!?");
   }
 

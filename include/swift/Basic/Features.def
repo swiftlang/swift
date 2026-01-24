@@ -510,7 +510,11 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 //   (Don't use "read"/"modify" in swiftinterface files.)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
 
-/// modify/read single-yield coroutines always execute code post-yield code
+/// `yielding borrow` and `yielding mutate` coroutine
+/// accessors always execute the second half of the
+/// coroutine, even after a thrown error.  This flag
+/// used to disable running the second half after an
+/// error, but no longer has any effect.
 EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
