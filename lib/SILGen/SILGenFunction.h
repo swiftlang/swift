@@ -2084,7 +2084,7 @@ public:
                                         bool isOnSelfParameter);
 
   ManagedValue applyBorrowMutateAccessor(SILLocation loc, ManagedValue fn,
-                                         bool canUnwind, SubstitutionMap subs,
+                                         SubstitutionMap subs,
                                          ArrayRef<ManagedValue> args,
                                          CanSILFunctionType substFnType,
                                          ApplyOptions options);
