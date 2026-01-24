@@ -225,7 +225,7 @@ extension Parent {
 // NESTED-NEXT: [[ExtInner_USR]] | internal | {{.*}}cursor_symbol_graph_referenced.swift | cursor_symbol_graph_referenced | User | NonSPI | source.lang.swift
 // NESTED-NEXT:   Parent swift.struct s:30cursor_symbol_graph_referenced6ParentV
 // NESTED-NEXT:   ExtInner swift.struct [[ExtInner_USR]]
-// NESTED-NEXT: [[FromSomeModule_USR]] | public | {{.*}}/SomeModule.swift | SomeModule | User | NonSPI | source.lang.swift
+// NESTED-NEXT: [[FromSomeModule_USR]] | public | {{.*}}SomeModule.swift | SomeModule | User | NonSPI | source.lang.swift
 // NESTED-NEXT:   FromSomeModule swift.struct [[FromSomeModule_USR]]
 // NESTED-NEXT: REFERENCED DECLS END
 
