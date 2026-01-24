@@ -1165,12 +1165,6 @@ std::optional<StringRef>
 Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
   assert(Tok.is(tok::string_literal));
 
-  // FIXME: Support extended escaping string literal.
-  if (Tok.getCustomDelimiterLen()) {
-    diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
-    return std::nullopt;
-  }
-
   SmallVector<Lexer::StringSegment, 1> Segments;
   L->getStringLiteralSegments(Tok, Segments);
   if (Segments.size() != 1 ||
@@ -1179,8 +1173,13 @@ Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText) {
     return std::nullopt;
   }
 
-  return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
-                                               Segments.front().Length));
+  llvm::SmallString<256> Buf;
+  StringRef EncodedStr = L->getEncodedStringSegment(Segments.front(), Buf);
+  if (!Buf.empty()) {
+    EncodedStr = Context.AllocateCopy(EncodedStr);
+  }
+
+  return EncodedStr;
 }
 
 struct ParserUnit::Implementation {
