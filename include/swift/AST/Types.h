@@ -5153,15 +5153,17 @@ enum class SILCoroutineKind : uint8_t {
   /// results and may not have yield results.
   None,
 
-  /// This function is a yield-once coroutine (used by e.g. accessors).
-  /// It must not have normal results and may have arbitrary yield results.
+  /// This function is a yield-once coroutine (used by legacy
+  /// `_read` and `_modify` accessors).
+  /// It must not have normal results and may have arbitrary
+  /// yield results.
   YieldOnce,
 
-  /// This function is a yield-once coroutine (used by read and modify
-  /// accessors).  It has the following differences from YieldOnce:
-  /// - it does not observe errors thrown by its caller (unless the feature
-  /// CoroutineAccessorsUnwindOnCallerError is enabled)
-  /// - it uses the callee-allocated ABI
+  /// This function is a yield-once coroutine (used by `yielding borrow`
+  /// and `yielding mutate` accessors).
+  /// Unlike YieldOnce, the second half of the coroutine is _always_
+  /// run, even if an error is thrown within the access scope.
+  /// It also uses a more efficient callee-allocated ABI.
   YieldOnce2,
 
   /// This function is a yield-many coroutine (used by e.g. generators).
