@@ -85,6 +85,10 @@ if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArch
 set "HostArchNameArg="
 if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME%"
 
+:: Build the debug info arguments
+set "DebugInfoArgs="
+if not "%INCLUDE_PACKAGING%"=="" set "DebugInfoArgs=-DebugInfo -CDebugFormat codeview -SwiftDebugFormat codeview"
+
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
@@ -94,6 +98,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %WindowsSDKArgs% ^
+  %DebugInfoArgs% ^
   %PackagingArg% ^
   %TestArg% ^
   -IncludeSBoM ^
