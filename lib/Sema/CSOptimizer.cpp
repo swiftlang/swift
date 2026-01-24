@@ -34,6 +34,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
+#include <random>
 
 using namespace swift;
 using namespace constraints;
@@ -1928,6 +1929,12 @@ ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
+
+  if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionSeed) {
+    std::mt19937 g(seed);
+    std::shuffle(disjunctions.begin(), disjunctions.end(), g);
+  }
+
   if (disjunctions.empty())
     return std::nullopt;
 

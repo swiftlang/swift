@@ -982,6 +982,13 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
+    /// If non-zero, randomly shuffle disjunctions using this seed. For debugging.
+    unsigned ShuffleDisjunctionSeed = 0;
+
+    /// If non-zero, randomly shuffle disjunction choices using this seed. For
+    /// debugging
+    unsigned ShuffleDisjunctionChoicesSeed = 0;
+
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.

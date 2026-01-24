@@ -1989,10 +1989,6 @@ struct MemberLookupResult {
   /// This is a list of viable candidates that were matched.
   ///
   SmallVector<OverloadChoice, 4> ViableCandidates;
-  
-  /// If there is a favored candidate in the viable list, this indicates its
-  /// index.
-  unsigned FavoredChoice = ~0U;
 
   /// The number of optional unwraps that were applied implicitly in the
   /// lookup, for contexts where that is permitted.
@@ -2072,10 +2068,6 @@ struct MemberLookupResult {
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
     UnviableCandidates.push_back(candidate);
     UnviableReasons.push_back(reason);
-  }
-
-  std::optional<unsigned> getFavoredIndex() const {
-    return (FavoredChoice == ~0U) ? std::optional<unsigned>() : FavoredChoice;
   }
 };
 
@@ -4406,8 +4398,7 @@ public:
   /// Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
-                      DeclContext *useDC, ConstraintLocator *locator,
-                      std::optional<unsigned> favoredIndex = std::nullopt);
+                      DeclContext *useDC, ConstraintLocator *locator);
 
   void addOverloadSet(ArrayRef<Constraint *> choices,
                       ConstraintLocator *locator);
@@ -4508,9 +4499,6 @@ public:
   ///
   /// \param locator The locator to use when generating constraints.
   ///
-  /// \param favoredIndex If there is a "favored" or preferred choice
-  /// this is its index in the set of choices.
-  ///
   /// \param requiresFix Determines whether choices require a fix to
   /// be included in the result. If the fix couldn't be provided by
   /// `getFix` for any given choice, such choice would be filtered out.
@@ -4522,7 +4510,6 @@ public:
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
-      std::optional<unsigned> favoredIndex = std::nullopt,
       bool requiresFix = false,
       llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
           getFix = [](unsigned, const OverloadChoice &) { return nullptr; });

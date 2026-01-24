@@ -431,6 +431,12 @@ def debug_constraints_on_line : Separate<["-"], "debug-constraints-on-line">,
 def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
   Alias<debug_constraints_on_line>;
 
+def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=">,
+  HelpText<"Random seed for shuffling disjunctions. For debugging solver performance">;
+
+def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
+  HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
+
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading (obsolete)">;
 
