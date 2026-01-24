@@ -129,8 +129,28 @@ public struct HeapObject {
 }
 
 
-
 /// Forward declarations of C functions
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+// Mirrors the interface defined in swift/EmbeddedPlatform.h
+
+@_extern(c, "_swift_alignedAllocate")
+public func _swift_alignedAllocate(_ pointer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ alignment: Int, _ size: Int) -> CInt
+
+@_extern(c, "_swift_free")
+public func _swift_free(_ p: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_generateRandom")
+public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
+
+@_extern(c, "_swift_generateRandomHashSeed")
+public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
+
+@_extern(c, "_swift_writeCharToStandardOutput")
+public func _swift_writeCharToStandardOutput(_: CInt) -> CInt
+
+#else
+// Interface that predates the introduction of swift/EmbeddedPlatform.h
 
 @_extern(c, "posix_memalign")
 func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _: Int) -> CInt
@@ -138,14 +158,21 @@ func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _
 @_extern(c, "free")
 func free(_ p: UnsafeMutableRawPointer?)
 
+@_extern(c, "arc4random_buf")
+func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
 
+#endif
 
 /// Allocations
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   let alignment = max(alignment, unsafe MemoryLayout<UnsafeRawPointer>.size)
   var r: UnsafeMutableRawPointer? = nil
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  _ = unsafe _swift_alignedAllocate(&r, alignment, size)
+#else
   _ = unsafe posix_memalign(&r, alignment, size)
+#endif
   return unsafe r
 }
 
@@ -169,7 +196,11 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_free(ptr)
+#else
   unsafe free(ptr)
+#endif
 }
 
 @c
@@ -703,12 +734,12 @@ public func swift_willThrow() throws {
 public func _willThrowTyped<E: Error>(_ error: E) {
 }
 
-@_extern(c, "arc4random_buf")
-func arc4random_buf(buf: UnsafeMutableRawPointer, nbytes: Int)
-
+#if !SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+// The Embedded Swift platform abstraction layer uses separate entrypoints.
 public func swift_stdlib_random(_ buf: UnsafeMutableRawPointer, _ nbytes: Int) {
   unsafe arc4random_buf(buf: buf, nbytes: nbytes)
 }
+#endif
 
 @c
 @inline(never)
