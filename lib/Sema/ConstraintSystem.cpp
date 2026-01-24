@@ -47,6 +47,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
 #include <cmath>
+#include <random>
 
 using namespace swift;
 using namespace constraints;
@@ -1299,8 +1300,7 @@ Type ConstraintSystem::getWrappedPropertyType(
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
-                                      ConstraintLocator *locator,
-                                      std::optional<unsigned> favoredIndex) {
+                                      ConstraintLocator *locator) {
   // If there is a single choice, add the bind overload directly.
   if (choices.size() == 1) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
@@ -1308,8 +1308,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   SmallVector<Constraint *, 4> candidates;
-  generateOverloadConstraints(candidates, boundType, choices, useDC, locator,
-                              favoredIndex);
+  generateOverloadConstraints(candidates, boundType, choices, useDC, locator);
   // For an overload set (disjunction) from newly generated candidates.
   addOverloadSet(candidates, locator);
 }
@@ -4013,41 +4012,24 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
 void ConstraintSystem::generateOverloadConstraints(
     SmallVectorImpl<Constraint *> &constraints, Type type,
     ArrayRef<OverloadChoice> choices, DeclContext *useDC,
-    ConstraintLocator *locator, std::optional<unsigned> favoredIndex,
-    bool requiresFix,
+    ConstraintLocator *locator, bool requiresFix,
     llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
         getFix) {
-  auto recordChoice = [&](SmallVectorImpl<Constraint *> &choices,
-                          unsigned index, const OverloadChoice &overload,
-                          bool isFavored = false) {
-    auto *fix = getFix(index, overload);
+  for (auto index : indices(choices)) {
+    auto *fix = getFix(index, choices[index]);
     // If fix is required but it couldn't be determined, this
     // choice has be filtered out.
     if (requiresFix && !fix)
-      return;
-
-    auto *choice = Constraint::createBindOverload(*this, type, overload,
-                                                  useDC, fix, locator);
-
-    if (isFavored)
-      choice->setFavored();
-
-    choices.push_back(choice);
-  };
-
-  if (favoredIndex) {
-    const auto &choice = choices[*favoredIndex];
-    assert(
-        (!choice.isDecl() || !isDeclUnavailable(choice.getDecl(), locator)) &&
-        "Cannot make unavailable decl favored!");
-    recordChoice(constraints, *favoredIndex, choice, /*isFavored=*/true);
-  }
-
-  for (auto index : indices(choices)) {
-    if (favoredIndex && (*favoredIndex == index))
       continue;
 
-    recordChoice(constraints, index, choices[index]);
+    auto *choice = Constraint::createBindOverload(*this, type, choices[index],
+                                                  useDC, fix, locator);
+    constraints.push_back(choice);
+  }
+
+  if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionChoicesSeed) {
+    std::mt19937 g(seed);
+    std::shuffle(constraints.begin(), constraints.end(), g);
   }
 }
 

@@ -404,6 +404,8 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
 // extend the lifetime of \p oldValue to cover the new uses.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
                                      OwnershipFixupContext &context) {
+  // Owned or unowned use points.
+  SmallVector<Operand *, 8> ownedUsePoints;
   switch (oldValue->getOwnershipKind()) {
   case OwnershipKind::Guaranteed: {
     // Check that the old lifetime can be extended and record the necessary
@@ -426,18 +428,29 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
     return OwnershipRAUWHelper::hasValidRAUWOwnership(
         oldValue, newValue, context.guaranteedUsePoints);
   }
+  case OwnershipKind::Unowned: {
+    if (newValue->getOwnershipKind() == OwnershipKind::Owned) {
+      // Check that a copy can be extended across all unowned uses.
+      // Required by OwnershipRAUWPrepare::prepareUnowned.
+      if (!findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+        return false;
+    }
+    // Ignore the uses of lexical unowned values when the new value is unowned
+    // or guaranteed.
+    break;
+  }
   default: {
-    SmallVector<Operand *, 8> ownedUsePoints;
     // If newValue is lexical, find the uses of oldValue so that it can be
     // determined whether the replacement would illegally extend the lifetime
     // of newValue.
     if (newValue->isLexical() &&
-        !findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+        !findUsesOfSimpleValue(oldValue, &ownedUsePoints)) {
       return false;
-    return OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
-                                                      ownedUsePoints);
+    }
   }
   }
+  return OwnershipRAUWHelper::hasValidRAUWOwnership(oldValue, newValue,
+                                                    ownedUsePoints);
 }
 
 bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {

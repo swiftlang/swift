@@ -662,6 +662,23 @@ private:
   }
 };
 
+enum class ConversionBehavior : unsigned {
+  None,
+  Class,
+  AnyHashable,
+  Double,
+  Pointer,
+  Array,
+  Dictionary,
+  Set,
+  Optional,
+  Structural,
+  Unknown
+};
+
+/// Classify the possible conversions having this type as result type.
+ConversionBehavior getConversionBehavior(Type type);
+
 /// Check whether there exists a type that could be implicitly converted
 /// to a given type i.e. is the given type is Double or Optional<..> this
 /// function is going to return true because CGFloat could be converted

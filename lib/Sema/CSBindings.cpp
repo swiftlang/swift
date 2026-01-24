@@ -1474,38 +1474,78 @@ static bool checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
   return true;
 }
 
+ConversionBehavior
+swift::constraints::inference::getConversionBehavior(Type type) {
+  if (type->is<StructType>()) {
+    if (type->isAnyHashable())
+      return ConversionBehavior::AnyHashable;
+    else if (type->isDouble() || type->isCGFloat())
+      return ConversionBehavior::Double;
+    else if (type->getAnyPointerElementType())
+      return ConversionBehavior::Pointer;
+
+    return ConversionBehavior::None;
+  }
+
+  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
+    if (auto eltTy = structTy->getArrayElementType()) {
+      return ConversionBehavior::Array;
+    } else if (ConstraintSystem::isDictionaryType(structTy)) {
+      return ConversionBehavior::Dictionary;
+    } else if (ConstraintSystem::isSetType(structTy)) {
+      return ConversionBehavior::Set;
+    } else if (type->getAnyPointerElementType()) {
+      return ConversionBehavior::Pointer;
+    }
+
+    return ConversionBehavior::None;
+  }
+
+  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
+    if (enumTy->getOptionalObjectType())
+      return ConversionBehavior::Optional;
+
+    return ConversionBehavior::None;
+  }
+
+  if (type->is<ClassType>() || type->is<BoundGenericClassType>())
+    return ConversionBehavior::Class;
+
+  if (type->is<EnumType>() ||
+      type->is<BuiltinType>() || type->is<ArchetypeType>())
+    return ConversionBehavior::None;
+
+  if (type->is<FunctionType>() || type->is<MetatypeType>())
+    return ConversionBehavior::Structural;
+
+  return ConversionBehavior::Unknown;
+}
+
 /// Check whether there exists a type that could be implicitly converted
 /// to a given type i.e. is the given type is Double or Optional<..> this
 /// function is going to return true because CGFloat could be converted
 /// to a Double and non-optional value could be injected into an optional.
 bool swift::constraints::inference::hasConversions(Type type) {
-  if (type->isAnyHashable() || type->isDouble() || type->isCGFloat())
-    return true;
-
-  if (type->getAnyPointerElementType())
-    return true;
-
-  if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->getArrayElementType()) {
-      return hasConversions(eltTy);
-    } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
-      return hasConversions(pair->second);
-    } else if (auto eltTy = ConstraintSystem::isSetType(structTy)) {
-      return hasConversions(*eltTy);
-    }
-
+  switch (getConversionBehavior(type)) {
+  case ConversionBehavior::None:
     return false;
+  case ConversionBehavior::Array:
+    return hasConversions(type->getArrayElementType());
+  case ConversionBehavior::Dictionary: {
+    auto pair = ConstraintSystem::isDictionaryType(type);
+    return hasConversions(pair->first) || hasConversions(pair->second);
   }
-
-  if (auto *enumTy = type->getAs<BoundGenericEnumType>()) {
-    if (enumTy->getOptionalObjectType())
-      return true;
-
-    return false;
+  case ConversionBehavior::Set:
+    return hasConversions(*ConstraintSystem::isSetType(type));
+  case ConversionBehavior::Class:
+  case ConversionBehavior::AnyHashable:
+  case ConversionBehavior::Double:
+  case ConversionBehavior::Pointer:
+  case ConversionBehavior::Optional:
+  case ConversionBehavior::Structural:
+  case ConversionBehavior::Unknown:
+    return true;
   }
-
-  return !(type->is<StructType>() || type->is<EnumType>() ||
-           type->is<BuiltinType>() || type->is<ArchetypeType>());
 }
 
 bool BindingSet::isViable(PotentialBinding &binding) {
