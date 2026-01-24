@@ -13,8 +13,8 @@
       "ClangRuntimeLibraryPlatformName": "xros",
       "SystemPrefix": "",
       "DefaultDeploymentTarget": "1.0",
-      "MinimumDeploymentTarget": "1.0", "MaximumDeploymentTarget": "1.0.99",
       "RecommendedDeploymentTarget": "1.0",
+      "MinimumDeploymentTarget": "1.0", "MaximumDeploymentTarget": "1.0.99",
       "ValidDeploymentTargets": ["1.0"]
     }
   },
