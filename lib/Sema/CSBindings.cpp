@@ -1230,8 +1230,7 @@ bool BindingSet::operator<(const BindingSet &other) {
   }
 #include "swift/Sema/CSTrail.def"
 
-const BindingSet *ConstraintSystem::determineBestBindings(
-    llvm::function_ref<void(const BindingSet &)> onCandidate) {
+const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
 
@@ -1280,7 +1279,12 @@ const BindingSet *ConstraintSystem::determineBestBindings(
     if (!isViable)
       continue;
 
-    onCandidate(bindings);
+    if (isDebugMode() && bindings.hasViableBindings()) {
+      auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
+      log << "(potential bindings ";
+      bindings.dump(log, solverState->getCurrentIndent() + 2);
+      log << ")\n";
+    }
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
