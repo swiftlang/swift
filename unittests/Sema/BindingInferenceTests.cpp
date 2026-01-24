@@ -200,8 +200,8 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
     ASSERT_TRUE(cs.getConstraintGraph()[typeVar]
                   .getPotentialBindings().getConformanceRequirements().empty());
 
-    ASSERT_TRUE(bool(bindings.TransitiveProtocols));
-    verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
+    ASSERT_TRUE(bindings.HasTransitiveProtocols);
+    verifyProtocolInferenceResults(bindings.TransitiveProtocols,
                                    {protocolTy1});
   }
 
@@ -224,8 +224,8 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
                   .getPotentialBindings().getConformanceRequirements().empty());
 
     auto &bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bool(bindings.TransitiveProtocols));
-    verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
+    ASSERT_TRUE(bindings.HasTransitiveProtocols);
+    verifyProtocolInferenceResults(bindings.TransitiveProtocols,
                                    {protocolTy1, protocolTy2});
   }
 }
@@ -290,23 +290,23 @@ TEST_F(SemaTest, TestComplexTransitiveProtocolInference) {
   auto &bindingsForT3 = inferBindings(cs, typeVar3);
   auto &bindingsForT5 = inferBindings(cs, typeVar5);
 
-  ASSERT_TRUE(bool(bindingsForT1.TransitiveProtocols));
-  verifyProtocolInferenceResults(*bindingsForT1.TransitiveProtocols,
+  ASSERT_TRUE(bindingsForT1.HasTransitiveProtocols);
+  verifyProtocolInferenceResults(bindingsForT1.TransitiveProtocols,
                                  {protocolTy1, protocolTy3, protocolTy4});
 
-  ASSERT_TRUE(bool(bindingsForT2.TransitiveProtocols));
+  ASSERT_TRUE(bindingsForT2.HasTransitiveProtocols);
   verifyProtocolInferenceResults(
-      *bindingsForT2.TransitiveProtocols,
+      bindingsForT2.TransitiveProtocols,
       {protocolTy1, protocolTy2, protocolTy3, protocolTy4});
 
-  ASSERT_TRUE(bool(bindingsForT3.TransitiveProtocols));
+  ASSERT_TRUE(bindingsForT3.HasTransitiveProtocols);
   verifyProtocolInferenceResults(
-      *bindingsForT3.TransitiveProtocols,
+      bindingsForT3.TransitiveProtocols,
       {protocolTy1, protocolTy2, protocolTy3, protocolTy4});
 
-  ASSERT_TRUE(bool(bindingsForT5.TransitiveProtocols));
+  ASSERT_TRUE(bindingsForT5.HasTransitiveProtocols);
   verifyProtocolInferenceResults(
-      *bindingsForT5.TransitiveProtocols,
+      bindingsForT5.TransitiveProtocols,
       {protocolTy1, protocolTy2, protocolTy3, protocolTy4});
 }
 
@@ -341,8 +341,8 @@ TEST_F(SemaTest, TestTransitiveProtocolInferenceThroughEquivalenceChains) {
 
   auto &bindings = inferBindings(cs, typeVar0);
 
-  ASSERT_TRUE(bool(bindings.TransitiveProtocols));
-  verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
+  ASSERT_TRUE(bindings.HasTransitiveProtocols);
+  verifyProtocolInferenceResults(bindings.TransitiveProtocols,
                                  {protocolTy0, protocolTy1});
 }
 

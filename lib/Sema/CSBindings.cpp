@@ -51,7 +51,9 @@ static bool isDirectRequirement(ConstraintSystem &cs,
 
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
-    : CS(CS), TypeVar(TypeVar), Info(info) {
+    : CS(CS), TypeVar(TypeVar), Info(info),
+      HasTransitiveProtocols(0),
+      HasImmediateBinding(0) {
 
   for (const auto &binding : info.Bindings)
     addBinding(binding);
@@ -391,7 +393,7 @@ bool BindingSet::isPotentiallyIncomplete() const {
 }
 
 void BindingSet::inferTransitiveProtocolRequirements() {
-  if (TransitiveProtocols)
+  if (HasTransitiveProtocols)
     return;
 
   llvm::SmallVector<std::pair<TypeVariableType *, TypeVariableType *>, 4>
@@ -438,12 +440,12 @@ void BindingSet::inferTransitiveProtocolRequirements() {
     // If current variable already has transitive protocol
     // conformances inferred, there is no need to look deeper
     // into subtype/equivalence chain.
-    if (bindings.TransitiveProtocols) {
+    if (bindings.HasTransitiveProtocols) {
       TypeVariableType *parent = nullptr;
       std::tie(parent, currentVar) = workList.pop_back_val();
       assert(parent);
       propagateProtocolsTo(parent, conformanceReqs,
-                            *bindings.TransitiveProtocols);
+                           bindings.TransitiveProtocols);
       continue;
     }
 
@@ -539,15 +541,15 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       auto &node = CS.getConstraintGraph()[equivalence.first];
       if (node.hasBindingSet()) {
         auto &bindings = node.getBindingSet();
-        bindings.TransitiveProtocols.emplace(protocolsForEquivalence.begin(),
-                                             protocolsForEquivalence.end());
+        bindings.TransitiveProtocols = protocolsForEquivalence;
+        bindings.HasTransitiveProtocols = 1;
       }
     }
 
     // Update the bindings associated with current type variable,
     // to avoid repeating this inference process.
-    bindings.TransitiveProtocols.emplace(inferredProtocols.begin(),
-                                         inferredProtocols.end());
+    bindings.TransitiveProtocols = inferredProtocols;
+    bindings.HasTransitiveProtocols = 1;
   } while (!workList.empty());
 }
 
@@ -723,8 +725,8 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
         // \endcode
         inferTransitiveProtocolRequirements();
 
-        if (TransitiveProtocols.has_value()) {
-          for (auto *constraint : *TransitiveProtocols) {
+        if (HasTransitiveProtocols) {
+          for (auto *constraint : TransitiveProtocols) {
             Type protocolTy = constraint->getSecondType();
 
             // Compiler-known marker protocols cannot be extended with members,
@@ -1100,6 +1102,57 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
+static bool isImmediateBinding(PotentialBinding binding) {
+  switch (binding.Kind) {
+  case AllowedBindingKind::Subtypes:
+    // Only alowed if the type in fact has no proper subtypes.
+    return !hasConversions(binding.BindingType);
+  case AllowedBindingKind::Exact:
+    // Always allowed.
+    return true;
+  case AllowedBindingKind::Supertypes:
+    // Never allowed.
+    return false;
+  }
+}
+
+void BindingSet::simplifyImmediateBinding() {
+  // If we already performed this step, skip.
+  if (hasImmediateBinding())
+    return;
+
+  if (isHole())
+    return;
+
+  if (CS.shouldAttemptFixes())
+    return;
+
+  // Result type of subscript could be l-value so we can't bind it early.
+  if (TypeVar->getImpl().isSubscriptResultType() ||
+      llvm::any_of(Info.DelayedBy, [](const Constraint *constraint) {
+        return constraint->getKind() == ConstraintKind::Disjunction ||
+               constraint->getKind() == ConstraintKind::ValueMember;
+      })) {
+    return;
+  }
+
+  std::optional<PotentialBinding> immediateBinding;
+  for (const auto &binding : Bindings) {
+    if (isImmediateBinding(binding)) {
+      immediateBinding = binding;
+      break;
+    }
+  }
+
+  if (immediateBinding.has_value()) {
+    HasImmediateBinding = 1;
+    Bindings.clear();
+    Bindings.insert(*immediateBinding);
+    Literals.clear();
+    Defaults.clear();
+  }
+}
+
 void PotentialBindings::inferFromLiteral(Constraint *constraint) {
   ASSERT(TypeVar);
   ASSERT(isDirectRequirement(CS, TypeVar, constraint));
@@ -1186,8 +1239,11 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
                                    : b.TypeVar->getImpl().isClosureType() ? 1
                                                                           : 0;
 
-  return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
-                         b.isDelayed(), b.isSubtypeOfExistentialType(),
+  return std::make_tuple(!b.hasImmediateBinding(),
+                         b.isHole(),
+                         numNonDefaultableBindings == 0,
+                         b.isDelayed(),
+                         b.isSubtypeOfExistentialType(),
                          b.involvesTypeVariables(),
                          static_cast<unsigned char>(b.getLiteralForScore()),
                          -numNonDefaultableBindings);
@@ -1297,6 +1353,8 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
 
     if (!isViable)
       continue;
+
+    bindings.simplifyImmediateBinding();
 
     if (isDebugMode() && bindings.hasViableBindings()) {
       if (first) {
@@ -1658,26 +1716,11 @@ bool BindingSet::isViable(PotentialBinding &binding) {
 }
 
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
+  if (HasImmediateBinding)
+    return true;
+
   if (isHole())
     return false;
-
-  if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
-        if (binding.Kind == AllowedBindingKind::Supertypes)
-          return false;
-
-        if (CS.shouldAttemptFixes())
-          return false;
-
-        return !hasConversions(binding.BindingType);
-      })) {
-    // Result type of subscript could be l-value so we can't bind it early.
-    if (!TypeVar->getImpl().isSubscriptResultType() &&
-        llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Disjunction ||
-                 constraint->getKind() == ConstraintKind::ValueMember;
-        }))
-      return true;
-  }
 
   if (isDelayed())
     return false;
