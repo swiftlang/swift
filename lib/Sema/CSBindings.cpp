@@ -1230,8 +1230,7 @@ bool BindingSet::operator<(const BindingSet &other) {
   }
 #include "swift/Sema/CSTrail.def"
 
-const BindingSet *ConstraintSystem::determineBestBindings(
-    llvm::function_ref<void(const BindingSet &)> onCandidate) {
+const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
 
@@ -1242,6 +1241,8 @@ const BindingSet *ConstraintSystem::determineBestBindings(
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
       node.initBindingSet();
   }
+
+  bool first = true;
 
   // Now let's see if we could infer something for related type
   // variables based on other bindings.
@@ -1280,12 +1281,26 @@ const BindingSet *ConstraintSystem::determineBestBindings(
     if (!isViable)
       continue;
 
-    onCandidate(bindings);
+    if (isDebugMode() && bindings.hasViableBindings()) {
+      if (first) {
+        llvm::errs().indent(solverState->getCurrentIndent())
+            << "(Potential Binding(s)\n";
+        first = false;
+      }
+      auto &log = llvm::errs().indent(solverState->getCurrentIndent() + 2);
+      bindings.dump(log, solverState->getCurrentIndent() + 2);
+      log << "\n";
+    }
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
     if (!bestBindings || bindings < *bestBindings)
       bestBindings = &bindings;
+  }
+
+  if (isDebugMode() && !first) {
+    auto &log = llvm::errs().indent(solverState->getCurrentIndent());
+    log << ")\n";
   }
 
   if (bestBindings)

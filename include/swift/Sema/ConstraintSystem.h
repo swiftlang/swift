@@ -5164,8 +5164,7 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  const BindingSet *determineBestBindings(
-      llvm::function_ref<void(const BindingSet &)> onCandidate);
+  const BindingSet *determineBestBindings();
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.

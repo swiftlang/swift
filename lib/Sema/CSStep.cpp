@@ -258,46 +258,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   // Setup active scope, only if previous component didn't fail.
   setupScope();
 
-  /// Try to figure out what this step is going to be,
-  /// after the scope has been established.
-  SmallString<64> potentialBindings;
-  llvm::raw_svector_ostream bos(potentialBindings);
-
-  const auto *bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
-    if (CS.isDebugMode() && bindings.hasViableBindings()) {
-      bos.indent(CS.solverState->getCurrentIndent() + 2);
-      bos << "(";
-      bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
-      bos << ")\n";
-    }
-  });
-
+  const auto *bestBindings = CS.determineBestBindings();
   auto disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
-
-  if (CS.isDebugMode()) {
-    SmallVector<Constraint *, 4> disjunctions;
-    CS.collectDisjunctions(disjunctions);
-    std::vector<std::string> overloadDisjunctions;
-    for (const auto &disjunction : disjunctions) {
-      auto constraints = disjunction->getNestedConstraints();
-      if (constraints[0]->getKind() == ConstraintKind::BindOverload)
-        overloadDisjunctions.push_back(
-            constraints[0]->getFirstType()->getString(
-                PrintOptions::forDebugging()));
-    }
-
-    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-      auto &log = getDebugLogger();
-      log << "(Potential Binding(s): " << '\n';
-      log << potentialBindings;
-    }
-
-    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-      auto &log = getDebugLogger();
-      log << ")\n";
-    }
-  }
 
   enum class StepKind { Binding, Disjunction, Conjunction };
 
