@@ -293,14 +293,6 @@ StepResult ComponentStep::take(bool prevFailed) {
       log << potentialBindings;
     }
 
-    if (!overloadDisjunctions.empty()) {
-      auto &log = getDebugLogger();
-      log.indent(CS.solverState->getCurrentIndent() + 2);
-      log << "Disjunction(s) = [";
-      interleave(overloadDisjunctions, log, ", ");
-      log << "]\n";
-    }
-
     if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
       auto &log = getDebugLogger();
       log << ")\n";
