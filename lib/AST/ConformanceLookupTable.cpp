@@ -1226,6 +1226,8 @@ int ConformanceLookupTable::compareProtocolConformances(
     }
   }
 
+  // FIXME: perhaps the reparentable sorting should simply happen here?
+
   // Otherwise, sort by protocol.
   ProtocolDecl *lhsProto = lhs->getProtocol();
   ProtocolDecl *rhsProto = rhs->getProtocol();

@@ -5784,6 +5784,17 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
   if (nominal1 && nominal2) {
     if (int result = compare(nominal1, nominal2))
       return result;
+
+    // Always order reparentable protocols away from non-reparentable protocols.
+    if (auto *proto1 = dyn_cast<ProtocolDecl>(nominal1)) {
+      if (auto *proto2 = dyn_cast<ProtocolDecl>(nominal2)) {
+        auto rp1 = proto1->getAttrs().hasAttribute<ReparentableAttr>();
+        auto rp2 = proto2->getAttrs().hasAttribute<ReparentableAttr>();
+        // FIXME: which sign is correct to not break existing ABI?
+        if (rp1 != rp2)
+          return rp1 ? -1 : +1;
+      }
+    }
   }
 
   if (int result = type1->getBaseIdentifier().str().compare(
