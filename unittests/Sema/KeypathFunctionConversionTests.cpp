@@ -60,6 +60,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   llvm::SmallVector<GenericTypeParamType *, 2> genericTypeParams = {
       genericType1, genericType2};
   auto genericSig = GenericSignature::get(genericTypeParams, {});
+  genericFnDecl->setGenericSignature(genericSig);
   auto genericFnTy = GenericFunctionType::get(genericSig, {genericFnParam},
                                               Context.TheEmptyTupleType)
                          ->withExtInfo(AnyFunctionType::ExtInfo());

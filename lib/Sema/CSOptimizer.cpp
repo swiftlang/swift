@@ -222,7 +222,8 @@ static bool isSupportedOperator(Constraint *disjunction) {
 
   auto name = decl->getBaseIdentifier();
   if (name.isArithmeticOperator() || name.isStandardComparisonOperator() ||
-      name.isBitwiseOperator() || name.isNilCoalescingOperator()) {
+      name.isBitwiseOperator() || name.isNilCoalescingOperator() ||
+      name.isStandardInfixLogicalOperator()) {
     return true;
   }
 
@@ -251,14 +252,6 @@ static bool isStandardComparisonOperator(Constraint *disjunction) {
   if (auto *decl = getOverloadChoiceDecl(choice))
     return decl->isOperator() &&
            decl->getBaseIdentifier().isStandardComparisonOperator();
-  return false;
-}
-
-static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
-  auto *choice = disjunction->getNestedConstraints()[0];
-  if (auto *decl = getOverloadChoiceDecl(choice))
-    return decl->isOperator() &&
-           decl->getBaseIdentifier().isStandardInfixLogicalOperator();
   return false;
 }
 
@@ -1932,6 +1925,8 @@ ConstraintSystem::selectDisjunction() {
   if (disjunctions.empty())
     return std::nullopt;
 
+  pruneDisjunctions(disjunctions);
+
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
 
@@ -1941,8 +1936,11 @@ ConstraintSystem::selectDisjunction() {
     unsigned firstActive = first->countActiveNestedConstraints();
     unsigned secondActive = second->countActiveNestedConstraints();
 
-    if (firstActive == 1 || secondActive == 1)
-      return secondActive != 1;
+    // A disjunction where all choices have been disabled allows us
+    // to immediately fail. A disjunction with one choice is a
+    // forced move.
+    if ((firstActive <= 1) || (secondActive <= 1))
+      return firstActive < secondActive;
 
     if (auto preference = isPreferable(*this, first, second))
       return preference.value();
@@ -1960,22 +1958,21 @@ ConstraintSystem::selectDisjunction() {
     // form disjunctions, but when they do, let's prefer them over
     // other operators when they have fewer choices because it helps
     // to split operator chains.
-    if (isFirstOperator && isSecondOperator) {
-      if (isStandardInfixLogicalOperator(first) !=
-          isStandardInfixLogicalOperator(second))
-        return firstActive < secondActive;
-    }
 
     // Not all of the non-operator disjunctions are supported by the
     // ranking algorithm, so to prevent eager selection of operators
     // when nothing concrete is known about them, let's reset the score
     // and compare purely based on number of choices.
     if (isFirstOperator != isSecondOperator) {
-      if (isFirstOperator && firstFavorings.IsSpeculative)
+      if (isFirstOperator && firstFavorings.IsSpeculative) {
+        ASSERT(firstScore.has_value());
         firstScore = 0;
+      }
 
-      if (isSecondOperator && secondFavorings.IsSpeculative)
+      if (isSecondOperator && secondFavorings.IsSpeculative) {
+        ASSERT(secondScore.has_value());
         secondScore = 0;
+      }
     }
 
     // Rank based on scores only if both disjunctions are supported.
@@ -1984,41 +1981,24 @@ ConstraintSystem::selectDisjunction() {
       // based on number of favored/active choices.
       if (*firstScore != *secondScore)
         return *firstScore > *secondScore;
-
-      // If the scores are the same and both disjunctions are operators
-      // they could be ranked purely based on whether the candidates
-      // were speculative or not. The one with more context always wins.
-      //
-      // Consider the following situation:
-      //
-      // func test(_: Int) { ... }
-      // func test(_: String) { ... }
-      //
-      // test("a" + "b" + "c")
-      //
-      // In this case we should always prefer ... + "c" over "a" + "b"
-      // because it would fail and prune the other overload if parameter
-      // type (aka contextual type) is `Int`.
-      if (isFirstOperator && isSecondOperator &&
-          firstFavorings.IsSpeculative != secondFavorings.IsSpeculative)
-        return secondFavorings.IsSpeculative;
     }
 
     // Use favored choices only if disjunction score is higher
     // than zero. This means that we can maintain favoring
     // choices without impacting selection decisions.
-    unsigned numFirstFavored =
-        firstScore.value_or(0) ? firstFavorings.FavoredChoices.size() : 0;
-    unsigned numSecondFavored =
-        secondScore.value_or(0) ? secondFavorings.FavoredChoices.size() : 0;
-
-    if (numFirstFavored == numSecondFavored) {
-      if (firstActive != secondActive)
-        return firstActive < secondActive;
+    unsigned numFirstFavored = firstActive;
+    if (firstScore && *firstScore != 0) {
+      if (auto numFavoredChoices = firstFavorings.FavoredChoices.size()) {
+        numFirstFavored = numFavoredChoices;
+      }
     }
 
-    numFirstFavored = numFirstFavored ? numFirstFavored : firstActive;
-    numSecondFavored = numSecondFavored ? numSecondFavored : secondActive;
+    unsigned numSecondFavored = secondActive;
+    if (secondScore && *secondScore != 0) {
+      if (auto numFavoredChoices = secondFavorings.FavoredChoices.size()) {
+        numSecondFavored = numFavoredChoices;
+      }
+    }
 
     return numFirstFavored < numSecondFavored;
   };
