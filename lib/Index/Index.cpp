@@ -1996,6 +1996,36 @@ bool shouldOutputEffectiveAccessOfValueSymbol(SymbolInfo Info) {
   }
 }
 
+static SymbolProperty getAccessLevel(const ValueDecl *D) {
+  AccessScope Scope = D->getFormalAccessScope();
+  if (Scope.isPublic()) {
+    if (D->isSPI()) {
+      return SymbolProperty::SwiftAccessControlSPI;
+    }
+    // If the entire library is marked as SPI, inherit that access level.
+    switch (D->getModuleContext()->getLibraryLevel()) {
+    case LibraryLevel::Other:
+      return SymbolProperty::SwiftAccessControlPublic;
+    case LibraryLevel::IPI:
+      return SymbolProperty::SwiftAccessControlSPI;
+    case LibraryLevel::SPI:
+      return SymbolProperty::SwiftAccessControlSPI;
+    case LibraryLevel::API:
+      return SymbolProperty::SwiftAccessControlPublic;
+    }
+  } else if (Scope.isPackage()) {
+    return SymbolProperty::SwiftAccessControlPackage;
+  } else if (Scope.isInternal()) {
+    return SymbolProperty::SwiftAccessControlInternal;
+  } else if (Scope.isFileScope()) {
+    return SymbolProperty::SwiftAccessControlFilePrivate;
+  } else if (Scope.isPrivate()) {
+    return SymbolProperty::SwiftAccessControlLessThanFilePrivate;
+  } else {
+    llvm_unreachable("Unsupported access scope");
+  }
+}
+
 bool IndexSwiftASTWalker::initIndexSymbol(
     ValueDecl *D, SourceLoc Loc, bool IsRef, IndexSymbol &Info,
     llvm::function_ref<bool(IndexSymbol &)> updateInfo) {
@@ -2045,25 +2075,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(
   if (shouldOutputEffectiveAccessOfValueSymbol(Info.symInfo) &&
       (Info.roles & (SymbolRoleSet)SymbolRole::Reference) == 0 &&
       !isLocalSymbol(D)) {
-    AccessScope Scope = D->getFormalAccessScope();
-    if (Scope.isPublic()) {
-      if (D->isSPI()) {
-        Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlSPI;
-      } else {
-        Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlPublic;
-      }
-    } else if (Scope.isPackage()) {
-      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlPackage;
-    } else if (Scope.isInternal()) {
-      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlInternal;
-    } else if (Scope.isFileScope()) {
-      Info.symInfo.Properties |= SymbolProperty::SwiftAccessControlFilePrivate;
-    } else if (Scope.isPrivate()) {
-      Info.symInfo.Properties |=
-          SymbolProperty::SwiftAccessControlLessThanFilePrivate;
-    } else {
-      llvm_unreachable("Unsupported access scope");
-    }
+    Info.symInfo.Properties |= getAccessLevel(D);
   }
 
   return false;
