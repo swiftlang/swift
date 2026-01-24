@@ -451,6 +451,8 @@ bool swift::findUsesOfSimpleValue(SILValue value,
         return false;
       }
       break;
+    case OperandOwnership::ForwardingUnowned:
+      return false;
     default:
       break;
     }
