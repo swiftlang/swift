@@ -2314,7 +2314,7 @@ namespace {
           condReqs.push_back(condReq);
         }
       }
-      if (condReqs.empty()) {
+      if (condReqs.empty() || Conformance->isReparented()) {
         // For a protocol P that conforms to another protocol, introduce a
         // conditional requirement for that P's Self: P. This aligns with
         // SILWitnessTable::enumerateWitnessTableConditionalConformances().
@@ -2322,6 +2322,13 @@ namespace {
           auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
           condReqs.emplace_back(RequirementKind::Conformance, selfType,
                                    selfProto->getDeclaredInterfaceType());
+
+          // Maintain canonical ordering.
+          llvm::array_pod_sort(
+              condReqs.begin(), condReqs.end(),
+              [](const Requirement *lhs, const Requirement *rhs) -> int {
+                return lhs->compare(*rhs);
+              });
         }
 
         if (condReqs.empty() && inverses.empty())

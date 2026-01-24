@@ -1250,21 +1250,29 @@ namespace {
       auto *descriptor = IGM.getAddrOfProtocolConformanceDescriptor(
           conf->getRootConformance());
 
-      // The conformance should not know about any explicit conditional
-      // requirements. We introduce a synthetic requirement that Self: Proto
-      // in SILWitnessTable::enumerateWitnessTableConditionalConformances
-      ASSERT(conf->getConditionalRequirements().size() == 0);
+      unsigned argumentCount = 0;
+      SILWitnessTable::enumerateWitnessTableConditionalConformances(
+          conf, [&](unsigned, CanType, ProtocolDecl *condProto) {
+            ASSERT(condProto == Proto && "only expected Self: Proto");
+            argumentCount++;
+            return false; // finished?
+          });
+      ASSERT(argumentCount == 1 && "unexpected number of instantiation args!");
 
-      // Instantiation argument array contains only the witness table for
-      // Self: Proto, as this conformance depends on that.
+      // This conformance of Proto: Base, where Base is the new parent, depends
+      // solely on the witness table for Self: Proto being present. Thus, that
+      // witness table is the only expected instantiation argument to create
+      // the witness table of Proto: Base. It'll be present in the private
+      // area at wt[-1].
 
       // void* instantationArgs = wtable;
       auto alloca = IGF.createAlloca(
           wtable->getType(), IGM.getPointerAlignment(), "instantiationArgs");
       IGF.Builder.CreateStore(wtable, alloca);
 
-      // swift_getWitnessTable(descriptor, associatedTypeMetadata,
-      // &instantiationArgs)
+      // swift_getWitnessTable(descriptor,
+      //                       associatedTypeMetadata,
+      //                       &instantiationArgs)
       auto *func = IGM.getGetWitnessTableFn();
       auto *funcTy = IGM.getGetWitnessTableFnType();
       auto thisTable = IGF.Builder.CreateCall(
