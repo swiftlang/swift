@@ -351,8 +351,8 @@ do {
 
   do {
     throw E.Boom
-    } catch let e as E.Boom {  // expected-error {{enum case 'Boom' is not a member type of 'E'}}
-    }
+  } catch let e as E.Boom { // expected-error {{enum case 'Boom' is not a member type of 'E'}}
+  }
 }
 
 // rdar://problem/25341015

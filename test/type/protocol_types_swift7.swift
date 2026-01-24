@@ -14,8 +14,8 @@ func throwingFn() throws {}
 func testExistentialInCatch() throws {
   do {
     try throwingFn()
-    } catch is HasAssoc {}
-    // expected-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  } catch is HasAssoc {}
+  // expected-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   _ = {
     do {
       try throwingFn()

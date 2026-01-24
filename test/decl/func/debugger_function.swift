@@ -50,7 +50,7 @@ func test2() -> Int {
 @LLDBDebuggerFunction
 func test3() {
   do {
-  } catch _ {
+  } catch {
   }
 }
 

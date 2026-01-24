@@ -117,8 +117,8 @@ func testExhaustiveDoCatch() async {
   do {
     _ = try await throwingAndAsync()
     // expected-error@-1{{errors thrown from here are not handled because the enclosing catch is not exhaustive}}
-    } catch let e as HomeworkError {
-    }
+  } catch let e as HomeworkError {
+  }
 
   // Ensure that we infer 'async' through an exhaustive do-catch.
   let fn = {

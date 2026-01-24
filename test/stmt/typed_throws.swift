@@ -107,6 +107,7 @@ func testDoCatchRethrowsTyped() throws(HomeworkError) {
   do {
     try doSomething()
   } catch .failed {
+
   } // expected-error{{thrown expression type 'MyError' cannot be converted to error type 'HomeworkError'}}
 
   do {
