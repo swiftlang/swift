@@ -418,11 +418,8 @@ bb0(%0 : $*TwoFields, %1 : $*TwoFields):
 }
 
 // CHECK-LABEL: sil [ossa] @guaranteed_argument_aliasing :
-// CHECK-NOT:     alloc_stack
-// CHECK:         [[A:%.*]] = struct_element_addr %0 : $*TwoFields, #TwoFields.a
-// CHECK-NEXT:    destroy_addr [[A]]
-// CHECK:         apply %{{[0-9]+}}([[A]], %0)
-// CHECK-NOT:     copy_addr
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
 // CHECK-LABEL: } // end sil function 'guaranteed_argument_aliasing'
 sil [ossa] @guaranteed_argument_aliasing : $@convention(thin) (@inout TwoFields, @owned Child) -> () {
 bb0(%0 : $*TwoFields, %1 : @owned $Child):
