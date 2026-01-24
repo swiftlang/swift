@@ -2097,3 +2097,39 @@ bb0(%0 : $*UInt64):
   return %99 : $()
 }
 
+sil @unused_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> () {
+[global: ]
+}
+
+sil @unused_inout_arg : $@convention(thin) (@inout Int32) -> () {
+[global: ]
+}
+
+// CHECK-LABEL: @unused_indirect_arg_should_be_treated_as_read
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0)
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=1,w=0
+sil [ossa] @unused_indirect_arg_should_be_treated_as_read : $@convention(thin) (@in_guaranteed Int32) -> () {
+bb0(%0 : $*Int32):
+  specify_test "memory_effects"
+  %1 = function_ref @unused_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed Int32) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @unused_inout_arg_is_readnone
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0)
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=0,w=0
+sil [ossa] @unused_inout_arg_is_readnone : $@convention(thin) (@inout Int32) -> () {
+bb0(%0 : $*Int32):
+  specify_test "memory_effects"
+  %1 = function_ref @unused_inout_arg : $@convention(thin) (@inout Int32) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Int32) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
