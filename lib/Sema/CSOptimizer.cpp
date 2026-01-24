@@ -1912,6 +1912,7 @@ ConstraintSystem::selectDisjunction() {
         applicableFn.get()->getFirstType()->getAs<FunctionType>();
     }
 
+    pruneDisjunction(disjunction, applicableFn.getPtrOrNull());
     auto info = computeDisjunctionInfo(*this, disjunctions, index, favorings);
     favorings.try_emplace(disjunction, info);
 

@@ -5249,6 +5249,9 @@ private:
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
 
+  void pruneDisjunction(Constraint *disjunction,
+                        Constraint *applicableFn);
+
   /// Pick a conjunction from the InactiveConstraints list.
   ///
   /// \returns The selected conjunction.
