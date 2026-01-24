@@ -696,16 +696,22 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
     }
   }
 
-  // Bridge native functions to blocks.
+  // Bridge native functions (which may be blocks) to blocks.
   auto bridgedFTy = dyn_cast<AnyFunctionType>(bridgedType);
   if (bridgedFTy && bridgedFTy->getRepresentation()
                       == AnyFunctionType::Representation::Block) {
     auto nativeFTy = cast<AnyFunctionType>(nativeType);
 
-    if (nativeFTy->getRepresentation()
-          != AnyFunctionType::Representation::Block)
-      return SGF.emitFuncToBlock(loc, v, nativeFTy, bridgedFTy,
-                                 loweredBridgedTy.castTo<SILFunctionType>());
+    // We used to test here whether the native type was already a block,
+    // and not do this if it was, but this code is *also* responsible for
+    // bridging between calling conventions in some cases.
+    //
+    // For instance, if you pass a Swift block of type (Int32) -> () to
+    // a routine that expects a C/C++ block of type (^)(const int&) -> void,
+    // we need to generate a thunk to dereference the reference before
+    // passing it to the Swift code.
+    return SGF.emitFuncToBlock(loc, v, nativeFTy, bridgedFTy,
+                               loweredBridgedTy.castTo<SILFunctionType>());
   }
 
   // If the native type conforms to _ObjectiveCBridgeable, use its

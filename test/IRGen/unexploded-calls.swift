@@ -28,6 +28,6 @@ public func g(_ s : S) {
 // CHECK:   [[ALLOCA]].g._value = getelementptr inbounds{{.*}} %TSf, ptr [[ALLOCA]].g, i32 0, i32 0
 // CHECK:   store float %1, ptr [[ALLOCA]].g._value, align 4
 // CHECK:   %[[LOAD:.*]] = load %struct.S, ptr [[ALLOCA]], align 4
-// CHECK:   call void @f(%struct.S %[[LOAD]])
+// CHECK:   call {{.*}}void @f(%struct.S %[[LOAD]])
 // CHECK: }
 

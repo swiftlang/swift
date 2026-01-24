@@ -8,7 +8,7 @@ import gizmo
 
 // CHECK-LABEL: sil hidden [ossa] @$s26default_arguments_imported9testGizmo{{[_0-9a-zA-Z]*}}F
 func testGizmo(gizmo: Gizmo) {
-  // CHECK: enum $Optional<@callee_guaranteed (@guaranteed Optional<Gizmo>) -> ()>, #Optional.none!enumelt
+  // CHECK: enum $Optional<@convention(block) (Optional<Gizmo>) -> ()>, #Optional.none!enumelt
   // CHECK: objc_method [[SELF:%[0-9]+]] : $Gizmo, #Gizmo.enumerateSubGizmos!foreign
   gizmo.enumerateSubGizmos()
 } // CHECK: } // end sil function '$s26default_arguments_imported9testGizmo5gizmoySo0E0C_tF'

@@ -163,6 +163,122 @@ namespace {
     llvm_unreachable("Invalid ImportHint.");
   }
 
+  // Convert the given type so that there are no unsigned POD types
+  // within it.
+  class MakeSigned final
+    : public clang::TypeVisitor<MakeSigned, const clang::QualType> {
+  private:
+    using RetTy = const clang::QualType;
+
+    const clang::ASTContext &Ctx;
+
+  public:
+    explicit MakeSigned(const clang::ASTContext &Ctx): Ctx(Ctx) {}
+
+    using TypeVisitor::Visit;
+    RetTy Visit(clang::QualType type) {
+      clang::QualType Result = Visit(type.getTypePtr());
+      Result.setLocalFastQualifiers(type.getLocalFastQualifiers());
+#if DEBUG_IMPORTER_MAKE_SIGNED
+      fprintf(stderr, "***MAKESIGNED***\n");
+      type->dump();
+      fprintf(stderr, "=>\n");
+      Result->dump();
+      fprintf(stderr, "---MAKESIGNED---\n");
+#endif
+      return Result;
+    }
+
+    RetTy VisitPointerType(const clang::PointerType *t) {
+      return Ctx.getPointerType(Visit(t->getPointeeType()),
+                                t->getPointerAttributes());
+    }
+
+    RetTy VisitBlockPointerType(const clang::BlockPointerType *t) {
+      return Ctx.getBlockPointerType(Visit(t->getPointeeType()));
+    }
+
+    RetTy VisitLValueReferenceType(const clang::LValueReferenceType *t) {
+      return Ctx.getLValueReferenceType(clang::QualType(t, 0),
+                                        t->isSpelledAsLValue());
+    }
+
+    RetTy VisitRValueReferenceType(const clang::RValueReferenceType *t) {
+      return Ctx.getRValueReferenceType(clang::QualType(t, 0));
+    }
+
+    RetTy VisitParenType(const clang::ParenType *t) {
+      clang::QualType InnerTy = Visit(t->getInnerType());
+      return Ctx.getParenType(InnerTy);
+    }
+
+    RetTy VisitAtomicType(const clang::AtomicType *t) {
+      clang::QualType ValueTy = Visit(t->getValueType());
+      return Ctx.getAtomicType(ValueTy);
+    }
+
+    RetTy VisitFunctionProtoType(const clang::FunctionProtoType *t) {
+      clang::QualType ReturnTy = Visit(t->getReturnType());
+      SmallVector<clang::QualType, 16> ParamTypes;
+      ParamTypes.reserve(t->getNumParams());
+      for (clang::QualType ParamTy : t->getParamTypes())
+        ParamTypes.push_back(Visit(ParamTy));
+      return Ctx.getFunctionType(ReturnTy, ParamTypes, t->getExtProtoInfo());
+    }
+
+    RetTy VisitFunctionNoProtoType(const clang::FunctionNoProtoType *t) {
+      clang::QualType ReturnTy = Visit(t->getReturnType());
+      return Ctx.getFunctionNoProtoType(ReturnTy, t->getExtInfo());
+    }
+
+    RetTy VisitBuiltinType(const clang::BuiltinType *t) {
+      if (!t->isUnsignedInteger() || t->getKind() == clang::BuiltinType::Bool)
+        return clang::QualType(t, 0);
+      return Ctx.getCorrespondingSignedType(clang::QualType(t, 0));
+    }
+
+    RetTy VisitVectorType(const clang::VectorType *t) {
+      auto EltTy = Visit(t->getElementType());
+      return Ctx.getVectorType(EltTy, t->getNumElements(), t->getVectorKind());
+    }
+
+    RetTy VisitBitIntType(const clang::BitIntType *t) {
+      if (!t->isUnsigned())
+        return clang::QualType(t, 0);
+      return Ctx.getBitIntType(false, t->getNumBits());
+    }
+
+    RetTy VisitDependentBitIntType(const clang::DependentBitIntType *t) {
+      if (!t->isUnsigned())
+        return clang::QualType(t, 0);
+      return Ctx.getDependentBitIntType(false, t->getNumBitsExpr());
+    }
+
+    RetTy VisitType(const clang::Type *t) { return clang::QualType(t, 0); }
+  };
+
+  static const clang::Type *
+  makeEquivalentType(const clang::Type *ClangType,
+                     const clang::ASTContext &Ctx) {
+    if (!ClangType) {
+      return nullptr;
+    }
+
+    // Convert unsigned types to signed types (this is to cope with the
+    // mapping of size_t and NSUInteger to Int).
+    MakeSigned Ms(Ctx);
+    auto Result = Ms.Visit(ClangType->getCanonicalTypeInternal()).getTypePtr();
+
+    // Also convert top-level C++ reference types to pointer types
+    if (Result->isReferenceType()) {
+      auto RefTy = cast<clang::ReferenceType>(Result);
+      auto PointeeTy = RefTy->getPointeeType();
+      Result = Ctx.getPointerType(PointeeTy).getTypePtr();
+    }
+
+    return Result;
+  }
+
   struct ImportResult {
     Type AbstractType;
     ImportHint Hint;
@@ -178,16 +294,20 @@ namespace {
     explicit operator bool() const { return (bool) AbstractType; }
   };
 
-  static ImportResult importFunctionPointerLikeType(const clang::Type &type,
-                                                    const Type &pointeeType) {
+  static ImportResult importFunctionPointerLikeType(
+      ClangImporter::Implementation &impl,
+      const clang::Type &type,
+      const Type &pointeeType
+  ) {
     auto funcTy = pointeeType->castTo<FunctionType>();
+    auto equivTy = makeEquivalentType(&type, impl.getClangASTContext());
     return {FunctionType::get(
                 funcTy->getParams(), funcTy->getResult(),
                 funcTy->getExtInfo()
                     .intoBuilder()
                     .withRepresentation(
                         AnyFunctionType::Representation::CFunctionPointer)
-                    .withClangFunctionType(&type)
+                    .withClangFunctionType(&type, equivTy)
                     .build()),
             type.isReferenceType() ? ImportHint::None
                                    : ImportHint::CFunctionPointer};
@@ -534,7 +654,7 @@ namespace {
       }
 
       if (pointeeQualType->isFunctionType()) {
-        return importFunctionPointerLikeType(*type, pointeeType);
+        return importFunctionPointerLikeType(Impl, *type, pointeeType);
       }
 
       // FIXME: this is a workaround for rdar://128013193
@@ -592,12 +712,12 @@ namespace {
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
-
+      auto equivTy = makeEquivalentType(type, Impl.getClangASTContext());
       auto extInfo =
           fTy->getExtInfo()
               .intoBuilder()
               .withRepresentation(FunctionType::Representation::Block)
-              .withClangFunctionType(type)
+              .withClangFunctionType(type, equivTy)
               .build();
       auto funcTy =
           FunctionType::get(fTy->getParams(), fTy->getResult(), extInfo);
@@ -619,7 +739,7 @@ namespace {
         return {pointeeType, ImportHint::None};
 
       if (pointeeQualType->isFunctionType()) {
-        return importFunctionPointerLikeType(*type, pointeeType);
+        return importFunctionPointerLikeType(Impl, *type, pointeeType);
       }
 
       // Currently, we can't generate thunks for references to dependent types
@@ -1613,13 +1733,20 @@ static ImportedType adjustTypeForConcreteImport(
     FunctionType::ExtInfo einfo = fTy->getExtInfo();
     if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
       const clang::Type *clangType = nullptr;
-      if (shouldStoreClangType(requiredFunctionTypeRepr))
+      if (shouldStoreClangType(requiredFunctionTypeRepr)) {
+        auto equivTy = makeEquivalentType(clangType, impl.getClangASTContext());
         clangType = fTy->getASTContext().getClangFunctionType(
             fTy->getParams(), fTy->getResult(), requiredFunctionTypeRepr);
-      einfo = einfo.intoBuilder()
+        einfo = einfo.intoBuilder()
                   .withRepresentation(requiredFunctionTypeRepr)
-                  .withClangFunctionType(clangType)
+                  .withClangFunctionType(clangType, equivTy)
                   .build();
+      } else {
+        einfo = einfo.intoBuilder()
+                  .withRepresentation(requiredFunctionTypeRepr)
+                  .withClangFunctionType(nullptr)
+                  .build();
+      }
       importedType = fTy->withExtInfo(einfo);
     }
     break;

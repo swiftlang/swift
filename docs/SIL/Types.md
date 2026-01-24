@@ -240,6 +240,10 @@ number of ways:
     -   An `@in_constant` parameter is indirect. The address must be of
         an initialized object; the function will treat the value held
         there as read-only.
+    -   An `@in_cxx` parameter is indirect. The address must be of an
+        initialized object; the callee may mutate the object, but is
+        not responsible for destroying it.  This corresponds to the
+        parameter-passing convention of the Itanium C++ ABI.
     -   A `@pack_owned` parameter is indirect. The parameter must be of
         pack type and is always an address. Whether the pack elements
         are direct values or addresses of values is encoded in the pack

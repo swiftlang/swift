@@ -269,7 +269,17 @@ ClangImporter::resolveStableSerializationPath(
       // Ignore unacceptable declarations.
       if (!isAcceptable(lookupDecl, step.first))
         continue;
-  
+
+      // If lookupDecl is the ObjC "id" type, return it directly; we can
+      // end up here if we find the `typedef objc_object *id` declaration,
+      // in which case we always want to use the built-in `id` type;
+      // we don't care about multiple matching declarations in this case...
+      // we just want to use the built-in `id` type.
+      if (auto typedefDecl = dyn_cast<clang::TypedefDecl>(lookupDecl)) {
+        if (typedefDecl->getUnderlyingType()->isObjCIdType())
+          return typedefDecl;
+      }
+
       // Bail out if we find multiple matching declarations.
       // TODO: make an effort to filter by the target module?
       if (resultDecl && !isSameDecl(resultDecl, lookupDecl))

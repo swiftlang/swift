@@ -1261,7 +1261,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
-  Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
+
+  // Clang function types should be enabled by default, but can be
+  // disabled if need be with -no-use-clang-function-types
+  Opts.UseClangFunctionTypes
+    = Args.hasFlag(options::OPT_use_clang_function_types,
+                   options::OPT_no_use_clang_function_types,
+                   /*default*/ true);
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
