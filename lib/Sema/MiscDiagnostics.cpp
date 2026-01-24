@@ -90,7 +90,8 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
-                                         bool isExprStmt) {
+                                         bool isExprStmt,
+                                         bool inForEachPreamble) {
   class DiagnoseWalker : public BaseDiagnosticWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
@@ -1501,11 +1502,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   // Diagnose uses of collection literals with defaulted types at the top
   // level.
-  if (auto collection =
-          dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (collection->isTypeDefaulted()) {
-      Walker.checkTypeDefaultedCollectionExpr(
-          const_cast<CollectionExpr *>(collection));
+  if (!inForEachPreamble) {
+    if (auto collection =
+            dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+      if (collection->isTypeDefaulted()) {
+        Walker.checkTypeDefaultedCollectionExpr(
+            const_cast<CollectionExpr *>(collection));
+      }
     }
   }
 }
@@ -4680,7 +4683,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
     checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(ctx, FES->getParsedSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
     checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
@@ -6487,10 +6490,11 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt,
-                                            bool isConstInitExpr) {
+                                            bool isConstInitExpr,
+                                            bool inForEachPreamble) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
-  diagSyntacticUseRestrictions(E, DC, isExprStmt);
+  diagSyntacticUseRestrictions(E, DC, isExprStmt, inForEachPreamble);
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
@@ -6835,21 +6839,6 @@ std::optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return std::nullopt;
-}
-
-bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                                  ForEachStmt *forEach) {
-  auto &ctx = dc->getASTContext();
-  if (auto thrownError = TypeChecker::canThrow(ctx, forEach)) {
-    if (forEach->getTryLoc().isInvalid()) {
-      ctx.Diags
-          .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-          .fixItInsert(forEach->getAwaitLoc(), "try");
-      return true;
-    }
-  }
-
-  return false;
 }
 
 void DeferredDiag::emit(swift::ASTContext &ctx) {

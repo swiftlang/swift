@@ -792,8 +792,7 @@ public:
       if (!shouldVerify(cast<Stmt>(S)))
         return false;
 
-      if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
         if (!shouldVerify(expansion)) {
           return false;
         }
@@ -802,29 +801,35 @@ public:
         ForEachPatternSequences.insert(expansion);
       }
 
-      if (!S->getElementExpr())
-        return true;
-
-      assert(!OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues[S->getElementExpr()] = 0;
+      if (S->getCachedDesugaredStmt()) {
+        ASSERT(S->getOpaqueSequenceExpr());
+        ASSERT(!OpaqueValues.count(S->getOpaqueSequenceExpr()));
+        OpaqueValues[S->getOpaqueSequenceExpr()] = 0;
+        if (S->getWhere()) {
+          ASSERT(S->getOpaqueWhereExpr());
+          ASSERT(!OpaqueValues.count(S->getOpaqueWhereExpr()));
+          OpaqueValues[S->getOpaqueWhereExpr()] = 0;
+        }
+      }
       return true;
     }
 
     void cleanup(ForEachStmt *S) {
-      if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
         assert(ForEachPatternSequences.count(expansion) != 0);
         ForEachPatternSequences.erase(expansion);
 
         // Clean up for real.
         cleanup(expansion);
       }
-
-      if (!S->getElementExpr())
-        return;
-
-      assert(OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues.erase(S->getElementExpr());
+      if (S->getCachedDesugaredStmt()) {
+        ASSERT(OpaqueValues.count(S->getOpaqueSequenceExpr()));
+        OpaqueValues.erase(S->getOpaqueSequenceExpr());
+        if (S->getWhere()) {
+          ASSERT(OpaqueValues.count(S->getOpaqueWhereExpr()));
+          OpaqueValues.erase(S->getOpaqueWhereExpr());
+        }
+      }
     }
 
     bool shouldVerify(InterpolatedStringLiteralExpr *expr) {

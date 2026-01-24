@@ -97,7 +97,6 @@ static DeclContext *getDisjunctionDC(Constraint *disjunction) {
   case ConstraintKind::BindOverload:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
     return choice->getDeclContext();
   default:
     return nullptr;

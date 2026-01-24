@@ -1086,6 +1086,10 @@ struct RefutablePatternInitInfo {
 
   /// PGO counter for the number of times the false branch is taken.
   ProfileCounter numFalseTaken;
+
+  /// A location to use for the initialization instead of the location provided
+  /// from the expression.
+  std::optional<SILLocation> customInitLoc;
 };
 
 /// Abstract base class for refutable pattern initializations.
@@ -1095,7 +1099,7 @@ class RefutablePatternInitialization : public Initialization {
 public:
   RefutablePatternInitialization(RefutablePatternInitInfo initInfo)
       : initInfo(initInfo) {
-    assert(initInfo.failureDest.isValid() &&
+    ASSERT(initInfo.failureDest.isValid() &&
            "Refutable patterns can only exist in failable conditions");
   }
 
@@ -1103,8 +1107,14 @@ public:
 
   JumpDest getFailureDest() const { return initInfo.failureDest; }
 
+  virtual void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                                       ManagedValue value, bool isInit) = 0;
+
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override = 0;
+                           ManagedValue value, bool isInit) override final {
+    auto initLoc = initInfo.customInitLoc.value_or(loc);
+    copyOrInitValueIntoImpl(SGF, initLoc, value, isInit);
+  }
 
   void bindVariable(SILLocation loc, VarDecl *var, ManagedValue value,
                     CanType formalValueType, SILGenFunction &SGF) {
@@ -1122,14 +1132,15 @@ public:
   ExprPatternInitialization(ExprPattern *P, RefutablePatternInitInfo initInfo)
       : RefutablePatternInitialization(initInfo), P(P) {}
 
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override;
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override;
 };
 } // end anonymous namespace
 
-void ExprPatternInitialization::
-copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                    ManagedValue value, bool isInit) {
+void ExprPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
+                                                        SILLocation loc,
+                                                        ManagedValue value,
+                                                        bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(P));
@@ -1168,8 +1179,8 @@ public:
       : RefutablePatternInitialization(initInfo), ElementDecl(ElementDecl),
         subInitialization(std::move(subInitialization)) {}
 
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override {
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override {
     assert(isInit && "Only initialization is supported for refutable patterns");
     emitEnumMatch(value, ElementDecl, subInitialization.get(), getInitInfo(),
                   loc, SGF);
@@ -1407,9 +1418,9 @@ public:
       : RefutablePatternInitialization(initInfo), pattern(pattern),
         subInitialization(std::move(subInitialization)) {}
 
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override;
-  
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override;
+
   void finishInitialization(SILGenFunction &SGF) override {
     if (subInitialization.get())
       subInitialization->finishInitialization(SGF);
@@ -1417,9 +1428,10 @@ public:
 };
 } // end anonymous namespace
 
-void IsPatternInitialization::
-copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                    ManagedValue value, bool isInit) {
+void IsPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
+                                                      SILLocation loc,
+                                                      ManagedValue value,
+                                                      bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
   
   // Try to perform the cast to the destination type, producing an optional that
@@ -1447,14 +1459,15 @@ public:
                             RefutablePatternInitInfo initInfo)
       : RefutablePatternInitialization(initInfo), pattern(pattern) {}
 
-  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                           ManagedValue value, bool isInit) override;
+  void copyOrInitValueIntoImpl(SILGenFunction &SGF, SILLocation loc,
+                               ManagedValue value, bool isInit) override;
 };
 } // end anonymous namespace
 
-void BoolPatternInitialization::
-copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
-                    ManagedValue value, bool isInit) {
+void BoolPatternInitialization::copyOrInitValueIntoImpl(SILGenFunction &SGF,
+                                                        SILLocation loc,
+                                                        ManagedValue value,
+                                                        bool isInit) {
   assert(isInit && "Only initialization is supported for refutable patterns");
 
   // Extract the i1 from the Bool struct.
@@ -1473,7 +1486,6 @@ copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                          initInfo.numFalseTaken);
   SGF.B.setInsertionPoint(contBB);
 }
-
 
 namespace {
 
@@ -1494,8 +1506,10 @@ struct InitializationForPattern
 
   InitializationForPattern(SILGenFunction &SGF, JumpDest patternFailDest,
                            bool generateDebugInfo, ProfileCounter numTrueTaken,
-                           ProfileCounter numFalseTaken)
-      : SGF(SGF), initInfo({patternFailDest, numTrueTaken, numFalseTaken}),
+                           ProfileCounter numFalseTaken,
+                           std::optional<SILLocation> customInitLoc)
+      : SGF(SGF),
+        initInfo({patternFailDest, numTrueTaken, numFalseTaken, customInitLoc}),
         generateDebugInfo(generateDebugInfo) {}
 
   // Paren, Typed, and Var patterns are noops, just look through them.
@@ -1506,6 +1520,9 @@ struct InitializationForPattern
     return visit(P->getSubPattern());
   }
   InitializationPtr visitBindingPattern(BindingPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  InitializationPtr visitOpaquePattern(OpaquePattern *P) {
     return visit(P->getSubPattern());
   }
 
@@ -1789,7 +1806,7 @@ void SILGenFunction::visitMacroExpansionDecl(MacroExpansionDecl *D) {
 /// condition has matched and any bound variables are in scope.
 ///
 void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
-                                       SILLocation loc,
+                                       Stmt *parentStmt,
                                        ProfileCounter NumTrueTaken,
                                        ProfileCounter NumFalseTaken) {
   // FIXME: The PGO counters here will be inaccurate when we have multiple
@@ -1797,7 +1814,24 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
   assert(B.hasValidInsertionPoint() &&
          "emitting condition at unreachable point");
-  
+
+  ASSERT(parentStmt);
+  auto loc = SILLocation(parentStmt);
+
+  // If this is the implicit continue loop for a for-each statement, we
+  // want to treat the location of the condition (e.g the implicit `next()`
+  // unwrap) as being the explicit location of the loop header for debug info.
+  // This ensures that stepping-over in a loop includes the header.
+  std::optional<SILLocation> customInitLoc;
+  if (auto *WS = dyn_cast<WhileStmt>(parentStmt)) {
+    if (auto *FES = WS->getParentForEach()) {
+      if (!FES->isImplicit() && FES->getContinueTarget() == WS) {
+        loc.markExplicit();
+        customInitLoc.emplace(loc);
+      }
+    }
+  }
+
   for (const auto &elt : Cond) {
     SILLocation booleanTestLoc = loc;
     SILValue booleanTestValue;
@@ -1809,8 +1843,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
           // but it's close enough.
           B.getSILGenFunction().enterDebugScope(loc, /*isBindingScope=*/true);
           InitializationPtr initialization = emitPatternBindingInitialization(
-              elt.getPattern(), FalseDest,
-              /*debugInfo*/ true, NumTrueTaken, NumFalseTaken);
+              elt.getPattern(), FalseDest, /*debugInfo*/ true, NumTrueTaken,
+              NumFalseTaken, customInitLoc);
 
           // Emit the initial value into the initialization.
           FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
@@ -1876,8 +1910,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
     // on success we fall through to a new block.
     auto FailBB = Cleanups.emitBlockForCleanups(FalseDest, loc);
     SILBasicBlock *ContBB = createBasicBlock();
-    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
-                       NumTrueTaken, NumFalseTaken);
+    B.createCondBranch(customInitLoc.value_or(booleanTestLoc), booleanTestValue,
+                       ContBB, FailBB, NumTrueTaken, NumFalseTaken);
 
     // Finally, emit the continue block and keep emitting the rest of the
     // condition.
@@ -1887,16 +1921,19 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
 
 InitializationPtr SILGenFunction::emitPatternBindingInitialization(
     Pattern *P, JumpDest failureDest, bool generateDebugInfo,
-    ProfileCounter numTrueTaken, ProfileCounter numFalseTaken) {
+    ProfileCounter numTrueTaken, ProfileCounter numFalseTaken,
+    std::optional<SILLocation> customInitLoc) {
   // We only currently support PGO for single top-level refutable patterns
   // since we don't track counters for individual refutable bits.
-  if (!P->getSemanticsProvidingPattern()->isSingleRefutablePattern()) {
+  if (!P->getSemanticsProvidingPattern()->isSingleRefutablePattern(
+          /*allowIsPatternCoercion*/ false)) {
     numTrueTaken = ProfileCounter();
     numFalseTaken = ProfileCounter();
   }
-  auto init = InitializationForPattern(*this, failureDest, generateDebugInfo,
-                                       numTrueTaken, numFalseTaken)
-                  .visit(P);
+  auto init =
+      InitializationForPattern(*this, failureDest, generateDebugInfo,
+                               numTrueTaken, numFalseTaken, customInitLoc)
+          .visit(P);
   init->setEmitDebugValueOnInit(generateDebugInfo);
   return init;
 }

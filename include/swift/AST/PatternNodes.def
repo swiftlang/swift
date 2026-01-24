@@ -33,6 +33,7 @@
 #endif
 
 // Metavars: x (variable binding), pat (pattern), e (expression)
+PATTERN(Opaque, Pattern)  // Wrapper around pat
 PATTERN(Paren, Pattern)   // (pat)
 PATTERN(Tuple, Pattern)   // (pat1, ..., patN), N >= 1
 PATTERN(Named, Pattern)   // let pat, var pat

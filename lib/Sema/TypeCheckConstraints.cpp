@@ -353,7 +353,8 @@ public:
       }
 
       performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt,
-                                      isConstInitExpr);
+                                      isConstInitExpr,
+                                      Target.isForEachPreamble());
     }
     ExprDepth += 1;
     return Action::Continue(E);
@@ -903,16 +904,12 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     }
   }
 
-  // Check to see if the sequence expr is throwing (in async context),
-  // if so require the stmt to have a `try`.
-  if (diagnoseUnhandledThrowsInAsyncContext(dc, stmt))
-    return true;
-
   return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  ASSERT(!expr->getType() && "the bool condition is already type checked");
+  ASSERT(!expr->getType() || isa<OpaqueValueExpr>(expr)
+         && "the bool condition is already type checked");
 
   auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)

@@ -333,13 +333,14 @@ func testStringForEachStmt() {
   // CHECK-LABEL: sil hidden [ossa] @$s13sil_locations21testStringForEachStmtyyF
   // CHECK: br {{.*}} line:[[@LINE-8]]:3
   // CHECK: switch_enum {{.*}} line:[[@LINE-9]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-8]]:10
+  // Loop exit branch:
+  // CHECK: br {{.*}} line:[[@LINE-11]]:3
+  // If statement:
+  // CHECK: cond_br {{.*}} line:[[@LINE-11]]:10
   // Break branch:
-  // CHECK: br {{.*}} line:[[@LINE-9]]:7
+  // CHECK: br {{.*}} line:[[@LINE-12]]:7
   // Looping back branch:
-  // CHECK: br {{.*}} line:[[@LINE-9]]:3
-  // Condition is false branch:
-  // CHECK: br {{.*}} line:[[@LINE-16]]:3
+  // CHECK: br {{.*}} line:[[@LINE-12]]:3
   
   
   

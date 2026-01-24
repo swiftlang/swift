@@ -1549,6 +1549,9 @@ static PrintNameContext getTypeMemberPrintNameContext(const Decl *d) {
 
 void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
+  case PatternKind::Opaque:
+    printPattern(cast<OpaquePattern>(pattern)->getSubPattern());
+    break;
   case PatternKind::Any:
     Printer << "_";
     break;
@@ -5659,6 +5662,8 @@ void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
   expr->getType()->print(Printer, Options);
 }
 
+void PrintAST::visitOpaqueStmt(OpaqueStmt *stmt) {}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }
@@ -5835,18 +5840,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   Printer << tok::kw_for << " ";
   printPattern(stmt->getPattern());
   Printer << " " << tok::kw_in << " ";
-  // FIXME: print container
-  if (auto *seq = stmt->getTypeCheckedSequence()) {
-    // Look through the call to '.makeIterator()'
-    
-    if (auto *CE = dyn_cast<CallExpr>(seq)) {
-      if (auto *SAE = dyn_cast<SelfApplyExpr>(CE->getFn()))
-        seq = SAE->getBase();
-    }
-    visit(seq);
-  } else {
-    visit(stmt->getParsedSequence());
-  }
+  visit(stmt->getSequence());
   Printer << " ";
   visit(stmt->getBody());
 }

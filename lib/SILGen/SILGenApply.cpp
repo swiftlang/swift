@@ -3245,6 +3245,11 @@ done:
 
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(argExpr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      argExpr = underlying;
+  }
+
   ForceValueExpr *forceUnwrap = nullptr;
   // Check for a force unwrap. This might show up inside or outside of the
   // load.
@@ -8048,6 +8053,9 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
       return visit(P->getSubPattern());
     }
     void visitBindingPattern(BindingPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    void visitOpaquePattern(OpaquePattern *P) {
       return visit(P->getSubPattern());
     }
     void visitTuplePattern(TuplePattern *P) {
