@@ -357,10 +357,17 @@ static const clang::Decl *getTemplateInstantiation(const clang::Decl *D) {
 }
 
 static clang::Module *getOwningModule(const clang::Decl *ClangDecl) {
+  std::optional<clang::Module *> M;
   if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
-    return Instance->getOwningModule();
+    M = importer::getClangSubmoduleForDecl(Instance, true);
+  } else {
+    M = importer::getClangSubmoduleForDecl(ClangDecl, true);
   }
-  return ClangDecl->getOwningModule();
+  if (M) {
+    // the inner value can be null, so flatten it
+    return M.value();
+  }
+  return nullptr;
 }
 
 struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
