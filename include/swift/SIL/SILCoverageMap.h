@@ -50,7 +50,10 @@ public:
       /// A skipped region, which represents a region that cannot have any
       /// coverage associated with it. This is used for e.g the inactive body of
       /// a \c #if.
-      Skipped
+      Skipped,
+
+      /// A branch region, which represents a branch in the source code.
+      Branch
     };
 
     Kind RegionKind;
@@ -59,13 +62,16 @@ public:
     unsigned EndLine;
     unsigned EndCol;
     llvm::coverage::Counter Counter;
+    llvm::coverage::Counter FalseCounter;
 
   private:
     MappedRegion(Kind RegionKind, unsigned StartLine, unsigned StartCol,
                  unsigned EndLine, unsigned EndCol,
-                 llvm::coverage::Counter Counter)
+                 llvm::coverage::Counter Counter,
+                 llvm::coverage::Counter FalseCounter = llvm::coverage::Counter())
         : RegionKind(RegionKind), StartLine(StartLine), StartCol(StartCol),
-          EndLine(EndLine), EndCol(EndCol), Counter(Counter) {}
+          EndLine(EndLine), EndCol(EndCol), Counter(Counter),
+          FalseCounter(FalseCounter) {}
 
   public:
     /// A code region, which represents a regular region of source code.
@@ -83,6 +89,15 @@ public:
                                 unsigned EndLine, unsigned EndCol) {
       return MappedRegion(Kind::Skipped, StartLine, StartCol, EndLine, EndCol,
                           llvm::coverage::Counter());
+    }
+
+    /// A branch region, which represents a branch in the source code.
+    static MappedRegion branch(unsigned StartLine, unsigned StartCol,
+                               unsigned EndLine, unsigned EndCol,
+                               llvm::coverage::Counter Counter,
+                               llvm::coverage::Counter FalseCounter) {
+      return MappedRegion(Kind::Branch, StartLine, StartCol, EndLine, EndCol,
+                          Counter, FalseCounter);
     }
 
     /// Retrieve the equivalent LLVM mapped region.

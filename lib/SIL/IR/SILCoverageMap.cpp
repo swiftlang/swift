@@ -15,10 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/STLExtras.h"
 #include "swift/SIL/SILCoverageMap.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/SILModule.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -54,7 +54,7 @@ SILCoverageMap::create(SILModule &M, SourceFile *ParentSourceFile,
 }
 
 SILCoverageMap::SILCoverageMap(SourceFile *ParentSourceFile, uint64_t Hash)
-  : ParentSourceFile(ParentSourceFile), Hash(Hash) {}
+    : ParentSourceFile(ParentSourceFile), Hash(Hash) {}
 
 SILCoverageMap::~SILCoverageMap() {}
 
@@ -67,6 +67,9 @@ SILCoverageMap::MappedRegion::getLLVMRegion(unsigned int FileID) const {
   case MappedRegion::Kind::Skipped:
     return CounterMappingRegion::makeSkipped(FileID, StartLine, StartCol,
                                              EndLine, EndCol);
+  case MappedRegion::Kind::Branch:
+    return CounterMappingRegion::makeBranchRegion(
+        Counter, FalseCounter, FileID, StartLine, StartCol, EndLine, EndCol);
   }
   llvm_unreachable("Unhandled case in switch!");
 }
