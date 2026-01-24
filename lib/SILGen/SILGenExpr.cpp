@@ -6196,6 +6196,7 @@ namespace {
     USE_SUBPATTERN(Paren)
     USE_SUBPATTERN(Typed)
     USE_SUBPATTERN(Binding)
+    USE_SUBPATTERN(Opaque)
 #undef USE_SUBPATTERN
 
 #define PATTERN(Kind, Parent)
@@ -6855,6 +6856,10 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
+  // If we have a whole expression associated, we can emit that instead.
+  if (auto *expr = SGF.OpaqueExprs.lookup(E))
+    return visit(expr, C);
+
   auto found = SGF.OpaqueValues.find(E);
   assert(found != SGF.OpaqueValues.end());
   return RValue(SGF, E, SGF.manageOpaqueValue(found->second, E, C));

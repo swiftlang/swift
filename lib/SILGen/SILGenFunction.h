@@ -1799,7 +1799,8 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
+  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
+                         Stmt *parentStmt,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
 
@@ -2449,6 +2450,13 @@ public:
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
 
+  /// A mapping from opaque statements to the statements that should be emitted.
+  llvm::SmallDenseMap<OpaqueStmt *, Stmt *> OpaqueStmts;
+
+  /// A mapping from OpaqueValueExprs to the whole expressions that should be
+  /// emitted.
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *> OpaqueExprs;
+
   /// Mapping from OpaqueValueExpr/PackElementExpr to their values.
   llvm::SmallDenseMap<Expr *, ManagedValue> OpaqueValues;
 
@@ -2863,7 +2871,8 @@ public:
   InitializationPtr emitPatternBindingInitialization(
       Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
       ProfileCounter numTrueTaken = ProfileCounter(),
-      ProfileCounter numFalseTaken = ProfileCounter());
+      ProfileCounter numFalseTaken = ProfileCounter(),
+      std::optional<SILLocation> customInitLoc = std::nullopt);
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.

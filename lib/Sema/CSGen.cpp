@@ -1943,6 +1943,11 @@ namespace {
       };
 
       switch (pattern->getKind()) {
+      case PatternKind::Opaque: {
+        auto *opaque = cast<OpaquePattern>(pattern);
+        auto *ogPattern = opaque->getSubPattern();
+        return setType(ogPattern->getType());
+      }
       case PatternKind::Paren: {
         auto *paren = cast<ParenPattern>(pattern);
 
@@ -3832,10 +3837,10 @@ static bool generateInitPatternConstraints(ConstraintSystem &cs,
 
 /// Generate constraints for a for-in statement preamble where the expression
 /// is a `PackExpansionExpr`.
-static std::optional<PackIterationInfo>
-generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
-                               PackExpansionExpr *expansion, Type patternType) {
-  auto packIterationInfo = PackIterationInfo();
+static bool generateForEachStmtConstraints(ConstraintSystem &cs,
+                                           DeclContext *dc,
+                                           PackExpansionExpr *expansion,
+                                           Type patternType) {
   auto elementLocator = cs.getConstraintLocator(
       expansion, ConstraintLocator::SequenceElementType);
 
@@ -3845,7 +3850,7 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
                                   /*isDiscarded=*/false);
 
     if (cs.generateConstraints(target))
-      return std::nullopt;
+      return true;
 
     cs.setTargetFor(expansion, target);
   }
@@ -3854,235 +3859,68 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
 
   cs.addConstraint(ConstraintKind::Conversion, elementType, patternType,
                    elementLocator);
-
-  packIterationInfo.patternType = patternType;
-  return packIterationInfo;
+  return false;
 }
 
 /// Generate constraints for a for-in statement preamble, expecting an
 /// expression that conforms to `Swift.Sequence`.
-static std::optional<SequenceIterationInfo>
-generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
-                               ForEachStmt *stmt, Pattern *typeCheckedPattern,
-                               bool shouldBindPatternVarsOneWay) {
-  ASTContext &ctx = cs.getASTContext();
+static bool generateForEachStmtConstraints(ConstraintSystem &cs,
+                                           DeclContext *dc, ForEachStmt *stmt,
+                                           Pattern *typeCheckedPattern,
+                                           bool shouldBindPatternVarsOneWay) {
   bool isAsync = stmt->getAwaitLoc().isValid();
-  auto *sequenceExpr = stmt->getParsedSequence();
+  auto *sequenceExpr = stmt->getSequence();
 
-  // If we have an unsafe expression for the sequence, lift it out of the
-  // sequence expression. We'll put it back after we've introduced the
-  // various calls.
-  UnsafeExpr *unsafeExpr = dyn_cast<UnsafeExpr>(sequenceExpr);
-  if (unsafeExpr) {
-    sequenceExpr = unsafeExpr->getSubExpr();
-  }
-
-  auto contextualLocator = cs.getConstraintLocator(
-      sequenceExpr, LocatorPathElt::ContextualType(CTP_ForEachSequence));
-  auto elementLocator = cs.getConstraintLocator(
-      sequenceExpr, ConstraintLocator::SequenceElementType);
-
-  auto sequenceIterationInfo = SequenceIterationInfo();
-
-  // The expression type must conform to the Sequence protocol.
-  auto sequenceProto = TypeChecker::getProtocol(
+  // Set the appropriate sequence protocol as the contextual type. We'll add the
+  // constraint for this as part of ForEachElement, and we rely on querying the
+  // contextual type for diagnostics.
+  auto *sequenceProto = TypeChecker::getProtocol(
       cs.getASTContext(), stmt->getForLoc(),
       isAsync ? KnownProtocolKind::AsyncSequence : KnownProtocolKind::Sequence);
   if (!sequenceProto)
-    return std::nullopt;
+    return true;
 
-  std::string name;
-  {
-    if (auto np = dyn_cast_or_null<NamedPattern>(stmt->getPattern()))
-      name = "$"+np->getBoundName().str().str();
-    name += "$generator";
-  }
+  ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
+                                 CTP_ForEachSequence);
+  cs.setContextualInfo(sequenceExpr, contextInfo);
 
-  auto *makeIteratorVar = new (ctx)
-      VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var,
-              sequenceExpr->getStartLoc(), ctx.getIdentifier(name), dc);
-  makeIteratorVar->setImplicit();
+  auto seqExprTarget =
+      SyntacticElementTarget(sequenceExpr, dc, contextInfo, false);
 
-  // FIXME: Apply `nonisolated(unsafe)` to async iterators.
-  //
-  // Async iterators are not `Sendable`; they're only meant to be used from
-  // the isolation domain that creates them. But the `next()` method runs on
-  // the generic executor, so calling it from an actor-isolated context passes
-  // non-`Sendable` state across the isolation boundary. `next()` should
-  // inherit the isolation of the caller, but for now, use the opt out.
-  if (isAsync) {
-    auto *nonisolated =
-        NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::Unsafe);
-    makeIteratorVar->addAttribute(nonisolated);
-  }
+  if (cs.generateConstraints(seqExprTarget))
+    return true;
 
-  // First, let's form a call from sequence to `.makeIterator()` and save
-  // that in a special variable which is going to be used by SILGen.
-  {
-    FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
+  cs.setTargetFor(sequenceExpr, seqExprTarget);
 
-    auto *makeIteratorRef = new (ctx) UnresolvedDotExpr(
-        sequenceExpr, SourceLoc(), DeclNameRef(makeIterator->getName()),
-        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
-    makeIteratorRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
-
-    Expr *makeIteratorCall =
-        CallExpr::createImplicitEmpty(ctx, makeIteratorRef);
-
-    // Swap in the 'unsafe' expression.
-    if (unsafeExpr) {
-      unsafeExpr->setSubExpr(makeIteratorCall);
-      makeIteratorCall = unsafeExpr;
-    }
-
-    Pattern *pattern = NamedPattern::createImplicit(ctx, makeIteratorVar);
-    auto *PB = PatternBindingDecl::createImplicit(
-        ctx, StaticSpellingKind::None, pattern, makeIteratorCall, dc);
-
-    auto makeIteratorTarget = SyntacticElementTarget::forInitialization(
-        makeIteratorCall, /*patternType=*/Type(), PB, /*index=*/0,
-        /*shouldBindPatternsOneWay=*/false);
-
-    ContextualTypeInfo contextInfo(sequenceProto->getDeclaredInterfaceType(),
-                                   CTP_ForEachSequence);
-    cs.setContextualInfo(sequenceExpr, contextInfo);
-
-    if (cs.generateConstraints(makeIteratorTarget))
-      return std::nullopt;
-
-    sequenceIterationInfo.makeIteratorVar = PB;
-
-    // Type of sequence expression has to conform to Sequence protocol.
-    //
-    // Note that the following emulates having `$generator` separately
-    // type-checked by introducing a `TVO_PrefersSubtypeBinding` type
-    // variable that would make sure that result of `.makeIterator` would
-    // get ranked standalone.
-    {
-      auto *externalIteratorType = cs.createTypeVariable(
-          cs.getConstraintLocator(sequenceExpr), TVO_PrefersSubtypeBinding);
-
-      cs.addConstraint(ConstraintKind::Equal, externalIteratorType,
-                       cs.getType(sequenceExpr),
-                       externalIteratorType->getImpl().getLocator());
-
-      cs.addConstraint(ConstraintKind::ConformsTo, externalIteratorType,
-                       sequenceProto->getDeclaredInterfaceType(),
-                       contextualLocator);
-
-      sequenceIterationInfo.sequenceType = cs.getType(sequenceExpr);
-    }
-
-    cs.setTargetFor({PB, /*index=*/0}, makeIteratorTarget);
-  }
-
-  // Now, result type of `.makeIterator()` is used to form a call to
-  // `.next()`. `next()` is called on each iteration of the loop.
-  {
-    FuncDecl *nextFn = 
-        TypeChecker::getForEachIteratorNextFunction(dc, stmt->getForLoc(), isAsync);
-    Identifier nextId = nextFn ? nextFn->getName().getBaseIdentifier()
-                               : ctx.Id_next;
-    TinyPtrVector<Identifier> labels;
-    if (nextFn && nextFn->getParameters()->size() == 1)
-      labels.push_back(ctx.Id_isolation);
-    auto *makeIteratorVarRef =
-        new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
-                              /*Implicit=*/true);
-    auto *nextRef = new (ctx)
-        UnresolvedDotExpr(makeIteratorVarRef, SourceLoc(),
-                          DeclNameRef(DeclName(ctx, nextId, labels)),
-                          DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
-    nextRef->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
-
-    ArgumentList *nextArgs;
-    if (nextFn && nextFn->getParameters()->size() == 1) {
-      auto isolationArg =
-        new (ctx) CurrentContextIsolationExpr(stmt->getForLoc(), Type());
-      nextArgs = ArgumentList::createImplicit(
-          ctx, {Argument(SourceLoc(), ctx.Id_isolation, isolationArg)});
-    } else {
-      nextArgs = ArgumentList::createImplicit(ctx, {});
-    }
-    Expr *nextCall = CallExpr::createImplicit(ctx, nextRef, nextArgs);
-
-    // `next` is always async but witness might not be throwing
-    if (isAsync) {
-      nextCall =
-          AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
-    }
-
-    // Wrap the 'next' call in 'unsafe', if the for..in loop has that
-    // effect or if the loop is async (in which case the iterator variable
-    // is nonisolated(unsafe).
-    if (stmt->getUnsafeLoc().isValid() ||
-        (isAsync &&
-         ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete)) {
-      SourceLoc loc = stmt->getUnsafeLoc();
-      bool implicit = stmt->getUnsafeLoc().isInvalid();
-      if (loc.isInvalid())
-        loc = stmt->getForLoc();
-      nextCall = new (ctx) UnsafeExpr(loc, nextCall, Type(), implicit);
-    }
-
-    // The iterator type must conform to IteratorProtocol.
-    {
-      ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
-          cs.getASTContext(), stmt->getForLoc(),
-          isAsync ? KnownProtocolKind::AsyncIteratorProtocol
-                  : KnownProtocolKind::IteratorProtocol);
-      if (!iteratorProto)
-        return std::nullopt;
-
-      ContextualTypeInfo contextInfo(iteratorProto->getDeclaredInterfaceType(),
-                                     CTP_ForEachSequence);
-      cs.setContextualInfo(nextRef->getBase(), contextInfo);
-    }
-
-    SyntacticElementTarget nextTarget(nextCall, dc, CTP_Unused,
-                                      /*contextualType=*/Type(),
-                                      /*isDiscarded=*/false);
-    if (cs.generateConstraints(nextTarget, FreeTypeVariableBinding::Disallow))
-      return std::nullopt;
-
-    sequenceIterationInfo.nextCall = nextTarget.getAsExpr();
-    cs.setTargetFor(sequenceIterationInfo.nextCall, nextTarget);
-  }
+  auto elementLocator = cs.getConstraintLocator(
+      sequenceExpr, ConstraintLocator::SequenceElementType);
 
   // Generate constraints for the pattern.
   Type initType =
       cs.generateConstraints(typeCheckedPattern, elementLocator,
                              shouldBindPatternVarsOneWay, nullptr, 0);
   if (!initType)
-    return std::nullopt;
+    return true;
 
-  // Add a conversion constraint between the element type of the sequence
-  // and the type of the element pattern.
-  auto *elementTypeLoc = cs.getConstraintLocator(
-      elementLocator, ConstraintLocator::OptionalInjection);
-  auto elementType = cs.createTypeVariable(elementTypeLoc,
-                                           /*flags=*/0);
-  {
-    auto nextType = cs.getType(sequenceIterationInfo.nextCall);
-    cs.addConstraint(ConstraintKind::OptionalObject, nextType, elementType,
-                     elementTypeLoc);
-    cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
-                     elementLocator);
-  }
+  // Introduce a `TVO_PrefersSubtypeBinding` type variable for the type of the
+  // sequence to maintain the same ranking behavior as if
+  // `<seq>.makeIterator()` were written.
+  auto *externalSeqTy = cs.createTypeVariable(
+      cs.getConstraintLocator(sequenceExpr), TVO_PrefersSubtypeBinding);
+  cs.addConstraint(ConstraintKind::Equal, externalSeqTy,
+                   cs.getType(sequenceExpr),
+                   externalSeqTy->getImpl().getLocator());
 
-  // Populate all of the information for a for-each loop.
-  sequenceIterationInfo.elementType = elementType;
-  sequenceIterationInfo.initType = initType;
-
-  return sequenceIterationInfo;
+  cs.addConstraint(ConstraintKind::ForEachElement, externalSeqTy, initType,
+                   elementLocator);
+  return false;
 }
 
 static std::optional<SyntacticElementTarget>
 generateForEachPreambleConstraints(ConstraintSystem &cs,
                                    SyntacticElementTarget target) {
   ForEachStmt *stmt = target.getAsForEachStmt();
-  auto *forEachExpr = stmt->getParsedSequence();
+  auto *forEachExpr = stmt->getSequence();
   auto *dc = target.getDeclContext();
 
   auto elementLocator = cs.getConstraintLocator(
@@ -4109,21 +3947,13 @@ generateForEachPreambleConstraints(ConstraintSystem &cs,
           cs, cs.getConstraintLocator(whereClause)));
     }
 
-    auto packIterationInfo =
-        generateForEachStmtConstraints(cs, dc, expansion, patternType);
-    if (!packIterationInfo) {
+    if (generateForEachStmtConstraints(cs, dc, expansion, patternType))
       return std::nullopt;
-    }
 
-    target.getForEachStmtInfo() = *packIterationInfo;
   } else {
-    auto sequenceIterationInfo = generateForEachStmtConstraints(
-        cs, dc, stmt, pattern, target.shouldBindPatternVarsOneWay());
-    if (!sequenceIterationInfo) {
+    auto bindOneWay = target.shouldBindPatternVarsOneWay();
+    if (generateForEachStmtConstraints(cs, dc, stmt, pattern, bindOneWay))
       return std::nullopt;
-    }
-
-    target.getForEachStmtInfo() = *sequenceIterationInfo;
   }
   return target;
 }
@@ -4208,8 +4038,13 @@ bool ConstraintSystem::generateConstraints(
             return std::nullopt;
           });
 
-      addContextualConversionConstraint(expr, convertType, ctp,
-                                        convertTypeLocator);
+      // Don't open opaque types for opaque patterns since they already have
+      // the expected archetype contextual type.
+      auto shouldOpenOpaqueType =
+          !isa_and_nonnull<OpaquePattern>(target.getPattern());
+
+      addContextualConversionConstraint(
+          expr, convertType, ctp, convertTypeLocator, shouldOpenOpaqueType);
     }
 
     // For an initialization target, generate constraints for the pattern.
