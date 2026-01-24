@@ -328,6 +328,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(EmbeddedSwiftPlatform)
 
   if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
     add_subdirectory(ClangOverlays)
