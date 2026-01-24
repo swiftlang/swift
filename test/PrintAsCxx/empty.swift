@@ -27,7 +27,6 @@
 // CHECK-NEXT:  #if defined(__cplusplus)
 // CHECK-NEXT:  #include <cstdint>
 // CHECK-NEXT:  #include <cstddef>
-// CHECK-NEXT:  #include <cstdbool>
 // CHECK-NEXT:  #include <cstring>
 // CHECK-NEXT:  #include <stdlib.h>
 // CHECK-NEXT:  #include <new>
