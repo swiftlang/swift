@@ -324,7 +324,7 @@ EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(PreambleMacros, false)
-EXPERIMENTAL_FEATURE(MacrosOnImports, true)
+LANGUAGE_FEATURE(MacrosOnImports, 0, "allow attaching Swift macros with swift_attr")
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
@@ -494,7 +494,7 @@ EXPERIMENTAL_FEATURE(TrailingComma, false)
 
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
-EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
+LANGUAGE_FEATURE(SafeInteropWrappers, 0, "wrap imported functions with safe interfaces")
 
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)

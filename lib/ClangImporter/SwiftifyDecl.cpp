@@ -738,6 +738,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
 
 void ClangImporter::Implementation::swiftifyProtocol(
     NominalTypeDecl *MappedDecl) {
+  return; // disable for now
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
   if (!isa<ProtocolDecl, ClassDecl>(MappedDecl))

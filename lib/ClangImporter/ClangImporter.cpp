@@ -593,8 +593,10 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
+    invocationArgStrs.push_back("-D__LIBC_STAGED_BOUNDS_SAFETY_ATTRIBUTES");
+  }
 
   // Set C language options.
   if (triple.isOSDarwin()) {
