@@ -221,6 +221,8 @@ void State::initializeAllNonConsumingUses(
     blocksWithNonConsumingUses.setFrozen();
   };
 
+  llvm::DenseSet<SILInstruction *> cache;
+  auto next_inst = beginInst->getIterator();
   for (Operand *use : nonConsumingUsers) {
     auto *userBlock = use->getUser()->getParent();
 
@@ -228,9 +230,14 @@ void State::initializeAllNonConsumingUses(
     // block or is strictly after our defining instruction. If so, stash the use
     // and continue.
     if (userBlock != getBeginBlock() ||
-        std::find_if(beginInst->getIterator(), userBlock->end(),
-                     [&use](const SILInstruction &inst) -> bool {
-                       return use->getUser() == &inst;
+        cache.contains(use->getUser()) ||
+        std::find_if(next_inst, userBlock->end(),
+                     [&use, &cache, &next_inst](SILInstruction &inst) -> bool {
+                       cache.insert(&inst);
+                       bool result = use->getUser() == &inst;
+                       if (result)
+                         next_inst = std::next(inst.getIterator());
+                       return result;
                      }) != userBlock->end()) {
       blocksWithNonConsumingUses.insert(userBlock, use);
       continue;
