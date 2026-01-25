@@ -1474,6 +1474,38 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   return result;
 }
 
+// Identifies Swift language runtime and standard library implementation
+// modules.
+//
+// Certain diagnostics (e.g. ForceOptional for optional existentials passed
+// to generic parameters) are only appropriate in user code. This helper is
+// used to suppress those fixes while compiling the standard library and its
+// supporting runtime modules, where such patterns are intentional.
+
+static bool isLanguageRuntimeModule(ModuleDecl *module) {
+
+  if (!module)
+    return false;
+
+  auto &ctx = module->getASTContext();
+
+  if (module == ctx.getStdlibModule())
+    return true;
+
+  if (module == ctx.TheBuiltinModule)
+    return true;
+
+  auto name = module->getName();
+
+  return name.is("Distributed") ||
+    name.is("Foundation") ||
+    name.is("Observation") ||
+    name.is("StdlibUnittest") ||
+    name.is("_Concurrency") ||
+    name.is("_Differentiation") ||
+    name.is("_StringProcessing");
+}
+
 // Match the argument of a call to the parameter.
 static ConstraintSystem::TypeMatchResult matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType, ArgumentList *argList,
@@ -1821,28 +1853,68 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         }
       }
 
-      // If the argument is an existential type and the parameter is generic,
-      // consider opening the existential type.
-      if (auto typeVarAndBindingTy = shouldOpenExistentialCallArgument(
-              callee, paramIdx, paramTy, argTy, argExpr, cs)) {
-        // My kingdom for a decent "if let" in C++.
+      auto shouldOpenExistentialArgument =
+      [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
+
+        Type argTypeForOpening = argTy;
+
+        auto *module = cs.DC ? cs.DC->getParentModule() : nullptr;
+        if (!module || isLanguageRuntimeModule(module)) {
+          return shouldOpenExistentialCallArgument(
+              callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
+        }
+        // 1) First try: the normal path.
+        auto opened = ::shouldOpenExistentialCallArgument(
+            callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
+
+        if (opened)
+          return opened;
+
+        // 2) If opening failed, consider ForceOptional ONLY if fixes are enabled
+        //    and arg is Optional whose object is an existential any ... with protocols
+        //    and not class-constrained.
+        if (!cs.shouldAttemptFixes())
+          return std::nullopt;
+
+        if (Type optObject = argTy->getOptionalObjectType()) {
+          Type unwrapped = optObject->lookThroughAllOptionalTypes();
+          if (unwrapped->isAnyExistentialType()) {
+            auto layout = unwrapped->getExistentialLayout();
+            if (!layout.getProtocols().empty() && !layout.requiresClass()) {
+
+              auto openedAfterPeel = shouldOpenExistentialCallArgument(
+                  callee, paramIdx, paramTy, unwrapped, argExpr, cs);
+
+              if (openedAfterPeel) {
+                cs.recordFix(ForceOptional::create(cs,
+                                                   argTy,
+                                                   unwrapped,
+                                                   cs.getConstraintLocator(loc)));
+
+                return openedAfterPeel;
+              }
+            }
+          }
+        }
+        return std::nullopt;
+      };
+
+      if (auto typeVarAndBindingTy = shouldOpenExistentialArgument()) {
         TypeVariableType *typeVar;
         Type bindingTy;
         std::tie(typeVar, bindingTy) = *typeVarAndBindingTy;
 
-        ExistentialArchetypeType *openedArchetype;
+        ExistentialArchetypeType *openedArchetype = nullptr;
 
-        // Open the argument type.
-        argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
-          if (t->isAnyExistentialType()) {
+        argTy = argTy.transformRec([&](TypeBase *t)-> std::optional<Type> {
+            if (!t->isAnyExistentialType())
+                return std::nullopt;
+
             Type openedTy;
             std::tie(openedTy, openedArchetype) =
                 cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
 
             return openedTy;
-          }
-
-          return std::nullopt;
         });
 
         openedExistentials.push_back({typeVar, openedArchetype});
