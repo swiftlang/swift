@@ -1,14 +1,20 @@
-;;===--- sil-mode.el ------------------------------------------------------===;;
-;;
+;;; sil-mode.el --- SIL major mode                   -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2014 - 2025  Apple Inc. and the Swift project authors
+
+;; Keywords: languages
+;; Version: 0.0.1
+
+;;; Commentary:
+
 ;; This source file is part of the Swift.org open source project
-;;
-;; Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+
 ;; Licensed under Apache License v2.0 with Runtime Library Exception
 ;;
 ;; See https://swift.org/LICENSE.txt for license information
 ;; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-;;
-;;===----------------------------------------------------------------------===;;
+
+;;; Code:
 
 (eval-when-compile
   (require 'cl))
@@ -264,9 +270,8 @@
 
 (unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
-  (define-key sil-mode-map "\t" 'tab-to-tab-stop)
-  (define-key sil-mode-map "\es" 'center-line)
-  (define-key sil-mode-map "\eS" 'center-paragraph))
+  (define-key sil-mode-map (kbd "C-c C-c") 'sil-mode-display-function-cfg)
+  (define-key sil-mode-map (kbd "C-c C-d") 'sil-mode-demangle))
 
 ;;; Helper functions
 
@@ -307,34 +312,60 @@
         (process-send-region p brace-start brace-end)
        (process-send-eof p)))))
 
+(defun sil-mode-demangle (begin end)
+  "Pass symbol at point or region BEGIN - END to swift demangle, depending on whether the region is active."
+  (interactive "r")
+  (let ((region
+          (if (region-active-p)
+            (cons begin end)
+            (bounds-of-thing-at-point 'symbol))))
+    (shell-command-on-region (car region) (cdr region)
+      "swift demangle"
+      "*Swift Demangle*")))
+
+(defun sil-mode-extract-index-name-function ()
+  "Extract the name of the SIL function or data structure defined on the current line."
+  (save-excursion
+    (when (re-search-forward "^\\<sil\\> [^@]*@\\([^ :]+\\)" nil t)
+      (match-string 1))))
+
+(defun sil-mode-beginning-of-defun-function (&optional arg)
+  "Move to the start of a SIL definition, ARG times."
+  (interactive "^p")
+  (re-search-backward "^sil .*{\s*$" nil t (or arg 1)))
+
+
+(defun sil-mode-end-of-defun-function (&optional arg)
+  "Move to the end of a SIL definition, ARG times."
+  (interactive "^p")
+  (re-search-forward "^\s*}" nil t (or arg 1)))
+
+
 ;;; Top Level Entry point
 
-(defun sil-mode ()
+(define-derived-mode sil-mode prog-mode "SIL"
   "Major mode for editing SIL source files.
-  \\{sil-mode-map}
-  Runs sil-mode-hook on startup."
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map sil-mode-map)         ;; Provides the local keymap.
-  (setq major-mode 'sil-mode)
+\\{sil-mode-map}
+Runs `sil-mode-hook' on startup."
 
+  :syntax-table sil-mode-syntax-table
   (make-local-variable 'font-lock-defaults)
-  (setq major-mode 'sil-mode           ;; This is how describe-mode
-                                       ;; finds the doc string to print.
-  mode-name "SIL"                      ;; This name goes into the modeline.
-  font-lock-defaults `(sil-font-lock-keywords))
+  (setq
+    font-lock-defaults `(sil-font-lock-keywords))
 
   (setq local-abbrev-table sil-mode-abbrev-table)
-  (set-syntax-table sil-mode-syntax-table)
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
-  (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
-                                       ;;   customize the mode with a hook.
+  ;; Enable defun navigation for SIL functions.
+  (setq-local beginning-of-defun-function 'sil-mode-beginning-of-defun-function)
+  (setq-local end-of-defun-function 'sil-mode-end-of-defun-function)
+  ;; Integrate with `imenu'.
+  (setq imenu-extract-index-name-function 'sil-mode-extract-index-name-function))
 
 ;; Associate .sil files with sil-mode
-(setq auto-mode-alist
-   (append '(("\\.sil$" . sil-mode)) auto-mode-alist))
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.sil$" . sil-mode))
 
 (provide 'sil-mode)
-;; end of sil-mode.el
+;;; sil-mode.el ends here
