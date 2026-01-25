@@ -16,6 +16,10 @@
 // RUN:     -target %target-future-triple                   \
 // RUN: | %FileCheck %s --check-prefixes=CHECK
 
+// REQUIRES: swift_feature_CoroutineAccessors
+
+// UNSUPPORTED: OS=windows-msvc
+
 // When CoroutineAccessors are enabled we want to generate
 
 // For explicit/implicit _read/_modify in source:
