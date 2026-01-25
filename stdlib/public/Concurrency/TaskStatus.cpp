@@ -799,7 +799,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
 void swift::_swift_taskGroup_cancel(TaskGroup *group) {
-  (void) group->statusCancel();
+  (void) group->statusCancel(); // TODO: do prevent the task group from being cancelled? I think probably no, we cancel and "don't observe", same as Task
 
   // Because only the owning task of the task group can modify the
   // child list of a task group status record, and it can only do so
@@ -830,7 +830,7 @@ void swift::_swift_taskGroup_cancel_unlocked(TaskGroup *group,
 /**************************************************************************/
 
 /// Perform any cancellation actions required by the given record.
-static void performCancellationAction(TaskStatusRecord *record) {
+static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord *record) {
   switch (record->getKind()) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
@@ -853,6 +853,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   case TaskStatusRecordKind::CancellationNotification: {
     auto notification =
       cast<CancellationNotificationStatusRecord>(record);
+    if (status.hasCancellationShield()) {
+      SWIFT_TASK_DEBUG_LOG("cancellation shielded: skip cancellation handler invocation in task = %p", swift_task_getCurrent());
+      return; 
+    }
     notification->run();
     return;
   }
@@ -889,7 +893,9 @@ static void swift_task_cancelImpl(AsyncTask *task) {
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;
   while (true) {
-    if (oldStatus.isCancelled()) {
+    // Are we already cancelled? 
+    // Even if we have a cancellation shield active, we do want to set the isCancelled flag.
+    if (oldStatus.isCancelled(/*ignoreShield=*/false)) {
       return;
     }
 
@@ -907,8 +913,8 @@ static void swift_task_cancelImpl(AsyncTask *task) {
 
   newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
   if (newStatus.getInnermostRecord() == nullptr) {
-     // No records, nothing to propagate
-     return;
+    // No records, nothing to propagate
+    return;
   }
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
@@ -917,7 +923,9 @@ static void swift_task_cancelImpl(AsyncTask *task) {
       // modify this list that is being iterated. However, cancellation is
       // happening from outside of the task so we know that no new records will
       // be added since that's only possible while on task.
-      performCancellationAction(cur);
+      //
+      // Each action must independently take care of how to deal with cancellation shields.
+      performCancellationAction(newStatus, cur);
     }
   });
 }

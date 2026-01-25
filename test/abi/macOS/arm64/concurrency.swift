@@ -400,6 +400,10 @@ Added: _$sScfsE25isIsolatingCurrentContextSbSgyF
 Added: _$sScf25isIsolatingCurrentContextSbSgyFTj
 Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
+// Cancellation shields
+Added: _swift_task_cancellationShieldPush
+Added: _swift_task_cancellationShieldPop
+
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
 
