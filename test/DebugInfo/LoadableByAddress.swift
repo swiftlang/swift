@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -module-name A -emit-ir -g -o - | %FileCheck %s
+// REQUIRES: PTRSIZE=64
 
 public struct Continuation<A> {
    private let magicToken = "Hello World"
