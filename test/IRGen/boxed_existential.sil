@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
+// UNSUPPORTED: CPU=wasm32
 
 import Swift
 
