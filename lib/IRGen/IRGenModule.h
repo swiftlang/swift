@@ -774,7 +774,6 @@ public:
     llvm::PointerType *FullBoxMetadataPtrTy;  /// %swift.full_boxmetadata*
     llvm::PointerType *FullHeapMetadataPtrTy; /// %swift.full_heapmetadata*
     llvm::PointerType *FullTypeMetadataPtrTy; /// %swift.full_type*
-    llvm::PointerType *FunctionPtrTy;
     llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
     llvm::PointerType *Int32PtrTy;     /// i32 *
@@ -812,6 +811,10 @@ public:
     llvm::PointerType *WitnessTablePtrTy;
     llvm::PointerType *WitnessTablePtrPtrTy; /// i8***
     llvm::PointerType *WitnessTableTy;
+  };
+  union {
+    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *Int8ProgramSpacePtrTy; /// i8* in same address space as programs
   };
 
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
