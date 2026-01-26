@@ -3472,7 +3472,7 @@ void OpenGenericTypeRequirements::operator()(GenericTypeDecl *decl,
   auto openType = [&](Type ty) -> Type {
     return cs.openType(ty, replacements, locator, preparedOverload);
   };
-  cs.openGenericRequirements(outerDC, sig, /*skipProtocolSelf*/ false, locator,
+  cs.openGenericRequirements(outerDC, sig, /*skipProtocolSelfConstraint=*/false, locator,
                              openType, preparedOverload);
 }
 
