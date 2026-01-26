@@ -11,11 +11,22 @@ import Builtin
 
 struct NE: ~Escapable {}
 
+// Labels used in lifetime attributes should not affect type equivalence.
+
+// CHECK-LABEL: typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: NE) -> NE
+typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: NE) -> NE
+// CHECK-LABEL: typealias IndexedLabelledNE2NE = @_lifetime(copy ne) (_ ne: NE) -> NE
+typealias IndexedNE2NE = @_lifetime(copy 0) (NE) -> NE
+// CHECK-LABEL: typealias InferredNE2NE = @_lifetime(copy ne) (_ ne: NE) -> NE
+typealias InferredNE2NE = (NE) -> NE
+
 // When lifetime attributes do not use parameter labels, we may omit them.
+// Each of these types is distinct so the first type is not reused.
+
 // CHECK-LABEL: typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: NE, _ ne2: NE) -> NE
 typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: NE, _ ne2: NE) -> NE
-// CHECK-LABEL: typealias UnnamedLifetimeType = @_lifetime(copy 0) (NE, NE) -> NE
-typealias UnnamedLifetimeType = @_lifetime(copy 0) (NE, NE) -> NE
+// CHECK-LABEL: typealias UnnamedLifetimeType = @_lifetime(copy 0) (NE, NE, NE) -> NE
+typealias UnnamedLifetimeType = @_lifetime(copy 0) (_ ne: NE, NE, NE) -> NE
 // CHECK-LABEL: typealias ImmortalLifetimeType = @_lifetime(immortal) (NE) -> NE
 typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: NE) -> NE
 
