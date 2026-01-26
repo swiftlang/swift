@@ -41,6 +41,17 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
+STATISTIC(StatsNumFunctionsProcessed, "# of functions processed");
+STATISTIC(StatsNumBasicBlocksProcessed, "# of basic blocks processed");
+STATISTIC(StatsNumMarkUninitProcessed,
+          "# of times a mark uninitialized inst checked");
+STATISTIC(StatsNumMemoryElements, "# of memory elements (total)");
+STATISTIC(StatsNumLivenessAtInstQueries,
+          "# of getLivenessAtInst queries issued");
+STATISTIC(StatsNumLivenessAtInstScans,
+          "# of instructions scanned during liveness queries");
+STATISTIC(StatsNumDataflowIterations, "# of dataflow iterations performed");
+
 using namespace swift;
 using namespace ownership;
 
@@ -3560,6 +3571,7 @@ computePredsLiveOut(SILBasicBlock *BB) {
 
       // Merge from the predecessor blocks.
       for (auto Pred : WorkBB->getPredecessorBlocks()) {
+        ++StatsNumDataflowIterations;
         changed |= BBState.mergeFromPred(getBlockInfo(Pred));
       }
       LLVM_DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID()
@@ -3602,6 +3614,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
                                                    unsigned NumElts) {
   LLVM_DEBUG(llvm::dbgs() << "Get liveness " << FirstElt << ", #" << NumElts
                           << " at " << *Inst);
+  ++StatsNumLivenessAtInstQueries;
 
   AvailabilitySet Result(TheMemory.getNumElements());
 
@@ -3788,6 +3801,8 @@ static void processMemoryObject(MarkUninitializedInst *I,
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
+  StatsNumMemoryElements += MemInfo.getNumElements();
+
   // Set up the datastructure used to collect the uses of the allocation.
   DIElementUseInfo UseInfo;
 
@@ -3803,6 +3818,7 @@ static void processMemoryObject(MarkUninitializedInst *I,
 static bool checkDefiniteInitialization(SILFunction &Fn) {
   FrontendStatsTracer StatsTracer(Fn.getModule().getASTContext().Stats,
                                   "definite-init", &Fn);
+  ++StatsNumFunctionsProcessed;
 
   LLVM_DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                           <<  Fn.getName() << "\n");
@@ -3811,8 +3827,10 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   BlockStates blockStates(&Fn);
 
   for (auto &BB : Fn) {
+    ++StatsNumBasicBlocksProcessed;
     for (SILInstruction &inst : BB) {
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(&inst)) {
+        ++StatsNumMarkUninitProcessed;
         processMemoryObject(MUI, blockStates);
         Changed = true;
         // mark_uninitialized needs to remain in SIL for mandatory passes which
