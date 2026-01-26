@@ -692,7 +692,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadendlifetime1 :
-// CHECK-NOT: end_lifetime
+// CHECK: end_lifetime
 // CHECK-LABEL: } // end sil function 'dce_deadendlifetime1'
 sil [ossa] @dce_deadendlifetime1 : $@convention(thin) () -> () {
 bb0:
@@ -711,7 +711,7 @@ bb3(%2 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadendlifetime2 :
-// CHECK-NOT: end_lifetime
+// CHECK: end_lifetime
 // CHECK-LABEL: } // end sil function 'dce_deadendlifetime2'
 sil [ossa] @dce_deadendlifetime2 : $@convention(thin) () -> () {
 bb0:
