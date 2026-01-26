@@ -85,7 +85,7 @@ EXPR_CHANGE(AppliedPropertyWrapper)
 EXPR_CHANGE(RecordedImpliedResult)
 EXPR_CHANGE(RecordedExprPattern)
 
-CLOSURE_CHANGE(RecordedClosureType)
+CLOSURE_CHANGE(RecordedClosure)
 CLOSURE_CHANGE(RecordedPreconcurrencyClosure)
 
 CONSTRAINT_CHANGE(DisabledConstraint)
