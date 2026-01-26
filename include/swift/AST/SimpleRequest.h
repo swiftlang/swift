@@ -318,7 +318,8 @@ public:
   }
 
   void diagnoseCycle(DiagnosticEngine &diags) const {
-    diags.diagnose(asDerived().getNearestLoc(), diag::circular_reference);
+    diags.diagnose(asDerived().getNearestLoc(), diag::circular_reference,
+                   TypeID<Derived>::getName());
   }
 
   void noteCycleStep(DiagnosticEngine &diags) const {
