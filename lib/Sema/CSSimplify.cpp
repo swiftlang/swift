@@ -1852,11 +1852,11 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       }
 
       auto shouldOpenExistentialArgument =
-      [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
+        [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
 
         Type argTypeForOpening = argTy;
 
-        auto *module = cs.DC ? cs.DC->getParentModule() : nullptr;
+        auto *module = cs.DC->getParentModule();
         if (!module || isLanguageRuntimeModule(module)) {
           return shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
@@ -1878,7 +1878,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           Type unwrapped = optObject->lookThroughAllOptionalTypes();
           if (unwrapped->isAnyExistentialType()) {
             auto layout = unwrapped->getExistentialLayout();
-            if (!layout.getProtocols().empty() && !layout.requiresClass()) {
+            if (!layout.requiresClass()) {
 
               auto openedAfterPeel = shouldOpenExistentialCallArgument(
                   callee, paramIdx, paramTy, unwrapped, argExpr, cs);
