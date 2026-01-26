@@ -3102,18 +3102,6 @@ ERROR(witness_not_as_sendable,none,
 NOTE(less_sendable_reqt_here,none,
      "expected sendability to match requirement here",
      ())
-WARNING(witness_not_accessible_strict_check_warn,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
-ERROR(witness_not_accessible_strict_check,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
