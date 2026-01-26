@@ -1081,6 +1081,9 @@ private:
   /// A map from Clang module name to all visible modules to a client
   /// of a by-name import of this Clang module
   llvm::StringMap<std::vector<std::string>> clangModulesVisibleFromNamedLookup;
+  /// A set of module identifiers for which a scanning action failed
+  /// to discover a Swift module dependency
+  llvm::StringSet<> negativeSwiftDependencyCache;
   /// Set containing all of the Clang modules that have already been seen.
   llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
@@ -1115,12 +1118,14 @@ public:
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
                      std::optional<ModuleDependencyKind> kind) const;
-  /// Whether we have cached dependency information for the given module Name.
-  bool hasDependency(StringRef moduleName) const;
-  /// Whether we have cached dependency information for the given Swift module.
-  bool hasSwiftDependency(StringRef moduleName) const;
   /// Whether we have cached dependency information for the given Clang module.
   bool hasClangDependency(StringRef moduleName) const;
+
+  /// Whether we have cached dependency information for the given Swift module,
+  /// or have previously failed a lookup of a Swift dependency for the
+  /// given identifier.
+  bool hasQueriedSwiftDependency(StringRef moduleName) const;
+
   /// Report the number of recorded Clang dependencies
   int numberOfClangDependencies() const;
   /// Report the number of recorded Swift dependencies
@@ -1253,6 +1258,8 @@ public:
   void
   setVisibleClangModulesFromLookup(ModuleDependencyID clangModuleID,
                                    const std::vector<std::string> &moduleNames);
+  /// Add an identifier to the set of failed Swift module queries
+  void recordFailedSwiftDependencyLookup(StringRef moduleIdentifier);
 
   StringRef getMainModuleName() const { return mainScanModuleName; }
 

@@ -9,7 +9,7 @@
 // Ensure that although the Swift overlay dependency 'A' shares a dependency on 'B' and 'C'
 // it does not incur additional namedqueries for them.
 //
-// CHECK: remark: Number of Swift module queries: '9'
+// CHECK: remark: Number of Swift module queries: '3'
 // CHECK: remark: Number of named Clang module queries: '2'
 // CHECK: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '2'
 // CHECK: remark: Number of recorded Swift module dependencies: '1'
