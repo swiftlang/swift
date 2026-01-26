@@ -250,16 +250,19 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// If the `operation` throws an error, it is caught by the `Task` and will be
   /// rethrown only when the task's `value` is awaited. Take care to not accidentally
   /// dismiss errors by not awaiting on the task's resulting value.
+  ///
 % end
+  /// Asynchronous work modeled with `Task` is unstructured concurrency.
+  /// Don't use an unstructured task if it's possible to model the operation
+  /// using structured concurrency features like child tasks (such as `async let`
+  /// or task groups). Child tasks automatically become cancelled when their
+  /// parent task becomes cancelled.
   ///
 % if IS_DETACHED:
-  /// Don't use a detached unstructured task if it's possible
-  /// to model the operation using structured concurrency features like child tasks.
-  /// Child tasks inherit the parent task's priority and task-local storage,
-  /// and canceling a parent task automatically cancels all of its child tasks.
-  /// You need to handle these considerations manually with a detached task.
-% end
+  /// A detached `Task` will not inherit task priority or task-local storage
+  /// from a parent task. You will need to handle these considerations manually.
   ///
+% end
   /// You need to keep a reference to the task
   /// if you want to cancel it by calling the `Task.cancel()` method.
   /// Discarding your reference to a task
