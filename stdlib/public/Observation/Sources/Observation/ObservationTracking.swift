@@ -21,9 +21,9 @@ public struct ObservationTracking: Sendable {
   struct Entry: @unchecked Sendable {
     let context: ObservationRegistrar.Context
     
-    var properties: Set<AnyKeyPath>
+    var properties: OptimizedSet<AnyKeyPath>
     
-    init(_ context: ObservationRegistrar.Context, properties: Set<AnyKeyPath> = []) {
+    init(_ context: ObservationRegistrar.Context, properties: OptimizedSet<AnyKeyPath> = .empty) {
       self.context = context
       self.properties = properties
     }
@@ -78,21 +78,21 @@ public struct ObservationTracking: Sendable {
     let values = tracking.list.entries.mapValues { 
       switch (willSet, didSet) {
       case (.some(let willSetObserver), .some(let didSetObserver)):
-        return Id.full($0.addWillSetObserver { keyPath in
-          tracking.state.withCriticalRegion { $0.changed = keyPath }
+        return Id.full($0.addWillSetObserver { property in
+          tracking.state.withCriticalRegion { $0.changed = property }
           willSetObserver(tracking)
-        }, $0.addDidSetObserver { keyPath in
-          tracking.state.withCriticalRegion { $0.changed = keyPath }
+        }, $0.addDidSetObserver { property in
+          tracking.state.withCriticalRegion { $0.changed = property }
           didSetObserver(tracking)
         })
       case (.some(let willSetObserver), .none):
-        return Id.willSet($0.addWillSetObserver { keyPath in
-          tracking.state.withCriticalRegion { $0.changed = keyPath }
+        return Id.willSet($0.addWillSetObserver { property in
+          tracking.state.withCriticalRegion { $0.changed = property }
           willSetObserver(tracking)
         })
       case (.none, .some(let didSetObserver)):
-        return Id.didSet($0.addDidSetObserver { keyPath in
-          tracking.state.withCriticalRegion { $0.changed = keyPath }
+        return Id.didSet($0.addDidSetObserver { property in
+          tracking.state.withCriticalRegion { $0.changed = property }
           didSetObserver(tracking)
         })
       case (.none, .none):
