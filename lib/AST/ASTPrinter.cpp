@@ -7056,7 +7056,8 @@ public:
                           PrintAST::defaultGenericRequirementFlags(Options));
     Printer << " ";
 
-    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true);
+    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/ true,
+                               /*printInternalLabels*/ hasLabelledLifetimes(T));
 
     if (T->hasExtInfo()) {
       if (T->isAsync()) {
