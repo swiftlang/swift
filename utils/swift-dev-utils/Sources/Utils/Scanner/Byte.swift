@@ -39,4 +39,36 @@ public extension Byte {
   var isSpaceTabOrNewline: Bool {
     isSpaceOrTab || isNewline
   }
+  var isDigit: Bool {
+    switch self {
+    case "0"..."9":
+      true
+    default:
+      false
+    }
+  }
+  var isHexDigit: Bool {
+    switch self {
+    case "a"..."f", "A"..."F", \.isDigit:
+      true
+    default:
+      false
+    }
+  }
+  var isWordChar: Bool {
+    switch self {
+    case "a"..."z", "A"..."Z", "0"..."9", "_":
+      true
+    default:
+      false
+    }
+  }
+  var lower: Byte {
+    switch self {
+    case "A"..."Z":
+      Byte(rawValue + 32)
+    default:
+      self
+    }
+  }
 }
