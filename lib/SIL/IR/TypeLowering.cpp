@@ -12,16 +12,13 @@
 
 #define DEBUG_TYPE "libsil"
 
-#include "swift/SIL/TypeLowering.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
@@ -33,19 +30,18 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILTypeProperties.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/Test.h"
-#include "clang/AST/Type.h"
 #include "clang/AST/Decl.h"
-#include "llvm/Support/Compiler.h"
+#include "clang/AST/Type.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -414,6 +410,33 @@ namespace {
                                      IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleAggregateByProperties(type,
                   getBuiltinFixedArrayProperties(type, origType, isSensitive));
+    }
+
+    RetTy visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                                 AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
+      auto referentType = type->getReferentType();
+      AbstractionPattern origReferent = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinBorrowType>()) {
+        origReferent = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getReferentType());
+      }
+
+      // For any particular referent's known type layout, the layout of `Borrow`
+      // is fixed size (either a bitwise image of the borrowed value, or a
+      // pointer to the value in memory), BitwiseCopyable, and non-Escapable.
+      // However, if the layout of the referent is unknown or abstracted, then
+      // we don't necessarily know which layout `Borrow` uses, so treat `Borrow`
+      // as address-only.
+      auto referentProps = classifyType(origReferent, referentType, TC,
+                                        Expansion);
+
+      if (referentProps.isFixedABI()) {
+        return SILTypeProperties::forTrivial();
+      } else {
+        return SILTypeProperties::forTrivialOpaque();
+      }
     }
 
     RetTy visitPackType(CanPackType type,
@@ -2474,6 +2497,34 @@ namespace {
       
       return handleAggregateByProperties<MiscNontrivialTypeLowering>(faType,
                  getBuiltinFixedArrayProperties(faType, origType, isSensitive));
+    }
+
+    TypeLowering *visitBuiltinBorrowType(CanBuiltinBorrowType borrowType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      auto referentType = borrowType->getReferentType();
+      AbstractionPattern origReferent = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinBorrowType>()) {
+        origReferent = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getReferentType());
+      }
+
+      // For any particular referent's known type layout, the layout of `Borrow`
+      // is fixed size (either a bitwise image of the borrowed value, or a
+      // pointer to the value in memory), BitwiseCopyable, and non-Escapable.
+      // However, if the layout of the referent is unknown or abstracted, then
+      // we don't necessarily know which layout `Borrow` uses, so treat `Borrow`
+      // as address-only.
+      auto referentProps = classifyType(origReferent, referentType, TC,
+                                        Expansion);
+
+      if (referentProps.isFixedABI()) {
+        return handleTrivial(borrowType);
+      } else {
+        return handleAddressOnly(borrowType,
+                                 SILTypeProperties::forTrivialOpaque());
+      }
     }
 
     bool handleResilience(CanType type, NominalTypeDecl *D,

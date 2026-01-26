@@ -2736,6 +2736,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(ExtractExecutor)
   UNARY_INSTRUCTION(FunctionExtractIsolation)
+  UNARY_INSTRUCTION(MakeBorrow)
+  UNARY_INSTRUCTION(DereferenceBorrow)
+  UNARY_INSTRUCTION(MakeAddrBorrow)
+  UNARY_INSTRUCTION(DereferenceAddrBorrow)
+  UNARY_INSTRUCTION(DereferenceBorrowAddr)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -3079,6 +3084,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool fromBuiltin = (Attr >> 4) & 0x01;
     ResultInst = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
                                                  fromBuiltin);
+    break;
+  }
+  case SILInstructionKind::InitBorrowAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    ResultInst = Builder.createInitBorrowAddr(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID, addrType),
+        getLocalValue(Builder.maybeGetFunction(), ValID2, addrType));
     break;
   }
   case SILInstructionKind::CopyAddrInst: {

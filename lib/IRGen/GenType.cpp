@@ -239,6 +239,10 @@ llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) c
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
       getBitwiseTakable(ResilienceExpansion::Maximal) >= IsBitwiseTakableOnly);
 }
+llvm::Value *FixedTypeInfo::getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+      getBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakableAndBorrowable);
+}
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
 }
@@ -1360,6 +1364,9 @@ namespace {
     llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
+    llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
     llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                           SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -2320,6 +2327,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     
   case TypeKind::BuiltinFixedArray: {
     return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
+  }
+
+  case TypeKind::BuiltinBorrow: {
+    return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
   }
 
   case TypeKind::PrimaryArchetype:

@@ -120,6 +120,7 @@ case TypeKind::Id:
       return t;
 
     // BuiltinGenericType subclasses
+    case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {
       auto bgaTy = cast<BuiltinGenericType>(base);
 

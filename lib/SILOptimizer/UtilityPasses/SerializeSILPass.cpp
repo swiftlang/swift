@@ -344,6 +344,12 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::IgnoredUseInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
   case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     // Handle by operand and result check.
     break;
 

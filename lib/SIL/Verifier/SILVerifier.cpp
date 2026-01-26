@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -41,7 +40,6 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -56,7 +54,6 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -5583,14 +5580,17 @@ public:
     requireSameType(functionResultType, instResultType,
                     "return value type does not match return type of function");
 
-    // If the result type is an address, ensure it's base address is from a
-    // function argument.
+    // If the result type is an address, ensure its base address is from a
+    // function argument or Builtin.Borrow.
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
-                  isa<ApplyInst>(base) &&
-                      cast<ApplyInst>(base)->hasAddressResult(),
+      require(!base->getType().isAddress()
+               || isa<SILFunctionArgument>(base)
+               || isa<DereferenceAddrBorrowInst>(base)
+               || isa<DereferenceBorrowAddrInst>(base)
+               || (isa<ApplyInst>(base)
+                   && cast<ApplyInst>(base)->hasAddressResult()),
               "unidentified address return");
     }
   }
@@ -7019,6 +7019,56 @@ public:
                 cvt->getOperand()->getType().addingMoveOnlyWrapper(),
             "Result and operand must have the same underlying type ignoring "
             "move only wrappedness.");
+  }
+
+  void checkMakeBorrowInst(MakeBorrowInst *mb) {
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getOperand()->getType().getASTType(),
+            "output should be a Builtin.Borrow of the input");
+  }
+
+  void checkDereferenceBorrowInst(DereferenceBorrowInst *mb) {
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
+  void checkMakeAddrBorrowInst(MakeAddrBorrowInst *mb) {
+    require(mb->getOperand()->getType().isAddress(), "input should be address");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getOperand()->getType().getASTType(),
+            "output should be a Builtin.Borrow of the input");
+  }
+
+  void checkDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *mb) {
+    // TODO: Only allow this operation on types with address borrow
+    // representation.
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isAddress(), "output should be address");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
+  void checkInitBorrowAddrInst(InitBorrowAddrInst *mb) {
+    require(mb->getDest()->getType().isAddress(), "dest should be address");
+    require(mb->getReferent()->getType().isAddress(), "referent should be address");
+    require(mb->getDest()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getReferent()->getType().getASTType(),
+            "dest should be a Builtin.Borrow of the referent");
+  }
+
+  void checkDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *mb) {
+    require(mb->getOperand()->getType().isAddress(), "input should be address");
+    require(mb->getType().isAddress(), "output should be address");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
   }
 
   void verifyEpilogBlocks(SILFunction *F) {

@@ -26,6 +26,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -230,7 +231,10 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
         isa<MergeIsolationRegionInst>(user) ||
-        isa<EndCOWMutationAddrInst>(user)) {
+        isa<EndCOWMutationAddrInst>(user) ||
+        isa<MakeBorrowInst>(user) || isa<DereferenceBorrowInst>(user) ||
+        isa<MakeAddrBorrowInst>(user) || isa<DereferenceAddrBorrowInst>(user) ||
+        isa<InitBorrowAddrInst>(user) || isa<DereferenceBorrowAddrInst>(user)) {
       callVisitUse(op);
       continue;
     }

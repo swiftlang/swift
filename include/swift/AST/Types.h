@@ -1830,7 +1830,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinGenericType, BuiltinType)
 /// value may be copied, moved, or destroyed.
 class BuiltinFixedArrayType : public BuiltinGenericType,
                               public llvm::FoldingSetNode {
-  friend class ASTContext;
+  friend ASTContext;
   
   CanType Size;
   CanType ElementType;
@@ -1886,6 +1886,47 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinGenericType)
+
+/// BuiltinBorrowType - The builtin type representing a reified borrow of
+/// another value.
+class BuiltinBorrowType : public BuiltinGenericType,
+                          public llvm::FoldingSetNode
+{
+  friend ASTContext;
+
+  CanType Referent;
+
+  BuiltinBorrowType(CanType Referent, RecursiveTypeProperties properties)
+    : BuiltinGenericType(TypeKind::BuiltinBorrow,
+                         Referent->getASTContext(),
+                         properties),
+      Referent(Referent)
+  {}
+
+  friend BuiltinGenericType;
+  /// Get the generic arguments as a substitution map.
+  SubstitutionMap buildSubstitutions() const;
+  
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinBorrow;
+  }
+  
+  static CanTypeWrapper<BuiltinBorrowType>
+  get(CanType Referent);
+
+  /// Get the type of the referenced borrow.
+  CanType getReferentType() const { return Referent; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getReferentType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Referent) {
+    ID.AddPointer(Referent.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBorrowType, BuiltinGenericType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.

@@ -417,6 +417,7 @@ void DCE::addReverseDependency(SILValue from, SILInstruction *to) {
 
 void DCE::findGuaranteedPhiDependencies(BorrowedValue borrow) {
   assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
+         borrow.kind == BorrowedValueKind::DereferenceBorrow ||
          borrow.kind == BorrowedValueKind::LoadBorrow);
   LLVM_DEBUG(llvm::dbgs() << "Finding @guaranteed phi dependencies of "
                           << borrow << "\n");
