@@ -25,7 +25,7 @@ import time
 
 
 VERBOSE = True
-EMIT_IR = True
+EMIT_IR = False
 NUM_ITERATIONS = 4
 
 
@@ -53,10 +53,10 @@ def compile_and_stat(compile_args, output_file):
 
 def print_diff(output_file, suffix):
     subprocess.run(
-        ["diff", output_file + suffix, output_file + ".ref" + suffix])
+        ["diff", "-c", output_file + suffix, output_file + ".ref" + suffix])
 
 def print_diffs(output_file):
-    print("\n## MD5 differences:", flush=True)
+    print("\n## log differences:", flush=True)
     print_diff(output_file, ".log")
 
     if EMIT_IR and VERBOSE:
@@ -97,6 +97,9 @@ def main():
       '-Xllvm', '-print-no-uuids',
       '-Xllvm', '-sil-print-pass-md5']
 
+    new_args += [
+      '-Xllvm', '-print-cse-internals']
+
     if EMIT_IR:
       new_args += [
         '-Xllvm', '-save-sil', '-Xllvm', output_file + '.sil',
@@ -135,7 +138,8 @@ def main():
         if reference_md5 != second_md5:
             print_diffs(output_file)
             sys.exit("ERROR: non-determinism when generating: " + output_file +
-                     "\ncommand line:\n" + " ".join(new_args))
+                     "\ncommand line:\n" + " ".join(new_args) +
+                     "\nDear build wrangler: please notify the Swift optimizer code owner!")
 
         # This is the bonus check: does the compiler not re-write the output
         # file. (For compilations < 1sec this check may succeed even if the
