@@ -1109,11 +1109,25 @@ public:
   DeclContext *getDeclContext() const { return DC; }
   void setDeclContext(DeclContext *newDC) { DC = newDC; }
 
-  /// getDesugaredStmt - Returns the semantic WhileStmt.
+  /// Returns the semantic WhileStmt that will be emitted by SILGen.
+  ///
+  /// The sequence expression, pattern, and where clause are all referenced in
+  /// this semantic statement using opaque AST nodes.
+  ///
+  /// We keep ForEachStmt itself in the type-checked AST since diagnostic
+  /// passes like effects checking rely on being able to reason about the `try`
+  /// and `await` keywords on the pattern, which is not representable with a
+  /// `while` loop. Semantic functionality also generally relies on being able
+  /// to map things between the source text and type-checked AST.
   BraceStmt *getDesugaredStmt();
+
+  /// Returns the semantic WhileStmt that will be emitted by SILGen, or
+  /// \c nullptr if it has not been computed yet. This should only be used by
+  /// the ASTWalker, ASTDumper, and the evalutator itself.
   BraceStmt *getCachedDesugaredStmt() const {
     return desugaredStmtAndComputed.getPointer();
   }
+
   void setDesugaredStmt(BraceStmt *newStmt) {
     desugaredStmtAndComputed.setPointer(newStmt);
   }
