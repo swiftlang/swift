@@ -4199,8 +4199,7 @@ public:
   void openGenericRequirement(DeclContext *outerDC,
                               GenericSignature signature,
                               unsigned index,
-                              const Requirement &requirement,
-                              bool skipProtocolSelfConstraint,
+                              Requirement requirement,
                               ConstraintLocatorBuilder locator,
                               llvm::function_ref<Type(Type)> subst,
                               PreparedOverloadBuilder *preparedOverload);
