@@ -5,6 +5,35 @@
 
 ## Swift (next)
 
+* Some properties of `Span` and `MutableSpan` as well as two functions of
+  `OutputRawSpan` are newly marked with `@unsafe`. `MutableSpan.mutableBytes`
+  is marked with `@unsafe`. It was proposed with `@unsafe` in SE-0467, but the
+  implementation in Swift 6.2 omitted the annotation. `Span.bytes` and
+  `MutableSpan.bytes` are now marked with `@unsafe`. They should have been
+  marked as such during the standard library audit we did along with SE-0458.
+  Finally, `OutputRawSpan`'s two generic `append()` functions  have been marked
+  with `@unsafe`, and should have been proposed as such in SE-0485.
+  
+  These annotations are required because of a permissible compiler optimization
+  involving values of types that contain padding. When the compiler stores such
+  a value to addressable memory, it is free to skip any padding bytes. This can
+  potentially leave those bytes uninitialized. This optimization is safe when
+  the memory is only ever read as the same type as the value stored. However,
+  when reinterpreting the memory as raw bytes, the potentially uninitialized
+  bytes violate the prerequisite that `RawSpan` and `MutableRawSpan` represent
+  fully initialized memory. In the case of `OutputRawSpan`, they violate the
+  postcondition that the memory it has written is fully initialized.
+  
+  When the `Element` type of `Span` or `MutableSpan` has neither internal nor
+  trailing padding bytes, it is safe to use the `bytes` computed property, as
+  every byte must be initialized. The same constraint applies to the type
+  parameter of `OutputSpan.append(_:as:)`.
+  
+  `MutableSpan`'s `mutableBytes` adds an additional safety constraint if the
+  memory is to later be used again as `Element`, namely that the non-padding
+  bytes of `Element` must allow every bit pattern to be permissible in a valid
+  value of `Element`.
+
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
   module selector is written before the name it qualifies and consists of the module name and two colons (`::`):
