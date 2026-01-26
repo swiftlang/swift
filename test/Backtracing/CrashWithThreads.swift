@@ -1,3 +1,4 @@
+// REQUIRES: rdar168895001
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -Onone -g -o %t/CrashWithThreads
 // RUN: %target-codesign %t/CrashWithThreads
