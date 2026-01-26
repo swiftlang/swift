@@ -7,7 +7,7 @@
 // RUN: cat %t/remarks.txt | %FileCheck %s
 
 // Ensure that despite being a common dependency to multiple Swift modules, only 1 query is performed to find 'C'
-// CHECK: remark: Number of Swift module queries: '6'
+// CHECK: remark: Number of Swift module queries: '3'
 // CHECK: remark: Number of named Clang module queries: '1'
 // CHECK: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '1'
 // CHECK: remark: Number of recorded Swift module dependencies: '2'
