@@ -6155,11 +6155,19 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
               if (getIsolationFromAttributes(ext).has_value())
                 return {};
 
-              // Keep looking.
-            } else {
-              // The type is nonisolated, so its members are nonisolated.
-              return {};
+              // Members declared in an extension are @MainActor isolated
+              // even if it's an extension of a nonisolated type. This helps
+              // to extend types from other modules, for example, to conform
+              // to new protocols declared in @MainActor isolated module without
+              // having to explicitly state `@MainActor`.
+              auto isolation =
+                  ActorIsolation::forGlobalActor(globalActor)
+                      .withPreconcurrency(!ctx.isLanguageModeAtLeast(6));
+              return {{{isolation, {}}, nullptr, {}}};
             }
+
+            // The type is nonisolated, so its members are nonisolated.
+            return {};
           }
         }
 
