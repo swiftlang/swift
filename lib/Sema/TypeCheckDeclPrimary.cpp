@@ -3486,7 +3486,11 @@ public:
 
     // For reparented protocols, we need to check that the derived protocol's
     // default witnesses are enough to satisfy the new base's requirements.
-    TypeChecker::checkConformancesInContext(PD);
+    //
+    // To support -parse-stdlib test cases, we synthesize special protocols like
+    // Copyable that will appear as if deserialized, so skip checking those.
+    if (PD->getParentSourceFile())
+      TypeChecker::checkConformancesInContext(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
