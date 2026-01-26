@@ -14,14 +14,14 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Lib.swiftinterface) -module-name Lib
 
 // Build the client using module
-// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
-// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
+// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
+// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
 
 // RUN: rm %t/Lib.swiftmodule
 
 // Re-build the client using interface
-// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
-// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
+// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name Client -I %t %t/src/Client.swift
+// RUN: %target-swift-frontend -typecheck -verify -language-mode 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -default-isolation MainActor -module-name ClientWithMacro -I %t %t/src/ClientWithMacro.swift
 
 // REQUIRES: swift_swift_parser, executable_test
 
@@ -83,4 +83,28 @@ struct S: P {
 }
 
 extension S: Q { // Ok (no errors about conformance isolation)
+}
+
+// @MainActor
+func globalFn() {}
+func takesMainActor(_: @MainActor () -> Void) {}
+
+// Check that a member declared in an extension of nonisolated type is considered @MainActor isolated
+extension S { // S is nonisolated because `P` is `Sendable`.
+  func test() {
+    globalFn() // Ok
+  }
+}
+
+// @MainActor
+protocol W {
+  func mainActorWitness()
+}
+
+extension S: W {
+  func mainActorWitness() {} // Ok (even though S is nonisolated new member is `@MainActor`)
+
+  func testIsolation(v: S) {
+    takesMainActor(v.mainActorWitness) // Ok
+  }
 }
