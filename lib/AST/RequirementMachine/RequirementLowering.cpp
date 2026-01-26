@@ -822,26 +822,41 @@ void swift::rewriting::realizeInheritedRequirements(
     TypeDecl *decl, Type type, bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
-  auto inheritedTypes = decl->getInherited();
-  auto *dc = decl->getInnermostDeclContext();
-  auto *moduleForInference = dc->getParentModule();
 
-  for (auto index : inheritedTypes.getIndices()) {
-    Type inheritedType =
-        inheritedTypes.getResolvedType(index, TypeResolutionStage::Structural);
+  using TypeOrExt = PointerUnion<const TypeDecl *, const ExtensionDecl *>;
+  auto realizeFromInheritedTypes = [&](TypeOrExt decl, DeclContext *dc) {
+    InheritedTypes inheritedTypes(decl);
+    auto *moduleForInference = dc->getParentModule();
 
-    if (!inheritedType) continue;
+    for (auto index : inheritedTypes.getIndices()) {
+      Type inheritedType = inheritedTypes.getResolvedType(
+          index, TypeResolutionStage::Structural);
 
-    if (shouldInferRequirements) {
-      inferRequirements(inheritedType, moduleForInference,
-                        decl->getInnermostDeclContext(), result);
+      if (!inheritedType)
+        continue;
+
+      if (shouldInferRequirements)
+        inferRequirements(inheritedType, moduleForInference, dc, result);
+
+      auto *typeRepr = inheritedTypes.getTypeRepr(index);
+      SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
+
+      realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
+                             /*isFromInheritanceClause*/ true);
     }
+  };
 
-    auto *typeRepr = inheritedTypes.getTypeRepr(index);
-    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
+  DeclContext *dc = decl->getInnermostDeclContext();
 
-    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
-                           /*isFromInheritanceClause*/ true);
+  // Add from the inheritance clause of the type decl.
+  realizeFromInheritedTypes(decl, dc);
+
+  // Protocols also have reparented relationships in extensions.
+  // They're also considered to be inherited requirements.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    for (auto *ext : proto->getExtensions()) {
+      realizeFromInheritedTypes(ext, ext);
+    }
   }
 
   // Also check for `SynthesizedProtocolAttr`s with additional constraints added

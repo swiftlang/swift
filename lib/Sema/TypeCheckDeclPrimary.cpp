@@ -208,13 +208,15 @@ static void checkInheritanceClause(
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
 
-    // Protocol extensions cannot have inheritance clauses.
+    // Protocol extensions can only have an inheritance clause
+    // consisting of @reparented entries.
     if (auto proto = ext->getExtendedProtocolDecl()) {
-      if (!inheritedClause.empty()) {
-        ext->diagnose(diag::extension_protocol_inheritance,
-                 proto->getName())
-          .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                                 inheritedClause.back().getSourceRange().End));
+      for (auto const &entry : inheritedClause) {
+        if (entry.isReparented())
+          continue;
+
+        ext->diagnose(diag::extension_protocol_inheritance, proto->getName())
+            .highlight(entry.getSourceRange());
         return;
       }
     }
