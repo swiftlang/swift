@@ -88,10 +88,14 @@ class SomeClass {
 @GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
+// expected-note @-1{{remove the 'GA1' attribute}} {{1-6=}}
+// expected-note @-2{{remove the 'OtherGlobalActor' attribute}} {{6-24=}}
 
 struct Container {
-  // FIXME: Diagnostic could be improved to show the generic arguments.
+// FIXME: Diagnostic could be improved to show the generic arguments.
 @GenericGlobalActor<Int> @GenericGlobalActor<String> func twoGenericGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('GenericGlobalActor' and 'GenericGlobalActor')}}
+// expected-note @-1{{remove the 'GenericGlobalActor' attribute}} {{1-26=}}
+// expected-note @-2{{remove the 'GenericGlobalActor' attribute}} {{26-54=}}
 }
 
 // -----------------------------------------------------------------------
