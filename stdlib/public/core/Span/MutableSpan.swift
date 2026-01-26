@@ -254,10 +254,11 @@ extension MutableSpan where Element: ~Copyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: BitwiseCopyable {
 
-  /// Construct a RawSpan over the memory represented by this span
+  /// Construct a raw span over the memory represented by this span.
   ///
   /// - Returns: a RawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+  @unsafe
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
@@ -265,7 +266,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     }
   }
 
-  /// Construct a MutableRawSpan over the memory represented by this span
+  /// Construct a mutable raw span over the memory represented by this span.
   ///
   /// Mutating `self` through this property is unsafe because
   /// it is possible to mutate a byte so as to produce an invalid
