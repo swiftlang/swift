@@ -76,6 +76,10 @@ struct ParsedDeclName {
   /// Form a declaration name from this parsed declaration name.
   DeclNameRef formDeclNameRef(ASTContext &ctx, bool isSubscript = false,
                               bool isCxxClassTemplateSpec = false) const;
+
+  /// Form a list of context names from this parsed declaration name.
+  void formContextNames(ASTContext &ctx,
+                        llvm::SmallVectorImpl<DeclNameRef> &out);
 };
 
 /// Parse a stringified Swift declaration name,
@@ -89,7 +93,8 @@ DeclName formDeclName(ASTContext &ctx, StringRef baseName,
                       bool isCxxClassTemplateSpec = false);
 
 /// Form a Swift declaration name reference from its constituent parts.
-DeclNameRef formDeclNameRef(ASTContext &ctx, StringRef baseName,
+DeclNameRef formDeclNameRef(ASTContext &ctx,
+                            StringRef moduleSelectorAndBaseName,
                             ArrayRef<StringRef> argumentLabels,
                             bool isFunctionName, bool isInitializer,
                             bool isSubscript = false,
