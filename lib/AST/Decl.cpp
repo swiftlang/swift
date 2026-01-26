@@ -12490,15 +12490,10 @@ StringRef swift::getAccessorLabel(AccessorKind kind) {
 #define ACCESSOR(ID, KEYWORD)
 #include "swift/AST/AccessorKinds.def"
 
-    // Transitional terminology.  Let's use this for a little
-    // while to ease the transition.  (Both forms are parsed
-    // correctly, this just changes what gets written into
-    // .swiftinterface files.)
-    case AccessorKind::YieldingBorrow: return "read";
-    case AccessorKind::YieldingMutate: return "modify";
-    // TODO: Switch to the final terminology before shipping...
-    // case AccessorKind::YieldingBorrow: return "yielding borrow";
-    // case AccessorKind::YieldingMutate: return "yielding mutate";
+    case AccessorKind::YieldingBorrow:
+      return "yielding borrow";
+    case AccessorKind::YieldingMutate:
+      return "yielding mutate";
   }
   llvm_unreachable("bad accessor kind");
 }
