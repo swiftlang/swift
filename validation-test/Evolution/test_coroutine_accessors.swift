@@ -3,7 +3,7 @@
 // The symbol diffing code does not seem to work on linux:
 //  nm: invalid argument to -U/--unicode
 // AssertionError: ['nm', '-gjU', '/home/../Output/test_coroutine_accessors.swift.tmp/before/libcoroutine_accessors.so'
-// UNSUPPORTED: os=linux
+// UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_CoroutineAccessors
