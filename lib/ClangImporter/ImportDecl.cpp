@@ -921,6 +921,42 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
     return false;
   }
 
+  if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
+    switch (fn->getDeclName().getNameKind()) {
+    case clang::DeclarationName::CXXOperatorName:
+    case clang::DeclarationName::CXXConversionFunctionName:
+    case clang::DeclarationName::CXXConstructorName:
+      // Eagerly import operators, conversions, and constructors for now.
+      // Some of these are handled in special ways that require them to
+      // be eagerly available, e.g., in VisitCXXRecordDecl() and
+      // conformToCxxConvertibleToBoolIfNeeded().
+      return true;
+
+    case clang::DeclarationName::Identifier:
+      if (auto *md = dyn_cast<clang::CXXMethodDecl>(fn)) {
+        // Import virtual functions eagerly for now, those are synthesized
+        if (md->isVirtual())
+          return true;
+
+        // Always import begin() and end() eagerly, those are needed for
+        // iterator conformances
+        if (md->getMinRequiredArguments() == 0 &&
+            (md->getName() == "begin" || md->getName() == "end"))
+          return true;
+
+        // Name lookup doesn't know about these renamed methods, import eagerly
+        if (CXXMethodBridging(md).classify() !=
+            CXXMethodBridging::Kind::unknown)
+          return true;
+      }
+
+      // All other functions can be imported lazily
+      return false;
+    default:
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -2526,6 +2562,12 @@ namespace {
           }
         }
 
+        // Record of all member names, even those we don't/fail to import,
+        // so that we can avoid synthesizing properties with name clashes.
+        // See also: CXXMethodBridging
+        if (nd->getDeclName().isIdentifier())
+          allMemberNames.insert(nd->getName());
+
         if (!shouldEagerlyImportClangRecordMember(nd))
           continue;
 
@@ -2542,9 +2584,6 @@ namespace {
           }
           continue;
         }
-
-        if (nd->getDeclName().isIdentifier())
-          allMemberNames.insert(nd->getName());
 
         if (isa<TypeDecl>(member)) {
           // TODO: we have a problem lazily looking up unnamed members, so we
