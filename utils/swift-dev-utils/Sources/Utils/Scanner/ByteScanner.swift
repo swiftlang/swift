@@ -79,27 +79,39 @@ public extension ByteScanner {
     tryEat(where: { $0 == byte })
   }
 
-  mutating func tryEat<S: Sequence>(_ seq: S) -> Bool where S.Element == UInt8 {
+  mutating func tryEat<S: Sequence>(
+    _ seq: S, caseSensitive: Bool = true
+  ) -> Bool where S.Element == UInt8 {
     let start = cursor
     for byte in seq {
-      guard tryEat(Byte(byte)) else {
-        cursor = start
-        return false
+      if caseSensitive {
+        guard tryEat(Byte(byte)) else {
+          cursor = start
+          return false
+        }
+      } else {
+        guard peek?.lower == Byte(byte).lower else {
+          cursor = start
+          return false
+        }
+        _ = eat()
       }
     }
     return true
   }
 
-  mutating func tryEat(utf8 str: StaticString) -> Bool {
+  mutating func tryEat(
+    utf8 str: StaticString, caseSensitive: Bool = true
+  ) -> Bool {
     str.withUTF8Buffer { utf8 in
-      tryEat(utf8)
+      tryEat(utf8, caseSensitive: caseSensitive)
     }
   }
 
   // Prefer the StaticString overload where we can.
   @_disfavoredOverload
-  mutating func tryEat(utf8 str: String) -> Bool {
-    tryEat(str.utf8)
+  mutating func tryEat(utf8 str: String, caseSensitive: Bool = true) -> Bool {
+    tryEat(str.utf8, caseSensitive: caseSensitive)
   }
 
   mutating func tryEating<T>(
@@ -341,6 +353,8 @@ public extension ByteScanner {
 }
 
 public extension ByteScanner.Consumer {
+  typealias Cursor = ByteScanner.Cursor
+
   var peek: Byte? {
     scanner.peek
   }
@@ -378,6 +392,12 @@ public extension ByteScanner.Consumer {
     scanner.cursor = scanner.input.endIndex
   }
 
+  func decodeUTF8<R: RangeExpression>(
+    _ range: R
+  ) -> String where R.Bound == Cursor {
+    scanner.decodeUTF8(range)
+  }
+
   mutating func skip() {
     result.skip(at: scanner.cursor)
     _ = scanner.eat()
@@ -385,25 +405,33 @@ public extension ByteScanner.Consumer {
 
   private mutating func _skip(
     using body: (inout ByteScanner) throws -> Void
-  ) rethrows {
+  ) rethrows -> Range<Cursor>? {
     let start = scanner.cursor
-    defer {
-      if scanner.cursor != start {
-        result.skip(start ..< scanner.cursor)
-      }
-    }
     try body(&scanner)
+    guard scanner.cursor != start else { return nil }
+    let range = start ..< scanner.cursor
+    result.skip(range)
+    return range
   }
 
-  mutating func skip(while pred: (Byte) throws -> Bool) rethrows {
+  @discardableResult
+  mutating func skip(
+    while pred: (Byte) throws -> Bool
+  ) rethrows -> Range<Cursor>? {
     try _skip(using: { try $0.skip(while: pred) })
   }
 
-  mutating func skip(until pred: (Byte) throws -> Bool) rethrows {
+  @discardableResult
+  mutating func skip(
+    until pred: (Byte) throws -> Bool
+  ) rethrows -> Range<Cursor>? {
     try _skip(using: { try $0.skip(until: pred) })
   }
 
-  mutating func skip(untilAfter pred: (Byte) throws -> Bool) rethrows {
+  @discardableResult
+  mutating func skip(
+    untilAfter pred: (Byte) throws -> Bool
+  ) rethrows -> Range<Cursor>? {
     try _skip(using: { try $0.skip(untilAfter: pred) })
   }
 

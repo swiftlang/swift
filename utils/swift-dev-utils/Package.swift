@@ -8,6 +8,7 @@ let package = Package(
     name: "swift-dev-utils",
     platforms: [.macOS(.v15)],
     targets: [
+        // MARK: swift-xcodegen
         .target(
             name: "SwiftXcodeGen",
             dependencies: [
@@ -18,16 +19,6 @@ let package = Package(
             exclude: [
               "Xcodeproj/README.md",
             ]
-        ),
-        .target(
-          name: "Utils",
-          dependencies: [
-            .product(name: "ArgumentParser", package: "swift-argument-parser"),
-          ],
-          swiftSettings: [
-            // Treat everything as @inlinable
-            .unsafeFlags(["-enable-cmo-everything"]),
-          ]
         ),
         .executableTarget(
           name: "swift-xcodegen",
@@ -43,6 +34,18 @@ let package = Package(
           name: "SwiftXcodeGenTest",
           dependencies: ["SwiftXcodeGen"]
         ),
+
+        // MARK: Utils
+        .target(
+          name: "Utils",
+          dependencies: [
+            .product(name: "ArgumentParser", package: "swift-argument-parser"),
+          ],
+          swiftSettings: [
+            // Treat everything as @inlinable
+            .unsafeFlags(["-enable-cmo-everything"]),
+          ]
+        ),
         .testTarget(
           name: "UtilsTest",
           dependencies: ["Utils"]
@@ -50,6 +53,42 @@ let package = Package(
     ],
     swiftLanguageModes: [.v6]
 )
+
+let useLocalDeps = ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] != nil
+
+// crash-reduce requires swift-subprocess, which isn't yet supported with local deps.
+if !useLocalDeps {
+  package.targets += [
+    // MARK: crash-reduce
+    .target(
+      name: "CrashReduce",
+      dependencies: [
+        "Utils",
+        .product(name: "Subprocess", package: "swift-subprocess"),
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+        .product(name: "SwiftParser", package: "swift-syntax"),
+        .product(name: "SwiftBasicFormat", package: "swift-syntax"),
+        .product(name: "SwiftOperators", package: "swift-syntax"),
+        .product(name: "SwiftFormat", package: "swift-format"),
+      ]
+    ),
+    .executableTarget(
+      name: "crash-reduce",
+      dependencies: [
+        "CrashReduce",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
+      ],
+      exclude: [
+        "README.md",
+      ]
+    ),
+    .testTarget(
+      name: "CrashReduceTests",
+      dependencies: ["CrashReduce"]
+    ),
+  ]
+}
 
 // Apply global Swift settings to targets.
 do {
@@ -79,14 +118,23 @@ do {
   }
 }
 
-if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
+if !useLocalDeps {
   package.dependencies += [
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.4.0"),
     .package(url: "https://github.com/swiftlang/swift-driver", branch: "main"),
+    .package(url: "https://github.com/swiftlang/swift-syntax.git", branch: "main"),
+    .package(url: "https://github.com/swiftlang/swift-format.git", branch: "main"),
+    .package(url: "https://github.com/swiftlang/swift-subprocess.git", branch: "main"),
   ]
 } else {
   package.dependencies += [
     .package(path: "../../../swift-argument-parser"),
     .package(path: "../../../swift-driver"),
+
+    // crash-reduce deps
+    // FIXME: Subprocess isn't currently supported as a local dependency
+    // .package(path: "../../../swift-syntax"),
+    // .package(path: "../../../swift-format"),
+    // .package(path: "../../../swift-subprocess"),
   ]
 }
