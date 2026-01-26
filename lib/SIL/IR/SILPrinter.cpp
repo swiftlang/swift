@@ -1945,6 +1945,30 @@ public:
     *this << '"' << llvm::toHex(SLI->getValue()) << '"';
   }
 
+  void visitMakeBorrowInst(MakeBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *I) {
+    *this << getIDAndType(I->getDest()) << " with " << getIDAndType(I->getReferent());
+  }
+
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case LoadOwnershipQualifier::Unqualified:

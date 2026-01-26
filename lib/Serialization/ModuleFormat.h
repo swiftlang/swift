@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 981; // require complete lifetimes
+const uint16_t SWIFTMODULE_VERSION_MINOR = 982; // `Builtin.Borrow`
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1309,6 +1309,11 @@ namespace decls_block {
     BUILTIN_FIXED_ARRAY_TYPE,
     TypeIDField, // count
     TypeIDField  // element type
+  );
+
+  TYPE_LAYOUT(BuiltinBorrowTypeLayout,
+    BUILTIN_BORROW_TYPE,
+    TypeIDField // referent type
   );
 
   TYPE_LAYOUT(TypeAliasTypeLayout,

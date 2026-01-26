@@ -340,7 +340,7 @@ extension LifetimeDependence.Scope {
     assert(iter.next() == nil,
            "guaranteed phis not allowed when diagnosing lifetime dependence")
     switch beginBorrow {
-    case .beginBorrow, .loadBorrow:
+    case .beginBorrow, .loadBorrow, .dereferenceBorrow:
       self = .borrowed(beginBorrow)
     case let .beginApply(value):
       self = .yield(value)

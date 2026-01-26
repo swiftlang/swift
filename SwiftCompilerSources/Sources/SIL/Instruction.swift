@@ -2168,3 +2168,21 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 
 final public class ImplicitActorToOpaqueIsolationCastInst
   : SingleValueInstruction, UnaryInstruction {}
+
+final public class MakeBorrowInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+final public class DereferenceBorrowInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+final public class MakeAddrBorrowInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+final public class DereferenceAddrBorrowInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+final public class InitBorrowAddrInst
+  : Instruction {}
+
+final public class DereferenceBorrowAddrInst
+  : SingleValueInstruction, UnaryInstruction {}

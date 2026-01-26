@@ -3302,7 +3302,8 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     }
   }
 
-  auto result = StorageRefResult::findStorageReferenceExprForBorrow(argExpr);
+  auto result = StorageRefResult::findStorageReferenceExprForBorrow(SGM.M,
+                                                                    argExpr);
 
   if (!result)
     return nullptr;
@@ -3427,7 +3428,7 @@ SILGenFunction::findStorageReferenceExprForBorrowExpr(Expr *argExpr) {
   if (!borrowExpr)
     return nullptr;
 
-  return StorageRefResult::findStorageReferenceExprForBorrow(
+  return StorageRefResult::findStorageReferenceExprForBorrow(SGM.M,
              borrowExpr->getSubExpr())
       .getTransitiveRoot();
 }
@@ -3446,11 +3447,11 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   return lvExpr;
 }
 
-Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
+Expr *ArgumentSource::findStorageReferenceExprForBorrow(SILModule &M) && {
   if (!isExpr()) return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto *lvExpr = StorageRefResult::findStorageReferenceExprForBorrow(argExpr)
+  auto *lvExpr = StorageRefResult::findStorageReferenceExprForBorrow(M, argExpr)
                      .getTransitiveRoot();
 
   // Claim the value of this argument if we found a storage reference.
@@ -3914,7 +3915,8 @@ private:
     // Handle yields of storage reference expressions specially so that we
     // don't emit them as +1 r-values and then expand.
     if (Options.contains(Flag::IsYield)) {
-      if (auto result = std::move(arg).findStorageReferenceExprForBorrow()) {
+      if (auto result = std::move(arg)
+            .findStorageReferenceExprForBorrow(SGF.SGM.M)) {
         emitExpandedBorrowed(result, origParamType);
         return;
       }
@@ -4034,7 +4036,7 @@ private:
     assert(paramsSlice.size() == 1);
 
     // Try to find an expression we can emit as an l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow();
+    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow(SGF.SGM.M);
     if (!lvExpr) return false;
 
     emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,

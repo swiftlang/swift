@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Demangling/Demangler.h"
 #include "DemanglerAssert.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1508,6 +1507,14 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinFixedArray);
       Ty->addChild(size, *this);
       Ty->addChild(element, *this);
+      break;
+    }
+    case 'W': {
+      NodePointer referent = popNode(Node::Kind::Type);
+      if (!referent)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinBorrow);
+      Ty->addChild(referent, *this);
       break;
     }
     case 'O':

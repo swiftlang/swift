@@ -736,7 +736,7 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
   }
 
   auto storageRefResult =
-      StorageRefResult::findStorageReferenceExprForBorrow(ret);
+      StorageRefResult::findStorageReferenceExprForBorrow(SGM.M, ret);
   auto lvExpr = storageRefResult.getTransitiveRoot();
   // If the return expression is not an lvalue, diagnose.
   if (!lvExpr) {

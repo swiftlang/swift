@@ -591,6 +591,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
+    llvm::FoldingSet<BuiltinBorrowType> BuiltinBorrowTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -3837,6 +3838,29 @@ BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
   ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
       .InsertNode(faTy, insertPos);
   return faTy;
+}
+
+CanBuiltinBorrowType BuiltinBorrowType::get(CanType Referent) {
+  RecursiveTypeProperties properties;
+  properties |= Referent->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
+  llvm::FoldingSetNodeID id;
+  BuiltinBorrowType::Profile(id, Referent);
+  auto &ctx = Referent->getASTContext();
+
+  void *insertPos;
+  if (BuiltinBorrowType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+                 .FindNodeOrInsertPos(id, insertPos))
+    return CanBuiltinBorrowType(faTy);
+
+  BuiltinBorrowType *faTy
+    = new (ctx, arena) BuiltinBorrowType(Referent, properties);
+  ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+      .InsertNode(faTy, insertPos);
+  return CanBuiltinBorrowType(faTy);
 }
 
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,

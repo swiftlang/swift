@@ -3086,6 +3086,39 @@ FUNCTION(MemsetS, c, memset_s, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::NoEffect),
          UNKNOWN_MEMEFFECTS)
 
+// MetadataResponse swift_getBorrowTypeMetadata(MetadataRequest request,
+//                                              Metadata *referent);
+FUNCTION(GetBorrowTypeMetadata,
+         Swift, swift_getBorrowTypeMetadata,
+         SwiftCC, AlwaysAvailable,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(RuntimeEffect::MetaData),
+         MEMEFFECTS(ReadOnly))
+
+// void swift_initBorrow(const Metadata *referent, OpaqueValue *destBorrow,
+//                       OpaqueValue *srcReferent);
+FUNCTION(InitBorrow,
+         Swift, swift_initBorrow,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy, OpaquePtrTy, OpaquePtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// const OpaqueValue *swift_dereferenceBorrow(Metadata *referent,
+//                                            const OpaqueValue *borrow);
+FUNCTION(DereferenceBorrow,
+         Swift, swift_dereferenceBorrow,
+         C_CC, AlwaysAvailable,
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, OpaquePtrTy),
+         ATTRS(NoUnwind, WillReturn),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

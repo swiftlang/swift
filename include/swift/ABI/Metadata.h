@@ -195,6 +195,16 @@ static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
   return asFullMetadata(const_cast<T*>(metadata));
 }
 
+/// Given a full metadata pointer, produce the regular metadata pointer.
+template <class T>
+static inline T *asMetadata(FullMetadata<T> *metadata) {
+  return (T *) (((typename T::HeaderType*) metadata) + 1);
+}
+template <class T>
+static inline const T *asMetadata(const FullMetadata<T> *metadata) {
+  return asMetadata(const_cast<FullMetadata<T> *>(metadata));
+}
+
 // std::result_of is busted in Xcode 5. This is a simplified reimplementation
 // that isn't SFINAE-safe.
 namespace {
@@ -1739,6 +1749,17 @@ struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
   }
 };
 using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
+
+/// The structure of `Builtin.Borrow` type metadata.
+template <typename Runtime>
+struct TargetBorrowTypeMetadata : public TargetMetadata<Runtime> {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Referent;
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::Borrow;
+  }
+};
+using BorrowTypeMetadata = TargetBorrowTypeMetadata<InProcess>;
 
 /// The structure of tuple type metadata.
 template <typename Runtime>

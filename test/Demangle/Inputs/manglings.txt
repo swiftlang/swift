@@ -508,3 +508,4 @@ $s3use1xAA3OfPVy3lib1GVyAA1fQryFQOyQo_GAjE1PAAxAeKHD1_AIHO_HCg_Gvp ---> use.x : 
 $sBAIgHgIL_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> () to @escaping @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> ()
 $sBAD ---> Builtin.ImplicitActor
 $sIeg_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed () -> () to @escaping @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> ()
+$sSiBW ---> Builtin.Borrow<Swift.Int>

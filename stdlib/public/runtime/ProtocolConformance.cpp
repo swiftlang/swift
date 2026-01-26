@@ -2272,6 +2272,16 @@ checkInvertibleRequirementsStructural(const Metadata *type,
     // Builtin.FixedArray has no conformances of its own.
     return std::nullopt;
 
+  case MetadataKind::Borrow:
+    // All Builtin.Borrow are '~Escapable'.
+    if (!ignored.containsEscapable()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+        "borrow type missing escapable invertible protocol %x",
+        ignored.rawBits());
+    }
+
+    return std::nullopt;
+
   case MetadataKind::LastEnumerated:
     break;
   }

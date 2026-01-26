@@ -6241,6 +6241,13 @@ namespace {
       printFoot();
     }
 
+    void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                                    Label label) {
+      printCommon("builtin_borrow_type", label);
+      printRec(T->getReferentType(), Label::optional("referent"));
+      printFoot();
+    }
+
     void visitTypeAliasType(TypeAliasType *T, Label label) {
       printCommon("type_alias_type", label);
 

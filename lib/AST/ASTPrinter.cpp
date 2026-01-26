@@ -6368,6 +6368,16 @@ public:
     Printer << ">";
   }
 
+  void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                              NonRecursivePrintOptions nrOptions) {
+    SmallString<32> buffer;
+    T->getTypeName(buffer);
+    Printer << buffer;
+    Printer << "<";
+    visit(T->getReferentType());
+    Printer << ">";
+  }
+
   void visitSILTokenType(SILTokenType *T,
                          NonRecursivePrintOptions nrOptions) {
     Printer << BUILTIN_TYPE_NAME_SILTOKEN;

@@ -125,7 +125,6 @@ class SILCloner : protected SILInstructionVisitor<ImplClass> {
   friend class SILVisitorBase<ImplClass>;
   friend class SILInstructionVisitor<ImplClass>;
 
-
 protected:
   /// MARK: Context shared with CRTP extensions.
 
@@ -3949,6 +3948,60 @@ void SILCloner<ImplClass>::visitIgnoredUseInst(IgnoredUseInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createIgnoredUse(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMakeBorrowInst(MakeBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createMakeBorrow(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void
+SILCloner<ImplClass>::visitDereferenceBorrowInst(DereferenceBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDereferenceBorrow(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitMakeAddrBorrowInst(MakeAddrBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createMakeAddrBorrow(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void
+SILCloner<ImplClass>
+::visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDereferenceAddrBorrow(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitInitBorrowAddrInst(InitBorrowAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createInitBorrowAddr(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getDest()),
+                                          getOpValue(Inst->getReferent())));
+}
+
+template <typename ImplClass>
+void
+SILCloner<ImplClass>
+::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createDereferenceBorrowAddr(getOpLocation(Inst->getLoc()),
                                           getOpValue(Inst->getOperand())));
 }
 

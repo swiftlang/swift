@@ -1180,3 +1180,8 @@ Added: __swift_runtime_demangle_allocate
 // New SPI for dynamic exclusivity checking.
 Added: __swift_exclusivityAccessGetParent
 Added: __swift_exclusivityAccessSetNext
+
+// Runtime support for `Builtin.Borrow`
+Added: _swift_dereferenceBorrow
+Added: _swift_getBorrowTypeMetadata
+Added: _swift_initBorrow

@@ -1258,6 +1258,12 @@ bool SILType::isAddressableForDeps(const SILFunction &function) const {
   return properties.isAddressableForDependencies();
 }
 
+bool SILType::isAddressableForDeps(SILModule &M,
+                                   TypeExpansionContext context) const {
+  auto properties = M.Types.getTypeProperties(*this, context);
+  return properties.isAddressableForDependencies();
+}
+
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
   auto *nominal = getNominalOrBoundGenericNominal();
   if (!nominal)
