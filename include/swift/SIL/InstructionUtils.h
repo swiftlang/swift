@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_INSTRUCTIONUTILS_H
 #define SWIFT_SIL_INSTRUCTIONUTILS_H
 
+#include "swift/SIL/NodeBits.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
 #include "swift/SIL/SILModule.h"
@@ -251,6 +252,33 @@ bool shouldExpand(SILModule &module, SILType ty);
 /// For historical reasons this utility is implemented in SILVerifier.cpp.
 bool isIndirectArgumentMutated(SILFunctionArgument *arg, bool ignoreDestroys = false,
                                bool defaultIsMutating = false);
+
+/// Caches instruction indices per basic block.
+///
+/// Instruction indices start at 0 at the first instruction of each basic block.
+///
+/// Note: in case there are more instructions in a block than can be stored in
+///       the index bitfield, the indices are maxed out for the remaining instructions.
+///
+/// Note: as this data structure occupies almost all custom SILNode bits, there
+///       is little room for using other InstructionSet or similar data structures
+///       concurrently.
+class InstructionIndices {
+  NodeBitfield indices;
+
+public:
+  // Leave a few bits for other purposes (e.g. InstructionSet).
+  enum { numIndexBits = SILNode::numCustomBits - 4 };
+
+  static_assert(numIndexBits >= 16,
+                "should at least be able to index 65536 instructions in a block");
+
+  InstructionIndices(SILFunction *f);
+
+  unsigned get(SILInstruction *inst) {
+    return indices.get(inst->asSILNode());
+  }
+};
 
 } // end namespace swift
 
