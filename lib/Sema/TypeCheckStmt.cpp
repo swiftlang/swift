@@ -3455,7 +3455,8 @@ public:
   DesugarForEachStmt(ForEachStmt *stmt)
       : stmt(stmt), dc(stmt->getDeclContext()),
         ctx(stmt->getDeclContext()->getASTContext()),
-        isAsync(stmt->getAwaitLoc().isValid()), isBorrowing(false) {}
+        isAsync(stmt->getAwaitLoc().isValid()),
+        isBorrowing(ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {}
 
   BraceStmt *operator()() {
     auto *sequence = stmt->getSequence();
@@ -3478,7 +3479,7 @@ public:
 
     // Check if this is a borrowing sequence by looking for
     // BorrowingIteratorProtocol
-    isBorrowing = checkIsBorrowingIterator();
+    isBorrowing = isBorrowing && checkIsBorrowingIterator();
 
     buildMakeIteratorVar();
 
