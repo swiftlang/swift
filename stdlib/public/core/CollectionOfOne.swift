@@ -194,6 +194,11 @@ extension CollectionOfOne: CustomDebugStringConvertible {
   }
 }
 
+extension CollectionOfOne: BitwiseCopyable
+where Element: BitwiseCopyable { }
+extension CollectionOfOne.Iterator: BitwiseCopyable
+where Element: BitwiseCopyable { }
+
 #if SWIFT_ENABLE_REFLECTION
 extension CollectionOfOne: CustomReflectable {
   public var customMirror: Mirror {
