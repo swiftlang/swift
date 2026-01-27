@@ -340,7 +340,7 @@ extension LifetimeDependence.Scope {
     assert(iter.next() == nil,
            "guaranteed phis not allowed when diagnosing lifetime dependence")
     switch beginBorrow {
-    case .beginBorrow, .loadBorrow:
+    case .beginBorrow, .loadBorrow, .dereferenceBorrow:
       self = .borrowed(beginBorrow)
     case let .beginApply(value):
       self = .yield(value)
@@ -771,13 +771,22 @@ extension LifetimeDependenceDefUseWalker {
       // Catch .instantaneousUse operations that are dependence leaf uses.
       return leafUse(of: operand)
 
-    case is DestroyValueInst, is EndLifetimeInst, is DeallocRefInst,
+    case is DeallocRefInst,
          is DeallocBoxInst, is DeallocExistentialBoxInst,
          is BeginCOWMutationInst, is EndCOWMutationInst,
          is EndInitLetRefInst, is DeallocPartialRefInst, is BeginDeallocRefInst:
       // Catch .destroyingConsume operations that are dependence leaf
       // uses.
       return leafUse(of: operand)
+
+    case let destroy as DestroyValueInst:
+      if destroy.isDeadEnd {
+        return .continueWalk
+      }
+      return leafUse(of: operand)
+
+    case is EndLifetimeInst:
+      return .continueWalk
 
     case let si as StoringInstruction where si.sourceOperand == operand:
       return visitStoredUses(of: operand, into: si.destinationOperand.value)

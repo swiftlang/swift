@@ -41,7 +41,7 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-#define DEBUG_TYPE "ConstraintSystem"
+#define DEBUG_TYPE "TypeOfReference"
 
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
@@ -179,7 +179,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
     if (auto signature = decl->getGenericSignature()) {
       cs.openGenericRequirements(
-          extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+          extension, signature, /*skipProtocolSelfConstraint=*/false, locator,
           [&](Type type) {
             // Why do we look in two substitution maps? We have to use the
             // context substitution map to find types, because we need to
@@ -392,10 +392,6 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
                                   TypePosition pos) {
     return cs.openPackExpansionType(expansion, replacements, locator,
                                     preparedOverload);
-  }
-
-  bool shouldUnwrapVanishingTuples() const {
-    return false;
   }
 
   bool shouldDesugarTypeAliases() const {
@@ -1474,18 +1470,40 @@ void ConstraintSystem::openGenericRequirements(
     PreparedOverloadBuilder *preparedOverload) {
   auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
+    auto req = requirements[pos];
+    auto kind = req.getKind();
+
+    // Determine whether this is the protocol 'Self' requirement we should skip.
+    //
+    // NOTE: At first glance it seems like this is just an optimization to avoid
+    // adding a redundant constraint, but it is in fact load bearing for
+    // DistributedActor since we can form a conformance to Actor in
+    // GetDistributedActorAsActorConformanceRequest despite the fact that
+    // DistributedActor does not require Actor conformance (although conforming
+    // types are guaranteed to have the witnesses). So a conformance check in
+    // that case would fail.
+    //
+    // We also skip the protocol 'Self' requirement for dynamic AnyObject lookup,
+    // because the base type there is AnyObject which does not conform to any
+    // @objc protocols.
+    if (skipProtocolSelfConstraint &&
+        kind == RequirementKind::Conformance &&
+        req.getProtocolDecl() == outerDC &&
+        req.getFirstType()->isEqual(getASTContext().TheSelfType)) {
+      continue;
+    }
+
     auto openedGenericLoc =
       locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
     openGenericRequirement(outerDC, signature, pos, requirements[pos],
-                           skipProtocolSelfConstraint, openedGenericLoc,
-                           substFn, preparedOverload);
+                           openedGenericLoc, substFn, preparedOverload);
   }
 }
 
 void ConstraintSystem::openGenericRequirement(
     DeclContext *outerDC, GenericSignature signature,
-    unsigned index, const Requirement &req,
-    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    unsigned index, Requirement req,
+    ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
   std::optional<Requirement> openedReq;
@@ -1495,20 +1513,6 @@ void ConstraintSystem::openGenericRequirement(
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
-    auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should skip.
-    //
-    // NOTE: At first glance it seems like this is just an optimization to avoid
-    // adding a redundant constraint, but it is in fact load bearing for
-    // DistributedActor since we can form a conformance to Actor in
-    // GetDistributedActorAsActorConformanceRequest despite the fact that
-    // DistributedActor does not require Actor conformance (although conforming
-    // types are guaranteed to have the witnesses). So a conformance check in
-    // that case would fail.
-    if (skipProtocolSelfConstraint && protoDecl == outerDC &&
-        protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
-      return;
-
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
     if (signature &&
@@ -2023,6 +2027,9 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   auto openedParams = openedType->castTo<FunctionType>()->getParams();
   assert(openedParams.size() == 1);
 
+  bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
+  bool skipProtocolSelfConstraint = isDynamicLookup || isRequirementOrWitness(locator);
+
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
   if (outerDC->getSelfProtocolDecl()) {
     // For a protocol, substitute the base object directly. We don't need a
@@ -2031,7 +2038,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,
                   preparedOverload);
-  } else if (choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
+  } else if (!isDynamicLookup) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator, preparedOverload);
   }
 
@@ -2043,8 +2050,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   // easier to diagnose.
   if (genericSig) {
     openGenericRequirements(
-        outerDC, genericSig,
-        /*skipProtocolSelfConstraint=*/true, locator,
+        outerDC, genericSig, skipProtocolSelfConstraint, locator,
         [&](Type type) {
           return openType(type, replacements, locator, preparedOverload);
         }, preparedOverload);
@@ -2923,6 +2929,12 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
       choice, useDC, locator, &builder);
 
+  LLVM_DEBUG(
+    llvm::dbgs() << "------------\n";
+    builder.dump(llvm::dbgs(), *this);
+    llvm::dbgs() << "------------\n");
+
+  ASSERT(PreparingOverload);
   PreparingOverload = false;
 
   size_t count = builder.Changes.size();
@@ -3275,5 +3287,92 @@ void ConstraintSystem::verifyThatArgumentIsHashable(unsigned index,
         ConstraintKind::ConformsTo, argType,
         hashable->getDeclaredInterfaceType(),
         getConstraintLocator(locator, LocatorPathElt::TupleElement(index)));
+  }
+}
+
+void PreparedOverloadChange::dump(llvm::raw_ostream &out,
+                                  ConstraintSystem &cs,
+                                  unsigned indent) const {
+  PrintOptions PO = PrintOptions::forDebugging();
+  out.indent(indent);
+
+  switch (Kind) {
+  case AddedTypeVariable:
+    out << "(AddedTypeVariable ";
+    TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case AddedConstraint:
+    out << "(AddedConstraint ";
+    TheConstraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << ")\n";
+    break;
+
+  case AddedBindConstraint:
+    out << "(AddedBindConstraint ";
+    Bind.FirstType->print(out, PO);
+    out << " ";
+    Bind.SecondType->print(out, PO);
+    out << ")\n";
+    break;
+
+  case OpenedTypes: {
+    out << "(OpenedTypes";
+    for (unsigned i = 0, e = Replacements.Count; i < e; ++i) {
+      out << " ";
+      auto openedType = Replacements.Data[i];
+      openedType.first->print(out, PO);
+      out << " -> ";
+      openedType.second->print(out, PO);
+    }
+    out << ")\n";
+    break;
+  }
+
+  case OpenedExistentialType:
+    out << "(OpenedExistentialType ";
+    TheExistential->print(out, PO);
+    out << ")\n";
+    break;
+
+  case OpenedPackExpansionType:
+    out << "(OpenedPackExpansionType ";
+    PackExpansion.TheExpansion->print(out, PO);
+    out << " ";
+    PackExpansion.TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case AppliedPropertyWrapper:
+    out << "(AppliedPropertyWrapper ";
+    PropertyWrapper.WrapperType->print(out, PO);
+    out << " ";
+    out << unsigned(PropertyWrapper.InitKind);
+    out << ")\n";
+    break;
+
+  case AddedFix:
+    out << "(AddedFix ";
+    Fix.TheFix->print(out);
+    out << ")\n";
+    break;
+
+  case RecordedNodeType:
+    out << "(RecordedNodeType at ";
+    Node.Node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
+    out << " ";
+    Node.TheType->print(out, PO);
+    out << ")\n";
+    break;
+  }
+}
+
+void PreparedOverloadBuilder::dump(llvm::raw_ostream &out,
+                                  ConstraintSystem &cs,
+                                  unsigned indent) const {
+  for (const auto &change : Changes) {
+    change.dump(out, cs, indent);
   }
 }

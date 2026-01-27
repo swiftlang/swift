@@ -378,7 +378,7 @@ following steps assume that you have already [built the toolchain with Ninja](#t
   specifically to generate Xcode projects for the Swift repo (as well as a
   couple of adjacent repos such as LLVM and Clang). It supports a number of
   different options, you can run `utils/generate-xcode --help` to see them. For
-  more information, see [the documentation for `swift-xcodegen`](/utils/swift-xcodegen/README.md).
+  more information, see [the documentation for `swift-xcodegen`](/utils/swift-dev-utils/Sources/swift-xcodegen/README.md).
 
 #### Regenerating the Xcode project
 

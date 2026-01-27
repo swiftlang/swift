@@ -113,3 +113,6 @@
 // CHECK: Vec16xInt8
 // CHECK: Vec32xInt8
 // CHECK: Vec64xInt8
+
+// DEMANGLE: $sSiBW
+// CHECK: Borrow<Int>

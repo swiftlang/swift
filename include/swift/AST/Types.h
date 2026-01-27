@@ -1519,7 +1519,12 @@ public:
   ///
   /// \param dropGlobalActor Whether to drop a global actor from a function
   /// type.
-  Type stripConcurrency(bool recurse, bool dropGlobalActor);
+  /// \param dropIsolation Whether to drop the isolation from a function type.
+  /// This should almost always be `false` except to one use in ASTMangler to
+  /// maintain old behavior where setting `dropGlobalActor` to `true` dropped
+  /// isolation for `@preconcurrency` declarations.
+  Type stripConcurrency(bool recurse, bool dropGlobalActor,
+                        bool dropIsolation = false);
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
@@ -1825,7 +1830,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinGenericType, BuiltinType)
 /// value may be copied, moved, or destroyed.
 class BuiltinFixedArrayType : public BuiltinGenericType,
                               public llvm::FoldingSetNode {
-  friend class ASTContext;
+  friend ASTContext;
   
   CanType Size;
   CanType ElementType;
@@ -1881,6 +1886,47 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinGenericType)
+
+/// BuiltinBorrowType - The builtin type representing a reified borrow of
+/// another value.
+class BuiltinBorrowType : public BuiltinGenericType,
+                          public llvm::FoldingSetNode
+{
+  friend ASTContext;
+
+  CanType Referent;
+
+  BuiltinBorrowType(CanType Referent, RecursiveTypeProperties properties)
+    : BuiltinGenericType(TypeKind::BuiltinBorrow,
+                         Referent->getASTContext(),
+                         properties),
+      Referent(Referent)
+  {}
+
+  friend BuiltinGenericType;
+  /// Get the generic arguments as a substitution map.
+  SubstitutionMap buildSubstitutions() const;
+  
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinBorrow;
+  }
+  
+  static CanTypeWrapper<BuiltinBorrowType>
+  get(CanType Referent);
+
+  /// Get the type of the referenced borrow.
+  CanType getReferentType() const { return Referent; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getReferentType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Referent) {
+    ID.AddPointer(Referent.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBorrowType, BuiltinGenericType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -5148,15 +5194,17 @@ enum class SILCoroutineKind : uint8_t {
   /// results and may not have yield results.
   None,
 
-  /// This function is a yield-once coroutine (used by e.g. accessors).
-  /// It must not have normal results and may have arbitrary yield results.
+  /// This function is a yield-once coroutine (used by legacy
+  /// `_read` and `_modify` accessors).
+  /// It must not have normal results and may have arbitrary
+  /// yield results.
   YieldOnce,
 
-  /// This function is a yield-once coroutine (used by read and modify
-  /// accessors).  It has the following differences from YieldOnce:
-  /// - it does not observe errors thrown by its caller (unless the feature
-  /// CoroutineAccessorsUnwindOnCallerError is enabled)
-  /// - it uses the callee-allocated ABI
+  /// This function is a yield-once coroutine (used by `yielding borrow`
+  /// and `yielding mutate` accessors).
+  /// Unlike YieldOnce, the second half of the coroutine is _always_
+  /// run, even if an error is thrown within the access scope.
+  /// It also uses a more efficient callee-allocated ABI.
   YieldOnce2,
 
   /// This function is a yield-many coroutine (used by e.g. generators).
@@ -6167,6 +6215,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 class SILBoxType;
 class SILLayout; // From SIL
 class SILModule; // From SIL
+class SILField;  // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
@@ -6186,6 +6235,52 @@ public:
 
   SILLayout *getLayout() const { return Layout; }
   SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+  /// Return the fields of this type from its layout.
+  ///
+  /// NOTE: These types have not been appropriately specialized either for a
+  /// SILFunction where it occurs or any substitutions that are stored within
+  /// the substitution map of the function. In order to get appropriate SILTypes
+  /// for fields to work with directly in SIL, please call getFieldType below
+  /// which handles the relevant specializations correctly for you.
+  ArrayRef<SILField> getFields() const;
+
+  /// Return the SILType of the field of the layout of the SILBoxType.
+  ///
+  /// NOTE: This ensures that the type is probably specialized both for the
+  /// substitutions of this type and the relevant SILFunction.
+  ///
+  /// Defined in SILType.cpp.
+  SILType getFieldType(SILFunction &fn, unsigned index);
+
+  /// Returns the number of fields in the box type's layout.
+  unsigned getNumFields() const { return getFields().size(); }
+
+  /// Returns true if the given field in the box is mutable. Returns false
+  /// otherwise.
+  bool isFieldMutable(unsigned index) const;
+
+  /// Returns a SILBoxType that is the same as the current box type but with the
+  /// mutability of each field specified via index in \p
+  /// fieldIndexMutabilityUpdatePairs to have its mutability be the index's
+  /// associated bool pair.
+  CanSILBoxType withMutable(ASTContext &ctx,
+                            std::initializer_list<std::pair<unsigned, bool>>
+                                fieldIndexMutabilityUpdatePairs) const;
+
+  using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
+  using SILFieldToSILTypeRange =
+      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
+                                           SILFieldIndexToSILTypeTransform>>;
+
+  /// Returns a range of SILTypes that have been specialized correctly for use
+  /// in the passed in SILFunction.
+  ///
+  /// DISCUSSION: The inner range is an IntRange since the inner API that we use
+  /// to transform fields is defined in terms of indices.
+  ///
+  /// Defined in SILType.cpp.
+  SILFieldToSILTypeRange getSILFieldTypes(SILFunction &fn);
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type

@@ -9,7 +9,7 @@
 // If the compiler needs more than 5 minutes, there is probably a real problem.
 // So please don't just increase the timeout in case this fails.
 
-// RUN: %{python} %S/../../test/Inputs/timeout.py 300 %target-swift-frontend -O -parse-as-library -sil-verify-none -emit-sil %t/main.swift | %FileCheck %s
+// RUN: %{python} %S/../../test/Inputs/timeout.py 300 %target-swift-frontend -O -parse-as-library -emit-sil %t/main.swift | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: long_test

@@ -591,6 +591,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
+    llvm::FoldingSet<BuiltinBorrowType> BuiltinBorrowTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -2844,15 +2845,19 @@ bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
   llvm::VersionTuple underlyingVersionInfo;
-  if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
-                           versionInfo, underlyingVersionInfo))
-    return false;
+  bool canImport =
+      canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
+                          versionInfo, underlyingVersionInfo);
 
-  SmallString<64> fullModuleName;
-  moduleName.getString(fullModuleName);
-  
-  addSucceededCanImportModule(fullModuleName, versionInfo, underlyingVersionInfo);
-  return true;
+  // If found an import or resolved an version, recorded the module.
+  if (canImport || !versionInfo.empty() || !underlyingVersionInfo.empty()) {
+    SmallString<64> fullModuleName;
+    moduleName.getString(fullModuleName);
+
+    addSucceededCanImportModule(fullModuleName, versionInfo,
+                                underlyingVersionInfo);
+  }
+  return canImport;;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
@@ -3833,6 +3838,29 @@ BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
   ctx.getImpl().getArena(arena).BuiltinFixedArrayTypes
       .InsertNode(faTy, insertPos);
   return faTy;
+}
+
+CanBuiltinBorrowType BuiltinBorrowType::get(CanType Referent) {
+  RecursiveTypeProperties properties;
+  properties |= Referent->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
+  llvm::FoldingSetNodeID id;
+  BuiltinBorrowType::Profile(id, Referent);
+  auto &ctx = Referent->getASTContext();
+
+  void *insertPos;
+  if (BuiltinBorrowType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+                 .FindNodeOrInsertPos(id, insertPos))
+    return CanBuiltinBorrowType(faTy);
+
+  BuiltinBorrowType *faTy
+    = new (ctx, arena) BuiltinBorrowType(Referent, properties);
+  ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+      .InsertNode(faTy, insertPos);
+  return CanBuiltinBorrowType(faTy);
 }
 
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
@@ -6984,6 +7012,21 @@ SILLayout *SILLayout::get(ASTContext &C,
   return newLayout;
 }
 
+SILLayout *
+SILLayout::withMutable(ASTContext &ctx,
+                       std::initializer_list<std::pair<unsigned, bool>>
+                           fieldIndexMutabilityUpdatePairs) const {
+  // Copy the fields, setting the mutable field to newMutable.
+  SmallVector<SILField, 8> newFields;
+  llvm::copy(getFields(), std::back_inserter(newFields));
+  for (auto p : fieldIndexMutabilityUpdatePairs) {
+    newFields[p.first].setIsMutable(p.second);
+  }
+
+  return SILLayout::get(ctx, getGenericSignature(), newFields,
+                        capturesGenericEnvironment());
+}
+
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
@@ -7018,6 +7061,23 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
                                      LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
+}
+
+CanSILBoxType
+SILBoxType::withMutable(ASTContext &ctx,
+                        std::initializer_list<std::pair<unsigned, bool>>
+                            fieldIndexMutabilityUpdatePairs) const {
+  return SILBoxType::get(
+      ctx, getLayout()->withMutable(ctx, fieldIndexMutabilityUpdatePairs),
+      getSubstitutions());
+}
+
+ArrayRef<SILField> SILBoxType::getFields() const {
+  return getLayout()->getFields();
+}
+
+bool SILBoxType::isFieldMutable(unsigned index) const {
+  return getFields()[index].isMutable();
 }
 
 LayoutConstraint

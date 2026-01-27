@@ -11,9 +11,14 @@
 # ===----------------------------------------------------------------------===#
 
 import os
+import sys
 import shutil
+from unittest.mock import patch
+import contextlib
+from io import StringIO
 
 from . import scheme_mock
+from update_checkout.update_checkout import obtain_all_additional_swift_sources, main
 
 
 class CloneTestCase(scheme_mock.SchemeMockTestCase):
@@ -89,6 +94,37 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             "You don't have all swift sources. Call this script with --clone to get them.",
             output,
         )
+
+    @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
+    @patch("sys.exit", return_value=None)
+    def test_clone_with_retry(self, mock_exit, mock_obtain):
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                return ([], [("fake-repo", "Simulated failure")])
+            else:
+                return obtain_all_additional_swift_sources(*args, **kwargs)
+
+        mock_obtain.side_effect = side_effect
+
+        # TODO: eventually call update_checkout using `main` rather than 
+        # `subprocess.call` to be able to mock some methods.
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--clone",
+            "--max-retries",
+            "1",
+        ]
+        with contextlib.redirect_stdout(StringIO()):
+            main()
+
+        self.assertEqual(call_count[0], 2)
 
 
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):

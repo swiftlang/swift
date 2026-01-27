@@ -1272,8 +1272,9 @@ ERROR(module_not_compiled_with_library_evolution,none,
       (Identifier, Identifier))
 GROUPED_WARNING(implementation_only_requires_library_evolution,
         ImplementationOnlyDeprecated,none,
-        "using '@_implementationOnly' without enabling library evolution "
-        "for %0 may lead to instability during execution",
+        "safely use '@_implementationOnly' without library evolution "
+        "by setting '-enable-experimental-feature CheckImplementationOnly' "
+        "for %0",
         (Identifier))
 GROUPED_WARNING(implementation_only_deprecated,
         ImplementationOnlyDeprecated,none,
@@ -3101,18 +3102,6 @@ ERROR(witness_not_as_sendable,none,
 NOTE(less_sendable_reqt_here,none,
      "expected sendability to match requirement here",
      ())
-WARNING(witness_not_accessible_strict_check_warn,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
-ERROR(witness_not_accessible_strict_check,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
@@ -3323,6 +3312,11 @@ NOTE(protocol_witness_mutation_modifier_conflict,none,
      (SelfAccessKind))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
+
+ERROR(protocol_witness_borrow_mutate_conflict, none,
+      "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
+      (StringRef))
+
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
 NOTE(protocol_witness_rethrows_by_conformance_conflict,none,
@@ -5016,8 +5010,7 @@ ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
 ERROR(value_of_metatype_type,none,
-      "expected member name or initializer call after type name%select{|; this "
-      "will be an error in Swift 6}0", (bool))
+      "expected member name or initializer call after type name", ())
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())

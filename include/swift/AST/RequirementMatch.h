@@ -98,13 +98,17 @@ enum class MatchKind : uint8_t {
 
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
-  
+
   /// The witness did not match because it is an enum case with
   /// associated values.
   EnumCaseWithAssociatedValues,
 
   /// The witness did not match due to _const/non-_const differences.
   CompileTimeLiteralConflict,
+
+  /// The witness did not match because it cannot satisy borrow/mutate
+  /// requirement.
+  BorrowMutateConflict,
 };
 
 // Describes the kind of optional adjustment performed when
@@ -218,9 +222,6 @@ enum class CheckKind : unsigned {
   /// The witness is less accessible than the requirement.
   Access,
 
-  /// Strict check for access holes making swiftinterface not usable
-  AccessStrict,
-
   /// The witness needs to be @usableFromInline.
   UsableFromInline,
 
@@ -268,12 +269,8 @@ public:
     ASSERT(kind != CheckKind::Availability);
   }
 
-  RequirementCheck(CheckKind accessKind, AccessScope requiredAccessScope,
-                   bool forSetter)
-      : Kind(accessKind), Access{requiredAccessScope, forSetter} {
-    ASSERT(accessKind == CheckKind::Access ||
-           accessKind == CheckKind::AccessStrict);
-  }
+  RequirementCheck(AccessScope requiredAccessScope, bool forSetter)
+      : Kind(CheckKind::Access), Access{requiredAccessScope, forSetter} {}
 
   RequirementCheck(AvailabilityConstraint constraint,
                    AvailabilityContext requiredContext)
@@ -298,7 +295,7 @@ public:
   /// The required access scope for checks that failed due to the witness being
   /// less accessible than the requirement.
   AccessScope getRequiredAccessScope() const {
-    ASSERT(Kind == CheckKind::Access || Kind == CheckKind::AccessStrict);
+    ASSERT(Kind == CheckKind::Access);
     return Access.requiredScope;
   }
 
@@ -417,6 +414,7 @@ struct RequirementMatch {
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
+    case MatchKind::BorrowMutateConflict:
       return false;
     }
 
@@ -454,6 +452,7 @@ struct RequirementMatch {
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
+    case MatchKind::BorrowMutateConflict:
       return false;
     }
 
@@ -490,6 +489,7 @@ struct RequirementMatch {
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
+    case MatchKind::BorrowMutateConflict:
       return false;
     }
 

@@ -593,7 +593,7 @@ fileprivate func hexFloat(
     return .infinity(sign: sign) // Overflow
   }
 
-  if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits + 1 {
+  if binaryExponent < targetFormat.minBinaryExponent - targetFormat.significandBits {
     return .zero(sign: sign) // Underflow
   }
 

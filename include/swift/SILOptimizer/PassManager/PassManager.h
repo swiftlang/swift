@@ -70,10 +70,6 @@ class SwiftPassInvocation : public SILContext {
   void endPass();
 
 public:
-  SwiftPassInvocation(SILPassManager *passManager, SILFunction *function,
-                         SILCombiner *silCombiner) :
-    SILContext(function), passManager(passManager), silCombiner(silCombiner) {}
-
   SwiftPassInvocation(SILPassManager *passManager, SILTransform *transform,
                       SILFunction *function) :
     SILContext(function), passManager(passManager), transform(transform) {}
@@ -82,6 +78,13 @@ public:
 
   virtual ~SwiftPassInvocation();
 
+  /// Gets the innermost active pass-invocation.
+  /// Pass-invocations can be nested if a module pass creates an inner context
+  /// for a specific function to modify.
+  SwiftPassInvocation *getCurrent() {
+    return nestedSwiftPassInvocation ? nestedSwiftPassInvocation->getCurrent() : this;
+  }
+
   SILPassManager *getPassManager() const { return passManager; }
   
   SILTransform *getTransform() const { return transform; }
@@ -89,6 +92,10 @@ public:
   SILFunction *getFunction() const { return function; }
 
   irgen::IRGenModule *getIRGenModule();
+
+  void injectSILCombiner(SILCombiner *combiner) {
+    silCombiner = combiner;
+  }
 
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst, bool salvageDebugInfo) override;
@@ -122,7 +129,11 @@ public:
 
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
-  
+
+  /// Updates all analysis.
+  /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
+  void updateAnalysis();
+
   void beginVerifyFunction(SILFunction *function);
   void endVerifyFunction();
 
@@ -130,13 +141,13 @@ public:
   bool getNeedFixStackNesting() const { return needFixStackNesting; }
 
   SwiftPassInvocation *initializeNestedSwiftPassInvocation(SILFunction *newFunction) {
-    assert(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
+    ASSERT(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
     nestedSwiftPassInvocation = new SwiftPassInvocation(passManager, transform, newFunction);
     return nestedSwiftPassInvocation;
   }
 
   void deinitializeNestedSwiftPassInvocation() {
-    assert(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
+    ASSERT(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
     nestedSwiftPassInvocation->finishedFunctionPassRun();
     delete nestedSwiftPassInvocation;
     nestedSwiftPassInvocation = nullptr;
@@ -443,11 +454,11 @@ private:
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F,
-                    int passIdx = -1);
+                    int passIdx = -1, bool skipNewline = false);
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, unsigned TransIdx,
-                    SILFunction *F = nullptr);
+                    SILFunction *F = nullptr, bool skipNewline = false);
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.

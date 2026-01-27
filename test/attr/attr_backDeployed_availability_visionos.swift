@@ -1,6 +1,4 @@
-// RUN: %empty-directory(%t/mock-sdk)
-// RUN: cp %S/../Inputs/MockPlatformRemapSDKConfig/SDKSettings.json %t/mock-sdk/SDKSettings.json
-// RUN: %swift -typecheck -verify -parse-stdlib -target arm64-apple-xros1.0 %s -sdk %t/mock-sdk
+// RUN: %swift -typecheck -verify -parse-stdlib -target arm64-apple-xros1.0 %s -sdk %S/Inputs/XROS1.1.sdk
 
 @backDeployed(before: visionOS 2) // Ok, introduced availability is inferred to be visionOS epoch
 public func topLevelFunc() {}

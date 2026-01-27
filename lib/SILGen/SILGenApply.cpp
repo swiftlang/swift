@@ -3245,6 +3245,11 @@ done:
 
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
+  if (auto *OV = dyn_cast<OpaqueValueExpr>(argExpr)) {
+    if (auto *underlying = OpaqueExprs.lookup(OV))
+      argExpr = underlying;
+  }
+
   ForceValueExpr *forceUnwrap = nullptr;
   // Check for a force unwrap. This might show up inside or outside of the
   // load.
@@ -3297,7 +3302,8 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     }
   }
 
-  auto result = StorageRefResult::findStorageReferenceExprForBorrow(argExpr);
+  auto result = StorageRefResult::findStorageReferenceExprForBorrow(SGM.M,
+                                                                    argExpr);
 
   if (!result)
     return nullptr;
@@ -3422,7 +3428,7 @@ SILGenFunction::findStorageReferenceExprForBorrowExpr(Expr *argExpr) {
   if (!borrowExpr)
     return nullptr;
 
-  return StorageRefResult::findStorageReferenceExprForBorrow(
+  return StorageRefResult::findStorageReferenceExprForBorrow(SGM.M,
              borrowExpr->getSubExpr())
       .getTransitiveRoot();
 }
@@ -3441,11 +3447,11 @@ ArgumentSource::findStorageReferenceExprForBorrowExpr(SILGenFunction &SGF) && {
   return lvExpr;
 }
 
-Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
+Expr *ArgumentSource::findStorageReferenceExprForBorrow(SILModule &M) && {
   if (!isExpr()) return nullptr;
 
   auto argExpr = asKnownExpr();
-  auto *lvExpr = StorageRefResult::findStorageReferenceExprForBorrow(argExpr)
+  auto *lvExpr = StorageRefResult::findStorageReferenceExprForBorrow(M, argExpr)
                      .getTransitiveRoot();
 
   // Claim the value of this argument if we found a storage reference.
@@ -3909,7 +3915,8 @@ private:
     // Handle yields of storage reference expressions specially so that we
     // don't emit them as +1 r-values and then expand.
     if (Options.contains(Flag::IsYield)) {
-      if (auto result = std::move(arg).findStorageReferenceExprForBorrow()) {
+      if (auto result = std::move(arg)
+            .findStorageReferenceExprForBorrow(SGF.SGM.M)) {
         emitExpandedBorrowed(result, origParamType);
         return;
       }
@@ -4029,7 +4036,7 @@ private:
     assert(paramsSlice.size() == 1);
 
     // Try to find an expression we can emit as an l-value.
-    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow();
+    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow(SGF.SGM.M);
     if (!lvExpr) return false;
 
     emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
@@ -5474,14 +5481,14 @@ ManagedValue CallEmission::applyBorrowMutateAccessor() {
   }
 
   auto value = SGF.applyBorrowMutateAccessor(
-      uncurriedLoc.value(), fnValue, canUnwind, callee.getSubstitutions(),
+      uncurriedLoc.value(), fnValue, callee.getSubstitutions(),
       uncurriedArgs, calleeTypeInfo.substFnType, options);
 
   return value;
 }
 
 ManagedValue SILGenFunction::applyBorrowMutateAccessor(
-    SILLocation loc, ManagedValue fn, bool canUnwind, SubstitutionMap subs,
+    SILLocation loc, ManagedValue fn, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, CanSILFunctionType substFnType,
     ApplyOptions options) {
   // Emit the call.
@@ -7869,12 +7876,13 @@ bool SILGenFunction::canUnwindAccessorDeclRef(SILDeclRef accessorRef) {
   auto kind = accessor->getAccessorKind();
   ASSERT(isYieldingAccessor(kind) && "only yielding accessors can unwind");
   if (!requiresFeatureCoroutineAccessors(kind)) {
-    // _read and _modify can unwind
+    // Legacy _read and _modify can unwind, skipping
+    // the second half of the coroutine
     return true;
   }
-  // Coroutine accessors can only unwind with the experimental feature.
-  return getASTContext().LangOpts.hasFeature(
-      Feature::CoroutineAccessorsUnwindOnCallerError);
+  // `yielding borrow` and `yielding mutate` coroutines
+  // never unwind; they always run to completion
+  return false;
 }
 
 CleanupHandle
@@ -8047,6 +8055,9 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
       return visit(P->getSubPattern());
     }
     void visitBindingPattern(BindingPattern *P) {
+      return visit(P->getSubPattern());
+    }
+    void visitOpaquePattern(OpaquePattern *P) {
       return visit(P->getSubPattern());
     }
     void visitTuplePattern(TuplePattern *P) {

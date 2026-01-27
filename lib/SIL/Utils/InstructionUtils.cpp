@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -643,6 +644,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::IgnoredUseInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
   case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::LoadInst: {
@@ -1500,4 +1507,16 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
 
   unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
   return (numFields <= 6);
+}
+
+InstructionIndices::InstructionIndices(SILFunction *f)
+    : indices(f, numIndexBits) {
+  for (SILBasicBlock &block : *f) {
+    unsigned idx = 1;
+    for (SILInstruction &inst : block) {
+      indices.set(inst.asSILNode(), idx);
+      if (indices.fits(idx + 1))
+        idx += 1;
+    }
+  }
 }

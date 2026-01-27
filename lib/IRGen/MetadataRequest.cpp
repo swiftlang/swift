@@ -1260,6 +1260,20 @@ static MetadataResponse emitFixedArrayMetadataRef(IRGenFunction &IGF,
     return MetadataResponse::handle(IGF, request, call);
 }
 
+static MetadataResponse emitBorrowMetadataRef(IRGenFunction &IGF,
+                                              CanBuiltinBorrowType type,
+                                              DynamicMetadataRequest request) {
+  auto call = IGF.Builder.CreateCall(
+    IGF.IGM.getGetBorrowTypeMetadataFunctionPointer(),
+    {request.get(IGF),
+     IGF.emitTypeMetadataRef(type->getReferentType(), MetadataState::Abstract)
+        .getMetadata()});
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  call->setDoesNotThrow();
+
+  return MetadataResponse::handle(IGF, request, call);
+}
+
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
                                                  DynamicMetadataRequest request) {
@@ -1871,6 +1885,17 @@ namespace {
       llvm_unreachable("not a real type");
     }
 
+    MetadataResponse
+    visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                           DynamicMetadataRequest request) {
+      if (auto cached = tryGetLocal(type, request)) {
+        return cached;
+      }
+
+      auto response = emitBorrowMetadataRef(IGF, type, request);
+      return setLocal(type, response);
+    }
+    
     MetadataResponse
     visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
                                DynamicMetadataRequest request) {

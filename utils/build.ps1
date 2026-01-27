@@ -1876,11 +1876,6 @@ function Build-CMakeProject {
             "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
           )
 
-          # FIXME(compnerd) remove this once we have the early swift-driver
-          if ($SwiftSDK) {
-            $SwiftFlags += @("-Xclang-linker", "-L", "-Xclang-linker", [IO.Path]::Combine($SwiftSDK, "usr", "lib", "swift", "android", $Platform.Architecture.LLVMName))
-          }
-
           $SwiftFlags += if ($DebugInfo) { @("-g") } else { @("-gnone") }
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
@@ -2816,6 +2811,13 @@ function Test-Runtime([Hashtable] $Platform) {
     throw "LIT test utilities not found in $CompilersBinaryCache\bin"
   }
 
+  $PlatformDefines = @{}
+  if ($Platform.OS -eq [OS]::Android) {
+    $PlatformDefines += @{
+      SWIFT_ANDROID_API_LEVEL = "$AndroidAPILevel";
+    }
+  }
+
   Invoke-IsolatingEnvVars {
     # Filter known issues when testing on Windows
     Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
@@ -2827,13 +2829,13 @@ function Test-Runtime([Hashtable] $Platform) {
       -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
-      -Defines @{
+      -Defines ($PlatformDefines + @{
         SWIFT_INCLUDE_TESTS = "YES";
         SWIFT_INCLUDE_TEST_BINARIES = "YES";
         SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
         SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
         LLVM_LIT_ARGS = "-vv";
-      }
+      })
   }
 }
 

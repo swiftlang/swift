@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 public func foo() {

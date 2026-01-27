@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -swift-version 4 -solver-scope-threshold=1000
 // REQUIRES: tools-release,no_asan
 
 func test(_ i: Int, _ j: Int) -> Int {

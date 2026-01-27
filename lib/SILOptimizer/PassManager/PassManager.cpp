@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/MD5Stream.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
@@ -39,6 +40,10 @@
 #include "llvm/Support/Casting.h"
 #include <fstream>
 
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+#error "Building the compiler without Swift sources is not supported anymore"
+#endif
+
 using namespace swift;
 
 llvm::cl::opt<bool> SILPrintAll(
@@ -52,6 +57,10 @@ llvm::cl::opt<bool> SILPrintPassName(
 llvm::cl::opt<bool> SILPrintPassTime(
     "sil-print-pass-time", llvm::cl::init(false),
     llvm::cl::desc("Print the execution time of each SIL pass"));
+
+llvm::cl::opt<bool> SILPrintPassMD5(
+    "sil-print-pass-md5", llvm::cl::init(false),
+    llvm::cl::desc("Print the MD5 of the SIL after each pass"));
 
 llvm::cl::opt<unsigned> SILMinPassTime(
     "sil-min-pass-time", llvm::cl::init(0),
@@ -560,7 +569,7 @@ bool SILPassManager::breakBeforeRunning(StringRef fnName,
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
-                                  SILFunction *F, int passIdx) {
+                                  SILFunction *F, int passIdx, bool skipNewline) {
   llvm::dbgs() << "  " << Title << " #" << NumPassesRun
                << ", stage " << StageName << ", pass";
   if (passIdx >= 0)
@@ -568,12 +577,13 @@ void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
   llvm::dbgs() << ": " << Tr->getID() << " (" << Tr->getTag() << ")";
   if (F)
     llvm::dbgs() << ", Function: " << F->getName();
-  llvm::dbgs() << '\n';
+  if (!skipNewline)
+    llvm::dbgs() << '\n';
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
-                                  SILFunction *F) {
-  dumpPassInfo(Title, Transformations[TransIdx], F, (int)TransIdx);
+                                  SILFunction *F, bool skipNewline) {
+  dumpPassInfo(Title, Transformations[TransIdx], F, (int)TransIdx, skipNewline);
 }
 
 bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
@@ -746,6 +756,15 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       llvm::dbgs() << llvm::format("%9.3f", milliSecs) << " ms: " << SFT->getTag()
                    << " #" << NumPassesRun << " @" << F->getName() << "\n";
     }
+  }
+  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+    MD5Stream md5Stream;
+    F->print(md5Stream);
+    llvm::MD5::MD5Result result;
+    md5Stream.final(result);
+
+    dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true);
+    llvm::dbgs() << " = " << result << "\n";
   }
 
   if (numRepeats > 1)
@@ -925,6 +944,15 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
                    << " #" << NumPassesRun << "\n";
     }
   }
+  if (SILPrintPassMD5 && CurrentPassHasInvalidated) {
+    MD5Stream md5Stream;
+    Mod->print(md5Stream);
+    llvm::MD5::MD5Result result;
+    md5Stream.final(result);
+
+    dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true);
+    llvm::dbgs() << " = " << result << "\n";
+  }
 
   // If this pass invalidated anything, print and verify.
   if (doPrintAfter(SMT, nullptr, CurrentPassHasInvalidated)) {
@@ -992,6 +1020,15 @@ void SILPassManager::execute() {
   if (SILPrintAll) {
     llvm::dbgs() << "*** SIL module before "  << StageName << " ***\n";
     printModule(Mod, Options.EmitVerboseSIL);
+  }
+
+  if (SILPrintPassMD5) {
+    MD5Stream md5Stream;
+    Mod->print(md5Stream);
+    llvm::MD5::MD5Result result;
+    md5Stream.final(result);
+
+    llvm::dbgs() << "Initial " << StageName << " MD5 = " << result << "\n";
   }
 
   // Run the transforms by alternating between function transforms and
@@ -1437,7 +1474,7 @@ void SwiftPassInvocation::finishedModulePassRun() {
   ASSERT(!function && transform && "not running a module pass");
   if (changeNotifications != 0) {
     ASSERT((changeNotifications & ~SILContext::NotificationKind::FunctionTables) == 0
-           && "a module pass must change the SIL of a function");
+           && "a module pass must not change the SIL of a function");
     passManager->invalidateFunctionTables();
     changeNotifications = SILContext::NotificationKind::Nothing;
   }
@@ -1447,18 +1484,21 @@ void SwiftPassInvocation::finishedModulePassRun() {
 
 void SwiftPassInvocation::startFunctionPassRun(SILFunctionTransform *transform) {
   ASSERT(!this->function && !this->transform && "a pass is already running");
+  ASSERT(!silCombiner && "didn't clear silCombiner backlink");
   this->transform = transform;
   this->function = transform->getFunction();
+  ASSERT(!this->function->needBreakInfiniteLoops() && "didn't break infinite loops in previous module pass");
+  ASSERT(!this->function->needCompleteLifetimes() && "didn't complete lifetimes in previous module pass");
 }
 
 void SwiftPassInvocation::finishedFunctionPassRun() {
   ASSERT(function && transform && "not running a function pass");
   ASSERT((changeNotifications & SILContext::NotificationKind::FunctionTables) == 0
          && "a function pass must not change function tables");
-  if (changeNotifications != SILContext::NotificationKind::Nothing) {
-    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
-  }
-  changeNotifications = SILContext::NotificationKind::Nothing;
+  ASSERT(!function->needBreakInfiniteLoops() && "didn't break infinite loops");
+  ASSERT(!function->needCompleteLifetimes() && "didn't complete lifetimes");
+
+  updateAnalysis();
 
   insertedPhisBySSAUpdater.clear();
   if (ssaUpdater) {
@@ -1468,7 +1508,15 @@ void SwiftPassInvocation::finishedFunctionPassRun() {
 
   function = nullptr;
   transform = nullptr;
+  silCombiner = nullptr;
   verifyEverythingIsCleared();
+}
+
+void SwiftPassInvocation::updateAnalysis() {
+  if (changeNotifications != SILContext::NotificationKind::Nothing) {
+    passManager->invalidateAnalysis(function, (SILAnalysis::InvalidationKind)changeNotifications);
+  }
+  changeNotifications = SILContext::NotificationKind::Nothing;
 }
 
 void SwiftPassInvocation::startInstructionPassRun(SILInstruction *inst) {

@@ -541,6 +541,21 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
+/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable>(_ referent: borrowing T) -> Borrow<T>
+///
+/// Form a `Builtin.Borrow` referencing the argument.
+BUILTIN_SIL_OPERATION(MakeBorrow, "makeBorrow", Special)
+
+/// dereferenceBorrow: <T: ~Copyable>(_ borrow: Borrow<T>) -> T
+///
+/// Access the value referenced by a `Builtin.Borrow`.
+///
+/// Although this is modeled as returning `T` at the AST level, the builtin has
+/// special handling to produce the return value as a borrow of the referenced
+/// value. This handling only works in certain contexts, so this builtin should
+/// not generally be used directly.
+BUILTIN_SIL_OPERATION(DereferenceBorrow, "dereferenceBorrow", Special)
+
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
 // These functions accept a single argument of any type.
 #ifndef BUILTIN_RUNTIME_CALL
@@ -698,6 +713,17 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// assert_configuration has type () -> Builtin.Int32
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
+
+/// Is true, but the compiler doesn't know.
+/// This builtin is used to break infinite loops.
+/// Note that this builtin intentionally has side effects defined (Attrs = "").
+/// This prevents optimizations to move code with side effects over an "empty"
+/// infinite loop (into the pseudo exit of the loop). E.g.
+/// ```
+///   print("end of processing") // must not be moved into the pseudo-exit of the infinite loop
+///   while true {}
+/// ```
+BUILTIN_MISC_OPERATION(InfiniteLoopTrueCondition, "infinite_loop_true_condition", "", None)
 
 /// Ifdef has type () -> Bool.
 BUILTIN_MISC_OPERATION(Ifdef, "ifdef", "n", Special)

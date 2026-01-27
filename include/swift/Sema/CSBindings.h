@@ -24,6 +24,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/APInt.h"
@@ -238,6 +239,14 @@ private:
 };
 
 struct PotentialBindings {
+  /// The constraint system this type variable and its bindings belong to.
+  ConstraintSystem &CS;
+
+  /// The type variable this bindings are associated with. Note that his
+  /// property could change when associated with a constraint graph node
+  /// that is being re-used. Calling \c reset sets it to `nullptr`.
+  TypeVariableType *TypeVar;
+
   /// The set of all constraints that have been added via infer().
   llvm::SmallSetVector<Constraint *, 2> Constraints;
 
@@ -275,9 +284,18 @@ struct PotentialBindings {
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  void record##PropertyName(Constraint *constraint);
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  void record##RelationName(TypeVariableType *typeVar, Constraint *originator);
+#include "swift/Sema/CSTrail.def"
+
+  PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
+      : CS(cs), TypeVar(typeVar) {}
+
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
-  void addPotentialBinding(TypeVariableType *typeVar, PotentialBinding binding);
+  void addPotentialBinding(PotentialBinding binding);
 
   bool isSubtypeOf(TypeVariableType *typeVar) const {
     return llvm::any_of(
@@ -292,37 +310,25 @@ struct PotentialBindings {
     return Protocols;
   }
 
-  void inferFromLiteral(ConstraintSystem &CS,
-                        TypeVariableType *TypeVar,
-                        Constraint *literal);
+  void inferFromLiteral(Constraint *literal);
 
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given
   /// relational constraint.
-  std::optional<PotentialBinding> inferFromRelational(
-      ConstraintSystem &CS,
-      TypeVariableType *TypeVar,
-      Constraint *constraint);
+  std::optional<PotentialBinding> inferFromRelational(Constraint *constraint);
 
-  void infer(ConstraintSystem &CS,
-             TypeVariableType *TypeVar,
-             Constraint *constraint);
+  void infer(Constraint *constraint);
 
   /// Retract all bindings and other information related to a given
   /// constraint from this binding set.
   ///
   /// This would happen when constraint is simplified or solver backtracks
   /// (either from overload choice or (some) type variable binding).
-  void retract(ConstraintSystem &CS,
-               TypeVariableType *TypeVar,
-               Constraint *constraint);
+  void retract(Constraint *constraint);
 
   void reset();
 
-  void dump(ConstraintSystem &CS,
-            TypeVariableType *TypeVar,
-            llvm::raw_ostream &out,
-            unsigned indent) const;
+  void dump(llvm::raw_ostream &out, unsigned indent) const;
 };
 
 
@@ -655,6 +661,30 @@ private:
 #undef ENTRY
   }
 };
+
+enum class ConversionBehavior : unsigned {
+  None,
+  Class,
+  AnyHashable,
+  Double,
+  Pointer,
+  Array,
+  Dictionary,
+  Set,
+  Optional,
+  Structural,
+  Unknown
+};
+
+/// Classify the possible conversions having this type as result type.
+ConversionBehavior getConversionBehavior(Type type);
+
+/// Check whether there exists a type that could be implicitly converted
+/// to a given type i.e. is the given type is Double or Optional<..> this
+/// function is going to return true because CGFloat could be converted
+/// to a Double and non-optional value could be injected into an optional.
+bool hasConversions(Type type);
+
 } // namespace inference
 } // namespace constraints
 } // namespace swift

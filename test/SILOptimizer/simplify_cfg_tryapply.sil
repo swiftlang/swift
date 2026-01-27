@@ -64,6 +64,7 @@ bb1(%5 : $Int):
 
 bb2(%8 : @owned $Error):
   dealloc_stack %as: $*Builtin.Int32
+  destroy_value [dead_end] %8
   unreachable
 }
 
@@ -93,6 +94,7 @@ bb1(%8 : @owned $Optional<BB>):
   return %8 : $Optional<BB>
 
 bb2(%10 : @owned $Error):
+  destroy_value [dead_end] %10
   unreachable
 }
 
@@ -118,6 +120,7 @@ bb2(%10 : @owned $Error):
   // Prevent that the conversion is done because the error block is empty and unreachable.
   %12 = function_ref @unknown : $@convention(thin) () -> ()
   apply %12() : $@convention(thin) () -> ()
+  destroy_value [dead_end] %10
   unreachable
 }
 
@@ -143,6 +146,7 @@ bb2(%10 : @owned $Error):
   // Prevent that the conversion is done because the error block is empty and unreachable.
   %12 = function_ref @unknown : $@convention(thin) () -> ()
   apply %12() : $@convention(thin) () -> ()
+  destroy_value [dead_end] %10
   unreachable
 }
 
@@ -260,6 +264,7 @@ bb1(%12 : $()):
   return %13 : $UP<()>
 
 bb2(%16 : @owned $Error):
+  destroy_value [dead_end] %16
   unreachable
 }
 
@@ -375,6 +380,7 @@ bb1(%5 : $Int):
   return %5 : $Int
 
 bb2(%8 : @owned $Error):
+  destroy_value [dead_end] %8
   unreachable
 }
 
@@ -412,6 +418,7 @@ bb1(%5 : $Int):
   return %5 : $Int
 
 bb2(%8 : @owned $Error):
+  destroy_value [dead_end] %8
   unreachable
 }
 

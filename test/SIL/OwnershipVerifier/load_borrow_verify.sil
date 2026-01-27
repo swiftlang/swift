@@ -180,6 +180,7 @@ bb1(%6 : @owned $K):
   br bb3
 
 bb2:
+  end_borrow %2
   unreachable
 
 bb3:

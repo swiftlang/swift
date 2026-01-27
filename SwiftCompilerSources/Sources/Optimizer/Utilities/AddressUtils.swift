@@ -115,6 +115,7 @@ extension AddressUseVisitor {
          is MarkUninitializedInst, is DropDeinitInst,
          is CopyableToMoveOnlyWrapperAddrInst,
          is MoveOnlyWrapperToCopyableAddrInst,
+         is DereferenceBorrowAddrInst,
          is MarkUnresolvedNonCopyableValueInst:
       let svi = operand.instruction as! SingleValueInstruction
       return projectedAddressUse(of: operand, into: svi)

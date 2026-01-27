@@ -1033,6 +1033,20 @@ SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) const 
                               f->getModule().Types, field);
 }
 
+SILType SILBoxType::getFieldType(SILFunction &fn, unsigned index) {
+  return ::getSILBoxFieldType(fn.getTypeExpansionContext(), this,
+                              fn.getModule().Types, index);
+}
+
+SILBoxType::SILFieldToSILTypeRange
+SILBoxType::getSILFieldTypes(SILFunction &fn) {
+  auto transform = [this, &fn](unsigned index) {
+    return getFieldType(fn, index);
+  };
+  return llvm::map_range(range(getNumFields()),
+                         SILFieldIndexToSILTypeTransform(transform));
+}
+
 SILType
 SILType::getSingletonAggregateFieldType(SILModule &M,
                                         ResilienceExpansion expansion) const {
@@ -1241,6 +1255,12 @@ bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
     hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
   auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
+}
+
+bool SILType::isAddressableForDeps(SILModule &M,
+                                   TypeExpansionContext context) const {
+  auto properties = M.Types.getTypeProperties(*this, context);
   return properties.isAddressableForDependencies();
 }
 

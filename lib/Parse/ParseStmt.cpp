@@ -2502,11 +2502,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
         Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
-      Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
-                                pattern.get(), InLoc,
-                                Container.get(), WhereLoc, Where.getPtrOrNull(),
-                                Body.get()));
+      Status, new (Context) ForEachStmt(
+                  LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc, pattern.get(),
+                  InLoc, Container.get(), WhereLoc, Where.getPtrOrNull(),
+                  Body.get(), CurDeclContext));
 }
 
 ///

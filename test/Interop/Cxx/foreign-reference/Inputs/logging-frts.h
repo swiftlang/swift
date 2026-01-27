@@ -5,6 +5,7 @@
 
 class SharedFRT {
 public:
+  SWIFT_RETURNS_RETAINED
   SharedFRT() : _refCount(1) { logMsg("Ctor"); }
 
 protected:
@@ -91,4 +92,7 @@ struct FirstBase {
   virtual ~FirstBase() {}
 };
 
-struct DerivedFRT : FirstBase, SharedFRT {};
+struct DerivedFRT : FirstBase, SharedFRT {
+  SWIFT_RETURNS_RETAINED
+  DerivedFRT() = default;
+};

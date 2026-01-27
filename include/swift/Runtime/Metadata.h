@@ -581,6 +581,13 @@ swift_getFixedArrayTypeMetadata(MetadataRequest request,
                                 intptr_t count,
                                 const Metadata *element);
 
+/// Fetch a metadata record representing a `Builtin.Borrow`
+/// of a given referent type.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getBorrowTypeMetadata(MetadataRequest request,
+                            const Metadata *referent);
+
 /// Fetch a uniqued metadata for a tuple type.
 ///
 /// The labels argument is null if and only if there are no element

@@ -3,15 +3,15 @@
 // RUN:     -enable-callee-allocated-coro-abi               \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
+// RUN: | %FileCheck %s
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                      \
-// RUN:     %s                                                                 \
-// RUN:     -enable-callee-allocated-coro-abi                                  \
-// RUN:     -enable-library-evolution                                          \
-// RUN:     -enable-experimental-feature CoroutineAccessors                    \
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types   \
+// RUN:     %s                                              \
+// RUN:     -enable-callee-allocated-coro-abi               \
+// RUN:     -enable-library-evolution                       \
+// RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
+// RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
@@ -148,8 +148,7 @@ public var irm: Int {
 // CHECK:      dealloc_stack [[OLD_VALUE_ADDR]]
 // CHECK:      return [[OLD_VALUE]]
 // CHECK:    bb2([[ERROR:%[^,]+]] : @owned $any Error):
-// CHECK-NOUNWIND: end_apply [[TOKEN]]
-// CHECK-UNWIND: abort_apply [[TOKEN]]
+// CHECK:      end_apply [[TOKEN]]
 // CHECK:      dealloc_stack [[ALLOCATION]]
 // CHECK:      end_access [[SELF_ACCESS]]
 // CHECK:      dealloc_stack [[NEW_VALUE_ADDR]]
@@ -173,7 +172,7 @@ public var i_r_m: Int {
   _read {
     yield _i
   }
-// CHECK-NOT:   sil [ossa] @$s19coroutine_accessors1SV5i_r_mSivx :
+
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV5i_r_mSivM :
 // CHECK-SAME:      $@yield_once
 // CHECK-SAME:      @convention(method)
@@ -185,6 +184,15 @@ public var i_r_m: Int {
   _modify {
     yield &_i
   }
+
+// We want to assume that the new coroutine accessor ABI is available at the
+// time we introduce the feature (such that we can use it with deployment target
+// >= that time).
+// Therefore, make sure we emit yielding borrow/mutate entry points when we
+// encounter _read/_modify.
+
+// CHECK-LABEL: sil {{.*}} @$s19coroutine_accessors1SV5i_r_mSivy : $@yield_once_2 @convention(method) (@guaranteed S) -> @yields Int {
+
 // CHECK-LABEL: sil {{.*}}[ossa] @$s19coroutine_accessors1SV5i_r_mSivs :
 // CHECK-SAME:      $@convention(method)
 // CHECK-SAME:      (Int, @inout S)
@@ -204,6 +212,15 @@ public var i_r_m: Int {
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         end_access [[SELF_ACCESS]]
 // CHECK-LABEL:} // end sil function '$s19coroutine_accessors1SV5i_r_mSivs'
+
+// We want to assume that the new coroutine accessor ABI is available at the
+// time we introduce the feature (such that we can use it with deployment target
+// >= that time).
+// Therefore, make sure we emit yielding borrow/mutate entry points when we
+// encounter _read/_modify.
+
+// CHECK-LABEL: sil {{.*}} @$s19coroutine_accessors1SV5i_r_mSivx : $@yield_once_2 @convention(method) (@inout S) -> @yields @inout Int {
+
 } // public var irm
 
 } // public struct S

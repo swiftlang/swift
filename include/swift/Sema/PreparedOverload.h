@@ -18,6 +18,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 
 class ExistentialArchetypeType;
@@ -147,6 +151,10 @@ struct PreparedOverloadChange {
   PreparedOverloadChange()
       : Kind(ChangeKind::AddedTypeVariable),
         TypeVar(nullptr) { }
+
+  void dump(llvm::raw_ostream &out,
+            ConstraintSystem &cs,
+            unsigned indent = 0) const;
 };
 
 /// A "pre-cooked" representation of all type variables and constraints
@@ -270,6 +278,10 @@ struct PreparedOverloadBuilder {
     change.Node.TheType = type;
     Changes.push_back(change);
   }
+
+  void dump(llvm::raw_ostream &out,
+            ConstraintSystem &cs,
+            unsigned indent = 0) const;
 };
 
 }  // end namespace constraints

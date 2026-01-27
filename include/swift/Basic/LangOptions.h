@@ -982,6 +982,13 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
+    /// If non-zero, randomly shuffle disjunctions using this seed. For debugging.
+    unsigned ShuffleDisjunctionSeed = 0;
+
+    /// If non-zero, randomly shuffle disjunction choices using this seed. For
+    /// debugging
+    unsigned ShuffleDisjunctionChoicesSeed = 0;
+
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
@@ -989,9 +996,6 @@ namespace swift {
 
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
-
-    /// Enable old constraint system performance hacks.
-    bool EnableConstraintSolverPerformanceHacks = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
@@ -1008,6 +1012,10 @@ namespace swift {
 
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
+
+    /// Enable experimental optimization to disable contradictory disjunction
+    /// choices.
+    bool SolverPruneDisjunctions = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

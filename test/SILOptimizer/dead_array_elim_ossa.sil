@@ -89,6 +89,8 @@ bb0(%0 : @owned $TrivialDestructor):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %5
+  destroy_value [dead_end] %0
   unreachable
 
 bb2:

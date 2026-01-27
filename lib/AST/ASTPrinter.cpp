@@ -85,6 +85,10 @@ static llvm::cl::opt<bool> NumberSuppressionChecks(
     llvm::cl::init(false), llvm::cl::Hidden);
 #endif
 
+llvm::cl::opt<bool>
+PrintNoUUIDS("print-no-uuids", llvm::cl::init(false),
+                   llvm::cl::desc("don't print UUIDs to make the output better diffable"));
+
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
     PrintOptions::defaultPrintExtensionContentAsMembers
@@ -580,9 +584,17 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   return *this;
 }
 
+void ASTPrinter::getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out) {
+  if (PrintNoUUIDS) {
+    out.clear();
+    return;
+  }
+  uuid.toString(out);
+}
+
 ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   llvm::SmallString<UUID::StringBufferSize> Str;
-  UU.toString(Str);
+  getUUIDStringForPrinting(UU, Str);
   printTextImpl(Str);
   return *this;
 }
@@ -1537,6 +1549,9 @@ static PrintNameContext getTypeMemberPrintNameContext(const Decl *d) {
 
 void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
+  case PatternKind::Opaque:
+    printPattern(cast<OpaquePattern>(pattern)->getSubPattern());
+    break;
   case PatternKind::Any:
     Printer << "_";
     break;
@@ -2568,6 +2583,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
 
+    // TODO: Print borrow/yielding borrow here?
     printWithSpace("get");
 
     if (asyncGet) printWithSpace("async");
@@ -2580,6 +2596,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (settable) {
       if (nonmutatingSetter) printWithSpace("nonmutating");
 
+      // TODO: Print mutate/yielding mutate here?
       printWithSpace("set");
     }
     Printer << " }";
@@ -5645,6 +5662,8 @@ void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
   expr->getType()->print(Printer, Options);
 }
 
+void PrintAST::visitOpaqueStmt(OpaqueStmt *stmt) {}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }
@@ -5821,18 +5840,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   Printer << tok::kw_for << " ";
   printPattern(stmt->getPattern());
   Printer << " " << tok::kw_in << " ";
-  // FIXME: print container
-  if (auto *seq = stmt->getTypeCheckedSequence()) {
-    // Look through the call to '.makeIterator()'
-    
-    if (auto *CE = dyn_cast<CallExpr>(seq)) {
-      if (auto *SAE = dyn_cast<SelfApplyExpr>(CE->getFn()))
-        seq = SAE->getBase();
-    }
-    visit(seq);
-  } else {
-    visit(stmt->getParsedSequence());
-  }
+  visit(stmt->getSequence());
   Printer << " ";
   visit(stmt->getBody());
 }
@@ -6357,6 +6365,16 @@ public:
     visit(T->getSize());
     Printer << ", ";
     visit(T->getElementType());
+    Printer << ">";
+  }
+
+  void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                              NonRecursivePrintOptions nrOptions) {
+    SmallString<32> buffer;
+    T->getTypeName(buffer);
+    Printer << buffer;
+    Printer << "<";
+    visit(T->getReferentType());
     Printer << ">";
   }
 

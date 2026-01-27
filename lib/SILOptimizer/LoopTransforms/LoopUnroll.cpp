@@ -27,6 +27,9 @@
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -524,6 +527,11 @@ class LoopUnrolling : public SILFunctionTransform {
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      removeUnreachableBlocks(*Fun);
+      if (Fun->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), Fun);
+      if (Fun->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), Fun);
     }
   }
 };

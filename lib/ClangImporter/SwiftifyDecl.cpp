@@ -357,10 +357,17 @@ static const clang::Decl *getTemplateInstantiation(const clang::Decl *D) {
 }
 
 static clang::Module *getOwningModule(const clang::Decl *ClangDecl) {
+  std::optional<clang::Module *> M;
   if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
-    return Instance->getOwningModule();
+    M = importer::getClangSubmoduleForDecl(Instance, true);
+  } else {
+    M = importer::getClangSubmoduleForDecl(ClangDecl, true);
   }
-  return ClangDecl->getOwningModule();
+  if (M) {
+    // the inner value can be null, so flatten it
+    return M.value();
+  }
+  return nullptr;
 }
 
 struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
@@ -372,37 +379,44 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
   Action walkToTypePre(Type ty) override {
     DLOG("Walking type:\n");
     LLVM_DEBUG(DUMP(ty));
-    if (Type PointeeTy = ConcretePointeeType(ty)) {
-      auto *Nom = PointeeTy->getAnyNominal();
-      const clang::Decl *ClangDecl = Nom->getClangDecl();
-      if (!ClangDecl) {
-        return Action::Continue;
-      }
 
-      if (auto RD = dyn_cast<clang::RecordDecl>(ClangDecl)) {
-        const clang::RecordDecl *Def = RD->getDefinition();
-        ASSERT(Def && "pointer to concrete type without type definition?");
-        const clang::Module *M = getOwningModule(ClangDecl);
-
-        if (!M) {
-          DLOG("Concrete type is in bridging header, which is always imported\n");
-          return Action::Continue;
-        }
-
-        if (!Owner) {
-          hasForwardDeclaredConcreteType = true;
-          DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
-          LLVM_DEBUG(DUMP(Def));
-          return Action::Stop;
-        }
-        if (!Owner->isModuleVisible(M)) {
-          hasForwardDeclaredConcreteType = true;
-          DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
-          LLVM_DEBUG(DUMP(Def));
-          return Action::Stop;
-        }
-      }
+    auto *Nom = ty->getAnyNominal();
+    if (!Nom) {
+      return Action::Continue;
     }
+
+    const clang::Decl *ClangDecl = Nom->getClangDecl();
+    if (!ClangDecl) {
+      return Action::Continue;
+    }
+
+    auto TD = dyn_cast<clang::TagDecl>(ClangDecl);
+    if (!TD) {
+      return Action::Continue;
+    }
+
+    const clang::TagDecl *Def = TD->getDefinition();
+    ASSERT(Def && "concrete type without type definition?");
+    const clang::Module *M = getOwningModule(ClangDecl);
+
+    if (!M) {
+      DLOG("Concrete type is in bridging header, which is always imported\n");
+      return Action::Continue;
+    }
+
+    if (!Owner) {
+      hasForwardDeclaredConcreteType = true;
+      DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
+      LLVM_DEBUG(DUMP(Def));
+      return Action::Stop;
+    }
+    if (!Owner->isModuleVisible(M)) {
+      hasForwardDeclaredConcreteType = true;
+      DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
+      LLVM_DEBUG(DUMP(Def));
+      return Action::Stop;
+    }
+
     return Action::Continue;
   }
 

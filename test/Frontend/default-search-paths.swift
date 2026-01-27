@@ -12,7 +12,7 @@
 // APPLE-NEXT: (End of search path lists.)
 
 // Apple paths with a system prefix.
-// RUN: %swift_frontend_plain -target arm64-apple-macos15.4 -sdk %S/Inputs/MacOSX26.1.sdk -parse-stdlib -parse %s -Rmodule-loading 2>&1 | %FileCheck --sanitize SDKROOT=%S/Inputs/MacOSX26.1.sdk -check-prefix=SYSTEMPREFIX %s
+// RUN: %swift_frontend_plain -target arm64-apple-macos15.4 -sdk %S/Inputs/MacOSX26.1.systemprefix.sdk -parse-stdlib -parse %s -Rmodule-loading 2>&1 | %FileCheck --sanitize SDKROOT=%S/Inputs/MacOSX26.1.systemprefix.sdk -check-prefix=SYSTEMPREFIX %s
 // SYSTEMPREFIX: Implicit framework search paths:
 // SYSTEMPREFIX-NEXT: [0] SDKROOT/System/macOSSupport/System/Library/Frameworks
 // SYSTEMPREFIX-NEXT: [1] SDKROOT/System/macOSSupport/System/Library/SubFrameworks

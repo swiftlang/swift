@@ -39,6 +39,10 @@ struct PointerStorage {
 class B { }
 class E : B { }
 
+class D {
+  @_hasStorage weak var c: B?
+}
+
 sil @use_b_guaranteed : $@convention(thin) (@guaranteed B) -> ()
 sil @usearray_error : $@convention(thin) (@guaranteed Array<Error>) -> ()
 
@@ -178,38 +182,11 @@ bb2:
   return %6 : $()
 }
 
-// For now until the proper unreachable pruning code is committed for
-// SILCombine, we should not dce dead instructions in unreachable code.
-
-// CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// CHECK: bb0
-// CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
-sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int64, 24
-  br bb2
-
-bb1:
-  %1 = integer_literal $Builtin.Int64, 48
-  br bb2
-
-bb2:
-  %2 = tuple()
-  return %2 : $()
-}
-
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil [ossa] @exit : $@convention(thin) () -> Never {
-bb0:
-  br bb1
-bb1:
-  br bb1
-}
+sil [ossa] @exit : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
 // CHECK: store
@@ -249,6 +226,7 @@ bb2a:
 bb2:
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
+  destroy_value [dead_end] %5
   unreachable
 }
 
@@ -3681,6 +3659,7 @@ bb3:
 bb4:
   %20 = integer_literal $Builtin.Int1, -1
   cond_fail %20 : $Builtin.Int1
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -3717,6 +3696,7 @@ bb1:
 bb2:
   %20 = integer_literal $Builtin.Int1, -1
   cond_fail %20 : $Builtin.Int1
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -3753,6 +3733,7 @@ bb1:
 bb2:
   %20 = integer_literal $Builtin.Int1, -1
   cond_fail %20 : $Builtin.Int1
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -4980,6 +4961,7 @@ bb0(%0 : @guaranteed $AnyObject):
   cond_br undef, bb3, bb4 
 
 bb3:
+  destroy_value [dead_end] %cast
   unreachable
 
 bb4:
@@ -5075,6 +5057,7 @@ bb1(%result : @owned $Builtin.NativeObject):
   return %result : $Builtin.NativeObject
 
 bb2(%error : @owned $Error):
+  destroy_value [dead_end] %error
   unreachable
 }
 
@@ -5605,5 +5588,80 @@ bb1:
   return %9
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_over_deinit_barrier :
+// CHECK:         load_weak
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_hoist_destroy_over_deinit_barrier'
+sil [ossa] @dont_hoist_destroy_over_deinit_barrier : $@convention(thin) (@owned B, @guaranteed D) -> @owned Optional<B> {
+bb0(%0 : @owned $B, %1 : @guaranteed $D):
+  %2 = copy_value %0
+  destroy_value %0
+  %4 = ref_element_addr %1, #D.c
+  %5 = load_weak %4
+  destroy_value %2
+  return %5
+}
 
+// Just check that this doesn't produce illegal SIL
+sil [ossa] @inject_enum_addr_in_different_block : $@convention(thin) (@inout Substring) -> @owned Optional<Character> {
+bb0(%0 : $*Substring):
+  %1 = alloc_stack $Optional<Character>
+  %2 = alloc_stack $Optional<Character>
+  %3 = apply undef() : $@convention(thin) () -> @owned Optional<Character>
+  store %3 to [init] %2
+  %5 = init_enum_data_addr %1, #Optional.some!enumelt
+  %6 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %7 = load [take] %6
+  store %7 to [init] %5
+  dealloc_stack %2
+  %10 = load [copy] %0
+  %11 = move_value [lexical] %10
+  destroy_addr %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb4, bb3
+
+bb2:
+  br bb5
+
+bb3:
+  destroy_value [dead_end] %11
+  unreachable
+
+bb4:
+  br bb5
+
+bb5:
+  %19 = apply undef() : $@convention(thin) () -> @owned Substring
+  store %19 to [init] %0
+  destroy_value %11
+  inject_enum_addr %1, #Optional.some!enumelt
+  %23 = load [take] %1
+  dealloc_stack %1
+  return %23
+}
+
+// Just check that this doesn't produce illegal SIL
+sil [ossa] @cond_fail_in_unreachable : $@convention(thin) (@owned String.UTF8View) -> () {
+bb0(%0 : @owned $String.UTF8View):
+  %1 = apply undef(%0) : $@convention(thin) (@guaranteed String.UTF8View) -> Int
+  %2 = begin_borrow %0
+  %3 = struct_extract %2, #String.UTF8View._guts
+  %4 = apply undef(%3) : $@convention(thin) (@guaranteed _StringGuts) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %2
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+
+bb2:
+  %10 = integer_literal $Builtin.Int1, -1
+  cond_fail %10, "Insufficient space allocated to copy string contents"
+  end_borrow %2
+  destroy_value [dead_end] %0
+  unreachable
+}
 

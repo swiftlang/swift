@@ -167,12 +167,8 @@ extension Task {
   ///
   /// - Returns: The task's result.
   public var value: Success {
-    get async throws(Failure) {
-      do {
-        return try await _taskFutureGetThrowing(_task)
-      } catch {
-        throw (error as! Failure) // as!-safe, because typed throw on the operation closure
-      }
+    get async throws {
+      return try await _taskFutureGetThrowing(_task)
     }
   }
 
@@ -193,7 +189,7 @@ extension Task {
       do {
         return .success(try await value)
       } catch {
-        return .failure(error)
+        return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
       }
     }
   }

@@ -2169,8 +2169,6 @@ swift::getDisallowedOriginKind(const Decl *decl,
 
   // Implementation-only memory layouts for non-library-evolution mode.
   if (isa<NominalTypeDecl>(decl) &&
-      Context.LangOpts.hasFeature(
-          Feature::CheckImplementationOnly) &&
       decl->getAttrs().hasAttribute<ImplementationOnlyAttr>())
     return DisallowedOriginKind::ImplementationOnlyMemoryLayout;
 

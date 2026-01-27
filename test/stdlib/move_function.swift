@@ -75,7 +75,9 @@ extension Class {
         }
         switch (x)[userHandle] {
         case .foo:
-            expectTrue(self.array._buffer.isUniquelyReferenced())
+          // The array buffer is not unique because the lexical lifetime of x spans
+          // over the switch statement.
+          expectFalse(self.array._buffer.isUniquelyReferenced())
         }
     }
 }

@@ -717,7 +717,7 @@ ASTWalker::PreWalkResult<Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                  charSourceRangeFromSourceRange(SM, ElemRange));
       }
     }
-    if (auto *S = ForEachS->getParsedSequence())
+    if (auto *S = ForEachS->getSequence())
       addExprElem(SyntaxStructureElementKind::Expr, S, SN);
     pushStructureNode(SN, S);
 

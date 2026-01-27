@@ -2255,11 +2255,30 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  // Initializing a borrow from the value as a referent counts as a liveness
+  // use.
+  if (isa<InitBorrowAddrInst>(user)) {
+    assert(op->getOperandNumber() == InitBorrowAddrInst::Referent
+           && "should have handled dest above in memInstMustInitialize");
+
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+      return false;
+    }
+
+    for (auto leafRange : leafRanges) {
+      useState.recordLivenessUse(user, leafRange);
+    }
+    return true;
+  }
+
   // At this point, we have handled all of the non-loadTakeOrCopy/consuming
   // uses.
   if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
-           "Should have dest above in memInstMust{Rei,I}nitialize");
+           "Should have handled dest above in memInstMust{Rei,I}nitialize");
 
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
@@ -2810,6 +2829,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!ue || ue->isDestructive()) {
       llvm::errs() << "Found a write classified as a liveness use?!\n";
       llvm::errs() << "Use: " << *user;
+      user->getFunction()->dump();
       llvm_unreachable("standard failure");
     }
   }
