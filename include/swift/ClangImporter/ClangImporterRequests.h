@@ -423,8 +423,10 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
+  ASTContext& ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);

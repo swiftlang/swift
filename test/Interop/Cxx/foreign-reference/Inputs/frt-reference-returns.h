@@ -1,5 +1,10 @@
 #pragma once
 
+#define IMMORTAL_FRT                                                           \
+  __attribute__((swift_attr("import_reference")))                              \
+  __attribute__((swift_attr("retain:immortal")))                               \
+  __attribute__((swift_attr("release:immortal")))
+
 namespace NoAnnotations {
 
 struct RefCountedType {
@@ -69,3 +74,19 @@ RefCountedType& getByRef();
 
 void retainBothRefCounted(BothAnnotations::RefCountedType* obj);
 void releaseBothRefCounted(BothAnnotations::RefCountedType* obj);
+
+struct ImmortalIntBox {
+  int value;
+
+  ImmortalIntBox(const ImmortalIntBox &) = delete;
+
+  ImmortalIntBox &builderPattern() { return *this; }
+} IMMORTAL_FRT;
+
+static ImmortalIntBox globalImmortalIntBox = {123};
+ImmortalIntBox &createImmortalIntBox() { return globalImmortalIntBox; }
+
+struct DerivedImmortalIntBox : ImmortalIntBox {};
+
+static DerivedImmortalIntBox globalDerivedImmortalIntBox = {456};
+DerivedImmortalIntBox &createDerivedImmortalIntBox() { return globalDerivedImmortalIntBox; }
