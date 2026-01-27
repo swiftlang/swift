@@ -9930,6 +9930,13 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto contextualTy = getContextualTypeInfo(anchor)->getType();
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
+  auto isBorrowing =
+      seqProto->isSpecificProtocol(KnownProtocolKind::BorrowingSequence);
+
+  if (seqTy->isExistentialType() && !isAsync && isBorrowing) {
+    isBorrowing = false;
+    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  }
 
   auto *contextualLoc = getConstraintLocator(
       anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
@@ -9945,7 +9952,8 @@ ConstraintSystem::simplifyForEachElementConstraint(
   // The erased element type is `any P`, but `makeIterator` can only produce
   // `any IteratorProtocol`, so the actual element type is `Any`.
   auto *iteratorAssocTy = seqProto->getAssociatedType(
-      isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+      isAsync ? ctx.Id_AsyncIterator
+              : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
   auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
                                       /*openExistential*/ true, contextualLoc);
   if (!iterTy) {
@@ -9956,9 +9964,10 @@ ConstraintSystem::simplifyForEachElementConstraint(
 
   // Now we have the Iterator type, do the same lookup for Element, opening
   // an existential if needed.
-  auto *iterProto =
-      ctx.getProtocol(isAsync ? KnownProtocolKind::AsyncIteratorProtocol
-                              : KnownProtocolKind::IteratorProtocol);
+  auto *iterProto = ctx.getProtocol(
+      isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+              : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
+                             : KnownProtocolKind::IteratorProtocol));
   auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
