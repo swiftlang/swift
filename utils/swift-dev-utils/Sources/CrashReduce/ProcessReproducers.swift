@@ -128,7 +128,8 @@ public actor ProcessReproducers {
   }
 
   public func process(
-    reprocess: Bool, ignoreExisting: Bool, fileIssues: Bool
+    reprocess: Bool, ignoreExisting: Bool, fileIssues: Bool,
+    frontendArgs: [Command.Argument]
   ) async throws {
     // TODO: This function should be refactored...
     let start = Date()
@@ -204,7 +205,9 @@ public actor ProcessReproducers {
       var errors: [any Error] = []
       do {
         // Evaluate the batches.
-        let batch = try self.getPotentialCrashers(for: inputPath)
+        let batch = try self.getPotentialCrashers(
+          for: inputPath, frontendArgs: frontendArgs
+        )
         results = await batch.eval { input in
           do {
             guard let crasher = try await self.getCrasher(input) else {
@@ -592,6 +595,16 @@ public actor ProcessReproducers {
       if case .empty = self { true } else { false }
     }
 
+    /// Make the batch more resilient to non-deterministic failures by
+    /// attempting multiple times and trying things like guard malloc.
+    var withNonDeterminismHandling: Self {
+      .firstOf([
+        self,
+        self.map(\.withGuardMalloc),
+        self.map { $0.withDeterministic(false) },
+      ])
+    }
+
     static func base(_ crasher: PotentialCrasher) -> Self {
       if crasher.buffers.count > 1 {
         var result: [PotentialCrasher] = [crasher.withJoinedBuffers()]
@@ -684,11 +697,18 @@ public actor ProcessReproducers {
   /// For a given input crasher, produce a batch of potential crasher
   /// configurations to try.
   private func getPotentialCrashers(
-    for path: AbsolutePath
+    for path: AbsolutePath, frontendArgs: [Command.Argument]
   ) throws -> PotentialCrasherBatch {
     typealias Batch = PotentialCrasherBatch
 
     let input = try FuzzerInput(from: path)
+
+    // If we have custom frontend args, then only try those.
+    let frontendArgs = input.header.frontendArgs ?? frontendArgs
+    if !frontendArgs.isEmpty {
+      return .one(.custom(input, frontendArgs: frontendArgs))
+        .withNonDeterminismHandling
+    }
 
     let completeBatch: Batch = try PotentialCrasher.completion(input).map {
       Batch.base($0.withSourceOrderCompletion(true).withSolverLimits())
@@ -719,13 +739,9 @@ public actor ProcessReproducers {
         extendedBatch, extendedBatch.map(\.withNoObjCInterop)
       ])
 
-      // If we still don't have a result, try the batches again with guard malloc
-      // and then try non-determ.
-      extendedBatch = .firstOf([
-        extendedBatch,
-        extendedBatch.map(\.withGuardMalloc),
-        extendedBatch.map { $0.withDeterministic(false) },
-      ])
+      // If we still don't have a result, try the batches again with
+      // non-determinism in mind.
+      extendedBatch = extendedBatch.withNonDeterminismHandling
       batch = .firstOf([batch, extendedBatch])
     }
 

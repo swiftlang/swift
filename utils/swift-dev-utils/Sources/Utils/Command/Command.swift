@@ -33,7 +33,7 @@ public extension Command {
 // MARK: Argument
 
 extension Command {
-  public enum Argument: Hashable, Sendable {
+  public enum Argument: Hashable, Sendable, Codable {
     case option(Option)
     case flag(Flag)
     case value(String)
@@ -66,6 +66,17 @@ public extension Command.Argument {
       value
     case .flag:
       nil
+    }
+  }
+
+  var rawArgs: [String] {
+    switch self {
+    case .option(let opt):
+      opt.rawArgs
+    case .value(let value):
+      [value]
+    case .flag(let f):
+      [f.printed]
     }
   }
 
@@ -110,7 +121,7 @@ public extension Command.Argument {
 // MARK: Flag
 
 extension Command {
-  public struct Flag: Hashable, Sendable {
+  public struct Flag: Hashable, Sendable, Codable {
     public var dash: Dash
     public var name: Name
 
@@ -122,7 +133,7 @@ extension Command {
 }
 
 public extension Command.Flag {
-  struct Name: Hashable, Sendable {
+  struct Name: Hashable, Sendable, Codable {
     public let rawValue: String
 
     public init(rawValue: String) {
@@ -143,7 +154,7 @@ public extension Command.Flag {
 }
 
 extension Command.Flag {
-  public enum Dash: Int, CaseIterable, Comparable, Sendable {
+  public enum Dash: Int, CaseIterable, Comparable, Sendable, Codable {
     case single = 1, double
     public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
   }
@@ -173,7 +184,7 @@ extension DefaultStringInterpolation {
 // MARK: Option
 
 extension Command {
-  public struct Option: Hashable, Sendable {
+  public struct Option: Hashable, Sendable, Codable {
     public var flag: Flag
     public var spacing: OptionSpacing
     public var value: String
@@ -197,6 +208,15 @@ public extension Command.Option {
     withValue(try fn(value))
   }
 
+  var rawArgs: [String] {
+    switch spacing {
+    case .equals, .unspaced:
+      ["\(flag)\(spacing)\(value)"]
+    case .spaced:
+      ["\(flag)", value]
+    }
+  }
+
   var printedArgs: [String] {
     switch spacing {
     case .equals, .unspaced:
@@ -214,7 +234,7 @@ public extension Command.Option {
 // MARK: OptionSpacing
 
 extension Command {
-  public enum OptionSpacing: Comparable, Sendable {
+  public enum OptionSpacing: Comparable, Sendable, Codable {
     case equals, unspaced, spaced
   }
 }

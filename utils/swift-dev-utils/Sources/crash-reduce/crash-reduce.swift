@@ -54,7 +54,7 @@ struct ReduceCommand: AsyncParsableCommand {
   @Option(help: "Path to the Swift compiler to use")
   var swiftPath: AnyPath
 
-  @Option(help: "Path to the SDK to use")
+  @Option(help: "Path to the SDK to use. If not set it will be inferred.")
   var sdkPath: AnyPath?
 
   // This is still experimental.
@@ -87,6 +87,15 @@ struct ReduceCommand: AsyncParsableCommand {
     )
   )
   var otherInputs: [AnyPath] = []
+
+  @Argument(
+    parsing: .postTerminator,
+    help: """
+      A set of frontend arguments to use for reproducing a frontend crash. If
+      not provided, a default set of arguments will be used.
+      """
+  )
+  var frontendArgs: [String] = []
 }
 
 extension ReduceCommand {
@@ -142,7 +151,7 @@ extension ReduceCommand {
       deleteInputs: deleteInputs
     ).process(
        reprocess: reprocess, ignoreExisting: ignoreExisting,
-       fileIssues: fileIssues
+       fileIssues: fileIssues, frontendArgs: frontendArgs.map { .value($0) }
     )
   }
 }
