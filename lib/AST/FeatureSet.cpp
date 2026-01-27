@@ -531,6 +531,7 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
+UNINTERESTING_FEATURE(BorrowingForLoop)
 
 static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureBorrowAndMutateAccessors =

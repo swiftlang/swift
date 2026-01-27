@@ -557,6 +557,9 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 /// Enable borrow/mutate accessors
 EXPERIMENTAL_FEATURE(BorrowAndMutateAccessors, false)
 
+/// Enable borrowing for-in loops
+EXPERIMENTAL_FEATURE(BorrowingForLoop, false)
+
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
