@@ -18,7 +18,7 @@
 ///
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/InputIterator
 public protocol UnsafeCxxInputIterator: Equatable {
-  associatedtype Pointee
+  associatedtype Pointee: ~Copyable
 
   /// Returns the unwrapped result of C++ `operator*()`.
   ///
@@ -34,19 +34,23 @@ public protocol UnsafeCxxInputIterator: Equatable {
   func successor() -> Self
 }
 
-extension UnsafePointer: @unsafe UnsafeCxxInputIterator {}
+extension UnsafePointer: UnsafeCxxInputIterator
+where Pointee: ~Copyable {}
 
-extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator {}
+extension UnsafeMutablePointer: UnsafeCxxInputIterator
+where Pointee: ~Copyable {}
 
 extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
 
   @inlinable
   public var pointee: Pointee {
-    if let value = self {
-      return value.pointee
+    _read {
+      guard let value = self else {
+        fatalError("Could not dereference nullptr")
+      }
+      yield value.pointee
     }
-    fatalError("Could not dereference nullptr")
   }
 
   @inlinable
@@ -63,7 +67,8 @@ public protocol UnsafeCxxMutableInputIterator: UnsafeCxxInputIterator {
   override var pointee: Pointee { get set }
 }
 
-extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator {}
+extension UnsafeMutablePointer: UnsafeCxxMutableInputIterator
+where Pointee: ~Copyable {}
 
 /// Bridged C++ iterator that allows computing the distance between two of its
 /// instances, and advancing an instance by a given number of elements.
@@ -79,14 +84,17 @@ public protocol UnsafeCxxRandomAccessIterator: UnsafeCxxInputIterator {
   static func +=(lhs: inout Self, rhs: Distance)
 }
 
-extension UnsafePointer: @unsafe UnsafeCxxRandomAccessIterator {}
+extension UnsafePointer: UnsafeCxxRandomAccessIterator
+where Pointee: ~Copyable {}
 
-extension UnsafeMutablePointer: @unsafe UnsafeCxxRandomAccessIterator {}
+extension UnsafeMutablePointer: UnsafeCxxRandomAccessIterator
+where Pointee: ~Copyable {}
 
 public protocol UnsafeCxxMutableRandomAccessIterator:
 UnsafeCxxRandomAccessIterator, UnsafeCxxMutableInputIterator {}
 
-extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
+extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator
+where Pointee: ~Copyable {}
 
 /// Bridged C++ iterator that allows traversing elements of a random access
 /// collection that are stored in contiguous memory segments.
@@ -95,6 +103,8 @@ extension UnsafeMutablePointer: UnsafeCxxMutableRandomAccessIterator {}
 /// `CxxRandomAccessCollection` and should not generally be used directly.
 ///
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/ContiguousIterator
+/// 
+/// TODO the two following protocols require ~Copyable
 public protocol UnsafeCxxContiguousIterator: UnsafeCxxRandomAccessIterator {}
 
 public protocol UnsafeCxxMutableContiguousIterator:
