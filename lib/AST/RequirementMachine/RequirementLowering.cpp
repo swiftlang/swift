@@ -854,8 +854,14 @@ void swift::rewriting::realizeInheritedRequirements(
   // Protocols also have reparented relationships in extensions.
   // They're also considered to be inherited requirements.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    for (auto *ext : proto->getExtensions()) {
-      realizeFromInheritedTypes(ext, ext);
+    if (!proto->isObjC()) {
+      for (auto *ext : proto->getExtensions()) {
+        // No valid reparentings can appear outside the protocol's module.
+        if (ext->getModuleContext() != proto->getModuleContext())
+          continue;
+
+        realizeFromInheritedTypes(ext, ext);
+      }
     }
   }
 

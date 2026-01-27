@@ -3616,12 +3616,17 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   //
   // We don't do this from getDirectlyInheritedNominalTypeDecls, only to avoid
   // doing a const_cast to access the extensions there.
-  for (auto *ext : PD->getExtensions()) {
-    // Skip extensions in other modules, they're never permitted to reparent.
-    if (ext->getModuleContext() != PD->getModuleContext())
-      continue;
+  //
+  // We avoid ObjC protocols, as they don't support @reparented and can trigger
+  // a request evaluator cycle.
+  if (!PD->isObjC()) {
+    for (auto *ext : PD->getExtensions()) {
+      // Skip extensions in other modules, they're never permitted to reparent.
+      if (ext->getModuleContext() != PD->getModuleContext())
+        continue;
 
-    addFrom(ext);
+      addFrom(ext);
+    }
   }
 
   // Apply inverses.
