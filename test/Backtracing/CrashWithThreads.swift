@@ -112,3 +112,5 @@ while (true) {
 
 // CHECK: Thread {{[0-9]*( ".*")?}}:
 // CHECK: {{0x[0-9a-f]+.*main.* CrashWithThreads}}
+
+// CHECK: Thread {{[0-9]*( ".*")?}}:
