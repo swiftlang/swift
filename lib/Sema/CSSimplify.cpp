@@ -1874,7 +1874,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
         ExistentialArchetypeType *openedArchetype = nullptr;
 
-        argTy = argTy.transformRec([&](TypeBase *t)-> std::optional<Type> {
+        // Open the argument type.
+        argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
             if (!t->isAnyExistentialType())
                 return std::nullopt;
 
