@@ -9555,6 +9555,11 @@ void ClangImporter::Implementation::importAttributes(
 
       const auto &replacement = avail->getReplacement();
 
+      if (introduced.empty() && deprecated.empty() && obsoleted.empty() &&
+          message.empty() && replacement.empty() &&
+          AttrKind == AvailableAttr::Kind::Default)
+        continue;
+
       StringRef swiftReplacement = "";
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
