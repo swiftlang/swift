@@ -1590,10 +1590,10 @@ public:
     return entity;
   }
 
-  static LinkEntity forKnownCoroFunctionPointer(const char *name) {
+  static LinkEntity forKnownCoroFunctionPointer(const char *name, IRGenModule *IGM) {
     LinkEntity entity;
     entity.Pointer = const_cast<char *>(name);
-    entity.SecondaryPointer = nullptr;
+    entity.SecondaryPointer = reinterpret_cast<void*>(IGM);
     entity.Data =
         LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownCoroFunctionPointer));
     return entity;
@@ -1837,6 +1837,9 @@ public:
   }
   bool isNominalTypeDescriptor() const {
     return getKind() == Kind::NominalTypeDescriptor;
+  }
+  bool isKnownCoroFunctionPointer() const {
+    return getKind() == Kind::KnownCoroFunctionPointer;
   }
 
   /// Determine whether this entity will be weak-imported.
