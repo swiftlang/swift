@@ -1876,14 +1876,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
         // Open the argument type.
         argTy = argTy.transformRec([&](TypeBase *t) -> std::optional<Type> {
-            if (!t->isAnyExistentialType())
-                return std::nullopt;
+          if (!t->isAnyExistentialType())
+            return std::nullopt;
 
-            Type openedTy;
-            std::tie(openedTy, openedArchetype) =
-                cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
+          Type openedTy;
+          std::tie(openedTy, openedArchetype) =
+            cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
 
-            return openedTy;
+          return openedTy;
         });
 
         openedExistentials.push_back({typeVar, openedArchetype});
