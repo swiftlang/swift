@@ -204,7 +204,13 @@ void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddBoolean(true);
     addressableParamIndicesAndImmortal.getPointer()->Profile(ID);
   } else {
-    ID.AddBoolean(false);  
+    ID.AddBoolean(false);
+  }
+  if (entry) {
+    ID.AddBoolean(true);
+    ID.AddPointer(entry);
+  } else {
+    ID.AddBoolean(false);
   }
 }
 
