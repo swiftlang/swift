@@ -1204,8 +1204,7 @@ namespace {
         // table for Self: RefiningProto needs to be accessible from this
         // witness table for Self: Base. That table will be filled-in by the
         // associated conformance access function
-        auto selfType =
-            CanGenericTypeParamType::getType(0, 0, Proto->getASTContext());
+        auto selfType = Proto->getASTContext().TheSelfType;
         AssociatedConformance assocConf(Proto, selfType, conf->getProtocol());
         defineDefaultAssociatedConformanceAccessFunction(
             assocConf, ProtocolConformanceRef(conf));

@@ -2319,7 +2319,7 @@ namespace {
         // conditional requirement for that P's Self: P. This aligns with
         // SILWitnessTable::enumerateWitnessTableConditionalConformances().
         if (auto selfProto = normal->getDeclContext()->getSelfProtocolDecl()) {
-          auto selfType = selfProto->getSelfInterfaceType()->getCanonicalType();
+          auto selfType = selfProto->getASTContext().TheSelfType;
           condReqs.emplace_back(RequirementKind::Conformance, selfType,
                                    selfProto->getDeclaredInterfaceType());
 
