@@ -3445,15 +3445,17 @@ class DesugarForEachStmt {
   DeclContext *dc;
   ASTContext &ctx;
   bool isAsync;
+  bool isBorrowing;
   VarDecl *makeIteratorVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
+  ForEachStmt *innerLoop = nullptr;
 
 public:
   DesugarForEachStmt(ForEachStmt *stmt)
       : stmt(stmt), dc(stmt->getDeclContext()),
         ctx(stmt->getDeclContext()->getASTContext()),
-        isAsync(stmt->getAwaitLoc().isValid()) {}
+        isAsync(stmt->getAwaitLoc().isValid()), isBorrowing(false) {}
 
   BraceStmt *operator()() {
     auto *sequence = stmt->getSequence();
@@ -3474,6 +3476,10 @@ public:
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
+    // Check if this is a borrowing sequence by looking for
+    // BorrowingIteratorProtocol
+    isBorrowing = checkIsBorrowingIterator();
+
     buildMakeIteratorVar();
 
     SmallVector<ASTNode, 2> stmts;
@@ -3491,6 +3497,44 @@ public:
   }
 
 private:
+  // FIXME: this entire function will be replaced and is only needed so long as
+  // this branch does not include the stdlib code for the
+  // BorrowingSequenceProtocol
+  bool checkIsBorrowingIterator() {
+    // Check if the iterator type conforms to BorrowingIteratorProtocol
+    // FIXME: Replace with proper KnownProtocolKind once added to
+    // KnownProtocols.def
+
+    auto borrowingIteratorId = ctx.getIdentifier("BorrowingIteratorProtocol");
+
+    // Look up BorrowingIteratorProtocol in the module
+    SmallVector<ValueDecl *, 2> results;
+    dc->getParentModule()->lookupValue(borrowingIteratorId,
+                                       NLKind::QualifiedLookup, results);
+
+    for (auto *decl : results) {
+      if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+        // Get the iterator type from the sequence conformance
+        auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
+        auto associatedType = sequenceProto->getAssociatedType(iteratorId);
+        if (!associatedType)
+          return false;
+
+        auto iteratorType = seqConformanceRef.getTypeWitness(associatedType);
+        if (!iteratorType)
+          return false;
+
+        // Check if the iterator type conforms to BorrowingIteratorProtocol
+        auto conformance = lookupConformance(iteratorType, proto);
+        if (!conformance.isInvalid()) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   void buildMakeIteratorVar() {
     std::string name;
     {
@@ -3516,13 +3560,46 @@ private:
     }
   }
 
+  Expr *buildNextSpanCall(DeclRefExpr *makeIteratorVarRef) {
+    // For borrowing: call nextSpan(maximumCount: Int.max)
+    auto nextSpanId = ctx.getIdentifier("nextSpan");
+    auto *nextSpanRef = new (ctx) UnresolvedDotExpr(
+        makeIteratorVarRef, stmt->getForLoc(), DeclNameRef(nextSpanId),
+        DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
+
+    // Build Int.max as an unresolved member reference
+    auto intId = ctx.getIdentifier("Int");
+    auto *intRef = new (ctx) UnresolvedDeclRefExpr(
+        DeclNameRef(intId), DeclRefKind::Ordinary, DeclNameLoc());
+
+    auto maxId = ctx.getIdentifier("max");
+    auto *maxRef = new (ctx) UnresolvedDotExpr(
+        intRef, SourceLoc(), DeclNameRef(maxId), DeclNameLoc(),
+        /*implicit=*/true);
+
+    // Create argument: maximumCount: Int.max
+    auto arg = Argument(SourceLoc(), ctx.getIdentifier("maximumCount"), maxRef);
+    auto *args = ArgumentList::createImplicit(ctx, {arg});
+
+    return CallExpr::createImplicit(ctx, nextSpanRef, args);
+  }
+
   Expr *buildNextCall() {
     // The result type of `.makeIterator()` is used to form a call to
-    // `.next()`. `next()` is called on each iteration of the loop.
+    // `.next()/.nextCall()`.
+    // `next()` is called on each iteration of the loop.
+    // `nextCall()` returns a span. For more details, see
+    // https://github.com/airspeedswift/swift-evolution/blob/61c3640ea04c4fc3b74de2a1f43cad61647c8786/proposals/NNNN-borrowing-sequence.md?plain=1#L114.
+    // FIXME: update above link
     auto *makeIteratorVarRef =
         new (ctx) DeclRefExpr(makeIteratorVar, DeclNameLoc(stmt->getForLoc()),
                               /*Implicit=*/true);
 
+    if (isBorrowing) {
+      return buildNextSpanCall(makeIteratorVarRef);
+    }
+
+    // Regular (non-borrowing): call next()
     FuncDecl *nextFn = TypeChecker::getForEachIteratorNextFunction(
         dc, stmt->getForLoc(), isAsync);
     TinyPtrVector<Identifier> labels;
@@ -3606,36 +3683,84 @@ private:
     NamedPattern *nextCallVarPattern =
         NamedPattern::createImplicit(ctx, nextCallVar);
 
-    auto *somePattern =
-        OptionalSomePattern::createImplicit(ctx, nextCallVarPattern);
+    // FIXME: is there a better way to do this?
+    Pattern *pattern = isBorrowing
+                           ? (Pattern *)nextCallVarPattern
+                           : (Pattern *)OptionalSomePattern::createImplicit(
+                                 ctx, nextCallVarPattern);
 
-    auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(),
-                                                     somePattern, nextCall);
+    auto PBI = ConditionalPatternBindingInfo::create(ctx, SourceLoc(), pattern,
+                                                     nextCall);
 
     auto conditionElement = StmtConditionElement(PBI);
-    SmallVector<StmtConditionElement, 1> cond;
+    SmallVector<StmtConditionElement, 2> cond;
     cond.push_back(conditionElement);
+
+    // For borrowing iterators, add !span.isEmpty condition.
+    // To signal that there are no more elements, `nextSpan()` will return
+    // an empty span.
+    if (isBorrowing) {
+      auto *spanRef =
+          new (ctx) DeclRefExpr(nextCallVar, DeclNameLoc(), /*implicit=*/true);
+      auto isEmptyId = ctx.getIdentifier("isEmpty");
+      auto *isEmptyRef = new (ctx) UnresolvedDotExpr(
+          spanRef, SourceLoc(), DeclNameRef(isEmptyId), DeclNameLoc(),
+          /*implicit=*/true);
+
+      // Create !span.isEmpty as a prefix unary operator call
+      auto notOpId = ctx.getIdentifier("!");
+      auto *notOpRef = new (ctx) UnresolvedDeclRefExpr(
+          DeclNameRef(notOpId), DeclRefKind::Ordinary, DeclNameLoc());
+      auto *notOp = PrefixUnaryExpr::create(ctx, notOpRef, isEmptyRef);
+      notOp->setImplicit();
+
+      cond.push_back(StmtConditionElement(notOp));
+    }
 
     return ctx.AllocateCopy(cond);
   }
 
   SmallVector<ASTNode> buildWhileBody(VarDecl *nextCallVar) {
-    SmallVector<ASTNode> whileBodyElements;
+    SmallVector<ASTNode> bodyElements;
 
     auto elementPattern = stmt->getPattern();
     auto *opaquePattern = new (ctx) OpaquePattern(elementPattern);
     auto *nextCallVarRef = new (ctx) DeclRefExpr(
         nextCallVar, DeclNameLoc(stmt->getForLoc()), /*Implicit=*/true);
 
+    // Either an unwrapped value returned by next, or an element of the span
+    // returned by nextSpan when dealing with BorrowingIterators.
+    Expr *element = nextCallVarRef;
+
+    Pattern *indexPattern = nullptr;
+
+    if (isBorrowing) {
+      // Bind original pattern to span[i] in inner loop.
+      auto *indexVar = new (ctx) VarDecl(
+          /*isStatic=*/false, VarDecl::Introducer::Let, stmt->getForLoc(),
+          ctx.getIdentifier("$i"), dc);
+      indexVar->setImplicit();
+      indexPattern = NamedPattern::createImplicit(ctx, indexVar);
+      auto *indexRef =
+          new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+
+      // Create span[i] subscript
+      auto *indexArgs = ArgumentList::createImplicit(
+          ctx, {Argument(SourceLoc(), Identifier(), indexRef)});
+      element = SubscriptExpr::create(ctx, nextCallVarRef, indexArgs,
+                                      ConcreteDeclRef(), /*implicit=*/true);
+    }
+
     auto isRefutable =
         elementPattern->isRefutablePattern(/*allowIsPatternCoercion*/ false);
     if (!isRefutable) {
       auto PBD = PatternBindingDecl::createImplicit(
-          ctx, StaticSpellingKind::None, opaquePattern, nextCallVarRef, dc);
-      whileBodyElements.push_back(PBD);
+          ctx, StaticSpellingKind::None, opaquePattern, element, dc);
+      bodyElements.push_back(PBD);
     }
 
-    /* for ... in ... where cond { body }
+    /* For a non-borrowing ForEachStmt,
+     * for ... in ... where cond { body }
      * becomes:
      * while ... { if cond then body else continue }
      */
@@ -3649,7 +3774,7 @@ private:
 
       if (isRefutable) {
         auto PBI = ConditionalPatternBindingInfo::create(
-            ctx, SourceLoc(), opaquePattern, nextCallVarRef);
+            ctx, SourceLoc(), opaquePattern, element);
         auto conditionElement = StmtConditionElement(PBI);
         internalConditions.push_back(conditionElement);
       }
@@ -3661,22 +3786,44 @@ private:
         internalConditions.push_back(opaqueWhere);
       }
 
-      whileBodyElements.push_back(new (ctx) IfStmt(
+      bodyElements.push_back(new (ctx) IfStmt(
           LabeledStmtInfo(), SourceLoc(), ctx.AllocateCopy(internalConditions),
           BraceStmt::createImplicit(ctx, {opaqueForBody}), SourceLoc(), nullptr,
           /*implicit*/ true));
     } else {
-      whileBodyElements.push_back(opaqueForBody);
+      bodyElements.push_back(opaqueForBody);
     }
 
-    return whileBodyElements;
+    if (isBorrowing) {
+      auto indicesId = ctx.getIdentifier("indices");
+      auto *indicesRef = new (ctx) UnresolvedDotExpr(
+          nextCallVarRef, SourceLoc(), DeclNameRef(indicesId), DeclNameLoc(),
+          /*implicit=*/true);
+
+      auto *innerBody =
+          BraceStmt::create(ctx, stmt->getBody()->getLBraceLoc(), bodyElements,
+                            stmt->getBody()->getRBraceLoc());
+
+      // Create the inner ForEachStmt, which will be desugared recursively.
+      innerLoop = new (ctx)
+          ForEachStmt(LabeledStmtInfo(), stmt->getForLoc(), stmt->getTryLoc(),
+                      stmt->getAwaitLoc(), stmt->getUnsafeLoc(), indexPattern,
+                      /* InLoc */ stmt->getInLoc(), indicesRef, SourceLoc(),
+                      /*where=*/nullptr, innerBody, dc,
+                      /*implicit=*/true);
+
+      return {innerLoop};
+    }
+
+    return bodyElements;
   }
 
   WhileStmt *buildWhileStmt() {
     Expr *nextCall = buildNextCall();
+    auto varName = isBorrowing ? "$span" : "$element";
     auto nextCallVar = new (ctx)
         VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let,
-                nextCall->getStartLoc(), ctx.getIdentifier("$element"), dc);
+                nextCall->getStartLoc(), ctx.getIdentifier(varName), dc);
     nextCallVar->setImplicit();
 
     auto *whileBody = BraceStmt::create(
@@ -3690,7 +3837,13 @@ private:
     // Set the statement as a target for any Break or Continue statements in the
     // ForEach.
     stmt->setBreakTarget(whileStmt);
-    stmt->setContinueTarget(whileStmt);
+
+    if (isBorrowing) {
+      ASSERT(innerLoop);
+      stmt->setContinueTarget(innerLoop);
+    } else {
+      stmt->setContinueTarget(whileStmt);
+    }
 
     whileStmt->setParentForEach(stmt);
 

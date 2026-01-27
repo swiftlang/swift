@@ -775,7 +775,7 @@ struct PGOMapping : public ASTWalker {
       // The counter for the for loop needs to be associated with the desugared
       // while statement since that's where the condition is checked.
       auto loopCount = loadExecutionCount(FES->getBody());
-      if (auto *continueTarget = FES->getContinueTarget())
+      if (auto *continueTarget = dyn_cast<WhileStmt>(FES->getContinueTarget()))
         setExecutionCount(continueTarget->getBody(), loopCount);
 
       setExecutionCount(FES, parentCount);
