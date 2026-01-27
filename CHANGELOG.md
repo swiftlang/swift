@@ -5,15 +5,12 @@
 
 ## Swift (next)
 
-* Some properties of `Span` and `MutableSpan` as well as two functions of
-  `OutputRawSpan` are newly marked with `@unsafe`. `MutableSpan.mutableBytes`
-  is marked with `@unsafe`. It was proposed with `@unsafe` in SE-0467, but the
-  implementation in Swift 6.2 omitted the annotation. `Span.bytes` and
-  `MutableSpan.bytes` are now marked with `@unsafe`. They should have been
-  marked as such during the standard library audit we did along with SE-0458.
-  Finally, `OutputRawSpan`'s two generic `append()` functions  have been marked
-  with `@unsafe`, and should have been proposed as such in SE-0485.
-  
+* The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
+  `mutableBytes`) as well as the two generic `append()` methods of
+  `OutputRawSpan` are newly marked with `@unsafe`. These changes correct
+  omissions in the SE-0458, SE-0467 and SE-0485 proposals or their
+  implementations.
+
   These annotations are required because of a permissible compiler optimization
   involving values of types that contain padding. When the compiler stores such
   a value to addressable memory, it is free to skip any padding bytes. This can
@@ -23,16 +20,16 @@
   bytes violate the prerequisite that `RawSpan` and `MutableRawSpan` represent
   fully initialized memory. In the case of `OutputRawSpan`, they violate the
   postcondition that the memory it has written is fully initialized.
-  
-  When the `Element` type of `Span` or `MutableSpan` has neither internal nor
-  trailing padding bytes, it is safe to use the `bytes` computed property, as
-  every byte must be initialized. The same constraint applies to the type
-  parameter of `OutputSpan.append(_:as:)`.
-  
-  `MutableSpan`'s `mutableBytes` adds an additional safety constraint if the
-  memory is to later be used again as `Element`, namely that the non-padding
-  bytes of `Element` must allow every bit pattern to be permissible in a valid
-  value of `Element`.
+
+  It is safe to use `bytes` when the `Element` type of `Span` or `MutableSpan`
+  has neither internal nor trailing padding bytes, as every byte is then known
+  to be initialized. The same constraint applies to the type parameter of
+  `OutputSpan.append(_:as:)`.
+
+  To safely use `MutableSpan`'s `mutableBytes`, an additional safety constraint
+  is added if the memory is to later be used again as `Element`. In that case,
+  the non-padding bytes of `Element` must allow every bit pattern to be
+  permissible in a valid value of `Element`.
 
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
@@ -3943,7 +3940,7 @@ concurrency checking.
 
 * The C `long double` type is now imported as `Float80` on i386 and x86_64
   macOS and Linux. The tgmath functions in the Darwin and glibc modules now
-  support `Float80` as well as `Float` and `Double`. Several tgmath
+  support `Float80` as well as `Float` and `Double`. Several tgmath
   functions have been made generic over `[Binary]FloatingPoint` so that they
   will automatically be available for any conforming type.
 
