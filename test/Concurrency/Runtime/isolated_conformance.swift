@@ -7,6 +7,8 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+@_spi(ExperimentalCustomExecutors) import _Concurrency
+
 protocol P {
   func f()
 }
@@ -203,7 +205,7 @@ await Task.detached { @SomeGlobalActor in
 // CHECK: Testing a separate task off the main actor
 print("Testing a separate task off the main actor")
 await Task.detached {
-  if #available(SwiftStdlib 6.2, *) {
+  if #available(SwiftStdlib 6.3, *) {
     // Skip tests on platforms that use the same executor for the main
     // actor and the global concurrent executor.
     guard Task.defaultExecutor !== MainActor.executor else { return }

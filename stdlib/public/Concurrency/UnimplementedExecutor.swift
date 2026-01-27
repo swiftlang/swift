@@ -14,7 +14,8 @@ import Swift
 
 // .. Main Executor ............................................................
 
-@available(StdlibDeploymentTarget 6.2, *)
+@_spi(ExperimentalCustomExecutors)
+@available(StdlibDeploymentTarget 6.3, *)
 public final class UnimplementedMainExecutor: MainExecutor, @unchecked Sendable {
   public init() {}
 
@@ -45,7 +46,8 @@ public final class UnimplementedMainExecutor: MainExecutor, @unchecked Sendable 
 
 // .. Task Executor ............................................................
 
-@available(StdlibDeploymentTarget 6.2, *)
+@_spi(ExperimentalCustomExecutors)
+@available(StdlibDeploymentTarget 6.3, *)
 public final class UnimplementedTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}
 
