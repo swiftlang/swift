@@ -1474,38 +1474,6 @@ shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   return result;
 }
 
-// Identifies Swift language runtime and standard library implementation
-// modules.
-//
-// Certain diagnostics (e.g. ForceOptional for optional existentials passed
-// to generic parameters) are only appropriate in user code. This helper is
-// used to suppress those fixes while compiling the standard library and its
-// supporting runtime modules, where such patterns are intentional.
-
-static bool isLanguageRuntimeModule(ModuleDecl *module) {
-
-  if (!module)
-    return false;
-
-  auto &ctx = module->getASTContext();
-
-  if (module == ctx.getStdlibModule())
-    return true;
-
-  if (module == ctx.TheBuiltinModule)
-    return true;
-
-  auto name = module->getName();
-
-  return name.is("Distributed") ||
-    name.is("Foundation") ||
-    name.is("Observation") ||
-    name.is("StdlibUnittest") ||
-    name.is("_Concurrency") ||
-    name.is("_Differentiation") ||
-    name.is("_StringProcessing");
-}
-
 // Match the argument of a call to the parameter.
 static ConstraintSystem::TypeMatchResult matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType, ArgumentList *argList,
@@ -1859,7 +1827,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         Type argTypeForOpening = argTy;
 
         auto *module = cs.DC->getParentModule();
-        if (!module || isLanguageRuntimeModule(module)) {
+        if (!module) {
           return shouldOpenExistentialCallArgument(
               callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
         }
