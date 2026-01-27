@@ -2594,6 +2594,19 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         !targetConv.isArgumentIndexOfIndirectErrorResult(i)) {
       continue;
     }
+    if (Fn.hasOwnership()) {
+      // If we have an @owned Arg which requires a cast, bailout if it has
+      // consuming uses other than the `try_apply` instead of creating a
+      // copy_value to fixup ownership.
+      if (Arg->getOwnershipKind() == OwnershipKind::Owned &&
+          origConv.getSILArgumentType(i, context) !=
+              targetConv.getSILArgumentType(calleeArgIdx, context)) {
+        auto *singleConsumingUse = Arg->getSingleConsumingUse();
+        if (!singleConsumingUse || singleConsumingUse->getUser() != TAI) {
+          return false;
+        }
+      }
+    }
     // Cast argument if required.
     std::tie(Arg, std::ignore) = castValueToABICompatibleType(
         &Builder, PM, TAI->getLoc(), Arg,
