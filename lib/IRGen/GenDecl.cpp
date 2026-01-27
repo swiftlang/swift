@@ -4204,6 +4204,12 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
     return indirect();
   }
 
+  if (entity.isKnownCoroFunctionPointer() &&
+      Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // In embedded we splat a symbol into every library.
+    return direct();
+  }
+
   if (auto *entityDC = entity.getDeclContextForEmission()) {
     auto *entitySF = entityDC->getModuleScopeContext();
     bool clangImportedEntity = isa<ClangModuleUnit>(entitySF);
