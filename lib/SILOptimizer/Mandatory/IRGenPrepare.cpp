@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-cleanup"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -29,6 +30,8 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/Strings.h"
 
 using namespace swift;
@@ -113,6 +116,64 @@ static bool cleanFunction(SILFunction &fn) {
   return madeChange;
 }
 
+/// Embed information about cold edges into the SIL via ProfileCounters
+/// so that it's available in LLVM.
+static bool lowerColdBlockInfo(DominanceAnalysis *DA,
+                               PostDominanceAnalysis *PDA,
+                               SILFunction &fn) {
+  bool invalidate = false;
+
+  ColdBlockInfo CBI(DA, PDA);
+  CBI.analyze(&fn);
+
+  // If the entry block is cold, then the whole function is cold.
+  if (CBI.isCold(fn.getEntryBlock())) {
+    fn.addSemanticsAttr(semantics::COLD);
+    return true;
+  }
+
+  SmallVector<SILSuccessor*, 8> coldSuccs;
+  SmallVector<SILSuccessor*, 8> warmSuccs;
+  for (auto &block : fn) {
+    if (CBI.isCold(&block) || block.getNumSuccessors() < 2)
+      continue;
+
+    coldSuccs.clear(); warmSuccs.clear();
+
+    // Partition the successors.
+    bool hasExistingProfileData = false;
+    for (SILSuccessor &succ : block.getSuccessors()) {
+      if (succ.getCount().hasValue()) {
+        hasExistingProfileData = true;
+        break;
+      }
+
+      if (CBI.isCold(succ))
+        coldSuccs.push_back(&succ);
+      else
+        warmSuccs.push_back(&succ);
+    }
+
+    if (hasExistingProfileData)
+      continue;
+
+    // Nothing to annotate if everything's warm.
+    if (coldSuccs.empty())
+      continue;
+
+    ASSERT(!warmSuccs.empty() && "all succs are cold, yet the block isn't?");
+    invalidate = true;
+
+    for (auto *coldSucc : coldSuccs)
+      coldSucc->setCount(ProfileCounter(1));
+
+    for (auto *warmSucc : warmSuccs)
+      warmSucc->setCount(ProfileCounter(2000));
+  }
+
+  return invalidate;
+}
+
 //===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
@@ -122,6 +183,8 @@ namespace {
 class IRGenPrepare : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
 
     if (getOptions().EmbeddedSwift) {
       // In Embedded Swift, code for a module can be generated into the clients
@@ -135,6 +198,8 @@ class IRGenPrepare : public SILFunctionTransform {
     }
 
     bool shouldInvalidate = cleanFunction(*F);
+
+    shouldInvalidate |= lowerColdBlockInfo(DA, PDA, *F);
 
     if (shouldInvalidate)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
