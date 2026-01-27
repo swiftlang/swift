@@ -74,3 +74,39 @@ extension InitBorrowAddrInst: OnoneSimplifiable, SILCombineSimplifiable {
     context.erase(instruction: self)
   }
 }
+
+extension DereferenceBorrowInst: OnoneSimplifiable, SILCombineSimplifiable {
+  /// ```
+  ///   %borrow = make_borrow %referent
+  ///   %deref = dereference_borrow %borrow
+  /// ```
+  /// is transformed to
+  /// ```
+  ///   %referent
+  /// ```
+  func simplify(_ context: SimplifyContext) {
+    guard let makeBorrow = borrow as? MakeBorrowInst else {
+      return
+    }
+
+    replace(with: makeBorrow.referent, context)
+  }
+}
+
+extension DereferenceAddrBorrowInst: OnoneSimplifiable, SILCombineSimplifiable {
+  /// ```
+  ///   %borrow = make_addr_borrow %referent
+  ///   %deref = dereference_addr_borrow %borrow
+  /// ```
+  /// is transformed to
+  /// ```
+  ///   %referent
+  /// ```
+  func simplify(_ context: SimplifyContext) {
+    guard let makeAddrBorrow = borrow as? MakeAddrBorrowInst else {
+      return
+    }
+
+    replace(with: makeAddrBorrow.referent, context)
+  }
+}

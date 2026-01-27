@@ -4395,3 +4395,28 @@ bb0(%0 : $*Builtin.Borrow<AddressOnlyEnum>, %1 : $*AddressOnlyEnum):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @test_dereference_borrow : $@convention(thin) (Int) -> Int {
+// CHECK:       bb0([[INT:%.*]] : $Int):
+// CHECK-NEXT:    return [[INT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_dereference_borrow'
+sil @test_dereference_borrow : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %borrow = make_borrow %0 : $Int
+  %int = dereference_borrow %borrow : $Builtin.Borrow<Int>
+  return %int : $Int
+}
+
+// CHECK-LABEL: sil @test_dereference_addr_borrow : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out AddressOnlyEnum {
+// CHECK:       bb0([[DEST_AOE:%.*]] : $*AddressOnlyEnum, [[SRC_AOE:%.*]] : $*AddressOnlyEnum):
+// CHECK-NOT:     dereference_addr_borrow
+// CHECK-NEXT:    copy_addr [[SRC_AOE]] to [init] [[DEST_AOE]]
+// CHECK-LABEL: } // end sil function 'test_dereference_addr_borrow'
+sil @test_dereference_addr_borrow : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out AddressOnlyEnum {
+bb0(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyEnum):
+  %borrow = make_addr_borrow %1 : $*AddressOnlyEnum
+  %aoe = dereference_addr_borrow %borrow : $Builtin.Borrow<AddressOnlyEnum>
+  copy_addr %aoe to [init] %0
+  %r = tuple ()
+  return %r : $()
+}
