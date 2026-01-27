@@ -8559,10 +8559,13 @@ ActorIsolation swift::inferConformanceIsolation(
 
       // If we're defaulting to main-actor isolation, use that.
       if (getDefaultIsolationForContext(dc) == DefaultIsolation::MainActor) {
-        // If type is `nonisolated` it means that defaulting didn't apply it
-        // it (i.e. due to direct conformance to a `Sendable` protocol), and
-        // it doesn't apply to extensions as well.
-        if (nominalIsolation.isNonisolated())
+        // Infer conformance as `@MainActor`-isolated only if neither type nor
+        // member, that serves as a witness, are isolated, otherwise in this
+        // mode either type or extension would have to be explicitly or
+        // implicitly nonisolated (i.e. via primary declaration conforming to
+        // a `Sendable` protocol) and that gives us a hint that conformance
+        // should be nonisolated as well.
+        if (nominalIsolation.isNonisolated() && !hasKnownIsolatedWitness)
           return nominalIsolation;
 
         return ActorIsolation::forMainActor(ctx);
