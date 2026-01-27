@@ -31,7 +31,7 @@ struct Plus100Eagle: Bird {
   }
 }
 
-extension UInt: AsInt {
+extension UInt: @retroactive AsInt {
   public func asInt() -> Int { return Int(self) }
 }
 #endif
