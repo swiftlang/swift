@@ -1107,23 +1107,41 @@ extension ArraySlice: RangeReplaceableCollection {
   }
 
   @inlinable
-  public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public mutating func withContiguousMutableStorageIfAvailable<R, E>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return unsafe try withUnsafeMutableBufferPointer {
-      (bufferPointer) -> R in
+      (bufferPointer) throws(E) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$ss10ArraySliceV39withContiguousMutableStorageIfAvailableyqd__Sgqd__SryxGzKXEKlF")
+  mutating func __rethrows_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    unsafe try withContiguousMutableStorageIfAvailable(body)
+  }
 
   @inlinable
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return unsafe try withUnsafeBufferPointer {
-      (bufferPointer) -> R in
+      (bufferPointer) throws(E) -> R in
       return try unsafe body(bufferPointer)
     }
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$ss10ArraySliceV32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
+  public func __rethrows_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    unsafe try withContiguousStorageIfAvailable(body)
   }
 
   @inlinable
@@ -1533,14 +1551,23 @@ extension ArraySlice {
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public mutating func withUnsafeMutableBytes<R>(
-    _ body: (UnsafeMutableRawBufferPointer) throws -> R
-  ) rethrows -> R {
-    return try unsafe self.withUnsafeMutableBufferPointer {
-      return try unsafe body(UnsafeMutableRawBufferPointer($0))
+  public mutating func withUnsafeMutableBytes<R, E>(
+    _ body: (UnsafeMutableRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R {
+    return try unsafe self.withUnsafeMutableBufferPointer { pointer throws(E) in
+      return try unsafe body(UnsafeMutableRawBufferPointer(pointer))
     }
   }
-
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$ss10ArraySliceV22withUnsafeMutableBytesyqd__qd__SwKXEKlF")
+  public mutating func __rethrows_withUnsafeMutableBytes<R>(
+    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    unsafe try withUnsafeMutableBytes(body)
+  }
+  
   /// Calls the given closure with a pointer to the underlying bytes of the
   /// array's contiguous storage.
   ///
@@ -1569,12 +1596,21 @@ extension ArraySlice {
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public func withUnsafeBytes<R>(
+  public func withUnsafeBytes<R, E>(
+    _ body: (UnsafeRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R {
+    return try unsafe self.withUnsafeBufferPointer { pointer throws(E) in
+      try unsafe body(UnsafeRawBufferPointer(pointer))
+    }
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$ss10ArraySliceV15withUnsafeBytesyqd__qd__SWKXEKlF")
+  public func __rethrows_withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeBufferPointer {
-      try unsafe body(UnsafeRawBufferPointer($0))
-    }
+    unsafe try withUnsafeBytes(body)
   }
 }
 
