@@ -442,7 +442,9 @@ extension UnsafeRawPointer {
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
   @inlinable
-  public func load<T>(
+  @_preInverseGenerics
+  @lifetime(borrow self)
+  public func load<T: ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -488,7 +490,9 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: BitwiseCopyable>(
+  @_preInverseGenerics
+  @lifetime(borrow self)
+  public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
@@ -559,7 +563,7 @@ extension UnsafeRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedUp<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedUp<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
@@ -577,7 +581,7 @@ extension UnsafeRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedDown<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedDown<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
@@ -1416,10 +1420,11 @@ extension UnsafeMutableRawPointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func storeBytes<T: BitwiseCopyable>(
+  public func storeBytes<T: BitwiseCopyable & ~Escapable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    unsafe Builtin.storeRaw(value, (self + offset)._rawValue)
+    let immortalValue = unsafe _overrideLifetime(value, borrowing: ())
+    unsafe Builtin.storeRaw(immortalValue, (self + offset)._rawValue)
   }
 
   /// Stores the given value's bytes into raw memory at the specified offset.
@@ -1563,7 +1568,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedUp<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedUp<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = (UInt(Builtin.ptrtoint_Word(_rawValue)) &+ mask) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
@@ -1581,7 +1586,7 @@ extension UnsafeMutableRawPointer {
   /// - Returns: a pointer properly aligned to store a value of type `T`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func alignedDown<T: ~Copyable>(for type: T.Type) -> Self {
+  public func alignedDown<T: ~Copyable & ~Escapable>(for type: T.Type) -> Self {
     let mask = UInt(Builtin.alignof(T.self)) &- 1
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
