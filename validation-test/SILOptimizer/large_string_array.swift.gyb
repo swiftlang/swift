@@ -1,3 +1,4 @@
+// REQUIRES: rdar168511262
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
