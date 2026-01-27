@@ -785,7 +785,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       break;
     case ComponentKind::UnresolvedApply:
     case ComponentKind::Apply:
-      return getConstraintLocator(anchor, *componentElt);
+      return getConstraintLocator(anchor, LocatorPathElt::KeyPathComponent(componentElt->getIndex() - 1));
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:

@@ -839,8 +839,8 @@ func test_keypath_with_method_refs() {
     init(val value: Int = 2024) { year = value }
     
     var add: (Int, Int) -> Int { return { $0 + $1 } }
-    func add(this: Int) -> Int { this + this}
-    func add(that: Int) -> Int { that + that }
+    func add(this: Int) -> Int { this + this} // expected-note 2 {{candidate has partially matching parameter list (this: Int)}}
+    func add(that: Int) -> Int { that + that } // expected-note 2 {{candidate has partially matching parameter list (that: Int)}}
     static func subtract(_ val: Int) -> Int { return millenium - val }
     nonisolated func nonisolatedNextYear() -> Int { return year + 1 }
     consuming func consume() { print(year) }
@@ -862,10 +862,10 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<S, (Int, Int) -> Int> = \.add
-  let _: KeyPath<S, (Int, Int) -> Int> = \.add()
+  let _: KeyPath<S, (Int, Int) -> Int> = \.add() // expected-error {{no exact matches in call to instance method 'add'}}
   // expected-error@-1 {{cannot assign value of type 'KeyPath<S, Int>' to type 'KeyPath<S, (Int, Int) -> Int>'}}
   // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and '(Int, Int) -> Int') are expected to be equal}}
-  let _: KeyPath<S, Int> = \.add() // expected-error {{failed to produce diagnostic for expression}}
+  let _: KeyPath<S, Int> = \.add() // expected-error {{no exact matches in call to instance method 'add'}}
   let _: KeyPath<S, (Int) -> Int> = \.add(this:)
   let _: KeyPath<S, Int> = \.add(that: 1)
   let _: KeyPath<S, (Int) -> Int> = \.subtract // expected-error {{static member 'subtract' cannot be used on instance of type 'S'}}
