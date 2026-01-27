@@ -2781,10 +2781,7 @@ void ConjunctionElement::findReferencedVariables(
 
 Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {
   auto *var = PB->getSingleVar();
-  if (!var)
-    return Type();
-
-  if (!var->getName().hasDollarPrefix())
+  if (!var || !var->isPlaceholderVar())
     return Type();
 
   auto *pattern = PB->getPattern(0);
@@ -2792,9 +2789,5 @@ Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {
   if (!typedPattern || !typedPattern->hasType())
     return Type();
 
-  auto type = typedPattern->getType();
-  if (!type->hasPlaceholder())
-    return Type();
-
-  return type;
+  return typedPattern->getType();
 }
