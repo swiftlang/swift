@@ -9804,6 +9804,9 @@ Type
 ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
                                         bool openExistential,
                                         ConstraintLocatorBuilder locator) {
+  /// TODO: This should become the basis for a new "type witness" constraint to
+  /// replace the use of DependentMemberType in the constraint system.
+
   ASSERT(!base->isTypeVariableOrMember() && "Must simplify first");
 
   GenericEnvironment *openedEnv = nullptr;
@@ -9848,6 +9851,9 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyForEachElementConstraint(
     Type first, Type second, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
+  /// TODO: Once we have a "type witness" constraint to express a
+  /// DependentMemberType, we ought to see if this constraint can be removed
+  /// and expressed in terms of member types instead.
 
   Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
   if (seqTy->isTypeVariableOrMember()) {
