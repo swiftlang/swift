@@ -1479,8 +1479,7 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
 
     // In the next language mode we should stop creating the compatibility
     // initializer.
-    using namespace version;
-    if (ctx.isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion()))
+    if (ctx.isAtLeastFutureMajorLanguageMode())
       return false;
 
     // If there are no extra properties present for the compatibility

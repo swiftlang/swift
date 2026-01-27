@@ -749,6 +749,14 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
+    /// Whether the "next major" language mode is being used. This isn't a real
+    /// language mode, it only exists to signal clients that expect to be
+    /// included in the next language mode when it becomes available.
+    bool isAtLeastFutureMajorLanguageMode() const {
+      using namespace version;
+      return isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion());
+    }
+
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
