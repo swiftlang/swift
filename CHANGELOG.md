@@ -7,19 +7,20 @@
 
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
-  `OutputRawSpan` are newly marked with `@unsafe`. These changes correct
-  omissions in the SE-0458, SE-0467 and SE-0485 proposals or their
+  `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
+  for omissions in the SE-0458, SE-0467 and SE-0485 proposals or their
   implementations.
 
-  These annotations are required because of a permissible compiler optimization
-  involving values of types that contain padding. When the compiler stores such
-  a value to addressable memory, it is free to skip any padding bytes. This can
-  potentially leave those bytes uninitialized. This optimization is safe when
-  the memory is only ever read as the same type as the value stored. However,
-  when reinterpreting the memory as raw bytes, the potentially uninitialized
-  bytes violate the prerequisite that `RawSpan` and `MutableRawSpan` represent
-  fully initialized memory. In the case of `OutputRawSpan`, they violate the
-  postcondition that the memory it has written is fully initialized.
+  These `@unsafe` annotations are required because of a permissible compiler
+  optimization involving values of types that contain padding. When the compiler
+  stores such a value to addressable memory, it is free to skip any padding
+  bytes. This can potentially leave those bytes uninitialized. This optimization
+  is safe when the memory is only ever read as the same type as the value
+  stored. However, when reinterpreting the memory as raw bytes, the potentially
+  uninitialized bytes violate the prerequisite that `RawSpan` and
+  `MutableRawSpan` represent fully initialized memory. In the case of
+  `OutputRawSpan`, they violate the postcondition that the memory it has written
+  is fully initialized.
 
   It is safe to use `bytes` when the `Element` type of `Span` or `MutableSpan`
   has neither internal nor trailing padding bytes, as every byte is then known
@@ -27,7 +28,7 @@
   `OutputSpan.append(_:as:)`.
 
   To safely use `MutableSpan`'s `mutableBytes`, an additional safety constraint
-  is added if the memory is to later be used again as `Element`. In that case,
+  applies when the memory is to later be used again as `Element`. In that case,
   the non-padding bytes of `Element` must allow every bit pattern to be
   permissible in a valid value of `Element`.
 
