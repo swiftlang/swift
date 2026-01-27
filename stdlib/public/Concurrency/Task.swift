@@ -1049,7 +1049,11 @@ extension Task where Failure == Error {
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
 #if compiler(>=5.6)
-  Task(operation: body)
+  if #available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *) {
+    Task.immediate(operation: body)
+  } else {
+    Task(operation: body)
+  }
 #else
   Task<Int, Error> {
     await body()
