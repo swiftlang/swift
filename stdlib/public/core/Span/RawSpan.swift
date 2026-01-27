@@ -340,12 +340,14 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public var byteCount: Int { _count }
+  @_semantics("fixed_storage.get_count")
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// A Boolean value indicating whether the span is empty.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { byteCount == 0 }
 
   /// The indices that are valid for subscripting the span, in ascending
@@ -531,6 +533,7 @@ extension RawSpan {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
