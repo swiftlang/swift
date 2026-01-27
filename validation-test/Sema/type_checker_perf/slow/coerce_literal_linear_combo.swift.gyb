@@ -2,7 +2,7 @@
 
 // REQUIRES: no_asan
 
-func g<T: Equatable>(_: T, _: T) {}
+func g<T>(_: T, _: T) {}
 
 let base: UInt64 = 0
 
