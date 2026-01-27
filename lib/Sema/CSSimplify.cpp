@@ -1825,14 +1825,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
 
         Type argTypeForOpening = argTy;
-
-        auto *module = cs.DC->getParentModule();
-        if (!module) {
-          return shouldOpenExistentialCallArgument(
-              callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
-        }
         // 1) First try: the normal path.
-        auto opened = ::shouldOpenExistentialCallArgument(
+        auto opened = shouldOpenExistentialCallArgument(
             callee, paramIdx, paramTy, argTypeForOpening, argExpr, cs);
 
         if (opened)
