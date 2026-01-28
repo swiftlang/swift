@@ -61,6 +61,7 @@ func pad<T>(_ value: T, _ width: Int, align: PadAlignment = .left) -> String {
   }
 }
 
+#if os(Linux)
 @_spi(Utils)
 @available(Backtracing 6.2, *)
 public func readString(from file: String) -> String? {
@@ -87,6 +88,7 @@ public func readString(from file: String) -> String? {
 
   return String(decoding: bytes, as: UTF8.self)
 }
+#endif
 
 @_spi(Utils)
 @available(Backtracing 6.2, *)

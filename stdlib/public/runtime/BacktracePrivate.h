@@ -17,11 +17,24 @@
 #ifndef SWIFT_RUNTIME_BACKTRACE_UTILS_H
 #define SWIFT_RUNTIME_BACKTRACE_UTILS_H
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Backtrace.h"
 #include "swift/shims/Visibility.h"
 
 #include <inttypes.h>
+
+#ifdef _WIN32
+typedef HANDLE  sys_fd_t;
+typedef DWORD   sys_signal_t;
+#else
+typedef int         sys_fd_t;
+typedef int         sys_signal_t;
+#endif
 
 #ifdef _WIN32
 // For DWORD
@@ -147,7 +160,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(CrashInfo *crashInfo,
 SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(CrashInfo *crashInfo);
 #endif
 
-SWIFT_RUNTIME_STDLIB_INTERNAL void _swift_displayCrashMessage(int signum, const void *pc);
+SWIFT_RUNTIME_STDLIB_INTERNAL void _swift_displayCrashMessage(sys_signal_t signum, const void *pc);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_formatAddress(uintptr_t addr, char buffer[18]);
@@ -158,6 +171,11 @@ inline void _swift_formatAddress(const void *ptr, char buffer[18]) {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_formatUnsigned(unsigned u, char buffer[22]);
+
+#ifdef _WIN32
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_formatHexDWORD(unsigned u, char buffer[10]);
+#endif
 
 } // namespace backtrace
 } // namespace runtime

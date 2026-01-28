@@ -169,7 +169,7 @@ typedef DWARF_ENUM(Dwarf_Byte, Dwarf_ChildDetermination) {
 /* .. Attribute Encodings ................................................... */
 
 // Table 7.5
-typedef enum DWARF_EXTENSIBLE_ENUM Dwarf_Attribute {
+typedef DWARF_ENUM(Dwarf_Word, Dwarf_Attribute) {
   DW_AT_sibling                 = 0x01, // reference
   DW_AT_location                = 0x02, // exprloc, loclist
   DW_AT_name                    = 0x03, // string

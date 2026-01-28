@@ -1680,6 +1680,17 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        const llvm::opt::ArgList &args,
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
+
+  // On Windows, look in the bin directory first
+  if (Triple.isOSWindows()) {
+    auto programPath = getDriver().getSwiftProgramPath();
+    scratchPath.clear();
+    scratchPath.append(programPath.begin(), programPath.end());
+    llvm::sys::path::remove_filename(scratchPath);
+    runtimeLibPaths.push_back(std::string(scratchPath.str()));
+  }
+
+  scratchPath.clear();
   getResourceDirPath(scratchPath, args, shared);
   runtimeLibPaths.push_back(std::string(scratchPath.str()));
 

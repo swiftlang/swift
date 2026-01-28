@@ -5,9 +5,19 @@ module BacktracingImpl {
       requires cplusplus
       export *
     }
+    module PeCoff {
+      header "ImageFormats/PeCoff/pe-coff.h"
+      requires cplusplus
+      export *
+    }
     module Dwarf {
       header "ImageFormats/Dwarf/dwarf.h"
       header "ImageFormats/Dwarf/eh_frame_hdr.h"
+      requires cplusplus
+      export *
+    }
+    module CodeView {
+      header "ImageFormats/CodeView/codeview.h"
       requires cplusplus
       export *
     }

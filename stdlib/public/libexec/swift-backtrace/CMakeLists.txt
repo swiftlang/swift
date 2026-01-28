@@ -27,6 +27,11 @@ if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_RUNTIME_MODULE)
   set(runtime Runtime)
 endif()
 
+set(cxx)
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  set(cxx "Cxx;CxxStdlib")
+endif()
+
 if(NOT SWIFT_BUILD_STDLIB)
   set(BUILD_STANDALONE TRUE)
 endif()
@@ -55,7 +60,9 @@ set(BACKTRACING_SOURCES
   JSON.swift
   TargetMacOS.swift
   TargetLinux.swift
+  TargetWindows.swift
   Themes.swift
+  Timing.swift
   Utils.swift
   )
 
@@ -72,7 +79,7 @@ endif()
 add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   ${BACKTRACING_SOURCES}
 
-  SWIFT_MODULE_DEPENDS         ${runtime}
+  SWIFT_MODULE_DEPENDS         ${runtime} ${cxx}
 
   SWIFT_MODULE_DEPENDS_OSX          ${darwin}
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
@@ -85,8 +92,9 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   COMPILE_FLAGS
     ${BACKTRACING_COMPILE_FLAGS}
     -parse-as-library
+    -g -Xlinker /debug
 
-  TARGET_SDKS OSX LINUX)
+  TARGET_SDKS OSX LINUX WINDOWS)
 
 set(static_target_sdks)
 if(SWIFT_BUILD_STATIC_STDLIB)

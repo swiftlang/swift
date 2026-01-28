@@ -22,7 +22,7 @@ import Swift
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 internal import Darwin
 #elseif os(Windows)
-internal import ucrt
+internal import WinSDK
 #elseif canImport(Glibc)
 internal import Glibc
 #elseif canImport(Musl)
@@ -233,6 +233,44 @@ let elf_hash = swift.runtime.elf_hash
 // .. Utilities ................................................................
 
 private func realPath(_ path: String) -> String? {
+  #if os(Windows)
+  let hFile: HANDLE = path.withCString(encodedAs: UTF16.self) {
+    return CreateFileW($0,
+                       GENERIC_READ,
+                       DWORD(FILE_SHARE_READ),
+                       nil,
+                       DWORD(OPEN_EXISTING),
+                       DWORD(FILE_ATTRIBUTE_NORMAL),
+                       nil)
+  }
+
+  if hFile == INVALID_HANDLE_VALUE {
+    return nil
+  }
+  defer {
+    CloseHandle(hFile)
+  }
+
+  var bufferSize = 1024
+  var result: String? = nil
+  while result == nil {
+    result = withUnsafeTemporaryAllocation(of: WCHAR.self,
+                                           capacity: 1024) { buffer in
+      let dwRet = GetFinalPathNameByHandleW(hFile,
+                                            buffer.baseAddress,
+                                            DWORD(buffer.count),
+                                            DWORD(VOLUME_NAME_DOS))
+      if dwRet >= bufferSize {
+        bufferSize = Int(dwRet + 1)
+        return nil
+      } else {
+        return String(decoding: buffer, as: UTF16.self)
+      }
+    }
+  }
+
+  return result
+  #else
   guard let result = realpath(path, nil) else {
     return nil
   }
@@ -242,6 +280,7 @@ private func realPath(_ path: String) -> String? {
   free(result)
 
   return s
+  #endif
 }
 
 private func dirname(_ path: String) -> Substring {
@@ -1792,6 +1831,8 @@ final class ElfImage<SomeElfTraits: ElfTraits>
                        offset: Int(relativeAddress - symbol.value))
   }
 
+  static var pathSeparator: String { "/" }
+
   func getDwarfSection(_ section: DwarfSection) -> ImageSource? {
     switch section {
       case .debugAbbrev: return getSection(".debug_abbrev")
@@ -1828,39 +1869,13 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   func inlineCallSites(
     at address: Traits.Address
   ) -> ArraySlice<CallSiteInfo> {
-    guard let callSiteInfo = dwarfReader?.inlineCallSites else {
+    guard let dwarfReader else {
       return [][0..<0]
     }
 
-    var min = 0
-    var max = callSiteInfo.count
-
-    while min < max {
-      let mid = min + (max - min) / 2
-      let callSite = callSiteInfo[mid]
-
-      if callSite.lowPC <= address && callSite.highPC > address {
-        var first = mid, last = mid
-        while first > 0
-                && callSiteInfo[first - 1].lowPC <= address
-                && callSiteInfo[first - 1].highPC > address {
-          first -= 1
-        }
-        while last < callSiteInfo.count - 1
-                && callSiteInfo[last + 1].lowPC <= address
-                && callSiteInfo[last + 1].highPC > address {
-          last += 1
-        }
-
-        return callSiteInfo[first...last]
-      } else if callSite.highPC <= address {
-        min = mid + 1
-      } else if callSite.lowPC > address {
-        max = mid
-      }
-    }
-
-    return []
+    return dwarfReader.lookupInlineCallSites(
+      at: DwarfReader<ElfImage>.Address(address)
+    )
   }
 
   typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
@@ -1868,33 +1883,12 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   func sourceLocation(
     for address: Traits.Address
   ) throws -> SourceLocation? {
-    var result: SourceLocation? = nil
-    var prevState: DwarfLineNumberState? = nil
-    guard let dwarfReader = dwarfReader else {
+    guard let dwarfReader else {
       return nil
     }
-    for ndx in 0..<dwarfReader.lineNumberInfo.count {
-      var info = dwarfReader.lineNumberInfo[ndx]
-      try info.executeProgram { (state, done) in
-        if let oldState = prevState,
-           address >= oldState.address && address < state.address {
-          result = SourceLocation(
-            path: oldState.path,
-            line: oldState.line,
-            column: oldState.column
-          )
-          done = true
-        }
-
-        if state.endSequence {
-          prevState = nil
-        } else {
-          prevState = state
-        }
-      }
-    }
-
-    return result
+    return try dwarfReader.sourceLocation(
+      for: DwarfReader<ElfImage>.Address(address)
+    )
   }
 }
 
