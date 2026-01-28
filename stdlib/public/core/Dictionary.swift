@@ -1059,13 +1059,33 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @inlinable
-  public mutating func merge<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public mutating func merge<S: Sequence, E: Error>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     try _variant.merge(other, uniquingKeysWith: combine)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    mutating func merge<S: Sequence>(
+      _ other: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows where S.Element == (Key, Value)
+  )
+  internal mutating func __rethrows_merge<S: Sequence>(
+    _ other: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try merge(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Merges the given dictionary into this dictionary, using a combining
   /// closure to determine the value for any duplicate keys.
@@ -1094,14 +1114,34 @@ extension Dictionary {
   ///   - combine: A closure that takes the current and new values for any
   ///     duplicate keys. The closure returns the desired value for the final
   ///     dictionary.
-  @inlinable
-  public mutating func merge(
+  @_alwaysEmitIntoClient
+  public mutating func merge<E: Error>(
     _ other: __owned [Key: Value],
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) {
     try _variant.merge(
       other.lazy.map { ($0, $1) }, uniquingKeysWith: combine)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    mutating func merge(
+      _ other: __owned [Key: Value],
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows
+  )
+  internal mutating func __rethrows_merge_dictionary(
+    _ other: __owned [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws {
+    try merge(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Creates a dictionary by merging key-value pairs in a sequence into the
   /// dictionary, using a combining closure to determine the value for

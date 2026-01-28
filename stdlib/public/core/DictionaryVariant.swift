@@ -482,11 +482,11 @@ extension Dictionary._Variant {
   }
 #endif
 
-  @inlinable
-  internal mutating func merge<S: Sequence>(
+  @_alwaysEmitIntoClient
+  internal mutating func merge<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
 #if _runtime(_ObjC)
     guard isNative else {
       var native = _NativeDictionary<Key, Value>(asCocoa)
@@ -504,5 +504,25 @@ extension Dictionary._Variant {
       isUnique: isUnique,
       uniquingKeysWith: combine)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    mutating func merge<S: Sequence>(
+      _ keysAndValues: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows where S.Element == (Key, Value)
+  )
+  internal mutating func __rethrows_merge<S: Sequence>(
+    _ keysAndValues: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try merge(keysAndValues, uniquingKeysWith: combine)
+  }
+#endif
 }
 

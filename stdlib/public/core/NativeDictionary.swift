@@ -791,12 +791,12 @@ extension _NativeDictionary { // High-level operations
   }
 #endif
 
-  @inlinable
-  internal mutating func merge<S: Sequence>(
+  @_alwaysEmitIntoClient
+  internal mutating func merge<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
     isUnique: Bool,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     var isUnique = isUnique
     for (key, value) in keysAndValues {
       let (bucket, found) = mutatingFind(key, isUnique: isUnique)
@@ -805,18 +805,43 @@ extension _NativeDictionary { // High-level operations
         do {
           let newValue = try combine(unsafe uncheckedValue(at: bucket), value)
           unsafe _values[bucket.offset] = newValue
-        } catch _MergeError.keyCollision {
-          #if !$Embedded
-          fatalError("Duplicate values for key: '\(key)'")
-          #else
-          fatalError("Duplicate values for a key in a Dictionary")
-          #endif
+        } catch let error as _MergeError {
+          switch error {
+          case .keyCollision:
+            #if !$Embedded
+            fatalError("Duplicate values for key: '\(key)'")
+            #else
+            fatalError("Duplicate values for a key in a Dictionary")
+            #endif
+          }
         }
       } else {
         _insert(at: bucket, key: key, value: value)
       }
     }
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merge, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    mutating func merge<S: Sequence>(
+      _ keysAndValues: __owned S,
+      isUnique: Bool,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows where S.Element == (Key, Value)
+  )
+  internal mutating func __rethrows_merge<S: Sequence>(
+    _ keysAndValues: __owned S,
+    isUnique: Bool,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try merge(keysAndValues, isUnique: isUnique, uniquingKeysWith: combine)
+  }
+#endif
 
   #if $Embedded
   @inlinable
