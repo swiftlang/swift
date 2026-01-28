@@ -15,9 +15,10 @@ target_compile_options(swiftCxxStdlib PRIVATE
   "SHELL:-enable-experimental-feature AssumeResilientCxxTypes"
   # The varying modularization of the C++ standard library on different
   # platforms makes it difficult to enable MemberImportVisibility for this
-  # module
+  # module or qualify types with module names
   "SHELL:-disable-upcoming-feature MemberImportVisibility"
-  "SHELL:-Xfrontend -module-interface-preserve-types-as-written")
+  "SHELL:-Xfrontend -module-interface-preserve-types-as-written"
+  "SHELL:-Xfrontend -disable-module-selectors-in-module-interface")
 # NOTE: We need to setup the sysroot here as we need to ensure that we pick up
 # the module.map from the C++ runtime for the `std` (spelt `CxxStdlib`) import.
 target_compile_options(swiftCxxStdlib PRIVATE
