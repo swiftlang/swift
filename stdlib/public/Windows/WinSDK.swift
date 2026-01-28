@@ -351,3 +351,43 @@ extension GUID: @retroactive Hashable {
     hasher.combine(uint128Value)
   }
 }
+
+extension GUID: @retroactive CustomStringConvertible {
+  public var description: String {
+    var buffer: RPC_CSTR!
+    defer {
+      unsafe RpcStringFreeA(&buffer)
+    }
+
+    unsafe withUnsafePointer(to: self) { uuidAddress in
+      let status = unsafe UuidToStringA(uuidAddress, &buffer)
+      assert(status == RPC_S_OK, "Could not create the string representation of a GUID: \(status)")
+    }
+
+    return unsafe String(cString: buffer)
+  }
+}
+
+extension GUID: @retroactive LosslessStringConvertible {
+  public init?(_ description: String) {
+    let guid: GUID? = unsafe description.withCString { description in
+      unsafe withUnsafeTemporaryAllocation(of: GUID.self, capacity: 1) { guid in
+        let guid = guid.baseAddress!
+
+        // We don't actually mutate `description`, but UuidFromStringA() takes a
+        // mutable pointer, so we must cast it.
+        let description = unsafe UnsafeMutablePointer(mutating: description)
+        guard unsafe RPC_S_OK == UuidFromStringA(description, guid) else {
+          return nil
+        }
+
+        return guid.move()
+      }
+    }
+    if let guid {
+      self = guid
+    } else {
+      return nil
+    }
+  }
+}
