@@ -72,13 +72,13 @@ public struct Wrapper {
 
   var nested_get3: Int {
     borrow {
-      return _s.get_k.id // TODO: Diagnose this case
+      return _s.get_k.id  // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
   }
 
   var nested_get4: Int {
     borrow {
-      return s_get.borrow_k.id // TODO: Diagnose this case
+      return s_get.borrow_k.id  // expected-error{{invalid return value from borrow accessor}} // expected-note{{borrow accessors can return either stored properties or computed properties that have borrow accessors}}
     }
   }
 

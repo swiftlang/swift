@@ -27,6 +27,16 @@ public struct S {
 public struct Wrapper {
   var _k: Klass
   var _s: S
+  var _id: Int
+
+  var id: Int {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
 
   var s: S {
     borrow {
@@ -81,12 +91,6 @@ public struct Wrapper {
       return &self[0]
     }
   }
-
-  var literal: Int {
-    borrow {
-      return 0
-    }
-  }
 }
 
 public struct SimpleWrapper<T> {
@@ -107,6 +111,16 @@ public struct GenWrapper<T> {
   var _w: SimpleWrapper<T>
   var _k: Klass
   var _s: S
+  var _id: Int
+
+  var id: Int {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
 
   public var prop: T {
     borrow {
@@ -188,12 +202,6 @@ public struct GenWrapper<T> {
       return &self[0]
     }
   }
-
-  var literal: Int {
-    borrow {
-      return 0
-    }
-  }
 }
 
 public struct NCS: ~Copyable {
@@ -255,12 +263,6 @@ public struct NCWrapper: ~Copyable {
     }
     mutate {
       return &self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }
@@ -362,12 +364,6 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
     }
     mutate {
       return &self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }
