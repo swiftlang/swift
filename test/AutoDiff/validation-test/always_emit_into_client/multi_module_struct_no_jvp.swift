@@ -17,6 +17,8 @@
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
 
+// UNSUPPORTED: OS=wasip1
+
 import MultiModuleStruct1
 import MultiModuleStruct2NoJVP
 import StdlibUnittest

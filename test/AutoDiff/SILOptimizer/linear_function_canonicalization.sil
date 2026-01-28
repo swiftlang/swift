@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -differentiation -enable-experimental-linear-map-transposition %s | %FileCheck %s
 
+// UNSUPPORTED: OS=wasip1
+
 sil_stage raw
 
 import Swift
