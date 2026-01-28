@@ -2575,6 +2575,13 @@ parseLifetimeDescriptor(Parser &P,
     return LifetimeDescriptor::forNamed(name, lifetimeDependenceKind, loc);
   }
   case tok::integer_literal: {
+    if (!P.isInSILMode()) {
+      P.diagnose(
+          token,
+          diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+          /* allow indices */ false);
+      return std::nullopt;
+    }
     SourceLoc loc;
     unsigned index;
     if (P.parseUnsignedInteger(
@@ -2590,7 +2597,8 @@ parseLifetimeDescriptor(Parser &P,
   default: {
     P.diagnose(
         token,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        /* allow indices */ P.isInSILMode());
     return std::nullopt;
   }
   }
@@ -5151,21 +5159,24 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   ParserStatus status;
 
+  // Only allow indices in SIL mode.
+  auto isDescriptor = [&](Token Tok) -> bool {
+    return Tok.isAny(tok::identifier, tok::kw_self) ||
+           (isInSILMode() && Tok.is(tok::integer_literal));
+  };
+
   auto getLifetimeDependenceKind =
       [&](Token Tok) -> std::optional<ParsedLifetimeDependenceKind> {
     if (Tok.isContextualKeyword("copy") &&
-        peekToken().isAny(tok::identifier, tok::integer_literal,
-                          tok::kw_self)) {
+        isDescriptor(peekToken())) {
       return ParsedLifetimeDependenceKind::Inherit;
     }
     if (Tok.isContextualKeyword("borrow") &&
-        peekToken().isAny(tok::identifier, tok::integer_literal,
-                          tok::kw_self)) {
+        isDescriptor(peekToken())) {
       return ParsedLifetimeDependenceKind::Borrow;
     }
     if (Tok.is(tok::amp_prefix) &&
-        peekToken().isAny(tok::identifier, tok::integer_literal,
-                          tok::kw_self)) {
+        isDescriptor(peekToken())) {
       return ParsedLifetimeDependenceKind::Inout;
     }
     return std::nullopt;
@@ -5180,7 +5191,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   auto lParenLoc = consumeAttributeLParen(); // consume the l_paren
 
   std::optional<LifetimeDescriptor> targetDescriptor;
-  if (Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
+  if (isDescriptor(Tok) &&
       peekToken().is(tok::colon)) {
     targetDescriptor = parseLifetimeDescriptor(*this);
     if (!targetDescriptor) {
@@ -5225,7 +5236,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   if (!foundParamId) {
     diagnose(
         Tok,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        /* allow indices */ isInSILMode());
     status.setIsParseError();
     return status;
   }
