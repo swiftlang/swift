@@ -48,6 +48,7 @@ benefit of all Swift developers.
     - [Reproducing the Compiler Driver build steps](#reproducing-the-compiler-driver-build-steps)
     - [Installing the Compiler Driver](#installing-the-compiler-driver)
 - [Debugging Swift Executables](#debugging-swift-executables)
+    - [Debugging Swift Testing Executables with LLDB](#debugging-swift-testing-executables-with-lldb)
     - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
     - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
@@ -1101,6 +1102,12 @@ individual build actions (`clean`, `build`, `install`), the product build path
 One can use the previous tips for debugging the Swift compiler with Swift
 executables as well. Here are some additional useful techniques that one can use
 in Swift executables.
+
+## Debugging Swift Testing Executables with LLDB
+
+When debugging executables that use Swift Testing with LLDB, refer to the Swift
+Testing documentation for LLDB command-line debugging techniques:
+https://github.com/swiftlang/swift-testing/blob/main/Documentation/CommandlineDebugging.md
 
 ## Determining the mangled name of a function in LLDB
 
