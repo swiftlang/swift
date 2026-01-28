@@ -819,6 +819,9 @@ Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing f
 
 // Functions changed for typed throws
 Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been removed
+Constructor Dictionary.init(_:uniquingKeysWith:) has been removed
+Constructor Dictionary.init(grouping:by:) has been removed
+Constructor _NativeDictionary.init(grouping:by:) has been removed
 Func Array.withUnsafeBufferPointer(_:) has been removed
 Func ArraySlice.withUnsafeBufferPointer(_:) has been removed
 Func ContiguousArray.withUnsafeBufferPointer(_:) has been removed

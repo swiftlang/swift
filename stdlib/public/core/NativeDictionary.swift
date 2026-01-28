@@ -872,12 +872,12 @@ extension _NativeDictionary { // High-level operations
   }
   #endif
 
-  @inlinable
+  @_alwaysEmitIntoClient
   @inline(__always)
-  internal init<S: Sequence>(
+  internal init<S: Sequence, E: Error>(
     grouping values: __owned S,
-    by keyForValue: (S.Element) throws -> Key
-  ) rethrows where Value == [S.Element] {
+    by keyForValue: (S.Element) throws(E) -> Key
+  ) throws(E) where Value == [S.Element] {
     self.init()
     for value in values {
       let key = try keyForValue(value)
@@ -889,6 +889,26 @@ extension _NativeDictionary { // High-level operations
       }
     }
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of init, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    init<S: Sequence>(
+      grouping values: __owned S,
+      by keyForValue: (S.Element) throws -> Key
+    ) rethrows where Value == [S.Element]
+  )
+  internal init<S: Sequence>(
+    __rethrows_grouping values: __owned S,
+    by keyForValue: (S.Element) throws -> Key
+  ) throws where Value == [S.Element] {
+    try self.init(grouping: values, by: keyForValue)
+  }
+#endif
 
   @_alwaysEmitIntoClient
   internal func filter(

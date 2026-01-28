@@ -533,16 +533,36 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - combine: A closure that is called with the values for any duplicate
   ///     keys that are encountered. The closure returns the desired value for
   ///     the final dictionary.
-  @inlinable
-  public init<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public init<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) where S.Element == (Key, Value) {
     var native = _NativeDictionary<Key, Value>(
       capacity: keysAndValues.underestimatedCount)
     try native.merge(keysAndValues, isUnique: true, uniquingKeysWith: combine)
     self.init(_native: native)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of init, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    init<S: Sequence>(
+      _ keysAndValues: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows where S.Element == (Key, Value)
+  )
+  internal init<S: Sequence>(
+    __rethrows_keysAndValues keysAndValues: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws where S.Element == (Key, Value) {
+    try self.init(keysAndValues, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Creates a new dictionary whose keys are the groupings returned by the
   /// given closure and whose values are arrays of the elements that returned
@@ -566,13 +586,33 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   - values: A sequence of values to group into a dictionary.
   ///   - keyForValue: A closure that returns a key for each element in
   ///     `values`.
-  @inlinable
-  public init<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public init<S: Sequence, E: Error>(
     grouping values: __owned S,
-    by keyForValue: (S.Element) throws -> Key
-  ) rethrows where Value == [S.Element] {
+    by keyForValue: (S.Element) throws(E) -> Key
+  ) throws(E) where Value == [S.Element] {
     try self.init(_native: _NativeDictionary(grouping: values, by: keyForValue))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of init, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    init<S: Sequence>(
+      grouping values: __owned S,
+      by keyForValue: (S.Element) throws -> Key
+    ) rethrows where Value == [S.Element]
+  )
+  internal init<S: Sequence>(
+    __rethrows_grouping values: __owned S,
+    by keyForValue: (S.Element) throws -> Key
+  ) throws where Value == [S.Element] {
+    try self.init(grouping: values, by: keyForValue)
+  }
+#endif
 }
 
 //
