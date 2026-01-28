@@ -1588,8 +1588,7 @@ public:
              ->getType()
              .getASTType()
              ->getASTContext()
-             .isLanguageModeAtLeast(
-                 version::Version::getFutureMajorLanguageVersion()))
+             .isAtLeastFutureMajorLanguageMode())
       return DiagnosticBehavior::Warning;
 
     return sendingOperand->get()->getType().getConcurrencyDiagnosticBehavior(
