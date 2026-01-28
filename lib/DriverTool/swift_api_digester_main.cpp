@@ -674,7 +674,17 @@ public:
         !D->getIntroducingVersion().hasOSAvailability() &&
         !D->hasDeclAttribute(DeclAttrKind::AlwaysEmitIntoClient) &&
         !D->hasDeclAttribute(DeclAttrKind::Marker)) {
-      D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+      // Check if this SPI group should ignore new API warnings
+      bool shouldIgnoreNewAPI = false;
+      for(auto spi: D->getSPIGroups()) {
+        if (Ctx.getOpts().SPIGroupNamesToIgnoreNewAPI.contains(spi)) {
+          shouldIgnoreNewAPI = true;
+          break;
+        }
+      }
+      if (!shouldIgnoreNewAPI) {
+        D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
+      }
     }
   }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
@@ -2404,6 +2414,8 @@ public:
       CheckerOpts.ToolArgs.push_back(Arg);
     for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups))
       CheckerOpts.SPIGroupNamesToIgnore.insert(spi);
+    for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups_new_api))
+      CheckerOpts.SPIGroupNamesToIgnoreNewAPI.insert(spi);
     if (!SDK.empty()) {
       auto Ver = getSDKBuildVersion(SDK);
       if (!Ver.empty()) {
