@@ -327,6 +327,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// - body: The closure to execute.
   ///
   /// Returns the result of executing the closure.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = unsafe _jobGetExecutorPrivateData(self.context)
@@ -336,6 +337,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// Kinds of schedulable jobs
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   @frozen
   public struct Kind: Sendable, RawRepresentable {
@@ -357,6 +359,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// What kind of job this is.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public var kind: Kind {
     return Kind(rawValue: _jobGetKind(self.context))!
@@ -454,6 +457,7 @@ extension ExecutorJob {
 
 // Helper to create a trampoline job to execute a job on a specified
 // executor.
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 extension ExecutorJob {
 
@@ -471,6 +475,7 @@ extension ExecutorJob {
   ///
   /// A new ExecutorJob that will enqueue the specified job on the specified
   /// executor.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public func createTrampoline(to executor: some Executor) -> ExecutorJob {
     let flags = taskCreateFlags(
@@ -496,6 +501,7 @@ extension ExecutorJob {
 }
 
 // Stack-disciplined job-local allocator support
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 extension ExecutorJob {
 
