@@ -298,6 +298,83 @@ func formerReabstractionCrash() {
   }()
 }
 
+// https://github.com/swiftlang/swift/issues/74273
+
+// Accessors & subscripts with typed throws getters where the error type is
+// substituted with Never should have unreachable error paths when called.
+
+struct GenericErrorAccessors<E: Error> {
+  var prop: Int {
+    get throws(E) { 42 }
+  }
+
+  subscript(key: Int) -> Int {
+    get throws(E) { key }
+  }
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}accessNeverThrowingProp{{[^:]*}}F :
+// CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+// CHECK:       [[ERROR]]:
+// CHECK-NEXT:    unreachable
+func accessNeverThrowingProp(_ s: GenericErrorAccessors<Never>) {
+  _ = s.prop
+}
+
+// CHECK-LABEL: sil {{.*}} @{{.*}}accessNeverThrowingSubscript{{[^:]*}}F :
+// CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+// CHECK:       [[ERROR]]:
+// CHECK-NEXT:    unreachable
+func accessNeverThrowingSubscript(_ s: GenericErrorAccessors<Never>) {
+  _ = s[0]
+}
+
+extension GenericErrorAccessors where E == Never {
+  // CHECK-LABEL: sil {{.*}} @{{.*}}Never{{.*}}readProp{{.*}}F :
+  // CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func readProp() {
+    _ = self.prop
+  }
+
+  // CHECK-LABEL: sil {{.*}} @{{.*}}Never{{.*}}readSubscript{{.*}}F :
+  // CHECK:         try_apply {{%.*}}<Never>{{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func readSubscript() {
+    _ = self[0]
+  }
+}
+
+protocol TypedThrowsProto {
+  associatedtype Err: Error
+
+  var throwingProp: Int { get throws(Err) }
+
+  subscript (key: Int) -> Int {
+    get throws(Err)
+  }
+}
+
+extension TypedThrowsProto where Err == Never {
+  // CHECK-LABEL: sil {{.*}} @{{.*}}TypedThrowsProto{{.*}}Never{{.*}}testProp{{.*}}F :
+  // CHECK:         try_apply {{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func testProp() {
+    _ = self.throwingProp
+  }
+
+  // CHECK-LABEL: sil {{.*}} @{{.*}}TypedThrowsProto{{.*}}Never{{.*}}testSubscript{{.*}}F :
+  // CHECK:         try_apply {{.*}}, error [[ERROR:bb[0-9]+]]
+  // CHECK:       [[ERROR]]:
+  // CHECK-NEXT:    unreachable
+  func testSubscript() {
+    _ = self[0]
+  }
+}
+
 // CHECK-LABEL:      sil_vtable MySubclass {
 // CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
 // CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]
