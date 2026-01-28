@@ -275,6 +275,8 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
         sectionFromInfo<BuiltinTypeDescriptorIterator>(Info,
                                                        Info.builtin_types),
         sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+        ReflectionSection<const void *>(nullptr, 0),
+        ReflectionSection<const void *>(nullptr, 0),
         sectionFromInfo<const void *>(Info, Info.type_references),
         sectionFromInfo<const void *>(Info, Info.reflection_strings),
         ReflectionSection<const void *>(nullptr, 0),
@@ -298,6 +300,8 @@ void swift_reflection_addReflectionMappingInfo(
             Info.builtin_types),
         reflectionSectionFromLocalAndRemote<CaptureDescriptorIterator>(
             Info.capture),
+        ReflectionSection<const void *>(nullptr, 0),
+        ReflectionSection<const void *>(nullptr, 0),
         reflectionSectionFromLocalAndRemote<const void *>(Info.type_references),
         reflectionSectionFromLocalAndRemote<const void *>(
             Info.reflection_strings),

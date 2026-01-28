@@ -2778,6 +2778,32 @@ public:
     
     return nullptr;
   }
+
+  const RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
+                                     TypeReferenceKind> *
+  getDirectPointer() const {
+    switch (getTypeKind()) {
+    case TypeReferenceKind::DirectTypeDescriptor:
+      return &DirectNominalTypeDescriptor;
+
+    default:
+      return nullptr;
+    }
+  }
+
+  const RelativeDirectPointerIntPair<
+      TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> *
+                                       __ptrauth_swift_type_descriptor>,
+      TypeReferenceKind> *
+  getIndirectPointer() const {
+    switch (getTypeKind()) {
+    case TypeReferenceKind::IndirectTypeDescriptor:
+      return &IndirectNominalTypeDescriptor;
+
+    default:
+      return nullptr;
+    }
+  }
 };
 
 using TypeMetadataRecord = TargetTypeMetadataRecord<InProcess>;
@@ -4647,16 +4673,21 @@ public:
       ->Stub.get();
   }
 
+  const MetadataListCount &getCanonicalMetadataPrespecializationsCount() const {
+    assert(this->hasCanonicalMetadataPrespecializations());
+    return *this->template getTrailingObjects<MetadataListCount>();
+  }
+
   llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
     if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
-    auto *listCount = this->template getTrailingObjects<MetadataListCount>();
+    auto listCount = getCanonicalMetadataPrespecializationsCount();
     auto *list = this->template getTrailingObjects<MetadataListEntry>();
     return llvm::ArrayRef<Metadata>(
         reinterpret_cast<const Metadata *>(list),
-        listCount->count
+        listCount.count
         );
   }
 
@@ -4665,11 +4696,11 @@ public:
       return {};
     }
 
-    auto *listCount = this->template getTrailingObjects<MetadataListCount>();
+    auto listCount = getCanonicalMetadataPrespecializationsCount();
     auto *list = this->template getTrailingObjects<MetadataAccessorListEntry>();
     return llvm::ArrayRef<MetadataAccessor>(
         reinterpret_cast<const MetadataAccessor *>(list),
-        listCount->count
+        listCount.count
         );
   }
 
@@ -4833,16 +4864,21 @@ public:
     return TargetStructMetadata<Runtime>::getGenericArgumentOffset();
   }
 
+  const MetadataListCount &getCanonicalMetadataPrespecializationsCount() const {
+    assert(this->hasCanonicalMetadataPrespecializations());
+    return *this->template getTrailingObjects<MetadataListCount>();
+  }
+
   llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
     if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
-    auto *listCount = this->template getTrailingObjects<MetadataListCount>();
+    auto listCount = getCanonicalMetadataPrespecializationsCount();
     auto *list = this->template getTrailingObjects<MetadataListEntry>();
     return llvm::ArrayRef<Metadata>(
         reinterpret_cast<const Metadata *>(list),
-        listCount->count
+        listCount.count
         );
   }
 
@@ -5009,16 +5045,21 @@ public:
     return *this->template getTrailingObjects<SingletonMetadataInitialization>();
   }
 
+  const MetadataListCount &getCanonicalMetadataPrespecializationsCount() const {
+    assert(this->hasCanonicalMetadataPrespecializations());
+    return *this->template getTrailingObjects<MetadataListCount>();
+  }
+
   llvm::ArrayRef<Metadata> getCanonicalMetadataPrespecializations() const {
     if (!this->hasCanonicalMetadataPrespecializations()) {
       return {};
     }
 
-    auto *listCount = this->template getTrailingObjects<MetadataListCount>();
+    auto listCount = getCanonicalMetadataPrespecializationsCount();
     auto *list = this->template getTrailingObjects<MetadataListEntry>();
     return llvm::ArrayRef<Metadata>(
         reinterpret_cast<const Metadata *>(list),
-        listCount->count
+        listCount.count
         );
   }
 
