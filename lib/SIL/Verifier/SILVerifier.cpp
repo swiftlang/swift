@@ -260,6 +260,30 @@ void swift::verificationFailure(
     exit(1);
 }
 
+void swift::verificationFailure(
+    const Twine &complaint, const SILWitnessTable *wtable,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in witness table ";
+    wtable->getConformance()->printName(out);
+    out << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
 
@@ -1041,7 +1065,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
 public:
   class VerifierErrorEmitter {
     std::optional<std::variant<const SILInstruction *, const SILArgument *,
-                               const SILFunction *>>
+                               const SILFunction *, const SILWitnessTable *>>
         value;
 
   public:
@@ -1077,6 +1101,15 @@ public:
                "constructs at the same time?!");
         getEmitter().value = arg;
       }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILWitnessTable *wtable)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = wtable;
+      }
+
       ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
     };
 
@@ -1099,6 +1132,11 @@ public:
 
       if (std::holds_alternative<const SILFunction *>(v)) {
         return verificationFailure(complaint, std::get<const SILFunction *>(v),
+                                   extraContext);
+      }
+
+      if (std::holds_alternative<const SILWitnessTable *>(v)) {
+        return verificationFailure(complaint, std::get<const SILWitnessTable *>(v),
                                    extraContext);
       }
 
@@ -7790,10 +7828,11 @@ void SILWitnessTable::verify(const SILModule &mod) const {
         entry.getMethodWitness().Requirement.print(os);
       }
 
-      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
-                  /*SingleFunction=*/true,
-                  /*checkLinearLifetime=*/false)
-          .requireABICompatibleFunctionTypes(
+      SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*SingleFunction=*/true,
+                           /*checkLinearLifetime=*/false);
+      SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
+      verifier.requireABICompatibleFunctionTypes(
               witnessFunction->getLoweredFunctionType(),
               baseInfo.getSILType().castTo<SILFunctionType>(),
               "witness table entry for " + baseName + " must be ABI-compatible",
