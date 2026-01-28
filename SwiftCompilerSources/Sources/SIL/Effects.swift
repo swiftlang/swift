@@ -101,6 +101,14 @@ extension Function {
         //     %2 = ref_element_addr %1   // class projection
         return getSideEffects()
       }
+      if convention.isIndirectIn && !argument.path.hasClassProjection {
+        // Even if an indirect argument is unused, pretend that the function reads from it. If the unused
+        // argument is passed to another generic function and that function is specialized, the argument
+        // may be re-abstracted and the specializer inserts a load from the indirect argument.
+        // Therefore we must be prepared that unused indirect argument might get loaded from -
+        // even if it's not the case right now.
+        result.memory.read = true
+      }
     } else {
       // Direct arguments:
       if argument.path.mayHaveTwoClassProjections {
