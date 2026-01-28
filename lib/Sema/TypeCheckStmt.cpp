@@ -3507,44 +3507,6 @@ public:
   }
 
 private:
-  // FIXME: this entire function will be replaced and is only needed so long as
-  // this branch does not include the stdlib code for the
-  // BorrowingSequenceProtocol
-  bool checkIsBorrowingIterator() {
-    // Check if the iterator type conforms to BorrowingIteratorProtocol
-    // FIXME: Replace with proper KnownProtocolKind once added to
-    // KnownProtocols.def
-
-    auto borrowingIteratorId = ctx.getIdentifier("BorrowingIteratorProtocol");
-
-    // Look up BorrowingIteratorProtocol in the module
-    SmallVector<ValueDecl *, 2> results;
-    dc->getParentModule()->lookupValue(borrowingIteratorId,
-                                       NLKind::QualifiedLookup, results);
-
-    for (auto *decl : results) {
-      if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-        // Get the iterator type from the sequence conformance
-        auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
-        auto associatedType = sequenceProto->getAssociatedType(iteratorId);
-        if (!associatedType)
-          return false;
-
-        auto iteratorType = seqConformanceRef.getTypeWitness(associatedType);
-        if (!iteratorType)
-          return false;
-
-        // Check if the iterator type conforms to BorrowingIteratorProtocol
-        auto conformance = lookupConformance(iteratorType, proto);
-        if (!conformance.isInvalid()) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
   void buildMakeIteratorVar() {
     std::string name;
     {
