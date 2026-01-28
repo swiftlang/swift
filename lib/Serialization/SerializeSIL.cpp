@@ -2519,8 +2519,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = SBI->getDest();
       value = SBI->getSrc();
     } else if (auto *IBA = dyn_cast<InitBorrowAddrInst>(&SI)) {
-      operand = IBA->getReferent();
-      value = IBA->getDest();
+      operand = IBA->getDest();
+      value = IBA->getReferent();
     } else {
       llvm_unreachable("switch out of sync");
     }
