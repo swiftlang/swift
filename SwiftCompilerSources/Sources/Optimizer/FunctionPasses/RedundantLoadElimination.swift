@@ -103,9 +103,9 @@ func eliminateRedundantLoads(in function: Function,
 
     // We cannot use for-in iteration here because if the load is split, the new
     // individual loads are inserted right before and they would be ignored by a for-in iteration.
-    var inst = block.instructions.reversed().first
-    while let i = inst {
-      defer { inst = i.previous }
+    // Also the `load` might be moved to another location instead of being deleted.
+    var iter = block.instructions.reversed().first
+    while let succ = iter, let inst = succ.previous {
 
       if let load = inst as? LoadingInstruction {
         if !context.continueWithNextSubpassRun(for: load) {
@@ -114,11 +114,16 @@ func eliminateRedundantLoads(in function: Function,
         if complexityBudget < 20 {
           complexityBudget = 20
         }
-        if !load.isEligibleForElimination(in: variant, context) {
-          continue;
+        if load.isEligibleForElimination(in: variant, context) {
+          if tryEliminate(load: load, complexityBudget: &complexityBudget, context) {
+            changed = true
+            // The `load` has been deleted: do not advance `iter`, because the next instruction to process is
+            // now its new predecessor.
+            continue
+          }
         }
-        changed = tryEliminate(load: load, complexityBudget: &complexityBudget, context) || changed
       }
+      iter = succ.previous
     }
   }
   return changed
@@ -141,6 +146,24 @@ extension LoadInst : LoadingInstruction {
 
   // Nothing to materialize, because this is already a `load`.
   func materializeLoadForReplacement(_ context: FunctionPassContext) -> LoadInst { return self }
+
+  func replaceEfficiently(with newValue: Value, _ context: FunctionPassContext) {
+    if let existingLoad = newValue as? LoadInst {
+      // As we are processing the loads in reverse control flow order, the replaced loads might accumulate
+      // quite a lot of users. This happens if the are many loads from the same location in a row.
+      // To avoid quadratic complexity in `uses.replaceAll`, we swap both load instructions and move the uses
+      // from the `existingLoad` (which usually has a small number of uses) to this load - and delete the
+      // `existingLoad`.
+      existingLoad.uses.replaceAll(with: self, context)
+      self.operand.set(to: existingLoad.address, context)
+      self.set(ownership: existingLoad.loadOwnership, context)
+      self.set(location: existingLoad.location, context)
+      self.move(before: existingLoad, context)
+      context.erase(instruction: existingLoad)
+    } else {
+      replace(with: newValue, context)
+    }
+  }
 }
 
 extension CopyAddrInst : LoadingInstruction {
@@ -357,7 +380,7 @@ private func replace(load: LoadingInstruction, with availableValues: [AvailableV
   // Make sure to keep dependencies valid after replacing the load
   insertMarkDependencies(for: originalLoad, context)
 
-  originalLoad.replace(with: newValue, context)
+  originalLoad.replaceEfficiently(with: newValue, context)
 }
 
 private func provideValue(
