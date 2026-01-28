@@ -1044,6 +1044,7 @@ class ForEachStmt : public LabeledStmt {
   // corresponding WhileStmt.
   LabeledStmt *continueTarget = nullptr;
   WhileStmt *breakTarget = nullptr;
+  bool synthesizedInnerLoopForBorrowing;
 
   friend class DesugarForEachStmtRequest;
 
@@ -1052,12 +1053,14 @@ public:
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
               Expr *WhereExpr, BraceStmt *Body, DeclContext *DC,
-              std::optional<bool> implicit = std::nullopt)
+              std::optional<bool> implicit = std::nullopt,
+              bool synthesizedInnerLoopForBorrowing = false)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc),
         UnsafeLoc(UnsafeLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
-        WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body), DC(DC) {
+        WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body), DC(DC),
+        synthesizedInnerLoopForBorrowing(synthesizedInnerLoopForBorrowing) {
     setPattern(Pat);
   }
 
@@ -1133,6 +1136,11 @@ public:
   /// the ForEachStmt has been desugared.
   WhileStmt *getBreakTarget() { return breakTarget; }
   void setBreakTarget(WhileStmt *target) { breakTarget = target; }
+
+  // FIXME: add doc comment
+  bool isSynthesizedInnerLoopForBorrowing() {
+    return synthesizedInnerLoopForBorrowing;
+  }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;

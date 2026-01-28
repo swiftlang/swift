@@ -3405,14 +3405,19 @@ void swift::diagnoseCaseVarMutabilityMismatch(DeclContext *dc,
   }
 }
 
-FuncDecl *TypeChecker::getForEachIteratorNextFunction(
-    DeclContext *dc, SourceLoc loc, bool isAsync
-) {
+FuncDecl *TypeChecker::getForEachIteratorNextFunction(DeclContext *dc,
+                                                      SourceLoc loc,
+                                                      bool isAsync,
+                                                      bool isBorrowing) {
   ASTContext &ctx = dc->getASTContext();
 
   // A synchronous for..in loop uses IteratorProtocol.next().
-  if (!isAsync)
-    return ctx.getIteratorNext();
+  if (!isAsync) {
+    if (!isBorrowing) {
+      return ctx.getIteratorNext();
+    }
+    return ctx.getBorrowingIteratorNextSpan();
+  }
 
   // If AsyncIteratorProtocol.next(isolation:) isn't available at all,
   // we're stuck using AsyncIteratorProtocol.next().
@@ -3457,7 +3462,8 @@ public:
       : stmt(stmt), dc(stmt->getDeclContext()),
         ctx(stmt->getDeclContext()->getASTContext()),
         isAsync(stmt->getAwaitLoc().isValid()),
-        isBorrowing(ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {}
+        isBorrowing(ctx.LangOpts.hasFeature(Feature::BorrowingForLoop) &&
+                    !stmt->isSynthesizedInnerLoopForBorrowing()) {}
 
   BraceStmt *operator()() {
     auto *sequence = stmt->getSequence();
@@ -3473,14 +3479,17 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    sequenceProto = isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
-                            : ctx.getProtocol(KnownProtocolKind::Sequence);
-    seqConformanceRef = lookupConformance(seqType, sequenceProto);
-    ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
-
     // Check if this is a borrowing sequence by looking for
     // BorrowingIteratorProtocol
-    isBorrowing = isBorrowing && checkIsBorrowingIterator();
+    isBorrowing = isBorrowing && !stmt->getPattern()->getType()->isCopyable();
+
+    sequenceProto =
+        isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
+                : (isBorrowing
+                       ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
+                       : ctx.getProtocol(KnownProtocolKind::Sequence));
+    seqConformanceRef = lookupConformance(seqType, sequenceProto);
+    ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
     buildMakeIteratorVar();
 
@@ -3603,7 +3612,7 @@ private:
 
     // Regular (non-borrowing): call next()
     FuncDecl *nextFn = TypeChecker::getForEachIteratorNextFunction(
-        dc, stmt->getForLoc(), isAsync);
+        dc, stmt->getForLoc(), isAsync, isBorrowing);
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
@@ -3658,8 +3667,10 @@ private:
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
-    FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
+    FuncDecl *makeIterator =
+        isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                : (isBorrowing ? ctx.getBorrowingSequenceMakeBorrowingIterator()
+                               : ctx.getSequenceMakeIterator());
 
     ConcreteDeclRef witness;
     if (seqType->isExistentialType())
@@ -3812,7 +3823,8 @@ private:
                       stmt->getAwaitLoc(), stmt->getUnsafeLoc(), indexPattern,
                       /* InLoc */ stmt->getInLoc(), indicesRef, SourceLoc(),
                       /*where=*/nullptr, innerBody, dc,
-                      /*implicit=*/true);
+                      /*implicit=*/true,
+                      /*isSynthesizedInnerLoopForBorrowing*/ true);
 
       return {innerLoop};
     }
