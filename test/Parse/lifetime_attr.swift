@@ -24,7 +24,7 @@ func testMissingLParenError(_ ne: NE) -> NE {
   ne
 }
 
-@_lifetime() // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
+@_lifetime() // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func testMissingDependence(_ ne: NE) -> NE {
   ne
 }

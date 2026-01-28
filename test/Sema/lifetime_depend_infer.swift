@@ -849,7 +849,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
 
 // Invalid keyword for the dependence kind.
 //
-@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
+@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func f_inout_bad_keyword(a: inout MutableRawSpan) {}
 
 // Don't allow a useless borrow dependency on an inout param--it is misleading.
