@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -emit-module-interface-path %t/test.swiftinterface -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature MacrosOnImports -strict-memory-safety \
+// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module -emit-module-interface-path %t/test.swiftinterface -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
 // RUN:   -verify -verify-additional-file %t%{fs-sep}test.h
 
 // Verify that including the binary module works as expected
