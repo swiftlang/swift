@@ -4,11 +4,11 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
-// CHECK: @"$e4main8MyBufferCN" = {{.*constant.*}} <{ ptr @"$es13ManagedBufferCySis5UInt8VGN", ptr @"$e4main8MyBufferCfD{{[^"]*}}", ptr null, ptr @"$e4main8MyBufferC12_doNotCallMeACyt_tcfC{{[^"]*}}" }>
-// CHECK: @"$es13ManagedBufferCySis5UInt8VGN" = {{.*constant.*}} <{ ptr null, ptr @"$es13ManagedBufferCfDSi_s5UInt8VTgq5{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferC12_doNotCallMeAByxq_Gyt_tcfCSi_s5UInt8VTgq5{{[^"]*}}" }>
+// CHECK: @"$e4main8MyBufferCN" = {{.*constant.*}} <{ ptr @"$es13ManagedBufferCySis5UInt8VGN", ptr @"$e4main8MyBufferCfD{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferC6headerxvxSi_s5UInt8VTgq5Twc", ptr @"$e4main8MyBufferC12_doNotCallMeACyt_tcfC{{[^"]*}}" }>
+// CHECK: @"$es13ManagedBufferCySis5UInt8VGN" = {{.*constant.*}} <{ ptr null, ptr @"$es13ManagedBufferCfDSi_s5UInt8VTgq5{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferC6headerxvxSi_s5UInt8VTgq5Twc", ptr @"$es13ManagedBufferC12_doNotCallMeAByxq_Gyt_tcfCSi_s5UInt8VTgq5{{[^"]*}}" }>
 
-// EXIST: @"$e4main8MyBufferCMf" = {{.*}} <{ ptr @"$eBoWV{{[^"]*}}", {{.*}} ptr @"$es13ManagedBufferCySis5UInt8VGMf", i32 0, i32 1), ptr @"$e4main8MyBufferCfD{{[^"]*}}", ptr null, ptr @"$e4main8MyBufferC12_doNotCallMeACyt_tcfC{{[^"]*}}" }>
-// EXIST: @"$es13ManagedBufferCySis5UInt8VGMf" = {{.*}} <{ ptr @"$eBoWV{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferCfDSi_s5UInt8VTgq5{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferC12_doNotCallMeAByxq_Gyt_tcfCSi_s5UInt8VTgq5{{[^"]*}}" }>
+// EXIST: @"$e4main8MyBufferCMf" = {{.*}} <{ ptr @"$eBoWV{{[^"]*}}", {{.*}} ptr @"$es13ManagedBufferCySis5UInt8VGMf", i32 0, i32 1), ptr @"$e4main8MyBufferCfD{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferC6headerxvxSi_s5UInt8VTgq5Twc", ptr @"$e4main8MyBufferC12_doNotCallMeACyt_tcfC{{[^"]*}}" }>
+// EXIST: @"$es13ManagedBufferCySis5UInt8VGMf" = {{.*}} <{ ptr @"$eBoWV{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferCfDSi_s5UInt8VTgq5{{[^"]*}}", ptr null, ptr @"$es13ManagedBufferC6headerxvxSi_s5UInt8VTgq5Twc", ptr @"$es13ManagedBufferC12_doNotCallMeAByxq_Gyt_tcfCSi_s5UInt8VTgq5{{[^"]*}}" }>
 
 // EXIST: @"$e4main8MyBufferCN" = {{.*}}alias
 // EXIST-NOT: @"$es13ManagedBufferCySis5UInt8VGN" = {{.*}}alias
