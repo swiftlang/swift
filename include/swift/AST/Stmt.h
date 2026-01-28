@@ -1044,6 +1044,7 @@ class ForEachStmt : public LabeledStmt {
   // corresponding WhileStmt.
   LabeledStmt *continueTarget = nullptr;
   WhileStmt *breakTarget = nullptr;
+  bool synthesizedInnerLoopForBorrowing;
 
   friend class DesugarForEachStmtRequest;
 
@@ -1052,7 +1053,8 @@ public:
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
               Expr *WhereExpr, BraceStmt *Body, DeclContext *DC,
-              std::optional<bool> implicit = std::nullopt)
+              std::optional<bool> implicit = std::nullopt,
+              bool synthesizedInnerLoopForBorrowing = false)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc),

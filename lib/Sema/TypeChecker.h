@@ -1178,8 +1178,8 @@ Type errorUnion(Type type1, Type type2,
 
 /// Retrieve the "next" function that should be used for iteration in a
 /// for..in loop.
-FuncDecl *getForEachIteratorNextFunction(
-    DeclContext *dc, SourceLoc loc, bool isAsync);
+FuncDecl *getForEachIteratorNextFunction(DeclContext *dc, SourceLoc loc,
+                                         bool isAsync, bool isBorrowing);
 
 /// If an expression references 'self.init' or 'super.init' in an
 /// initializer context, returns the implicit 'self' decl of the constructor.

@@ -151,6 +151,9 @@ PROTOCOL(UnsafeCxxMutableContiguousIterator)
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
 
+PROTOCOL(BorrowingSequence)
+PROTOCOL(BorrowingIteratorProtocol)
+
 PROTOCOL(FloatingPoint)
 
 #define INVERTIBLE_PROTOCOL(Name, Bit) \
