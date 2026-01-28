@@ -51,7 +51,7 @@ func warnOptionalToAnyCoercion(value x: Int?) -> Any {
     // expected-note@-1 {{provide a default value to avoid this warning}}
     // expected-note@-2 {{force-unwrap the value to avoid this warning}}
     // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  } catch {}
+  } catch _ {}
 
   return x // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
   // expected-note@-1 {{provide a default value to avoid this warning}}

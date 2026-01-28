@@ -483,7 +483,7 @@ struct TestYieldInDoCatch2 {
       do {
         try aThrowingFunction() // expected-note {{missing yield when error is thrown}}
         yield stored
-      } catch {
+      } catch _ {
       }
     } // expected-error {{accessor must yield on all paths before returning}}
 
@@ -513,7 +513,7 @@ struct TestMultipleTries {
 
         try aThrowingFunction()
         yield stored // expected-error {{accessor must not yield more than once}}
-      } catch {
+      } catch _ {
       }
     }
 
@@ -524,7 +524,7 @@ struct TestMultipleTries {
 
         try aThrowingFunction() // expected-note {{missing yield when error is thrown}}
       }
-      catch {
+      catch _ {
       }
     } // expected-error {{accessor must yield on all paths before returning}}
   }
@@ -542,7 +542,7 @@ struct TestMultipleTries {
         }
 
         yield stored
-      } catch {
+      } catch _ {
       }
     } // expected-error {{accessor must yield on all paths before returning}}
 
@@ -557,7 +557,7 @@ struct TestMultipleTries {
           try aThrowingFunction() // expected-note {{missing yield when error is thrown}}
           yield &stored
         }
-      } catch {
+      } catch _ {
       }
     } // expected-error {{accessor must yield on all paths before returning}}
   }

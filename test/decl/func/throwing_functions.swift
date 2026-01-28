@@ -276,7 +276,7 @@ struct FunctionHolder {
       // expected-note@-2 {{did you mean to use 'try'?}}
       // expected-note@-3 {{did you mean to handle error as optional value?}}
       // expected-note@-4 {{did you mean to disable error propagation?}}
-    } catch {}
+    } catch _ {}
   }
 }
 
