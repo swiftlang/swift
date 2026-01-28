@@ -176,7 +176,7 @@ class BorrowNonFixedTypeInfo final
 {
 public:
   BorrowNonFixedTypeInfo(IRGenModule &IGM)
-    : WitnessSizedTypeInfo(nullptr,
+    : WitnessSizedTypeInfo(IGM.OpaqueTy,
                            Alignment(1),
                            IsTriviallyDestroyable,
                            IsBitwiseTakableAndBorrowable,

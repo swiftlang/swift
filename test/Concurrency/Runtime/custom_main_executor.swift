@@ -20,6 +20,8 @@
 import StdlibUnittest
 import Synchronization
 
+@_spi(ExperimentalCustomExecutors) import _Concurrency
+
 #if TOPLEVEL_FACTORY
 typealias DefaultExecutorFactory = SimpleExecutorFactory
 #endif
