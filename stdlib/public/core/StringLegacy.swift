@@ -80,6 +80,9 @@ extension StringProtocol {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public func hasPrefix<Prefix: StringProtocol>(_ prefix: Prefix) -> Bool {
     return self.starts(with: prefix)
@@ -114,6 +117,9 @@ extension StringProtocol {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @inlinable
   public func hasSuffix<Suffix: StringProtocol>(_ suffix: Suffix) -> Bool {
     return self.reversed().starts(with: suffix.reversed())
@@ -121,6 +127,9 @@ extension StringProtocol {
 }
 
 extension String {
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public func hasPrefix(_ prefix: String) -> Bool {
     if _fastPath(self._guts.isNFCFastUTF8 && prefix._guts.isNFCFastUTF8) {
       guard prefix._guts.count <= self._guts.count else { return false }
@@ -139,6 +148,9 @@ extension String {
     return starts(with: prefix)
   }
 
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   public func hasSuffix(_ suffix: String) -> Bool {
     if _fastPath(self._guts.isNFCFastUTF8 && suffix._guts.isNFCFastUTF8) {
       let suffixStart = self._guts.count - suffix._guts.count

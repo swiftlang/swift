@@ -10,12 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Sequence where Element == Unicode.Scalar {
   internal var _internalNFD: Unicode._InternalNFD<Self> {
     Unicode._InternalNFD(self)
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode  {
 
   /// The contents of the source sequence, in Normalization Form D.
@@ -32,6 +38,9 @@ extension Unicode  {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._InternalNFD: Sequence {
 
   internal consuming func makeIterator() -> Iterator {
@@ -54,9 +63,19 @@ extension Unicode._InternalNFD: Sequence {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._InternalNFD: Sendable where Source: Sendable {}
+
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._InternalNFD.Iterator: Sendable where Source.Iterator: Sendable {}
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode {
 
   /// A stateful normalizer, producing a single logical stream
@@ -200,6 +219,9 @@ extension Unicode {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._NFDNormalizer {
 
   @inline(never)

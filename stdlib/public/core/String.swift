@@ -1022,6 +1022,9 @@ extension String {
   /// - Returns: A lowercase copy of the string.
   ///
   /// - Complexity: O(*n*)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @_effects(releasenone)
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
@@ -1056,6 +1059,9 @@ extension String {
   /// - Returns: An uppercase copy of the string.
   ///
   /// - Complexity: O(*n*)
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   @_effects(releasenone)
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
@@ -1096,6 +1102,9 @@ extension String: CustomStringConvertible {
   public var description: String { return self }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension String {
   public // @testable
   var _nfcCodeUnits: [UInt8] {

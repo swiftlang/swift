@@ -13,6 +13,9 @@
 import SwiftShims
 
 extension Sequence where Element == Unicode.Scalar {
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal var _internalNFC: Unicode._InternalNFC<Self> {
     Unicode._InternalNFC(self)
   }
@@ -24,6 +27,9 @@ extension Unicode {
   ///
   /// Normalization to NFC preserves canonical equivalence.
   ///
+  #if hasFeature(CustomAvailability)
+  @available(Unicode)
+  #endif
   internal struct _InternalNFC<Source> where Source: Sequence<Unicode.Scalar> {
 
     internal let source: Source
@@ -34,6 +40,9 @@ extension Unicode {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._InternalNFC: Sequence {
 
   internal consuming func makeIterator() -> Iterator {
@@ -62,9 +71,19 @@ extension Unicode._InternalNFC: Sequence {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._InternalNFC: Sendable where Source: Sendable {}
+
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._InternalNFC.Iterator: Sendable where Source.Iterator: Sendable {}
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode {
 
   /// A stateful normalizer, producing a single logical stream
@@ -241,6 +260,9 @@ extension Unicode {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Unicode._NFCNormalizer {
 
   @inline(never)

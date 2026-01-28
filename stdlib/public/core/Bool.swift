@@ -197,6 +197,9 @@ extension Bool: Hashable {
   }
 }
 
+#if hasFeature(CustomAvailability)
+@available(Unicode)
+#endif
 extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
