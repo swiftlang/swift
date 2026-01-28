@@ -10,24 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct Command: Hashable {
-  var executable: AnyPath
-  var args: [Argument]
+public struct Command: Hashable, Sendable {
+  public var executable: AnyPath
+  public var args: [Argument]
 
-  init(executable: AnyPath, args: [Argument]) {
+  public init(executable: AnyPath, args: [Argument]) {
     self.executable = executable
     self.args = args
   }
 }
 
-extension Command: Decodable {
-  init(from decoder: any Decoder) throws {
-    let command = try decoder.singleValueContainer().decode(String.self)
-    self = try CommandParser.parseCommand(command)
-  }
-}
-
-extension Command {
+public extension Command {
   var printedArgs: [String] {
     [executable.rawPath.escaped] + args.flatMap(\.printedArgs)
   }
@@ -40,14 +33,14 @@ extension Command {
 // MARK: Argument
 
 extension Command {
-  enum Argument: Hashable {
+  public enum Argument: Hashable, Sendable {
     case option(Option)
     case flag(Flag)
     case value(String)
   }
 }
 
-extension Command.Argument {
+public extension Command.Argument {
   static func option(
     _ flag: Command.Flag, spacing: Command.OptionSpacing, value: String
   ) -> Self {
@@ -117,13 +110,26 @@ extension Command.Argument {
 // MARK: Flag
 
 extension Command {
-  struct Flag: Hashable {
-    var dash: Dash
-    var name: Name
+  public struct Flag: Hashable, Sendable {
+    public var dash: Dash
+    public var name: Name
+
+    public init(dash: Dash, name: Name) {
+      self.dash = dash
+      self.name = name
+    }
   }
 }
 
-extension Command.Flag {
+public extension Command.Flag {
+  struct Name: Hashable, Sendable {
+    public let rawValue: String
+
+    public init(rawValue: String) {
+      self.rawValue = rawValue
+    }
+  }
+
   static func dash(_ name: Name) -> Self {
     .init(dash: .single, name: name)
   }
@@ -137,13 +143,13 @@ extension Command.Flag {
 }
 
 extension Command.Flag {
-  enum Dash: Int, CaseIterable, Comparable {
+  public enum Dash: Int, CaseIterable, Comparable, Sendable {
     case single = 1, double
-    static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
+    public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
   }
 }
 
-extension Command.Flag.Dash {
+public extension Command.Flag.Dash {
   init?(numDashes: Int) {
     self.init(rawValue: numDashes)
   }
@@ -159,7 +165,7 @@ extension Command.Flag.Dash {
 }
 
 extension DefaultStringInterpolation {
-  mutating func appendInterpolation(_ flag: Command.Flag) {
+  public mutating func appendInterpolation(_ flag: Command.Flag) {
     appendInterpolation(flag.printed)
   }
 }
@@ -167,12 +173,12 @@ extension DefaultStringInterpolation {
 // MARK: Option
 
 extension Command {
-  struct Option: Hashable {
-    var flag: Flag
-    var spacing: OptionSpacing
-    var value: String
+  public struct Option: Hashable, Sendable {
+    public var flag: Flag
+    public var spacing: OptionSpacing
+    public var value: String
 
-    init(_ flag: Flag, spacing: OptionSpacing, value: String) {
+    public init(_ flag: Flag, spacing: OptionSpacing, value: String) {
       self.flag = flag
       self.spacing = spacing
       self.value = value
@@ -180,7 +186,7 @@ extension Command {
   }
 }
 
-extension Command.Option {
+public extension Command.Option {
   func withValue(_ newValue: String) -> Self {
     var result = self
     result.value = newValue
@@ -208,13 +214,13 @@ extension Command.Option {
 // MARK: OptionSpacing
 
 extension Command {
-  enum OptionSpacing: Comparable {
+  public enum OptionSpacing: Comparable, Sendable {
     case equals, unspaced, spaced
   }
 }
 
 extension Command.OptionSpacing {
-  var printed: String {
+  public var printed: String {
     switch self {
     case .equals:   "="
     case .unspaced: ""
@@ -226,17 +232,17 @@ extension Command.OptionSpacing {
 // MARK: CustomStringConvertible
 
 extension Command.Argument: CustomStringConvertible {
-  var description: String { printed }
+  public var description: String { printed }
 }
 
 extension Command.OptionSpacing: CustomStringConvertible {
-  var description: String { printed }
+  public var description: String { printed }
 }
 
 extension Command.Flag: CustomStringConvertible {
-  var description: String { printed }
+  public var description: String { printed }
 }
 
 extension Command.Option: CustomStringConvertible {
-  var description: String { printed }
+  public var description: String { printed }
 }

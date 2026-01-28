@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 extension Command {
-  struct FlagSpec {
-    let flags: [Element]
+  public struct FlagSpec: Sendable {
+    public let flags: [Element]
 
-    init(_ flags: [Element]) {
+    public init(_ flags: [Element]) {
       // Sort by shortest first, except in cases where one is a prefix of
       // another, in which case we need the longer one first to ensure we prefer
       // it when parsing.
@@ -37,15 +37,15 @@ extension Command {
 }
 
 extension Command {
-  struct OptionSpacingSpec: OptionSet {
-    var rawValue: Int
-    init(rawValue: Int) {
+  public struct OptionSpacingSpec: OptionSet, Sendable {
+    public var rawValue: Int
+    public init(rawValue: Int) {
       self.rawValue = rawValue
     }
-    init(_ rawValue: Int) {
+    public init(_ rawValue: Int) {
       self.rawValue = rawValue
     }
-    init(_ optionSpacing: OptionSpacing) {
+    public init(_ optionSpacing: OptionSpacing) {
       switch optionSpacing {
       case .equals:
         self = .equals
@@ -55,26 +55,26 @@ extension Command {
         self = .spaced
       }
     }
-    static let equals   = Self(1 << 0)
-    static let unspaced = Self(1 << 1)
-    static let spaced   = Self(1 << 2)
+    public static let equals   = Self(1 << 0)
+    public static let unspaced = Self(1 << 1)
+    public static let spaced   = Self(1 << 2)
   }
 }
 
-extension Command.FlagSpec {
+public extension Command.FlagSpec {
   typealias Flag = Command.Flag
   typealias OptionSpacingSpec = Command.OptionSpacingSpec
 
-  struct Element {
-    let flag: Flag
-    let spacing: OptionSpacingSpec
+  struct Element: Sendable {
+    public let flag: Flag
+    public let spacing: OptionSpacingSpec
 
-    init(_ flag: Flag, option: [OptionSpacingSpec]) {
+    public init(_ flag: Flag, option: [OptionSpacingSpec]) {
       self.flag = flag
       self.spacing = option.reduce([], { $0.union($1) })
     }
 
-    init(_ flag: Flag, option: OptionSpacingSpec...) {
+    public init(_ flag: Flag, option: OptionSpacingSpec...) {
       self.init(flag, option: option)
     }
   }

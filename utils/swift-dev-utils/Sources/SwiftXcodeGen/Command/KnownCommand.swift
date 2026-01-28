@@ -46,16 +46,14 @@ extension Command.Flag {
   }
 }
 
-extension Command.Flag {
-  struct Name: Hashable {
-    let rawValue: String
-
-    // Fileprivate because definitions should be added below.
-    fileprivate init(_ rawValue: String) {
-      self.rawValue = rawValue
-    }
+extension Command.Flag.Name {
+  // Fileprivate because definitions should be added below.
+  fileprivate init(_ rawValue: String) {
+    self.init(rawValue: rawValue)
   }
+}
 
+extension Command.Flag {
   fileprivate static func dash(_ name: String) -> Self {
     dash(.init(name))
   }
