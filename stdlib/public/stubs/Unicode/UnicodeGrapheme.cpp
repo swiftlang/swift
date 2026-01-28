@@ -12,8 +12,6 @@
 
 #if SWIFT_STDLIB_ENABLE_UNICODE_DATA
 #include "Common/GraphemeData.h"
-#else
-#include "swift/Runtime/Debug.h"
 #endif
 #include "UnicodeData.h"
 #include <stdint.h>
