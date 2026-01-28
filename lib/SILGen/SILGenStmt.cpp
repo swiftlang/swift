@@ -727,14 +727,6 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
     return B.createUncheckedOwnership(regularLoc, load);
   };
 
-  // If the return expression is a literal, emit as a regular return
-  // expression.
-  if (isa<LiteralExpr>(ret)) {
-    auto RV = emitRValue(ret);
-    std::move(RV).forwardAll(*this, directResults);
-    return false;
-  }
-
   auto storageRefResult =
       StorageRefResult::findStorageReferenceExprForBorrow(SGM.M, ret);
   auto lvExpr = storageRefResult.getTransitiveRoot();
