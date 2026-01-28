@@ -366,6 +366,9 @@ Func Dictionary.mapValues(_:) is now without rethrows
 Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
 Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
 Func Dictionary.merge(_:uniquingKeysWith:) is now without rethrows
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merging(_:uniquingKeysWith:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies

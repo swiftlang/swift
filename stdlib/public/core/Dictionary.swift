@@ -1171,15 +1171,35 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @inlinable
-  public __consuming func merging<S: Sequence>(
+  @_alwaysEmitIntoClient
+  public __consuming func merging<S: Sequence, E: Error>(
     _ other: __owned S,
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> [Key: Value] where S.Element == (Key, Value) {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> [Key: Value] where S.Element == (Key, Value) {
     var result = self
     try result._variant.merge(other, uniquingKeysWith: combine)
     return result
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merging, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    __consuming func merging<S: Sequence>(
+      _ other: __owned S,
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows -> [Key: Value] where S.Element == (Key, Value)
+  )
+  internal __consuming func __rethrows_merging<S: Sequence>(
+    _ other: __owned S,
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws -> [Key: Value] where S.Element == (Key, Value) {
+    try merging(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Creates a dictionary by merging the given dictionary into this
   /// dictionary, using a combining closure to determine the value for
@@ -1211,15 +1231,35 @@ extension Dictionary {
   ///     dictionary.
   /// - Returns: A new dictionary with the combined keys and values of this
   ///   dictionary and `other`.
-  @inlinable
-  public __consuming func merging(
+  @_alwaysEmitIntoClient
+  public __consuming func merging<E: Error>(
     _ other: __owned [Key: Value],
-    uniquingKeysWith combine: (Value, Value) throws -> Value
-  ) rethrows -> [Key: Value] {
+    uniquingKeysWith combine: (Value, Value) throws(E) -> Value
+  ) throws(E) -> [Key: Value] {
     var result = self
     try result.merge(other, uniquingKeysWith: combine)
     return result
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of merging, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    __consuming func merging(
+      _ other: __owned [Key: Value],
+      uniquingKeysWith combine: (Value, Value) throws -> Value
+    ) rethrows -> [Key: Value]
+  )
+  internal __consuming func __rethrows_merging_dictionary(
+    _ other: __owned [Key: Value],
+    uniquingKeysWith combine: (Value, Value) throws -> Value
+  ) throws -> [Key: Value] {
+    try merging(other, uniquingKeysWith: combine)
+  }
+#endif
 
   /// Removes and returns the key-value pair at the specified index.
   ///
