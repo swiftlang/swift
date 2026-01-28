@@ -320,6 +320,26 @@ private enum InactiveCodeChecker {
   case name(String)
   case tryOrThrow
 
+  /// Check if a token is part of a pattern in a variable/constant declaration.
+  private func isInPatternBinding(of token: TokenSyntax) -> Bool {
+    var node: Syntax? = Syntax(token)
+    while let currentNode = node {
+      if let patternBinding = currentNode.as(PatternBindingSyntax.self) {
+        // Check if the token is within the pattern (the name being declared)
+        // but not in the initializer or accessor
+        let pattern = patternBinding.pattern
+        if pattern.position <= token.position && token.endPosition <= pattern.endPosition {
+          return true
+        }
+
+        return false
+      }
+
+      node = currentNode.parent
+    }
+    return false
+  }
+
   /// Search for the kind of entity in the given syntax node.
   func search(syntax: SourceFileSyntax, configuredRegions: ConfiguredRegions) -> Bool {
     // If there are no regions, everything is active. This is the common case.
@@ -327,19 +347,14 @@ private enum InactiveCodeChecker {
       return false
     }
 
-    var previousToken: TokenSyntax? = nil
     for token in syntax.tokens(viewMode: .sourceAccurate) {
-      defer { previousToken = token }
-
       // Match what we're looking for, and continue iterating if it doesn't
       // match.
       switch self {
       case .name(let name):
         if let identifier = token.identifier, identifier.name == name {
-          // Skip if this is a declaration
-          if let prev = previousToken,
-             let prevKeyword = prev.keywordKind,
-             (prevKeyword == .var || prevKeyword == .let) {
+          // Skip if this is in a pattern binding declaration
+          if isInPatternBinding(of: token) {
             continue
           }
           break
