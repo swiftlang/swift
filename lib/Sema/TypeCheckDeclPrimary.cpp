@@ -418,6 +418,21 @@ static void checkInheritanceClause(
     // the inherited type is either itself a class, or when it is a subclass
     // existential via the existential type path above.
     if (inheritedTy->getClassOrBoundGenericClass()) {
+      if (auto globalActorTypeExpr = inherited.getGlobalActorIsolationType()) {
+        auto typeRepr = globalActorTypeExpr->getTypeRepr();
+        SourceRange removalRange = typeRepr->getSourceRange();
+        SourceLoc startLoc = removalRange.Start;
+        SourceLoc prevLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                                       startLoc.getAdvancedLoc(-1));
+        Token prevToken = Lexer::getTokenAtLocation(ctx.SourceMgr, prevLoc);
+        if (prevToken.is(tok::at_sign))
+          removalRange.Start = prevToken.getLoc();
+        diags.diagnose(globalActorTypeExpr->getLoc(),
+                       diag::global_actor_on_inheritance_clause,
+                       typeRepr)
+            .fixItRemove(removalRange);
+      }
+
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
