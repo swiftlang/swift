@@ -415,6 +415,15 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
     return;
   }
 
+  if (I->isBorrow()) {
+    FormalEvaluationScope writeback(*this);
+    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue MV = emitBorrowedLValue(E, std::move(lv));
+    I->copyOrInitValueInto(*this, L ? *L : E, std::move(MV), /*isInit*/ true);
+    std::move(writeback).deferPop();
+    return;
+  }
+
   FormalEvaluationScope writeback(*this);
   RValue result = emitRValue(E, SGFContext(I));
   if (result.isInContext())

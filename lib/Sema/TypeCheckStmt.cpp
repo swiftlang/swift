@@ -3404,14 +3404,19 @@ void swift::diagnoseCaseVarMutabilityMismatch(DeclContext *dc,
   }
 }
 
-FuncDecl *TypeChecker::getForEachIteratorNextFunction(
-    DeclContext *dc, SourceLoc loc, bool isAsync
-) {
+FuncDecl *TypeChecker::getForEachIteratorNextFunction(DeclContext *dc,
+                                                      SourceLoc loc,
+                                                      bool isAsync,
+                                                      bool isBorrowing) {
   ASTContext &ctx = dc->getASTContext();
 
   // A synchronous for..in loop uses IteratorProtocol.next().
-  if (!isAsync)
-    return ctx.getIteratorNext();
+  if (!isAsync) {
+    if (!isBorrowing) {
+      return ctx.getIteratorNext();
+    }
+    return ctx.getBorrowingIteratorNextSpan();
+  }
 
   // If AsyncIteratorProtocol.next(isolation:) isn't available at all,
   // we're stuck using AsyncIteratorProtocol.next().
@@ -3449,7 +3454,7 @@ class DesugarForEachStmt {
   VarDecl *makeIteratorVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
-  ForEachStmt *innerLoop = nullptr;
+  WhileStmt *innerLoop = nullptr;
 
 public:
   DesugarForEachStmt(ForEachStmt *stmt)
@@ -3472,14 +3477,13 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    sequenceProto = isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
-                            : ctx.getProtocol(KnownProtocolKind::Sequence);
+    sequenceProto =
+        isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
+                : (isBorrowing
+                       ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
+                       : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
-
-    // Check if this is a borrowing sequence by looking for
-    // BorrowingIteratorProtocol
-    isBorrowing = isBorrowing && checkIsBorrowingIterator();
 
     buildMakeIteratorVar();
 
@@ -3498,44 +3502,6 @@ public:
   }
 
 private:
-  // FIXME: this entire function will be replaced and is only needed so long as
-  // this branch does not include the stdlib code for the
-  // BorrowingSequenceProtocol
-  bool checkIsBorrowingIterator() {
-    // Check if the iterator type conforms to BorrowingIteratorProtocol
-    // FIXME: Replace with proper KnownProtocolKind once added to
-    // KnownProtocols.def
-
-    auto borrowingIteratorId = ctx.getIdentifier("BorrowingIteratorProtocol");
-
-    // Look up BorrowingIteratorProtocol in the module
-    SmallVector<ValueDecl *, 2> results;
-    dc->getParentModule()->lookupValue(borrowingIteratorId,
-                                       NLKind::QualifiedLookup, results);
-
-    for (auto *decl : results) {
-      if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-        // Get the iterator type from the sequence conformance
-        auto iteratorId = isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator;
-        auto associatedType = sequenceProto->getAssociatedType(iteratorId);
-        if (!associatedType)
-          return false;
-
-        auto iteratorType = seqConformanceRef.getTypeWitness(associatedType);
-        if (!iteratorType)
-          return false;
-
-        // Check if the iterator type conforms to BorrowingIteratorProtocol
-        auto conformance = lookupConformance(iteratorType, proto);
-        if (!conformance.isInvalid()) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
   void buildMakeIteratorVar() {
     std::string name;
     {
@@ -3602,7 +3568,7 @@ private:
 
     // Regular (non-borrowing): call next()
     FuncDecl *nextFn = TypeChecker::getForEachIteratorNextFunction(
-        dc, stmt->getForLoc(), isAsync);
+        dc, stmt->getForLoc(), isAsync, isBorrowing);
     TinyPtrVector<Identifier> labels;
     if (nextFn && nextFn->getParameters()->size() == 1)
       labels.push_back(ctx.Id_isolation);
@@ -3657,8 +3623,10 @@ private:
 
     // First, let's form a call from sequence to `.makeIterator()` and save
     // that in a special variable which is going to be used by SILGen.
-    FuncDecl *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
+    FuncDecl *makeIterator =
+        isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                : (isBorrowing ? ctx.getBorrowingSequenceMakeBorrowingIterator()
+                               : ctx.getSequenceMakeIterator());
 
     ConcreteDeclRef witness;
     if (seqType->isExistentialType())
@@ -3721,10 +3689,64 @@ private:
     return ctx.AllocateCopy(cond);
   }
 
+  VarDecl *buildCountVar(DeclRefExpr *nextCallVarRef) {
+    auto *countVar = new (ctx) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Let, stmt->getForLoc(),
+        ctx.getIdentifier("$count"), dc);
+    countVar->setImplicit();
+    return countVar;
+  }
+
+  StmtCondition buildInnerWhileCond(VarDecl *countVar, VarDecl *indexVar) {
+    auto *indexRef =
+        new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+    auto *countVarRef =
+        new (ctx) DeclRefExpr(countVar, DeclNameLoc(), /*implicit=*/true);
+
+    auto *lessThanOp = new (ctx)
+        UnresolvedDeclRefExpr(DeclNameRef(ctx.getIdentifier("<")),
+                              DeclRefKind::BinaryOperator, DeclNameLoc());
+    auto *condition = BinaryExpr::create(ctx, indexRef, lessThanOp, countVarRef,
+                                         /*implicit=*/true);
+
+    auto conditionElement = StmtConditionElement(condition);
+    SmallVector<StmtConditionElement> innerWhileCond;
+    innerWhileCond.push_back(conditionElement);
+
+    return ctx.AllocateCopy(innerWhileCond);
+  }
+
+  AssignExpr *buildIndexIncrAssignment(VarDecl *indexVar) {
+    // Add $i = $i + 1 at the end of the body
+    auto *indexRefForIncr =
+        new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+    auto *indexRefRHS =
+        new (ctx) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit=*/true);
+    auto *oneLiteral =
+        IntegerLiteralExpr::createFromUnsigned(ctx, 1, stmt->getForLoc());
+
+    auto *plusOp = new (ctx)
+        UnresolvedDeclRefExpr(DeclNameRef(ctx.getIdentifier("+")),
+                              DeclRefKind::BinaryOperator, DeclNameLoc());
+    auto *addExpr = BinaryExpr::create(ctx, indexRefRHS, plusOp, oneLiteral,
+                                       /*implicit=*/true);
+
+    return new (ctx)
+        AssignExpr(indexRefForIncr, SourceLoc(), addExpr, /*implicit=*/true);
+  }
+
   SmallVector<ASTNode> buildWhileBody(VarDecl *nextCallVar) {
     SmallVector<ASTNode> bodyElements;
 
     auto elementPattern = stmt->getPattern();
+    if (isBorrowing && elementPattern->getType()->isNoncopyable()) {
+      // We need to borrow the element to be able to use it in the loop.
+      auto *forVarDecl = elementPattern->getSingleVar();
+      if (forVarDecl) {
+        forVarDecl->setIntroducer(VarDecl::Introducer::Borrowing);
+      }
+    }
+
     auto *opaquePattern = new (ctx) OpaquePattern(elementPattern);
     auto *nextCallVarRef = new (ctx) DeclRefExpr(
         nextCallVar, DeclNameLoc(stmt->getForLoc()), /*Implicit=*/true);
@@ -3738,7 +3760,7 @@ private:
     if (isBorrowing) {
       // Bind original pattern to span[i] in inner loop.
       auto *indexVar = new (ctx) VarDecl(
-          /*isStatic=*/false, VarDecl::Introducer::Let, stmt->getForLoc(),
+          /*isStatic=*/false, VarDecl::Introducer::Var, stmt->getForLoc(),
           ctx.getIdentifier("$i"), dc);
       indexVar->setImplicit();
       indexPattern = NamedPattern::createImplicit(ctx, indexVar);
@@ -3747,7 +3769,7 @@ private:
 
       // Create span[i] subscript
       auto *indexArgs = ArgumentList::createImplicit(
-          ctx, {Argument(SourceLoc(), Identifier(), indexRef)});
+          ctx, {Argument(elementPattern->getLoc(), Identifier(), indexRef)});
       element = SubscriptExpr::create(ctx, nextCallVarRef, indexArgs,
                                       ConcreteDeclRef(), /*implicit=*/true);
     }
@@ -3763,7 +3785,7 @@ private:
     /* For a non-borrowing ForEachStmt,
      * for ... in ... where cond { body }
      * becomes:
-     * while ... { if cond then body else continue }
+     * while ... { if cond then body }
      */
     auto *whereClause = stmt->getWhere();
 
@@ -3796,24 +3818,40 @@ private:
     }
 
     if (isBorrowing) {
-      auto indicesId = ctx.getIdentifier("indices");
-      auto *indicesRef = new (ctx) UnresolvedDotExpr(
-          nextCallVarRef, SourceLoc(), DeclNameRef(indicesId), DeclNameLoc(),
+      // Create integer literal 0 for initial value of $i
+      auto *zeroLiteral =
+          IntegerLiteralExpr::createFromUnsigned(ctx, 0, stmt->getForLoc());
+      auto *indexInitPB = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, indexPattern, zeroLiteral, dc);
+
+      // $count = $span.count
+      auto *countVar = buildCountVar(nextCallVarRef);
+      auto *countPattern = NamedPattern::createImplicit(ctx, countVar);
+
+      auto countId = ctx.getIdentifier("count");
+      auto *countRef = new (ctx) UnresolvedDotExpr(
+          nextCallVarRef, SourceLoc(), DeclNameRef(countId), DeclNameLoc(),
           /*implicit=*/true);
+      auto *countPB = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, countPattern, countRef, dc);
 
-      auto *innerBody =
+      auto *indexVar = indexPattern->getSingleVar();
+      ASSERT(indexVar != nullptr);
+
+      // Add $i = $i + 1 at the end of the body
+      bodyElements.push_back(buildIndexIncrAssignment(indexVar));
+
+      auto *innerWhileBody =
           BraceStmt::create(ctx, stmt->getBody()->getLBraceLoc(), bodyElements,
-                            stmt->getBody()->getRBraceLoc());
+                            stmt->getBody()->getRBraceLoc(),
+                            /*implicit=*/true);
 
-      // Create the inner ForEachStmt, which will be desugared recursively.
       innerLoop = new (ctx)
-          ForEachStmt(LabeledStmtInfo(), stmt->getForLoc(), stmt->getTryLoc(),
-                      stmt->getAwaitLoc(), stmt->getUnsafeLoc(), indexPattern,
-                      /* InLoc */ stmt->getInLoc(), indicesRef, SourceLoc(),
-                      /*where=*/nullptr, innerBody, dc,
-                      /*implicit=*/true);
+          WhileStmt(LabeledStmtInfo(), stmt->getForLoc(),
+                    /* $i < $count */ buildInnerWhileCond(countVar, indexVar),
+                    innerWhileBody, /*implicit=*/true);
 
-      return {innerLoop};
+      return {indexInitPB, countPB, innerLoop};
     }
 
     return bodyElements;

@@ -292,6 +292,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(SGF, CleanupLocation(S));
+  FormalEvaluationScope BraceEvaluationScope(SGF);
   // This is a workaround until the FIXME in SILGenFunction::getOrCreateScope
   // has been addressed. Property wrappers create incorrect source locations.
   DebugScope DbgScope(SGF, S);

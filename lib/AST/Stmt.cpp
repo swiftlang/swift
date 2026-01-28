@@ -488,16 +488,6 @@ BraceStmt *ForEachStmt::getDesugaredStmt() {
                            nullptr);
 }
 
-LabeledStmt *ForEachStmt::getContinueTarget() {
-  if (continueTarget) {
-    if (auto *FES = dyn_cast<ForEachStmt>(continueTarget)) {
-      return FES->getContinueTarget();
-    }
-    ASSERT(dyn_cast<WhileStmt>(continueTarget));
-  }
-  return continueTarget;
-}
-
 Type DoCatchStmt::getExplicitCaughtType() const {
   ASTContext &ctx = DC->getASTContext();
   return CatchNode(const_cast<DoCatchStmt *>(this)).getExplicitCaughtType(ctx);
