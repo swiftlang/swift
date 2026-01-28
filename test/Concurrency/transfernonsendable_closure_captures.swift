@@ -938,7 +938,7 @@ class ConcreteDelegateNonsendable: DelegateProtocolNonsendable {
 // Test: Nested weak captures with protocols
 func testNestedProtocolWeakCapturesSendable<T: ProtocolSendable, U: ProtocolSendable>(_ outer: T, _ inner: U) {
   let _ = { [weak outer] in
-    let _ = { [weak outer, weak inner] in
+    let _ = { [weak outer, weak inner = inner] in
       escapingAsyncUse { @MainActor in
         if let o = outer { useValue(o) }
         if let i = inner { useValue(i) }
@@ -949,7 +949,7 @@ func testNestedProtocolWeakCapturesSendable<T: ProtocolSendable, U: ProtocolSend
 
 func testNestedProtocolWeakCapturesNonsendable<T: ProtocolNonsendable, U: ProtocolNonsendable>(_ outer: T, _ inner: U) {
   let _ = { [weak outer] in
-    let _ = { [weak outer, weak inner] in
+    let _ = { [weak outer, weak inner = inner] in
       escapingAsyncUse { @MainActor in
         if let o = outer { // expected-error {{sending 'outer' risks causing data races}}
           // expected-note @-1 {{task-isolated 'outer' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
