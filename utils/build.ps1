@@ -2480,7 +2480,6 @@ function Build-Brotli([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
     }
 }
 
@@ -3199,12 +3198,6 @@ function Test-XCTest {
 }
 
 function Build-Testing([Hashtable] $Platform) {
-  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
-    @();
-  } else {
-    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
-  }
-
   Build-CMakeProject `
     -Src $SourceCache\swift-testing `
     -Bin (Get-ProjectBinaryCache $Platform Testing) `
@@ -3215,7 +3208,6 @@ function Build-Testing([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
-      CMAKE_Swift_FLAGS = $SwiftFlags;
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }
@@ -3369,7 +3361,6 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         -SwiftSDK ${SDKROOT} `
         -Defines @{
           BUILD_SHARED_LIBS = "NO";
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
