@@ -20,6 +20,7 @@ public func withContinuousObservation(
   return observation.token
 }
 
+@available(SwiftStdlib 6.4, *)
 extension ObservationTracking {
   @available(SwiftStdlib 6.4, *)
   public struct Token: ~Copyable {
@@ -36,7 +37,7 @@ extension ObservationTracking {
   }
 }
 
-
+@available(SwiftStdlib 6.4, *)
 struct ContinuousObservation: ~Copyable {
   // Tracks whether the didSet of the tracking has occurred (kind of).
   // Whether it has come to the point of suspension after the isolation. "Next suspension on
@@ -79,6 +80,7 @@ struct ContinuousObservation: ~Copyable {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 extension ContinuousObservation.State {
   fileprivate static func emitEvent(
     _ state: _ManagedCriticalState<ContinuousObservation.State>,
@@ -208,7 +210,7 @@ extension ContinuousObservation.State {
 }
 
 // MARK: - Runner
-
+@available(SwiftStdlib 6.4, *)
 extension ContinuousObservation {
   // This is representing the state of the runner, which is spawning the task that's responsible
   // for suspending (to wait after willSet) and resuming.
@@ -248,6 +250,7 @@ private struct UnsafeBox<Element>: @unchecked Sendable {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 extension ContinuousObservation.RunnerState {
   // This says I'm waiting for something to do. I'm waiting to perform an action.
   fileprivate static func dequeue(
@@ -285,6 +288,7 @@ extension ContinuousObservation.RunnerState {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 extension ContinuousObservation {
   fileprivate static func run(
     _ state: _ManagedCriticalState<State>,
