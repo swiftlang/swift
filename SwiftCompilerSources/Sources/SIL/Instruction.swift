@@ -92,6 +92,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     return Location(bridged: bridged.getLocation())
   }
 
+  final public func set(location: Location, _ context: some MutatingContext) {
+    bridged.setLocation(location.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public final func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
