@@ -70,6 +70,15 @@ VARIABLE(SWIFT_DEBUG_ENABLE_CACHE_PROTOCOL_CONFORMANCES_BY_TYPE_DESCRIPTOR,
 VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, bool, true,
          "Enable dispatch cooperative queues in the global executor.")
 
+VARIABLE(SWIFT_DEBUG_CONCURRENCY_ALWAYS_USE_STEALERS, bool, false,
+         "When Tasks are enqueued on the Dispatch default global executor, "
+         "stealer objects may be used for escalating the priority of a Task "
+         "stuck on a low-priority queue. This can leave the large Task objects "
+         "lingering if the low-priority queue never drains. This flag causes "
+         "the runtime to always use stealer objects instead of enqueuing the "
+         "Task directly which may reduce memory usage in pathological cases "
+         "at the cost of a small overhead on every Task enqueue and execute.")
+
 #ifndef NDEBUG
 
 VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
