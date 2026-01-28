@@ -407,6 +407,7 @@ class CanType : public Type {
                                   bool functionsCount);
   static bool isConstraintTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
+  static bool isOpaqueTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
   static bool isTypeErasedGenericClassTypeImpl(CanType type);
@@ -487,6 +488,9 @@ public:
   bool isExistentialType() const {
     return isExistentialTypeImpl(*this);
   }
+
+  /// Is this type an opaque type (e.g., 'some P')?
+  bool isOpaqueType() const { return isOpaqueTypeImpl(*this); }
 
   /// Is this type an existential or an existential metatype?
   bool isAnyExistentialType() const {
