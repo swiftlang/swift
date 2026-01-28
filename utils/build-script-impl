@@ -2912,10 +2912,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 INSTALL_TARGETS=install-swift-components
                 ;;
             llbuild)
-                if [[ -z "${INSTALL_LLBUILD}" ]] ; then
-                    continue
-                fi
-                INSTALL_TARGETS="install-swift-build-tool"
+                # The llbuild built by build-script impl is tested and is used
+                # to bootstrap SwiftPM, but doesn't install any toolchain
+                # content
+                continue
                 ;;
             # Products from this here install themselves; they don't fall-through.
             lldb)
