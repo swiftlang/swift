@@ -124,6 +124,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// The source location, if available.
     public var sourceLocation: SourceLocation?
 
+    public var platform: Backtrace.SymbolicationPlatform
+
     /// True if this symbol represents a Swift runtime failure.
     public var isSwiftRuntimeFailure: Bool {
       guard let sourceLocation = sourceLocation else {
@@ -149,19 +151,19 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
 
     private func maybeUnderscore(_ sym: String) -> String {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-      return "_" + sym
-      #else
-      return sym
-      #endif
+      if case .Darwin = platform {
+        return "_" + sym
+      } else {
+        return sym
+      }
     }
 
     private func dylibName(_ dylib: String) -> String {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-      return dylib + ".dylib"
-      #else
-      return dylib + ".so"
-      #endif
+      if case .Darwin = platform {
+        return dylib + ".dylib"
+      } else {
+        return dylib + ".so"
+      }
     }
 
     /// True if this symbol represents a system function.
@@ -169,11 +171,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// For instance, the `start` function from `dyld` on macOS is a system
     /// function, and we don't need to display it under normal circumstances.
     public var isSystemFunction: Bool {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-      if rawName == "start" && imageName == "dyld" {
+      if case .Darwin = platform, rawName == "start", imageName == "dyld" {
         return true
       }
-      #endif
       if rawName.hasSuffix("5$mainyyFZ")
            || rawName.hasSuffix("5$mainyyYaFZTQ0_")
            || rawName == maybeUnderscore("async_MainTQ0_") {
@@ -193,12 +193,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     /// Construct a new Symbol.
     public init(imageIndex: Int, imageName: String,
-                rawName: String, offset: Int, sourceLocation: SourceLocation?) {
+                rawName: String, offset: Int, sourceLocation: SourceLocation?,
+                platform: Backtrace.SymbolicationPlatform) {
+
       self.imageIndex = imageIndex
       self.imageName = imageName
       self.rawName = rawName
       self.offset = offset
       self.sourceLocation = sourceLocation
+      self.platform = platform
     }
 
     /// Demangle the raw name, if possible.
@@ -210,7 +213,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
         // length is the size of the buffer that was allocated, *not* the
         // length of the string.
-        let stringLen = strlen(demangled)
+        let stringLen: Int = strnlen(demangled,4096)
         if stringLen > 0 {
           return demangled.withMemoryRebound(to: UInt8.self,
                                              capacity: stringLen) {
@@ -281,9 +284,16 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   }
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  private enum macOSSymbolicationError: Error {
+    case invalidUUID
+  }
   /// Convert a build ID to a CFUUIDBytes.
-  private static func uuidBytesFromBuildID(_ buildID: [UInt8])
+  private static func uuidBytesFromBuildID(_ buildID: [UInt8]) throws
     -> CFUUIDBytes {
+    guard buildID.count == MemoryLayout<CFUUIDBytes>.size else {
+      throw macOSSymbolicationError.invalidUUID
+    }
+
     return withUnsafeTemporaryAllocation(of: CFUUIDBytes.self,
                                          capacity: 1) { buf in
       buf.withMemoryRebound(to: UInt8.self) {
@@ -297,17 +307,21 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   private static func withSymbolicator<T>(images: ImageMap,
                                           useSymbolCache: Bool,
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
-    let binaryImageList = images.map{ image in
-      BinaryImageInformation(
-        base: vm_address_t(image.baseAddress)!,
-        extent: vm_address_t(image.endOfText)!,
-        uuid: uuidBytesFromBuildID(image.uniqueID!),
+    let binaryImageList = try images.map { image in
+      guard let uuidBytes = image.uniqueID else {
+        throw macOSSymbolicationError.invalidUUID
+      }
+
+      return BinaryImageInformation(
+        base: vm_address_t(image.baseAddress) ?? 0,
+        extent: vm_address_t(image.endOfText) ?? 0,
+        uuid: try uuidBytesFromBuildID(uuidBytes),
         arch: HostContext.coreSymbolicationArchitecture,
         path: image.path ?? "",
         relocations: [
           BinaryRelocationInformation(
-            base: vm_address_t(image.baseAddress)!,
-            extent: vm_address_t(image.endOfText)!,
+            base: vm_address_t(image.baseAddress) ?? 0,
+            extent: vm_address_t(image.endOfText) ?? 0,
             name: "__TEXT"
           )
         ],
@@ -369,11 +383,18 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       }
     }
 
+    let offset = if let addr64 = UInt64(address) {
+      Int(addr64 - UInt64(range.location))
+    } else {
+      0
+    }
+
     let theSymbol = Symbol(imageIndex: imageIndex,
                            imageName: imageName,
                            rawName: rawName,
-                           offset: Int(UInt64(address)! - UInt64(range.location)),
-                           sourceLocation: location)
+                           offset: offset,
+                           sourceLocation: location,
+                           platform: .Darwin)
     theSymbol.name = name
 
     return Frame(captured: capturedFrame, symbol: theSymbol, inlined: isInline)
@@ -381,6 +402,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   #endif
 
   /// Actually symbolicate.
+  /// Note: if you try to symbolicate a Linux backtrace using the macOS symbolicator (for example),
+  /// this will crash, so it's up to you to use the correct platform.
   internal static func symbolicate(backtrace: Backtrace,
                                    images: ImageMap?,
                                    platform symbolicationPlatform: Backtrace.SymbolicationPlatform,
@@ -401,6 +424,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     switch symbolicationPlatform {
     case .Darwin:
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
       withSymbolicator(images: theImages,
                       useSymbolCache: options.contains(.useSymbolCache)) {
         symbolicator in
@@ -461,6 +485,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
         }
       }
       break
+      #else
+      fatalError("You cannot symbolicate Darwin images on non Darwin platforms.")
+      #endif
 
     case .Linux(let alternativePaths):
       let cache = ElfImageCache.threadLocal
@@ -477,7 +504,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       imageName: name,
                                       rawName: "<unknown>",
                                       offset: 0,
-                                      sourceLocation: nil)
+                                      sourceLocation: nil,
+                                      platform: symbolicationPlatform)
 
           func lookupSymbol<ElfImage: ElfSymbolLookupProtocol>(
             image: ElfImage?,
@@ -509,7 +537,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                         imageName: name,
                                         rawName: inline.rawName ?? "<unknown>",
                                         offset: 0,
-                                        sourceLocation: location)
+                                        sourceLocation: location,
+                                        platform: symbolicationPlatform)
                 frames.append(Frame(captured: frame,
                                     symbol: fakeSymbol,
                                     inlined: true))
@@ -524,7 +553,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                           imageName: name,
                           rawName: theSymbol.name,
                           offset: theSymbol.offset,
-                          sourceLocation: location)
+                          sourceLocation: location,
+                          platform: symbolicationPlatform)
           }
 
           if let hit = cache.lookup(
