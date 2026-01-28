@@ -1066,7 +1066,7 @@ public:
   /// \c getAttrs().add(...) since it also attaches the attribute if necessary.
   void addAttribute(DeclAttribute *attr) {
     attr->attachToDecl(this);
-    getAttrs().add(attr);
+    getAttrs().add(attr, this);
   }
 
   /// Returns the attributes that were directly attached to this declaration

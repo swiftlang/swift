@@ -78,7 +78,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
          "Distributed function must be part of distributed actor");
 
   auto selfDecl = thunk->getImplicitSelfDecl();
-  selfDecl->addAttribute(new (C) KnownToBeLocalAttr(implicit));
+  auto localAttr = new (C) KnownToBeLocalAttr(implicit);
+  if (localAttr->canAppearOnDecl(selfDecl))
+    selfDecl->addAttribute(localAttr);
 
   // === return type
   Type returnTy = func->getResultInterfaceType();
@@ -584,19 +586,26 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   }
   thunk->setSynthesized(true);
 
-  if (isa<ClassDecl>(DC))
-    thunk->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
+  if (isa<ClassDecl>(DC)) {
+    auto attr = new (C) FinalAttr(/*isImplicit=*/true);
+    if (attr->canAppearOnDecl(thunk))
+      thunk->addAttribute(attr);
+  }
 
   thunk->setGenericSignature(baseSignature);
   thunk->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+  auto implAttr = NonisolatedAttr::createImplicit(C);
+  if (implAttr->canAppearOnDecl(thunk))
+    thunk->addAttribute(implAttr);
   // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
   //                    this way we would not hop off the caller when calling system.remoteCall;
   //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
-  thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  auto concurAttr = new (C) ConcurrentAttr(/*IsImplicit=*/true);
+  if (concurAttr->canAppearOnDecl(thunk))
+    thunk->addAttribute(concurAttr);
 
   return thunk;
 }
@@ -852,10 +861,14 @@ GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
 
   // mark as nonisolated, allowing access to it from everywhere
-  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
+  auto implAttr = NonisolatedAttr::createImplicit(C);
+  if (implAttr->canAppearOnDecl(propDecl))
+    propDecl->addAttribute(implAttr);
   // mark as @_compilerInitialized, since we synthesize the initializing
   // assignment during SILGen.
-  propDecl->addAttribute(new (C) CompilerInitializedAttr(/*IsImplicit=*/true));
+  auto compInitAttr = new (C) CompilerInitializedAttr(/*IsImplicit=*/true);
+  if (compInitAttr->canAppearOnDecl(propDecl))
+    propDecl->addAttribute(compInitAttr);
 
   // IMPORTANT: The `id` MUST be the first field of any distributed actor,
   // because when we allocate remote proxy instances, we don't allocate memory
@@ -905,7 +918,9 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, nominal);
 
   // mark as nonisolated, allowing access to it from everywhere
-  propDecl->addAttribute(NonisolatedAttr::createImplicit(C));
+  auto implAttr = NonisolatedAttr::createImplicit(C);
+  if (implAttr->canAppearOnDecl(propDecl))
+    propDecl->addAttribute(implAttr);
 
   auto idProperty = nominal->getDistributedActorIDProperty();
   // If the id was not yet synthesized, we need to ensure that eventually
