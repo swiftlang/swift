@@ -6157,6 +6157,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 class SILBoxType;
 class SILLayout; // From SIL
 class SILModule; // From SIL
+class SILField;  // From SIL
 typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
@@ -6176,6 +6177,52 @@ public:
 
   SILLayout *getLayout() const { return Layout; }
   SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+  /// Return the fields of this type from its layout.
+  ///
+  /// NOTE: These types have not been appropriately specialized either for a
+  /// SILFunction where it occurs or any substitutions that are stored within
+  /// the substitution map of the function. In order to get appropriate SILTypes
+  /// for fields to work with directly in SIL, please call getFieldType below
+  /// which handles the relevant specializations correctly for you.
+  ArrayRef<SILField> getFields() const;
+
+  /// Return the SILType of the field of the layout of the SILBoxType.
+  ///
+  /// NOTE: This ensures that the type is probably specialized both for the
+  /// substitutions of this type and the relevant SILFunction.
+  ///
+  /// Defined in SILType.cpp.
+  SILType getFieldType(SILFunction &fn, unsigned index);
+
+  /// Returns the number of fields in the box type's layout.
+  unsigned getNumFields() const { return getFields().size(); }
+
+  /// Returns true if the given field in the box is mutable. Returns false
+  /// otherwise.
+  bool isFieldMutable(unsigned index) const;
+
+  /// Returns a SILBoxType that is the same as the current box type but with the
+  /// mutability of each field specified via index in \p
+  /// fieldIndexMutabilityUpdatePairs to have its mutability be the index's
+  /// associated bool pair.
+  CanSILBoxType withMutable(ASTContext &ctx,
+                            std::initializer_list<std::pair<unsigned, bool>>
+                                fieldIndexMutabilityUpdatePairs) const;
+
+  using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
+  using SILFieldToSILTypeRange =
+      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
+                                           SILFieldIndexToSILTypeTransform>>;
+
+  /// Returns a range of SILTypes that have been specialized correctly for use
+  /// in the passed in SILFunction.
+  ///
+  /// DISCUSSION: The inner range is an IntRange since the inner API that we use
+  /// to transform fields is defined in terms of indices.
+  ///
+  /// Defined in SILType.cpp.
+  SILFieldToSILTypeRange getSILFieldTypes(SILFunction &fn);
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type

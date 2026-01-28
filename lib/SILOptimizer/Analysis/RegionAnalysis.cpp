@@ -117,7 +117,7 @@ struct AddressBaseComputingVisitor
 
   SILValue visitAll(SILValue sourceAddr) {
     // If our initial value is Sendable, then it is our "value".
-    if (SILIsolationInfo::isSendableType(sourceAddr))
+    if (SILIsolationInfo::isSendable(sourceAddr))
       value = sourceAddr;
 
     SILValue result = visit(sourceAddr);
@@ -167,8 +167,7 @@ struct AddressBaseComputingVisitor
     // If this is a type case, see if the result of the cast is sendable. In
     // such a case, we do not want to look through this cast.
     if (castType == AccessStorageCast::Type &&
-        !SILIsolationInfo::isNonSendableType(cast->getType(),
-                                             cast->getFunction()))
+        !SILIsolationInfo::isNonSendable(cast))
       return SILValue();
 
     // Do not look through begin_borrow [var_decl]. They are start new semantic
@@ -213,14 +212,12 @@ struct AddressBaseComputingVisitor
       case ProjectionKind::Enum: {
         auto op = cast<UncheckedTakeEnumDataAddrInst>(projInst)->getOperand();
 
-        bool isOperandSendable = !SILIsolationInfo::isNonSendableType(
-            op->getType(), op->getFunction());
+        bool isOperandSendable = !SILIsolationInfo::isNonSendable(op);
 
         // If our operand is Sendable and our field is non-Sendable and we have
         // not stashed a value yet, stash value.
         if (!value && isOperandSendable &&
-            SILIsolationInfo::isNonSendableType(projInst->getType(),
-                                                projInst->getFunction())) {
+            SILIsolationInfo::isNonSendable(projInst)) {
           value = projInst;
         }
 
@@ -230,15 +227,13 @@ struct AddressBaseComputingVisitor
         // These are merges if we have multiple fields.
         auto op = cast<TupleElementAddrInst>(projInst)->getOperand();
 
-        bool isOperandSendable = !SILIsolationInfo::isNonSendableType(
-            op->getType(), op->getFunction());
+        bool isOperandSendable = !SILIsolationInfo::isNonSendable(op);
 
         // If our operand is Sendable and our field is non-Sendable, we need to
         // bail since we want to root the non-Sendable type in the Sendable
         // type.
         if (!value && isOperandSendable &&
-            SILIsolationInfo::isNonSendableType(projInst->getType(),
-                                                projInst->getFunction()))
+            SILIsolationInfo::isNonSendable(projInst))
           value = projInst;
 
         isProjectedFromAggregate |= op->getType().getNumTupleElements() > 1;
@@ -247,15 +242,13 @@ struct AddressBaseComputingVisitor
       case ProjectionKind::Struct:
         auto op = cast<StructElementAddrInst>(projInst)->getOperand();
 
-        bool isOperandSendable = !SILIsolationInfo::isNonSendableType(
-            op->getType(), op->getFunction());
+        bool isOperandSendable = !SILIsolationInfo::isNonSendable(op);
 
         // If our operand is Sendable and our field is non-Sendable, we need to
         // bail since we want to root the non-Sendable type in the Sendable
         // type.
         if (!value && isOperandSendable &&
-            SILIsolationInfo::isNonSendableType(projInst->getType(),
-                                                projInst->getFunction()))
+            SILIsolationInfo::isNonSendable(projInst))
           value = projInst;
 
         // These are merges if we have multiple fields.
@@ -637,7 +630,7 @@ RegionAnalysisValueMap::initializeTrackableValue(
   self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
   // Before we do anything, see if we have a Sendable value.
-  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+  if (!SILIsolationInfo::isNonSendable(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {{iter.first->first, iter.first->second}, true};
   }
@@ -680,7 +673,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
 
   // Then check our oracle to see if the value is actually sendable. If we have
   // a Sendable value, just return early.
-  if (!SILIsolationInfo::isNonSendableType(value->getType(), fn)) {
+  if (!SILIsolationInfo::isNonSendable(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -889,11 +882,9 @@ private:
   /// Visit \p sourceValue returning a load base if we find one. The actual
   /// underlying object is value.
   SILValue visit(SILValue sourceValue) {
-    auto *fn = sourceValue->getFunction();
-
     // If our result is ever Sendable, we record that as our value if we do
     // not have a value yet. We always want to take the first one.
-    if (SILIsolationInfo::isSendableType(sourceValue->getType(), fn)) {
+    if (SILIsolationInfo::isSendable(sourceValue)) {
       if (!value) {
         value = sourceValue;
       }
@@ -901,8 +892,8 @@ private:
 
     if (auto *svi = dyn_cast<SingleValueInstruction>(sourceValue)) {
       if (isStaticallyLookThroughInst(svi)) {
-        if (!value && SILIsolationInfo::isSendableType(svi->getOperand(0)) &&
-            SILIsolationInfo::isNonSendableType(svi)) {
+        if (!value && SILIsolationInfo::isSendable(svi->getOperand(0)) &&
+            SILIsolationInfo::isNonSendable(svi)) {
           value = svi;
         }
 
@@ -912,14 +903,13 @@ private:
       // If we have a cast and our operand and result are non-Sendable, treat it
       // as a look through.
       if (isLookThroughIfOperandAndResultNonSendable(svi)) {
-        if (SILIsolationInfo::isNonSendableType(svi->getType(), fn) &&
-            SILIsolationInfo::isNonSendableType(svi->getOperand(0)->getType(),
-                                                fn)) {
+        if (SILIsolationInfo::isNonSendable(svi) &&
+            SILIsolationInfo::isNonSendable(svi->getOperand(0))) {
           return svi->getOperand(0);
         }
 
-        if (!value && SILIsolationInfo::isSendableType(svi->getOperand(0)) &&
-            SILIsolationInfo::isNonSendableType(svi)) {
+        if (!value && SILIsolationInfo::isSendable(svi->getOperand(0)) &&
+            SILIsolationInfo::isNonSendable(svi)) {
           value = svi;
         }
       }
@@ -927,8 +917,8 @@ private:
 
     if (auto *inst = sourceValue->getDefiningInstruction()) {
       if (isStaticallyLookThroughInst(inst)) {
-        if (!value && SILIsolationInfo::isSendableType(inst->getOperand(0)) &&
-            SILIsolationInfo::isNonSendableType(sourceValue)) {
+        if (!value && SILIsolationInfo::isSendable(inst->getOperand(0)) &&
+            SILIsolationInfo::isNonSendable(sourceValue)) {
           value = sourceValue;
         }
 
@@ -942,7 +932,7 @@ private:
 public:
   SILValue visitAll(SILValue sourceValue) {
     // Before we do anything,
-    if (SILIsolationInfo::isSendableType(sourceValue))
+    if (SILIsolationInfo::isSendable(sourceValue))
       value = sourceValue;
 
     SILValue result = visit(sourceValue);
@@ -2010,7 +2000,7 @@ class PartitionOpTranslator {
             // being uniquely identified and captured.
             SILValue val = op.get();
             if (val->getType().isAddress() &&
-                isNonSendableType(val->getType())) {
+                SILIsolationInfo::isNonSendable(val)) {
               auto trackVal = getTrackableValue(val, true);
               (void)trackVal;
               REGIONBASEDISOLATION_LOG(
@@ -2018,7 +2008,7 @@ class PartitionOpTranslator {
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
-              if (isNonSendableType(pbi->getType())) {
+              if (SILIsolationInfo::isNonSendable(pbi)) {
                 auto trackVal = getTrackableValue(val, true);
                 (void)trackVal;
                 continue;
@@ -2116,14 +2106,6 @@ public:
   RegionAnalysisValueMap &getValueMap() const { return valueMap; }
 
 private:
-  /// Check if the passed in type is NonSendable.
-  ///
-  /// NOTE: We special case RawPointer and NativeObject to ensure they are
-  /// treated as non-Sendable and strict checking is applied to it.
-  bool isNonSendableType(SILType type) const {
-    return SILIsolationInfo::isNonSendableType(type, function);
-  }
-
   TrackableValueLookupResult
   getTrackableValue(SILValue value,
                     bool isAddressCapturedByPartialApply = false) {
@@ -3222,8 +3204,7 @@ public:
     case TranslationSemantics::AssertingIfNonSendable:
       // Do not error if all of our operands are sendable.
       if (llvm::none_of(inst->getOperandValues(), [&](SILValue value) {
-            return ::SILIsolationInfo::isNonSendableType(value->getType(),
-                                                         inst->getFunction());
+            return ::SILIsolationInfo::isNonSendable(value);
           }))
         return;
       llvm::errs() << "BadInst: " << *inst;
@@ -3721,8 +3702,8 @@ IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(StructExtractInst)
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *cast) {        \
     assert(isLookThroughIfOperandAndResultNonSendable(cast) && "Out of sync"); \
     bool isOperandNonSendable =                                                \
-        isNonSendableType(cast->getOperand()->getType());                      \
-    bool isResultNonSendable = isNonSendableType(cast->getType());             \
+        SILIsolationInfo::isNonSendable(cast->getOperand());                   \
+    bool isResultNonSendable = SILIsolationInfo::isNonSendable(cast);          \
                                                                                \
     if (isOperandNonSendable) {                                                \
       if (isResultNonSendable) {                                               \
@@ -3802,7 +3783,7 @@ PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
   // Before we do anything, see if asi is Sendable or if it is non-Sendable,
   // that it is from a var decl. In both cases, we can just return assign fresh
   // and exit early.
-  if (!SILIsolationInfo::isNonSendableType(asi) || asi->isFromVarDecl())
+  if (!SILIsolationInfo::isNonSendable(asi) || asi->isFromVarDecl())
     return TranslationSemantics::AssignFresh;
 
   // Ok at this point we know that our value is a non-Sendable temporary.
@@ -3855,7 +3836,7 @@ PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 /// the address so that if we have a load from a non-Sendable base, we properly
 /// require the base.
 TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *li) {
-  if (SILIsolationInfo::isSendableType(li->getOperand())) {
+  if (SILIsolationInfo::isSendable(li->getOperand())) {
     translateSILRequire(li->getOperand());
   }
 
@@ -3875,7 +3856,7 @@ TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *li) {
 /// require the base.
 TranslationSemantics
 PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  if (SILIsolationInfo::isSendableType(lbi->getOperand())) {
+  if (SILIsolationInfo::isSendable(lbi->getOperand())) {
     translateSILRequire(lbi->getOperand());
   }
 
@@ -3908,7 +3889,7 @@ PartitionOpTranslator::visitRefToBridgeObjectInst(RefToBridgeObjectInst *r) {
 
 TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
-  if (!isNonSendableType(r->getType()))
+  if (!SILIsolationInfo::isNonSendable(r))
     return TranslationSemantics::Require;
   translateSILAssign(SILValue(r), r->getPackOperand());
   return TranslationSemantics::Special;
@@ -3916,7 +3897,7 @@ PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
 
 TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
     TuplePackElementAddrInst *r) {
-  if (!isNonSendableType(r->getType())) {
+  if (!SILIsolationInfo::isNonSendable(r)) {
     translateSILRequire(r->getTuple());
   } else {
     translateSILAssign(SILValue(r), r->getTupleOperand());
@@ -3926,7 +3907,7 @@ TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
 
 TranslationSemantics
 PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
-  if (!isNonSendableType(r->getType())) {
+  if (!SILIsolationInfo::isNonSendable(r)) {
     translateSILRequire(r->getTuple());
   } else {
     translateSILAssign(SILValue(r), r->getTupleOperand());
@@ -3937,7 +3918,7 @@ PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
 TranslationSemantics
 PartitionOpTranslator::visitPackElementSetInst(PackElementSetInst *r) {
   // If the value we are storing is sendable, treat this as a require.
-  if (!isNonSendableType(r->getValue()->getType())) {
+  if (!SILIsolationInfo::isNonSendable(r->getValue())) {
     return TranslationSemantics::Require;
   }
 
@@ -3953,7 +3934,7 @@ PartitionOpTranslator::visitRawPointerToRefInst(RawPointerToRefInst *r) {
   //
   // NOTE: From RBI perspective, RawPointer is non-Sendable, so this is really
   // just look through if operand and result non-Sendable.
-  if (isNonSendableType(r->getType()))
+  if (SILIsolationInfo::isNonSendable(r))
     return TranslationSemantics::LookThrough;
 
   // Otherwise to be conservative, we need to treat this as a require.
@@ -3968,7 +3949,7 @@ PartitionOpTranslator::visitRefToRawPointerInst(RefToRawPointerInst *r) {
   //
   // NOTE: From RBI perspective, RawPointer is non-Sendable, so this is really
   // just look through if operand and result non-Sendable.
-  if (isNonSendableType(r->getOperand()->getType()))
+  if (SILIsolationInfo::isNonSendable(r->getOperand()))
     return TranslationSemantics::LookThrough;
 
   // Otherwise to be conservative, we need to treat the raw pointer as a fresh
@@ -3993,7 +3974,7 @@ TranslationSemantics PartitionOpTranslator::visitMergeIsolationRegionInst(
 
 TranslationSemantics
 PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
-  if (!isNonSendableType(ptai->getType())) {
+  if (!SILIsolationInfo::isNonSendable(ptai)) {
     return TranslationSemantics::Require;
   }
   return TranslationSemantics::Assign;
@@ -4022,7 +4003,7 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
 TranslationSemantics
 PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
   // If our field is a NonSendableType...
-  if (!isNonSendableType(reai->getType())) {
+  if (!SILIsolationInfo::isNonSendable(reai)) {
     // And the field is a let... then ignore it. We know that we cannot race on
     // any writes to the field.
     if (reai->getField()->isLet()) {
@@ -4042,7 +4023,7 @@ PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
 TranslationSemantics
 PartitionOpTranslator::visitRefTailAddrInst(RefTailAddrInst *reai) {
   // If our trailing type is Sendable...
-  if (!isNonSendableType(reai->getType())) {
+  if (!SILIsolationInfo::isNonSendable(reai)) {
     // And our ref_tail_addr is immutable... we can ignore the access since we
     // cannot race against a write to any of these fields.
     if (reai->isImmutable()) {

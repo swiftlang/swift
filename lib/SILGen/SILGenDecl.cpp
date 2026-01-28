@@ -608,6 +608,16 @@ public:
       Box = SGF.B.createMarkUnresolvedReferenceBindingInst(
           decl, Box, MarkUnresolvedReferenceBindingInst::Kind::InOut);
 
+    // If we are from a capture list, then the variable that we are creating is
+    // just a temporary used to initialize the value in the closure caller. We
+    // want to treat that as a temporary. The actual var decl is represented in
+    // the closure using a function parameter. So leave the value as a
+    // temporary.
+    auto isFromVarDecl = IsFromVarDecl_t::IsFromVarDecl;
+    if (decl->isCaptureList()) {
+      isFromVarDecl = IsNotFromVarDecl;
+    }
+
     if (SGF.getASTContext().SILOpts.supportsLexicalLifetimes(SGF.getModule())) {
       auto loweredType = SGF.getTypeLowering(decl->getTypeInContext()).getLoweredType();
       auto lifetime = SGF.F.getLifetime(decl, loweredType);
@@ -619,7 +629,7 @@ public:
       // requires one.
       Box =
           SGF.B.createBeginBorrow(decl, Box, IsLexical_t(lifetime.isLexical()),
-                                  DoesNotHavePointerEscape, IsFromVarDecl);
+                                  DoesNotHavePointerEscape, isFromVarDecl);
     }
 
     Addr = SGF.B.createProjectBox(decl, Box, 0);
