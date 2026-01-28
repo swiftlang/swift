@@ -81,15 +81,15 @@ func testBorrowingSequence() {
   let seq = MockBorrowingSequence([1, 2, 3, 4, 5])
 
   // With borrowing feature enabled, we expect nextSpan to be called
-  // CHECK-BORROWING: bb1:
   // CHECK-BORROWING: [[NEXT_SPAN_FN:%.*]] = function_ref @$s18borrowing_for_loop21MockBorrowingIteratorV8nextSpan12maximumCounts10ArraySliceVySiGSi_tF : $@convention(method) (Int, @inout MockBorrowingIterator) -> @owned ArraySlice<Int>
   // CHECK-BORROWING: = apply [[NEXT_SPAN_FN]]
   // CHECK-BORROWING: [[IS_EMPTY_CHECK:%.*]] = function_ref @$sSlsE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@in_guaranteed τ_0_0) -> Bool
   // CHECK-BORROWING: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK-BORROWING: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
-  // CHECK-BORROWING: = apply [[NOT_EMPTY]]([[IS_EMPTY_CALL]]
-  // TODO: check for IndexingIterator creation in bb2?
-  // CHECK-BORROWING: bb3:
+  // CHECK-BORROWING: [[NOT_EMPTY_CALL:%.*]] = apply [[NOT_EMPTY]]([[IS_EMPTY_CALL]]
+  // CHECK-BORROWING: [[NOT_EMPTY_RES:%.*]] = struct_extract [[NOT_EMPTY_CALL]] : $Bool, #Bool._value
+  // CHECK-BORROWING: cond_br [[NOT_EMPTY_RES]]
+  // CHECK-BORROWING: function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in τ_0_0) -> @out IndexingIterator<τ_0_0>
   // CHECK-BORROWING: [[INNER_LOOP_NEXT_FN:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (@inout IndexingIterator<τ_0_0>) -> @out Optional<τ_0_0.Element>
   // CHECK-BORROWING: = apply [[INNER_LOOP_NEXT_FN]]
   // TODO: add tests for accessing span elements
@@ -102,5 +102,59 @@ func testBorrowingSequence() {
 
   for element in seq {
     print(element)
+  }
+}
+
+// CHECK-BORROWING: sil hidden [ossa] @$s18borrowing_for_loop35testContinueTargetBorrowingSequenceyyF : $@convention(thin) () -> ()
+func testContinueTargetBorrowingSequence() {
+  let seq = MockBorrowingSequence([1, 2, 3, 4, 5])
+
+  // CHECK-BORROWING: [[OUTER_LOOP_HEADER:bb1]]:
+  // CHECK-BORROWING: cond_br {{.*}}, [[OUTER_LOOP_BODY:bb2]], [[EXIT_OUTER_LOOP:bb8]]
+  // CHECK-BORROWING: [[OUTER_LOOP_BODY]]:
+  // CHECK-BORROWING: br [[INNER_LOOP_HEADER:bb3]]
+  // CHECK-BORROWING: [[INNER_LOOP_HEADER]]:
+  // CHECK-BORROWING: switch_enum {{.*}}: [[INNER_LOOP_BODY:%.*]]
+  // Continue condition
+  // CHECK-BORROWING: cond_br {{.*}}, [[CONTINUE_BB:bb5]], [[PRINT_BB:bb6]]
+  // CHECK-BORROWING: [[CONTINUE_BB]]:
+  // CHECK-BORROWING: br [[INNER_LOOP_HEADER]]
+  // CHECK-BORROWING: [[PRINT_BB]]:
+  // Make sure that we are printing on this branch.
+  // CHECK-BORROWING: function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String
+  // CHECK-BORROWING: br [[INNER_LOOP_HEADER]]
+
+  for element in seq {
+    if (element == 2){
+        continue
+    }
+    print(element)
+  }
+}
+
+// CHECK-BORROWING: sil hidden [ossa] @$s18borrowing_for_loop32testBreakTargetBorrowingSequenceyyF : $@convention(thin) () -> ()
+func testBreakTargetBorrowingSequence() {
+  let seq = MockBorrowingSequence([1, 2, 3, 4, 5])
+
+  // CHECK-BORROWING: [[OUTER_LOOP_HEADER:bb1]]:
+  // CHECK-BORROWING: cond_br {{.*}}, [[OUTER_LOOP_BODY:bb2]]
+  // CHECK-BORROWING: [[OUTER_LOOP_BODY]]:
+  // CHECK-BORROWING: br [[INNER_LOOP_HEADER:bb3]]
+  // CHECK-BORROWING: [[INNER_LOOP_HEADER]]:
+  // CHECK-BORROWING: switch_enum {{.*}}: [[INNER_LOOP_BODY:%.*]]
+  // Continue condition
+  // CHECK-BORROWING: cond_br {{.*}}, [[BREAK_BB:bb5]], [[LOOP_BB:bb6]]
+  // CHECK-BORROWING: [[BREAK_BB]]:
+  // CHECK-BORROWING: br [[EXIT_OUTER_LOOP:bb9]]
+  // CHECK-BORROWING: [[LOOP_BB]]:
+  // CHECK-BORROWING: br [[INNER_LOOP_HEADER]]
+  // CHECK-BORROWING: [[EXIT_OUTER_LOOP]]:
+  // CHECK-BORROWING: return
+  // CHECK-BORROWING: } // end sil function '$s18borrowing_for_loop32testBreakTargetBorrowingSequenceyyF'
+
+  for element in seq {
+    if (element == 2){
+        break
+    }
   }
 }
