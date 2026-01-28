@@ -83,6 +83,7 @@ public func withTaskCancellationHandler<Return, Failure>(
   // if the task was already cancelled, it will be executed right away.
   let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
   defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+
   return try await operation()
 }
 
