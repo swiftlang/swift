@@ -559,10 +559,10 @@ extension __CocoaDictionary: _DictionaryBuffer {
 }
 
 extension __CocoaDictionary {
-  @inlinable
-  internal func mapValues<Key: Hashable, Value, T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  internal func mapValues<Key: Hashable, Value, T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
     var result = _NativeDictionary<Key, T>(capacity: self.count)
     for (cocoaKey, cocoaValue) in self {
       let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
@@ -570,6 +570,22 @@ extension __CocoaDictionary {
       try result.insertNew(key: key, value: transform(value))
     }
     return result
+  }
+
+  // ABI-only entrypoint for the rethrows version of mapValues, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    func mapValues<Key: Hashable, Value, T>(
+      _ transform: (Value) throws -> T
+    ) rethrows -> _NativeDictionary<Key, T>
+  )
+  internal func __rethrows_mapValues<Key: Hashable, Value, T>(
+    _ transform: (Value) throws -> T
+  ) throws -> _NativeDictionary<Key, T> {
+    try mapValues(transform)
   }
 }
 

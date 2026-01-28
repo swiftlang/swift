@@ -926,12 +926,30 @@ extension Dictionary {
   ///   this dictionary.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the dictionary.
-  @inlinable
-  public func mapValues<T>(
-    _ transform: (Value) throws -> T
-  ) rethrows -> Dictionary<Key, T> {
+  @_alwaysEmitIntoClient
+  public func mapValues<T, E: Error>(
+    _ transform: (Value) throws(E) -> T
+  ) throws(E) -> Dictionary<Key, T> {
     return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of mapValues, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    func mapValues<T>(
+      _ transform: (Value) throws -> T
+    ) rethrows -> Dictionary<Key, T>
+  )
+  internal func __rethrows_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) throws -> Dictionary<Key, T> {
+    try mapValues(transform)
+  }
+#endif
 
   /// Returns a new dictionary containing only the key-value pairs that have
   /// non-`nil` values as the result of transformation by the given closure.

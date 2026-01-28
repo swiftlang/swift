@@ -822,6 +822,11 @@ Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been 
 Func Array.withUnsafeBufferPointer(_:) has been removed
 Func ArraySlice.withUnsafeBufferPointer(_:) has been removed
 Func ContiguousArray.withUnsafeBufferPointer(_:) has been removed
+Func Dictionary._Variant.mapValues(_:) has been removed
+Func Dictionary.mapValues(_:) has been removed
+Func _NativeDictionary.mapValues(_:) has been removed
+Func __CocoaDictionary.mapValues(_:) has been removed
+
 
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
