@@ -5796,8 +5796,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     SmallString<16> toLabelStr;
     concatLabels(labels, toLabelStr);
 
-    using namespace version;
-    if (ctx.isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion())) {
+    if (ctx.isAtLeastFutureMajorLanguageMode()) {
       ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
                          fromLabelStr, toLabelStr);
     } else {

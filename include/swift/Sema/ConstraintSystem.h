@@ -2454,6 +2454,12 @@ public:
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
+  /// A mapping between an input expr and a custom simulated initial depth for
+  /// the constraint system's depth map.
+  /// FIXME: This only exists for a narrow compatibility hack and should be
+  /// removed.
+  llvm::DenseMap<Expr *, unsigned> InputExprSimulatedDepths;
+
 private:
   /// Describes the current solver state.
   struct SolverState {
@@ -4911,7 +4917,8 @@ private:
   /// failure.
   Type lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
                              bool openExistential,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             ProtocolConformanceRef *conformanceOut = nullptr);
 
   /// Attempt to simplify the ForEachElement constraint.
   SolutionKind

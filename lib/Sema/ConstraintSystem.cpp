@@ -1046,9 +1046,9 @@ void ConstraintSystem::recordPackElementExpansion(
 
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
-static void extendDepthMap(
-   Expr *expr,
-   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+static void
+extendDepthMap(Expr *expr, unsigned initialDepth,
+               llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
   // If we already have an entry in the map, we don't need to update it. This
   // avoids invalidating previous entries when solving a smaller component of a
   // larger AST node, e.g during conjunction solving.
@@ -1063,8 +1063,9 @@ static void extendDepthMap(
     unsigned Depth = 0;
 
     explicit RecordingTraversal(
+        unsigned initialDepth,
         llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
-        : DepthMap(depthMap) {}
+        : DepthMap(depthMap), Depth(initialDepth) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
@@ -1122,7 +1123,7 @@ static void extendDepthMap(
     }
   };
 
-  RecordingTraversal traversal(depthMap);
+  RecordingTraversal traversal(initialDepth, depthMap);
   expr->walk(traversal);
 }
 
@@ -1130,7 +1131,12 @@ std::optional<std::pair<unsigned, Expr *>>
 ConstraintSystem::getExprDepthAndParent(Expr *expr) {
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
-    extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
+    auto *E = InputExprs[NumInputExprsInWeights];
+    unsigned initialDepth = 0;
+    auto depthIter = InputExprSimulatedDepths.find(E);
+    if (depthIter != InputExprSimulatedDepths.end())
+      initialDepth = depthIter->second;
+    extendDepthMap(E, initialDepth, ExprWeights);
     ++NumInputExprsInWeights;
   }
 
@@ -3911,6 +3917,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
+    case ConstraintLocator::ImplicitForEachCompatMember:
     case ConstraintLocator::ExistentialMemberAccessConversion:
       break;
     }

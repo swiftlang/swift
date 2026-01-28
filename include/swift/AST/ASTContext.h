@@ -1555,6 +1555,13 @@ public:
     return LangOpts.isLanguageModeAtLeast(major, minor);
   }
 
+  /// Whether the "next major" language mode is being used. This isn't a real
+  /// language mode, it only exists to signal clients that expect to be
+  /// included in the next language mode when it becomes available.
+  bool isAtLeastFutureMajorLanguageMode() const {
+    return LangOpts.isAtLeastFutureMajorLanguageMode();
+  }
+
   /// Check whether it's important to respect access control restrictions
   /// in current context.
   bool isAccessControlDisabled() const {
