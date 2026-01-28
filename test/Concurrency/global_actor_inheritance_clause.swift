@@ -1,0 +1,20 @@
+// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// REQUIRES: concurrency
+
+actor SomeActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+
+class Base {}
+class Derived1: @MainActor Base {} // expected-error {{global actor 'MainActor' cannot be applied to type in inheritance clause}}
+class Derived2: @SomeGlobalActor Base {} // expected-error {{global actor 'SomeGlobalActor' cannot be applied to type in inheritance clause}}
+
+protocol SomeProtocol {}
+class Derived3: @MainActor SomeProtocol {}
+struct SomeStruct: @MainActor SomeProtocol {}
+enum SomeEnum: @MainActor SomeProtocol {}
+
+class Derived4: @MainActor Base, @MainActor SomeProtocol {} // expected-error {{global actor 'MainActor' cannot be applied to type in inheritance clause}}
