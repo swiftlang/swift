@@ -17,7 +17,6 @@ func read<T>(_ c : () -> T) -> T { c() }
 // disabled: ok!
 var im : Int {
   yielding mutate { // expected-error{{variable with a 'yielding mutate' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
-                   // expected-disabled-error@-1{{accessor_requires_coroutine_accessor}}
     1 // expected-warning{{integer literal is unused}}
   }
 }
@@ -25,7 +24,7 @@ var im : Int {
 // enabled: ok
 // disabled: ok!
 var ir : Int {
-  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessor}}
+  yielding borrow {
     1 // expected-warning{{integer literal is unused}}
   }
 }
