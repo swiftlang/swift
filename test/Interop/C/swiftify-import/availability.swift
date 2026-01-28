@@ -24,7 +24,7 @@
 void bufferPointer(int *__counted_by(len), int len) __attribute__((availability(ios,introduced=2.0))) __attribute__((availability(macosx,introduced=10.5)));
 void span(int *__counted_by(len) p __noescape, int len) __attribute__((availability(ios,introduced=2.0))) __attribute__((availability(macosx,introduced=10.5)));
 
-//--- macos-expansions.expected
+//--- macosx-expansions.expected
 @__swiftmacro_So13bufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
