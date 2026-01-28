@@ -343,3 +343,8 @@ struct WritableActorKeyPath<Root: Actor, Value>: Sendable {
         nonmutating set { setter(root, newValue) }
     }
 }
+
+protocol P {}
+struct S: isolated P {} // expected-error {{'isolated' may only be used on parameters}}
+
+
