@@ -2829,15 +2829,6 @@ void IRGenSILFunction::setupDebugLocationFor(SILInstruction &I,
     DS = BB->getTerminator()->getDebugScope();
   }
 
-  // Until SILDebugScopes are properly serialized, bare functions
-  // are allowed to not have a scope.
-  if (!DS) {
-    auto *SILFn = I.getFunction();
-    if (SILFn->isBare())
-      DS = SILFn->getDebugScope();
-    assert(maybeScopeless(I) && "instruction has location, but no scope");
-  }
-
   if (DS)
     IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
 }
