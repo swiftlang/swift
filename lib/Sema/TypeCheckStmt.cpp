@@ -3450,6 +3450,7 @@ class DesugarForEachStmt {
   VarDecl *makeIteratorVar = nullptr;
   ProtocolDecl *sequenceProto = nullptr;
   ProtocolConformanceRef seqConformanceRef;
+  ForEachStmt *innerLoop = nullptr;
 
 public:
   DesugarForEachStmt(ForEachStmt *stmt)
@@ -3806,7 +3807,7 @@ private:
                             stmt->getBody()->getRBraceLoc());
 
       // Create the inner ForEachStmt, which will be desugared recursively.
-      auto *innerLoop = new (ctx)
+      innerLoop = new (ctx)
           ForEachStmt(LabeledStmtInfo(), stmt->getForLoc(), stmt->getTryLoc(),
                       stmt->getAwaitLoc(), stmt->getUnsafeLoc(), indexPattern,
                       /* InLoc */ stmt->getInLoc(), indicesRef, SourceLoc(),
@@ -3838,7 +3839,13 @@ private:
     // Set the statement as a target for any Break or Continue statements in the
     // ForEach.
     stmt->setBreakTarget(whileStmt);
-    stmt->setContinueTarget(whileStmt);
+
+    if (isBorrowing) {
+      ASSERT(innerLoop);
+      stmt->setContinueTarget(innerLoop);
+    } else {
+      stmt->setContinueTarget(whileStmt);
+    }
 
     whileStmt->setParentForEach(stmt);
 

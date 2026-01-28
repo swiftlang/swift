@@ -1042,7 +1042,7 @@ class ForEachStmt : public LabeledStmt {
   OpaqueStmt *opaqueBodyStmt = nullptr;
   // Used to map Continue and Break targets to a desugared ForEachStmt's
   // corresponding WhileStmt.
-  WhileStmt *continueTarget = nullptr;
+  LabeledStmt *continueTarget = nullptr;
   WhileStmt *breakTarget = nullptr;
 
   friend class DesugarForEachStmtRequest;
@@ -1126,8 +1126,8 @@ public:
 
   /// getContinueTarget - Retrieve the WhileStmt Continue target once
   /// the ForEachStmt has been desugared.
-  WhileStmt *getContinueTarget() { return continueTarget; }
-  void setContinueTarget(WhileStmt *target) { continueTarget = target; }
+  LabeledStmt *getContinueTarget();
+  void setContinueTarget(LabeledStmt *target) { continueTarget = target; }
 
   /// getBreakTarget - Retrieve the WhileStmt Break target once
   /// the ForEachStmt has been desugared.
