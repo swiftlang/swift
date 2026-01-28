@@ -851,8 +851,13 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
       // .6 minimum_instruction_length
       let minimumInstructionLength = UInt(try cursor.read(as: Dwarf_Byte.self))
 
-      // .7 maximum_operations_per_instruction
-      let maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
+      let maximumOpsPerInstruction: UInt
+      if version >= 4 {
+        // .7 maximum_operations_per_instruction
+        maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
+      } else {
+        maximumOpsPerInstruction = 1
+      }
 
       // .8 default_is_stmt
       let defaultIsStmt = try cursor.read(as: Dwarf_Byte.self) != 0
