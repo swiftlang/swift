@@ -14,6 +14,7 @@
 #define SWIFT_AST_CONFORMANCELOOKUP_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include <optional>
 
 namespace swift {
@@ -92,6 +93,29 @@ ProtocolConformanceRef lookupExistentialConformance(Type type,
 llvm::ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(CanType fromType, CanType existential,
                                bool allowMissing = false);
+
+/// Find all types in conformance 'type: proto' that must not conform to 'proto'
+/// to prevent 'type' from conforming. If 'type' has no conformance, then it is
+/// the only type returned.
+///
+/// \param requiredInterfaceTypes is initially empty and upon returning contains all types
+/// required to prevent conformance. It remains empty if 'type' unconditionally
+/// conforms to 'proto'.
+///
+/// \returns 'false' only if requirements cannot be visited, for example because
+/// of an error type.
+///
+/// Example:
+///
+///     (normal_conformance type="Wrapper<T, U>" protocol="Escapable"
+///        (requirement "T" conforms_to "Escapable")
+///        (requirement "U" conforms_to "Escapable"))
+///
+///     requiredInterfaceTypes: (T, U)
+///
+bool collectRequiredTypesForInverseConformance(
+  Type type, ProtocolDecl *proto,
+  llvm::SmallVectorImpl<Type> &requiredInterfaceTypes);
 
 }
 

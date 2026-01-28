@@ -195,6 +195,10 @@ public:
       SmallVectorImpl<ProtocolConformanceRef> *isolatedConformances = nullptr
   ) const;
 
+  bool collectRequiredTypesForInvertibleProtocol(
+    SmallVectorImpl<Requirement> &subReqs, ProtocolDecl *proto,
+    SmallVectorImpl<Type> &requiredInterfaceTypes) const;
+
   /// Determines if this substituted requirement can ever be satisfied,
   /// possibly with additional substitutions.
   ///
@@ -248,6 +252,10 @@ checkRequirementsWithoutContext(ArrayRef<Requirement> requirements);
 CheckRequirementsResult checkRequirements(ArrayRef<Requirement> requirements,
                                           TypeSubstitutionFn substitutions,
                                           SubstOptions options = std::nullopt);
+
+bool collectRequiredTypesForInvertibleProtocol(
+  ArrayRef<Requirement> requirements, ProtocolDecl *proto,
+  SmallVectorImpl<Type> &requiredInterfaceTypes);
 
 /// A requirement as written in source, together with a source location. See
 /// ProtocolDecl::getStructuralRequirements().

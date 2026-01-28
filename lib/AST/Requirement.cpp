@@ -351,6 +351,60 @@ CheckRequirementsResult swift::checkRequirements(
   return checkRequirements(substReqs);
 }
 
+bool swift::collectRequiredTypesForInvertibleProtocol(
+  ArrayRef<Requirement> requirements, ProtocolDecl *proto,
+  SmallVectorImpl<Type> &requiredInterfaceTypes) {
+
+  SmallVector<Requirement, 4> worklist(requirements.begin(),
+                                       requirements.end());
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+    if (!req.collectRequiredTypesForInvertibleProtocol(worklist, proto,
+                                                       requiredInterfaceTypes))
+      return false;
+  }
+  return true;
+}
+
+bool Requirement::collectRequiredTypesForInvertibleProtocol(
+  SmallVectorImpl<Requirement> &subReqs, ProtocolDecl *proto,
+  SmallVectorImpl<Type> &requiredInterfaceTypes) const {
+  if (hasError())
+    return false;
+
+  if (getKind() != RequirementKind::Conformance)
+    return true;
+
+  if (getProtocolDecl() != proto)
+    return true;
+
+  Type firstType = getFirstType();
+
+  if (auto packType = firstType->getAs<PackType>()) {
+    for (auto eltType : packType->getElementTypes()) {
+      if (auto *expansionType = eltType->getAs<PackExpansionType>()) {
+        eltType = expansionType->getPatternType();
+      }
+      subReqs.emplace_back(RequirementKind::Conformance, eltType,
+                           getSecondType());
+    }
+    return true;
+  }
+
+  if (firstType->isTypeParameter()) {
+    requiredInterfaceTypes.push_back(firstType);
+    return true;
+  }
+  auto conformance = lookupConformance(firstType, proto);
+  if (!conformance) {
+    requiredInterfaceTypes.push_back(firstType);
+    return true;
+  }
+  auto condReqs = conformance.getConditionalRequirements();
+  subReqs.append(condReqs.begin(), condReqs.end());
+  return true;
+}
+
 InverseRequirement::InverseRequirement(Type subject,
                                        ProtocolDecl *protocol,
                                        SourceLoc loc)
