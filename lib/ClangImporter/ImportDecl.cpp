@@ -503,15 +503,35 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
   nominal->addMember(typealias);
 }
 
-static bool isCxxProtocol(const ProtocolDecl *protocol) {
-  return protocol->getNameStr().contains("Cxx");
-}
-
 static bool
 checkSuppressedConformancesRequirements(const NominalTypeDecl *nominal,
                                         const ProtocolDecl *protocol) {
+  // Previously we would never conform a type that is ~Copyable or
+  // ~Escapable to a synthesized protocol. We relax this for C++ standard
+  // library overlay protocols, but we make sure that, if a type is ~Copyable
+  // or ~Escapable, the synthesized protocol we're trying to conform to has
+  // the same requirement.
+
+  auto isCxxKnownProtocol = [](const ProtocolDecl *protocol) {
+    auto protoKind = protocol->getKnownProtocolKind();
+    if (!protoKind.has_value())
+      return false;
+    switch (protoKind.value()) {
+#define CXX_PROTOCOL(Name)                                                     \
+  case KnownProtocolKind::Name:                                                \
+    return true;
+#include "swift/AST/KnownProtocols.def"
+    default:
+      return false;
+    }
+    return false;
+  };
+
   auto nominalAttrs = nominal->getAttrs();
-  if (!isCxxProtocol(protocol))
+  // For any protocol that is not part of the C++ stdlib overlay, we still
+  // ignore the synthesized conformances when the `nominal` is ~Copyable or
+  // ~Escapable
+  if (!isCxxKnownProtocol(protocol))
     return !(nominalAttrs.hasAttribute<MoveOnlyAttr>() ||
              nominalAttrs.hasAttribute<NonEscapableAttr>());
 
