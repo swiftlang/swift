@@ -93,8 +93,9 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
           Context.Diags
               .diagnose(loc, diagID, D, accessor->getFormalAccess(),
                         fragileKind.getSelector())
-              .warnUntilFutureLanguageModeIf(
-                  !Context.LangOpts.hasFeature(Feature::StrictAccessControl));
+              .warnUntilLanguageModeIf(
+                  !Context.LangOpts.hasFeature(Feature::StrictAccessControl),
+                  LanguageMode::future);
           Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
         }
       }
@@ -214,7 +215,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .warnUntilLanguageModeIf(warnPreSwift6, LanguageMode::v6)
         .limitBehaviorIfMorePermissive(commonBehavior);
   } else {
     ctx.Diags
@@ -223,7 +224,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .warnUntilLanguageModeIf(warnPreSwift6, LanguageMode::v6)
         .limitBehaviorIfMorePermissive(commonBehavior);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
@@ -399,7 +400,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))
         .warnUntilLanguageModeIf(downgradeToWarning == DowngradeToWarning::Yes,
-                                 6)
+                                 LanguageMode::v6)
         .limitBehaviorIfMorePermissive(commonBehavior);
 
     if (originKind == DisallowedOriginKind::MissingImport &&
@@ -489,8 +490,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
           (warnIfConformanceUnavailablePreSwift6 &&
            originKind != DisallowedOriginKind::SPIOnly &&
            originKind != DisallowedOriginKind::NonPublicImport) ||
-          originKind == DisallowedOriginKind::MissingImport,
-          6)
+              originKind == DisallowedOriginKind::MissingImport,
+          LanguageMode::v6)
       .limitBehaviorIfMorePermissive(commonBehavior);
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&

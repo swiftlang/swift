@@ -682,7 +682,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       if (!anchor->hasCurriedSelf() || ctx.isAtLeastFutureMajorLanguageMode())
         return Type();
 
-      diag.warnUntilFutureLanguageMode();
+      diag.warnUntilLanguageMode(LanguageMode::future);
     }
   }
 

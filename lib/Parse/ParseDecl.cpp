@@ -4229,7 +4229,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     consumeToken();
     if (Version.empty()) {
       // Versions cannot be empty (e.g. "0").
-      diagnose(Range.Start, D).warnUntilLanguageMode(6);
+      diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
       return true;
     }
     return false;
@@ -4270,7 +4270,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
 
   if (Version.empty()) {
     // Versions cannot be empty (e.g. "0.0").
-    diagnose(Range.Start, D).warnUntilLanguageMode(6);
+    diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
     return true;
   }
 
@@ -4308,7 +4308,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   if (isAtAttributeLParen(/*isCustomAttribute=*/true)) {
     if (getEndOfPreviousLoc() != Tok.getLoc()) {
       diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
@@ -4367,7 +4367,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   bool hasModuleSelector = peekToken().is(tok::colon_colon);
@@ -4786,7 +4786,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   // If this not an identifier, the attribute is malformed.

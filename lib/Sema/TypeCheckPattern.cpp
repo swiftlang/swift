@@ -1085,7 +1085,7 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
       ctx.Diags
           .diagnose(NLE->getLoc(), diag::value_type_comparison_with_nil_illegal,
                     patternTy)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
 
       if (ctx.isLanguageModeAtLeast(6))
         return nullptr;

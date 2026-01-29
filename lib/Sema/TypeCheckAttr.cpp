@@ -1337,7 +1337,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilFutureLanguageMode();
+                .warnUntilLanguageMode(LanguageMode::future);
           }
         }
       }
@@ -2228,8 +2228,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     });
 
     if (candidates.empty()) {
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
+      const auto languageModeForError = LanguageMode::future;
+      bool shouldError = ctx.isLanguageModeAtLeast(languageModeForError);
 
       // Diagnose as an error in resilient modules regardless of language
       // version since this will break the swiftinterface. Don't diagnose
@@ -2244,7 +2244,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
                   requiredAccessScope.requiredAccessForDiagnostics(),
                   /*isForSetter=*/false, /*useDefaultAccess=*/false,
                   /*updateAttr=*/false);
-      diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
+      diag.warnUntilLanguageModeIf(!shouldError, languageModeForError);
 
       if (shouldError) {
         attr->setInvalid();
@@ -3062,7 +3062,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated,
              applicationMainKind)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_deprecated_use_attr_main)
@@ -5657,7 +5657,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
     // properties of Objective-C protocols.
     auto D = diag::ownership_invalid_in_protocols;
     Diags.diagnose(attr->getLocation(), D, ownershipKind)
-        .warnUntilLanguageMode(5)
+        .warnUntilLanguageMode(LanguageMode::v5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
@@ -7941,7 +7941,7 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
     if (isolation.isActorIsolated()) {
       diagnoseAndRemoveAttr(attr, diag::sendable_isolated_sync_function,
                             isolation, value)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
   }
   // Prevent Sendable Attr from being added to methods of non-sendable types
@@ -8025,12 +8025,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (var->supportsMutation() && !attr->isUnsafe() && !canBeNonisolated) {
           if (var->hasAttachedPropertyWrapper()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-                .warnUntilLanguageModeIf(attr->isImplicit(), 6)
+                .warnUntilLanguageModeIf(attr->isImplicit(), LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-                .warnUntilLanguageMode(6)
+                .warnUntilLanguageMode(LanguageMode::v6)
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else {
@@ -8111,7 +8111,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
         if (!ctor->hasAsync()) {
           // the isolation for a synchronous init cannot be `nonisolated`.
           diagnoseAndRemoveAttr(attr, diag::nonisolated_actor_sync_init)
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           return;
         }
       }
@@ -8237,7 +8237,7 @@ void AttributeChecker::visitInheritActorContextAttr(
     diagnose(attr->getLocation(),
              diag::inherit_actor_context_only_on_sending_or_Sendable_params,
              attr)
-        .warnUntilFutureLanguageMode();
+        .warnUntilLanguageMode(LanguageMode::future);
   }
 
   // Either `async` or `@isolated(any)`.
@@ -8246,7 +8246,7 @@ void AttributeChecker::visitInheritActorContextAttr(
         attr,
         diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
         attr)
-        .warnUntilFutureLanguageMode();
+        .warnUntilLanguageMode(LanguageMode::future);
   }
 }
 
@@ -8330,7 +8330,7 @@ void AttributeChecker::visitUnsafeInheritExecutorAttr(
     bool inConcurrencyModule = D->getDeclContext()->getParentModule()->getName()
         .str() == "_Concurrency";
     auto diag = fn->diagnose(diag::unsafe_inherits_executor_deprecated);
-    diag.warnUntilLanguageMode(6);
+    diag.warnUntilLanguageMode(LanguageMode::v6);
     diag.limitBehaviorIf(inConcurrencyModule, DiagnosticBehavior::Warning);
     replaceUnsafeInheritExecutorWithDefaultedIsolationParam(fn, diag);
   }
@@ -8713,7 +8713,7 @@ public:
                    diag::isolated_parameter_closure_combined_global_actor_attr,
                    param->getName())
               .fixItRemove(attr->getRangeWithAt())
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           attr->setInvalid();
           break; // don't need to complain about this more than once.
         }

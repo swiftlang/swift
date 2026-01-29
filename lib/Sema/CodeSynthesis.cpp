@@ -407,7 +407,7 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
                             ICK == ImplicitConstructorKind::Memberwise,
                             decl->getDeclaredType(), existingIsolation,
                             isolation)
-                  .warnUntilLanguageMode(6);
+                  .warnUntilLanguageMode(LanguageMode::v6);
               if (previousVar) {
                 previousVar->diagnose(diag::property_requires_actor,
                                       previousVar, existingIsolation);
@@ -952,7 +952,7 @@ static void diagnoseMissingRequiredInitializer(
       .diagnose(insertionLoc, diag::required_initializer_missing,
                 superInitializer->getName(),
                 superInitializer->getDeclContext()->getDeclaredInterfaceType())
-      .warnUntilLanguageModeIf(downgradeToWarning, 6)
+      .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::v6)
       .fixItInsert(insertionLoc, initializerText);
 
   ctx.Diags.diagnose(findNonImplicitRequiredInit(superInitializer),
