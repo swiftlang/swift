@@ -1579,6 +1579,69 @@ static CanPackType getInducedPackType(AnyFunctionType::CanParamArrayRef params,
   return CanPackType::get(ctx, elts);
 }
 
+static MetadataResponse
+emitExtendedFunctionTypeMetadataBackdeploy(IRGenFunction &IGF,
+                                           ArrayRef<llvm::Value *> arguments,
+                                           FunctionTypeMetadataParamInfo info) {
+  assert(arguments.size() == 8 && "We always expect 8 parameters");
+  std::array<llvm::Type *, 8> types;
+  for (auto pair : llvm::enumerate(arguments)) {
+    types[pair.index()] = pair.value()->getType();
+  }
+  auto *helper = IGF.IGM.getOrCreateHelperFunction(
+      "__swift_getExtendedFunctionTypeMetadata_backDeploy", IGF.IGM.PtrTy,
+      types, [&](auto &subIGF) {
+        llvm::Function *curFn = subIGF.CurFn;
+        std::array<llvm::Value *, 8> arguments;
+        for (auto pair : llvm::enumerate(curFn->args())) {
+          arguments[pair.index()] = &pair.value();
+        }
+        std::array<llvm::Value *, 4> backdeployArgs = {
+            arguments[0],
+            // We skip the second parameter since it is for the differentiable
+            // entry.
+            arguments[2], arguments[3], arguments[4]};
+
+        auto fnPtr = subIGF.IGM.getGetFunctionMetadataExtendedFunctionPointer();
+        auto isNonNull =
+            subIGF.Builder.CreateIsNotNull(fnPtr.getPointer(subIGF));
+        auto *successBlock =
+            subIGF.createBasicBlock("have-get-function-metadata-extended");
+        auto *failBlock = subIGF.createBasicBlock(
+            "do-not-have-get-function-metadata-extended");
+        auto *contBB =
+            subIGF.createBasicBlock("cont-get-function-metadata-extended-call");
+        subIGF.Builder.CreateCondBr(isNonNull, successBlock, failBlock);
+
+        subIGF.Builder.emitBlock(successBlock);
+        auto *successValue = subIGF.Builder.CreateCall(fnPtr, arguments);
+        successValue->setDoesNotThrow();
+        subIGF.Builder.CreateBr(contBB);
+
+        subIGF.Builder.emitBlock(failBlock);
+        auto *failValue = subIGF.Builder.CreateCall(
+            subIGF.IGM.getGetFunctionMetadataFunctionPointer(), backdeployArgs);
+        failValue->setDoesNotThrow();
+        subIGF.Builder.CreateBr(contBB);
+
+        subIGF.Builder.emitBlock(contBB);
+        auto *phi = subIGF.Builder.CreatePHI(failValue->getType(), 2);
+        phi->addIncoming(successValue, successBlock);
+        phi->addIncoming(failValue, failBlock);
+        subIGF.Builder.CreateRet(phi);
+      });
+
+  auto fnType = llvm::FunctionType::get(IGF.IGM.PtrTy, types,
+                                        false /*is var arg*/);
+  auto sig = Signature(fnType, {}, IGF.IGM.DefaultCC);
+  auto fnPtr = FunctionPointer::forDirect(FunctionPointer::Kind::Function,
+                                          helper, nullptr, sig);
+  auto call = IGF.Builder.CreateCall(fnPtr, arguments);
+  call->setDoesNotThrow();
+  cleanupFunctionTypeMetadataParams(IGF, info);
+  return MetadataResponse::forComplete(call);
+}
+
 static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
                                                     CanFunctionType type,
                                                     DynamicMetadataRequest request) {
@@ -1666,7 +1729,6 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
 
   default:
     llvm::SmallVector<llvm::Value *, 8> arguments;
-
     arguments.push_back(flagsVal);
 
     llvm::Value *diffKindVal = nullptr;
@@ -1743,24 +1805,42 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
       arguments.push_back(llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
     }
 
-    auto getMetadataFn =
-        flags.hasExtendedFlags()
-            ? IGF.IGM.getGetFunctionMetadataExtendedFunctionPointer()
-        : type->getGlobalActor()
-            ? (IGF.IGM.isConcurrencyAvailable()
-                   ? IGF.IGM
-                         .getGetFunctionMetadataGlobalActorFunctionPointer()
-                   : IGF.IGM
-                         .getGetFunctionMetadataGlobalActorBackDeployFunctionPointer())
-        : type->isDifferentiable()
-            ? IGF.IGM.getGetFunctionMetadataDifferentiableFunctionPointer()
-            : IGF.IGM.getGetFunctionMetadataFunctionPointer();
+    // If we have a function that is nonisolated(nonsending) and that is the
+    // only extended flag that it has, allow for the metadata call to backdeploy
+    // by calling GetFunctionMetadata instead of GetFunctionMetadataExtended if
+    // we backdeploy and GetFunctionMetadataExtended is not available.
+    //
+    // SAFETY: This is safe to do as long as we do not attempt to reflect (in a
+    // way that exposes the async bits of the type), cast, or existential erase
+    // these types.
+    if (flags.hasExtendedFlags() &&
+        (extFlags == decltype(extFlags)().withNonIsolatedCaller()) &&
+        !type->isDifferentiable() &&
+        cast<llvm::Function>(IGF.IGM.getGetFunctionMetadataExtendedFn())
+            ->hasExternalWeakLinkage()) {
+      return emitExtendedFunctionTypeMetadataBackdeploy(IGF, arguments, info);
+    }
+
+    auto getMetadataFn = [&]() -> FunctionPointer {
+      if (flags.hasExtendedFlags())
+        return IGF.IGM.getGetFunctionMetadataExtendedFunctionPointer();
+
+      if (type->getGlobalActor()) {
+        if (IGF.IGM.isConcurrencyAvailable())
+          return IGF.IGM.getGetFunctionMetadataGlobalActorFunctionPointer();
+        return IGF.IGM
+            .getGetFunctionMetadataGlobalActorBackDeployFunctionPointer();
+      }
+
+      if (type->isDifferentiable())
+        return IGF.IGM.getGetFunctionMetadataDifferentiableFunctionPointer();
+
+      return IGF.IGM.getGetFunctionMetadataFunctionPointer();
+    }();
 
     auto call = IGF.Builder.CreateCall(getMetadataFn, arguments);
     call->setDoesNotThrow();
-
     cleanupFunctionTypeMetadataParams(IGF, info);
-
     return MetadataResponse::forComplete(call);
   }
 }
