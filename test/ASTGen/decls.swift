@@ -119,8 +119,8 @@ func testVars() {
     get async throws { return 0 }
   }
   var t: Int {
-    read { yield q }
-    modify { yield &q }
+    yielding borrow { yield q }
+    yielding mutate { yield &q }
   }
 }
 

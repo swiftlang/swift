@@ -26,20 +26,20 @@ public func bar(t: T2) -> MyClass<T2> {
 
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvgAA2T1V_Tg5 {{.*}}{
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvsAA2T1V_Tg5 {{.*}}{
-// CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvMAA2T1V_Tg5 {{.*}}{
+// CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvxAA2T1V_Tg5 {{.*}}{
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tt0g5 {{.*}}{
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassCfDAA2T1V_Tg5 {{.*}}{
 
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvgAA2T2V_Tg5 {{.*}}{
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvsAA2T2V_Tg5 {{.*}}{
-// CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvMAA2T2V_Tg5 {{.*}}{
+// CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1txvxAA2T2V_Tg5 {{.*}}{
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tt0g5 {{.*}}{
 // CHECK-SIL-DAG: sil {{.*}}@$e4main7MyClassCfDAA2T2V_Tg5 {{.*}}{
 
 // CHECK-SIL: sil_vtable $MyClass<T2> {
 // CHECK-SIL:   #MyClass.t!getter: <T> (MyClass<T>) -> () -> T : @$e4main7MyClassC1txvgAA2T2V_Tg5 // specialized MyClass.t.getter
 // CHECK-SIL:   #MyClass.t!setter: <T> (MyClass<T>) -> (T) -> () : @$e4main7MyClassC1txvsAA2T2V_Tg5 // specialized MyClass.t.setter
-// CHECK-SIL:   #MyClass.t!modify: <T> (MyClass<T>) -> () -> () : @$e4main7MyClassC1txvMAA2T2V_Tg5  // specialized MyClass.t.modify
+// CHECK-SIL:   #MyClass.t!yielding_mutate: <T> (MyClass<T>) -> () -> () : @$e4main7MyClassC1txvxAA2T2V_Tg5  // specialized MyClass.t.yielding_mutate
 // CHECK-SIL:   #MyClass.init!allocator: <T> (MyClass<T>.Type) -> (T) -> MyClass<T> : @$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5  // specialized MyClass.__allocating_init(t:)
 // CHECK-SIL:   #MyClass.deinit!deallocator: @$e4main7MyClassCfDAA2T2V_Tg5  // specialized MyClass.__deallocating_deinit
 // CHECK-SIL: }
@@ -47,14 +47,14 @@ public func bar(t: T2) -> MyClass<T2> {
 // CHECK-SIL: sil_vtable $MyClass<T1> {
 // CHECK-SIL:   #MyClass.t!getter: <T> (MyClass<T>) -> () -> T : @$e4main7MyClassC1txvgAA2T1V_Tg5 // specialized MyClass.t.getter
 // CHECK-SIL:   #MyClass.t!setter: <T> (MyClass<T>) -> (T) -> () : @$e4main7MyClassC1txvsAA2T1V_Tg5 // specialized MyClass.t.setter
-// CHECK-SIL:   #MyClass.t!modify: <T> (MyClass<T>) -> () -> () : @$e4main7MyClassC1txvMAA2T1V_Tg5  // specialized MyClass.t.modify
+// CHECK-SIL:   #MyClass.t!yielding_mutate: <T> (MyClass<T>) -> () -> () : @$e4main7MyClassC1txvxAA2T1V_Tg5  // specialized MyClass.t.yielding_mutate
 // CHECK-SIL:   #MyClass.init!allocator: <T> (MyClass<T>.Type) -> (T) -> MyClass<T> : @$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5  // specialized MyClass.__allocating_init(t:)
 // CHECK-SIL:   #MyClass.deinit!deallocator: @$e4main7MyClassCfDAA2T1V_Tg5  // specialized MyClass.__deallocating_deinit
 // CHECK-SIL: }
 
 
-// CHECK-IR-DAG: @"$e4main7MyClassCyAA2T2VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$e4main7MyClassCfDAA2T2V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvMAA2T2V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
-// CHECK-IR-DAG: @"$e4main7MyClassCyAA2T1VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$e4main7MyClassCfDAA2T1V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvMAA2T1V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
+// CHECK-IR-DAG: @"$e4main7MyClassCyAA2T2VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$e4main7MyClassCfDAA2T2V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvxAA2T2V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
+// CHECK-IR-DAG: @"$e4main7MyClassCyAA2T1VGN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$e4main7MyClassCfDAA2T1V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvxAA2T1V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
 
 // CHECK-IR-DAG: define {{.*}}void @"$e4main7MyClassC1txvgAA2T1V_Tg5"(ptr swiftself %0)
 // CHECK-IR-DAG: define {{.*}}i1 @"$e4main7MyClassC1txvgAA2T2V_Tg5"(ptr swiftself %0)
@@ -73,8 +73,8 @@ public func bar(t: T2) -> MyClass<T2> {
 
 
 
-// CHECK-IR-EXIST-DAG: @"$e4main7MyClassCyAA2T1VGMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfDAA2T1V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvMAA2T1V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
-// CHECK-IR-EXIST-DAG: @"$e4main7MyClassCyAA2T2VGMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfDAA2T2V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvMAA2T2V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
+// CHECK-IR-EXIST-DAG: @"$e4main7MyClassCyAA2T1VGMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfDAA2T1V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvxAA2T1V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
+// CHECK-IR-EXIST-DAG: @"$e4main7MyClassCyAA2T2VGMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfDAA2T2V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvxAA2T2V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
 
 // CHECK-IR-EXIST-DAG: @"$e4main7MyClassCyAA2T1VGN" = {{.*}} alias {{.*}} ptr @"$e4main7MyClassCyAA2T1VGMf", i32 0, i32 1)
 // CHECK-IR-EXIST-DAG: @"$e4main7MyClassCyAA2T2VGN" = {{.*}} alias {{.*}} ptr @"$e4main7MyClassCyAA2T2VGMf", i32 0, i32 1)
