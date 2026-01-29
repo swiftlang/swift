@@ -1683,8 +1683,6 @@ public:
       handleAssignNonDisconnectedIntoSendingResult(op);
 
       // Create extra region for our dest and merge it into dest's region.
-      //
-      // We use an optional in case our evaluator does not support doing this.
       p.trackNewElement(op.getOpArg3());
       p.merge(op.getOpArg1(), op.getOpArg3());
 
