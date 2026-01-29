@@ -368,7 +368,9 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
-  void printLifetimeDependence(
+  /// Print lifetimeDependence as a SIL lifetime attribute, attached to a
+  /// parameter or result of a function.
+  void printSILLifetimeDependence(
       std::optional<LifetimeDependenceInfo> lifetimeDependence) {
     if (!lifetimeDependence.has_value()) {
       return;
@@ -380,9 +382,20 @@ public:
       ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
     if (auto lifetimeDependence =
             getLifetimeDependenceFor(lifetimeDependencies, index)) {
-      printLifetimeDependence(*lifetimeDependence);
+      printSILLifetimeDependence(*lifetimeDependence);
     }
   }
+  
+  /// Print lifetimeDependence as a Swift lifetime attribute, that could be
+  /// attached to a function type or a declaration, if is possible to express
+  /// with Swift lifetime syntax (using parameter labels, not indices).
+  ///
+  /// Any lifetime with a source or target parameter that doesn't have a label
+  /// must have been inferred, so we do not need to print it. This relies on
+  /// indices being disallowed in Swift lifetime annotations.
+  void tryPrintSwiftLifetimeDependence(
+      LifetimeDependenceInfo const &lifetimeDependence,
+      ArrayRef<AnyFunctionType::Param> params, bool hasUncurriedSelf);
 
 private:
   virtual void anchor();

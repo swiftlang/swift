@@ -33,6 +33,7 @@ namespace swift {
 class AbstractFunctionDecl;
 class FunctionTypeRepr;
 class LifetimeDependentTypeRepr;
+struct LifetimeDependenceInfoFunctionTypeRequestData;
 class SILParameterInfo;
 class SILResultInfo;
 
@@ -307,6 +308,12 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
+  /// Get a string representation of this LifetimeDependenceInfo suitable for
+  /// printing in SIL. The target is not included, since this is determined by
+  /// the position of the attribute in SIL.
+  ///
+  /// For printing lifetimes in Swift, see
+  /// ASTPrinter::tryPrintSwiftLifetimeDependence.
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
@@ -315,6 +322,14 @@ public:
   /// lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers.
   static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ValueDecl *decl);
+
+  /// Builds LifetimeDependenceInfo from a function type.
+  ///
+  /// The information is passed indirectly because it contains
+  /// AnyFunctionType::Param, which is defined in Types.h. Including that header
+  /// in this one would create a cycle.
+  static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  get(LifetimeDependenceInfoFunctionTypeRequestData &data);
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

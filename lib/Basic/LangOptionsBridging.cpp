@@ -181,8 +181,8 @@ void BridgedLangOptions_enumerateBuildConfigurationEntries(
     callback(cLangOpts, callbackContext, BCKAttribute, StringRef(#SPELLING));
 #include "swift/AST/DeclAttr.def"
 
-#define SIL_TYPE_ATTR(X, C)
-#define TYPE_ATTR(SPELLING, CLASS)                                             \
+#define SIL_TYPE_ATTR(X, C, ...)
+#define TYPE_ATTR(SPELLING, CLASS, ...)                                        \
   callback(cLangOpts, callbackContext, BCKAttribute, StringRef(#SPELLING));
 #include "swift/AST/TypeAttr.def"
 

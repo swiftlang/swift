@@ -25,7 +25,7 @@ using namespace swift;
 
 // Define `.asTypeAttr` on each BridgedXXXTypeAttr type.
 #define SIMPLE_TYPE_ATTR(...)
-#define TYPE_ATTR(SPELLING, CLASS)                                             \
+#define TYPE_ATTR(SPELLING, CLASS, ...)                                        \
   SWIFT_NAME("getter:Bridged" #CLASS "TypeAttr.asTypeAttribute(self:)")        \
   BridgedTypeAttribute Bridged##CLASS##TypeAttr_asTypeAttribute(               \
       Bridged##CLASS##TypeAttr attr) {                                         \
@@ -67,6 +67,14 @@ BridgedDifferentiableTypeAttr BridgedDifferentiableTypeAttr_createParsed(
     SourceLoc kindLoc) {
   return new (cContext.unbridged()) DifferentiableTypeAttr(
       atLoc, nameLoc, parensRange, {unbridged(cKind), kindLoc});
+}
+
+BridgedLifetimeTypeAttr BridgedLifetimeTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedLifetimeEntry entry) {
+  return new (cContext.unbridged())
+      LifetimeTypeAttr(atLoc, nameLoc, parensRange, entry.unbridged());
 }
 
 BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(

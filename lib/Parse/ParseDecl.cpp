@@ -39,6 +39,7 @@
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/ParserResult.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -4885,8 +4886,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   switch (attr) {
 
   // Simple type attributes don't need any further checking.
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS)
-#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS, ...)
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS, ...) case TypeAttrKind::CLASS:
 #include "swift/AST/TypeAttr.def"
   SimpleAttr:
     if (!justChecking) {
@@ -4896,7 +4897,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
 
   // For simple SIL type attributes, check whether we're parsing SIL,
   // then return to the SimpleAttr case.
-#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) case TypeAttrKind::CLASS:
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS, ...) case TypeAttrKind::CLASS:
 #include "swift/AST/TypeAttr.def"
     if (!isInSILMode()) {
       if (!justChecking) {
@@ -5072,6 +5073,22 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     if (!justChecking) {
       result = new (Context) DifferentiableTypeAttr(AtLoc, attrLoc, parensRange,
                                                     {diffKind, diffKindLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Lifetime: {
+    const auto entryResult = parseLifetimeEntry(AtLoc);
+    if (entryResult.isNull()) {
+      return makeParserError();
+    }
+
+    auto *entry = entryResult.get();
+
+    if (!justChecking) {
+      result = new (Context) LifetimeTypeAttr(
+          AtLoc, attrLoc, SourceRange(entry->getStartLoc(), entry->getEndLoc()),
+          entryResult.get());
     }
     return makeParserSuccess();
   }
