@@ -886,6 +886,21 @@ case TypeKind::Id:
 
           extInfo = extInfo->withGlobalActor(globalActorType);
         }
+
+        // Transform the sendable dependent type if present.
+        if (auto sendableDep = origExtInfo.getSendableDependentType()) {
+          auto [newSendableDep, isSendable] =
+              asDerived().transformSendableDependentType(sendableDep);
+          if (!newSendableDep) {
+            // If we're no longer sendable dependent, update the @Sendable bit.
+            extInfo = extInfo->withSendableDependentType(Type());
+            extInfo = extInfo->withSendable(isSendable);
+            isUnchanged = false;
+          } else if (newSendableDep.getPointer() != sendableDep.getPointer()) {
+            extInfo = extInfo->withSendableDependentType(newSendableDep);
+            isUnchanged = false;
+          }
+        }
       }
 
       if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
@@ -1141,6 +1156,10 @@ case TypeKind::Id:
   }
 
   bool shouldDesugarTypeAliases() const { return false; }
+
+  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    return std::make_pair(ty, false);
+  }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();

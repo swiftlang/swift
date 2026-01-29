@@ -1611,7 +1611,7 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
 
 namespace {
 
-struct TypeSimplifier {
+struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
   ConstraintSystem &CS;
   llvm::function_ref<Type(TypeVariableType *)> GetFixedTypeFn;
 
@@ -1623,9 +1623,12 @@ struct TypeSimplifier {
 
   TypeSimplifier(ConstraintSystem &CS,
                  llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn)
-    : CS(CS), GetFixedTypeFn(getFixedTypeFn) {}
+      : TypeTransform(CS.getASTContext()), CS(CS),
+        GetFixedTypeFn(getFixedTypeFn) {}
 
-  std::optional<Type> operator()(TypeBase *type) {
+  Type simplify(Type ty) { return doIt(ty, TypePosition::Invariant); }
+
+  std::optional<Type> transform(TypeBase *type, /*unused*/ TypePosition) {
     if (auto tvt = dyn_cast<TypeVariableType>(type)) {
       auto fixedTy = GetFixedTypeFn(tvt);
 
@@ -1659,7 +1662,7 @@ struct TypeSimplifier {
       if (tuple->getNumElements() == 1) {
         auto element = tuple->getElement(0);
         auto elementType = element.getType();
-        auto resolvedType = elementType.transformRec(*this);
+        auto resolvedType = simplify(elementType);
 
         // If this is a single-element tuple with pack expansion
         // variable inside, let's unwrap it if pack is flattened.
@@ -1705,8 +1708,8 @@ struct TypeSimplifier {
       }
 
       // Transform the count type, ignoring any active pack expansions.
-      auto countType = expansion->getCountType().transformRec(
-          TypeSimplifier(CS, GetFixedTypeFn));
+      auto countType = TypeSimplifier(CS, GetFixedTypeFn)
+                           .simplify(expansion->getCountType());
 
       if (!countType->is<PackType>() &&
           !countType->is<PackArchetypeType>()) {
@@ -1730,7 +1733,7 @@ struct TypeSimplifier {
           ActivePackExpansions.back().isPackExpansion =
             (countExpansion != nullptr);
 
-          auto elt = expansion->getPatternType().transformRec(*this);
+          auto elt = simplify(expansion->getPatternType());
           if (countExpansion)
             elt = PackExpansionType::get(elt, countExpansion->getCountType());
           elts.push_back(elt);
@@ -1744,7 +1747,7 @@ struct TypeSimplifier {
         return PackType::get(CS.getASTContext(), elts);
       } else {
         ActivePackExpansions.push_back({true, 0});
-        auto patternType = expansion->getPatternType().transformRec(*this);
+        auto patternType = simplify(expansion->getPatternType());
         ActivePackExpansions.pop_back();
         return PackExpansionType::get(patternType, countType);
       }
@@ -1754,7 +1757,7 @@ struct TypeSimplifier {
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       // Simplify the base.
-      Type newBase = depMemTy->getBase().transformRec(*this);
+      Type newBase = simplify(depMemTy->getBase());
 
       if (newBase->isPlaceholder()) {
         return PlaceholderType::get(CS.getASTContext(), depMemTy);
@@ -1814,13 +1817,24 @@ struct TypeSimplifier {
 
     return std::nullopt;
   }
+
+  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    ty = simplify(ty);
+
+    // If we still have type variables, we keep the dependence.
+    if (ty->hasTypeVariable())
+      return std::pair(ty, false);
+
+    // Otherwise we've flattened the dependence, evaluate Sendable.
+    return std::make_pair(Type(), ty->isSendableType());
+  }
 };
 
 } // end anonymous namespace
 
 Type ConstraintSystem::simplifyTypeImpl(Type type,
     llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) {
-  return type.transformRec(TypeSimplifier(*this, getFixedTypeFn));
+  return TypeSimplifier(*this, getFixedTypeFn).simplify(type);
 }
 
 Type ConstraintSystem::simplifyType(Type type) {
@@ -3712,7 +3726,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::GlobalActorType:
-    case ConstraintLocator::ContextualType: {
+    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::FunctionSendability: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
