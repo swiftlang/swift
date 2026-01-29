@@ -19,7 +19,6 @@ import StdlibUnittest
 var suite = TestSuite("OutputSpan Tests")
 defer { runAllTests() }
 
-@available(SwiftStdlib 6.2, *)
 struct Allocation<T>: ~Copyable {
   let allocation: UnsafeMutableBufferPointer<T>
   var count: Int? = nil
@@ -258,6 +257,27 @@ suite.test("InlineArray initialization throws")
     _ = a
   } catch {
     expectEqual(I.count, 0)
+  }
+}
+
+suite.test("OutputSpan.withUnsafeMutableBufferPointer")
+.require(.stdlib_6_2).code {
+  let c = 10
+  var a = Allocation(of: c, [Int].self)
+  a.initialize {
+    $0.withUnsafeMutableBufferPointer {
+      expectEqual($0.count, c)
+      for i in $0.indices {
+        $0.initializeElement(at: i, to: .init(repeating: i, count: i))
+        $1 += 1
+      }
+    }
+  }
+  a.withSpan {
+    expectEqual($0.count, c)
+    for i in $0.indices {
+      expectEqual($0[i], Array(repeating: i, count: i))
+    }
   }
 }
 
