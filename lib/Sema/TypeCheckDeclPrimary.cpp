@@ -418,6 +418,14 @@ static void checkInheritanceClause(
     // the inherited type is either itself a class, or when it is a subclass
     // existential via the existential type path above.
     if (inheritedTy->getClassOrBoundGenericClass()) {
+      if (auto globalActorTypeExpr = inherited.getGlobalActorIsolationType()) {
+        auto typeRepr = globalActorTypeExpr->getTypeRepr();
+        diags.diagnose(globalActorTypeExpr->getLoc(),
+                       diag::global_actor_on_inheritance_clause,
+                       typeRepr)
+            .fixItRemove(typeRepr->getSourceRange());
+      }
+
       // First, check if we already had a superclass.
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
