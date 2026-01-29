@@ -2254,6 +2254,19 @@ public:
     llvm::report_fatal_error("all apply instructions should be covered");
   }
 
+  /// Helper for code that does not have indirect results. Meant to allow for
+  /// transition to the one with indirect results.
+  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
+  void
+  translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
+                          const SourceValueRangeTy &sourceValues,
+                          SILIsolationInfo resultIsolationInfoOverride = {},
+                          bool requireSrcValues = true) {
+    return translateSILMultiAssign(directResultValues, ArrayRef<Operand *>(),
+                                   sourceValues, resultIsolationInfoOverride,
+                                   requireSrcValues);
+  }
+
   /// Require all non-sendable sources, merge their regions, and assign the
   /// resulting region to all non-sendable targets, or assign non-sendable
   /// targets to a fresh region if there are no non-sendable sources.
@@ -2263,14 +2276,17 @@ public:
   /// element isolation of disconnected. NOTE: The results will still be in the
   /// region of the non-Sendable arguments so at the region level they will have
   /// the same value.
-  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
+  template <typename DirectResultsRangeTy, typename IndirectResultsRangeTy,
+            typename SourceValueRangeTy>
   void
   translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
+                          const IndirectResultsRangeTy &indirectResultAddresses,
                           const SourceValueRangeTy &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
     SmallVector<std::pair<Operand *, TrackableValue>, 8> sourceOperandTVPairs;
     SmallVector<TrackableValue, 8> directResultTVs;
+    SmallVector<std::pair<Operand *, TrackableValue>, 8> indirectResultTVPairs;
 
     // A helper we use to emit an unknown patten error if our merge is
     // invalid. This ensures we guarantee that if we find an actor merge error,
@@ -2345,6 +2361,7 @@ public:
                        sourceOperandTVPairs[i].first);
     }
 
+    // Then process our direct results.
     for (SILValue result : directResultValues) {
       // If we had isolation info explicitly passed in... use our
       // resultIsolationInfoError. Otherwise, we want to infer.
@@ -2368,8 +2385,32 @@ public:
       }
     }
 
+    // Finally, process our indirect results.
+    for (Operand *result : indirectResultAddresses) {
+      // If we had isolation info explicitly passed in... use our
+      // resultIsolationInfoError. Otherwise, we want to infer.
+      if (resultIsolationInfoOverride) {
+        // We only get back result if it is non-Sendable.
+        if (auto nonSendableValue = initializeTrackedValue(
+                result->get(), resultIsolationInfoOverride)) {
+          // If we did not insert, emit an unknown patten error.
+          if (!nonSendableValue->second) {
+            builder.addUnknownPatternError(result->get());
+          }
+          indirectResultTVPairs.emplace_back(result, nonSendableValue->first);
+        }
+      } else {
+        if (auto lookupResult = tryToTrackValue(result->get())) {
+          if (lookupResult->value.isSendable())
+            continue;
+          auto value = lookupResult->value;
+          indirectResultTVPairs.emplace_back(result, value);
+        }
+      }
+    }
+
     // If we do not have any non sendable results, return early.
-    if (directResultTVs.empty()) {
+    if (directResultTVs.empty() && indirectResultTVPairs.empty()) {
       // If we did not have any non-Sendable results and we did have
       // non-Sendable operands and we are supposed to mark value as actor
       // derived, introduce a fake element so we just propagate the actor
@@ -2391,7 +2432,13 @@ public:
     // If we do not have any non-Sendable srcs, then all of our results get one
     // large fresh region.
     if (sourceOperandTVPairs.empty()) {
-      builder.addAssignFresh(directResultTVs);
+      auto transformRange = makeTransformRange(
+          iterator_range(indirectResultTVPairs),
+          [](const std::pair<Operand *, TrackableValue> &pair) {
+            return pair.second;
+          });
+      builder.addAssignFresh(
+          llvm::concat<TrackableValue>(directResultTVs, transformRange));
       return;
     }
 
@@ -2400,6 +2447,10 @@ public:
     // non-Sendable one.
     for (auto result : directResultTVs) {
       builder.addAssignDirectResult(result, sourceOperandTVPairs.front().first);
+    }
+    for (auto result : indirectResultTVPairs) {
+      builder.addAssignIndirectResult(result.first,
+                                      sourceOperandTVPairs.front().first);
     }
   }
 
