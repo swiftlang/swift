@@ -38,37 +38,37 @@ TEST_F(IsFeatureEnabledTest, VerifyTestedFeatures) {
   {
     ASSERT_FALSE(Feature::getUpcomingFeature(feature.name));
     ASSERT_FALSE(Feature::getExperimentalFeature(feature.name));
-    ASSERT_FALSE(feature.id.isMigratable());
+    ASSERT_FALSE(feature.isMigratable());
   }
 
   feature = upcomingF;
   {
     ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
-    ASSERT_FALSE(feature.id.isMigratable());
-    ASSERT_LT(defaultLangMode, feature.langMode);
+    ASSERT_FALSE(feature.isMigratable());
+    ASSERT_LT(defaultLanguageMode, feature.getLanguageMode().value());
   }
 
   feature = adoptableUpcomingF;
   {
     ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
-    ASSERT_TRUE(feature.id.isMigratable());
-    ASSERT_LT(defaultLangMode, feature.langMode);
+    ASSERT_TRUE(feature.isMigratable());
+    ASSERT_LT(defaultLanguageMode, feature.getLanguageMode().value());
   }
 
   feature = strictConcurrencyF;
   {
     ASSERT_TRUE(Feature::getUpcomingFeature(feature.name));
-    ASSERT_FALSE(feature.id.isMigratable());
-    ASSERT_LT(defaultLangMode, feature.langMode);
+    ASSERT_FALSE(feature.isMigratable());
+    ASSERT_LT(defaultLanguageMode, feature.getLanguageMode().value());
   }
 
   feature = experimentalF;
   {
     // If these tests start failing because `experimentalF` was promoted, swap
     // it for another experimental feature one that is available in production.
-    ASSERT_TRUE(feature.id.isAvailableInProduction());
+    ASSERT_TRUE(feature.isAvailableInProduction());
     ASSERT_TRUE(Feature::getExperimentalFeature(feature.name));
-    ASSERT_FALSE(feature.id.isMigratable());
+    ASSERT_FALSE(feature.isMigratable());
   }
 }
 
@@ -98,10 +98,10 @@ static const IsFeatureEnabledTestCase defaultStateTestCases[] = {
         {experimentalF, FeatureState::Off},
       }),
   IsFeatureEnabledTestCase(
-      {"-swift-version", upcomingF.langMode},
+      {"-swift-version", upcomingF.getLanguageMode()->versionString()},
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase(
-      {"-swift-version", strictConcurrencyF.langMode},
+      {"-swift-version", strictConcurrencyF.getLanguageMode()->versionString()},
       {{strictConcurrencyF, FeatureState::Enabled}}),
 };
 // clang-format on
@@ -163,7 +163,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
 #ifndef NDEBUG
   // Requesting migration mode in target language mode has no effect.
   IsFeatureEnabledTestCase({
-        "-swift-version", adoptableUpcomingF.langMode,
+        "-swift-version", adoptableUpcomingF.getLanguageMode()->versionString(),
         "-enable-upcoming-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
@@ -181,7 +181,7 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
 #ifndef NDEBUG
   // Requesting migration mode in target language mode has no effect.
   IsFeatureEnabledTestCase({
-        "-swift-version", adoptableUpcomingF.langMode,
+        "-swift-version", adoptableUpcomingF.getLanguageMode()->versionString(),
         "-enable-experimental-feature", adoptableUpcomingF.name + ":migrate",
       },
       {{adoptableUpcomingF, FeatureState::Enabled}}),
@@ -247,12 +247,12 @@ static const IsFeatureEnabledTestCase singleDisableTestCases[] = {
 
   // Disabling in target language mode has no effect.
   IsFeatureEnabledTestCase({
-        "-swift-version", upcomingF.langMode,
+        "-swift-version", upcomingF.getLanguageMode()->versionString(),
         "-disable-upcoming-feature", upcomingF.name,
       },
       {{upcomingF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
-        "-swift-version", upcomingF.langMode,
+        "-swift-version", upcomingF.getLanguageMode()->versionString(),
         "-disable-experimental-feature", upcomingF.name,
       },
       {{upcomingF, FeatureState::Enabled}}),
@@ -267,12 +267,12 @@ static const IsFeatureEnabledTestCase singleDisableTestCases[] = {
   // Disabling in target language mode has no effect.
   IsFeatureEnabledTestCase({
         "-disable-upcoming-feature", strictConcurrencyF.name,
-        "-swift-version", strictConcurrencyF.langMode,
+        "-swift-version", strictConcurrencyF.getLanguageMode()->versionString(),
       },
       {{strictConcurrencyF, FeatureState::Enabled}}),
   IsFeatureEnabledTestCase({
         "-disable-experimental-feature", strictConcurrencyF.name,
-        "-swift-version", strictConcurrencyF.langMode,
+        "-swift-version", strictConcurrencyF.getLanguageMode()->versionString(),
       },
       {{strictConcurrencyF, FeatureState::Enabled}}),
 

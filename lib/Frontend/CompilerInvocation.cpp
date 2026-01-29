@@ -940,11 +940,11 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
-    if (auto firstVersion = feature->getLanguageMode()) {
-      if (Opts.isLanguageModeAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(languageMode.value())) {
         Diags.diagnose(SourceLoc(),
                        diag::warning_upcoming_feature_on_by_default,
-                       feature->getName(), *firstVersion);
+                       feature->getName(), languageMode->versionString());
         continue;
       }
     }
@@ -1346,8 +1346,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Add a future feature if it is not already implied by the language version.
   auto addFutureFeatureIfNotImplied = [&](Feature feature) {
     // Check if this feature was introduced already in this language version.
-    if (auto firstVersion = feature.getLanguageMode()) {
-      if (Opts.isLanguageModeAtLeast(*firstVersion))
+    if (auto languageMode = feature.getLanguageMode()) {
+      if (Opts.isLanguageModeAtLeast(languageMode.value()))
         return;
     }
 
