@@ -81,12 +81,6 @@ public struct Wrapper {
       return &self[0]
     }
   }
-
-  var literal: Int {
-    borrow {
-      return 0
-    }
-  }
 }
 
 public struct SimpleWrapper<T> {
@@ -188,12 +182,6 @@ public struct GenWrapper<T> {
       return &self[0]
     }
   }
-
-  var literal: Int {
-    borrow {
-      return 0
-    }
-  }
 }
 
 public struct NCS: ~Copyable {
@@ -255,12 +243,6 @@ public struct NCWrapper: ~Copyable {
     }
     mutate {
       return &self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }
@@ -362,12 +344,6 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
     }
     mutate {
       return &self[0]
-    }
-  }
-
-  var literal: Int {
-    borrow {
-      return 0
     }
   }
 }

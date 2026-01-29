@@ -873,8 +873,10 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
     for (auto cleanup : resultCleanups) {
       Cleanups.forwardCleanup(cleanup);
     }
-  } else if (F.getConventions().hasGuaranteedResult() ||
-             F.getConventions().hasAddressResult()) {
+  } else if (auto *accessor =
+                 dyn_cast_or_null<AccessorDecl>(FunctionDC->getAsDecl());
+             (accessor &&
+              (accessor->isBorrowAccessor() || accessor->isMutateAccessor()))) {
     bool hasError =
         emitBorrowOrMutateAccessorResult(branchLoc, ret, directResults);
     if (hasError) {
