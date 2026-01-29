@@ -138,10 +138,11 @@ extension ReduceCommand {
         swiftPath: swiftPath.absoluteInWorkingDir,
         sdkPath: computeSDKPath()
       ),
-      quickMode: quick
+      quickMode: quick,
+      deleteInputs: deleteInputs
     ).process(
-      reprocess: reprocess, deleteInputs: deleteInputs,
-      ignoreExisting: ignoreExisting, fileIssues: fileIssues
+       reprocess: reprocess, ignoreExisting: ignoreExisting,
+       fileIssues: fileIssues
     )
   }
 }

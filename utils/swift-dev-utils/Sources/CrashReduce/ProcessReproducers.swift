@@ -28,11 +28,12 @@ public actor ProcessReproducers {
   let executablePath: AbsolutePath
 
   let quickMode: Bool
+  let deleteInputs: Bool
 
   public init(
     from inputDir: AbsolutePath?, to outputDir: AbsolutePath,
     otherInputs: [AbsolutePath], ideOutputDir: AbsolutePath?,
-    toolchain: Toolchain, quickMode: Bool
+    toolchain: Toolchain, quickMode: Bool, deleteInputs: Bool
   ) throws {
     self.toolchain = toolchain
     self.inputDir = inputDir
@@ -45,6 +46,7 @@ public actor ProcessReproducers {
     }
     self.executablePath = AnyPath(execPath).absoluteInWorkingDir
     self.quickMode = quickMode
+    self.deleteInputs = deleteInputs
   }
 
   func writeReproducer(_ reproducer: Reproducer) throws {
@@ -126,7 +128,7 @@ public actor ProcessReproducers {
   }
 
   public func process(
-    reprocess: Bool, deleteInputs: Bool, ignoreExisting: Bool, fileIssues: Bool
+    reprocess: Bool, ignoreExisting: Bool, fileIssues: Bool
   ) async throws {
     // TODO: This function should be refactored...
     let start = Date()
@@ -234,7 +236,7 @@ public actor ProcessReproducers {
           log.warning("\(inputPath.fileName) didn't reproduce issue")
           if let noreproDir = self.noreproDir {
             let outPath = noreproDir.appending(inputPath.fileName)
-            if outPath.exists && deleteInputs {
+            if outPath.exists && self.deleteInputs {
               inputPath.remove()
             } else {
               try? FileManager.default.moveItem(
@@ -256,7 +258,7 @@ public actor ProcessReproducers {
         }
         return true
       }) else {
-        if deleteInputs {
+        if self.deleteInputs {
           inputPath.remove()
         }
         return []
@@ -521,9 +523,9 @@ public actor ProcessReproducers {
   }
 
   /// The directory to place non-reproducing crashers into. Only used when an
-  /// input directory is given.
+  /// input directory is given and input deletion is enabled.
   private lazy var noreproDir: AbsolutePath? = {
-    guard let inputDir else { return nil }
+    guard let inputDir, deleteInputs else { return nil }
     let result = inputDir.appending("norepro")
     if !result.exists {
       try? result.makeDir()
