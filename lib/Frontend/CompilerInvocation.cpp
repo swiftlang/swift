@@ -609,6 +609,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
                    "-module-interface-preserve-types-as-written",
                    "-enable-module-selectors-in-module-interface");
   }
+
+  if (Opts.AliasModuleNames && Opts.UseModuleSelectors) {
+    Opts.AliasModuleNames = false;
+    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
+                   "-alias-module-names-in-module-interface",
+                   "-enable-module-selectors-in-module-interface");
+  }
 }
 
 /// Checks if an arg is generally allowed to be included
