@@ -334,8 +334,8 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   if (state.isEnabled())
     return state;
 
-  if (auto version = feature.getLanguageMode()) {
-    if (isLanguageModeAtLeast(*version)) {
+  if (auto languageMode = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(languageMode.value())) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
   }
@@ -348,8 +348,8 @@ bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
   if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageMode()) {
-    if (isLanguageModeAtLeast(*version))
+  if (auto languageMode = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(languageMode.value()))
       return true;
   }
 
