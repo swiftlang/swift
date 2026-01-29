@@ -1671,17 +1671,23 @@ struct PartitionOpBuilder {
         PartitionOp::AssignFresh(id, currentInst));
   }
 
-  void addAssignFresh(ArrayRef<TrackableValue> values) {
-    if (values.empty())
+  /// Assign fresh an entire range of values to the same region.
+  template <typename ValueRangeTy>
+  void addAssignFresh(ValueRangeTy values) {
+    auto iter = values.begin();
+    auto end = values.end();
+    if (iter == end)
       return;
 
-    auto first = values.front();
+    TrackableValue first = *iter;
+    ++iter;
     currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(first.getID(), currentInst));
 
-    for (auto value : values.drop_front()) {
+    while (iter != end) {
       currentInstPartitionOps->emplace_back(PartitionOp::AssignFreshAssign(
-          value.getID(), first.getID(), currentInst));
+          (*iter).getID(), first.getID(), currentInst));
+      ++iter;
     }
   }
 
