@@ -2836,15 +2836,19 @@ bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
   llvm::VersionTuple underlyingVersionInfo;
-  if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
-                           versionInfo, underlyingVersionInfo))
-    return false;
+  bool canImport =
+      canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
+                          versionInfo, underlyingVersionInfo);
 
-  SmallString<64> fullModuleName;
-  moduleName.getString(fullModuleName);
-  
-  addSucceededCanImportModule(fullModuleName, versionInfo, underlyingVersionInfo);
-  return true;
+  // If found an import or resolved an version, recorded the module.
+  if (canImport || !versionInfo.empty() || !underlyingVersionInfo.empty()) {
+    SmallString<64> fullModuleName;
+    moduleName.getString(fullModuleName);
+
+    addSucceededCanImportModule(fullModuleName, versionInfo,
+                                underlyingVersionInfo);
+  }
+  return canImport;;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
