@@ -615,8 +615,9 @@ static bool emitConstValuesForWholeModuleIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
-                                                     Instance.getDiags(), Protocols);
+  bool inputParseSuccess = parseProtocolListFromFile(
+      constExtractProtocolListPath, Instance.getDiags(),
+      Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return true;
   auto ConstValues = gatherConstValuesForModule(Protocols,
@@ -640,8 +641,9 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
-                                                     Instance.getDiags(), Protocols);
+  bool inputParseSuccess = parseProtocolListFromFile(
+      constExtractProtocolListPath, Instance.getDiags(),
+      Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return;
   for (auto *SF : Instance.getPrimarySourceFiles()) {

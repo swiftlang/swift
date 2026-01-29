@@ -2023,6 +2023,11 @@ def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement
   HelpText<"File containing a new-line separated list of protocol names">,
   MetaVarName<"<path>">;
 
+def const_gather_protocols_list
+  : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
+
 def input_paths: Separate<["-", "--"], "input-paths">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"The SDK contents under comparison">,

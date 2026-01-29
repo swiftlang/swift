@@ -483,6 +483,11 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   StringRef AccessNotePath = CI.getLangOptions().AccessNotesPath;
   if (!AccessNotePath.empty())
     addCommonFile(AccessNotePath);
+
+  // const-gather-protocols-file
+  StringRef ConstProtocolFile = SearchPathOpts.ConstGatherProtocolListFilePath;
+  if (!ConstProtocolFile.empty())
+    addCommonFile(ConstProtocolFile);
 }
 
 void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
