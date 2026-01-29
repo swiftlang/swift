@@ -273,3 +273,12 @@ class F<T> {
 func bar(_ a: F<Dummy>, _ b: F<Dummy>) {
   _ = (try? a.wait()) === (try? b.wait())
 }
+
+// Test fix-its for redundant try
+func nonThrowingFunc() -> Int? { return nil }
+
+func testRedundantTryFixit() {
+  _ = try nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
+  _ = try! nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
+  _ = try? nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
+}
