@@ -12,8 +12,8 @@
 // RUN:   -emit-module-interface-path %t/Exported.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Exported.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exported.private.swiftinterface) -module-name Exported -I %t
-// RUN: cat %t/Exported.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTER %s
-// RUN: cat %t/Exported.private.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTED %s
+// RUN: %FileCheck -input-file=%t/Exported.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
+// RUN: %FileCheck -input-file=%t/Exported.private.swiftinterface -check-prefix=CHECK-USE-EXPORTED %s
 
 /// The public swiftinterface only builds under the name of Exporter.
 // RUN: sed -e "s/module-name Exported/module-name Exporter/" -ibk %t/Exported.swiftinterface
@@ -28,20 +28,8 @@
 // RUN:   -emit-private-module-interface-path %t/Exporter.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.private.swiftinterface) -module-name Exporter -I %t
-// RUN: cat %t/Exporter.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTER %s
-// RUN: cat %t/Exporter.private.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTED %s
-
-/// Build lib with an @exported import of the exported one.
-// RUN: %target-swift-frontend -emit-module %t/Exporter.swift \
-// RUN:   -module-name Exporter -swift-version 5 -I %t \
-// RUN:   -enable-library-evolution \
-// RUN:   -emit-module-path %t/Exporter.swiftmodule \
-// RUN:   -emit-module-interface-path %t/Exporter.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/Exporter.private.swiftinterface
-// RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.swiftinterface) -I %t
-// RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.private.swiftinterface) -module-name Exporter -I %t
-// RUN: cat %t/Exporter.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTER %s
-// RUN: cat %t/Exporter.private.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTED %s
+// RUN: %FileCheck -input-file=%t/Exporter.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
+// RUN: %FileCheck -input-file=%t/Exporter.private.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
 
 /// Build a client of the exporter lib.
 // RUN: %target-swift-frontend -emit-module %t/Client.swift \
@@ -52,8 +40,8 @@
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -module-name Client -I %t
-// RUN: cat %t/Client.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTER %s
-// RUN: cat %t/Client.private.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTED %s
+// RUN: %FileCheck -input-file=%t/Client.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
+// RUN: %FileCheck -input-file=%t/Client.private.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
 
 /// Build a client of the exporter lib against the public swiftinterface.
 // RUN: rm %t/Exporter.private.swiftinterface %t/Exporter.swiftmodule
@@ -65,8 +53,8 @@
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -module-name Client -I %t
-// RUN: cat %t/Client.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTER %s
-// RUN: cat %t/Client.private.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTED %s
+// RUN: %FileCheck -input-file=%t/Client.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
+// RUN: %FileCheck -input-file=%t/Client.private.swiftinterface -check-prefix=CHECK-USE-EXPORTER %s
 
 //--- module.modulemap
 module Exported {
