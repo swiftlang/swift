@@ -494,15 +494,21 @@ InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
   return *this;
 }
 
-InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureLanguageMode() {
-  using namespace version;
-  return warnUntilLanguageMode(Version::getFutureMajorLanguageVersion());
+InFlightDiagnostic &
+InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                   LanguageMode mode) {
+  return limitBehaviorUntilLanguageMode(limit, mode.version().first);
 }
 
 InFlightDiagnostic &
 InFlightDiagnostic::warnUntilLanguageMode(unsigned majorVersion) {
   return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
                                         majorVersion);
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::warnUntilLanguageMode(LanguageMode mode) {
+  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, mode);
 }
 
 InFlightDiagnostic &

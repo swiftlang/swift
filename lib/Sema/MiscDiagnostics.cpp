@@ -765,7 +765,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
-          .warnUntilLanguageModeIf(downgradeToWarningUntil6, 6);
+          .warnUntilLanguageModeIf(downgradeToWarningUntil6, LanguageMode::v6);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -2293,23 +2293,22 @@ public:
       SourceLoc loc, Expr *base, AbstractClosureExpr *closure,
       Diag<ArgTypes...> ID,
       typename detail::PassArgument<ArgTypes>::type... Args) {
-    std::optional<unsigned> warnUntilVersion;
+    std::optional<LanguageMode> languageModeForError;
     // Prior to Swift 6, we may need to downgrade to a warning for compatibility
     // with the 5.10 diagnostic behavior.
-    if (!Ctx.isLanguageModeAtLeast(6) &&
+    if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
-      warnUntilVersion.emplace(6);
+      languageModeForError.emplace(LanguageMode::v6);
     }
     // Prior to the next language mode, downgrade to a warning if we're in a
     // macro to preserve compatibility with the Swift 6 diagnostic behavior
     // where we previously skipped diagnosing.
-    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-    if (!Ctx.isLanguageModeAtLeast(futureVersion) && isInMacro())
-      warnUntilVersion.emplace(futureVersion);
+    if (!Ctx.isLanguageModeAtLeast(LanguageMode::future) && isInMacro())
+      languageModeForError.emplace(LanguageMode::future);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
-    if (warnUntilVersion)
-      diag.warnUntilLanguageMode(*warnUntilVersion);
+    if (languageModeForError)
+      diag.warnUntilLanguageMode(*languageModeForError);
 
     return diag;
   }

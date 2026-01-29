@@ -3700,7 +3700,7 @@ public:
     SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
     ctx.Diags
         .diagnose(diagLoc, diag::witness_not_usable_from_inline, witness, proto)
-        .warnUntilLanguageMode(5);
+        .warnUntilLanguageMode(LanguageMode::v5);
     emitDeclaredHereIfNeeded(ctx.Diags, diagLoc, witness);
   }
 };
@@ -4449,7 +4449,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                 .diagnose(getLocForDiagnosingWitness(conformance, witness),
                           diag::witness_not_as_sendable, witness,
                           conformance->getProtocol())
-                .limitBehaviorUntilLanguageMode(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)
                 .limitBehaviorIf(preconcurrencyBehaviorLimit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here);
             return preconcurrencyBehaviorLimit &&
@@ -5071,13 +5071,13 @@ static void diagnoseConformanceIsolationErrors(
                     diag::conformance_mismatched_isolation_common,
                     conformance->getType(), conformance->getProtocol(),
                     *potentialIsolation)
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
     } else {
       ctx.Diags
           .diagnose(conformance->getProtocolNameLoc(),
                     diag::conformance_mismatched_isolation,
                     conformance->getType(), conformance->getProtocol())
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
     }
 
     // Suggest isolating the conformance, if possible.
@@ -5268,7 +5268,7 @@ static void diagnoseInvariantSelfRequirement(
   diags.diagnose(loc, diag::non_final_class_cannot_conform_to_self_same_type,
                  adoptee, proto->getDeclaredInterfaceType(),
                  firstType, kind, secondType)
-      .warnUntilLanguageMode(6);
+      .warnUntilLanguageMode(LanguageMode::v6);
 }
 
 static bool
@@ -5291,9 +5291,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   // In Swift 6 and earlier type witness availability diagnostics are warnings.
   using namespace version;
-  const unsigned warnBeforeVersion = Version::getFutureMajorLanguageVersion();
-  bool shouldError =
-      ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
+  const auto languageModeForError = LanguageMode::future;
+  bool shouldError = ctx.LangOpts.isLanguageModeAtLeast(languageModeForError);
 
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
@@ -5311,15 +5310,15 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
   if (constraint->isUnavailable()) {
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, assocType, attr,
-         shouldError](NormalProtocolConformance *conformance) {
+        [witness, assocType, attr, shouldError,
+         languageModeForError](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           EncodedDiagnosticMessage encodedMessage(attr.getMessage());
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::witness_unavailable, witness,
                         conformance->getProtocol(), encodedMessage.Message)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
           ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
@@ -5332,8 +5331,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   ctx.addDelayedConformanceDiag(
       conformance, shouldError,
-      [witness, attr, requiredRange,
-       shouldError](NormalProtocolConformance *conformance) {
+      [witness, attr, requiredRange, shouldError,
+       languageModeForError](NormalProtocolConformance *conformance) {
         SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
         auto &ctx = conformance->getDeclContext()->getASTContext();
         auto domain = attr.getDomain();
@@ -5344,14 +5343,14 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
                         domain.isPlatform() ? ctx.getTargetAvailabilityDomain()
                                             : domain,
                         *requiredRange)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
         } else {
           ctx.Diags
               .diagnose(
                   loc,
                   diag::availability_protocol_requirement_only_available_in,
                   conformance->getProtocol(), witness, domain)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
         }
 
         emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);

@@ -413,7 +413,7 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
                         "actors")
               .fixItRemove(convenAttr->getLocation())
               .warnInSwiftInterface(dc)
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
 
         } else { // not an actor
           // Forbid convenience inits on Foreign CF types, as Swift does not yet

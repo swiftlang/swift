@@ -451,7 +451,7 @@ GlobalActorAttributeRequest::evaluate(
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       if (!accessor->isGetter()) {
         decl->diagnose(diag::global_actor_disallowed, decl)
-            .warnUntilLanguageMode(6)
+            .warnUntilLanguageMode(LanguageMode::v6)
             .fixItRemove(globalActorAttr->getRangeWithAt());
 
         auto &ctx = decl->getASTContext();
@@ -2021,7 +2021,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(
         .diagnose(memberLoc, diag::actor_isolated_non_self_reference, member,
                   useKindInt, baseActor.kind + 1, baseActor.globalActor,
                   isolation)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     noteIsolatedActorMember(member, useKind);
     maybeNoteMutatingMethodSuggestion(C, member, memberLoc, refCxt, isolation, useKind);
@@ -2453,7 +2453,7 @@ namespace {
             if (behavior != DiagnosticBehavior::Note) {
               fn->diagnose(diag::invalid_isolated_calls_in_body,
                            globalActor->getString(), fn)
-                  .limitBehaviorUntilLanguageMode(behavior, 6);
+                  .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
             }
 
             // Overrides cannot be isolated to a global actor; the isolation
@@ -2626,7 +2626,7 @@ namespace {
                                  Type fromType, Type toType) {
       auto diagnoseNonSendableParametersAndResult =
           [&](FunctionType *fnType,
-              std::optional<unsigned> warnUntilSwiftMode = std::nullopt) {
+              std::optional<LanguageMode> languageModeForError = std::nullopt) {
             auto *dc = getDeclContext();
             llvm::SmallPtrSet<Type, 2> nonSendableTypes;
 
@@ -2656,8 +2656,8 @@ namespace {
                     diag::invalid_function_conversion_with_non_sendable,
                     fromType, toType);
 
-                if (warnUntilSwiftMode)
-                  diag.warnUntilLanguageMode(*warnUntilSwiftMode);
+                if (languageModeForError)
+                  diag.warnUntilLanguageMode(*languageModeForError);
               }
 
               for (auto type : nonSendableTypes) {
@@ -2692,7 +2692,7 @@ namespace {
                     .diagnose(funcConv->getLoc(),
                               diag::converting_func_loses_global_actor,
                               fromType, toType, fromActor)
-                    .warnUntilLanguageMode(6);
+                    .warnUntilLanguageMode(LanguageMode::v6);
                 return;
               }
             }
@@ -2706,7 +2706,7 @@ namespace {
                 .diagnose(funcConv->getLoc(),
                           diag::isolated_any_conversion_to_synchronous_func,
                           fromFnType, toFnType)
-                .warnUntilFutureLanguageMode();
+                .warnUntilLanguageMode(LanguageMode::future);
             return;
           }
 
@@ -2768,22 +2768,22 @@ namespace {
             case FunctionTypeIsolation::Kind::Parameter:
             case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
             case FunctionTypeIsolation::Kind::Erased:
-              diagnoseNonSendableParametersAndResult(
-                  toFnType, version::Version::getFutureMajorLanguageVersion());
+              diagnoseNonSendableParametersAndResult(toFnType,
+                                                     LanguageMode::future);
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor: {
-              diagnoseNonSendableParametersAndResult(toFnType,
-                                                     /*warnUntilSwiftMode*/ 6);
+              diagnoseNonSendableParametersAndResult(
+                  toFnType,
+                  /*languageModeForError*/ LanguageMode::v6);
               break;
             }
 
             case FunctionTypeIsolation::Kind::NonIsolated: {
               // nonisolated synchronous <-> @concurrent
               if (fromFnType->isAsync() != toFnType->isAsync()) {
-                diagnoseNonSendableParametersAndResult(
-                    toFnType,
-                    version::Version::getFutureMajorLanguageVersion());
+                diagnoseNonSendableParametersAndResult(toFnType,
+                                                       LanguageMode::future);
               }
               break;
             }
@@ -2797,8 +2797,8 @@ namespace {
             switch (fromIsolation.getKind()) {
             case FunctionTypeIsolation::Kind::Parameter:
             case FunctionTypeIsolation::Kind::Erased:
-              diagnoseNonSendableParametersAndResult(
-                  toFnType, version::Version::getFutureMajorLanguageVersion());
+              diagnoseNonSendableParametersAndResult(toFnType,
+                                                     LanguageMode::future);
               break;
 
             case FunctionTypeIsolation::Kind::NonIsolated: {
@@ -2807,9 +2807,8 @@ namespace {
               // be possible for non-Sendable state to escape from
               // actor isolation.
               if (fromFnType->isAsync()) {
-                diagnoseNonSendableParametersAndResult(
-                    toFnType,
-                    version::Version::getFutureMajorLanguageVersion());
+                diagnoseNonSendableParametersAndResult(toFnType,
+                                                       LanguageMode::future);
                 break;
               }
               // Runs on the actor.
@@ -2829,8 +2828,8 @@ namespace {
                       toIsolation.getGlobalActorType()))
                 break;
 
-              diagnoseNonSendableParametersAndResult(
-                  toFnType, version::Version::getFutureMajorLanguageVersion());
+              diagnoseNonSendableParametersAndResult(toFnType,
+                                                     LanguageMode::future);
               break;
             }
             break;
@@ -3784,7 +3783,7 @@ namespace {
       }
 
       ctx.Diags.diagnose(loc, diag::shared_mutable_state_access, value)
-          .limitBehaviorUntilLanguageMode(limit, 6)
+          .limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)
           // Preconcurrency global variables are warnings even in Swift 6
           .limitBehaviorIf(isPreconcurrencyImport, limit);
       value->diagnose(diag::kind_declared_here, value->getDescriptiveKind());
@@ -3826,7 +3825,8 @@ namespace {
               ctx.Diags.diagnose(apply->getLoc(),
                                  diag::actor_isolated_mutating_func,
                                  fnDecl->getName(), decl)
-                  .warnUntilLanguageModeIf(downgradeToWarning, 6);
+                  .warnUntilLanguageModeIf(downgradeToWarning,
+                                           LanguageMode::v6);
               result = true;
               return;
             }
@@ -3933,7 +3933,7 @@ namespace {
               .diagnose(declLoc,
                         diag::distributed_actor_isolated_non_self_reference,
                         decl)
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
           noteIsolatedActorMember(decl, context);
           return std::nullopt;
         }
@@ -4553,7 +4553,7 @@ namespace {
                 .diagnose(component.getLoc(),
                           diag::actor_isolated_keypath_component, isolation,
                           decl)
-                .warnUntilLanguageModeIf(downgrade, 6);
+                .warnUntilLanguageModeIf(downgrade, LanguageMode::v6);
 
             diagnosed = !downgrade;
             break;
@@ -5227,7 +5227,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
           ctx.Diags.diagnose(attr->getLocation(), diag::unsafe_global_actor)
               .fixItRemove(attr->getArgs()->getSourceRange())
               .fixItInsert(attr->getLocation(), "@preconcurrency ")
-              .warnUntilLanguageMode(6);
+              .warnUntilLanguageMode(LanguageMode::v6);
         }
       } else {
         ctx.Diags.diagnose(
@@ -5816,7 +5816,7 @@ static bool checkClassGlobalActorIsolation(
   // Complain about the mismatch.
   classDecl->diagnose(diag::actor_isolation_superclass_mismatch, isolation,
                       classDecl, superIsolation, superclassDecl)
-      .warnUntilLanguageModeIf(downgradeToWarning, 6);
+      .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::v6);
   return true;
 }
 
@@ -5971,7 +5971,7 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
       value
           ->diagnose(diag::isolated_parameter_combined_global_actor_attr, value)
           .fixItRemove(attr->first->getRangeWithAt())
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
   }
 
@@ -5980,7 +5980,7 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
     if (!attr->isImplicit()) {
       value->diagnose(diag::isolated_parameter_combined_nonisolated, value)
           .fixItRemove(attr->getRangeWithAt())
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
   }
 }
@@ -6863,7 +6863,7 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
           !isa<ParamDecl>(var) || requiredIsolation.preconcurrency();
       var->diagnose(diag::isolated_default_argument_context, requiredIsolation,
                     enclosingIsolation)
-          .warnUntilLanguageModeIf(preconcurrency, 6);
+          .warnUntilLanguageModeIf(preconcurrency, LanguageMode::v6);
       return ActorIsolation::forUnspecified();
     }
   }
@@ -6958,7 +6958,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   value
       ->diagnose(diag::actor_isolation_override_mismatch, isolation, value,
                  overriddenIsolation)
-      .limitBehaviorUntilLanguageMode(behavior, 6);
+      .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
   overridden->diagnose(diag::overridden_here);
 }
 
@@ -6996,7 +6996,7 @@ void swift::checkGlobalIsolation(VarDecl *var) {
         diagVar);
   } else {
     diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
     diagnosed = true;
   }
 
@@ -7134,7 +7134,7 @@ static bool checkSendableInstanceStorage(
           && SendableCheckContext(dc, check)
                .defaultDiagnosticBehavior() != DiagnosticBehavior::Ignore) {
         sd->diagnose(diag::sendable_raw_storage, sd->getName())
-            .limitBehaviorUntilLanguageMode(behavior, 6);
+            .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
       }
       return true;
     }
@@ -7394,7 +7394,7 @@ bool swift::checkSendableConformance(
     if (!(nominal->hasClangNode() && wasImplied)) {
       conformanceDecl
           ->diagnose(diag::concurrent_value_outside_source_file, nominal)
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -7408,7 +7408,7 @@ bool swift::checkSendableConformance(
     if (!classDecl->isSemanticallyFinal()) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,classDecl->getName())
           .fixItInsert(classDecl->getStartLoc(), "final")
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
 
       if (behavior == DiagnosticBehavior::Unspecified)
         return true;
@@ -7423,7 +7423,7 @@ bool swift::checkSendableConformance(
               ->diagnose(diag::concurrent_value_inherit,
                          nominal->getASTContext().LangOpts.EnableObjCInterop,
                          classDecl->getName())
-              .limitBehaviorUntilLanguageMode(behavior, 6);
+              .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
 
           if (behavior == DiagnosticBehavior::Unspecified)
             return true;
@@ -8706,7 +8706,7 @@ namespace {
               loc, diag::isolated_conformance_wrong_domain,
               firstConformance->getIsolation(), firstConformance->getType(),
               firstConformance->getProtocol()->getName(), getContextIsolation())
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
       return true;
     }
   };

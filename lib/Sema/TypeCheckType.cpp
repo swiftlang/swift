@@ -4318,7 +4318,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   unsigned numIsolatedParams = countIsolatedParamsUpTo(repr, 2);
   if (!repr->isWarnedAbout() && numIsolatedParams > 1) {
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     if (ctx.isLanguageModeAtLeast(6))
       return ErrorType::get(ctx);
@@ -4333,7 +4333,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (globalActor && !globalActor->hasError() && !globalActorAttr->isInvalid()) {
       if (numIsolatedParams != 0) {
         diagnose(repr->getLoc(), diag::isolated_parameter_global_actor_type)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
         globalActorAttr->setInvalid();
       } else if (isolatedAttr) {
         diagnose(repr->getLoc(), diag::isolated_attr_global_actor_type,
@@ -5871,6 +5871,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // In language modes up to Swift 5, we allow `T!` in invalid position for
     // compatibility and downgrade the error to a warning.
     const unsigned swiftLangModeForError = 5;
+    const auto languageModeForError = LanguageMode::v5;
 
     // If we are about to error, mark this node as invalid.
     // This is the only way to indicate that something went wrong without
@@ -5894,7 +5895,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     }
 
     diagnose(repr->getExclamationLoc(), diagID)
-        .warnUntilLanguageMode(swiftLangModeForError);
+        .warnUntilLanguageMode(languageModeForError);
 
     // Suggest a regular optional, but not when `T!` is the right-hand side of
     // a cast expression.
