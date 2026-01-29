@@ -1437,9 +1437,18 @@ public:
                         llvm::Value **typeMetadataCache) const override {
     auto conformingType = Conformance->getType()->getCanonicalType();
 
-    if (isa<NormalProtocolConformance>(Conformance)) {
+    if (auto *normalConf = dyn_cast<NormalProtocolConformance>(Conformance)) {
       conformingType = conformingType->getReducedType(
         Conformance->getGenericSignature());
+
+      // For reparented conformances, we need to replace generic type parameters
+      // with archetypes, as the type conforming to this new parent protocol
+      // is whatever runtime type conforms to the child protocol.
+      if (normalConf->isReparented()) {
+        conformingType = normalConf->getDeclContext()
+                             ->mapTypeIntoEnvironment(conformingType)
+                             ->getCanonicalType();
+      }
     }
 
     // If we're looking up a dependent type, we can't cache the result.
@@ -1808,6 +1817,16 @@ public:
         ConformanceInContext.getAssociatedConformance(
           requirement.getAssociation(),
           requirement.getAssociatedRequirement());
+
+      // Map the conformance into the reparented conformance's environment, to
+      // replace type parameters with archetypes.
+      if (ConformanceInContext.isReparented()) {
+        auto *genericEnv = ConformanceInContext.getDeclContext()
+                               ->getGenericEnvironmentOfContext();
+        auto newConf = associatedConformance
+                           .subst(genericEnv->getForwardingSubstitutionMap());
+        associatedConformance = newConf;
+      }
 
 #ifndef NDEBUG
       assert(entry.getKind() == SILWitnessTable::AssociatedConformance

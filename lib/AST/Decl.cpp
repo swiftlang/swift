@@ -2261,6 +2261,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
   return std::nullopt;
 }
 
+bool ExtensionDecl::isForReparenting() const {
+  // Must be a protocol extension
+  if (!getExtendedProtocolDecl())
+    return false;
+
+  // Must be at least one @reparented inherited entry.
+  for (auto const& entry : getInherited().getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
+}
+
 bool Decl::hasOnlyCEntryPoint() const {
   if (ExternAttr::find(getAttrs(), ExternKind::C))
     return true;

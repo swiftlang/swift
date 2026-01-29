@@ -2255,6 +2255,8 @@ public:
   std::optional<InvertibleProtocolKind>
   isAddingConformanceToInvertible() const;
 
+  bool isForReparenting() const;
+
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
   Identifier getObjCCategoryName() const;

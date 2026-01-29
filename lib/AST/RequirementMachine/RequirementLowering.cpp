@@ -1262,6 +1262,9 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           //
           // FIXME: Protocol extensions with noncopyable generics can!
           if (ext->getTrailingWhereClause()) continue;
+
+          // Also ignore extensions defining a reparenting
+          if (ext->isForReparenting()) continue;
         }
 
         // We found something.
