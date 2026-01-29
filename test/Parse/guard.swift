@@ -6,3 +6,7 @@ func noConditionNoElse() {
 func noCondition() {
   guard else {} // expected-error {{missing condition in 'guard' statement}} 
 }
+
+func guardRecovery() {
+  guard x = else {} // expected-error {{missing condition in 'guard' statement}}
+}
