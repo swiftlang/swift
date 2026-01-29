@@ -2973,6 +2973,25 @@ public:
     }
   }
 
+  /// Perform an assign for dest that is an indirect parameter. It should be a
+  /// parameter of the current inst we are processing.
+  template <typename SourceOperandsTy>
+  void translateSILAssignIndirect(Operand *dest,
+                                  SourceOperandsTy sourceOperands) {
+    return translateSILMultiAssign(
+        ArrayRef<SILValue>(), TinyPtrVector<Operand *>(dest), sourceOperands);
+  }
+
+  /// Perform an assign for dest that is an indirect parameter. It should be a
+  /// parameter of the current inst we are processing.
+  template <>
+  void translateSILAssignIndirect<Operand *>(Operand *dest,
+                                             Operand *srcOperand) {
+    return translateSILMultiAssign(ArrayRef<SILValue>(),
+                                   TinyPtrVector<Operand *>(dest),
+                                   TinyPtrVector<Operand *>(srcOperand));
+  }
+
   /// Perform an assign for dest that is a direct parameter. It should be a
   /// parameter of the current inst we are processing.
   template <typename Collection>
