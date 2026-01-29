@@ -236,9 +236,9 @@ bb5:
 
 // CHECK-LABEL: sil @dont_licm_ginit_dependency1
 // CHECK: bb0:
+// CHECK:   [[U:%[0-9]+]] = function_ref @unknown
 // CHECK:   [[I:%[0-9]+]] = function_ref @$s4test10testGlobalSivau
 // CHECK: bb2:
-// CHECK:   [[U:%[0-9]+]] = function_ref @unknown
 // CHECK:   apply [[U]]
 // CHECK: bb4:
 // CHECK:   apply [[I]]

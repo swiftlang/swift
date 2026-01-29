@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -220,6 +221,12 @@ BridgedDeclObj BridgedPassContext::getSwiftArrayDecl() const {
 BridgedDeclObj BridgedPassContext::getSwiftMutableSpanDecl() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return {mod->getASTContext().getMutableSpanDecl()};
+}
+
+bool BridgedPassContext::isBlockCold(BridgedBasicBlock bb) const {
+  swift::ColdBlockInfo coldBlockInfo(invocation->getPassManager()->getAnalysis<swift::DominanceAnalysis>(), invocation->getPassManager()->getAnalysis<swift::PostDominanceAnalysis>());
+  coldBlockInfo.analyze(invocation->getFunction());
+  return coldBlockInfo.isCold(bb.unbridged());
 }
 
 // Array semantics call
