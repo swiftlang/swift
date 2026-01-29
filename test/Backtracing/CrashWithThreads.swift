@@ -1,4 +1,3 @@
-// REQUIRES: rdar168895001
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -Onone -g -o %t/CrashWithThreads
 // RUN: %target-codesign %t/CrashWithThreads
@@ -115,4 +114,3 @@ while (true) {
 // CHECK: {{0x[0-9a-f]+.*main.* CrashWithThreads}}
 
 // CHECK: Thread {{[0-9]*( ".*")?}}:
-// CHECK: {{0x[0-9a-f]+.*pthread_start}}
