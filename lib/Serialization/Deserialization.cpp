@@ -2484,11 +2484,13 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                                        mismatchingTypes);
 
     // If we want to workaround broken modularization, we can keep going if
-    // we found a matching top-level decl in a different module. This is
-    // obviously dangerous as it could just be some other decl that happens to
-    // match.
-    if (getContext().LangOpts.ForceWorkaroundBrokenModules &&
+    // we found a matching top-level decl in a different module. The risk
+    // here would be to pick an unrelated decl that happens to share the same
+    // signature. Even if we recover, print as a warning the errors we skip.
+    if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
+        baseModule->findUnderlyingClangModule() &&
+        foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
       // Print the error as a warning and notify of the recovery attempt.
       llvm::handleAllErrors(std::move(error),

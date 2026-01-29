@@ -1194,8 +1194,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
 
-  Opts.ForceWorkaroundBrokenModules
-    |= Args.hasArg(OPT_force_workaround_broken_modules);
+  Opts.EnableWorkaroundBrokenModules
+    &= !Args.hasArg(OPT_disable_workaround_broken_modules);
 
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
@@ -2115,6 +2115,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_solver_enable_prepared_overloads) ||
       Args.hasArg(OPT_solver_disable_prepared_overloads))
     Opts.SolverEnablePreparedOverloads = Args.hasArg(OPT_solver_enable_prepared_overloads);
+
+  if (Args.hasArg(OPT_solver_enable_prune_disjunctions) ||
+      Args.hasArg(OPT_solver_disable_prune_disjunctions))
+    Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;

@@ -131,7 +131,6 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
       [&] {
         out << "#include <cstdint>\n"
                "#include <cstddef>\n"
-               "#include <cstdbool>\n"
                "#include <cstring>\n";
         out << "#include <stdlib.h>\n";
         out << "#include <new>\n";

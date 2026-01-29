@@ -9800,10 +9800,12 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
-Type
-ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
-                                        bool openExistential,
-                                        ConstraintLocatorBuilder locator) {
+Type ConstraintSystem::lookupDependentMember(
+    Type base, AssociatedTypeDecl *assocTy, bool openExistential,
+    ConstraintLocatorBuilder locator, ProtocolConformanceRef *conformanceOut) {
+  /// TODO: This should become the basis for a new "type witness" constraint to
+  /// replace the use of DependentMemberType in the constraint system.
+
   ASSERT(!base->isTypeVariableOrMember() && "Must simplify first");
 
   GenericEnvironment *openedEnv = nullptr;
@@ -9822,6 +9824,8 @@ ConstraintSystem::lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
   // Then lookup the conformance to dig out the witness. If it's missing, we'll
   // have recorded a fix in the ConformsTo constraint so can bail.
   auto conformance = lookupConformance(base, proto);
+  if (conformanceOut)
+    *conformanceOut = conformance;
   if (!conformance) {
     // Increase SK_Hole just to ensure the solution is marked invalid.
     increaseScore(SK_Hole, locator);
@@ -9848,6 +9852,9 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyForEachElementConstraint(
     Type first, Type second, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
+  /// TODO: Once we have a "type witness" constraint to express a
+  /// DependentMemberType, we ought to see if this constraint can be removed
+  /// and expressed in terms of member types instead.
 
   Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
   if (seqTy->isTypeVariableOrMember()) {
@@ -9907,12 +9914,62 @@ ConstraintSystem::simplifyForEachElementConstraint(
               : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
                              : KnownProtocolKind::IteratorProtocol));
   auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
-  auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
-                                     /*openExistential*/ true, contextualLoc);
+  ProtocolConformanceRef iterConf;
+  auto eltTy =
+      lookupDependentMember(iterTy, eltAssocTy,
+                            /*openExistential*/ true, contextualLoc, &iterConf);
   if (!eltTy) {
     // Already recorded fix.
     recordTypeVariablesAsHoles(second);
     return SolutionKind::Solved;
+  }
+
+  // Source compatibility hack: Bind an overload for 'makeIterator'/'next' to
+  // preserve ranking behavior for cases where e.g a default Collection
+  // 'makeIterator' is compared against a concrete 'makeIterator'
+  // implementation.
+  if (!ctx.isAtLeastFutureMajorLanguageMode()) {
+    auto bindOverload = [&](OverloadChoice choice, ConstraintLocator *loc) {
+      auto overloadTy = getTypeOfMemberReference(choice, DC, loc,
+                                                 /*preparedOverload*/ nullptr);
+      auto overload = SelectedOverload{choice,
+                                       overloadTy.openedType,
+                                       overloadTy.adjustedOpenedType,
+                                       overloadTy.referenceType,
+                                       overloadTy.adjustedReferenceType,
+                                       overloadTy.adjustedOpenedType};
+      recordResolvedOverload(loc, overload);
+    };
+
+    auto *iterFn = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                           : ctx.getSequenceMakeIterator();
+    ConcreteDeclRef iterWitness;
+    if (iterFn) {
+      iterWitness = seqConf.getWitnessByName(iterFn->getName());
+    }
+    if (iterWitness) {
+      auto choice =
+          OverloadChoice::getDecl(seqConf.getType(), iterWitness.getDecl(),
+                                  FunctionRefInfo::singleBaseNameApply());
+      auto *loc = getConstraintLocator(
+          contextualLoc, {LocatorPathElt::ImplicitForEachCompatMember()});
+      bindOverload(choice, loc);
+    }
+    auto *nextFn = TypeChecker::getForEachIteratorNextFunction(
+        DC, anchor.getStartLoc(), isAsync);
+    ConcreteDeclRef nextWitness;
+    if (nextFn) {
+      nextWitness = iterConf.getWitnessByName(nextFn->getName());
+    }
+    if (nextWitness) {
+      auto choice =
+          OverloadChoice::getDecl(iterConf.getType(), nextWitness.getDecl(),
+                                  FunctionRefInfo::singleBaseNameApply());
+      auto *loc = getConstraintLocator(
+          contextualLoc, {LocatorPathElt::ImplicitForEachCompatMember(),
+                          LocatorPathElt::ImplicitForEachCompatMember()});
+      bindOverload(choice, loc);
+    }
   }
 
   // Desugar the element type if necessary, since types like

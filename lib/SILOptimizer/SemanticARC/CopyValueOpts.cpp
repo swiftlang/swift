@@ -813,7 +813,7 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // parent owned value's lifetime.
   // Note: we cannot optimistically ignore DeadEndBlocks - unlike for ownership
   //       verification.
-  LinearLifetimeChecker checker(nullptr);
+  LinearLifetimeChecker checker(nullptr, /*instIndices=*/ nullptr);
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

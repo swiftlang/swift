@@ -2953,7 +2953,8 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
     if (!hasLayoutString &&
         IGM.Context.LangOpts.hasFeature(
             Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+        ti.isCopyable(ResilienceExpansion::Maximal)) {
       hasLayoutString |= needsSingletonMetadataInitialization(IGM, type) ||
                          (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
     }

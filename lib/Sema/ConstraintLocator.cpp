@@ -111,6 +111,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ThrownErrorType:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
+  case ConstraintLocator::ImplicitForEachCompatMember:
   case ConstraintLocator::ExistentialMemberAccessConversion:
     return 0;
 
@@ -521,6 +522,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::FallbackType: {
     out << "fallback type";
+    break;
+
+  case ConstraintLocator::ImplicitForEachCompatMember:
+    out << "implicit 'for' loop 'makeIterator'/'next' compatibility member";
     break;
 
   case ConstraintLocator::KeyPathSubscriptIndex:

@@ -3089,9 +3089,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::InitBorrowAddrInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
-    ResultInst = Builder.createInitBorrowAddr(
-        Loc, getLocalValue(Builder.maybeGetFunction(), ValID, addrType),
-        getLocalValue(Builder.maybeGetFunction(), ValID2, addrType));
+    auto refType = SILType::getPrimitiveAddressType(
+      addrType.castTo<BuiltinBorrowType>()->getReferentType());
+    auto referent = getLocalValue(Builder.maybeGetFunction(), ValID, refType);
+    auto borrow = getLocalValue(Builder.maybeGetFunction(), ValID2, addrType);
+    ResultInst = Builder.createInitBorrowAddr(Loc, borrow, referent);
     break;
   }
   case SILInstructionKind::CopyAddrInst: {

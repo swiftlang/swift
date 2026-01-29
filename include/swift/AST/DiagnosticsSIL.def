@@ -1269,7 +1269,7 @@ ERROR(noncopyable_shared_case_block_unimplemented, none,
 ERROR(invalid_borrow_accessor_return, none,
       "invalid return value from borrow accessor", ())
 NOTE(borrow_accessor_not_a_projection_note, none,
-     "borrow accessors can return either literals, stored properties or computed "
+     "borrow accessors can return either stored properties or computed "
      "properties that have borrow accessors",
      ())
 ERROR(invalid_multiple_return_borrow_accessor, none,

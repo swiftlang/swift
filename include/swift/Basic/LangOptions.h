@@ -455,7 +455,7 @@ namespace swift {
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
-    bool ForceWorkaroundBrokenModules = false;
+    bool EnableWorkaroundBrokenModules = true;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -749,6 +749,14 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
+    /// Whether the "next major" language mode is being used. This isn't a real
+    /// language mode, it only exists to signal clients that expect to be
+    /// included in the next language mode when it becomes available.
+    bool isAtLeastFutureMajorLanguageMode() const {
+      using namespace version;
+      return isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion());
+    }
+
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
@@ -1012,6 +1020,10 @@ namespace swift {
 
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
+
+    /// Enable experimental optimization to disable contradictory disjunction
+    /// choices.
+    bool SolverPruneDisjunctions = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

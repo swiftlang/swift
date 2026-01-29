@@ -774,9 +774,9 @@ def disable_deserialization_safety :
   Flag<["-"], "disable-deserialization-safety">,
   HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
 
-def force_workaround_broken_modules :
-  Flag<["-"], "experimental-force-workaround-broken-modules">,
-  HelpText<"Attempt unsafe recovery for imported modules with broken modularization">;
+def disable_workaround_broken_modules :
+  Flag<["-"], "disable-workaround-broken-modules">,
+  HelpText<"Disable recovery for imported modules with broken modularization">;
 
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
@@ -921,6 +921,12 @@ def solver_disable_prepared_overloads : Flag<["-"], "solver-disable-prepared-ove
 
 def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overloads">,
   HelpText<"Enable experimental prepared overloads optimization">;
+
+def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjunctions">,
+  HelpText<"Disable experimental disjunction pruning algorithm for lookahead in the solver">;
+
+def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
+  HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;

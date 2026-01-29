@@ -1157,6 +1157,10 @@ BridgedLocation BridgedInstruction::getLocation() const {
   return unbridged()->getDebugLocation();
 }
 
+void BridgedInstruction::setLocation(BridgedLocation loc) const {
+  return unbridged()->setDebugLocation(loc.getLoc());
+}
+
 BridgedMemoryBehavior BridgedInstruction::getMemBehavior() const {
   return (BridgedMemoryBehavior)unbridged()->getMemoryBehavior();
 }
@@ -2953,6 +2957,14 @@ return {unbridged().createConvertFunction(regularLoc(), originalFunction.getSILV
 
 BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const {
   return {unbridged().createConvertEscapeToNoEscape(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), isLifetimeGuaranteed)};
+}
+
+BridgedInstruction BridgedBuilder::createMakeBorrow(BridgedValue referent) const {
+  return {unbridged().createMakeBorrow(regularLoc(), referent.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createMakeAddrBorrow(BridgedValue referent) const {
+  return {unbridged().createMakeAddrBorrow(regularLoc(), referent.getSILValue())};
 }
 
 //===----------------------------------------------------------------------===//

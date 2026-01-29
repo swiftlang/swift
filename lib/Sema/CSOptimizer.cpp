@@ -1790,14 +1790,6 @@ static DisjunctionInfo computeDisjunctionInfo(
         }
       });
 
-  if (cs.isDebugMode()) {
-    llvm::errs().indent(cs.solverState->getCurrentIndent())
-        << "<<< Disjunction "
-        << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
-               PrintOptions::forDebugging())
-        << " with score " << bestScore << "\n";
-  }
-
   // Determine if the score and favoring decisions here are
   // based only on "speculative" sources i.e. inference from
   // literals.
@@ -1819,83 +1811,6 @@ static DisjunctionInfo computeDisjunctionInfo(
   }
 
   return info.build();
-}
-
-/// Given a set of disjunctions, attempt to determine
-/// favored choices in the current context.
-static void determineBestChoicesInContext(
-    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions,
-    llvm::DenseMap<Constraint *, DisjunctionInfo> &result) {
-  unsigned bestOverallScore = 0;
-
-  for (auto index : indices(disjunctions)) {
-    auto info = computeDisjunctionInfo(cs, disjunctions, index, result);
-    bestOverallScore = std::max(bestOverallScore, info.Score.value_or(0));
-    result.try_emplace(disjunctions[index], info);
-  }
-
-  if (cs.isDebugMode() && bestOverallScore > 0) {
-    PrintOptions PO = PrintOptions::forDebugging();
-
-    auto getLogger = [&](unsigned extraIndent = 0) -> llvm::raw_ostream & {
-      return llvm::errs().indent(cs.solverState->getCurrentIndent() +
-                                 extraIndent);
-    };
-
-    {
-      auto &log = getLogger();
-      log << "(Optimizing disjunctions: [";
-
-      interleave(
-          disjunctions,
-          [&](const auto *disjunction) {
-            log << disjunction->getNestedConstraints()[0]
-                       ->getFirstType()
-                       ->getString(PO);
-          },
-          [&]() { log << ", "; });
-
-      log << "]\n";
-    }
-
-    getLogger(/*extraIndent=*/4)
-        << "Best overall score = " << bestOverallScore << '\n';
-
-    for (auto *disjunction : disjunctions) {
-      auto found = result.find(disjunction);
-
-      getLogger(/*extraIndent=*/4)
-          << "[Disjunction '"
-          << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
-                 PO);
-
-      if (found != result.end()) {
-        auto &entry = found->second;
-        if (entry.Score.has_value()) {
-          getLogger(/*extraIndent=*/4)
-              << "' with score = " << entry.Score.value_or(0) << '\n';
-        } else {
-          getLogger(/*extraIndent=*/4)
-              << "' without score\n";
-        }
-
-        for (const auto *choice : entry.FavoredChoices) {
-          auto &log = getLogger(/*extraIndent=*/6);
-
-          log << "- ";
-          choice->print(log, &cs.getASTContext().SourceMgr);
-          log << '\n';
-        }
-      } else {
-        getLogger(/*extraIndent=*/4)
-            << "' unsupported\n";
-      }
-
-      getLogger(/*extraIdent=*/4) << "]\n";
-    }
-
-    getLogger() << ")\n";
-  }
 }
 
 static std::optional<bool> isPreferable(ConstraintSystem &cs,
@@ -1924,22 +1839,120 @@ static std::optional<bool> isPreferable(ConstraintSystem &cs,
   return std::nullopt;
 }
 
+namespace {
+
+struct DisjunctionStats {
+  unsigned FavoredChoices = 0;
+  unsigned ActiveChoices = 0;
+  unsigned DisabledChoices = 0;
+
+  explicit DisjunctionStats(Constraint *disjunction) {
+    for (auto constraint : disjunction->getNestedConstraints()) {
+      if (constraint->isDisabled()) {
+        ++DisabledChoices;
+        continue;
+      }
+
+      ++ActiveChoices;
+    }
+  }
+
+  void print(llvm::raw_ostream &out) {
+    out << "active=" << ActiveChoices << " disabled=" << DisabledChoices;
+  }
+};
+
+}
+
 std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
 ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
 
+  if (disjunctions.empty())
+    return std::nullopt;
+
+  auto getLogger = [&](unsigned extraIndent = 0) -> llvm::raw_ostream & {
+    return llvm::errs().indent(solverState->getCurrentIndent() +
+                               extraIndent);
+  };
+  PrintOptions PO = PrintOptions::forDebugging();
+
+  if (isDebugMode()) {
+    auto &log = getLogger();
+    log << "(disjunctions: (";
+    interleave(
+          disjunctions,
+          [&](const auto *disjunction) {
+            log << disjunction->getNestedConstraints()[0]
+                       ->getFirstType()
+                       ->getString(PO);
+          },
+          [&]() { log << " "; });
+
+      log << ")\n";
+  }
+
   if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionSeed) {
     std::mt19937 g(seed);
     std::shuffle(disjunctions.begin(), disjunctions.end(), g);
   }
 
-  if (disjunctions.empty())
-    return std::nullopt;
-
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
-  determineBestChoicesInContext(*this, disjunctions, favorings);
+
+  for (auto index : indices(disjunctions)) {
+    auto *disjunction = disjunctions[index];
+
+    auto applicableFn =
+        getApplicableFnConstraint(getConstraintGraph(), disjunction);
+    FunctionType *argFuncType = nullptr;
+    if (applicableFn) {
+      argFuncType =
+        applicableFn.get()->getFirstType()->getAs<FunctionType>();
+    }
+
+    pruneDisjunction(disjunction, applicableFn.getPtrOrNull());
+    auto info = computeDisjunctionInfo(*this, disjunctions, index, favorings);
+    favorings.try_emplace(disjunction, info);
+
+    if (isDebugMode()) {
+      auto &log = getLogger(/*extraIndent=*/2);
+      log << "(disjunction '"
+          << disjunction->getNestedConstraints()[0]->getFirstType()->getString(
+                 PO) << "': ";
+
+      DisjunctionStats(disjunction).print(log);
+
+      if (argFuncType)
+        log << " type=" << simplifyType(argFuncType)->getString(PO);
+
+      if (info.Score.has_value()) {
+        log << " score=" << info.Score.value_or(0);
+      } else {
+        log << " unsupported";
+      }
+
+      if (info.FavoredChoices.empty()) {
+        log << ")\n";
+      } else {
+        log << "\n";
+        for (const auto *choice : info.FavoredChoices) {
+          auto &log = getLogger(/*extraIndent=*/4);
+
+          log << "- ";
+          choice->print(log, &getASTContext().SourceMgr);
+          log << "\n";
+        }
+
+        getLogger(/*extraIndent=*/2) << ")\n";
+      }
+    }
+  }
+
+  if (isDebugMode()) {
+    getLogger() << ")\n";
+  }
 
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
@@ -1947,8 +1960,11 @@ ConstraintSystem::selectDisjunction() {
     unsigned firstActive = first->countActiveNestedConstraints();
     unsigned secondActive = second->countActiveNestedConstraints();
 
-    if (firstActive == 1 || secondActive == 1)
-      return secondActive != 1;
+    // A disjunction where all choices have been disabled allows us
+    // to immediately fail. A disjunction with one choice is a
+    // forced move.
+    if ((firstActive <= 1) || (secondActive <= 1))
+      return firstActive < secondActive;
 
     if (auto preference = isPreferable(*this, first, second))
       return preference.value();

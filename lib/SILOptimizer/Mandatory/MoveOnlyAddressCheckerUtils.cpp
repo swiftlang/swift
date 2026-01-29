@@ -2257,7 +2257,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   // Initializing a borrow from the value as a referent counts as a liveness
   // use.
-  if (auto *initBorrowAddr = dyn_cast<InitBorrowAddrInst>(user)) {
+  if (isa<InitBorrowAddrInst>(user)) {
     assert(op->getOperandNumber() == InitBorrowAddrInst::Referent
            && "should have handled dest above in memInstMustInitialize");
 

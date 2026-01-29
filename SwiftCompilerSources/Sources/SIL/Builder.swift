@@ -847,6 +847,16 @@ public struct Builder {
     let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
+
+  public func createMakeBorrow(referent: Value) -> MakeBorrowInst {
+    let makeBorrow = bridged.createMakeBorrow(referent.bridged)
+    return notifyNew(makeBorrow.getAs(MakeBorrowInst.self))
+  }
+
+  public func createMakeAddrBorrow(referent: Value) -> MakeAddrBorrowInst {
+    let makeAddrBorrow = bridged.createMakeAddrBorrow(referent.bridged)
+    return notifyNew(makeAddrBorrow.getAs(MakeAddrBorrowInst.self))
+  }
 }
 
 
@@ -855,6 +865,18 @@ public struct Builder {
 //===----------------------------------------------------------------------===//
 
 extension Builder {
+  public func emitLoadBorrow(fromAddress: Value) -> LoadInstruction {
+    if !fromAddress.parentFunction.hasOwnership {
+      return createLoad(fromAddress: fromAddress, ownership: .unqualified)
+    }
+
+    if fromAddress.type.isTrivial(in: fromAddress.parentFunction) {
+      return createLoad(fromAddress: fromAddress, ownership: .trivial)
+    }
+
+    return createLoadBorrow(fromAddress: fromAddress)
+  }
+
   public func emitDestroy(of value: Value) {
     if value.type.isTrivial(in: value.parentFunction) {
       return

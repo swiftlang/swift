@@ -52,6 +52,30 @@ func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> Pic
   return nil
 }
 
+@available(SwiftStdlib 6.0, *)
+func test_cancellation_withTaskCancellationHandler(_ anything: Any, isolation: (any Actor)? = #isolation) async -> PictureData? {
+  let handle: Task<PictureData, Error> = .init {
+    let file = SomeFile()
+
+    do {
+      return try await withTaskCancellationHandler(
+        operation: { () throws in
+          await test_cancellation_guard_isCancelled(file)
+        },
+        onCancel: {
+          file.close()
+        },
+        isolation: isolation
+      )
+    } catch {
+      return PictureData.value("...")
+    }
+  }
+
+  handle.cancel()
+  return nil
+}
+
 @available(SwiftStdlib 5.1, *)
 func test_cancellation_loop() async -> Int {
   struct SampleTask { func process() async {} }

@@ -2454,6 +2454,12 @@ public:
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
+  /// A mapping between an input expr and a custom simulated initial depth for
+  /// the constraint system's depth map.
+  /// FIXME: This only exists for a narrow compatibility hack and should be
+  /// removed.
+  llvm::DenseMap<Expr *, unsigned> InputExprSimulatedDepths;
+
 private:
   /// Describes the current solver state.
   struct SolverState {
@@ -4911,7 +4917,8 @@ private:
   /// failure.
   Type lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
                              bool openExistential,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             ProtocolConformanceRef *conformanceOut = nullptr);
 
   /// Attempt to simplify the ForEachElement constraint.
   SolutionKind
@@ -5163,8 +5170,7 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  const BindingSet *determineBestBindings(
-      llvm::function_ref<void(const BindingSet &)> onCandidate);
+  const BindingSet *determineBestBindings();
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
@@ -5248,6 +5254,9 @@ private:
   /// \returns The selected disjunction and a set of it's favored choices.
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
+
+  void pruneDisjunction(Constraint *disjunction,
+                        Constraint *applicableFn);
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///

@@ -38,6 +38,7 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
+class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -728,7 +729,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
 
   SWIFT_DEBUG_DUMP;
 };

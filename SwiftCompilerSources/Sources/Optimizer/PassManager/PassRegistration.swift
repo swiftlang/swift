@@ -148,6 +148,9 @@ private func registerSwiftPasses() {
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
+  registerForSILCombine(InitBorrowAddrInst.self,    { run(InitBorrowAddrInst.self, $0) })
+  registerForSILCombine(DereferenceBorrowInst.self, { run(DereferenceBorrowInst.self, $0) })
+  registerForSILCombine(DereferenceAddrBorrowInst.self, { run(DereferenceAddrBorrowInst.self, $0) })
 }
 
 private func registerSwiftAnalyses() {

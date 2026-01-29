@@ -26,6 +26,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -1295,7 +1296,7 @@ void ModuleDependencyScanner::processBatchClangModuleQueryResult(
             // a `ModuleDeps` info for the queried module itself, then
             // it has to have been included in the set of already-seen
             // module dependencies from a prior query.
-            assert(DependencyCache.hasDependency(dependencyID));
+            assert(DependencyCache.hasClangDependency(moduleIdentifier));
           }
         } else if (!optionalImport) {
           // Otherwise, we failed to resolve this dependency. We will try
@@ -1468,23 +1469,16 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   auto scanForSwiftModuleDependency =
       [this, &lookupResultLock,
        &moduleLookupResult](Identifier moduleIdentifier, bool isTestable) {
-        auto moduleName = moduleIdentifier.str().str();
-        {
-          std::lock_guard<std::mutex> guard(lookupResultLock);
-          if (DependencyCache.hasSwiftDependency(moduleName))
-            return;
-        }
-
         auto moduleDependencies = withDependencyScanningWorker(
             [moduleIdentifier,
              isTestable](ModuleDependencyScanningWorker *ScanningWorker) {
               return ScanningWorker->scanFilesystemForSwiftModuleDependency(
                   moduleIdentifier, isTestable);
             });
-
         {
           std::lock_guard<std::mutex> guard(lookupResultLock);
-          moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
+          moduleLookupResult.insert_or_assign(moduleIdentifier.str().str(),
+                                              moduleDependencies);
         }
       };
 
@@ -1492,6 +1486,9 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   for (const auto &dependsOn : moduleDependencyInfo.getModuleImports()) {
     // Avoid querying the underlying Clang module here
     if (moduleID.ModuleName == dependsOn.importIdentifier)
+      continue;
+    // Avoid querying Swift module dependencies previously looked up
+    if (DependencyCache.hasQueriedSwiftDependency(dependsOn.importIdentifier))
       continue;
     ScanningThreadPool.async(
         scanForSwiftModuleDependency,
@@ -1532,10 +1529,13 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
                        moduleImport.importIdentifier))
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier, cachedInfo.value()->getKind()});
-        else
+        else {
           ScanDiagnosticReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
                      moduleImport, lookupResult.incompatibleCandidates,
                      DependencyCache, std::nullopt);
+          DependencyCache
+            .recordFailedSwiftDependencyLookup(moduleImport.importIdentifier);
+        }
       };
 
   for (const auto &importInfo : moduleDependencyInfo.getModuleImports())
@@ -1673,43 +1673,36 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
 
   // A scanning task to query a Swift module by-name. If the module already
   // exists in the cache, do nothing and return.
-  auto scanForSwiftDependency = [this, &moduleID, &lookupResultLock,
-                                 &swiftOverlayLookupResult](
-                                    Identifier moduleIdentifier) {
-    auto moduleName = moduleIdentifier.str();
-    {
-      std::lock_guard<std::mutex> guard(lookupResultLock);
-      if (DependencyCache.hasDependency(moduleName,
-                                        ModuleDependencyKind::SwiftInterface) ||
-          DependencyCache.hasDependency(moduleName,
-                                        ModuleDependencyKind::SwiftBinary))
-        return;
-    }
+  auto scanForSwiftDependency =
+      [this, &lookupResultLock,
+       &swiftOverlayLookupResult](Identifier moduleIdentifier) {
+        auto moduleDependencies = withDependencyScanningWorker(
+            [moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
+              return ScanningWorker->scanFilesystemForSwiftModuleDependency(
+                  moduleIdentifier, /* isTestableImport */ false);
+            });
+        {
+          std::lock_guard<std::mutex> guard(lookupResultLock);
+          swiftOverlayLookupResult.insert_or_assign(moduleIdentifier.str(),
+                                                    moduleDependencies);
+        }
+      };
 
+  // Enque asynchronous lookup tasks
+  for (const auto &clangDep : visibleClangDependencies) {
+    auto clangDepName = clangDep.getKey().str();
     // Avoid Swift overlay lookup for the underlying clang module of a known
     // Swift module. i.e. When computing set of Swift Overlay dependencies
     // for module 'A', which depends on a Clang module 'A', ensure we don't
     // lookup Swift module 'A' itself here.
-    if (moduleName == moduleID.ModuleName)
-      return;
-
-    auto moduleDependencies = withDependencyScanningWorker(
-        [moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
-          return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-              moduleIdentifier, /* isTestableImport */ false);
-        });
-                                      
-    {
-      std::lock_guard<std::mutex> guard(lookupResultLock);
-      swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
-    }
-  };
-
-  // Enque asynchronous lookup tasks
-  for (const auto &clangDep : visibleClangDependencies)
-    ScanningThreadPool.async(
-        scanForSwiftDependency,
-        getModuleImportIdentifier(clangDep.getKey().str()));
+    if (clangDepName == moduleID.ModuleName)
+      continue;
+    // Avoid querying Swift module dependencies previously looked up
+    if (DependencyCache.hasQueriedSwiftDependency(clangDepName))
+      continue;
+    ScanningThreadPool.async(scanForSwiftDependency,
+                             getModuleImportIdentifier(clangDepName));
+  }
   ScanningThreadPool.wait();
 
   // Aggregate both previously-cached and freshly-scanned module results

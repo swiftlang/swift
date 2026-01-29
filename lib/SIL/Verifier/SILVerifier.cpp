@@ -260,6 +260,30 @@ void swift::verificationFailure(
     exit(1);
 }
 
+void swift::verificationFailure(
+    const Twine &complaint, const SILWitnessTable *wtable,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in witness table ";
+    wtable->getConformance()->printName(out);
+    out << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
 
@@ -1031,6 +1055,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   CalleeCache *calleeCache;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
+  InstructionIndices instIndices;
 
   bool SingleFunction = true;
   bool checkLinearLifetime = false;
@@ -1040,7 +1065,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
 public:
   class VerifierErrorEmitter {
     std::optional<std::variant<const SILInstruction *, const SILArgument *,
-                               const SILFunction *>>
+                               const SILFunction *, const SILWitnessTable *>>
         value;
 
   public:
@@ -1076,6 +1101,15 @@ public:
                "constructs at the same time?!");
         getEmitter().value = arg;
       }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILWitnessTable *wtable)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = wtable;
+      }
+
       ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
     };
 
@@ -1101,6 +1135,11 @@ public:
                                    extraContext);
       }
 
+      if (std::holds_alternative<const SILWitnessTable *>(v)) {
+        return verificationFailure(complaint, std::get<const SILWitnessTable *>(v),
+                                   extraContext);
+      }
+
       llvm::report_fatal_error("Unhandled case?!");
     }
   };
@@ -1110,9 +1149,6 @@ public:
 private:
   VerifierErrorEmitter ErrorEmitter;
   std::unique_ptr<DominanceInfo> Dominance;
-
-  // Used for dominance checking within a basic block.
-  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -1383,35 +1419,24 @@ public:
     return match;
   }
 
-  static unsigned numInstsInFunction(const SILFunction &F) {
-    unsigned numInsts = 0;
-    for (auto &BB : F) {
-      numInsts += std::distance(BB.begin(), BB.end());
-    }
-    return numInsts;
-  }
-
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
               bool SingleFunction, bool checkLinearLifetime)
       : M(F.getModule().getSwiftModule()), F(F),
         calleeCache(calleeCache),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        instIndices(const_cast<SILFunction *>(&F)),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)) {
+        Dominance(nullptr) {
     if (F.isExternalDeclaration())
       return;
 
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
-    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
-      for (auto &I : BB)
-        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
@@ -1435,7 +1460,10 @@ public:
     if (aBlock != bBlock)
       return Dominance->properlyDominates(aBlock, bBlock);
 
-    return InstNumbers[a] < InstNumbers[b];
+    // Note that it might happen that for absurdly large basic blocks, the instruction
+    // indices are "maxed out". In this case we cannot compute the before-after
+    // relation efficiently and we conservatively return true.
+    return a != b && instIndices.get(a) <= instIndices.get(b);
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -1542,7 +1570,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get());
+    SILValue(V).verifyOwnership(DEBlocks.get(), &instIndices);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -7800,10 +7828,11 @@ void SILWitnessTable::verify(const SILModule &mod) const {
         entry.getMethodWitness().Requirement.print(os);
       }
 
-      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
-                  /*SingleFunction=*/true,
-                  /*checkLinearLifetime=*/false)
-          .requireABICompatibleFunctionTypes(
+      SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*SingleFunction=*/true,
+                           /*checkLinearLifetime=*/false);
+      SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
+      verifier.requireABICompatibleFunctionTypes(
               witnessFunction->getLoweredFunctionType(),
               baseInfo.getSILType().castTo<SILFunctionType>(),
               "witness table entry for " + baseName + " must be ABI-compatible",
