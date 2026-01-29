@@ -124,6 +124,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
+    if (auto sendableDep = ty->getSendableDependentType()) {
+      if (doIt(sendableDep))
+        return true;
+    }
+
     return doIt(ty->getResult());
   }
 
