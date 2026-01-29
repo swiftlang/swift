@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ProfileCounter.h"
@@ -1746,6 +1747,9 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
       }
     }
   }
+  if (singleVar && singleVar->isConstValue())
+    initExpr = evaluateOrDefault(C.evaluator,
+                                 ConstantFoldExpression{initExpr, &C}, {});
 
   emitExprInto(initExpr, initialization.get());
 }

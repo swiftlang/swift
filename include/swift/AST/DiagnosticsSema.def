@@ -846,6 +846,10 @@ ERROR(const_opaque_callee,none,
       "unable to resolve callee in a constant expression", ())
 ERROR(const_non_const_param,none,
       "reference to a non-'@const' parameter in a constant expression", ())
+ERROR(const_integer_overflow,none,
+      "operation results in integer overflow", ())
+ERROR(const_divide_by_zero,none,
+      "division by zero", ())
 ERROR(const_unknown_default,none,
       "not supported in a constant expression", ())
 
