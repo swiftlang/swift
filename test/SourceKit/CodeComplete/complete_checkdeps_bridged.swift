@@ -10,6 +10,15 @@ func foo() {
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)
 
+// DEFINE: %{args} = \
+// DEFINE:   -target %target-triple \
+// DEFINE:   -module-name MyProject \
+// DEFINE:   -F %t/Frameworks \
+// DEFINE:   -I %t/MyProject \
+// DEFINE:   -import-objc-header %t/MyProject/Bridging.h \
+// DEFINE:   %t/MyProject/Library.swift \
+// DEFINE:   %s
+
 // RUN: cp -R %S/Inputs/checkdeps/MyProject %t/
 // RUN: cp -R %S/Inputs/checkdeps/ClangFW.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule)
@@ -20,16 +29,16 @@ func foo() {
 // RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 
 // RUN:   -shell -- echo "### Initial" == \
-// RUN:   -req=complete -pos=5:3 %s -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %s == \
+// RUN:   -req=complete -pos=5:3 %s -- %{args} == \
 
 // RUN:   -shell -- echo '### Modify bridging header library file' == \
 // RUN:   -shell -- cp -R %S/Inputs/checkdeps/MyProject_mod/LocalCFunc.h %t/MyProject/ == \
 // RUN:   -shell -- touch -t 210001010101 %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name == \
-// RUN:   -req=complete -pos=5:3 %s -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %s == \
+// RUN:   -req=complete -pos=5:3 %s -- %{args} == \
 
 // RUN:   -shell -- echo '### Fast completion' == \
 // RUN:   -shell -- touch -t 202001010101 %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name == \
-// RUN:   -req=complete -pos=5:3 %s -- -target %target-triple -module-name MyProject -F %t/Frameworks -I %t/MyProject -import-objc-header %t/MyProject/Bridging.h %t/MyProject/Library.swift %s \
+// RUN:   -req=complete -pos=5:3 %s -- %{args} \
 
 // RUN:   | %FileCheck %s
 
