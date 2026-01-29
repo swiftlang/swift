@@ -336,8 +336,14 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
 
+  /// The declaration of 'BorrowingSequence.makeBorrowingIterator()'.
+  FuncDecl *MakeBorrowingIterator = nullptr;
+
   /// The declaration of 'IteratorProtocol.next()'.
   FuncDecl *IteratorNext = nullptr;
+
+  /// The declaration of 'IteratorProtocol.nextSpan(maximumCount:)'.
+  FuncDecl *BorrowingIteratorNextSpan = nullptr;
 
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
@@ -1130,6 +1136,23 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   return nullptr;
 }
 
+FuncDecl *ASTContext::getBorrowingSequenceMakeBorrowingIterator() const {
+  if (getImpl().MakeBorrowingIterator) {
+    return getImpl().MakeBorrowingIterator;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::BorrowingSequence);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_makeBorrowingIterator)) {
+    getImpl().MakeBorrowingIterator = func;
+    return func;
+  }
+
+  return nullptr;
+}
+
 FuncDecl *ASTContext::getAsyncSequenceMakeAsyncIterator() const {
   if (getImpl().MakeAsyncIterator) {
     return getImpl().MakeAsyncIterator;
@@ -1158,6 +1181,23 @@ FuncDecl *ASTContext::getIteratorNext() const {
 
   if (auto *func = lookupRequirement(proto, Id_next)) {
     getImpl().IteratorNext = func;
+    return func;
+  }
+
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getBorrowingIteratorNextSpan() const {
+  if (getImpl().IteratorNext) {
+    return getImpl().BorrowingIteratorNextSpan;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::BorrowingIteratorProtocol);
+  if (!proto)
+    return nullptr;
+
+  if (auto *func = lookupRequirement(proto, Id_nextSpan)) {
+    getImpl().BorrowingIteratorNextSpan = func;
     return func;
   }
 

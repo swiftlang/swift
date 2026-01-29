@@ -1042,8 +1042,9 @@ class ForEachStmt : public LabeledStmt {
   OpaqueStmt *opaqueBodyStmt = nullptr;
   // Used to map Continue and Break targets to a desugared ForEachStmt's
   // corresponding WhileStmt.
-  WhileStmt *continueTarget = nullptr;
+  LabeledStmt *continueTarget = nullptr;
   WhileStmt *breakTarget = nullptr;
+  bool synthesizedInnerLoopForBorrowing;
 
   friend class DesugarForEachStmtRequest;
 
@@ -1052,12 +1053,14 @@ public:
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
               SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
               Expr *WhereExpr, BraceStmt *Body, DeclContext *DC,
-              std::optional<bool> implicit = std::nullopt)
+              std::optional<bool> implicit = std::nullopt,
+              bool synthesizedInnerLoopForBorrowing = false)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc),
         UnsafeLoc(UnsafeLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
-        WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body), DC(DC) {
+        WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body), DC(DC),
+        synthesizedInnerLoopForBorrowing(synthesizedInnerLoopForBorrowing) {
     setPattern(Pat);
   }
 
@@ -1140,13 +1143,18 @@ public:
 
   /// getContinueTarget - Retrieve the WhileStmt Continue target once
   /// the ForEachStmt has been desugared.
-  WhileStmt *getContinueTarget() { return continueTarget; }
-  void setContinueTarget(WhileStmt *target) { continueTarget = target; }
+  LabeledStmt *getContinueTarget();
+  void setContinueTarget(LabeledStmt *target) { continueTarget = target; }
 
   /// getBreakTarget - Retrieve the WhileStmt Break target once
   /// the ForEachStmt has been desugared.
   WhileStmt *getBreakTarget() { return breakTarget; }
   void setBreakTarget(WhileStmt *target) { breakTarget = target; }
+
+  // FIXME: add doc comment
+  bool isSynthesizedInnerLoopForBorrowing() {
+    return synthesizedInnerLoopForBorrowing;
+  }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;

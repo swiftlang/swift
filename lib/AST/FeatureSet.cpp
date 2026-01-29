@@ -483,6 +483,7 @@ UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
 // Ignore borrow and mutate accessors until it is used in the standard library.
 UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+UNINTERESTING_FEATURE(BorrowingForLoop)
 
 static bool usesFeatureInlineAlways(Decl *decl) {
   if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {

@@ -867,3 +867,18 @@ extension RawSpan {
     extracting(droppingFirst: k)
   }
 }
+
+extension RawSpan {
+  @available(SwiftStdlib 6.3, *)
+  @_transparent
+  public var _span: Span<UInt8> {
+    @lifetime(borrow self)
+    get {
+      let buf = unsafe UnsafeBufferPointer(
+        start: _pointer?.assumingMemoryBound(to: UInt8.self), 
+        count: _count)
+      let span = unsafe Span(_unsafeElements: buf)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+}
