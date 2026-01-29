@@ -3192,14 +3192,10 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto closure = dyn_cast_or_null<ClosureExpr>(
       dyn_cast<AbstractClosureExpr>(CurDeclContext));
   if (!closure) {
-    if (Context.LangOpts.DebuggerSupport) {
-      auto refKind = DeclRefKind::Ordinary;
-      auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier),
-                                                 refKind, DeclNameLoc(Loc));
-    }
-    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
-    return new (Context) ErrorExpr(Loc);
+    auto refKind = DeclRefKind::Ordinary;
+    auto identifier = Context.getIdentifier(Name);
+    return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier), refKind,
+                                               DeclNameLoc(Loc));
   }
 
   // Check whether the closure already has explicit parameters.
