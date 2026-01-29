@@ -746,19 +746,19 @@ namespace swift {
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
     /// check for isLanguageModeAtLeast(5).
+    [[deprecated("use e.g. isLanguageModeAtLeast(LanguageMode::v6)")]]
     bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
+
+    /// Returns a boolean value indicating whether the language mode is at least
+    /// `mode`.
+    ///
+    /// This is very likely the check you want; for example, when introducing
+    /// a new language feature which is only visible in Swift 5, you would
+    /// check for `isLanguageModeAtLeast(LanguageMode::v5)`.
     bool isLanguageModeAtLeast(LanguageMode mode) const {
       return mode.isEffectiveIn(EffectiveLanguageVersion);
-    }
-
-    /// Whether the "next major" language mode is being used. This isn't a real
-    /// language mode, it only exists to signal clients that expect to be
-    /// included in the next language mode when it becomes available.
-    bool isAtLeastFutureMajorLanguageMode() const {
-      using namespace version;
-      return isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion());
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.

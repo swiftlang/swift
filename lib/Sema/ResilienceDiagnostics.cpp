@@ -109,7 +109,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
-  if (D->shouldUseObjCDispatch() && !Context.isLanguageModeAtLeast(5) &&
+  if (D->shouldUseObjCDispatch() &&
+      !Context.isLanguageModeAtLeast(LanguageMode::v5) &&
       !DC->getParentModule()->isResilient()) {
     return false;
   }
@@ -123,22 +124,23 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   // Swift 4.2 did not perform any checks for type aliases.
   if (isa<TypeAliasDecl>(D)) {
-    if (!Context.isLanguageModeAtLeast(4, 2))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v4_2))
       return false;
-    if (!Context.isLanguageModeAtLeast(5))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
   // Swift 4.2 did not check accessor accessibility.
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
-    if (!accessor->isInitAccessor() && !Context.isLanguageModeAtLeast(5))
+    if (!accessor->isInitAccessor() &&
+        !Context.isLanguageModeAtLeast(LanguageMode::v5))
       downgradeToWarning = DowngradeToWarning::Yes;
   }
 
   // Swift 5.0 did not check the underlying types of local typealiases.
   if (isa<TypeAliasDecl>(DC) &&
       !Context.LangOpts.hasFeature(Feature::StrictAccessControl) &&
-      !Context.isLanguageModeAtLeast(6))
+      !Context.isLanguageModeAtLeast(LanguageMode::v6))
     downgradeToWarning = DowngradeToWarning::Yes;
 
   auto diagID = diag::resilience_decl_unavailable;
@@ -231,7 +233,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
       originKind == DisallowedOriginKind::MissingImport &&
-      !ctx.isLanguageModeAtLeast(6))
+      !ctx.isLanguageModeAtLeast(LanguageMode::v6))
     addMissingImport(loc, D, where);
 
   // If limited by an import, note which one.
@@ -496,7 +498,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
       originKind == DisallowedOriginKind::MissingImport &&
-      !ctx.isLanguageModeAtLeast(6))
+      !ctx.isLanguageModeAtLeast(LanguageMode::v6))
     addMissingImport(loc, ext, where);
 
   // If limited by an import, note which one.

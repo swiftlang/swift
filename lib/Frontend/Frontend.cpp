@@ -1521,7 +1521,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getLangOptions().hasFeature(Feature::LibraryEvolution))
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    if (Invocation.getLangOptions().isLanguageModeAtLeast(6))
+    if (Invocation.getLangOptions().isLanguageModeAtLeast(LanguageMode::v6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions()

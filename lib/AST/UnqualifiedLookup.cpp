@@ -379,7 +379,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
 
   // Previously we didn't perform the lookup of 'self' for anything outside
   // of a '[weak self]' closure, maintain that behavior until Swift 6 mode.
-  if (!Ctx.isLanguageModeAtLeast(6) && !capturesSelfWeakly)
+  if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) && !capturesSelfWeakly)
     return nullptr;
 
   auto selfDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
@@ -413,7 +413,7 @@ ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) c
   // In these cases, using the Swift 6 lookup behavior doesn't affect
   // how the body is type-checked, so it can be used in Swift 5 mode
   // without breaking source compatibility for non-escaping closures.
-  if (!Ctx.isLanguageModeAtLeast(6) &&
+  if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
       !implicitSelfReferenceIsUnwrapped(selfDecl)) {
     return nullptr;
   }

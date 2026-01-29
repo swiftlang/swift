@@ -482,7 +482,7 @@ GlobalActorAttributeRequest::evaluate(
         }
 
         // In Swift 6, once the diag above is an error, it is disallowed.
-        if (ctx.isLanguageModeAtLeast(6))
+        if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
           return std::nullopt;
       }
     }
@@ -951,7 +951,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
 
         ctx.Diags
             .diagnose(importLoc, diag::add_predates_concurrency_import,
-                      ctx.isLanguageModeAtLeast(6),
+                      ctx.isLanguageModeAtLeast(LanguageMode::v6),
                       nominal->getParentModule()->getName())
             .fixItInsert(importLoc, "@preconcurrency ");
 
@@ -1932,7 +1932,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(
     ValueDecl const *member, SourceLoc memberLoc,
     std::optional<VarRefUseEnv> useKind) {
   // no need for this in Swift 6+
-  if (refCxt->getASTContext().isLanguageModeAtLeast(6))
+  if (refCxt->getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
     return false;
 
   // must be an access to an instance member.
@@ -6153,9 +6153,9 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
           // Preconcurrency here is used to stage the diagnostics
           // when users select `@MainActor` default isolation with
           // non-strict concurrency modes (pre Swift 6).
-          auto isolation =
-              ActorIsolation::forGlobalActor(globalActor)
-                  .withPreconcurrency(!ctx.isLanguageModeAtLeast(6));
+          auto isolation = ActorIsolation::forGlobalActor(globalActor)
+                               .withPreconcurrency(!ctx.isLanguageModeAtLeast(
+                                   LanguageMode::v6));
           return {{{isolation, {}}, nullptr, {}}};
       }
 
