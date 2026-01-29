@@ -1554,6 +1554,9 @@ public:
   bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
     return LangOpts.isLanguageModeAtLeast(major, minor);
   }
+  bool isLanguageModeAtLeast(LanguageMode mode) const {
+    return LangOpts.isLanguageModeAtLeast(mode);
+  }
 
   /// Whether the "next major" language mode is being used. This isn't a real
   /// language mode, it only exists to signal clients that expect to be

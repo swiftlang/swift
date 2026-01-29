@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
@@ -747,6 +748,9 @@ namespace swift {
     /// check for isLanguageModeAtLeast(5).
     bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
+    }
+    bool isLanguageModeAtLeast(LanguageMode mode) const {
+      return mode.isEffectiveIn(EffectiveLanguageVersion);
     }
 
     /// Whether the "next major" language mode is being used. This isn't a real
