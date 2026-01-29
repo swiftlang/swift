@@ -1657,7 +1657,11 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
       auto *inst = &*ii;
       ++ii;
 
-      // TODO: Eliminate trivially dead instructions here.
+      // Eliminate trivially dead instructions.
+      if (!inst->mayHaveSideEffects() && inst->use_empty()) {
+        inst->eraseFromParent();
+        continue;
+      }
 
       // If `I` is a floating-point literal instruction where the literal is
       // inf, it means the input has a literal that overflows even
