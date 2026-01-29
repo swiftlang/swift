@@ -748,7 +748,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // - member type expressions rooted on non-identifier types, e.g.
       //   '[X].Y' since they used to be accepted without the '.self'.
       bool downgradeToWarningUntil6 = false;
-      if (!Ctx.isLanguageModeAtLeast(6)) {
+      if (!Ctx.isLanguageModeAtLeast(LanguageMode::v6)) {
         if (ParentExpr && (isa<SubscriptExpr>(ParentExpr) ||
                            isa<DynamicSubscriptExpr>(ParentExpr) ||
                            isa<ObjectLiteralExpr>(ParentExpr))) {
@@ -1895,7 +1895,7 @@ public:
 
     // Prior to Swift 6, use the old validation logic.
     auto &ctx = inClosure->getASTContext();
-    if (!ctx.isLanguageModeAtLeast(6))
+    if (!ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
@@ -2280,7 +2280,7 @@ public:
 
   bool shouldRecordClosure(const AbstractClosureExpr *E) {
     // Record all closures in Swift 6 mode.
-    if (Ctx.isLanguageModeAtLeast(6))
+    if (Ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return true;
 
     // Only record closures requiring self qualification prior to Swift 6
@@ -2367,7 +2367,8 @@ public:
 
     if (memberLoc.isValid()) {
       const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
-      if (Ctx.isLanguageModeAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+      if (Ctx.isLanguageModeAtLeast(LanguageMode::v6) && selfDRE &&
+          selfDRE->getDecl()) {
         parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
             selfDRE->getDecl(), selfDRE->getType(), ACE);
       }
@@ -5696,7 +5697,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // Do not warn on coercions from implicitly unwrapped optionals
       // for Swift versions less than 5.
-      if (!Ctx.isLanguageModeAtLeast(5) &&
+      if (!Ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
           hasImplicitlyUnwrappedResult(subExpr))
         return;
 
@@ -6702,7 +6703,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   maybeDiagnoseCallToKeyValueObserveMethod(E, DC);
   diagnoseExplicitUseOfLazyVariableStorage(E, DC);
   diagnoseComparisonWithNaN(E, DC);
-  if (!ctx.isLanguageModeAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
     diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));

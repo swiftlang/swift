@@ -405,7 +405,7 @@ WARNING(module_interface_scoped_import_unsupported,none,
         "scoped imports are not yet supported in module interfaces",
         ())
 WARNING(warn_unsupported_module_interface_swift_version,none,
-        "module interfaces are only supported with Swift language version 5 "
+        "module interfaces are only supported with the Swift 5 language mode "
         "or later (currently using -swift-version %0)",
         (StringRef))
 WARNING(warn_unsupported_module_interface_library_evolution,none,

@@ -1087,7 +1087,7 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
                     patternTy)
           .warnUntilLanguageMode(LanguageMode::v6);
 
-      if (ctx.isLanguageModeAtLeast(6))
+      if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
         return nullptr;
     }
   }

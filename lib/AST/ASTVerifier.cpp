@@ -2199,7 +2199,7 @@ public:
     void verifyChecked(OptionalTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OptionalTryExpr", E);
 
-      if (Ctx.isLanguageModeAtLeast(5)) {
+      if (Ctx.isLanguageModeAtLeast(LanguageMode::v5)) {
         checkSameType(E->getType(), E->getSubExpr()->getType(),
                       "OptionalTryExpr and sub-expression");
       }

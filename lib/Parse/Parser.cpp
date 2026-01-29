@@ -618,7 +618,7 @@ bool Parser::isAtAttributeLParen(bool isCustomAttr) {
   if (!Tok.isFollowingLParen())
     return false;
 
-  if (Context.isLanguageModeAtLeast(6)) {
+  if (Context.isLanguageModeAtLeast(LanguageMode::v6)) {
     // No-space '(' are always arguments.
     if (getEndOfPreviousLoc() == Tok.getLoc())
       return true;

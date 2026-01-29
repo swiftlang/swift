@@ -271,7 +271,7 @@ const {
   if (getExportedLevel() == ExportedLevel::ImplicitlyExported &&
       originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
       !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-      !ctx.isLanguageModeAtLeast(7))
+      !ctx.isLanguageModeAtLeast(LanguageMode::future))
     return DiagnosticBehavior::Warning;
 
   return DiagnosticBehavior::Error;

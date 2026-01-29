@@ -4320,7 +4320,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     diagnose(repr->getLoc(), diag::isolated_parameter_duplicate_type)
         .warnUntilLanguageMode(LanguageMode::v6);
 
-    if (ctx.isLanguageModeAtLeast(6))
+    if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
       return ErrorType::get(ctx);
     else
       repr->setWarned();
@@ -5870,7 +5870,6 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
     // In language modes up to Swift 5, we allow `T!` in invalid position for
     // compatibility and downgrade the error to a warning.
-    const unsigned swiftLangModeForError = 5;
     const auto languageModeForError = LanguageMode::v5;
 
     // If we are about to error, mark this node as invalid.
@@ -5885,12 +5884,12 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     // Compiler should diagnose both `Int!` and `String!` as invalid,
     // but returning `ErrorType` from here would stop type resolution
     // after `Int!`.
-    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(languageModeForError)) {
       repr->setInvalid();
     }
 
     Diag<> diagID = diag::iuo_deprecated_here;
-    if (ctx.isLanguageModeAtLeast(swiftLangModeForError)) {
+    if (ctx.isLanguageModeAtLeast(languageModeForError)) {
       diagID = diag::iuo_invalid_here;
     }
 

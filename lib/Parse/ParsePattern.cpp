@@ -180,7 +180,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // Per SE-0155, enum elements may not have empty parameter lists.
     if (paramContext == ParameterContextKind::EnumElement) {
       decltype(diag::enum_element_empty_arglist) diagnostic;
-      if (Context.isLanguageModeAtLeast(5)) {
+      if (Context.isLanguageModeAtLeast(LanguageMode::v5)) {
         diagnostic = diag::enum_element_empty_arglist;
       } else {
         diagnostic = diag::enum_element_empty_arglist_swift4;

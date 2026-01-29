@@ -1481,7 +1481,7 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
     // In the next language mode we should stop creating the compatibility
     // initializer if 'DeprecateCompatMemberwiseInit' is enabled.
     if (ctx.LangOpts.hasFeature(Feature::DeprecateCompatMemberwiseInit) &&
-        ctx.isAtLeastFutureMajorLanguageMode()) {
+        ctx.isLanguageModeAtLeast(LanguageMode::future)) {
       return false;
     }
 
