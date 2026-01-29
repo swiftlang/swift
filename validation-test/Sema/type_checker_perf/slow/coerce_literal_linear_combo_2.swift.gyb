@@ -1,0 +1,14 @@
+// RUN: %scale-test --begin 1 --end 3 --step 1 --select NumLeafScopes %s
+
+// REQUIRES: no_asan
+
+func g<T>(_: T, _: T) -> T { fatalError() }
+
+let base: UInt64 = 0
+
+func f() {
+  g(base, (0 * 0) + 0)
+%for i in range(1, N):
+         + (0 * 0)
+%end
+}

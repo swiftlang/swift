@@ -1927,6 +1927,10 @@ ConstraintSystem::selectDisjunction() {
       if (argFuncType)
         log << " type=" << simplifyType(argFuncType)->getString(PO);
 
+      if (info.IsSpeculative) {
+        log << " speculative";
+      }
+
       if (info.Score.has_value()) {
         log << " score=" << info.Score.value_or(0);
       } else {
