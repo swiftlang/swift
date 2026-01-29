@@ -3,9 +3,23 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %swiftc_driver -emit-module -emit-module-path themod.swiftmodule -Xfrontend -experimental-skip-all-function-bodies -module-name themod -module-cache-path %t%{fs-sep}mcp -sdk %sdk -swift-version 5 -I %S%{fs-sep}Inputs%{fs-sep}mymod -Xfrontend -experimental-allow-module-with-compiler-errors -Xcc -D__INDEX_BUILD__=1 -D__INDEX_BUILD__ -Xcc -Xclang -Xcc -fallow-pcm-with-compiler-errors -Xcc -Xclang -Xcc -fmodule-format=raw -Xcc -Xclang -Xcc -detailed-preprocessing-record %s
-// RUN: %swiftc_driver -index-file -index-file-path %s -index-store-path %t%{fs-sep}idx -index-ignore-system-modules -module-name themod -module-cache-path %t%{fs-sep}mcp -sdk %sdk -swift-version 5 -I %S%{fs-sep}Inputs%{fs-sep}mymod -Xfrontend -experimental-allow-module-with-compiler-errors -Xcc -D__INDEX_BUILD__=1 -D__INDEX_BUILD__ -Xcc -Xclang -Xcc -fallow-pcm-with-compiler-errors -Xcc -Xclang -Xcc -fmodule-format=raw -Xcc -Xclang -Xcc -detailed-preprocessing-record %s
-// RUN: %sourcekitd-test -req=sema %s -- -module-name themod -module-cache-path %t%{fs-sep}mcp -sdk %sdk -swift-version 5 -I %S%{fs-sep}Inputs%{fs-sep}mymod -Xfrontend -experimental-allow-module-with-compiler-errors -Xcc -D__INDEX_BUILD__=1 -D__INDEX_BUILD__ -Xcc -Xclang -Xcc -fallow-pcm-with-compiler-errors -Xcc -Xclang -Xcc -fmodule-format=raw -Xcc -Xclang -Xcc -detailed-preprocessing-record %s
+// DEFINE: %{args} = \
+// DEFINE:   -module-name themod \
+// DEFINE:   -module-cache-path %t/mcp \
+// DEFINE:   -sdk %sdk \
+// DEFINE:   -swift-version 5 \
+// DEFINE:   -I %S/Inputs/mymod \
+// DEFINE:   -Xfrontend -experimental-allow-module-with-compiler-errors \
+// DEFINE:   -Xcc -D__INDEX_BUILD__=1 -D__INDEX_BUILD__ \
+// DEFINE:   -Xcc -Xclang -Xcc -fallow-pcm-with-compiler-errors \
+// DEFINE:   -Xcc -Xclang -Xcc -fmodule-format=raw \
+// DEFINE:   -Xcc -Xclang -Xcc -detailed-preprocessing-record \
+// DEFINE:   %s
+
+// RUN: %swiftc_driver -emit-module -emit-module-path themod.swiftmodule -Xfrontend -experimental-skip-all-function-bodies  %{args}
+// RUN: %swiftc_driver -index-file -index-file-path %s -index-store-path %t/idx -index-ignore-system-modules %{args}
+// RUN: %sourcekitd-test -req=sema %s -- %{args}
+// RUN: %find_files %t%{fs-sep}mcp 'mymod-*.pcm'
 // RUN: %find_files %t%{fs-sep}mcp 'mymod-*.pcm' | count 1
 
 import mymod
