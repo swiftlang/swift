@@ -1,6 +1,9 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
+// XFAIL: *
+// Safe interop Protocol support removed for now
+
 // REQUIRES: foundation
 
 // RUN: %empty-directory(%t)
