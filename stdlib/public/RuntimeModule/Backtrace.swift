@@ -349,6 +349,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     }
   }
 
+  public enum SymbolicationPlatform {
+    case Darwin
+    case Linux(alternativeSymbolFilePaths: [String])
+    case Windows
+
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    static public let `default` = SymbolicationPlatform.Darwin
+    #elseif os(Linux)
+    static public let `default` = SymbolicationPlatform.Linux([])
+    #else
+    static public let `default` = SymbolicationPlatform.Windows
+    #endif
+  }
+
   /// Return a symbolicated version of the backtrace.
   ///
   /// - images:  Specifies the set of images to use for symbolication.
@@ -356,13 +370,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   ///            has already captured images.  If it has, those will be
   ///            used; otherwise we will capture images at this point.
   ///
+  /// - platform: Which platform does this backtrace come from.
+  ///            The Linux platform allows specifying an alternate list of
+  ///            files to attempt opening for symbol lookup, matching on
+  ///            last path component.
+  ///
   /// - options: Symbolication options; see `SymbolicationOptions`.
   public func symbolicated(with images: ImageMap? = nil,
+                           platform: SymbolicationPlatform = SymbolicationPlatform.default,
                            options: SymbolicationOptions = .default)
     -> SymbolicatedBacktrace? {
     return SymbolicatedBacktrace.symbolicate(
       backtrace: self,
       images: images,
+      platform: platform,
       options: options
     )
   }

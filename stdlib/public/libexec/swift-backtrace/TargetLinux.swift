@@ -168,6 +168,7 @@ class Target {
       }
 
       let context = HostContext.fromHostMContext(ucontext.uc_mcontext)
+
       let backtrace = try Backtrace.capture(from: context,
                                             using: reader,
                                             images: images,

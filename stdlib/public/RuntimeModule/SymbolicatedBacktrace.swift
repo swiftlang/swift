@@ -124,6 +124,8 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// The source location, if available.
     public var sourceLocation: SourceLocation?
 
+    public var platform: Backtrace.SymbolicationPlatform
+
     /// True if this symbol represents a Swift runtime failure.
     public var isSwiftRuntimeFailure: Bool {
       guard let sourceLocation = sourceLocation else {
@@ -149,19 +151,19 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
 
     private func maybeUnderscore(_ sym: String) -> String {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-      return "_" + sym
-      #else
-      return sym
-      #endif
+      if case .Darwin = platform {
+        return "_" + sym
+      } else {
+        return sym
+      }
     }
 
     private func dylibName(_ dylib: String) -> String {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-      return dylib + ".dylib"
-      #else
-      return dylib + ".so"
-      #endif
+      if case .Darwin = platform {
+        return dylib + ".dylib"
+      } else {
+        return dylib + ".so"
+      }
     }
 
     /// True if this symbol represents a system function.
@@ -169,11 +171,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// For instance, the `start` function from `dyld` on macOS is a system
     /// function, and we don't need to display it under normal circumstances.
     public var isSystemFunction: Bool {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-      if rawName == "start" && imageName == "dyld" {
+      if case .Darwin = platform, rawName == "start", imageName == "dyld" {
         return true
       }
-      #endif
       if rawName.hasSuffix("5$mainyyFZ")
            || rawName.hasSuffix("5$mainyyYaFZTQ0_")
            || rawName == maybeUnderscore("async_MainTQ0_") {
@@ -193,12 +193,15 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     /// Construct a new Symbol.
     public init(imageIndex: Int, imageName: String,
-                rawName: String, offset: Int, sourceLocation: SourceLocation?) {
+                rawName: String, offset: Int, sourceLocation: SourceLocation?,
+                platform: Backtrace.SymbolicationPlatform) {
+
       self.imageIndex = imageIndex
       self.imageName = imageName
       self.rawName = rawName
       self.offset = offset
       self.sourceLocation = sourceLocation
+      self.platform = platform
     }
 
     /// Demangle the raw name, if possible.
@@ -210,7 +213,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
         // length is the size of the buffer that was allocated, *not* the
         // length of the string.
-        let stringLen = strlen(demangled)
+        let stringLen: Int = strnlen(demangled,4096)
         if stringLen > 0 {
           return demangled.withMemoryRebound(to: UInt8.self,
                                              capacity: stringLen) {
@@ -281,9 +284,16 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   }
 
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  private enum macOSSymbolicationError: Error {
+    case invalidUUID
+  }
   /// Convert a build ID to a CFUUIDBytes.
-  private static func uuidBytesFromBuildID(_ buildID: [UInt8])
+  private static func uuidBytesFromBuildID(_ buildID: [UInt8]) throws
     -> CFUUIDBytes {
+    guard buildID.count == MemoryLayout<CFUUIDBytes>.size else {
+      throw macOSSymbolicationError.invalidUUID
+    }
+
     return withUnsafeTemporaryAllocation(of: CFUUIDBytes.self,
                                          capacity: 1) { buf in
       buf.withMemoryRebound(to: UInt8.self) {
@@ -297,17 +307,21 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   private static func withSymbolicator<T>(images: ImageMap,
                                           useSymbolCache: Bool,
                                           fn: (CSSymbolicatorRef) throws -> T) rethrows -> T {
-    let binaryImageList = images.map{ image in
-      BinaryImageInformation(
-        base: vm_address_t(image.baseAddress)!,
-        extent: vm_address_t(image.endOfText)!,
-        uuid: uuidBytesFromBuildID(image.uniqueID!),
+    let binaryImageList = try images.map { image in
+      guard let uuidBytes = image.uniqueID else {
+        throw macOSSymbolicationError.invalidUUID
+      }
+
+      return BinaryImageInformation(
+        base: vm_address_t(image.baseAddress) ?? 0,
+        extent: vm_address_t(image.endOfText) ?? 0,
+        uuid: try uuidBytesFromBuildID(uuidBytes),
         arch: HostContext.coreSymbolicationArchitecture,
         path: image.path ?? "",
         relocations: [
           BinaryRelocationInformation(
-            base: vm_address_t(image.baseAddress)!,
-            extent: vm_address_t(image.endOfText)!,
+            base: vm_address_t(image.baseAddress) ?? 0,
+            extent: vm_address_t(image.endOfText) ?? 0,
             name: "__TEXT"
           )
         ],
@@ -369,11 +383,18 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       }
     }
 
+    let offset = if let addr64 = UInt64(address) {
+      Int(addr64 - UInt64(range.location))
+    } else {
+      0
+    }
+
     let theSymbol = Symbol(imageIndex: imageIndex,
                            imageName: imageName,
                            rawName: rawName,
-                           offset: Int(UInt64(address)! - UInt64(range.location)),
-                           sourceLocation: location)
+                           offset: offset,
+                           sourceLocation: location,
+                           platform: .Darwin)
     theSymbol.name = name
 
     return Frame(captured: capturedFrame, symbol: theSymbol, inlined: isInline)
@@ -381,9 +402,13 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   #endif
 
   /// Actually symbolicate.
+  /// Note: if you try to symbolicate a Linux backtrace using the macOS symbolicator (for example),
+  /// this will crash, so it's up to you to use the correct platform.
   internal static func symbolicate(backtrace: Backtrace,
                                    images: ImageMap?,
-                                   options: Backtrace.SymbolicationOptions)
+                                   platform symbolicationPlatform: Backtrace.SymbolicationPlatform,
+                                   options: Backtrace.SymbolicationOptions
+                                   )
     -> SymbolicatedBacktrace? {
 
     let theImages: ImageMap
@@ -397,165 +422,184 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     var frames: [Frame] = []
 
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    withSymbolicator(images: theImages,
-                     useSymbolCache: options.contains(.useSymbolCache)) {
-      symbolicator in
-      for frame in backtrace.frames {
-        switch frame {
-          case .omittedFrames(_), .truncated:
-            frames.append(Frame(captured: frame, symbol: nil))
-          default:
-            let address = vm_address_t(frame.adjustedProgramCounter)!
-            let owner
-              = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator,
-                                                              address,
-                                                              kCSBeginningOfTime)
-
-            if CSIsNull(owner) {
+    switch symbolicationPlatform {
+    case .Darwin:
+      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      withSymbolicator(images: theImages,
+                      useSymbolCache: options.contains(.useSymbolCache)) {
+        symbolicator in
+        for frame in backtrace.frames {
+          switch frame {
+            case .omittedFrames(_), .truncated:
               frames.append(Frame(captured: frame, symbol: nil))
-            } else if options.contains(.showInlineFrames) {
-              // These present in *reverse* order (i.e. the real one first,
-              // then the inlined frames from callee to caller).
-              let pos = frames.count
-              var first = true
+            default:
+              let address = vm_address_t(frame.adjustedProgramCounter)!
+              let owner
+                = CSSymbolicatorGetSymbolOwnerWithAddressAtTime(symbolicator,
+                                                                address,
+                                                                kCSBeginningOfTime)
 
-              _ = CSSymbolOwnerForEachStackFrameAtAddress(owner, address) {
-                symbol, sourceInfo in
+              if CSIsNull(owner) {
+                frames.append(Frame(captured: frame, symbol: nil))
+              } else if options.contains(.showInlineFrames) {
+                // These present in *reverse* order (i.e. the real one first,
+                // then the inlined frames from callee to caller).
+                let pos = frames.count
+                var first = true
 
-                frames.insert(buildFrame(from: frame,
-                                         with: owner,
-                                         isInline: !first,
-                                         symbol: symbol,
-                                         sourceInfo: sourceInfo,
-                                         images: theImages),
-                              at: pos)
+                _ = CSSymbolOwnerForEachStackFrameAtAddress(owner, address) {
+                  symbol, sourceInfo in
 
-                first = false
+                  frames.insert(buildFrame(from: frame,
+                                          with: owner,
+                                          isInline: !first,
+                                          symbol: symbol,
+                                          sourceInfo: sourceInfo,
+                                          images: theImages),
+                                at: pos)
+
+                  first = false
+                }
+              } else if options.contains(.showSourceLocations) {
+                let symbol = CSSymbolOwnerGetSymbolWithAddress(owner, address)
+                let sourceInfo = CSSymbolOwnerGetSourceInfoWithAddress(owner,
+                                                                      address)
+
+                frames.append(buildFrame(from: frame,
+                                        with: owner,
+                                        isInline: false,
+                                        symbol: symbol,
+                                        sourceInfo: sourceInfo,
+                                        images: theImages))
+              } else {
+                let symbol = CSSymbolOwnerGetSymbolWithAddress(owner, address)
+
+                frames.append(buildFrame(from: frame,
+                                        with: owner,
+                                        isInline: false,
+                                        symbol: symbol,
+                                        sourceInfo: nil,
+                                        images: theImages))
               }
-            } else if options.contains(.showSourceLocations) {
-              let symbol = CSSymbolOwnerGetSymbolWithAddress(owner, address)
-              let sourceInfo = CSSymbolOwnerGetSourceInfoWithAddress(owner,
-                                                                     address)
-
-              frames.append(buildFrame(from: frame,
-                                       with: owner,
-                                       isInline: false,
-                                       symbol: symbol,
-                                       sourceInfo: sourceInfo,
-                                       images: theImages))
-            } else {
-              let symbol = CSSymbolOwnerGetSymbolWithAddress(owner, address)
-
-              frames.append(buildFrame(from: frame,
-                                       with: owner,
-                                       isInline: false,
-                                       symbol: symbol,
-                                       sourceInfo: nil,
-                                       images: theImages))
-            }
+          }
         }
       }
-    }
-    #elseif os(Linux)
-    let cache = ElfImageCache.threadLocal
+      break
+      #else
+      fatalError("You cannot symbolicate Darwin images on non Darwin platforms.")
+      #endif
 
-    // This could be more efficient; at the moment we execute the line
-    // number programs once per frame, whereas we could just run them once
-    // for all the addresses we're interested in.
+    case .Linux(let alternativePaths):
+      let cache = ElfImageCache.threadLocal
 
-    for frame in backtrace.frames {
-      let address = frame.adjustedProgramCounter
-      if let imageNdx = theImages.indexOfImage(at: address) {
-        let name = theImages[imageNdx].name ?? "<unknown>"
-        var symbol: Symbol = Symbol(imageIndex: imageNdx,
-                                    imageName: name,
-                                    rawName: "<unknown>",
-                                    offset: 0,
-                                    sourceLocation: nil)
+      // This could be more efficient; at the moment we execute the line
+      // number programs once per frame, whereas we could just run them once
+      // for all the addresses we're interested in.
 
-        func lookupSymbol<ElfImage: ElfSymbolLookupProtocol>(
-          image: ElfImage?,
-          at imageNdx: Int,
-          named name: String,
-          address imageAddr: ImageSource.Address
-        ) -> Symbol? {
-          let address = ElfImage.Traits.Address(imageAddr)
-
-          guard let image = image else {
-            return nil
-          }
-          guard let theSymbol = image.lookupSymbol(address: address) else {
-            return nil
-          }
-
-          var location: SourceLocation?
-
-          if options.contains(.showSourceLocations)
-               || options.contains(.showInlineFrames) {
-            location = try? image.sourceLocation(for: address)
-          } else {
-            location = nil
-          }
-
-          if options.contains(.showInlineFrames) {
-            for inline in image.inlineCallSites(at: address) {
-              let fakeSymbol = Symbol(imageIndex: imageNdx,
+      for frame in backtrace.frames {
+        let address = frame.adjustedProgramCounter
+        if let imageNdx = theImages.indexOfImage(at: address) {
+          let name = theImages[imageNdx].name ?? "<unknown>"
+          var symbol: Symbol = Symbol(imageIndex: imageNdx,
                                       imageName: name,
-                                      rawName: inline.rawName ?? "<unknown>",
+                                      rawName: "<unknown>",
                                       offset: 0,
-                                      sourceLocation: location)
-              frames.append(Frame(captured: frame,
-                                  symbol: fakeSymbol,
-                                  inlined: true))
+                                      sourceLocation: nil,
+                                      platform: symbolicationPlatform)
 
-              location = SourceLocation(path: inline.filename,
-                                        line: inline.line,
-                                        column: inline.column)
+          func lookupSymbol<ElfImage: ElfSymbolLookupProtocol>(
+            image: ElfImage?,
+            at imageNdx: Int,
+            named name: String,
+            address imageAddr: ImageSource.Address
+          ) -> Symbol? {
+            let address = ElfImage.Traits.Address(imageAddr)
+
+            guard let image = image else {
+              return nil
+            }
+            guard let theSymbol = image.lookupSymbol(address: address) else {
+              return nil
+            }
+
+            var location: SourceLocation?
+
+            if options.contains(.showSourceLocations)
+                || options.contains(.showInlineFrames) {
+              location = try? image.sourceLocation(for: address)
+            } else {
+              location = nil
+            }
+
+            if options.contains(.showInlineFrames) {
+              for inline in image.inlineCallSites(at: address) {
+                let fakeSymbol = Symbol(imageIndex: imageNdx,
+                                        imageName: name,
+                                        rawName: inline.rawName ?? "<unknown>",
+                                        offset: 0,
+                                        sourceLocation: location,
+                                        platform: symbolicationPlatform)
+                frames.append(Frame(captured: frame,
+                                    symbol: fakeSymbol,
+                                    inlined: true))
+
+                location = SourceLocation(path: inline.filename,
+                                          line: inline.line,
+                                          column: inline.column)
+              }
+            }
+
+            return Symbol(imageIndex: imageNdx,
+                          imageName: name,
+                          rawName: theSymbol.name,
+                          offset: theSymbol.offset,
+                          sourceLocation: location,
+                          platform: symbolicationPlatform)
+          }
+
+          if let hit = cache.lookup(
+            path: theImages[imageNdx].path,
+            alternativePaths: alternativePaths) {
+
+            switch hit {
+              case let .elf32Image(image):
+                let relativeAddress = ImageSource.Address(
+                  address - theImages[imageNdx].baseAddress
+                ) + image.imageBase
+                if let theSymbol = lookupSymbol(image: image,
+                                                at: imageNdx,
+                                                named: name,
+                                                address: relativeAddress) {
+                  symbol = theSymbol
+                }
+              case let .elf64Image(image):
+                let relativeAddress = ImageSource.Address(
+                  address - theImages[imageNdx].baseAddress
+                ) + image.imageBase
+                if let theSymbol = lookupSymbol(image: image,
+                                                at: imageNdx,
+                                                named: name,
+                                                address: relativeAddress) {
+                  symbol = theSymbol
+                }
             }
           }
 
-          return Symbol(imageIndex: imageNdx,
-                        imageName: name,
-                        rawName: theSymbol.name,
-                        offset: theSymbol.offset,
-                        sourceLocation: location)
+          frames.append(Frame(captured: frame, symbol: symbol))
+          continue
         }
 
-        if let hit = cache.lookup(path: theImages[imageNdx].path) {
-          switch hit {
-            case let .elf32Image(image):
-              let relativeAddress = ImageSource.Address(
-                address - theImages[imageNdx].baseAddress
-              ) + image.imageBase
-              if let theSymbol = lookupSymbol(image: image,
-                                              at: imageNdx,
-                                              named: name,
-                                              address: relativeAddress) {
-                symbol = theSymbol
-              }
-            case let .elf64Image(image):
-              let relativeAddress = ImageSource.Address(
-                address - theImages[imageNdx].baseAddress
-              ) + image.imageBase
-              if let theSymbol = lookupSymbol(image: image,
-                                              at: imageNdx,
-                                              named: name,
-                                              address: relativeAddress) {
-                symbol = theSymbol
-              }
-          }
-        }
-
-        frames.append(Frame(captured: frame, symbol: symbol))
-        continue
+        frames.append(Frame(captured: frame, symbol: nil))
       }
 
-      frames.append(Frame(captured: frame, symbol: nil))
+      break
+
+    case .Windows:
+      // waiting for PR #83871
+      frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }
+      break
+
     }
-    #else
-    frames = backtrace.frames.map{ Frame(captured: $0, symbol: nil) }
-    #endif
 
     return SymbolicatedBacktrace(backtrace: backtrace,
                                  images: theImages,

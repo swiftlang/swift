@@ -275,21 +275,25 @@ extension CrashLog.Frame {
         }
     }
 
-    func symbol(imageIndex: Int) -> SymbolicatedBacktrace.Symbol {
+    func symbol(imageIndex: Int,
+                platform: Backtrace.SymbolicationPlatform) -> SymbolicatedBacktrace.Symbol {
         .init(
             imageIndex: imageIndex,
             imageName: image ?? "???",
             rawName: symbol ?? "???",
             offset: offset ?? 0,
-            sourceLocation: sourceLocation?.symbolicatedSourceLocation())
+            sourceLocation: sourceLocation?.symbolicatedSourceLocation(),
+            platform: platform)
     }
 
-    func symbolicatedFrame(imageIndex: Int) -> SymbolicatedBacktrace.Frame? {
+    func symbolicatedFrame(imageIndex: Int,
+                platform: Backtrace.SymbolicationPlatform) -> SymbolicatedBacktrace.Frame? {
         if let backtraceFrame = backtraceFrame() {
             .init(
                 captured: backtraceFrame,
-                symbol: symbol(imageIndex: imageIndex),
-                inlined: inlined)
+                symbol: symbol(imageIndex: imageIndex, platform: platform),
+                inlined: inlined
+                )
         } else {
             nil
         }
@@ -391,14 +395,19 @@ public extension CrashLog.Thread {
         return Backtrace(architecture: architecture, frames: frames, images: images)
     }
 
-    func symbolicatedBacktrace(architecture: String, images: ImageMap?) -> SymbolicatedBacktrace? {
+    func symbolicatedBacktrace(
+        architecture: String,
+        images: ImageMap?,
+        platform: Backtrace.SymbolicationPlatform) 
+    -> SymbolicatedBacktrace? {
         guard let images else { return nil }
         let backtrace = backtrace(architecture: architecture, images: images)
         let frames = self.frames.compactMap { frame in
             frame.symbolicatedFrame(imageIndex:
                 images.images.firstIndex(where:
                     { $0.name == frame.image }
-                ) ?? -1
+                ) ?? -1,
+                platform: platform
             )
         }
         return .init(backtrace: backtrace, images: images, frames: frames)
@@ -437,6 +446,7 @@ extension CrashLog {
 
     public mutating func symbolicate(
         allThreads: Bool = false,
+        platform: Backtrace.SymbolicationPlatform,
         options: Backtrace.SymbolicationOptions = .default) {
 
         let images = imageMap()
@@ -446,7 +456,9 @@ extension CrashLog {
             let backtrace: Backtrace = thread.backtrace(architecture: architecture, images: images)
 
             if let symbolicatedBacktrace = backtrace.symbolicated(
-                with: images, options: options) {
+                with: images,
+                platform: platform,
+                options: options) {
 
                 thread.updateWithBacktrace(symbolicatedBacktrace: symbolicatedBacktrace)
             }

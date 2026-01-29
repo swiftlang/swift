@@ -132,8 +132,22 @@ struct ImageSource {
       self.bytes = chunk
     }
 
-    convenience init(path: String) throws {
-      let fd = open(path, O_RDONLY, 0)
+    convenience init(path: String, alternativePaths: [String]) throws {
+      // TODO: file path separator
+      let filePathCharacter: Character = "/"
+      let lastPathComponent = path.split(separator: filePathCharacter).last
+      let fd = if alternativePaths.isEmpty {
+        open(path, O_RDONLY, 0)
+      } else {
+        alternativePaths.reduce(open(path, O_RDONLY, 0)) {
+          if $0 < 0, $1.split(separator: filePathCharacter).last == lastPathComponent {
+            open($1, O_RDONLY, 0)
+          } else {
+            $0
+          }
+        }
+      }
+
       if fd < 0 {
         throw ImageSourceError.posixError(errno)
       }
@@ -318,9 +332,11 @@ struct ImageSource {
               isMappedImage: isMappedImage, path: path)
   }
 
-  /// Initialise with a mapped file
-  init(path: String) throws {
-    self.init(storage: try Storage(path: path),
+  /// Initialise with a mapped file (this is currently used by Linux)
+  init(path: String, alternativePaths: [String] = []) throws {
+    self.init(storage: try Storage(
+                  path: path,
+                  alternativePaths: alternativePaths),
               isMappedImage: false, path: path)
   }
 
