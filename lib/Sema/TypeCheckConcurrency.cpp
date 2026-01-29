@@ -6339,12 +6339,12 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
     if (mainIsolation) {
-      if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
-        if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
-                           mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
-        }
+      // If an explicit attribute is anything other than `@MainActor`, complain.
+      if (isolationFromAttr &&
+          !(isolationFromAttr->isGlobalActor() &&
+            areTypesEqual(isolationFromAttr->getGlobalActor(),
+                          mainIsolation->getGlobalActor()))) {
+        fd->diagnose(diag::main_function_must_be_mainActor);
       }
       return {
         *mainIsolation,
