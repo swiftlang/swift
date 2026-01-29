@@ -524,7 +524,7 @@ void importer::getNormalInvocationArguments(
       // Enable block support.
       "-fblocks",
 
-      languageVersion.preprocessorDefinition("__swift__", {10000, 100, 1}),
+      "-D__swift__",
 
       "-fretain-comments-from-system-headers",
 
