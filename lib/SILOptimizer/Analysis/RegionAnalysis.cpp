@@ -3154,7 +3154,7 @@ public:
       if (destResult.value().value.isNoAlias() &&
           !resultIsolationInfoOverride &&
           !isProjectedFromAggregate(destValue))
-        return translateSILAssignDirect(destValue, src);
+        return translateSILAssignIndirect(dest, src);
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(destValue, src, /*requireOperand*/true,

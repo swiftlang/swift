@@ -120,8 +120,10 @@ sil @coro_multiple_params : $@yield_once @convention(thin) (@owned NonSendableKl
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
 // CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   store %2 to [init] %1 : $*NonSendableKlass
 // CHECK-NEXT: require %%0:   store %2 to [init] %1 : $*NonSendableKlass
-// CHECK-NEXT: assign_direct %%1 = %%0:   store %2 to [init] %1 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%1 = %%0.   Overwritten Value: 2:   store %2 to [init] %1 : $*NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_store_init: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_store_init : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass):
@@ -176,8 +178,10 @@ bb0(%0 : @guaranteed $NonSendableKlass, %arg1 : @guaranteed $NonSendableKlass):
 // CHECK-NEXT:     Rep Value: %1 = argument of bb0 : $NonSendableKlass
 // CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   store %5 to [assign] %2 : $*NonSendableKlass
 // CHECK-NEXT: require %%1:   store %5 to [assign] %2 : $*NonSendableKlass
-// CHECK-NEXT: assign_direct %%2 = %%1:   store %5 to [assign] %2 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%2 = %%1.   Overwritten Value: 3:   store %5 to [assign] %2 : $*NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_store_assign_unaliased: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_store_assign_unaliased : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass):
@@ -236,8 +240,10 @@ bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass, %arg
 // CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   copy_addr %1 to [init] %2 : $*NonSendableKlass
 // CHECK-NEXT: require %%2:   copy_addr %1 to [init] %2 : $*NonSendableKlass
-// CHECK-NEXT: assign_direct %%1 = %%2:   copy_addr %1 to [init] %2 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%1 = %%2.   Overwritten Value: 3:   copy_addr %1 to [init] %2 : $*NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_copy_addr_to_init: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_copy_addr_to_init : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass):
@@ -263,8 +269,10 @@ bb0(%0 : @guaranteed $NonSendableKlass):
 // CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   copy_addr [take] %1 to [init] %2 : $*NonSendableKlass
 // CHECK-NEXT: require %%2:   copy_addr [take] %1 to [init] %2 : $*NonSendableKlass
-// CHECK-NEXT: assign_direct %%1 = %%2:   copy_addr [take] %1 to [init] %2 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%1 = %%2.   Overwritten Value: 3:   copy_addr [take] %1 to [init] %2 : $*NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_copy_addr_take_to_init: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_copy_addr_take_to_init : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass):
@@ -291,8 +299,10 @@ bb0(%0 : @guaranteed $NonSendableKlass):
 // CHECK-NEXT:     Rep Value:   %3 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%4: TrackableValue. State: TrackableValueState[id: 4][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   copy_addr %2 to %3 : $*NonSendableKlass
 // CHECK-NEXT: require %%3:   copy_addr %2 to %3 : $*NonSendableKlass
-// CHECK-NEXT: assign_direct %%2 = %%3:   copy_addr %2 to %3 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%2 = %%3.   Overwritten Value: 4:   copy_addr %2 to %3 : $*NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_copy_addr_to_initialized: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_copy_addr_to_initialized : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass):
@@ -320,8 +330,10 @@ bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass):
 // CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
 // CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   explicit_copy_addr %1 to [init] %2 : $*NonSendableKlass
 // CHECK-NEXT: require %%2:   explicit_copy_addr %1 to [init] %2 : $*NonSendableKlass
-// CHECK-NEXT: assign_direct %%1 = %%2:   explicit_copy_addr %1 to [init] %2 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%1 = %%2.   Overwritten Value: 3:   explicit_copy_addr %1 to [init] %2 : $*NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_explicit_copy_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_explicit_copy_addr : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass):
@@ -2712,8 +2724,10 @@ bb0(%0 : $*@sil_weak Optional<NonSendableKlass>):
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $Optional<NonSendableKlass>
 // CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
 // CHECK-NEXT:     Rep Value: %1 = argument of bb0 : $*@sil_weak Optional<NonSendableKlass>
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   store_weak %0 to %1 : $*@sil_weak Optional<NonSendableKlass>
 // CHECK-NEXT: require %%0:   store_weak %0 to %1 : $*@sil_weak Optional<NonSendableKlass>
-// CHECK-NEXT: assign_direct %%1 = %%0:   store_weak %0 to %1 : $*@sil_weak Optional<NonSendableKlass>
+// CHECK-NEXT: assign_indirect %%1 = %%0.   Overwritten Value: 2:   store_weak %0 to %1 : $*@sil_weak Optional<NonSendableKlass>
 // CHECK-NEXT: end running test {{.*}} on test_store_weak: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_store_weak : $@convention(thin) (@owned Optional<NonSendableKlass>, @inout @sil_weak Optional<NonSendableKlass>) -> () {
 bb0(%0 : @owned $Optional<NonSendableKlass>, %1 : $*@sil_weak Optional<NonSendableKlass>):
@@ -2751,8 +2765,10 @@ bb0(%0 : $*@sil_unowned NonSendableKlass):
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
 // CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
 // CHECK-NEXT:     Rep Value: %1 = argument of bb0 : $*@sil_unowned NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   store_unowned %0 to %1 : $*@sil_unowned NonSendableKlass
 // CHECK-NEXT: require %%0:   store_unowned %0 to %1 : $*@sil_unowned NonSendableKlass
-// CHECK-NEXT: assign_direct %%1 = %%0:   store_unowned %0 to %1 : $*@sil_unowned NonSendableKlass
+// CHECK-NEXT: assign_indirect %%1 = %%0.   Overwritten Value: 2:   store_unowned %0 to %1 : $*@sil_unowned NonSendableKlass
 // CHECK-NEXT: end running test {{.*}} on test_store_unowned: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_store_unowned : $@convention(thin) (@guaranteed NonSendableKlass, @inout @sil_unowned NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass, %1 : $*@sil_unowned NonSendableKlass):
@@ -3428,3 +3444,118 @@ bb0:
 //  %r = tuple ()
 //  return %r : $()
 //}
+
+//===----------------------------------------------------------------------===//
+// MARK: mark_unresolved_move_addr, unchecked_ref_cast_addr, unconditional_checked_cast_addr
+//===----------------------------------------------------------------------===//
+
+// These instructions use Store semantics with translateSILAssignIndirect.
+
+// CHECK-LABEL: begin running test {{.*}} on test_mark_unresolved_move_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   mark_unresolved_move_addr %1 to %2 : $*NonSendableKlass
+// CHECK-NEXT: require %%2:   mark_unresolved_move_addr %1 to %2 : $*NonSendableKlass
+// CHECK-NEXT: assign_indirect %%1 = %%2.   Overwritten Value: 3:   mark_unresolved_move_addr %1 to %2 : $*NonSendableKlass
+// CHECK-NEXT: end running test {{.*}} on test_mark_unresolved_move_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_mark_unresolved_move_addr : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = alloc_stack $NonSendableKlass
+  %2 = alloc_stack $NonSendableKlass
+  %3 = copy_value %0
+  store %3 to [init] %1
+  mark_unresolved_move_addr %1 to %2 : $*NonSendableKlass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_addr %1
+  destroy_addr %2
+  dealloc_stack %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_unchecked_ref_cast_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlassSubKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   unchecked_ref_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+// CHECK-NEXT: require %%2:   unchecked_ref_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+// CHECK-NEXT: assign_indirect %%1 = %%2.   Overwritten Value: 3:   unchecked_ref_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+// CHECK-NEXT: end running test {{.*}} on test_unchecked_ref_cast_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unchecked_ref_cast_addr : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = alloc_stack $NonSendableKlass
+  %2 = alloc_stack $NonSendableKlassSubKlass
+  %3 = copy_value %0
+  store %3 to [init] %1
+  unchecked_ref_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_addr %2
+  dealloc_stack %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_unconditional_checked_cast_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlassSubKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: Value from Overwritten Memory. Op Num: 1. User:   unconditional_checked_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+// CHECK-NEXT: require %%2:   unconditional_checked_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+// CHECK-NEXT: assign_indirect %%1 = %%2.   Overwritten Value: 3:   unconditional_checked_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+// CHECK-NEXT: end running test {{.*}} on test_unconditional_checked_cast_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unconditional_checked_cast_addr : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = alloc_stack $NonSendableKlass
+  %2 = alloc_stack $NonSendableKlassSubKlass
+  %3 = copy_value %0
+  store %3 to [init] %1
+  unconditional_checked_cast_addr NonSendableKlass in %1 : $*NonSendableKlass to NonSendableKlassSubKlass in %2 : $*NonSendableKlassSubKlass
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_addr %2
+  dealloc_stack %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_pack_element_set: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = alloc_pack $Pack{NonSendableKlass}
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = alloc_stack $NonSendableKlass
+// CHECK-NEXT: require %%1:   pack_element_set %2 : $*NonSendableKlass into %5 of %1 : $*Pack{NonSendableKlass}
+// CHECK-NEXT: require %%2:   pack_element_set %2 : $*NonSendableKlass into %5 of %1 : $*Pack{NonSendableKlass}
+// CHECK-NEXT: merge %%1 with %%2:   pack_element_set %2 : $*NonSendableKlass into %5 of %1 : $*Pack{NonSendableKlass}
+// CHECK-NEXT: end running test {{.*}} on test_pack_element_set: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_pack_element_set : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass):
+  %1 = alloc_pack $Pack{NonSendableKlass}
+  %2 = alloc_stack $NonSendableKlass
+  %3 = copy_value %0
+  store %3 to [init] %2
+  %index = scalar_pack_index 0 of $Pack{NonSendableKlass}
+  pack_element_set %2 : $*NonSendableKlass into %index of %1 : $*Pack{NonSendableKlass}
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_addr %2
+  dealloc_stack %2
+  dealloc_pack %1
+  %r = tuple ()
+  return %r : $()
+}

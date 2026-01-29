@@ -148,7 +148,8 @@ public:
     }
 
     if (auto *op = value.dyn_cast<Operand *>()) {
-      os << "Value from Overwritten Memory : " << *op;
+      os << "Value from Overwritten Memory. Op Num: " << op->getOperandNumber()
+         << ". User: " << *op->getUser();
       return;
     }
 
@@ -1674,9 +1675,6 @@ public:
              "Assign PartitionOp's dest argument should be already tracked");
       assert(p.isTrackingElement(op.getOpArg2()) &&
              "Assign PartitionOp's source argument should be already tracked");
-      assert(
-          p.isTrackingElement(op.getOpArg3()) &&
-          "Assign PartitionOp's dest value argument should be already tracked");
 
       // First emit any errors if we are assigning a non-disconnected thing into
       // a sending result.
