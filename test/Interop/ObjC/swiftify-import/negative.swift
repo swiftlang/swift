@@ -1,5 +1,8 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
+// XFAIL: *
+// Safe interop Protocol support removed for now
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
