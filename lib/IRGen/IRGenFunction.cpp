@@ -171,6 +171,15 @@ llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
                             {metadata, size, alignMask}, name);
 }
 
+/// Emit a typed heap allocation.
+llvm::Value *IRGenFunction::emitAllocObjectTypedCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    llvm::Value *typeDescriptor, const llvm::Twine &name) {
+  // For now, all we have is swift_allocObjectTyped.
+  return emitAllocatingCall(*this, IGM.getAllocObjectTypedFunctionPointer(),
+                            {metadata, size, alignMask, typeDescriptor}, name);
+}
+
 llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
                                                     llvm::Value *object,
                                                     const llvm::Twine &name) {

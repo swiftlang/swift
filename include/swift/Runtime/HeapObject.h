@@ -66,6 +66,14 @@ HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
 
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+    SWIFT_RUNTIME_EXPORT_ATTRIBUTE HeapObject *
+    swift_allocObjectTyped(HeapMetadata const *metadata, size_t requiredSize,
+                           size_t requiredAlignmentMask,
+                           malloc_type_id_t typeId);
+#endif
+
 /// Initializes the object header of a stack allocated object.
 ///
 /// \param metadata - the object's metadata which is stored in the header

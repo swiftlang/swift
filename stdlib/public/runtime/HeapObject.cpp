@@ -123,11 +123,9 @@ static inline bool isValidPointerForNativeRetain(const void *p) {
 // NOTE: the memcpy and asm("") naming shenanigans are to convince the compiler
 // not to emit a bunch of ptrauth instructions just to perform the comparison.
 // We only want to authenticate the function pointer if we actually call it.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
-static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
-                                       size_t requiredSize,
-                                       size_t requiredAlignmentMask)
-                                       asm("__swift_allocObject_");
+SWIFT_RETURNS_NONNULL SWIFT_NODISCARD static HeapObject *
+_swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
+                    size_t requiredAlignmentMask) asm("__swift_allocObject_");
 static HeapObject *_swift_retain_(HeapObject *object) asm("__swift_retain_");
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n)
   asm("__swift_retain_n_");
@@ -210,6 +208,27 @@ static malloc_type_id_t getMallocTypeId(const HeapMetadata *heapMetadata) {
 
   return desc.type_id;
 }
+
+static HeapObject *_swift_allocObjectTyped(HeapMetadata const *metadata,
+                                           size_t requiredSize,
+                                           size_t requiredAlignmentMask,
+                                           malloc_type_id_t typeId) {
+  auto object = reinterpret_cast<HeapObject *>(
+      swift_slowAllocTyped(requiredSize, requiredAlignmentMask, typeId));
+
+  // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
+  // check on the placement new allocator which we have observed on Windows,
+  // Linux, and macOS.
+  ::new (object) HeapObject(metadata);
+
+  // If leak tracking is enabled, start tracking this object.
+  SWIFT_LEAKS_START_TRACKING_OBJECT(object);
+
+  SWIFT_RT_TRACK_INVOCATION(object, swift_allocObject);
+
+  return object;
+}
+
 #endif // SWIFT_STDLIB_HAS_MALLOC_TYPE
 
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
@@ -274,6 +293,31 @@ HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
                                      size_t requiredAlignmentMask) {
   CALL_IMPL_CHECK(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
 }
+
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+HeapObject *swift::swift_allocObjectTyped(HeapMetadata const *metadata,
+                                          size_t requiredSize,
+                                          size_t requiredAlignmentMask,
+                                          malloc_type_id_t typeId) {
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+  void *fptr;
+  memcpy(&fptr, (void *)&_swift_allocObject, sizeof(fptr));
+  extern char _swift_allocObject_as_char asm("__swift_allocObject_");
+  fptr = __ptrauth_swift_runtime_function_entry_strip(fptr);
+  if (SWIFT_UNLIKELY(fptr != &_swift_allocObject_as_char)) {
+    if (SWIFT_UNLIKELY(
+            !_swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly
+                 .load(std::memory_order_relaxed))) {
+      _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly
+          .store(true, std::memory_order_relaxed);
+    }
+    return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
+  }
+#endif
+  return _swift_allocObjectTyped(metadata, requiredSize, requiredAlignmentMask,
+                                 typeId);
+}
+#endif
 
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
