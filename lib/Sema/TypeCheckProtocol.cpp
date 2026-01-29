@@ -1698,7 +1698,8 @@ bool WitnessChecker::findBestWitness(
 
     if (anyFromUnconstrainedExtension &&
         conformance != nullptr &&
-        conformance->isInvalid()) {
+        conformance->isInvalid() &&
+        !conformance->isReparented()) {
       doNotDiagnoseMatches = true;
     }
 

@@ -1802,6 +1802,10 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "%0 requires a function with one argument", (DeclAttribute))
 
+ERROR(attribute_requires_experimental_feature,none,
+      "'%0' is an experimental feature; use '-enable-experimental-feature %1'",
+      (DeclAttribute, StringRef))
+
 ERROR(nominal_type_not_attribute,none,
       "%kind0 cannot be used as an attribute", (const ValueDecl *))
 
@@ -2806,7 +2810,7 @@ ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (Type))
 ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause",
+      "extension of protocol %0 cannot declare inheritance relationship",
       (Identifier))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
@@ -6075,9 +6079,19 @@ ERROR(typeattr_not_inheritance_clause,none,
 ERROR(typeattr_not_extension_inheritance_clause,none,
       "%0 only applies in inheritance clauses in extensions",
       (const TypeAttribute *))
+ERROR(typeattr_not_protocol_inheritance_clause,none,
+      "%0 only applies in inheritance clause of a protocol extension",
+      (const TypeAttribute *))
 ERROR(typeattr_not_existential,none,
       "%0 cannot apply to non-protocol type %1",
       (const TypeAttribute *, Type))
+ERROR(typeattr_reparented_requires_reparentable_protocol,none,
+      "%0 cannot apply to %1 unless it is declared to be '@reparentable'",
+      (const TypeAttribute *, const TypeDecl *))
+
+ERROR(reparented_missing_unconstrained_extension,none,
+      "An unconstrained extension of %0 must be declared when @reparented by %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 
 WARNING(unchecked_conformance_not_special,none,
       "'@unchecked' conformance to %0 has no meaning", (Type))

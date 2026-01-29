@@ -5117,6 +5117,7 @@ public:
                        requires_stored_property_inits)
   TRIVIAL_ATTR_PRINTER(ResultBuilder, result_builder)
   TRIVIAL_ATTR_PRINTER(Rethrows, rethrows)
+  TRIVIAL_ATTR_PRINTER(Reparentable, reparentable)
   TRIVIAL_ATTR_PRINTER(Safe, safe)
   TRIVIAL_ATTR_PRINTER(SPIOnly, spi_only)
   TRIVIAL_ATTR_PRINTER(Sendable, sendable)

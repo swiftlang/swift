@@ -3020,6 +3020,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Nonisolated:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
+      case TypeAttrKind::Reparented:
         // These attributes are only available in inheritance clasuses.
         return;
       default:

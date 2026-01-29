@@ -1192,6 +1192,11 @@ private:
   /// type.
   Type computeGenericParamWitness(AssociatedTypeDecl *assocType) const;
 
+  /// Given this is a reparented conformance, see if there is a same-type
+  /// requirement written on the extension of the generic context that
+  /// provides a candidate witness for this associated type requirement.
+  Type computeReparentedConformanceWitness(AssociatedTypeDecl *assocType) const;
+
   /// Collect abstract type witnesses and feed them to the given system.
   void collectAbstractTypeWitnesses(
       TypeWitnessSystem &system,
@@ -1200,6 +1205,10 @@ private:
   /// Simplify all tentative type witnesses until fixed point. Returns if
   /// any remain unsubstituted.
   bool simplifyCurrentTypeWitnesses();
+
+  /// Performs full substitution for type witnesses of a reparented conformance.
+  /// \returns true iff any witnesses remain unsubstituted
+  bool fixupReparentedTypeWitnesses();
 
   /// Retrieve substitution options with a tentative type witness
   /// operation that queries the current set of type witnesses.
@@ -2518,8 +2527,27 @@ getPeerConformances(NormalProtocolConformance *conformance) {
 Type AssociatedTypeInference::computeFixedTypeWitness(
                                             AssociatedTypeDecl *assocType) {
   Type resultType;
+  const auto selfTy = assocType->getProtocol()->getSelfInterfaceType();
+  const auto structuralTy =
+      DependentMemberType::get(selfTy, assocType->getName());
 
-  auto selfTy = assocType->getProtocol()->getSelfInterfaceType();
+  auto checkForFixedTypeIn = [&](GenericSignature sig) -> Type {
+    if (!sig->isValidTypeParameter(structuralTy))
+      return Type();
+
+    const auto ty = sig.getReducedType(structuralTy);
+
+    // A dependent member type with an identical base and name indicates that
+    // the protocol does not same-type constrain it in any way; move on to
+    // the next signature.
+    if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
+      if (memberTy->getBase()->isEqual(selfTy) &&
+          memberTy->getName() == assocType->getName())
+        return Type();
+    }
+
+    return ty;
+  };
 
   // Look through other local conformances of our declaration context to see if
   // any fix this associated type to a concrete type.
@@ -2535,20 +2563,9 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
         conformedProto->isComputingRequirementSignature())
       continue;
 
-    auto structuralTy = DependentMemberType::get(selfTy, assocType->getName());
-    if (!sig->isValidTypeParameter(structuralTy))
+    const auto ty = checkForFixedTypeIn(sig);
+    if (!ty)
       continue;
-
-    const auto ty = sig.getReducedType(structuralTy);
-
-    // A dependent member type with an identical base and name indicates that
-    // the protocol does not same-type constrain it in any way; move on to
-    // the next protocol.
-    if (auto *const memberTy = ty->getAs<DependentMemberType>()) {
-      if (memberTy->getBase()->isEqual(selfTy) &&
-          memberTy->getName() == assocType->getName())
-        continue;
-    }
 
     if (!resultType) {
       resultType = ty;
@@ -2556,8 +2573,21 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
     }
 
     // FIXME: Bailing out on ambiguity.
-    if (!resultType->isEqual(ty))
-      return Type();
+    if (!resultType->isEqual(ty)) {
+      resultType = Type();
+      break;
+    }
+  }
+
+  if (resultType)
+    return resultType;
+
+  // For reparented conformances, check the generic signature of the
+  // conformance's context as well, as it's an extension that can have same-type
+  // requirements that fixes the associated type to a concrete type.
+  if (conformance->isReparented()) {
+    auto sig = conformance->getDeclContext()->getGenericSignatureOfContext();
+    resultType = checkForFixedTypeIn(sig);
   }
 
   return resultType;
@@ -2715,6 +2745,71 @@ Type AssociatedTypeInference::computeGenericParamWitness(
   return Type();
 }
 
+Type AssociatedTypeInference::computeReparentedConformanceWitness(
+    AssociatedTypeDecl *assocType) const {
+  assert(conformance->isReparented());
+  auto *ext = cast<ExtensionDecl>(conformance->getDeclContext());
+  const auto selfTy = ext->getASTContext().TheSelfType;
+  const auto target =
+      DependentMemberType::get(selfTy, assocType)->getCanonicalType();
+
+  // Search for a single same-type requirement mentioning this associated type,
+  // and use the other type as the witness.
+  //
+  // This avoids the complexity of TypeWitnessSystem by being less flexible in
+  // how programmers can express the reparented conformance's type witness.
+  // The expected form is  `Self.X == WhateverType`, modulo swapped operands.
+  std::optional<Type> candidate;
+  for (const auto &req : ext->getGenericRequirements()) {
+    if (req.getKind() != RequirementKind::SameType)
+      continue;
+
+    Type found;
+    if (req.getFirstType()->getCanonicalType() == target) {
+      found = req.getSecondType();
+    } else if (req.getSecondType()->getCanonicalType() == target) {
+      found = req.getFirstType();
+    }
+
+    if (!found)
+      continue;
+
+    if (candidate) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "computeReparentedConformanceWitness found two candidates for "
+          << assocType->getName() << "; " << *candidate << " and " << found
+          << "... bailing out due to ambiguity\n");
+      return Type();
+    }
+
+    candidate = found;
+  }
+
+  if (!candidate)
+    return Type();
+
+  // FIXME: this substitution is preferring associated types alphabetically
+  // earlier based on their names, which means
+  //   Self.[BorrowingSequence]BSElement
+  // is being witnessed by
+  //   Self.[BorrowingSequence]BSElement
+  // rather than
+  //   Self.[Sequence]Element
+  // because of `Element == BSElement` and B comes before E. Similarly for
+  //   BorrowingSequence.Element vs Sequence.Element
+  // the tie is possibly being broken in favor of the parent protocol, meaning
+  // it's a self-witnessing requirement, which is wrong!
+  const auto witness = dc->mapTypeIntoEnvironment(*candidate);
+
+  LLVM_DEBUG(llvm::dbgs() << "computeReparentedConformanceWitness successfully "
+                             "found candidate for "
+                          << assocType->getName() << " -> ";
+             witness.dump(llvm::dbgs()); llvm::dbgs() << "\n");
+
+  return witness;
+}
+
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
     TypeWitnessSystem &system,
     ArrayRef<AssociatedTypeDecl *> unresolvedAssocTypes) const {
@@ -2765,6 +2860,8 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
 
     if (auto gpType = computeGenericParamWitness(assocType)) {
       system.addTypeWitness(assocType->getName(), gpType, /*preferred=*/true);
+    } else if (auto witness = computeReparentedConformanceWitness(assocType)) {
+      system.addTypeWitness(assocType->getName(), witness, /*preferred=*/true);
     } else if (const auto &typeWitness = computeDefaultTypeWitness(assocType)) {
       bool preferred = (typeWitness->getDefaultedAssocType()->getDeclContext()
                         == conformance->getProtocol());
@@ -2773,6 +2870,49 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
                                    preferred);
     }
   }
+}
+
+bool AssociatedTypeInference::fixupReparentedTypeWitnesses() {
+  // TODO: Is this still needed with computeReparentedConformanceWitness
+  //   mapping the witness into the generic context already?
+
+  assert(conformance->isReparented());
+
+  LLVM_DEBUG(llvm::dbgs() << "Fixup type witnesses for reparented conformance "
+                          << conformance->getType() << " : " << proto->getName()
+                          << "\n");
+
+  bool anyUnsubstituted = false;
+  for (auto assocType : proto->getAssociatedTypeMembers()) {
+    if (conformance->hasTypeWitness(assocType))
+      continue;
+
+    // If the type binding does not have a type parameter, there's nothing
+    // to do.
+    auto known = typeWitnesses.begin(assocType);
+    assert(known != typeWitnesses.end());
+    auto typeWitness = known->first;
+    if (!typeWitness->hasTypeParameter())
+      continue;
+
+    // Map the type witness into the extension's generic environment.
+    Type simplified = dc->mapTypeIntoEnvironment(typeWitness);
+
+    if (!simplified->isEqual(typeWitness)) {
+      known->first = simplified;
+
+      LLVM_DEBUG(llvm::dbgs() << "Fixed-up reparented witness for "
+                              << assocType->getName() << ": \n";
+                 typeWitness->dump(llvm::dbgs());
+                 llvm::dbgs() << "\t=== turned into ===>\n";
+                 simplified->dump(llvm::dbgs()); llvm::dbgs() << "\n";);
+    }
+
+    if (simplified->hasTypeParameter())
+      anyUnsubstituted = true;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "Fixup reparented type witnesses done\n");
+  return anyUnsubstituted;
 }
 
 /// Simplify all tentative type witnesses until fixed point. Returns if
@@ -3099,6 +3239,9 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
       abstractTypeWitnesses.emplace_back(assocType, resolvedTy);
     }
   }
+
+  if (conformance->isReparented())
+    fixupReparentedTypeWitnesses();
 
   simplifyCurrentTypeWitnesses();
 

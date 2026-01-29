@@ -1070,14 +1070,14 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
       ProtocolConformanceState::Incomplete,
       ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
-  if (conformance->isConformanceOfProtocol()) {
+  if (conformance->isConformanceOfProtocol() && !conformance->isReparented()) {
     auto &C = dc->getASTContext();
 
     // Currently this should only be happening for the
     // "DistributedActor as Actor" SILGen generated conformance.
     // See `isConformanceOfProtocol` for details, if adding more such
     // conformances, consider changing the way we structure their construction.
-    assert(conformance->getProtocol()->getInterfaceType()->isEqual(
+    ASSERT(conformance->getProtocol()->getInterfaceType()->isEqual(
                C.getProtocol(KnownProtocolKind::Actor)->getInterfaceType()) &&
            "Only expected to 'skip' finishNormalConformance for manually "
            "created DistributedActor-as-Actor conformance.");
@@ -3482,8 +3482,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 6);
-      ProtocolConformanceOptions options(rawID & 0x3F, /*global actor*/nullptr);
+      static_assert(NumProtocolConformanceOptions == 7);
+      ProtocolConformanceOptions options(rawID & 0x7F, /*global actor*/nullptr);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;

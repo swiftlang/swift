@@ -877,7 +877,10 @@ DECL_ATTR(abi, ABI,
   LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   165)
 
-// Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
+SIMPLE_DECL_ATTR(reparentable, Reparentable,
+  OnProtocol,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UserInaccessible | ForbiddenInABIAttr,
+  166)
 
 SIMPLE_DECL_ATTR(const, ConstVal,
   OnParam | OnVar | OnFunc,
