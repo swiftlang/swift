@@ -8137,21 +8137,22 @@ importer::getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
   return refParentDecls.front();
 }
 
-// Is this a pointer to a foreign reference type.
-// TODO: We need to review functions like this to ensure that
-// CxxRecordSemantics::evaluate is consistently invoked wherever we need to
-// determine whether a C++ type qualifies as a foreign reference type
-// rdar://145184659
-static bool isForeignReferenceType(const clang::QualType type) {
-  if (!type->isPointerType())
+/// Is this a pointer or a reference to a foreign reference type.
+static bool isForeignReferenceType(const clang::QualType type,
+                                   ASTContext &ctx) {
+  if (!type->isPointerOrReferenceType())
     return false;
 
   auto pointeeType =
       dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
   if (pointeeType == nullptr)
     return false;
+  auto pointeeDecl = pointeeType->getAsRecordDecl();
 
-  return hasImportAsRefAttr(pointeeType->getDecl());
+  auto semanticsKind = evaluateOrDefault(
+      ctx.evaluator,
+      CxxRecordSemantics({pointeeDecl, ctx, /*importerImpl=*/nullptr}), {});
+  return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
 
 static bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr) {
@@ -8598,7 +8599,7 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (isForeignReferenceType(method->getReturnType()))
+    if (isForeignReferenceType(method->getReturnType(), desc.ctx))
       return true;
 
     // begin and end methods likely return an interator, so they're unsafe. This
@@ -8611,8 +8612,8 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 
     bool parentIsSelfContained =
-      !isForeignReferenceType(parentQualType) &&
-      anySubobjectsSelfContained(method->getParent());
+        !isForeignReferenceType(parentQualType, desc.ctx) &&
+        anySubobjectsSelfContained(method->getParent());
 
     // If it returns a pointer or reference from an owned parent, that's a
     // projection (unsafe).
