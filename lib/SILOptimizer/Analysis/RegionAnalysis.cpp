@@ -2568,7 +2568,7 @@ public:
     // See if we have a reabstraction thunk. In such a case, just do an assign.
     if (auto *calleeFn = pai->getCalleeFunction()) {
       if (calleeFn->isThunk() == IsReabstractionThunk) {
-        return translateSILAssign(pai);
+        return translateSILAssignDirect(pai);
       }
     }
 
@@ -2916,17 +2916,23 @@ public:
     }
   }
 
+  /// Perform an assign for dest that is a direct parameter. It should be a
+  /// parameter of the current inst we are processing.
   template <typename Collection>
-  void translateSILAssign(SILValue dest, Collection collection) {
+  void translateSILAssignDirect(SILValue dest, Collection collection) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(dest), collection);
   }
 
+  /// Perform an assign for dest that is a direct parameter. It should be a
+  /// parameter of the current inst we are processing.
   template <>
-  void translateSILAssign<Operand *>(SILValue dest, Operand *srcOperand) {
-    return translateSILAssign(dest, TinyPtrVector<Operand *>(srcOperand));
+  void translateSILAssignDirect<Operand *>(SILValue dest, Operand *srcOperand) {
+    return translateSILAssignDirect(dest, TinyPtrVector<Operand *>(srcOperand));
   }
 
-  void translateSILAssign(SILInstruction *inst) {
+  /// TODO: Remove this, we want people to think about their direct and indirect
+  /// results.
+  void translateSILAssignDirect(SILInstruction *inst) {
     return translateSILMultiAssign(inst->getResults(),
                                    makeOperandRefRange(inst->getAllOperands()));
   }
@@ -3056,7 +3062,7 @@ public:
       if (destResult.value().value.isNoAlias() &&
           !resultIsolationInfoOverride &&
           !isProjectedFromAggregate(destValue))
-        return translateSILAssign(destValue, src);
+        return translateSILAssignDirect(destValue, src);
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(destValue, src, /*requireOperand*/true,
@@ -3092,7 +3098,7 @@ public:
       // non-Sendable base.
       if (nonSendableTgt.value().value.isNoAlias() &&
           !isProjectedFromAggregate(dest))
-        return translateSILAssign(
+        return translateSILAssignDirect(
             dest, makeOperandRefRange(inst->getElementOperands()));
 
       // Stores to possibly aliased storage must be treated as merges.
@@ -3981,7 +3987,7 @@ TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
   if (!SILIsolationInfo::isNonSendable(r))
     return TranslationSemantics::Require;
-  translateSILAssign(SILValue(r), r->getPackOperand());
+  translateSILAssignDirect(SILValue(r), r->getPackOperand());
   return TranslationSemantics::Special;
 }
 
@@ -3990,7 +3996,7 @@ TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
   if (!SILIsolationInfo::isNonSendable(r)) {
     translateSILRequire(r->getTuple());
   } else {
-    translateSILAssign(SILValue(r), r->getTupleOperand());
+    translateSILAssignDirect(SILValue(r), r->getTupleOperand());
   }
   return TranslationSemantics::Special;
 }
@@ -4000,7 +4006,7 @@ PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
   if (!SILIsolationInfo::isNonSendable(r)) {
     translateSILRequire(r->getTuple());
   } else {
-    translateSILAssign(SILValue(r), r->getTupleOperand());
+    translateSILAssignDirect(SILValue(r), r->getTupleOperand());
   }
   return TranslationSemantics::Special;
 }
