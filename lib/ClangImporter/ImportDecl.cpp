@@ -5966,8 +5966,6 @@ namespace {
 
       result->setMemberLoader(&Impl, 0);
 
-      Impl.swiftifyProtocol(result);
-
       return result;
     }
 
