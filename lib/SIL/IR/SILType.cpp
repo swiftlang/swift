@@ -779,6 +779,11 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
                                     Lowering::TypeConverter &typeConverter,
                                     TypeExpansionContext expansion) {
   SILParameterInfo paramInfo = getParameters()[paramIdx];
+  if (paramIdx == getSelfParameterIndex() && getNumResults() == 1 &&
+      getSingleResult().getConvention() ==
+          ResultConvention::GuaranteedAddress) {
+    return true;
+  }
   for (auto &depInfo : getLifetimeDependencies()) {
     auto *addressableIndices = depInfo.getAddressableIndices();
     if (addressableIndices && addressableIndices->contains(paramIdx)) {
