@@ -83,6 +83,12 @@ FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 /// Total instructions-executed count in each frontend process.
 FRONTEND_STATISTIC(Frontend, NumInstructionsExecuted)
 
+/// Total processor cycles-executed count in each frontend process.
+FRONTEND_STATISTIC(Frontend, NumCyclesExecuted)
+
+/// Elapsed wall clock time in microseconds in each frontend process.
+FRONTEND_STATISTIC(Frontend, WallClockMicroseconds)
+
 /// Maximum number of bytes allocated via malloc.
 FRONTEND_STATISTIC(Frontend, MaxMallocUsage)
 

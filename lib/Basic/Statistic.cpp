@@ -533,6 +533,8 @@ FrontendStatsTracer::~FrontendStatsTracer()
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
     UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
+  C.WallClockMicroseconds = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
   if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
@@ -540,9 +542,23 @@ void updateProcessWideFrontendCounters(
     C.MaxMallocUsage = ru.ri_lifetime_max_phys_footprint;
     return;
   }
+#elif defined(_WIN32)
+  ULONG64 CycleTime;
+  if (QueryProcessCycleTime(GetCurrentProcess(), &CycleTime)) {
+    C.NumCyclesExecuted = CycleTime;
+  }
+
+  PROCESS_MEMORY_COUNTERS_EX PMC;
+  PMC.cb = sizeof(PMC);
+  if (GetProcessMemoryInfo(GetCurrentProcess(),
+                           reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&PMC),
+                           sizeof(PMC))) {
+    C.MaxMallocUsage = PMC.PeakWorkingSetSize;
+  }
+  return;
 #endif
 
-  // FIXME: Do something useful when the above API is not available.
+  // FIXME: Do something useful when the above APIs are not available.
 }
 
 static inline void
