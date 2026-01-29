@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -848,12 +848,12 @@ extension _NativeDictionary { // High-level operations
   }
 
   @_alwaysEmitIntoClient
-  internal func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> _NativeDictionary<Key, Value> {
+  internal func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> _NativeDictionary<Key, Value> {
     try unsafe _UnsafeBitset.withTemporaryBitset(
       capacity: _storage._bucketCount
-    ) { bitset in
+    ) { (bitset: _UnsafeBitset) throws(E) -> _NativeDictionary<Key, Value> in
       var count = 0
       for unsafe bucket in unsafe hashTable {
         if try unsafe isIncluded(

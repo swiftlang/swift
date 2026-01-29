@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -614,11 +614,11 @@ extension Dictionary {
   ///   argument and returns a Boolean value indicating whether the pair
   ///   should be included in the returned dictionary.
   /// - Returns: A dictionary of the key-value pairs that `isIncluded` allows.
-  @inlinable
+  @_alwaysEmitIntoClient
   @available(swift, introduced: 4.0)
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Key: Value] {
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Key: Value] {
   #if _runtime(_ObjC)
     guard _variant.isNative else {
       // Slow path for bridged dictionaries
@@ -633,6 +633,24 @@ extension Dictionary {
   #endif
     return Dictionary(_native: try _variant.asNative.filter(isIncluded))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) rethrows -> [Key: Value]
+  )
+  internal __consuming func __rethrows_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Key: Value] {
+    try filter(isIncluded)
+  }
+#endif
 }
 
 extension Dictionary: Collection {
