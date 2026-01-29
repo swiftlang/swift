@@ -19,7 +19,6 @@ import StdlibUnittest
 var suite = TestSuite("OutputRawSpan Tests")
 defer { runAllTests() }
 
-@available(SwiftStdlib 6.2, *)
 @safe
 private struct Allocation: ~Copyable {
   let allocation: UnsafeMutableRawBufferPointer
@@ -160,6 +159,27 @@ suite.test("deinitialize buffer")
   }
   catch {
     expectTrue(false)
+  }
+}
+
+suite.test("OutputRawSpan.withUnsafeBytes")
+.require(.stdlib_6_2).code {
+  let c = 49
+  var a = Allocation(byteCount: c)
+  a.initialize {
+    $0.withUnsafeMutableBytes {
+      expectEqual($0.count, c)
+      for i in $0.indices {
+        $0.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
+        $1 += 1
+      }
+    }
+  }
+  a.withSpan {
+    expectEqual($0.byteCount, c)
+    for i in $0.byteOffsets {
+      expectEqual($0.unsafeLoad(fromByteOffset: i, as: UInt8.self), UInt8(i))
+    }
   }
 }
 
