@@ -51,3 +51,6 @@ SWIFT_REQUEST(ClangImporter, CxxValueSemantics,
 SWIFT_REQUEST(ClangImporter, ClangDeclExplicitSafety,
               ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ClangRefCountedSmartPointer,
+              RefCountedPtrRequestResult(ClangRefCountedSmartPointerDescriptor),
+              Cached, NoLocationInfo)

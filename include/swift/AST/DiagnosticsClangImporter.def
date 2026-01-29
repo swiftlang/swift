@@ -397,6 +397,21 @@ NOTE(refcounted_ptr_torawpointer_lookup_ambiguity, none,
      "'_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR %1",
      (StringRef, const clang::NamedDecl *))
 
+NOTE(refcounted_ptr_ctor_wrong_parameter_type, none,
+     "the constructor's parameter to create smart pointer from a raw pointer "
+     "does not match the return type of the raw pointer accessor in %0",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_ctor_lookup_failure, none,
+     "cannot find constructor to create smart pointer from a raw pointer to a "
+     "shared reference %0",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_ctor_lookup_ambiguity, none,
+     "there are multiple constructors to create smart pointer from a raw "
+     "pointer to a shared reference %0",
+     (const clang::NamedDecl *))
+
 NOTE(refcounted_ptr_torawpointer_not_function, none,
      "%0 specified in '_toRawPointer' parameter of "
      "SWIFT_REFCOUNTED_PTR on %1 is not a function",
@@ -408,6 +423,7 @@ NOTE(
     "SWIFT_REFCOUNTED_PTR on %1 has incorrect signature; expected a function "
     "that takes no arguments and returns a pointer to a foreign reference type",
     (const Decl *, const clang::NamedDecl *))
+
 ERROR(invalid_conditional_attr, none,
       "%0 is invalid because it is only supported in "
       "class templates",

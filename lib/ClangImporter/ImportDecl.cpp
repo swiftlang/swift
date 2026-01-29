@@ -32,6 +32,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -2111,82 +2112,77 @@ namespace {
 
     bool
     injectBridgingConversionsForRefCountedSmartPtrs(NominalTypeDecl *smartPtr) {
-      for (const auto *attr : smartPtr->getAttrs()) {
-        if (const auto *customAttr = dyn_cast<CustomAttr>(attr)) {
-          if (!customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                  "_refCountedPtr"))
-            continue;
-          auto clangDecl = cast<clang::TagDecl>(smartPtr->getClangDecl());
-          StringRef ToRawPtrFuncName;
-          for (auto arg : *customAttr->getArgs()) {
-            if (arg.getLabel().str() == "ToRawPointer") {
-              if (const auto *literal =
-                      dyn_cast<StringLiteralExpr>(arg.getExpr()))
-                ToRawPtrFuncName = literal->getValue();
-            }
-          }
-          if (ToRawPtrFuncName.empty()) {
-            Impl.addImportDiagnostic(
-                clangDecl,
-                Diagnostic(diag::refcounted_ptr_missing_torawpointer,
-                           clangDecl),
-                clangDecl->getLocation());
-            return false;
-          }
-
-          auto results = getValueDeclsForName(smartPtr, ToRawPtrFuncName);
-          if (results.empty()) {
-            Impl.addImportDiagnostic(
-                clangDecl,
-                Diagnostic(
-                    diag::refcounted_ptr_torawpointer_lookup_failure,
-                    Impl.SwiftContext.AllocateCopy(ToRawPtrFuncName.str()),
-                    clangDecl),
-                clangDecl->getLocation());
-            return false;
-          }
-          if (results.size() > 1) {
-            Impl.addImportDiagnostic(
-                clangDecl,
-                Diagnostic(
-                    diag::refcounted_ptr_torawpointer_lookup_ambiguity,
-                    Impl.SwiftContext.AllocateCopy(ToRawPtrFuncName.str()),
-                    clangDecl),
-                clangDecl->getLocation());
-            return false;
-          }
-
-          auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
-          if (!toRawPtrFunc) {
-            Impl.addImportDiagnostic(
-                clangDecl,
-                Diagnostic(diag::refcounted_ptr_torawpointer_not_function,
-                           toRawPtrFunc, clangDecl),
-                clangDecl->getLocation());
-            return false;
-          }
-
-          auto pointeeType = toRawPtrFunc->getResultInterfaceType()
-                                 ->lookThroughSingleOptionalType();
-          ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
-
-          if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl) {
-            Impl.addImportDiagnostic(
-                clangDecl,
-                Diagnostic(diag::refcounted_ptr_torawpointer_wrong_signature,
-                           toRawPtrFunc, clangDecl),
-                clangDecl->getLocation());
-            return false;
-          }
-
-          auto asReferenceDecl =
-              synthesizer.createSmartPtrBridgingProperty(toRawPtrFunc);
-          smartPtr->addMember(asReferenceDecl);
-          smartPtr->addMemberToLookupTable(asReferenceDecl);
-          break;
+      auto clangDecl = cast<clang::TagDecl>(smartPtr->getClangDecl());
+      auto [refCountedSmartPtr, toRawPtrFunc, toRawPtrFuncName] =
+          getClangRefCountedSmartPointer(smartPtr);
+      if (auto error = std::get_if<RefCountedPtrError>(&refCountedSmartPtr)) {
+        switch (*error) {
+        case RefCountedPtrError::MissingToRawPointer:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_missing_torawpointer, clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::ToRawPointerLookupFailure:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_torawpointer_lookup_failure,
+                         Impl.SwiftContext.AllocateCopy(toRawPtrFuncName.str()),
+                         clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::ToRawPointerLookupAmbiguity:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_torawpointer_lookup_ambiguity,
+                         Impl.SwiftContext.AllocateCopy(toRawPtrFuncName.str()),
+                         clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::ToRawPointerNotFunction:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_torawpointer_not_function,
+                         toRawPtrFunc, clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::ToRawPointerWrongSignature:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_torawpointer_wrong_signature,
+                         toRawPtrFunc, clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::CtorLookupAmbiguity:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_ctor_lookup_ambiguity, clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::CtorLookupFailure:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_ctor_lookup_failure, clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::CtorWrongParamType:
+          Impl.addImportDiagnostic(
+              clangDecl,
+              Diagnostic(diag::refcounted_ptr_ctor_wrong_parameter_type,
+                         clangDecl),
+              clangDecl->getLocation());
+          return false;
+        case RefCountedPtrError::NotAnnotated:
+          return true;
         }
+      } else {
+        ASSERT(toRawPtrFunc);
+        auto asReferenceDecl = synthesizer.createSmartPtrBridgingProperty(
+            cast<FuncDecl>(toRawPtrFunc));
+        smartPtr->addMember(asReferenceDecl);
+        smartPtr->addMemberToLookupTable(asReferenceDecl);
+        return true;
       }
-      return true;
     }
 
     std::pair<CustomRefCountingOperationResult,
