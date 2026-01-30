@@ -91,6 +91,11 @@ public struct LargeStruct {
       return _largeTuple
     }
   }
+  var nestedLargePropBorrow: LargeProp {
+    borrow {
+      return largePropBorrow
+    }
+  }
 }
 
 func test() {
@@ -120,6 +125,11 @@ public struct NCLargeStruct : ~Copyable {
   var largePropBorrow: LargeNCProp {
     borrow {
       return _largeProp
+    }
+  }
+  var nestedLargePropBorrow: LargeNCProp {
+    borrow {
+      return largePropBorrow
     }
   }
 }
@@ -161,20 +171,16 @@ func nctest() {
 // CHECK-IRGEN:   ret i64 [[REG1]]
 // CHECK-IRGEN: }
 
-// LoadableByAddress transforms to an indirect result
-// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb : $@convention(method) (@in_guaranteed LargeStruct) -> @out LargeProp {
-// CHECK: bb0([[REG0:%.*]] : $*LargeProp, [[REG1:%.*]] : $*LargeStruct):
-// CHECK:   [[REG3:%.*]] = struct_element_addr [[REG1]], #LargeStruct._largeProp
-// CHECK:   copy_addr [take] [[REG3]] to [init] [[REG0]]
-// CHECK:   [[REG5:%.*]] = tuple ()
-// CHECK:   return [[REG5]]
+// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address LargeProp {
+// CHECK: bb0([[REG0:%.*]] : $*LargeStruct):
+// CHECK: [[REG1:%.*]] = struct_element_addr [[REG0]], #LargeStruct._largeProp
+// CHECK: return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias sret(%T21borrow_accessor_large9LargePropV) captures(none) [[REG0:%.*]], ptr noalias swiftself captures(none) dereferenceable(208) [[REG1:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself dereferenceable(208) [[REG0:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
-// CHECK-IRGEN:   %._largeProp = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG1]], i32 0, i32 3
-// CHECK-IRGEN:   call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[REG0]], ptr align 8 %._largeProp, i64 64, i1 false)
-// CHECK-IRGEN:   ret void
+// CHECK-IRGEN:   %._largeProp = getelementptr inbounds nuw %T21borrow_accessor_large11LargeStructV, ptr [[REG0]], i32 0, i32 3
+// CHECK-IRGEN:   ret ptr %._largeProp
 // CHECK-IRGEN: }
 
 // LoadableByAddress does not transform large tuples
@@ -223,6 +229,19 @@ func nctest() {
 // CHECK-IRGEN:   ret void
 // CHECK-IRGEN: }
 
+// CHECK: sil hidden @$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address LargeProp {
+// CHECK: bb0([[REG0:%.*]] : $*LargeStruct):
+// CHECK:   [[REG1:%.*]] = function_ref @$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address LargeProp
+// CHECK:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed LargeStruct) -> @guaranteed_address LargeProp
+// CHECK:   return [[REG2]]
+// CHECK: } // end sil function '$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb'
+
+// CHECK-IRGEN define hidden swiftcc ptr @"$s21borrow_accessor_large11LargeStructV06nestedD10PropBorrowAA0dG0Vvb"(ptr noalias swiftself dereferenceable(208) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN entry:
+// CHECK-IRGEN   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large11LargeStructV0C10PropBorrowAA0dF0Vvb"(ptr noalias swiftself dereferenceable(208) [[REG0]])
+// CHECK-IRGEN   ret ptr [[REG1]]
+// CHECK-IRGEN }
+
 // CHECK: sil hidden @$s21borrow_accessor_large13NCLargeStructV0A2NCAA0F0Vvb : $@convention(method) (@in_guaranteed NCLargeStruct) -> @guaranteed NC {
 // CHECK: bb0([[REG0:%.*]] : $*NCLargeStruct):
 // CHECK:   [[REG2:%.*]] = struct_element_addr [[REG0]], #NCLargeStruct._k
@@ -240,18 +259,27 @@ func nctest() {
 // CHECK-IRGEN: }
 
 // Note: ~Copyable types are returned indirectly via copy_addy which in turn generates a memcopy
-// CHECK: sil hidden @$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb : $@convention(method) (@in_guaranteed NCLargeStruct) -> @out LargeNCProp {
-// CHECK: bb0([[REG0:%.*]] : $*LargeNCProp, [[REG1:%.*]] : $*NCLargeStruct):
-// CHECK:   [[REG3:%.*]] = struct_element_addr [[REG1]], #NCLargeStruct._largeProp
-// CHECK:   copy_addr [take] [[REG3]] to [init] [[REG0]]
-// CHECK:   [[REG5:%.*]] = tuple ()
-// CHECK:   return [[REG5]]
+// CHECK: sil hidden @$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb : $@convention(method) (@in_guaranteed NCLargeStruct) -> @guaranteed_address LargeNCProp {
+// CHECK: bb0([[REG0:%.*]] : $*NCLargeStruct):
+// CHECK:   [[REG1:%.*]] = struct_element_addr [[REG0]], #NCLargeStruct._largeProp
+// CHECK:   return [[REG1]]
 // CHECK: }
 
-// CHECK-IRGEN: define hidden swiftcc void @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias sret(%T21borrow_accessor_large11LargeNCPropV) captures(none) [[REG0]], ptr noalias swiftself captures(none) dereferenceable(72) [[REG1:%.*]]) {{.*}} {
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias swiftself dereferenceable(72) [[REG1:%.*]]) {{.*}} {
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:   %._largeProp = getelementptr inbounds nuw %T21borrow_accessor_large13NCLargeStructV, ptr [[REG1]], i32 0, i32 1
-// CHECK-IRGEN:   call void @llvm.memcpy.p0.p0.i64(ptr align 8 [[REG0]], ptr align 8 %._largeProp, i64 64, i1 false)
-// CHECK-IRGEN:   ret void
+// CHECK-IRGEN:   ret ptr %._largeProp
 // CHECK-IRGEN: }
 
+// CHECK: sil hidden @$s21borrow_accessor_large13NCLargeStructV21nestedLargePropBorrowAA0G6NCPropVvb : $@convention(method) (@in_guaranteed NCLargeStruct) -> @guaranteed_address LargeNCProp {
+// CHECK: bb0([[REG0:%.*]] : $*NCLargeStruct):
+// CHECK:   [[REG1:%.*]] = function_ref @$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb : $@convention(method) (@in_guaranteed NCLargeStruct) -> @guaranteed_address LargeNCProp
+// CHECK:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed NCLargeStruct) -> @guaranteed_address LargeNCProp
+// CHECK:   return [[REG2]]
+// CHECK: } // end sil function '$s21borrow_accessor_large13NCLargeStructV21nestedLargePropBorrowAA0G6NCPropVvb'
+
+// CHECK-IRGEN: define hidden swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV21nestedLargePropBorrowAA0G6NCPropVvb"(ptr noalias swiftself dereferenceable(72) [[REG0:%.*]]) {{.*}} {
+// CHECK-IRGEN: entry:
+// CHECK-IRGEN:   [[REG1:%.*]] = call swiftcc ptr @"$s21borrow_accessor_large13NCLargeStructV0C10PropBorrowAA11LargeNCPropVvb"(ptr noalias swiftself dereferenceable(72) [[REG0]])
+// CHECK-IRGEN:   ret ptr [[REG1]]
+// CHECK-IRGEN: }

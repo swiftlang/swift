@@ -5113,6 +5113,10 @@ public:
            getConvention() == ResultConvention::GuaranteedAddress;
   }
 
+  bool isGuaranteedAddressResult() const {
+    return getConvention() == ResultConvention::GuaranteedAddress;
+  }
+
   /// Transform this SILResultInfo by applying the user-provided
   /// function to its type.
   ///
@@ -5567,6 +5571,13 @@ public:
       return false;
     }
     return getResults()[0].isAddressResult(loweredAddresses);
+  }
+
+  bool hasGuaranteedAddressResult() const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isGuaranteedAddressResult();
   }
 
   struct IndirectFormalResultFilter {
