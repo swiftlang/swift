@@ -541,7 +541,7 @@ void AvailableValueDataflowFixup::verifyOwnership(DeadEndBlocks &deBlocks) {
       continue;
 
     for (auto result : inst->getResults()) {
-      result.verifyOwnership(&deBlocks);
+      result.verifyOwnership(&deBlocks, /*instIndices=*/ nullptr);
     }
   }
   insertedInsts.clear();

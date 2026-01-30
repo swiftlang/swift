@@ -919,6 +919,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   CalleeCache *calleeCache;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
+  InstructionIndices instIndices;
 
   bool SingleFunction = true;
   bool checkLinearLifetime = false;
@@ -927,9 +928,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
   std::unique_ptr<DominanceInfo> Dominance;
-
-  // Used for dominance checking within a basic block.
-  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -1200,35 +1198,24 @@ public:
     return match;
   }
 
-  static unsigned numInstsInFunction(const SILFunction &F) {
-    unsigned numInsts = 0;
-    for (auto &BB : F) {
-      numInsts += std::distance(BB.begin(), BB.end());
-    }
-    return numInsts;
-  }
-
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
               bool SingleFunction, bool checkLinearLifetime)
       : M(F.getModule().getSwiftModule()), F(F),
         calleeCache(calleeCache),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        instIndices(const_cast<SILFunction *>(&F)),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)) {
+        Dominance(nullptr) {
     if (F.isExternalDeclaration())
       return;
 
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
-    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
-      for (auto &I : BB)
-        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
@@ -1252,7 +1239,10 @@ public:
     if (aBlock != bBlock)
       return Dominance->properlyDominates(aBlock, bBlock);
 
-    return InstNumbers[a] < InstNumbers[b];
+    // Note that it might happen that for absurdly large basic blocks, the instruction
+    // indices are "maxed out". In this case we cannot compute the before-after
+    // relation efficiently and we conservatively return true.
+    return a != b && instIndices.get(a) <= instIndices.get(b);
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -1360,7 +1350,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get());
+    SILValue(V).verifyOwnership(DEBlocks.get(), &instIndices);
   }
 
   void checkSILInstruction(SILInstruction *I) {
