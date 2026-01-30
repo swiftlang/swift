@@ -105,7 +105,7 @@ func extractFunctionIsolationExpr(
 
   // Only `@isolated(any)` functions have `.isolation`
   let myActor = A()
-  let _: (any Actor)? = myActor.actorFunction.isolation // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.actorFunction.isolation // expected-error {{value of type '() -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.asyncActorFunction.isolation // expected-error {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.asyncThrowsActorFunction.isolation // expected-error {{value of type '@Sendable () async throws -> ()' has no member 'isolation'}}
   let _: (any Actor)? = myActor.actorFunctionWithArgs.isolation // expected-error {{value of type '@Sendable (Int) async -> String' has no member 'isolation'}}

@@ -1248,6 +1248,10 @@ namespace {
         auto *param = thunkParamList->get(idx);
         auto arg = thunkTy->getParams()[idx];
 
+        // Propagate isolation from function type to the parameter declaration,
+        // this is important for subsequent verification.
+        param->setIsolated(arg.isIsolated());
+
         param->setInterfaceType(arg.getParameterType()->mapTypeOutOfEnvironment());
         param->setSpecifier(ParamDecl::getParameterSpecifierForValueOwnership(
             arg.getValueOwnership()));
@@ -1389,6 +1393,10 @@ namespace {
           ParamDecl::getParameterSpecifierForValueOwnership(
               selfThunkParam.getValueOwnership()));
       selfParamDecl->setImplicit();
+
+      // Propagate isolation from function type to the parameter declaration,
+      // this is important for subsequent verification.
+      selfParamDecl->setIsolated(selfThunkParam.isIsolated());
 
       // Build a reference to the 'self' parameter.
       Expr *selfParamRef = new (ctx) DeclRefExpr(selfParamDecl, DeclNameLoc(),
