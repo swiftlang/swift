@@ -738,13 +738,23 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
 
   auto *accessor = dyn_cast<AccessorDecl>(FD);
-  if (accessor &&
-      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
-    if (attrModifier == SelfAccessKind::Consuming ||
-        attrModifier == SelfAccessKind::LegacyConsuming) {
-      diagnoseAndRemoveAttr(
-          attr, diag::consuming_invalid_borrow_mutate_accessor,
-          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+  if (accessor) {
+    if (accessor->isBorrowAccessor() || accessor->isMutateAccessor()) {
+      if (attrModifier == SelfAccessKind::Consuming ||
+          attrModifier == SelfAccessKind::LegacyConsuming) {
+        diagnoseAndRemoveAttr(
+            attr, diag::modifier_invalid_borrow_mutate_accessor,
+            getAccessorNameForDiagnostic(accessor, /*article*/ true),
+            "consuming");
+      }
+    }
+    if (accessor->isMutateAccessor()) {
+      if (attrModifier == SelfAccessKind::Borrowing) {
+        diagnoseAndRemoveAttr(
+            attr, diag::modifier_invalid_borrow_mutate_accessor,
+            getAccessorNameForDiagnostic(accessor, /*article*/ true),
+            "borrowing");
+      }
     }
   }
 }
