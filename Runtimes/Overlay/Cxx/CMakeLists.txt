@@ -19,6 +19,7 @@ add_library(swiftCxx STATIC
   CxxPair.swift
   CxxRandomAccessCollection.swift
   CxxSequence.swift
+  CxxBorrowingSequence.swift
   CxxSet.swift
   CxxSpan.swift
   CxxVector.swift

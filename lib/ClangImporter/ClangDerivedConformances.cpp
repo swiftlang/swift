@@ -946,6 +946,26 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   }
 }
 
+static void
+conformToCxxBorrowingSequenceIfNeeded(ClangImporter::Implementation &impl,
+                                      NominalTypeDecl *decl,
+                                      const clang::CXXRecordDecl *clangDecl) {
+  PrettyStackTraceDecl trace("conforming to CxxBorrowingSequence", decl);
+
+  assert(decl);
+  assert(clangDecl);
+  ASTContext &ctx = decl->getASTContext();
+
+  ProtocolDecl *cxxIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxBorrowingSequenceProto =
+      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
+  // If the Cxx module is missing, or does not include one of the necessary
+  // protocols, bail.
+  if (!cxxIteratorProto || !cxxBorrowingSequenceProto)
+    return;
+}
+
 bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
   auto *parentDecl =
       dyn_cast<clang::CXXRecordDecl>(methodDecl->getDeclContext());
@@ -1383,6 +1403,7 @@ void swift::deriveAutomaticCxxConformances(
   // Automatic conformances: these may be applied to any type that fits the
   // requirements.
   conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
+  conformToCxxBorrowingSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxConvertibleToBoolIfNeeded(Impl, result, clangDecl);
 
