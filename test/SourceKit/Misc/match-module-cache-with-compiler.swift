@@ -21,7 +21,6 @@
 // RUN: %swiftc_driver -emit-module -emit-module-path themod.swiftmodule -Xfrontend -experimental-skip-all-function-bodies  %{args}
 // RUN: %swiftc_driver -index-file -index-file-path %s -index-store-path %t/idx -index-ignore-system-modules %{args}
 // RUN: %sourcekitd-test -req=sema %s -- %{args}
-// RUN: %find_files %t%{fs-sep}mcp 'mymod-*.pcm'
 // RUN: %find_files %t%{fs-sep}mcp 'mymod-*.pcm' | count 1
 
 import mymod
