@@ -7838,6 +7838,10 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
+Decl *ClangImporter::lookupImportedDecl(const clang::NamedDecl *decl) {
+  return Impl.lookupImportedDecl(decl);
+}
+
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext,
     ClangInheritanceInfo inheritance) {
@@ -8873,6 +8877,94 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
 bool ClangDeclExplicitSafety::isCached() const {
   return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           ClangRefCountedSmartPointerDescriptor desc) {
+  out << "Validating SWIFT_REFCOUNTED_PTR for '";
+  out << desc.smartPtr->getNameStr();
+  out << "'\n";
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc) {
+  return SourceLoc();
+}
+
+RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
+    Evaluator &evaluator, ClangRefCountedSmartPointerDescriptor desc) const {
+  for (const auto *attr : desc.smartPtr->getAttrs()) {
+    if (const auto *customAttr = dyn_cast<CustomAttr>(attr)) {
+      if (!customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
+              "_refCountedPtr"))
+        continue;
+      StringRef ToRawPtrFuncName;
+      for (auto arg : *customAttr->getArgs()) {
+        if (arg.getLabel().str() == "ToRawPointer") {
+          if (const auto *literal = dyn_cast<StringLiteralExpr>(arg.getExpr()))
+            ToRawPtrFuncName = literal->getValue();
+        }
+      }
+      if (ToRawPtrFuncName.empty())
+        return {RefCountedPtrError::MissingToRawPointer, nullptr};
+
+      auto results = getValueDeclsForName(desc.smartPtr, ToRawPtrFuncName);
+      if (results.empty())
+        return {RefCountedPtrError::ToRawPointerLookupFailure, nullptr,
+                ToRawPtrFuncName};
+
+      if (results.size() > 1)
+        return {RefCountedPtrError::ToRawPointerLookupAmbiguity, nullptr,
+                ToRawPtrFuncName};
+
+      auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
+      if (!toRawPtrFunc)
+        return {RefCountedPtrError::ToRawPointerNotFunction, toRawPtrFunc};
+
+      auto pointeeType = toRawPtrFunc->getResultInterfaceType()
+                             ->lookThroughSingleOptionalType();
+      ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
+
+      if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl)
+        return {RefCountedPtrError::ToRawPointerWrongSignature, toRawPtrFunc};
+
+      auto ctors =
+          desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
+      // We should have a single constructor taking a foreign reference
+      // types. This is relied on during SILGen to introduce implicit
+      // bridging.
+      ConstructorDecl *selected = nullptr;
+      Type selectedCtorParamType = nullptr;
+      for (auto result : ctors) {
+        auto ctor = cast<ConstructorDecl>(result);
+        if (ctor->getParameters()->size() != 1)
+          continue;
+        Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
+        if (ctorParamType->isForeignReferenceType()) {
+          if (selected != nullptr)
+            return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
+          selected = ctor;
+          selectedCtorParamType = ctorParamType;
+        }
+      }
+      if (!selected)
+        return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
+      if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
+              pointeeType))
+        return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};
+
+      return {RefCountedPtrInfo{selected}, toRawPtrFunc};
+    }
+  }
+  return {RefCountedPtrError::NotAnnotated, nullptr};
+}
+
+RefCountedPtrRequestResult
+importer::getClangRefCountedSmartPointer(NominalTypeDecl *decl) {
+  return evaluateOrDefault(
+      decl->getASTContext().evaluator,
+      ClangRefCountedSmartPointer(ClangRefCountedSmartPointerDescriptor{decl}),
+      RefCountedPtrRequestResult{RefCountedPtrError::NotAnnotated, nullptr});
 }
 
 const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(

@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "clang/AST/Attr.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
@@ -99,6 +100,7 @@ class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
 class ValueDecl;
+class ConstructorDecl;
 class VisibleDeclConsumer;
 using ModuleDependencyIDSetVector =
     llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
@@ -681,6 +683,10 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
+  /// Returns a decl that was imported earlier or null if it was not found in
+  /// the cache.
+  virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) override;
+
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
@@ -916,6 +922,31 @@ std::optional<T> matchSwiftAttrOnRecordPtr(
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getCxxRefConventionWithAttrs(const clang::Decl *decl);
+
+enum class RefCountedPtrError {
+  NotAnnotated,
+  MissingToRawPointer,
+  ToRawPointerLookupFailure,
+  ToRawPointerLookupAmbiguity,
+  ToRawPointerNotFunction,
+  ToRawPointerWrongSignature,
+  CtorLookupAmbiguity,
+  CtorLookupFailure,
+  CtorWrongParamType
+};
+
+struct RefCountedPtrInfo {
+  ConstructorDecl *toSmartPtr;
+};
+
+struct RefCountedPtrRequestResult {
+  std::variant<RefCountedPtrInfo, RefCountedPtrError> result;
+  ValueDecl *toRawPtrFunc = nullptr;
+  StringRef toRawPtrName = "";
+};
+
+RefCountedPtrRequestResult
+getClangRefCountedSmartPointer(NominalTypeDecl *decl);
 } // namespace importer
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.

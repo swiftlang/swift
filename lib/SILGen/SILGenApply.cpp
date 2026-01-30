@@ -25,10 +25,12 @@
 #include "StorageRefResult.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -44,6 +46,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -3949,6 +3952,30 @@ private:
     });
   }
 
+  static ManagedValue
+  emitNativeToCppBridgedSmartPtr(ArgumentSource &&argSrc,
+                                 const clang::CXXRecordDecl *rd,
+                                 SILType destType, SILGenFunction &SGF) {
+    auto decl = cast<StructDecl>(
+        SGF.getASTContext().getClangModuleLoader()->lookupImportedDecl(rd));
+    auto result = importer::getClangRefCountedSmartPointer(decl);
+
+    // We always have a RefCountedPtrInfo here as this is validated when the
+    // type is imported.
+    ConstructorDecl *selected =
+        std::get<importer::RefCountedPtrInfo>(result.result).toSmartPtr;
+    SILLocation loc = argSrc.getLocation();
+    SILDeclRef c(selected, SILDeclRef::Kind::Allocator, true);
+    SILValue bridgingFn = SGF.emitGlobalFunctionRef(loc, c);
+
+    auto temporary = SGF.emitTemporary(loc, SGF.getTypeLowering(destType));
+    SGF.B.createApply(loc, bridgingFn, {},
+                      {temporary->getAddress(),
+                       std::move(argSrc).getAsSingleValue(SGF).getValue()});
+    temporary->finishInitialization(SGF);
+    return temporary->getManagedAddress();
+  }
+
   void emitIndirect(ArgumentSource &&arg,
                     SILType loweredSubstArgType,
                     AbstractionPattern origParamType,
@@ -3993,8 +4020,15 @@ private:
 
     // Otherwise, simultaneously emit and reabstract.
     } else {
-      result = std::move(arg).materialize(SGF, origParamType,
-                                          SGF.getSILInterfaceType(param));
+      // Try materialize via bridging conversion first.
+      auto substFormalType = arg.getSubstRValueType();
+      auto destType = SGF.getSILInterfaceType(param);
+      if (substFormalType.isForeignReferenceType())
+        if (auto rd = Lowering::getBridgedSmartPtr(origParamType))
+          result =
+              emitNativeToCppBridgedSmartPtr(std::move(arg), rd, destType, SGF);
+      if (!result)
+        result = std::move(arg).materialize(SGF, origParamType, destType);
     }
 
     Args.push_back(result);
