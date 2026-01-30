@@ -54,15 +54,19 @@ SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
   if (!bbi) {
     return value;
   }
-  auto *muncvi = cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
+  auto *muncvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
   if (!muncvi) {
     return value;
   }
-  auto *cvi = cast<CopyValueInst>(muncvi->getOperand());
+  auto *cvi = dyn_cast<CopyValueInst>(muncvi->getOperand());
   if (!cvi) {
     return value;
   }
-  return cvi->getOperand();
+  auto result = cvi->getOperand();
+  if (auto *cmwi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(result)) {
+    return cmwi->getOperand();
+  }
+  return result;
 }
 
 bool swift::visitNonOwnershipUses(SILValue value,

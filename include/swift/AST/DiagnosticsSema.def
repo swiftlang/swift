@@ -1821,9 +1821,6 @@ ERROR(static_functions_not_mutating,none,
 ERROR(consuming_invalid_borrow_mutate_accessor, none,
       "%0 cannot be declared consuming", (StringRef))
 
-ERROR(ownership_modifier_unsupported_borrow_mutate_accessor, none,
-      "%0 ownership modifier is not yet supported on %1", (StringRef, StringRef))
-
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
       "%select{both the %3 is %4 and the %5 is not %6|either the %3 is not %4 or the %5 is %6|the %3 is not %4|the %5 is %6}2",
