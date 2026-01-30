@@ -3173,8 +3173,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
       getName().printPretty(os);
     }
   } else {
-    auto moduleName = cast<ModuleDecl>(this)->getRealName();
-    os << moduleName;
+    cast<ModuleDecl>(this)->getReverseFullModuleName().printForward(os);
   }
 
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
