@@ -49,9 +49,7 @@ Assuming you want to profile `swiftc.exe` run on an input source file `S:\Temp\h
     1. Path to executable: `S:\Program Files\Swift\Toolchains\0.0.0+Asserts\usr\bin\swiftc.exe`
     2. Command line options: `hello.swift`
     3. Working directory: `S:\Temp` 
-    4. Environment Variables (these enable VS to find PDB files for our EXEs and DLLs):
-        - `Path`: `S:\Program Files\Swift\Runtimes\0.0.0\usr\bin;S:\Program Files\Swift\Toolchains\0.0.0+Asserts\usr\bin;%PATH%`
-        - `SDKROOT`: `S:\Program Files\Swift\Platforms\Windows.platform\Developer\SDKs\Windows.sdk`
+    4. Environment Variables: see "Using the Toolchain" in [WindowsQuickStart.md](https://github.com/compnerd/swift-build/blob/main/docs/WindowsQuickStart.md).
 4. Click Ok, select "CPU Usage," click Start.
 5. When the run is done, use the GUI to examine functions that take most of the time and hot traces.
 
@@ -78,9 +76,7 @@ Assuming you want to profile `swiftc.exe` run on an input source file `S:\Temp\h
     5. Uncheck “Use application directory as working directory”
     6. Working directory: for example, `S:\Temp`
     7. Advanced >
-        1. User-defined environment variables:
-            - `Path`: `S:\Program Files\Swift\Runtimes\0.0.0\usr\bin;S:\Program Files\Swift\Toolchains\0.0.0+Asserts\usr\bin;%PATH%`
-            - `SDKROOT`: `S:\Program Files\Swift\Platforms\Windows.platform\Developer\SDKs\Windows.sdk`
+        1. User-defined environment variables: see "Using the Toolchain" in [WindowsQuickStart.md](https://github.com/compnerd/swift-build/blob/main/docs/WindowsQuickStart.md).
         2. Make sure “Analyze child processes” is checked (it is by default)
         3. Duration time estimate: Under 1 minute
         4. Store result in (and create link file to) another directory: `C:\Users\%USER%\Documents\VTune\Projects\swift_hello` (note: manually fill in your `%USER%`)
