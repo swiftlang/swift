@@ -309,13 +309,17 @@ private extension AllocStackInst {
     defer { useSet.deinitialize() }
 
     useSet.insert(contentsOf: self.users)
-    for inst in InstructionList(first: self) {
-      if inst == instruction {
-        return false
-      }
+
+    var worklist = InstructionWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushPredecessors(of: instruction, ignoring: self)
+
+    while let inst = worklist.pop() {
       if useSet.contains(inst) {
         return true
       }
+      worklist.pushPredecessors(of: inst, ignoring: self)
     }
     return false
   }

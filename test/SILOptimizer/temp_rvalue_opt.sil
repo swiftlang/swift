@@ -858,3 +858,24 @@ bb0(%0 : $*NC):
   return %r
 }
 
+
+// Test that the operand of the debug value dominates its use.
+// CHECK-LABEL: sil [ossa] @copy_and_consuming_arg :
+// CHECK:  %1 = alloc_stack $Klass
+// CHECK:  debug_value %1 : $*Klass, let, name "x"
+// CHECK-LABEL: } // end sil function 'copy_and_consuming_arg'
+sil [ossa] @copy_and_consuming_arg : $@convention(thin) (@inout Str) -> () {
+bb0(%0 : $*Str):
+  %1 = alloc_stack $Klass
+  br bb1
+
+bb1:
+  debug_value %1, let, name "x"
+  %3 = struct_element_addr %0, #Str.kl
+  copy_addr %3 to [init] %1
+  %4 = apply undef(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9 : $()
+}
