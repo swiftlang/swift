@@ -44,6 +44,7 @@ add_library(swift_Concurrency
   AsyncThrowingFlatMapSequence.swift
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
+  AsyncTypedFailureFilterSequence.swift
   AsyncThrowingStream.swift
   CheckedContinuation.swift
   Clock.swift
