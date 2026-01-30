@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Version.h"
 #include "swift/Option/Options.h"
@@ -510,10 +511,16 @@ static void diagnoseSwiftVersion(std::optional<version::Version> &vers,
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
 
-  // Note valid versions.
-  auto validVers = version::Version::getValidEffectiveVersions();
-  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
-  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
+  // Enumerate the valid language modes.
+  std::string modesStr;
+  {
+    llvm::raw_string_ostream os(modesStr);
+    llvm::interleaveComma(
+        LanguageMode::allSupportedModes(), os,
+        [&](LanguageMode mode) { os << "'" << mode.versionString() << "'"; });
+  }
+
+  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, modesStr);
 }
 
 /// Create a new Regex instance out of the string value in \p RpassArg.
