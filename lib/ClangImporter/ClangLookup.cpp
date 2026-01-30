@@ -384,7 +384,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (name.isSimpleName("pointee")) {
       if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl))
         result.push_back(pointee);
-    } else if (name.isSimpleName("successor")) {
+    } else if (name.getBaseName() == "successor" &&
+               name.getArgumentNames().size() == 0) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
         result.push_back(succ);
     }
