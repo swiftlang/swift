@@ -29,6 +29,25 @@ extension CompileCommands {
     var file: AbsolutePath
     var output: AnyPath?
     var command: Command
+
+    enum CodingKeys: String, CodingKey {
+      case directory, file, output, command
+    }
+    init(from decoder: any Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      self.directory = try container.decode(AbsolutePath.self, forKey: .directory)
+      self.file = try container.decode(AbsolutePath.self, forKey: .file)
+      self.output = try container.decodeIfPresent(AnyPath.self, forKey: .output)
+      self.command = try container.decode(DecodableCommand.self, forKey: .command).command
+    }
+  }
+}
+
+fileprivate struct DecodableCommand: Decodable {
+  var command: Command
+  public init(from decoder: any Decoder) throws {
+    let command = try decoder.singleValueContainer().decode(String.self)
+    self.command = try CommandParser.parseCommand(command)
   }
 }
 
