@@ -18,6 +18,7 @@
 #include "Conversion.h"
 #include "Initialization.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/DeclCXX.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -166,9 +167,10 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF,
                                          AbstractionPattern origFormalType,
                                          SILType destType) && {
   auto substFormalType = getSubstRValueType();
-  assert(!destType || destType.getObjectType() ==
-               SGF.getLoweredType(origFormalType,
-                                  substFormalType).getObjectType());
+  assert(
+      !destType ||
+      destType.getObjectType() ==
+          SGF.getLoweredType(origFormalType, substFormalType).getObjectType());
 
   // Fast path: if the types match exactly, no abstraction difference
   // is possible and we can just materialize as normal.
