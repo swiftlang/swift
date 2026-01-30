@@ -2648,10 +2648,12 @@ public:
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
-    SmallVector<SILValue, 8> applyResults;
-    getApplyResults(pai, applyResults);
-    translateSILMultiAssign(applyResults,
-                            makeOperandRefRange(pai->getAllOperands()));
+    SmallVector<SILValue, 8> directResults;
+    getApplyResults(pai, directResults);
+    translateSILMultiAssign(
+        directResults,
+        ArrayRef<Operand *>(), // No indirect results for a partial_apply.
+        makeOperandRefRange(pai->getAllOperands()));
   }
 
   void translateCreateAsyncTask(BuiltinInst *bi) {
