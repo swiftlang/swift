@@ -2490,14 +2490,31 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   SWIFT_TASK_DEBUG_LOG("Task %p can give up thread?", task);
   if (currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
-      !shouldYieldThread() &&
-      tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG(
-        "switch succeeded, task %p assumed thread for executor %p", task,
-        newExecutor.getIdentity());
+      !shouldYieldThread()) {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+    // With actors-as-locks, tryAssumeThreadForSwitch always succeeds. We must
+    // give up the thread first, or else we may deadlock due to holding the old
+    // actor while trying to acquire the new one.
     giveUpThreadForSwitch(currentExecutor);
+    bool success = tryAssumeThreadForSwitch(newExecutor, newTaskExecutor);
+    assert(success);
+    SWIFT_TASK_DEBUG_LOG(
+        "switched to new actor, task %p assumed thread for executor %p", task,
+        newExecutor.getIdentity());
     // 'return' forces tail call
     return runOnAssumedThread(task, newExecutor, trackingInfo);
+#else
+    // Without actors-as-locks, tryAssumeThreadForSwitch can fail. Try it first,
+    // and give up the thread only if it succeeds.
+    if (tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
+      SWIFT_TASK_DEBUG_LOG(
+          "switch succeeded, task %p assumed thread for executor %p", task,
+          newExecutor.getIdentity());
+      giveUpThreadForSwitch(currentExecutor);
+      // 'return' forces tail call
+      return runOnAssumedThread(task, newExecutor, trackingInfo);
+    }
+#endif
   }
 
   // Otherwise, just asynchronously enqueue the task on the given
