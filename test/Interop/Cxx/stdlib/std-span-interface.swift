@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=StdSpan -source-filename=x -enable-experimental-cxx-interop -Xcc -std=c++20 -module-cache-path %t > %t/interface.swift
-// RUN: %FileCheck %s < %t/interface.swift
+// RUN: %FileCheck %s --match-full-lines < %t/interface.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -warnings-as-errors -verify -Xcc -std=c++20 %s
@@ -19,7 +19,7 @@ import CxxStdlib
 // CHECK:     struct DependsOnSelf {
 // CHECK:       @_lifetime(borrow self)
 // CHECK-NEXT:  @_alwaysEmitIntoClient @_disfavoredOverload public borrowing func get() -> Span<CInt>
-// CHECK-NEXT:  borrowing func get() -> ConstSpanOfInt
+// CHECK-NEXT:  @safe borrowing func get() -> ConstSpanOfInt
 
 // CHECK:      mutating func set(_ x: borrowing std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>)
 // CHECK:      func funcWithSafeWrapper(_ s: ConstSpanOfInt)
@@ -31,6 +31,11 @@ import CxxStdlib
 // CHECK-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func methodWithSafeWrapper(_ s: Span<CInt>)
 // CHECK-NEXT:   mutating func methodWithSafeWrapper(_ s: ConstSpanOfInt)
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @_lifetime(&self)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public mutating func getMutable(_ s: Span<CInt>) -> MutableSpan<CInt>
+// CHECK-NEXT: mutating func getMutable(_ s: ConstSpanOfInt) -> SpanOfInt
 // CHECK-NEXT: }
 // CHECK: struct SpanWithoutTypeAlias {
 // CHECK-NEXT:   init()
@@ -149,6 +154,7 @@ import CxxStdlib
 
 func callMethodWithSafeWrapper(_ x: inout X, s: Span<CInt>) {
     x.methodWithSafeWrapper(s)
+    let _ = x.getMutable(s)
 }
 
 func callFooBar(_ x: inout SpanWithoutTypeAlias, _ s: ConstSpanOfInt) {
