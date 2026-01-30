@@ -868,3 +868,54 @@ bb2:
   unwind
 }
 
+struct MyStruct {
+  @_hasStorage var storage: UInt32
+}
+
+sil [transparent] [ossa] @MyStruct_callee : $@yield_once_2 @convention(method) (@inout MyStruct) -> @yields @inout UInt32 {
+bb0(%0 : $*MyStruct):
+  %2 = begin_access [modify] [static] %0
+  %3 = struct_element_addr %2, #MyStruct.storage
+  yield %3, resume bb1, unwind bb2
+
+bb1:
+  end_access %2
+  %6 = tuple ()
+  return %6
+
+bb2:
+  end_access %2
+  unwind
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @MyStruct_caller : $@yield_once_2 @convention(thin) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout UInt32 for <MyStruct> {
+// CHECK: bb0(%0 : $*MyStruct):
+// CHECK:   [[TMP1:%.*]] = begin_access
+// CHECK:   [[TMP2:%.*]] = struct_element_addr [[TMP1]]
+// CHECK:   yield [[TMP2]] : $*UInt32, resume bb1, unwind bb2
+// CHECK: bb1:
+// CHECK:   end_access [[TMP1]] : $*MyStruct
+// CHECK:   [[TMP5:%.*]] = tuple ()
+// CHECK:   return [[TMP5]] : $()
+// CHECK: bb2:
+// CHECK:   end_access [[TMP1]] : $*MyStruct
+// CHECK:   unwind
+// CHECK: }
+
+sil [transparent]  [ossa] @MyStruct_caller : $@yield_once_2 @convention(thin) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout UInt32 for <MyStruct> {
+bb0(%0 : $*MyStruct):
+  %1 = function_ref @MyStruct_callee : $@yield_once_2 @convention(method) (@inout MyStruct) -> @yields @inout UInt32
+  (%2, %3, %4) = begin_apply %1(%0) : $@yield_once_2 @convention(method) (@inout MyStruct) -> @yields @inout UInt32
+  yield %2, resume bb1, unwind bb2
+
+bb1:
+  %6 = end_apply %3 as $()
+  dealloc_stack %4
+  %8 = tuple ()
+  return %8
+
+bb2:
+  %10 = end_apply %3 as $()
+  dealloc_stack %4
+  unwind
+}
