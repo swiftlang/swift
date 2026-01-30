@@ -5,6 +5,11 @@
 
 ## Swift (next)
 
+* Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
+  instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
+  (by enqueueing on the global pool before calling the async target), and can improve performance
+  and ordering predictability of calling async code through these bridged APIs.
+
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
   `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
