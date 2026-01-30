@@ -1032,7 +1032,8 @@ public:
 
     // Mark variables in async functions that don't generate a shadow copy for
     // lifetime extension, so they get spilled into the async context.
-    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+    if (!IGM.IRGen.Opts.shouldOptimize() &&
+        (CurSILFn->isAsync() || CurSILFn->isCoroutine()))
       if (isa<llvm::AllocaInst>(Storage)) {
         if (emitLifetimeExtendingUse(Storage))
           if (ValueVariables.insert(Storage).second)
@@ -1052,7 +1053,8 @@ public:
 
     // Mark variables in async functions for lifetime extension, so they get
     // spilled into the async context.
-    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync()) {
+    if (!IGM.IRGen.Opts.shouldOptimize() &&
+        (CurSILFn->isAsync() || CurSILFn->isCoroutine())) {
       if (emitLifetimeExtendingUse(shadow)) {
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
@@ -1088,7 +1090,8 @@ public:
 
       // Mark variables in async functions for lifetime extension, so they get
       // spilled into the async context.
-      if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+      if (!IGM.IRGen.Opts.shouldOptimize() &&
+          (CurSILFn->isAsync() || CurSILFn->isCoroutine()))
         if (vals.begin() != vals.end()) {
           auto Value = vals.front();
           if (isa<llvm::Instruction>(Value) || isa<llvm::Argument>(Value))
