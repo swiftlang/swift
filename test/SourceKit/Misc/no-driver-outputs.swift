@@ -1,5 +1,3 @@
-// REQUIRES: shell
-
 // RUN: %empty-directory(%t)
 // RUN: env TMPDIR=%t __XPC_TMPDIR=%t %sourcekitd-test -req=syntax-map %s 
 // RUN: ls %t/ | count 0
