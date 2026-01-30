@@ -2622,10 +2622,11 @@ public:
       return translateSILPartialApplyAsyncLetBegin(pai);
     }
 
-    // See if we have a reabstraction thunk. In such a case, just do an assign.
+    // See if we have a reabstraction thunk. In such a case, just do an assign
+    // of all of the operands to the result of the partial_apply.
     if (auto *calleeFn = pai->getCalleeFunction()) {
       if (calleeFn->isThunk() == IsReabstractionThunk) {
-        return translateSILAssignDirect(pai);
+        return translateSILAssignDirect(pai, pai->getAllOperands());
       }
     }
 
@@ -2999,18 +3000,18 @@ public:
     return translateSILMultiAssign(TinyPtrVector<SILValue>(dest), collection);
   }
 
+  template <>
+  void translateSILAssignDirect(SILValue dest,
+                                MutableArrayRef<Operand> collection) {
+    auto transform = [](Operand &op) { return &op; };
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(dest),
+                                   makeTransformRange(collection, transform));
+  }
   /// Perform an assign for dest that is a direct parameter. It should be a
   /// parameter of the current inst we are processing.
   template <>
   void translateSILAssignDirect<Operand *>(SILValue dest, Operand *srcOperand) {
     return translateSILAssignDirect(dest, TinyPtrVector<Operand *>(srcOperand));
-  }
-
-  /// TODO: Remove this, we want people to think about their direct and indirect
-  /// results.
-  void translateSILAssignDirect(SILInstruction *inst) {
-    return translateSILMultiAssign(inst->getResults(),
-                                   makeOperandRefRange(inst->getAllOperands()));
   }
 
   /// If the passed SILValue is NonSendable, then create a fresh region for it,
