@@ -2564,6 +2564,7 @@ bb0:
 // CHECK-NEXT:     Rep Value:   %2 = integer_literal $Builtin.Int32, 0
 // CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %3 = select_enum %0 : $NonSendableEnum, case #NonSendableEnum.some!enumelt: %1, case #NonSendableEnum.none!enumelt: %2 : $Builtin.Int32
+// CHECK-NEXT: require %%0:   %3 = select_enum %0 : $NonSendableEnum, case #NonSendableEnum.some!enumelt: %1, case #NonSendableEnum.none!enumelt: %2 : $Builtin.Int32
 // CHECK-NEXT: end running test {{.*}} on test_select_enum: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_select_enum : $@convention(thin) (@guaranteed NonSendableEnum) -> Builtin.Int32 {
 bb0(%0 : @guaranteed $NonSendableEnum):
@@ -2584,6 +2585,7 @@ bb0(%0 : @guaranteed $NonSendableEnum):
 // CHECK-NEXT:     Rep Value:   %2 = integer_literal $Builtin.Int32, 0
 // CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %3 = select_enum_addr %0 : $*NonSendableEnum, case #NonSendableEnum.some!enumelt: %1, case #NonSendableEnum.none!enumelt: %2 : $Builtin.Int32
+// CHECK-NEXT: require %%0:   %3 = select_enum_addr %0 : $*NonSendableEnum, case #NonSendableEnum.some!enumelt: %1, case #NonSendableEnum.none!enumelt: %2 : $Builtin.Int32
 // CHECK-NEXT: end running test {{.*}} on test_select_enum_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_select_enum_addr : $@convention(thin) (@in_guaranteed NonSendableEnum) -> Builtin.Int32 {
 bb0(%0 : $*NonSendableEnum):

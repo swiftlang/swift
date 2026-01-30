@@ -3611,6 +3611,8 @@ CONSTANT_TRANSLATION(ExistentialMetatypeInst, AssignDirect)
 CONSTANT_TRANSLATION(ObjectInst, AssignDirect)
 CONSTANT_TRANSLATION(StructInst, AssignDirect)
 CONSTANT_TRANSLATION(TupleInst, AssignDirect)
+CONSTANT_TRANSLATION(SelectEnumAddrInst, AssignDirect)
+CONSTANT_TRANSLATION(SelectEnumInst, AssignDirect)
 
 //===---
 // Look Through
@@ -4242,18 +4244,6 @@ TranslationSemantics PartitionOpTranslator::visitEnumInst(EnumInst *ei) {
   if (ei->getNumOperands() == 0)
     return TranslationSemantics::AssignFresh;
   return TranslationSemantics::AssignDirect;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
-  translateSILSelectEnum(inst);
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitSelectEnumInst(SelectEnumInst *inst) {
-  translateSILSelectEnum(inst);
-  return TranslationSemantics::Special;
 }
 
 TranslationSemantics
