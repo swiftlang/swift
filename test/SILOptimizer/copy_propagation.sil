@@ -33,7 +33,9 @@ sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeOwnedCAndGuaranteedC : $@convention(thin) (@owned C, @guaranteed C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @borrowB : $@convention(thin) (@guaranteed B) -> ()
-sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> () {
+[global:]
+}
 sil [ossa] @getMOS : $() -> (@owned MOS)
 
 // -O hoists the destroy
@@ -1010,10 +1012,8 @@ bb0:
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @takeGuaranteedC
 // CHECK:         apply [[BORROW]]([[INSTANCE]])
-// The destroy of the copy should be hoisted over the deinit barrier, and then
-// canonicalization of the lexical value should remove the copy.
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         apply [[BARRIER]]()
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_destroy_of_copy_of_lexical_over_deinit_barrier'
 sil [ossa] @hoist_destroy_of_copy_of_lexical_over_deinit_barrier : $(@owned C) -> () {
 entry(%instance : @owned $C):

@@ -39,6 +39,10 @@ struct PointerStorage {
 class B { }
 class E : B { }
 
+class D {
+  @_hasStorage weak var c: B?
+}
+
 sil @use_b_guaranteed : $@convention(thin) (@guaranteed B) -> ()
 sil @usearray_error : $@convention(thin) (@guaranteed Array<Error>) -> ()
 
@@ -5596,5 +5600,17 @@ bb1:
   return %9
 }
 
-
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_over_deinit_barrier :
+// CHECK:         load_weak
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_hoist_destroy_over_deinit_barrier'
+sil [ossa] @dont_hoist_destroy_over_deinit_barrier : $@convention(thin) (@owned B, @guaranteed D) -> @owned Optional<B> {
+bb0(%0 : @owned $B, %1 : @guaranteed $D):
+  %2 = copy_value %0
+  destroy_value %0
+  %4 = ref_element_addr %1, #D.c
+  %5 = load_weak %4
+  destroy_value %2
+  return %5
+}
 
