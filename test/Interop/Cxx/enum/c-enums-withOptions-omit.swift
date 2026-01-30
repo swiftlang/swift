@@ -8,6 +8,9 @@ import CenumsWithOptionsOmit
 // CHECK-NEXT: func enumerateObjects(options
 // CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "enumerateObjects(options:)")
 
+// CHECK-NOT: typealias MacroPrefixEnum
+// CHECK: struct MacroPrefixEnum : OptionSet
+
 // CHECK: class TestsForEnhancedOmitNeedlessWords {
 
 // Tests for withOptions -> 'with options'

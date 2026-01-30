@@ -52,6 +52,14 @@ typedef CF_OPTIONS(NSUInteger, UITableViewScrollPosition) {
   UITableViewScrollPosition1,
   UITableViewScrollPosition2
 };
+
+#define TEST(X) MacroPrefix##X
+
+typedef CF_OPTIONS(NSUInteger, TEST(Enum)) {
+  MacroPrefixEnumFoo = (1 << 0),
+  MacroPrefixEnumBar = (1 << 1),
+};
+
 @interface NSIndexPath
 @end
 
