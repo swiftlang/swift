@@ -14,11 +14,11 @@
 // RUN: rm %t/test.swiftmodule %t/depender.swiftmodule
 
 // Comments are not emitted into the swiftinterface, so add some comments with the right path to depender.swift
-// RUN: echo "// expected-textinterface-error@%t%{fs-sep}test.swiftinterface:14{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>'}}" >> %t/depender.swift
-// RUN: echo "// expected-textinterface-error@%t%{fs-sep}test.swiftinterface:14{{missing argument for parameter #2 in call}}" >> %t/depender.swift
+// RUN: echo "// expected-textinterface-error@'%t%{fs-sep}test.swiftinterface':14{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>'}}" >> %t/depender.swift
+// RUN: echo "// expected-textinterface-error@'%t%{fs-sep}test.swiftinterface':14{{missing argument for parameter #2 in call}}" >> %t/depender.swift
 
-// RUN: echo "// expected-textinterface-error@%t%{fs-sep}test.swiftinterface:20{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>'}}" >> %t/depender.swift
-// RUN: echo "// expected-textinterface-error@%t%{fs-sep}test.swiftinterface:20{{missing argument for parameter #2 in call}}" >> %t/depender.swift
+// RUN: echo "// expected-textinterface-error@'%t%{fs-sep}test.swiftinterface':20{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>'}}" >> %t/depender.swift
+// RUN: echo "// expected-textinterface-error@'%t%{fs-sep}test.swiftinterface':20{{missing argument for parameter #2 in call}}" >> %t/depender.swift
 
 // Verify that absence of the macro plugin doesn't break compilation by itself - only if one of the inlinable functions calls the safe wrapper
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/depender.swiftmodule %t/depender.swift -I %t -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
