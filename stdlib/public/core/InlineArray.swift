@@ -381,6 +381,32 @@ extension InlineArray where Element: Copyable {
       unsafe buffer.initialize(repeating: value)
     }
   }
+
+  /// Accesses the element at the specified position.
+  ///
+  /// This subscript provides get and set access for `Copyable` elements,
+  /// enabling conformance to protocols with subscript requirements.
+  ///
+  /// - Parameter i: The position of the element to access. `i` must be a valid
+  ///   index of the array that is not equal to the `endIndex` property.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.2, *)
+  @_addressableSelf
+  @_alwaysEmitIntoClient
+  public subscript(_ i: Index) -> Element {
+    @_transparent
+    get {
+      _checkIndex(i)
+      return unsafe _address[i]
+    }
+
+    @_transparent
+    set {
+      _checkIndex(i)
+      unsafe _mutableAddress[i] = newValue
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//
