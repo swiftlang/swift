@@ -1090,4 +1090,47 @@ CastsTests.test("type(of:) should look through __SwiftValue")
   expectEqual(t, "S")  // Fails: currently says `__SwiftValue`
 }
 
+#if _runtime(_ObjC)
+CastsTests.test("Struct casts to NSObjectProtocol")
+{
+  func nsobject(from value: Any) -> NSObjectProtocol? {
+    return value as? NSObjectProtocol
+  }
+  struct TestStruct {}
+  @objc class TestClass: NSObject {}
+
+  let nullableStruct: TestStruct? = TestStruct()
+  let nullableStructResult = nsobject(from: nullableStruct as Any)
+  expectNil(nullableStructResult)
+
+  let nullableClass: TestClass? = TestClass()
+  let nullableClassResult = nsobject(from: nullableClass as Any)
+  expectNotNil(nullableClassResult)
+
+  let nullStruct: TestStruct? = nil
+  let nullStructResult = nsobject(from: nullStruct as Any)
+  if let inner = nullStructResult {
+    expectTrue(inner is NSNull)
+  } else {
+    expectTrue(false, String(describing:nullStructResult))
+  }    
+
+  let nullClass: TestClass? = nil
+  let nullClassResult = nsobject(from: nullClass as Any)
+  if let inner = nullClassResult {
+    expectTrue(inner is NSNull)
+  } else {
+    expectTrue(false, String(describing:nullStructResult))
+  }    
+
+  let nonnullableStruct: TestStruct = TestStruct()
+  let nonnullableStructResult = nsobject(from: nonnullableStruct as Any)
+  expectNil(nonnullableStructResult)
+
+  let nonnullableClass: TestClass = TestClass()
+  let nonnullableClassResult = nsobject(from: nonnullableClass as Any)
+  expectNotNil(nonnullableClassResult)
+}
+#endif
+
 runAllTests()
