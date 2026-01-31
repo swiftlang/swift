@@ -802,19 +802,28 @@ extension _NativeDictionary { // High-level operations
       let (bucket, found) = mutatingFind(key, isUnique: isUnique)
       isUnique = true
       if found {
-        do {
-          let newValue = try combine(unsafe uncheckedValue(at: bucket), value)
-          unsafe _values[bucket.offset] = newValue
-        } catch let error as _MergeError {
-          switch error {
-          case .keyCollision:
-            #if !$Embedded
-            fatalError("Duplicate values for key: '\(key)'")
-            #else
-            fatalError("Duplicate values for a key in a Dictionary")
-            #endif
-          }
-        }
+        let newValue = try combine(unsafe uncheckedValue(at: bucket), value)
+        unsafe _values[bucket.offset] = newValue
+      } else {
+        _insert(at: bucket, key: key, value: value)
+      }
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  internal mutating func merge<S: Sequence>(
+    trappingOnDuplicates keysAndValues: __owned S,
+  ) where S.Element == (Key, Value) {
+    var isUnique = true
+    for (key, value) in keysAndValues {
+      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
+      isUnique = true
+      if found {
+        #if !$Embedded
+        fatalError("Duplicate values for key: '\(key)'")
+        #else
+        fatalError("Duplicate values for a key in a Dictionary")
+        #endif
       } else {
         _insert(at: bucket, key: key, value: value)
       }
