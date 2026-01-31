@@ -3845,7 +3845,7 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
       // fix the rvalue to begin_access operand. The end_access cleanup
       // doesn't change. FIXME: this can't happen with sil-opaque-values.
       if (accessAddr != destAddr && rvalue.isComplete()
-          && rvalue.isPlusZero(*this) && !isa<TupleType>(rvalue.getType())) {
+          && rvalue.isPlusZero() && !isa<TupleType>(rvalue.getType())) {
         auto mv = std::move(rvalue).getScalarValue();
         if (mv.getValue() == accessAddr)
           mv = std::move(mv).transform(
