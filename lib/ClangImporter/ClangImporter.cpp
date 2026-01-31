@@ -7998,6 +7998,29 @@ bool importer::hasImportAsRefAttr(const clang::RecordDecl *decl) {
          });
 }
 
+bool importer::hasImportAsRefAttrInHierarchy(const clang::RecordDecl *decl) {
+  // Check if the record itself has the attribute.
+  if (hasImportAsRefAttr(decl))
+    return true;
+
+  // For C++ records with a definition, also check base classes.
+  if (const auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
+    if (cxxDecl->hasDefinition()) {
+      bool hasRefBase = false;
+      cxxDecl->forallBases([&](const clang::CXXRecordDecl *base) {
+        if (hasImportAsRefAttr(base)) {
+          hasRefBase = true;
+          return false; // Stop iteration.
+        }
+        return true; // Continue iteration.
+      });
+      return hasRefBase;
+    }
+  }
+
+  return false;
+}
+
 static bool hasDiamondInheritanceRefType(const clang::CXXRecordDecl *decl) {
   if (!decl->hasDefinition() || decl->isDependentType())
     return false;
