@@ -2,15 +2,15 @@
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-cmark 2>&1 | %FileCheck --check-prefix=SKIP-CMARK-CHECK %s
+# RUN: env SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-cmark 2>&1 | %FileCheck --check-prefix=SKIP-CMARK-CHECK %s
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-llvm 2>&1 | %FileCheck --check-prefix=SKIP-LLVM-CHECK %s
+# RUN: env SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-llvm 2>&1 | %FileCheck --check-prefix=SKIP-LLVM-CHECK %s
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-swift 2>&1 | %FileCheck --check-prefix=SKIP-SWIFT-CHECK %s
+# RUN: env SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-swift 2>&1 | %FileCheck --check-prefix=SKIP-SWIFT-CHECK %s
 
 # SKIP-CMARK-CHECK-NOT: cmake --build {{.*}}cmark-
 # SKIP-CMARK-CHECK-NOT: --- Installing cmark ---
