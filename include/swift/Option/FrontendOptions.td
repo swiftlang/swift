@@ -113,6 +113,11 @@ def block_list_file
     Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
     HelpText<"The path to a blocklist configuration file">;
 
+def const_gather_protocols_file
+  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
@@ -272,10 +277,6 @@ def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overl
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
-
-def const_gather_protocols_file
-  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
 
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
