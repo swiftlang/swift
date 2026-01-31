@@ -1546,11 +1546,11 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public __consuming func split(
+  public __consuming func split<E>(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence] {
+    whereSeparator isSeparator: (Element) throws(E) -> Bool
+  ) throws(E) -> [SubSequence] {
     // TODO: swift-3-indexing-model - review the following
     _precondition(maxSplits >= 0, "Must take zero or more splits")
 
@@ -1590,6 +1590,19 @@ extension Collection {
     }
 
     return result
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$sSlsE5split9maxSplits25omittingEmptySubsequences14whereSeparatorSay11SubSequenceQzGSi_S2b7ElementQzKXEtKF")
+  __consuming func __rethrows_split(
+    maxSplits: Int = Int.max,
+    omittingEmptySubsequences: Bool = true,
+    whereSeparator isSeparator: (Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    try split(maxSplits: maxSplits,
+              omittingEmptySubsequences: omittingEmptySubsequences,
+              whereSeparator: isSeparator)
   }
 }
 

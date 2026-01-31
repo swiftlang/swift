@@ -98,9 +98,9 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func firstIndex(
-    where predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
+  public func firstIndex<E>(
+    where predicate: (Element) throws(E) -> Bool
+  ) throws(E) -> Index? {
     var i = self.startIndex
     while i != self.endIndex {
       if try predicate(self[i]) {
@@ -109,6 +109,15 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF")
+  func __rethrows_firstIndex(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    try firstIndex(where: predicate)
   }
 }
 
@@ -137,10 +146,19 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func last(
+  public func last<E>(
+    where predicate: (Element) throws(E) -> Bool
+  ) throws(E) -> Element? {
+    return try lastIndex(where: predicate).map { self[$0] }
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$sSKsE4last5where7ElementQzSgSbADKXE_tKF")
+  func __rethrows_last(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Element? {
-    return try lastIndex(where: predicate).map { self[$0] }
+    try last(where: predicate)
   }
 
   /// Returns the index of the last element in the collection that matches the
@@ -165,9 +183,9 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public func lastIndex(
-    where predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
+  public func lastIndex<E>(
+    where predicate: (Element) throws(E) -> Bool
+  ) throws(E) -> Index? {
     var i = endIndex
     while i != startIndex {
       formIndex(before: &i)
@@ -176,6 +194,15 @@ extension BidirectionalCollection {
       }
     }
     return nil
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$sSKsE9lastIndex5where0B0QzSgSb7ElementQzKXE_tKF")
+  func __rethrows_lastIndex(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    try lastIndex(where: predicate)
   }
 }
 
@@ -325,10 +352,19 @@ extension MutableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public mutating func partition(
+  public mutating func partition<E>(
+    by belongsInSecondPartition: (Element) throws(E) -> Bool
+  ) throws(E) -> Index {
+    return try _halfStablePartition(isSuffixElement: belongsInSecondPartition)
+  }
+  
+  // ABI-only
+  @inlinable
+  @_silgen_name("$sSMsE9partition2by5IndexQzSb7ElementQzKXE_tKF")
+  mutating func __rethrows_partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
-    return try _halfStablePartition(isSuffixElement: belongsInSecondPartition)
+    try partition(by: belongsInSecondPartition)
   }
 
   /// Moves all elements satisfying `isSuffixElement` into a suffix of the
@@ -336,9 +372,9 @@ extension MutableCollection {
   ///
   /// - Complexity: O(*n*) where n is the length of the collection.
   @inlinable
-  internal mutating func _halfStablePartition(
-    isSuffixElement: (Element) throws -> Bool
-  ) rethrows -> Index {
+  internal mutating func _halfStablePartition<E>(
+    isSuffixElement: (Element) throws(E) -> Bool
+  ) throws(E) -> Index {
     guard var i = try firstIndex(where: isSuffixElement)
     else { return endIndex }
     
@@ -348,7 +384,7 @@ extension MutableCollection {
       formIndex(after: &j)
     }
     return i
-  }  
+  }
 }
 
 extension MutableCollection where Self: BidirectionalCollection {
