@@ -570,3 +570,18 @@ func test_no_warnings_with_fatalError_when_wrapped_in_buildExpression() {
     }
   }
 }
+
+class C2 {
+  var s: String
+  var i: Int
+
+  init(s: String, b: Bool) {
+    var i = 0
+    if b {
+      exit()  // no-warning
+    }
+    self.s = s
+    i = i + 1
+    self.i = i
+  }
+}
