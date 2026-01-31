@@ -1,7 +1,7 @@
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
+# RUN: env SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-USE-RUNTIMES %s
 
 # LLVM-USE-RUNTIMES: Building llvm
 # LLVM-USE-RUNTIMES-DAG: cmake -G Ninja
@@ -11,7 +11,7 @@
 # LLVM-USE-RUNTIMES-SAME: llvm{{$}}
 
 # RUN: %empty-directory(%t)
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
+# RUN: env SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --skip-build-compiler-rt --cmake %cmake  2>&1 | %FileCheck --check-prefix=DONT-BUILD-COMPILER-RT %s
 
 # DONT-BUILD-COMPILER-RT: Building llvm
 # DONT-BUILD-COMPILER-RT-DAG: cmake -G Ninja
