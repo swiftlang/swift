@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/TTYDetection
 // RUN: %target-codesign %t/TTYDetection
 
-// RUN: (env SWIFT_BACKTRACE=enable=yes,cache=no,interactive=no %target-run script -reF %t/script-output %t/TTYDetection || true) && cat %t/script-output | %FileCheck %s
+// RUN: not --crash env SWIFT_BACKTRACE=enable=yes,cache=no,interactive=no %target-run script -reF %t/script-output %t/TTYDetection && cat %t/script-output | %FileCheck %s
 
 
 // UNSUPPORTED: use_os_stdlib
