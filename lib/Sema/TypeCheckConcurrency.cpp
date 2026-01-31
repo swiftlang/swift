@@ -1063,8 +1063,23 @@ bool swift::diagnoseNonSendableTypes(
   if (auto *expansion = type->getAs<PackExpansionType>())
     type = PackType::get(ctx, {expansion});
 
+  // Check each element of a tuple individually because this check could be
+  // used recursively during conformance lookup and passing tuples to
+  // recursive calls to \c lookupConformance defeats circularity checking
+  // in the request because \c ImplicitKnownProtocolConformanceRequest
+  // operates on nominal types.
+  if (auto *tuple = type->getAs<TupleType>()) {
+    bool anyMissing = false;
+    for (Type elementTy : tuple->getElementTypes()) {
+      anyMissing |= diagnoseNonSendableTypes(
+          elementTy, fromContext, inDerivedConformance, loc, diagnose);
+    }
+    return anyMissing;
+  }
+
   // FIXME: More detail for unavailable conformances.
-  auto conformance = lookupConformance(type, proto, /*allowMissing=*/true);
+  auto conformance =
+      lookupConformance(type->getCanonicalType(), proto, /*allowMissing=*/true);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
