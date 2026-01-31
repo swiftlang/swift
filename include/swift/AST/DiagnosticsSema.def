@@ -8197,6 +8197,10 @@ NOTE(macro_expand_circular_reference_unnamed_through, none,
 ERROR(accessor_macro_not_single_var, none,
       "accessor macro %0 can only apply to a single variable", (DeclName))
 
+WARNING(macro_on_import_not_loadable, none,
+        "could not load macro '%0'; this may cause errors down the line",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
