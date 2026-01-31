@@ -19,9 +19,13 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -678,6 +682,29 @@ static bool shouldSkipModule(ModuleDecl *M) {
   return false;
 }
 
+static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
+                                       StringRef MacroName,
+                                       Decl *MappedDecl) {
+  ExternalMacroDefinitionRequest request{
+      &SwiftContext, SwiftContext.getIdentifier("SwiftMacros"),
+      SwiftContext.getIdentifier(MacroName)};
+  auto externalDef =
+      evaluateOrDefault(SwiftContext.evaluator, request,
+                        ExternalMacroDefinition::error("failed request"));
+  if (externalDef.isError()) {
+    auto &diags = SwiftContext.Diags;
+    auto didSuppressWarnings = diags.getSuppressWarnings();
+    // We are highly likely parsing a textual interface, where warnings are
+    // silenced. Make sure this warning gets emitted anyways.
+    diags.setSuppressWarnings(false);
+    SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+    diags.diagnose(MappedDecl, diag::macro_on_import_not_loadable, MacroName);
+    return true;
+  }
+
+  return false;
+}
+
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
@@ -722,6 +749,9 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     printer.printTypeMapping();
     out << ")";
   }
+
+  if (diagnoseMissingMacroPlugin(SwiftContext, "_SwiftifyImport", MappedDecl))
+    return;
 
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
   if (clang::RawComment *raw =
