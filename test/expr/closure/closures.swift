@@ -575,7 +575,7 @@ do {
   class C {
     init() {
       // expected-warning@+1{{capture 'self' was never used}}
-      let _ = f { fn in { [unowned self, fn] x in x != 1000 ? fn(x + 1) : "success" } }(0)
+      let _ = f { fn in { [unowned self = self, fn] x in x != 1000 ? fn(x + 1) : "success" } }(0)
     }
   }
 }
