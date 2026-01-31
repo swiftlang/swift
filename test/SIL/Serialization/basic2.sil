@@ -23,6 +23,15 @@ bb0(%0 : @guaranteed $Klass):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @inferred_immutable : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0(%0 : @inferredImmutable @guaranteed $Klass):
+// CHECK: } // end sil function 'inferred_immutable'
+sil [ossa] @inferred_immutable : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @inferredImmutable @guaranteed $Klass):
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: merge_isolation_region %0 : $Klass, %1 : $*C
 // CHECK: merge_isolation_region %1 : $*C, %0 : $Klass, %0 : $Klass

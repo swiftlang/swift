@@ -503,6 +503,8 @@ LEGACY_PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
 LEGACY_PASS(ThunkLowering, "sil-thunk-lowering",
      "Lower thunk instructions to actual thunks")
+LEGACY_PASS(MarkNeverWrittenMutableClosureBoxesAsImmutable, "mark-never-written-mutable-closure-boxes-as-immutable",
+     "Mark never written mutable closure boxes as immutable")
 LEGACY_PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 

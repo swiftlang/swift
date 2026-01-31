@@ -102,6 +102,19 @@ public:
     return false;
   }
 
+  /// Pushes the operands of all uses of \p value onto the worklist if the
+  /// operands have never been pushed before. Returns \p true if we inserted
+  /// /any/ values.
+  ///
+  /// This is a bulk convenience API.
+  bool pushResultOperandsIfNotVisited(SILValue value) {
+    bool insertedOperand = false;
+    for (auto *use : value->getUses()) {
+      insertedOperand |= pushIfNotVisited(use);
+    }
+    return insertedOperand;
+  }
+
   /// Pushes the operands of all uses of \p instruction onto the worklist if the
   /// operands have never been pushed before. Returns \p true if we inserted
   /// /any/ values.
@@ -110,9 +123,7 @@ public:
   bool pushResultOperandsIfNotVisited(SILInstruction *inst) {
     bool insertedOperand = false;
     for (auto result : inst->getResults()) {
-      for (auto *use : result->getUses()) {
-        insertedOperand |= pushIfNotVisited(use);
-      }
+      insertedOperand |= pushResultOperandsIfNotVisited(result);
     }
     return insertedOperand;
   }

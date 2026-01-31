@@ -6976,6 +6976,21 @@ SILLayout *SILLayout::get(ASTContext &C,
   return newLayout;
 }
 
+SILLayout *
+SILLayout::withMutable(ASTContext &ctx,
+                       std::initializer_list<std::pair<unsigned, bool>>
+                           fieldIndexMutabilityUpdatePairs) const {
+  // Copy the fields, setting the mutable field to newMutable.
+  SmallVector<SILField, 8> newFields;
+  llvm::copy(getFields(), std::back_inserter(newFields));
+  for (auto p : fieldIndexMutabilityUpdatePairs) {
+    newFields[p.first].setIsMutable(p.second);
+  }
+
+  return SILLayout::get(ctx, getGenericSignature(), newFields,
+                        capturesGenericEnvironment());
+}
+
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
@@ -7010,6 +7025,23 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
                                      LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
+}
+
+CanSILBoxType
+SILBoxType::withMutable(ASTContext &ctx,
+                        std::initializer_list<std::pair<unsigned, bool>>
+                            fieldIndexMutabilityUpdatePairs) const {
+  return SILBoxType::get(
+      ctx, getLayout()->withMutable(ctx, fieldIndexMutabilityUpdatePairs),
+      getSubstitutions());
+}
+
+ArrayRef<SILField> SILBoxType::getFields() const {
+  return getLayout()->getFields();
+}
+
+bool SILBoxType::isFieldMutable(unsigned index) const {
+  return getFields()[index].isMutable();
 }
 
 LayoutConstraint
