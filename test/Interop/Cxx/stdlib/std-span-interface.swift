@@ -3,13 +3,11 @@
 // RUN: %FileCheck %s --match-full-lines < %t/interface.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -warnings-as-errors -verify -Xcc -std=c++20 %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -module-cache-path %t -verify -Xcc -std=c++20 %s
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span
-
-// REQUIRES: rdar163085444
 
 #if !BRIDGING_HEADER
 import StdSpan
