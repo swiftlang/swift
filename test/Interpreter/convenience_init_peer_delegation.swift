@@ -29,9 +29,6 @@
 // REQUIRES: foundation
 // XFAIL: CPU=arm64e
 
-// Because of the use of 'sed' in this test.
-// REQUIRES: shell
-
 import Darwin
 import Foundation
 
