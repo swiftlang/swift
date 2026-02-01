@@ -213,3 +213,53 @@ func mainActorAsyncFuncToDeferCallToMainActor() async {
   }
   voidFunc()
 }
+
+actor A {
+  nonisolated func asyncMethod() async {
+    defer {
+      await isolatedMethod()
+    }
+    voidFunc()
+  }
+
+  nonisolated func nonisolatedSyncMethod() {
+    defer { // expected-error {{'async' defer must appear within an 'async' context}}
+      await isolatedMethod()
+    }
+    voidFunc()
+  }
+
+  func isolatedMethod() async {
+    defer {
+      await anotherIsolatedMethod()
+    }
+    voidFunc()
+  }
+
+  func anotherIsolatedMethod() async {}
+  func isolatedSyncMethod() {
+    defer {
+      anotherIsolatedSyncMethod()
+    }
+    voidFunc()
+  }
+  func anotherIsolatedSyncMethod() {}
+}
+
+func testLocalIsolatedParameter(_ a: isolated A) async {
+  defer {
+    await a.isolatedMethod()
+    await a.asyncMethod()
+    a.isolatedSyncMethod()
+  }
+  voidFunc()
+}
+
+func testLocalNonisolatedParameter(_ a: A) async {
+  defer {
+    await a.isolatedMethod()
+    await a.asyncMethod()
+    await a.isolatedSyncMethod()
+  }
+  voidFunc()
+}
