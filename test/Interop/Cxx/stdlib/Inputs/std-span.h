@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 
-#ifndef __counted_by // cstddef already imports ptrcheck.h on apple platforms
-#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
-  #define __counted_by(x) __attribute__((__counted_by__(x)))
-#else
-  #define __counted_by(x)
+#ifdef __counted_by
+#undef __counted_by // some libstdc++ versions seem to include incompatible definitions of __counted_by??
 #endif
+
+#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
+#define __counted_by(x) __attribute__((__counted_by__(x)))
+#else
+#define __counted_by(x)
 #endif
 
 using ConstSpanOfInt = std::span<const int>;
