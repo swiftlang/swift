@@ -73,6 +73,16 @@ static size_t computeAlignment(size_t alignMask) {
                                      : alignMask + 1;
 }
 
+#if defined(__linux__) || defined(__FreeBSD__)
+// glibc documentation is ambiguous about aligned_alloc(0). FreeBSD
+// documentation does not specify malloc(0) behavior.
+static constexpr bool MALLOC_ZERO_RETURNS_NULL = true;
+#else
+// All other platforms explicitly specify that malloc(0) and aligned_alloc(0)
+// return non-NULL pointers.
+static constexpr bool MALLOC_ZERO_RETURNS_NULL = false;
+#endif
+
 // For alignMask > (_minAllocationAlignment-1)
 // i.e. alignment == 0 || alignment > _minAllocationAlignment:
 //   The runtime must use AlignedAlloc, and the standard library must
@@ -83,6 +93,10 @@ static size_t computeAlignment(size_t alignMask) {
 //   The runtime may use either malloc or AlignedAlloc, and the standard library
 //   must deallocate using an identical alignment.
 void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
+  if (MALLOC_ZERO_RETURNS_NULL && SWIFT_UNLIKELY(size == 0)) {
+    return swift_slowAlloc(1, alignMask);
+  }
+
   void *p;
   // This check also forces "default" alignment to use AlignedAlloc.
   if (alignMask <= MALLOC_ALIGN_MASK) {
@@ -97,6 +111,10 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
 
 void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
                                   MallocTypeId typeId) {
+  if (MALLOC_ZERO_RETURNS_NULL && SWIFT_UNLIKELY(size == 0)) {
+    return swift_slowAllocTyped(1, alignMask, typeId);
+  }
+
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
     void *p;
@@ -122,6 +140,10 @@ void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
 
 void *swift::swift_coroFrameAlloc(size_t size,
                                   MallocTypeId typeId) {
+  if (MALLOC_ZERO_RETURNS_NULL && SWIFT_UNLIKELY(size == 0)) {
+    return swift_coroFrameAlloc(1, typeId);
+  }
+
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
     void *p = malloc_type_malloc(size, typeId);
