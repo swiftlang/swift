@@ -397,12 +397,15 @@ UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
 UnsafeMutableRawPointerExtraTestSuite.test("zero-allocation") {
   let a = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 1)
   let b = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 16)
+  let c = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 1024)
   defer {
     a.deallocate()
     b.deallocate()
+    c.deallocate()
   }
   expectNotEqual(Int(bitPattern: a), 0x0)
   expectNotEqual(Int(bitPattern: b), 0x0)
+  expectNotEqual(Int(bitPattern: c), 0x0)
 }
 
 runAllTests()

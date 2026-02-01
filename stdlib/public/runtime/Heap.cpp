@@ -73,14 +73,18 @@ static size_t computeAlignment(size_t alignMask) {
                                      : alignMask + 1;
 }
 
-#if defined(__linux__) || defined(__FreeBSD__)
-// glibc documentation is ambiguous about aligned_alloc(0). FreeBSD
-// documentation does not specify malloc(0) behavior.
-static constexpr bool MALLOC_ZERO_RETURNS_NULL = true;
-#else
-// All other platforms explicitly specify that malloc(0) and aligned_alloc(0)
-// return non-NULL pointers.
+#if defined(__APPLE__) || defined(_WIN32) || defined(__OpenBSD__)
+// These platforms document that their malloc(0) and aligned_alloc(0)
+// implementations return a non-NULL pointer, so we can skip the size check.
 static constexpr bool MALLOC_ZERO_RETURNS_NULL = false;
+#else
+// These platforms either don't specify what malloc(0) or aligned_alloc(0)
+// returns, or they specify that one or both return NULL. This is also the
+// fail-safe case for platforms whose behavior we haven't explicitly looked at.
+//
+// - Linux: glibc's documentation for aligned_alloc() is ambiguous.
+// - FreeBSD: does not document what the return value should be.
+static constexpr bool MALLOC_ZERO_RETURNS_NULL = true;
 #endif
 
 // For alignMask > (_minAllocationAlignment-1)
