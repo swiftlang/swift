@@ -1142,6 +1142,9 @@ bb0(%0 : @owned ${ var Int64 }):
 
 bb1:
   %5a = copy_value %5 : $@callee_guaranteed () -> ()
+  destroy_value [dead_end] %5a
+  destroy_value [dead_end] %5
+  destroy_value [dead_end] %0b
   unreachable
 
 bb2:

@@ -85,6 +85,10 @@ static llvm::cl::opt<bool> NumberSuppressionChecks(
     llvm::cl::init(false), llvm::cl::Hidden);
 #endif
 
+llvm::cl::opt<bool>
+PrintNoUUIDS("print-no-uuids", llvm::cl::init(false),
+                   llvm::cl::desc("don't print UUIDs to make the output better diffable"));
+
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
     PrintOptions::defaultPrintExtensionContentAsMembers
@@ -269,7 +273,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
                                                    InterfaceMode interfaceMode,
-                                                   bool useExportedModuleNames,
+                                                   ExportedModuleNameUsage
+                                                    useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
                                                      *aliasModuleNamesTargets
@@ -580,9 +585,17 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   return *this;
 }
 
+void ASTPrinter::getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out) {
+  if (PrintNoUUIDS) {
+    out.clear();
+    return;
+  }
+  uuid.toString(out);
+}
+
 ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   llvm::SmallString<UUID::StringBufferSize> Str;
-  UU.toString(Str);
+  getUUIDStringForPrinting(UU, Str);
   printTextImpl(Str);
   return *this;
 }
@@ -1475,6 +1488,12 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
+  // Attributes that are not permitted to appear should not be printed
+  for (auto *attr : attrs) {
+    if (!attr->canAppearOnDecl(D))
+      scope.Options.ExcludeAttrList.push_back(attr->getKind());
+  }
+
   attrs.print(Printer, Options, D);
 }
 
@@ -1537,6 +1556,9 @@ static PrintNameContext getTypeMemberPrintNameContext(const Decl *d) {
 
 void PrintAST::printPattern(const Pattern *pattern) {
   switch (pattern->getKind()) {
+  case PatternKind::Opaque:
+    printPattern(cast<OpaquePattern>(pattern)->getSubPattern());
+    break;
   case PatternKind::Any:
     Printer << "_";
     break;
@@ -2568,6 +2590,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
 
+    // TODO: Print borrow/yielding borrow here?
     printWithSpace("get");
 
     if (asyncGet) printWithSpace("async");
@@ -2580,6 +2603,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (settable) {
       if (nonmutatingSetter) printWithSpace("nonmutating");
 
+      // TODO: Print mutate/yielding mutate here?
       printWithSpace("set");
     }
     Printer << " }";
@@ -2671,12 +2695,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case ReadImplKind::Read:
       AddAccessorToPrint(AccessorKind::Read);
       break;
-    case ReadImplKind::Read2:
+    case ReadImplKind::YieldingBorrow:
       if (ASD->getAccessor(AccessorKind::Read) &&
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Read);
       }
-      AddAccessorToPrint(AccessorKind::Read2);
+      AddAccessorToPrint(AccessorKind::YieldingBorrow);
       break;
     case ReadImplKind::Borrow:
       AddAccessorToPrint(AccessorKind::Borrow);
@@ -2696,7 +2720,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       AddAccessorToPrint(AccessorKind::Set);
       if (!shouldHideModifyAccessor()) {
         AddAccessorToPrint(AccessorKind::Modify);
-        AddAccessorToPrint(AccessorKind::Modify2);
+        AddAccessorToPrint(AccessorKind::YieldingMutate);
       }
       break;
     case WriteImplKind::MutableAddress:
@@ -2707,12 +2731,12 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     case WriteImplKind::Modify:
       AddAccessorToPrint(AccessorKind::Modify);
       break;
-    case WriteImplKind::Modify2:
+    case WriteImplKind::YieldingMutate:
       if (ASD->getAccessor(AccessorKind::Modify) &&
           Options.SuppressCoroutineAccessors) {
         AddAccessorToPrint(AccessorKind::Modify);
       }
-      AddAccessorToPrint(AccessorKind::Modify2);
+      AddAccessorToPrint(AccessorKind::YieldingMutate);
       break;
     case WriteImplKind::Mutate:
       AddAccessorToPrint(AccessorKind::Mutate);
@@ -3318,6 +3342,13 @@ static void suppressingFeatureTildeSendable(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureCAttribute(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCAttribute, true);
+  action();
+}
+
 namespace {
 struct ExcludeAttrRAII {
   std::vector<AnyAttrKind> &ExcludeAttrList;
@@ -3413,6 +3444,14 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
+
+    // Special case: CAttribute feature prints has a hasAttribute(c) check. We
+    // might want to generalize this notion if we keep having to do it.
+    if (Feature(feature) == Feature::CAttribute) {
+      printer << "hasAttribute(c)";
+      continue;
+    }
+
     printer << "$" << Feature(feature).getName();
   }
 
@@ -3897,12 +3936,6 @@ static bool isEscaping(Type type) {
   return false;
 }
 
-static bool isNonisolatedCaller(Type type) {
-  if (auto *funcTy = type->getAs<AnyFunctionType>())
-    return funcTy->getIsolation().isNonIsolatedCaller();
-  return false;
-}
-
 static void printParameterFlags(ASTPrinter &printer,
                                 const PrintOptions &options,
                                 const ParamDecl *param,
@@ -4101,11 +4134,14 @@ void PrintAST::printOneParameter(const ParamDecl *param,
         !willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
       auto type = TheTypeLoc.getType();
 
+      bool isCallerIsolated = false;
+      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer()))
+        isCallerIsolated = funcTy->getIsolation().isNonIsolatedCaller();
+
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type) && !isEnumElement,
-                          isNonisolatedCaller(interfaceTy));
+                          isEscaping(type) && !isEnumElement, isCallerIsolated);
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -4269,9 +4305,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
   case AccessorKind::DidSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Borrow:
@@ -5633,6 +5669,8 @@ void PrintAST::visitTypeValueExpr(TypeValueExpr *expr) {
   expr->getType()->print(Printer, Options);
 }
 
+void PrintAST::visitOpaqueStmt(OpaqueStmt *stmt) {}
+
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   printBraceStmt(stmt);
 }
@@ -5809,18 +5847,7 @@ void PrintAST::visitForEachStmt(ForEachStmt *stmt) {
   Printer << tok::kw_for << " ";
   printPattern(stmt->getPattern());
   Printer << " " << tok::kw_in << " ";
-  // FIXME: print container
-  if (auto *seq = stmt->getTypeCheckedSequence()) {
-    // Look through the call to '.makeIterator()'
-    
-    if (auto *CE = dyn_cast<CallExpr>(seq)) {
-      if (auto *SAE = dyn_cast<SelfApplyExpr>(CE->getFn()))
-        seq = SAE->getBase();
-    }
-    visit(seq);
-  } else {
-    visit(stmt->getParsedSequence());
-  }
+  visit(stmt->getSequence());
   Printer << " ";
   visit(stmt->getBody());
 }
@@ -6059,6 +6086,23 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
+  bool shouldUseExportedModuleName(ASTContext &ctx,
+                                   StringRef exportedModuleName) {
+    if (exportedModuleName.empty())
+      return false;
+
+    switch (Options.UseExportedModuleNames) {
+    case PrintOptions::ExportedModuleNameUsage::Always:
+      return true;
+    case PrintOptions::ExportedModuleNameUsage::Never:
+      return false;
+    case PrintOptions::ExportedModuleNameUsage::IfLoaded:
+      return ctx.getLoadedModule(ctx.getIdentifier(exportedModuleName));
+    }
+
+    llvm_unreachable("Unrecognized ExportedModuleNameUsage");
+  }
+
   void printModuleContext(GenericTypeDecl *TyDecl) {
     FileUnit *File = cast<FileUnit>(TyDecl->getModuleScopeContext());
     ModuleDecl *Mod = File->getParentModule();
@@ -6096,7 +6140,7 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     // Should use the module real (binary) name here and everywhere else the
     // module is printed in case module aliasing is used (see -module-alias)
     Identifier Name = Mod->getRealName();
-    if (Options.UseExportedModuleNames && !ExportedModuleName.empty()) {
+    if (shouldUseExportedModuleName(Mod->getASTContext(), ExportedModuleName)) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
@@ -6345,6 +6389,16 @@ public:
     visit(T->getSize());
     Printer << ", ";
     visit(T->getElementType());
+    Printer << ">";
+  }
+
+  void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                              NonRecursivePrintOptions nrOptions) {
+    SmallString<32> buffer;
+    T->getTypeName(buffer);
+    Printer << buffer;
+    Printer << "<";
+    visit(T->getReferentType());
     Printer << ">";
   }
 

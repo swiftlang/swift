@@ -290,7 +290,7 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
       // behavior for the operator that we just instantiated.
       auto lookupTable1 = impl.findLookupTable(classDecl);
       addEntryToLookupTable(*lookupTable1, clangCallee, impl.getNameImporter());
-      auto owningModule = impl.getClangOwningModule(classDecl);
+      auto owningModule = importer::getClangOwningModule(classDecl, clangCtx);
       auto lookupTable2 = impl.findLookupTable(owningModule);
       if (lookupTable1 != lookupTable2)
         addEntryToLookupTable(*lookupTable2, clangCallee, impl.getNameImporter());
@@ -398,7 +398,7 @@ static bool synthesizeCXXOperator(ClangImporter::Implementation &impl,
   impl.synthesizedAndAlwaysVisibleDecls.insert(equalEqualDecl);
   auto lookupTable1 = impl.findLookupTable(classDecl);
   addEntryToLookupTable(*lookupTable1, equalEqualDecl, impl.getNameImporter());
-  auto owningModule = impl.getClangOwningModule(classDecl);
+  auto owningModule = importer::getClangOwningModule(classDecl, clangCtx);
   auto lookupTable2 = impl.findLookupTable(owningModule);
   if (lookupTable1 != lookupTable2)
     addEntryToLookupTable(*lookupTable2, equalEqualDecl,
@@ -545,10 +545,9 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
     }
   }
 
-  // Check if present: `var pointee: Pointee { get }`
-  auto pointeeId = ctx.getIdentifier("pointee");
-  auto pointee = lookupDirectSingleWithoutExtensions<VarDecl>(decl, pointeeId);
-  if (!pointee || pointee->isGetterMutating() || pointee->getTypeInContext()->hasError())
+  auto *pointee = impl.lookupAndImportPointee(decl);
+  if (!pointee || pointee->isGetterMutating() ||
+      pointee->getTypeInContext()->hasError())
     return;
 
   // Check if `var pointee: Pointee` is settable. This is required for the
@@ -556,10 +555,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   // UnsafeCxxInputIterator.
   bool pointeeSettable = pointee->isSettable(nullptr);
 
-  // Check if present: `func successor() -> Self`
-  auto successorId = ctx.getIdentifier("successor");
-  auto successor =
-      lookupDirectSingleWithoutExtensions<FuncDecl>(decl, successorId);
+  auto *successor = impl.lookupAndImportSuccessor(decl);
   if (!successor || successor->isMutating())
     return;
   auto successorTy = successor->getResultInterfaceType();
@@ -714,6 +710,9 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   auto *Wrapped = dyn_cast_or_null<TypeAliasDecl>(
       impl.importDecl(value_type, impl.CurrentVersion));
   if (!Wrapped)
+    return;
+
+  if (!impl.lookupAndImportPointee(decl))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),
@@ -1376,7 +1375,8 @@ void swift::deriveAutomaticCxxConformances(
   //
   // We will still attempt to synthesize to account for scenarios where the
   // module specification is missing altogether.
-  if (auto *clangModule = Impl.getClangOwningModule(result->getClangNode());
+  if (auto *clangModule = importer::getClangOwningModule(
+          result->getClangNode(), Impl.getClangASTContext());
       clangModule && !requiresCPlusPlus(clangModule))
     return;
 

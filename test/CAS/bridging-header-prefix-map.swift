@@ -43,14 +43,14 @@
 // RUN: %target-swift-frontend-plain -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd /^tmp/test.swift \
 // RUN:   -emit-module -o %t/Test.swiftmodule
 
-// RUN: %target-swift-frontend-plain -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -o %t/deps-3.json -auto-bridging-header-chaining -cache-compile-job -cas-path %t/cas \
 // RUN:   -scanner-prefix-map-paths %swift_src_root /^src -scanner-prefix-map-paths %t /^tmp \
 // RUN:   -scanner-prefix-map-paths %t/header-1 /^header \
 // RUN:   -scanner-output-dir %t/header-1 -I %t
 
-// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies\
+// RUN: %swift-scan-test -action get_chained_bridging_header -- %target-swift-frontend -scan-dependencies \
 // RUN:   -module-name User -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/user.swift -o %t/deps-3.json -auto-bridging-header-chaining -cache-compile-job -cas-path %t/cas \
@@ -72,6 +72,18 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps-4.json bridgingHeader:Test includeTree > %t/includeTree-4.casid
 // RUN: diff %t/includeTree-3.casid %t/includeTree-4.casid
 
+/// Scan prefix mapped main bridging header.
+// RUN: %target-swift-frontend -scan-dependencies -module-name User -module-cache-path %t/clang-module-cache -O \
+// RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
+// RUN:   %t/user.swift -o %t/deps-5.json -auto-bridging-header-chaining -cache-compile-job -cas-path %t/cas \
+// RUN:   -scanner-prefix-map-paths %swift_src_root /^src -scanner-prefix-map-paths %t /^tmp \
+// RUN:   -scanner-prefix-map-paths %t/header-1 /^header \
+// RUN:   -scanner-output-dir %t/header-1 -I %t -import-objc-header %t/header-3/User.h 2>&1 | %FileCheck %s --check-prefix=SUCCESS --allow-empty
+
+// SUCCESS-NOT: failed to load bridging header
+
+// RUN: %FileCheck %s --check-prefix=DEPS --input-file=%t/deps-5.json
+// DEPS: "bridgingHeader"
 
 
 //--- test.swift
@@ -90,3 +102,5 @@ void b(void);
 #include "Foo.h"
 //--- header-2/Foo.h
 void b(void);
+//--- header-3/User.h
+void user(void);

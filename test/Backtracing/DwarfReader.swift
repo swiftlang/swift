@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/Inlining.swift -parse-as-library -g -o %t/Inlining
+// RUN: %target-build-swift %S/Inputs/Inlining.swift -Xfrontend -disable-availability-checking -parse-as-library -g -o %t/Inlining
 // RUN: %target-build-swift %s -parse-as-library -g -o %t/DwarfReader
 // RUN: %target-run %t/DwarfReader %t/Inlining | %FileCheck %s
 

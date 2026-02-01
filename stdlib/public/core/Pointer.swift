@@ -422,18 +422,24 @@ func _convertInOutToPointerArgument<
   return ToPointer(from)
 }
 
+#if !$Embedded
+/// Type used for the result of _convertConstArrayToPointerArgument and friends,
+/// which is any object for non-Embedded and a native object for Embedded Swift.
+public typealias _ConvertedObject = AnyObject
+#else
+public typealias _ConvertedObject = Builtin.NativeObject
+#endif
 
 /// Derive a pointer argument from a value array parameter.
 ///
 /// This always produces a non-null pointer, even if the array doesn't have any
 /// storage.
-#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
->(_ arr: [FromElement]) -> (AnyObject?, ToPointer) {
+>(_ arr: [FromElement]) -> (_ConvertedObject?, ToPointer) {
   let (owner, opaquePointer) = unsafe arr._cPointerArgs()
 
   let validPointer: ToPointer
@@ -446,37 +452,16 @@ func _convertConstArrayToPointerArgument<
   }
   return (owner, validPointer)
 }
-#else
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertConstArrayToPointerArgument<
-  FromElement,
-  ToPointer: _Pointer
->(_ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
-
-  let validPointer: ToPointer
-  if let addr = unsafe opaquePointer {
-    validPointer = ToPointer(addr._rawValue)
-  } else {
-    let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
-    let lastAlignedPointer = unsafe UnsafeRawPointer(bitPattern: lastAlignedValue)!
-    validPointer = ToPointer(lastAlignedPointer._rawValue)
-  }
-  return (owner, validPointer)
-}
-#endif
 
 /// Derive a pointer argument from an inout array parameter.
 ///
 /// This always produces a non-null pointer, even if the array's length is 0.
-#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
->(_ a: inout [FromElement]) -> (AnyObject?, ToPointer) {
+>(_ a: inout [FromElement]) -> (_ConvertedObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
 
@@ -486,41 +471,13 @@ func _convertMutableArrayToPointerArgument<
 
   return _convertConstArrayToPointerArgument(a)
 }
-#else
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertMutableArrayToPointerArgument<
-  FromElement,
-  ToPointer: _Pointer
->(_ a: inout [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  // TODO: Putting a canary at the end of the array in checked builds might
-  // be a good idea
-
-  // Call reserve to force contiguous storage.
-  a.reserveCapacity(0)
-  _debugPrecondition(unsafe a._baseAddressIfContiguous != nil || a.isEmpty)
-
-  return _convertConstArrayToPointerArgument(a)
-}
-#endif
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer: _Pointer
->(_ str: String) -> (AnyObject?, ToPointer) {
+>(_ str: String) -> (_ConvertedObject?, ToPointer) {
   let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }
-#else
-@_transparent
-public // COMPILER_INTRINSIC
-func _convertConstStringToUTF8PointerArgument<
-  ToPointer: _Pointer
->(_ str: String) -> (Builtin.NativeObject?, ToPointer) {
-  let utf8 = Array(str.utf8CString)
-  return _convertConstArrayToPointerArgument(utf8)
-}
-#endif

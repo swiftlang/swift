@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_Embedded
 
 // For some reason integer hashing results in an undefined symbol "arc4random_buf" linker error on linux
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
 
 public class C {
   public var x: Int {
@@ -60,6 +60,6 @@ struct Main {
     handler.d[27] = WrappedBool(b: false)
     handler.set(key: 27)
     // CHECK: true
-    print(handler.d[27]!.b ? "true" : "false") 
+    print(handler.d[27]!.b ? "true" : "false")
   }
 }

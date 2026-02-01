@@ -161,6 +161,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringSet<> OriginallyDefinedInTypes;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
+  TrackingDIRefMap ExistentialTypeAliasMap;
   /// \}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
@@ -667,11 +668,11 @@ private:
         case AccessorKind::Init:
           Kind = ".init";
           break;
-        case AccessorKind::Modify2:
-          Kind = ".modify2";
+        case AccessorKind::YieldingMutate:
+          Kind = ".yielding_mutate";
           break;
-        case AccessorKind::Read2:
-          Kind = ".read2";
+        case AccessorKind::YieldingBorrow:
+          Kind = ".yielding_borrow";
           break;
         case AccessorKind::Borrow:
           Kind = ".borrow";
@@ -915,6 +916,8 @@ private:
         CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
     StringRef IncludePath =
         HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
+    StringRef ASTFile =
+        Desc.getCASID().empty() ? Desc.getASTFile() : Desc.getCASID();
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -932,16 +935,16 @@ private:
         ASTSourceDescriptor ParentDescriptor(*ClangModule->Parent);
         Parent = getOrCreateModule(
             {ParentDescriptor.getModuleName(), ParentDescriptor.getPath(),
-             Desc.getASTFile(), Desc.getSignature(), /*CASID=*/""},
+             Desc.getASTFile(), Desc.getSignature(), Desc.getCASID()},
             ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               IncludePath, Signature, Desc.getASTFile());
+                               IncludePath, Signature, ASTFile);
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
                              Desc.getModuleName(), IncludePath, Signature,
-                             Desc.getASTFile());
+                             ASTFile);
   };
 
   static std::optional<ASTSourceDescriptor>
@@ -1920,6 +1923,10 @@ private:
     case TypeKind::BuiltinUnboundGeneric:
       llvm_unreachable("not a real type");
 
+    case TypeKind::BuiltinBorrow: {
+      llvm_unreachable("todo");
+
+    }
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         auto *FixedArray = llvm::cast<swift::BuiltinFixedArrayType>(BaseTy);
@@ -2657,11 +2664,12 @@ private:
           // Describe the submodule, but substitute the cached ASTFile from
           // the toplevel module. The ASTFile pointer in SubModule may be
           // dangling and cant be trusted.
-          Scope = getOrCreateModule(
-              {SubModuleDesc->getModuleName(), SubModuleDesc->getPath(),
-               TopLevelModuleDesc->getASTFile(),
-               TopLevelModuleDesc->getSignature(), /*CASID=*/""},
-              SubModuleDesc->getModuleOrNull());
+          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                     SubModuleDesc->getPath(),
+                                     TopLevelModuleDesc->getASTFile(),
+                                     TopLevelModuleDesc->getSignature(),
+                                     TopLevelModuleDesc->getCASID()},
+                                    SubModuleDesc->getModuleOrNull());
         else if (SubModuleDesc->getModuleOrNull() == nullptr)
           // This is (bridging header) PCH.
           Scope = getOrCreateModule(*SubModuleDesc, nullptr);
@@ -2684,6 +2692,16 @@ private:
     return Scope;
   }
 
+  static bool isExistentialTypeAlias(DebugTypeInfo DbgTy) {
+    TypeBase *BaseTy = DbgTy.getType();
+    auto *ExistentialTy = BaseTy->getAs<ExistentialType>();
+    if (!ExistentialTy)
+      return false;
+    Type ConstraintTy = ExistentialTy->getConstraintType();
+    TypeBase *TyPtr = ConstraintTy.getPointer();
+    return isa<TypeAliasType>(TyPtr);
+  }
+
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy,
                                 llvm::DIScope *Scope = nullptr) {
     // Is this an empty type?
@@ -2697,6 +2715,22 @@ private:
       return DITy;
     }
 
+    // Use a separate DIRefMap cache for existential typealiases
+    // because they have identical mangled names as their inner
+    // protocol types and cause conflicts in the cache. For example,
+    // protocol P<Value> {
+    //    associatedtype Value
+    // }
+    // actor A<Value> {
+    //    public typealias T = P<Value>
+    //    let t: any T
+    //    ...
+    // }
+    // "any T" (existential type) and "P<Value>" (parameterized protocol type)
+    // have the same mangled name but distinct DI types.
+    TrackingDIRefMap &RefMap =
+        isExistentialTypeAlias(DbgTy) ? ExistentialTypeAliasMap : DIRefMap;
+
     // Second line of defense: Look up the mangled name. TypeBase*'s are
     // not necessarily unique, but name mangling is too expensive to do
     // every time.
@@ -2706,7 +2740,7 @@ private:
       Mangled = getMangledName(DbgTy);
       if (!Mangled.Sugared.empty()) {
         UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Sugared);
-        if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID))
+        if (llvm::Metadata *CachedTy = RefMap.lookup(UID))
           return cast<llvm::DIType>(CachedTy);
 
         if (DbgTy.getType()->getKind() != swift::TypeKind::TypeAlias) {
@@ -2718,7 +2752,7 @@ private:
           // recursively that appears iniside itself. To deal with the latter we
           // directly emit a type alias to the canonical type.
           UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Canonical);
-          if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
+          if (llvm::Metadata *CachedTy = RefMap.lookup(UID)) {
             Scope = updateScope(Scope, DbgTy);
             llvm::DIType *DITy = cast<llvm::DIType>(CachedTy);
             llvm::DIType *TypeDef = DBuilder.createTypedef(
@@ -2741,13 +2775,13 @@ private:
           return DBuilder.createTypedef(Desugared, Name, MainFile, 0,
                                         updateScope(Scope, DbgTy));
         return Desugared;
-      } else if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID)) {
+      } else if (llvm::Metadata *CachedTy = RefMap.lookup(UID)) {
         auto *DITy = cast<llvm::DIType>(CachedTy);
         assert(sanityCheckCachedType(DbgTy, DITy));
         return DITy;
       } else {
         UID = llvm::MDString::get(IGM.getLLVMContext(), Mangled.Canonical);
-        if (llvm::Metadata *CachedTy = DIRefMap.lookup(UID))
+        if (llvm::Metadata *CachedTy = RefMap.lookup(UID))
           return cast<llvm::DIType>(CachedTy);
       }
     }
@@ -2789,7 +2823,7 @@ private:
     if (auto *CTy = dyn_cast<llvm::DICompositeType>(DITy)) {
 #ifndef NDEBUG
       // Soundness check.
-      if (llvm::Metadata *V = DIRefMap.lookup(UID)) {
+      if (llvm::Metadata *V = RefMap.lookup(UID)) {
         auto *CachedTy = cast<llvm::DIType>(V);
         assert(CachedTy == DITy && "conflicting types for one UID");
       }
@@ -2798,7 +2832,7 @@ private:
       if (auto UID = CTy->getRawIdentifier()) {
         assert(UID->getString() == MangledName &&
                "Unique identifier is different from mangled name ");
-        DIRefMap[UID] = llvm::TrackingMDNodeRef(DITy);
+        RefMap[UID] = llvm::TrackingMDNodeRef(DITy);
       }
     }
 

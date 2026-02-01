@@ -6,16 +6,6 @@
 import P
 import FooBar
 
-
-// CHECK:      {{.*}}{{/|\\}}error_source_locations.swift:7:8: error: unable to resolve module dependency: 'FooBar'
-// CHECK-NEXT: 5 |
-// CHECK-NEXT: 6 | import P
-// CHECK-NEXT: 7 | import FooBar
-// CHECK-NEXT:   |        |- error: unable to resolve module dependency: 'FooBar'
-// CHECK-NEXT:   |        `- note: a dependency of main module 'deps'
-// CHECK-NEXT: 8 |
-// CHECK-NEXT: 9 |
-
 // CHECK:      {{.*}}{{/|\\}}Z.swiftinterface:3:8: error: unable to resolve module dependency: 'missing_module'
 // CHECK-NEXT: 1 | // swift-interface-format-version: 1.0
 // CHECK-NEXT: 2 | // swift-module-flags: -module-name Z
@@ -26,3 +16,12 @@ import FooBar
 // CHECK-NEXT:   |        |- note: a dependency of Swift module 'P': '{{.*}}{{/|\\}}P.swiftinterface'
 // CHECK-NEXT:   |        `- note: a dependency of main module 'deps'
 // CHECK-NEXT: 4 | public func funcZ() { }
+
+// CHECK:      {{.*}}{{/|\\}}error_source_locations.swift:7:8: error: unable to resolve module dependency: 'FooBar'
+// CHECK-NEXT: 5 |
+// CHECK-NEXT: 6 | import P
+// CHECK-NEXT: 7 | import FooBar
+// CHECK-NEXT:   |        |- error: unable to resolve module dependency: 'FooBar'
+// CHECK-NEXT:   |        `- note: a dependency of main module 'deps'
+// CHECK-NEXT: 8 |
+// CHECK-NEXT: 9 |

@@ -24,7 +24,8 @@ import sys
 import time
 
 
-VERBOSE = False
+VERBOSE = True
+EMIT_IR = False
 NUM_ITERATIONS = 4
 
 
@@ -33,7 +34,12 @@ def compile_and_stat(compile_args, output_file):
     (md5sum, last modified time) for ``output_file`` after the
     compilation has finished.
     """
-    subprocess.check_call(compile_args)
+
+    logFile = open(output_file + ".log", "w")
+
+    subprocess.check_call(compile_args, stderr=logFile)
+
+    logFile.close()
 
     md5 = subprocess.check_output(["md5", "-q", output_file],
                                   universal_newlines=True)
@@ -45,6 +51,21 @@ def compile_and_stat(compile_args, output_file):
 
     return (md5, mtime)
 
+def print_diff(output_file, suffix):
+    subprocess.run(
+        ["diff", "-c", output_file + suffix, output_file + ".ref" + suffix])
+
+def print_diffs(output_file):
+    print("\n## log differences:", flush=True)
+    print_diff(output_file, ".log")
+
+    if EMIT_IR and VERBOSE:
+        print("\n## SIL differences:", flush=True)
+        print_diff(output_file, ".sil")
+        print("\n## IRGen differences:", flush=True)
+        print_diff(output_file, ".irgen.ll")
+        print("\n## IR differences:", flush=True)
+        print_diff(output_file, ".ll")
 
 def main():
 
@@ -72,6 +93,19 @@ def main():
         subprocess.check_call(new_args)
         return
 
+    new_args += [
+      '-Xllvm', '-print-no-uuids',
+      '-Xllvm', '-sil-print-pass-md5']
+
+    new_args += [
+      '-Xllvm', '-print-cse-internals']
+
+    if EMIT_IR:
+      new_args += [
+        '-Xllvm', '-save-sil', '-Xllvm', output_file + '.sil',
+        '-Xllvm', '-save-irgen', '-Xllvm', output_file + '.irgen.ll',
+        '-Xllvm', '-save-ir', '-Xllvm', output_file + '.ll']
+
     if VERBOSE:
         print("Reference compilation of " + output_file + ":")
 
@@ -83,6 +117,14 @@ def main():
     reference_md5, reference_time = compile_and_stat(new_args, output_file)
 
     subprocess.check_call(["cp", output_file, output_file + ".ref.o"])
+    subprocess.check_call(["cp", output_file + ".log", output_file + ".ref.log"])
+    if EMIT_IR:
+        subprocess.check_call(
+            ["cp", output_file + ".sil", output_file + ".ref.sil"])
+        subprocess.check_call(
+            ["cp", output_file + ".irgen.ll", output_file + ".ref.irgen.ll"])
+        subprocess.check_call(
+            ["cp", output_file + ".ll", output_file + ".ref.ll"])
 
     for iteration in range(1, NUM_ITERATIONS + 1):
 
@@ -94,15 +136,19 @@ def main():
         # This is the most important check: is the output file exactly the
         # same.
         if reference_md5 != second_md5:
+            print_diffs(output_file)
             sys.exit("ERROR: non-determinism when generating: " + output_file +
-                     "\ncommand line:\n" + " ".join(new_args))
+                     "\ncommand line:\n" + " ".join(new_args) +
+                     "\nDear build wrangler: please notify the Swift optimizer code owner!")
 
         # This is the bonus check: does the compiler not re-write the output
         # file. (For compilations < 1sec this check may succeed even if the
         # file was overwritten).
         if compare_time and reference_time != second_time:
+            print_diffs(output_file)
             sys.exit("ERROR: file timestamp was re-written: " + output_file)
 
 
 if __name__ == '__main__':
     main()
+

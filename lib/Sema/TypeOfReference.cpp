@@ -41,7 +41,7 @@ using namespace swift;
 using namespace constraints;
 using namespace inference;
 
-#define DEBUG_TYPE "ConstraintSystem"
+#define DEBUG_TYPE "TypeOfReference"
 
 Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
                                               Type parentTy,
@@ -179,7 +179,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
     if (auto signature = decl->getGenericSignature()) {
       cs.openGenericRequirements(
-          extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+          extension, signature, /*skipProtocolSelfConstraint=*/false, locator,
           [&](Type type) {
             // Why do we look in two substitution maps? We have to use the
             // context substitution map to find types, because we need to
@@ -392,10 +392,6 @@ struct TypeOpener : public TypeTransform<TypeOpener> {
                                   TypePosition pos) {
     return cs.openPackExpansionType(expansion, replacements, locator,
                                     preparedOverload);
-  }
-
-  bool shouldUnwrapVanishingTuples() const {
-    return false;
   }
 
   bool shouldDesugarTypeAliases() const {
@@ -1018,36 +1014,36 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         }
       } else if (numApplies < decl->getNumCurryLevels() &&
                  decl->hasCurriedSelf() ) {
-        auto shouldMarkMemberTypeSendable = [&]() {
-          Type capturedBaseType = baseType;
+        Type sendableDepTy = baseType;
+        if (!decl->isInstanceMember()) {
+          // Static member types are Sendable when the metatype of their
+          // base type is Sendable, because they capture that metatype.
+          // For example, `(S.Type) -> () -> Void`.
+          if (!sendableDepTy)
+            sendableDepTy = decl->getDeclContext()->getSelfTypeInContext();
 
-          if (!decl->isInstanceMember()) {
-            // Static member types are Sendable when the metatype of their
-            // base type is Sendable, because they capture that metatype.
-            // For example, `(S.Type) -> () -> Void`.
-            if (!capturedBaseType)
-              capturedBaseType = decl->getDeclContext()->getSelfTypeInContext();
-
-            if (!capturedBaseType->is<AnyMetatypeType>())
-              capturedBaseType = MetatypeType::get(capturedBaseType);
-          } else if (capturedBaseType) {
-            // For instance members we need to check whether instance type
-            // is Sendable because @Sendable function values cannot capture
-            // non-Sendable values (base instance type in this case).
-            // For example, `(C) -> () -> Void` where `C` should be Sendable
-            // for the inner function type to be Sendable as well.
-            capturedBaseType = capturedBaseType->getMetatypeInstanceType();
-          }
-
-          return capturedBaseType && capturedBaseType->isSendableType();
-        };
+          if (!sendableDepTy->is<AnyMetatypeType>())
+            sendableDepTy = MetatypeType::get(sendableDepTy);
+        } else if (sendableDepTy) {
+          // For instance members we need to check whether instance type
+          // is Sendable because @Sendable function values cannot capture
+          // non-Sendable values (base instance type in this case).
+          // For example, `(C) -> () -> Void` where `C` should be Sendable
+          // for the inner function type to be Sendable as well.
+          sendableDepTy = sendableDepTy->getMetatypeInstanceType();
+        }
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
-        if (shouldMarkMemberTypeSendable()) {
+        if (sendableDepTy && !referenceTy->isSendable()) {
+          sendableDepTy = simplifyType(sendableDepTy);
+          auto extInfo = referenceTy->getExtInfo();
+          if (sendableDepTy->hasTypeVariable()) {
+            extInfo = extInfo.withSendableDependentType(sendableDepTy);
+          } else {
+            extInfo = extInfo.withSendable(sendableDepTy->isSendableType());
+          }
           referenceTy =
-              referenceTy
-                  ->withExtInfo(referenceTy->getExtInfo().withSendable())
-                  ->getAs<FunctionType>();
+              referenceTy->withExtInfo(extInfo)->castTo<FunctionType>();
         }
 
         // @Sendable since fully uncurried type doesn't capture anything.
@@ -1474,18 +1470,40 @@ void ConstraintSystem::openGenericRequirements(
     PreparedOverloadBuilder *preparedOverload) {
   auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
+    auto req = requirements[pos];
+    auto kind = req.getKind();
+
+    // Determine whether this is the protocol 'Self' requirement we should skip.
+    //
+    // NOTE: At first glance it seems like this is just an optimization to avoid
+    // adding a redundant constraint, but it is in fact load bearing for
+    // DistributedActor since we can form a conformance to Actor in
+    // GetDistributedActorAsActorConformanceRequest despite the fact that
+    // DistributedActor does not require Actor conformance (although conforming
+    // types are guaranteed to have the witnesses). So a conformance check in
+    // that case would fail.
+    //
+    // We also skip the protocol 'Self' requirement for dynamic AnyObject lookup,
+    // because the base type there is AnyObject which does not conform to any
+    // @objc protocols.
+    if (skipProtocolSelfConstraint &&
+        kind == RequirementKind::Conformance &&
+        req.getProtocolDecl() == outerDC &&
+        req.getFirstType()->isEqual(getASTContext().TheSelfType)) {
+      continue;
+    }
+
     auto openedGenericLoc =
       locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
     openGenericRequirement(outerDC, signature, pos, requirements[pos],
-                           skipProtocolSelfConstraint, openedGenericLoc,
-                           substFn, preparedOverload);
+                           openedGenericLoc, substFn, preparedOverload);
   }
 }
 
 void ConstraintSystem::openGenericRequirement(
     DeclContext *outerDC, GenericSignature signature,
-    unsigned index, const Requirement &req,
-    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    unsigned index, Requirement req,
+    ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
   std::optional<Requirement> openedReq;
@@ -1495,20 +1513,6 @@ void ConstraintSystem::openGenericRequirement(
   auto kind = req.getKind();
   switch (kind) {
   case RequirementKind::Conformance: {
-    auto protoDecl = req.getProtocolDecl();
-    // Determine whether this is the protocol 'Self' constraint we should skip.
-    //
-    // NOTE: At first glance it seems like this is just an optimization to avoid
-    // adding a redundant constraint, but it is in fact load bearing for
-    // DistributedActor since we can form a conformance to Actor in
-    // GetDistributedActorAsActorConformanceRequest despite the fact that
-    // DistributedActor does not require Actor conformance (although conforming
-    // types are guaranteed to have the witnesses). So a conformance check in
-    // that case would fail.
-    if (skipProtocolSelfConstraint && protoDecl == outerDC &&
-        protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
-      return;
-
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
     if (signature &&
@@ -2023,6 +2027,9 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   auto openedParams = openedType->castTo<FunctionType>()->getParams();
   assert(openedParams.size() == 1);
 
+  bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
+  bool skipProtocolSelfConstraint = isDynamicLookup || isRequirementOrWitness(locator);
+
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
   if (outerDC->getSelfProtocolDecl()) {
     // For a protocol, substitute the base object directly. We don't need a
@@ -2031,7 +2038,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,
                   preparedOverload);
-  } else if (choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
+  } else if (!isDynamicLookup) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator, preparedOverload);
   }
 
@@ -2043,8 +2050,7 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   // easier to diagnose.
   if (genericSig) {
     openGenericRequirements(
-        outerDC, genericSig,
-        /*skipProtocolSelfConstraint=*/true, locator,
+        outerDC, genericSig, skipProtocolSelfConstraint, locator,
         [&](Type type) {
           return openType(type, replacements, locator, preparedOverload);
         }, preparedOverload);
@@ -2447,11 +2453,62 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     auto memberTy = createTypeVariable(keyPathLoc, TVO_CanBindToLValue |
                                                        TVO_CanBindToNoEscape);
 
+    bool isSubscriptRef = locator->isSubscriptMemberRef();
+    auto addMemberConstraint = [&]() {
+      // Attempt to lookup a member with a give name in the root type and
+      // assign result to the leaf type of the keypath.
+      DeclNameRef memberName =
+          isSubscriptRef ? DeclNameRef::createSubscript()
+                         // FIXME: Should propagate name-as-written through.
+                         : DeclNameRef(choice.getName());
+
+      // Check the current depth of applied dynamic member lookups, if we've
+      // exceeded the limit then record a fix and set a hole for the member.
+      unsigned lookupDepth = [&]() {
+        auto path = keyPathLoc->getPath();
+        auto iter = path.begin();
+        (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
+        return path.end() - iter;
+      }();
+      if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
+        (void)recordFix(TooManyDynamicMemberLookups::create(
+            *this, DeclNameRef(choice.getName()), locator));
+        recordTypeVariablesAsHoles(memberTy);
+      } else {
+        addValueMemberConstraint(
+            LValueType::get(rootTy), memberName, memberTy, useDC,
+            isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
+                           : FunctionRefInfo::unappliedBaseName(),
+            /*outerAlternatives=*/{}, keyPathLoc);
+      }
+    };
+
+    // If we're doing a subscript lookup and have a dynamic member base we need
+    // to add the applicable function first since solving the member constraint
+    // requires the constraint to be available for recursive cases since it may
+    // retire it. We can't yet do this in the general case since the simplifying
+    // of the applicable fn in CSGen is currently load-bearing for existential
+    // opening.
+    // FIXME: Once existential opening is no longer sensitive to solving
+    // order, we ought to be able to just always record the applicable fn as
+    // an unsolved constraint before the member.
+    auto delayMemberConstraint =
+        isSubscriptRef && simplifyType(rootTy)
+                              ->getRValueType()
+                              ->getMetatypeInstanceType()
+                              ->eraseDynamicSelfType()
+                              ->hasDynamicMemberLookupAttribute();
+    if (!delayMemberConstraint)
+      addMemberConstraint();
+    SWIFT_DEFER {
+      if (delayMemberConstraint)
+        addMemberConstraint();
+    };
+
     // In case of subscript things are more complicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
     // associated with index expression and re-bind it to match "member type"
     // looked up by dynamically.
-    bool isSubscriptRef = locator->isSubscriptMemberRef();
     if (isSubscriptRef) {
       // Make sure that regular subscript declarations (if any) are
       // preferred over key path dynamic member lookup.
@@ -2527,35 +2584,6 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
       addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);
-    }
-
-    // Attempt to lookup a member with a give name in the root type and
-    // assign result to the leaf type of the keypath. Note we need to do this
-    // after handling the applicable function constraint in the subscript case
-    // to ensure it's available for recursive cases.
-    DeclNameRef memberName = isSubscriptRef
-                           ? DeclNameRef::createSubscript()
-                           // FIXME: Should propagate name-as-written through.
-                           : DeclNameRef(choice.getName());
-
-    // Check the current depth of applied dynamic member lookups, if we've
-    // exceeded the limit then record a fix and set a hole for the member.
-    unsigned lookupDepth = [&]() {
-      auto path = keyPathLoc->getPath();
-      auto iter = path.begin();
-      (void)keyPathLoc->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter);
-      return path.end() - iter;
-    }();
-    if (lookupDepth > ctx.TypeCheckerOpts.DynamicMemberLookupDepthLimit) {
-      (void)recordFix(TooManyDynamicMemberLookups::create(
-          *this, DeclNameRef(choice.getName()), locator));
-      recordTypeVariablesAsHoles(memberTy);
-    } else {
-      addValueMemberConstraint(
-          LValueType::get(rootTy), memberName, memberTy, useDC,
-          isSubscriptRef ? FunctionRefInfo::doubleBaseNameApply()
-                         : FunctionRefInfo::unappliedBaseName(),
-          /*outerAlternatives=*/{}, keyPathLoc);
     }
     return;
   }
@@ -2901,6 +2929,12 @@ PreparedOverload *ConstraintSystem::prepareOverload(OverloadChoice choice,
   std::tie(openedType, thrownErrorType) = prepareOverloadImpl(
       choice, useDC, locator, &builder);
 
+  LLVM_DEBUG(
+    llvm::dbgs() << "------------\n";
+    builder.dump(llvm::dbgs(), *this);
+    llvm::dbgs() << "------------\n");
+
+  ASSERT(PreparingOverload);
   PreparingOverload = false;
 
   size_t count = builder.Changes.size();
@@ -3253,5 +3287,92 @@ void ConstraintSystem::verifyThatArgumentIsHashable(unsigned index,
         ConstraintKind::ConformsTo, argType,
         hashable->getDeclaredInterfaceType(),
         getConstraintLocator(locator, LocatorPathElt::TupleElement(index)));
+  }
+}
+
+void PreparedOverloadChange::dump(llvm::raw_ostream &out,
+                                  ConstraintSystem &cs,
+                                  unsigned indent) const {
+  PrintOptions PO = PrintOptions::forDebugging();
+  out.indent(indent);
+
+  switch (Kind) {
+  case AddedTypeVariable:
+    out << "(AddedTypeVariable ";
+    TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case AddedConstraint:
+    out << "(AddedConstraint ";
+    TheConstraint->print(out, &cs.getASTContext().SourceMgr,
+                         indent + 2);
+    out << ")\n";
+    break;
+
+  case AddedBindConstraint:
+    out << "(AddedBindConstraint ";
+    Bind.FirstType->print(out, PO);
+    out << " ";
+    Bind.SecondType->print(out, PO);
+    out << ")\n";
+    break;
+
+  case OpenedTypes: {
+    out << "(OpenedTypes";
+    for (unsigned i = 0, e = Replacements.Count; i < e; ++i) {
+      out << " ";
+      auto openedType = Replacements.Data[i];
+      openedType.first->print(out, PO);
+      out << " -> ";
+      openedType.second->print(out, PO);
+    }
+    out << ")\n";
+    break;
+  }
+
+  case OpenedExistentialType:
+    out << "(OpenedExistentialType ";
+    TheExistential->print(out, PO);
+    out << ")\n";
+    break;
+
+  case OpenedPackExpansionType:
+    out << "(OpenedPackExpansionType ";
+    PackExpansion.TheExpansion->print(out, PO);
+    out << " ";
+    PackExpansion.TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case AppliedPropertyWrapper:
+    out << "(AppliedPropertyWrapper ";
+    PropertyWrapper.WrapperType->print(out, PO);
+    out << " ";
+    out << unsigned(PropertyWrapper.InitKind);
+    out << ")\n";
+    break;
+
+  case AddedFix:
+    out << "(AddedFix ";
+    Fix.TheFix->print(out);
+    out << ")\n";
+    break;
+
+  case RecordedNodeType:
+    out << "(RecordedNodeType at ";
+    Node.Node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
+    out << " ";
+    Node.TheType->print(out, PO);
+    out << ")\n";
+    break;
+  }
+}
+
+void PreparedOverloadBuilder::dump(llvm::raw_ostream &out,
+                                  ConstraintSystem &cs,
+                                  unsigned indent) const {
+  for (const auto &change : Changes) {
+    change.dump(out, cs, indent);
   }
 }

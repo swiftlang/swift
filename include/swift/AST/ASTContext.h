@@ -272,6 +272,7 @@ class ASTContext final {
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
+      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
@@ -298,6 +299,7 @@ public:
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
+      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -1029,12 +1031,6 @@ public:
   /// Availability macros parsed from the command line arguments.
   const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
-  /// Test support utility for loading a platform remap file
-  /// in case an SDK is not specified to the compilation.
-  const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
-  getAuxiliaryDarwinPlatformRemapInfo(
-      clang::DarwinSDKInfo::OSEnvPair Kind) const;
-
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -1557,6 +1553,13 @@ public:
   /// check for isLanguageModeAtLeast(5).
   bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
     return LangOpts.isLanguageModeAtLeast(major, minor);
+  }
+
+  /// Whether the "next major" language mode is being used. This isn't a real
+  /// language mode, it only exists to signal clients that expect to be
+  /// included in the next language mode when it becomes available.
+  bool isAtLeastFutureMajorLanguageMode() const {
+    return LangOpts.isAtLeastFutureMajorLanguageMode();
   }
 
   /// Check whether it's important to respect access control restrictions

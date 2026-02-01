@@ -1270,6 +1270,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     llvm_unreachable(
         "All forward definitions of local archetypes should be resolved");
 
+  // The de-serialized SIL is assumed to be in a correct state.
+  fn->setNeedBreakInfiniteLoops(false);
+  fn->setNeedCompleteLifetimes(false);
+
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
@@ -1329,6 +1333,8 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       fArg->setClosureCapture(isClosureCapture);
       bool isFormalParameterPack = (Args[I + 1] >> 17) & 0x1;
       fArg->setFormalParameterPack(isFormalParameterPack);
+      bool isInferredImmutable = (Args[I + 1] >> 18) & 0x1;
+      fArg->setInferredImmutable(isInferredImmutable);
       Arg = fArg;
     } else {
       Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind,
@@ -1805,11 +1811,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto usesMoveableValueDebugInfo =
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
+    auto inferredImmutable = (Attr >> 4) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
         std::nullopt, hasDynamicLifetime, reflection,
         usesMoveableValueDebugInfo,
-        /*skipVarDeclAssert*/ false, pointerEscape);
+        /*skipVarDeclAssert*/ false, pointerEscape, inferredImmutable);
     break;
   }
   case SILInstructionKind::AllocStackInst: {
@@ -2729,6 +2736,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(ExtractExecutor)
   UNARY_INSTRUCTION(FunctionExtractIsolation)
+  UNARY_INSTRUCTION(MakeBorrow)
+  UNARY_INSTRUCTION(DereferenceBorrow)
+  UNARY_INSTRUCTION(MakeAddrBorrow)
+  UNARY_INSTRUCTION(DereferenceAddrBorrow)
+  UNARY_INSTRUCTION(DereferenceBorrowAddr)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -3072,6 +3084,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool fromBuiltin = (Attr >> 4) & 0x01;
     ResultInst = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
                                                  fromBuiltin);
+    break;
+  }
+  case SILInstructionKind::InitBorrowAddrInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory, Fn);
+    auto refType = SILType::getPrimitiveAddressType(
+      addrType.castTo<BuiltinBorrowType>()->getReferentType());
+    auto referent = getLocalValue(Builder.maybeGetFunction(), ValID, refType);
+    auto borrow = getLocalValue(Builder.maybeGetFunction(), ValID2, addrType);
+    ResultInst = Builder.createInitBorrowAddr(Loc, borrow, referent);
     break;
   }
   case SILInstructionKind::CopyAddrInst: {

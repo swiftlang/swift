@@ -67,7 +67,7 @@ bool SyntacticMacroExpansionInstance::setup(
       invocation.getSILOptions(), invocation.getSearchPathOptions(),
       invocation.getClangImporterOptions(), invocation.getSymbolGraphOptions(),
       invocation.getCASOptions(), invocation.getSerializationOptions(),
-      SourceMgr, Diags));
+      SourceMgr, Diags, invocation.getSDKInfo()));
   registerParseRequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
 

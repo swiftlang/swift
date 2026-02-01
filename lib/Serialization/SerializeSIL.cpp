@@ -764,8 +764,9 @@ void SILSerializer::writeSILBasicBlock(const SILBasicBlock &BB) {
       packedMetadata |= unsigned(SFA->getLifetimeAnnotation()) << 14; // 2 bits
       packedMetadata |= unsigned(SFA->isClosureCapture()) << 16;      // 1 bit
       packedMetadata |= unsigned(SFA->isFormalParameterPack()) << 17; // 1 bit
+      packedMetadata |= unsigned(SFA->isInferredImmutable()) << 18;   // 1 bit
     }
-    // Used: 17 bits. Free: 15.
+    // Used: 18 bits. Free: 14.
     //
     // TODO: We should be able to shrink the packed metadata of the first two.
     Args.push_back(packedMetadata);
@@ -1293,6 +1294,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     flags |= unsigned(ABI->emitReflectionMetadata()) << 1;
     flags |= unsigned(ABI->usesMoveableValueDebugInfo()) << 2;
     flags |= unsigned(ABI->hasPointerEscape()) << 3;
+    flags |= unsigned(ABI->isInferredImmutable()) << 4;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());
@@ -1784,7 +1786,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::DestroyNotEscapedClosureInst:
-  case SILInstructionKind::ThrowInst: {
+  case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst: {
     unsigned Attr = 0;
     if (auto *LI = dyn_cast<LoadInst>(&SI))
       Attr = unsigned(LI->getOwnershipQualifier());
@@ -2476,7 +2483,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ExplicitCopyAddrInst:
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::StoreInst:
-  case SILInstructionKind::StoreBorrowInst: {
+  case SILInstructionKind::StoreBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst: {
     SILValue operand, value;
     unsigned Attr = 0;
     if (SI.getKind() == SILInstructionKind::StoreInst) {
@@ -2510,6 +2518,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else if (auto *SBI = dyn_cast<StoreBorrowInst>(&SI)) {
       operand = SBI->getDest();
       value = SBI->getSrc();
+    } else if (auto *IBA = dyn_cast<InitBorrowAddrInst>(&SI)) {
+      operand = IBA->getDest();
+      value = IBA->getReferent();
     } else {
       llvm_unreachable("switch out of sync");
     }

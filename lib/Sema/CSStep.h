@@ -623,7 +623,6 @@ public:
       : BindingStep(cs, {cs, disjunction, favoredChoices}, solutions),
         Disjunction(disjunction) {
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
-    pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
   }
 
@@ -684,52 +683,6 @@ private:
   /// \return true if the choice has been accepted and system can be
   /// simplified further, false otherwise.
   bool attempt(const DisjunctionChoice &choice) override;
-
-  // Check if selected disjunction has a representative
-  // this might happen when there are multiple binary operators
-  // chained together. If so, disable choices which differ
-  // from currently selected representative.
-  void pruneOverloadSet(Constraint *disjunction) {
-    if (!CS.performanceHacksEnabled())
-      return;
-
-    auto *choice = disjunction->getNestedConstraints().front();
-    if (choice->getKind() != ConstraintKind::BindOverload)
-      return;
-
-    auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
-    if (!typeVar)
-      return;
-
-    auto *repr = typeVar->getImpl().getRepresentative(nullptr);
-    if (!repr || repr == typeVar)
-      return;
-
-    for (auto overload : CS.getResolvedOverloads()) {
-      auto resolved = overload.second;
-      if (!resolved.boundType->isEqual(repr))
-        continue;
-
-      auto &representative = resolved.choice;
-      if (!representative.isDecl())
-        return;
-
-      // Disable all of the overload choices which are different from
-      // the one which is currently picked for representative.
-      for (auto *constraint : disjunction->getNestedConstraints()) {
-        if (constraint->isDisabled())
-          continue;
-
-        auto choice = constraint->getOverloadChoice();
-        if (!choice.isDecl() || choice.getDecl() == representative.getDecl())
-          continue;
-
-        constraint->setDisabled();
-        DisabledChoices.push_back(constraint);
-      }
-      break;
-    }
-  };
 
   // Figure out which of the solutions has the smallest score.
   static std::optional<Score>

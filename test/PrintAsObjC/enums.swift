@@ -12,6 +12,7 @@
 // RUN: %FileCheck -check-prefix=NEGATIVE %s -input-file %t/enums.WMO.h
 // RUN: %check-in-clang %t/enums.WMO.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.WMO.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.WMO.h -include ctypes.h -include CoreFoundation.h -std=c99
 
 // Ensure that providing the output header path via the supplementary output
 // file map also works.
@@ -26,12 +27,12 @@ import Foundation
 
 // NEGATIVE-NOT: NSMalformedEnumMissingTypedef :
 // NEGATIVE-NOT: enum EnumNamed
-// CHECK-LABEL: typedef SWIFT_ENUM_FWD_DECL(NSInteger, FooComments)
-// CHECK-LABEL: typedef SWIFT_ENUM_FWD_DECL(int16_t, NegativeValues)
-// CHECK-LABEL: typedef SWIFT_ENUM_FWD_DECL(NSInteger, ObjcEnumNamed)
+// CHECK-LABEL: SWIFT_ENUM_FWD_DECL(NSInteger, FooComments)
+// CHECK-LABEL: SWIFT_ENUM_FWD_DECL(int16_t, NegativeValues)
+// CHECK-LABEL: SWIFT_ENUM_FWD_DECL(NSInteger, ObjcEnumNamed)
 
-// CHECK-SUPPLEMENTAL: typedef SWIFT_ENUM_FWD_DECL(int16_t, NegativeValues)
-// CHECK-SUPPLEMENTAL: typedef SWIFT_ENUM_FWD_DECL(NSInteger, ObjcEnumNamed)
+// CHECK-SUPPLEMENTAL: SWIFT_ENUM_FWD_DECL(int16_t, NegativeValues)
+// CHECK-SUPPLEMENTAL: SWIFT_ENUM_FWD_DECL(NSInteger, ObjcEnumNamed)
 
 // CHECK-LABEL: @interface AnEnumMethod
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo SWIFT_WARN_UNUSED_RESULT;

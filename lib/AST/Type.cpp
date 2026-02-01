@@ -272,6 +272,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::Integer:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
+  case TypeKind::BuiltinBorrow:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -984,11 +985,12 @@ unsigned int TypeBase::getOptionalityDepth() {
   return depth;
 }
 
-Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
+Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
+                                bool dropIsolation) {
   // Look through optionals.
   if (Type optionalObject = getOptionalObjectType()) {
-    Type newOptionalObject =
-        optionalObject->stripConcurrency(recurse, dropGlobalActor);
+    Type newOptionalObject = optionalObject->stripConcurrency(
+        recurse, dropGlobalActor, dropIsolation);
     if (optionalObject->isEqual(newOptionalObject))
       return Type(this);
 
@@ -1001,7 +1003,10 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     ASTExtInfo extInfo =
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
     extInfo = extInfo.withSendable(false);
-    if (dropGlobalActor)
+    if (dropGlobalActor && extInfo.getGlobalActor())
+      extInfo = extInfo.withoutIsolation();
+
+    if (dropIsolation)
       extInfo = extInfo.withoutIsolation();
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -1012,7 +1017,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       for (unsigned paramIdx : indices(params)) {
         const auto &param = params[paramIdx];
         Type newParamType = param.getPlainType()->stripConcurrency(
-            recurse, dropGlobalActor);
+            recurse, dropGlobalActor, dropIsolation);
 
         if (!newParams.empty()) {
           newParams.push_back(param.withType(newParamType));
@@ -1029,7 +1034,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       if (!newParams.empty())
         params = newParams;
 
-      resultType = resultType->stripConcurrency(recurse, dropGlobalActor);
+      resultType =
+          resultType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     }
 
     // Drop Sendable requirements.
@@ -1070,8 +1076,9 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   }
 
   if (auto existentialType = getAs<ExistentialType>()) {
-    auto newConstraintType = existentialType->getConstraintType()
-        ->stripConcurrency(recurse, dropGlobalActor);
+    auto newConstraintType =
+        existentialType->getConstraintType()->stripConcurrency(
+            recurse, dropGlobalActor, dropIsolation);
     if (newConstraintType.getPointer() ==
             existentialType->getConstraintType().getPointer())
       return Type(this);
@@ -1096,7 +1103,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     for (unsigned i : indices(members)) {
       auto memberType = members[i];
       auto newMemberType =
-          memberType->stripConcurrency(recurse, dropGlobalActor);
+          memberType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
       if (!newMembers.empty()) {
         newMembers.push_back(newMemberType);
         continue;
@@ -1122,7 +1129,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   if (auto existentialMetatype = getAs<ExistentialMetatypeType>()) {
     auto instanceType = existentialMetatype->getExistentialInstanceType();
     auto newInstanceType =
-        instanceType->stripConcurrency(recurse, dropGlobalActor);
+        instanceType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     if (instanceType.getPointer() != newInstanceType.getPointer()) {
       std::optional<MetatypeRepresentation> repr;
       if (existentialMetatype->hasRepresentation())
@@ -1142,8 +1149,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     SmallVector<Type, 2> genericArgs;
     llvm::transform(BGT->getGenericArgs(), std::back_inserter(genericArgs),
                     [&](Type argTy) {
-                      auto newArgTy =
-                          argTy->stripConcurrency(recurse, dropGlobalActor);
+                      auto newArgTy = argTy->stripConcurrency(
+                          recurse, dropGlobalActor, dropIsolation);
                       anyChanged |= !newArgTy->isEqual(argTy);
                       return newArgTy;
                     });
@@ -1162,7 +1169,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     llvm::transform(
         tuple->getElements(), std::back_inserter(elts), [&](const auto &elt) {
           auto eltTy = elt.getType();
-          auto strippedTy = eltTy->stripConcurrency(recurse, dropGlobalActor);
+          auto strippedTy =
+              eltTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
           anyChanged |= !strippedTy->isEqual(eltTy);
           return elt.getWithType(strippedTy);
         });
@@ -1171,8 +1179,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   }
 
   if (auto *arrayTy = dyn_cast<ArraySliceType>(this)) {
-    auto newBaseTy =
-        arrayTy->getBaseType()->stripConcurrency(recurse, dropGlobalActor);
+    auto newBaseTy = arrayTy->getBaseType()->stripConcurrency(
+        recurse, dropGlobalActor, dropIsolation);
     return newBaseTy->isEqual(arrayTy->getBaseType())
                ? Type(this)
                : ArraySliceType::get(newBaseTy);
@@ -1180,9 +1188,11 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
 
   if (auto *dictTy = dyn_cast<DictionaryType>(this)) {
     auto keyTy = dictTy->getKeyType();
-    auto strippedKeyTy = keyTy->stripConcurrency(recurse, dropGlobalActor);
+    auto strippedKeyTy =
+        keyTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     auto valueTy = dictTy->getValueType();
-    auto strippedValueTy = valueTy->stripConcurrency(recurse, dropGlobalActor);
+    auto strippedValueTy =
+        valueTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
 
     return keyTy->isEqual(strippedKeyTy) && valueTy->isEqual(strippedValueTy)
                ? Type(this)
@@ -4231,7 +4241,19 @@ Type AnyFunctionType::getThrownError() const {
   }
 }
 
+Type AnyFunctionType::getSendableDependentType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getSendableDependentType();
+  case TypeKind::GenericFunction:
+    return Type();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 bool AnyFunctionType::isSendable() const {
+  ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
   return getExtInfo().isSendable();
 }
 
@@ -4316,10 +4338,15 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
     }
   }
 
+  Type sendableDependentType = getSendableDependentType();
+  if (sendableDependentType)
+    sendableDependentType = sendableDependentType->getCanonicalType();
+
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError, getLifetimeDependencies());
+                 globalActor, thrownError, sendableDependentType,
+                 getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4661,6 +4688,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Integer:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
+  case TypeKind::BuiltinBorrow:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -5293,8 +5321,7 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!type->getASTContext().isLanguageModeAtLeast(
-            version::Version::getFutureMajorLanguageVersion()))
+    if (!declCtx->getASTContext().isAtLeastFutureMajorLanguageMode())
       return DiagnosticBehavior::Warning;
   }
 

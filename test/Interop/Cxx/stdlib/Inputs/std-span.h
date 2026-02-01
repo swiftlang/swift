@@ -92,6 +92,7 @@ inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
 
 struct X {
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
+  SpanOfInt getMutable(ConstSpanOfInt s [[clang::noescape]]) [[clang::lifetimebound]];
 };
 
 inline ConstSpanOfInt mixedFuncWithSafeWrapper1(const int * __counted_by(len) p

@@ -139,6 +139,7 @@ add_library(swiftRuntime
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
+  Mangling.swift
   MemoryReader.swift
   OSReleaseScanner.swift
   ProcMapsScanner.swift

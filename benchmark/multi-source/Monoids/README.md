@@ -6,11 +6,15 @@ More specifically, this program enumerates two-generator two-relation monoid pre
 
     <a,b|u=v,w=x>  where |u| + |v| + |w| + |x| <= 10
 
+The program applies various "strategies" to solve the harder instances, such as attempting different reduction orders, as well as a simple [morphocompletion](https://link.springer.com/chapter/10.1007/3-540-51081-8_141) implementation that adds an extra letter to the alphabet.
+
 This takes a few seconds to finish and solves all but three instances. The three it cannot solve are:
 
     <a,b|aaa=a,abba=bb>
     <a,b|bab=aaa,bbbb=1>
     <a,b|aaaa=1,abbba=b>
+
+It turns out the first one cannot be presented by a finite complete rewriting system over any alphabet. The status of the other two remains an open question.
 
 In addition to Knuth-Bendix completion, there are some other interesting algorithms here as well:
 - Shortlex order with arbitrary permutation of alphabet

@@ -68,6 +68,13 @@ void _swift_stdlib_reportUnimplementedInitializer(
     const unsigned char *initName, int initNameLength,
     __swift_uint32_t flags);
 
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_reportExclusivityConflict(__swift_uintptr_t oldAction,
+                                      const void *_Nullable oldPC,
+                                      __swift_uintptr_t newFlags,
+                                      const void *_Nullable newPC,
+                                      const void *_Nullable pointer);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -439,26 +439,31 @@ static bool isAsyncSequenceFailure(AssociatedTypeDecl *assocType) {
   return assocType->getName() == assocType->getASTContext().Id_Failure;
 }
 
-static Type resolveTypeWitnessViaParameterizedProtocol(
-    Type t, AssociatedTypeDecl *assocType) {
+static void resolveTypeWitnessViaParameterizedProtocol(
+    Type t, SourceLoc inheritedLoc, AssociatedTypeDecl *assocType,
+    SmallVectorImpl<std::pair<Type, SourceLoc>>
+        &fromParameterizedProtocolType) {
   if (auto *pct = t->getAs<ProtocolCompositionType>()) {
     for (auto member : pct->getMembers()) {
-      if (auto result = resolveTypeWitnessViaParameterizedProtocol(
-            member, assocType)) {
-        return result;
-      }
+      resolveTypeWitnessViaParameterizedProtocol(
+          member, inheritedLoc, assocType, fromParameterizedProtocolType);
     }
   } else if (auto *ppt = t->getAs<ParameterizedProtocolType>()) {
     auto *proto = ppt->getProtocol();
     unsigned i = 0;
     for (auto *otherAssocType : proto->getPrimaryAssociatedTypes()) {
-      if (otherAssocType->getName() == assocType->getName())
-        return ppt->getArgs()[i];
+      if (otherAssocType->getName() == assocType->getName()) {
+        auto typeWitness = ppt->getArgs()[i];
+        if (!llvm::any_of(fromParameterizedProtocolType,
+                          [&](const std::pair<Type, SourceLoc> &pair) -> bool {
+                            return pair.first->isEqual(typeWitness);
+                          })) {
+          fromParameterizedProtocolType.push_back({typeWitness, inheritedLoc});
+        }
+      }
       ++i;
     }
   }
-
-  return Type();
 }
 
 /// Attempt to resolve a type witness via member name lookup.
@@ -480,23 +485,24 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
 
   // Look for a parameterized protocol type in the conformance context's
   // inheritance clause.
-  bool deducedFromParameterizedProtocolType = false;
+  SmallVector<std::pair<Type, SourceLoc>, 2> fromParameterizedProtocolType;
   auto inherited = (isa<NominalTypeDecl>(dc)
                     ? cast<NominalTypeDecl>(dc)->getInherited()
                     : cast<ExtensionDecl>(dc)->getInherited());
   for (auto index : inherited.getIndices()) {
     if (auto inheritedTy = inherited.getResolvedType(index)) {
-      if (auto typeWitness = resolveTypeWitnessViaParameterizedProtocol(
-            inheritedTy, assocType)) {
-        recordTypeWitness(conformance, assocType, typeWitness, nullptr);
-        deducedFromParameterizedProtocolType = true;
-      }
+      resolveTypeWitnessViaParameterizedProtocol(
+          inheritedTy, inherited.getEntry(index).getLoc(), assocType,
+          fromParameterizedProtocolType);
     }
   }
 
   // Next, look for a member type declaration with this name.
-  NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes |
-                          NL_ProtocolMembers | NL_IncludeAttributeImplements);
+  NLOptions subOptions = (NL_QualifiedDefault |
+                          NL_RemoveAssociatedTypes |
+                          NL_OnlyTypes |
+                          NL_ProtocolMembers |
+                          NL_IncludeAttributeImplements);
 
   // Look for a member type with the same name as the associated type.
   SmallVector<ValueDecl *, 4> candidates;
@@ -505,31 +511,22 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
                       dc->getSelfNominalTypeDecl()->getLoc(), subOptions,
                       candidates);
 
-  // If there aren't any candidates, we're done.
-  if (candidates.empty()) {
-    return ResolveWitnessResult::Missing;
-  }
-
   // Determine which of the candidates is viable.
   SmallVector<LookupTypeResultEntry, 2> viable;
   SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
   SmallPtrSet<CanType, 4> viableTypes;
 
   for (auto candidate : candidates) {
-    auto *typeDecl = cast<TypeDecl>(candidate);
-
-    // Skip other associated types.
-    if (isa<AssociatedTypeDecl>(typeDecl))
-      continue;
+    auto *genericDecl = cast<GenericTypeDecl>(candidate);
 
     // If the name doesn't match and there's no appropriate @_implements
     // attribute, skip this candidate.
     //
     // Also skip candidates in protocol extensions, because they tend to cause
     // request cycles. We'll look at those during associated type inference.
-    if (assocType->getName() != typeDecl->getName() &&
-        !(witnessHasImplementsAttrForExactRequirement(typeDecl, assocType) &&
-          !typeDecl->getDeclContext()->getSelfProtocolDecl()))
+    if (assocType->getName() != genericDecl->getName() &&
+        !(witnessHasImplementsAttrForExactRequirement(genericDecl, assocType) &&
+          !genericDecl->getDeclContext()->getSelfProtocolDecl()))
       continue;
 
     // Prior to Swift 6, ignore a member named Failure when matching
@@ -537,10 +534,8 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // instead.
     if (isAsyncSequenceFailure(assocType) &&
         !ctx.isLanguageModeAtLeast(6) &&
-        assocType->getName() == typeDecl->getName())
-      continue;;
-
-    auto *genericDecl = cast<GenericTypeDecl>(typeDecl);
+        assocType->getName() == genericDecl->getName())
+      continue;
 
     // If the declaration has generic parameters, it cannot witness an
     // associated type.
@@ -548,14 +543,14 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
       continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl))
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl))
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
     // Skip dependent protocol typealiases.
     //
     // FIXME: This should not be necessary.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl)) {
       if (isa<ProtocolDecl>(typeAliasDecl->getDeclContext()) &&
           typeAliasDecl->getUnderlyingType()->getCanonicalType()
             ->hasTypeParameter()) {
@@ -572,7 +567,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     }
 
     auto memberType = TypeChecker::substMemberTypeWithBase(
-        typeDecl, dc->getSelfInterfaceType());
+        genericDecl, dc->getSelfInterfaceType());
 
     // Type witnesses that resolve to constraint types are always
     // existential types. This can only happen when the type witness
@@ -595,13 +590,32 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // Check this type against the protocol requirements.
     if (auto checkResult =
             checkTypeWitness(memberTypeInContext, assocType, conformance)) {
-      nonViable.push_back({typeDecl, checkResult});
+      nonViable.push_back({genericDecl, checkResult});
     } else {
-      viable.push_back({typeDecl, memberType, nullptr});
+      viable.push_back({genericDecl, memberType, nullptr});
     }
   }
 
-  if (!deducedFromParameterizedProtocolType) {
+  // Diagnose ambiguity when fromParameterizedProtocolType.size() > 1
+  if (fromParameterizedProtocolType.size() > 1) {
+    ctx.addDelayedConformanceDiag(
+        conformance, true,
+        [assocType, fromParameterizedProtocolType](
+            NormalProtocolConformance *conformance) {
+          auto &diags = assocType->getASTContext().Diags;
+          diags.diagnose(
+              conformance->getLoc(),
+              diag::ambiguous_associated_type_from_parameterized_protocols,
+              assocType, conformance->getProtocol());
+          for (const auto &pair : fromParameterizedProtocolType) {
+            diags.diagnose(
+                pair.second,
+                diag::associated_type_candidate_from_parameterized_protocol);
+          }
+        });
+  }
+
+  if (fromParameterizedProtocolType.empty()) {
     // If there are no viable witnesses, and all nonviable candidates came from
     // protocol extensions, treat this as "missing".
     if (viable.empty() &&
@@ -626,14 +640,29 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   } else {
     // We deduced the type witness from a parameterized protocol type, so just
     // make sure there was nothing else.
-    if (viable.size() == 1 &&
-        isa<TypeAliasDecl>(viable[0].Member) &&
-        viable[0].Member->isSynthesized()) {
-      // We found the type alias synthesized above.
+    if (viable.empty()) {
+      // There was nothing else. Record the type witness, which will
+      // synthesize the type alias.
+      recordTypeWitness(conformance, assocType,
+                        fromParameterizedProtocolType[0].first,
+                        /*typeDecl=*/nullptr);
+      return ResolveWitnessResult::Success;
+    }
+
+    if (viable.size() == 1 && isa<TypeAliasDecl>(viable[0].Member) &&
+        viable[0].Member->getDeclaredInterfaceType()->isEqual(
+            fromParameterizedProtocolType[0].first)) {
+      // We found another type alias with the same underlying type,
+      // which is okay.
+      recordTypeWitness(conformance, assocType,
+                        fromParameterizedProtocolType[0].first,
+                        viable[0].Member);
       return ResolveWitnessResult::Success;
     }
 
     // Otherwise fall through.
+    recordTypeWitness(conformance, assocType,
+                      ErrorType::get(ctx), nullptr);
   }
 
   // If we had multiple viable types, diagnose the ambiguity.
@@ -1344,8 +1373,10 @@ public:
 
     // If we already have an interface type, don't bother trying to
     // avoid a cycle.
-    if (witness->hasInterfaceType())
+    if (witness->hasInterfaceType()) {
+      LLVM_DEBUG(llvm::errs() << "Already has an interface type\n");
       return false;
+    }
 
     // We call checkForPotentailCycle() multiple times with
     // different witnesses.
@@ -2093,25 +2124,22 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
     defaultName = DeclNameRef(getASTContext().getIdentifier(defaultNameStr));
   }
 
-  NLOptions subOptions = (NL_QualifiedDefault |
-                          NL_OnlyTypes |
+  NLOptions subOptions = (NL_OnlyTypes |
+                          NL_RemoveAssociatedTypes |
                           NL_ProtocolMembers |
                           NL_IncludeAttributeImplements);
 
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
-  SmallVector<ValueDecl *, 4> lookupResults;
+  SmallVector<ValueDecl *, 4> candidates;
   dc->lookupQualified(dc->getSelfNominalTypeDecl(), defaultName,
                       isa<ExtensionDecl>(dc)
                       ? cast<ExtensionDecl>(dc)->getStartLoc()
                       : cast<NominalTypeDecl>(dc)->getStartLoc(),
-                      subOptions, lookupResults);
+                      subOptions, candidates);
 
-  for (auto decl : lookupResults) {
-    // We want type declarations.
-    auto typeDecl = dyn_cast<TypeDecl>(decl);
-    if (!typeDecl || isa<AssociatedTypeDecl>(typeDecl))
-      continue;
+  for (auto decl : candidates) {
+    auto typeDecl = cast<TypeDecl>(decl);
 
     // We only find these within a protocol extension.
     auto defaultProto = typeDecl->getDeclContext()->getSelfProtocolDecl();
@@ -4017,6 +4045,8 @@ auto AssociatedTypeInference::solve() -> std::optional<InferredTypeWitnesses> {
     case ResolveWitnessResult::Missing:
       // We did not find the witness via name lookup. Try to derive
       // it below.
+      LLVM_DEBUG(llvm::dbgs() << "Associated type " << assocType->getName()
+                              << " will be inferred\n";);
       break;
     }
 

@@ -148,6 +148,11 @@ __swift_bool _swift_stdlib_isExecutableLinkedOnOrAfter(
   _SwiftStdlibVersion version
 ) __attribute__((const));
 
+/// Redeclare _swift_disableExclusivityChecking from Exclusivity.h for use in
+/// Exclusivity.swift
+SWIFT_RUNTIME_EXPORT
+__swift_bool _swift_disableExclusivityChecking;
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -enable-experimental-feature Embedded -enforce-exclusivity=none %s -c -o %t/a.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
 
@@ -28,7 +28,7 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-@_silgen_name("print_long")
+@_extern(c, "print_long")
 func print_long(_: Int)
 
 public func print(_ n: Int, terminator: StaticString = "\n") {
@@ -36,7 +36,7 @@ public func print(_ n: Int, terminator: StaticString = "\n") {
     print("", terminator: terminator)
 }
 
-@_silgen_name("malloc")
+@_extern(c, "malloc")
 func malloc(_: Int) -> UnsafeMutableRawPointer
 
 struct Bytes<T>: Collection {
@@ -47,11 +47,11 @@ struct Bytes<T>: Collection {
         self.storage.initialize(repeating: initialValue)
         self.size = size
     }
-    
+
     func index(after i: Int) -> Int {
         return i + 1
     }
-    
+
     subscript(position: Int) -> T {
         get {
             return storage[position]
@@ -60,20 +60,20 @@ struct Bytes<T>: Collection {
             storage[position] = newValue
         }
     }
-    
+
     public subscript(bounds: Range<Index>) -> SubSequence {
         get { fatalError() }
         set { fatalError() }
     }
-    
+
     var startIndex: Int { return 0 }
-    
+
     var endIndex: Int { return size }
-    
+
     typealias Element = T
-    
+
     typealias Index = Int
-    
+
     typealias SubSequence = Bytes
 }
 

@@ -1081,8 +1081,7 @@ NOTE(modularization_issue_side_effect_type_error,none,
      (DeclName))
 
 NOTE(modularization_issue_worked_around,none,
-     "attempting forced recovery enabled by "
-     "-experimental-force-workaround-broken-modules",
+     "attempting to recover from the previous modularization issue",
      ())
 
 ERROR(modularization_issue_conformance_xref_error,none,
@@ -1272,8 +1271,9 @@ ERROR(module_not_compiled_with_library_evolution,none,
       (Identifier, Identifier))
 GROUPED_WARNING(implementation_only_requires_library_evolution,
         ImplementationOnlyDeprecated,none,
-        "using '@_implementationOnly' without enabling library evolution "
-        "for %0 may lead to instability during execution",
+        "safely use '@_implementationOnly' without library evolution "
+        "by setting '-enable-experimental-feature CheckImplementationOnly' "
+        "for %0",
         (Identifier))
 GROUPED_WARNING(implementation_only_deprecated,
         ImplementationOnlyDeprecated,none,
@@ -1820,9 +1820,6 @@ ERROR(static_functions_not_mutating,none,
 
 ERROR(consuming_invalid_borrow_mutate_accessor, none,
       "%0 cannot be declared consuming", (StringRef))
-
-ERROR(ownership_modifier_unsupported_borrow_mutate_accessor, none,
-      "%0 ownership modifier is not yet supported on %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
@@ -3101,12 +3098,6 @@ ERROR(witness_not_as_sendable,none,
 NOTE(less_sendable_reqt_here,none,
      "expected sendability to match requirement here",
      ())
-WARNING(witness_not_accessible_strict_check,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
@@ -3266,6 +3257,11 @@ NOTE(associated_type_deduction_default,none,
      "using associated type default %0", (Type))
 NOTE(ambiguous_witnesses_type,none,
      "multiple matching types named %0", (Identifier))
+ERROR(ambiguous_associated_type_from_parameterized_protocols,none,
+     "ambiguous associated type %0 in conformance to %1",
+     (const AssociatedTypeDecl *, const ProtocolDecl *))
+NOTE(associated_type_candidate_from_parameterized_protocol,none,
+     "candidate inferred from parameterized protocol here", ())
 NOTE(protocol_witness_exact_match,none,
      "candidate exactly matches%0", (StringRef))
 NOTE(protocol_witness_non_sendable,none,
@@ -3312,6 +3308,11 @@ NOTE(protocol_witness_mutation_modifier_conflict,none,
      (SelfAccessKind))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
+
+ERROR(protocol_witness_borrow_mutate_conflict, none,
+      "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
+      (StringRef))
+
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
 NOTE(protocol_witness_rethrows_by_conformance_conflict,none,
@@ -4473,7 +4474,7 @@ ERROR(derivative_attr_class_member_dynamic_self_result_unsupported,none,
 ERROR(derivative_attr_nonfinal_class_init_unsupported,none,
       "cannot register derivative for 'init' in a non-final class; consider "
       "making %0 final", (Type))
-ERROR(derivative_attr_unsupported_accessor_kind,none,
+NOTE(derivative_attr_unsupported_accessor_kind,none,
       "cannot register derivative for %0", (/*accessorKind*/ DescriptiveDeclKind))
 // TODO(https://github.com/apple/swift/issues/55542): Remove this temporary diagnostic.
 ERROR(derivative_attr_class_setter_unsupported,none,
@@ -5005,8 +5006,7 @@ ERROR(value_of_module_type,none,
       "expected module member name after module name", ())
 
 ERROR(value_of_metatype_type,none,
-      "expected member name or initializer call after type name%select{|; this "
-      "will be an error in Swift 6}0", (bool))
+      "expected member name or initializer call after type name", ())
 
 NOTE(add_parens_to_type,none,
      "add arguments after the type to construct a value of the type", ())
@@ -6929,7 +6929,7 @@ ERROR(exclusivity_on_computed_property,none,
       ())
 
 //------------------------------------------------------------------------------
-// MARK: @_borrowed
+// MARK: @_borrowed and @_owned
 //------------------------------------------------------------------------------
 ERROR(borrowed_with_objc_dynamic,none,
       "%kindonly0 cannot be '@_borrowed' if it is '@objc dynamic'",
@@ -6941,6 +6941,12 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 ERROR(borrowed_with_effect,none,
       "%kindonly0 cannot be '@_borrowed' if it is 'async' or 'throws'",
       (const AccessorDecl *))
+ERROR(borrowed_and_owned,none,
+      "%kindonly0 cannot be '@_borrowed' and '@_owned' at the same time",
+      (const AbstractStorageDecl *))
+ERROR(owned_non_getter,none,
+      "%kindonly0 must define a 'get' to support '@_owned'",
+      (const AbstractStorageDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: dynamic
@@ -8191,6 +8197,10 @@ NOTE(macro_expand_circular_reference_unnamed_through, none,
 ERROR(accessor_macro_not_single_var, none,
       "accessor macro %0 can only apply to a single variable", (DeclName))
 
+WARNING(macro_on_import_not_loadable, none,
+        "could not load macro '%0'; this may cause errors down the line",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
@@ -8454,9 +8464,7 @@ ERROR(lifetime_dependence_function_type, none,
 ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
-      "cannot copy the lifetime of an Escapable type, use "
-      "'@_lifetime(%0%1)' instead",
-      (StringRef, StringRef))
+      "cannot copy the lifetime of an Escapable type", ())
 ERROR(lifetime_dependence_parsed_borrow_with_ownership, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
@@ -8475,6 +8483,8 @@ ERROR(lifetime_parameter_requires_inout, none,
       "lifetime-dependent parameter '%0' must be 'inout'", (StringRef))
 ERROR(lifetime_target_requires_nonescapable, none,
       "invalid lifetime dependence on an Escapable %0", (StringRef))
+NOTE(lifetime_escapable_source_requires_escapable_note, none,
+     "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements

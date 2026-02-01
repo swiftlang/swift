@@ -191,12 +191,6 @@ public:
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 
-  /// Introduce linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = true;
-
-  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
-  bool OSSAVerifyComplete = false;
-
   /// Enable pack metadata stack "promotion".
   ///
   /// More accurately, enable skipping mandatory heapification of pack metadata
@@ -333,7 +327,7 @@ public:
   bool MergeableTraps = false;
 
   /// Whether the @yield_once_2 convention is used by accessors added with the
-  /// CoroutineAccessors feature (i.e. read2/modify2).
+  /// CoroutineAccessors feature (i.e. yielding borrow/mutate).
   bool CoroutineAccessorsUseYieldOnce2 = false;
 
   SILOptions() {}

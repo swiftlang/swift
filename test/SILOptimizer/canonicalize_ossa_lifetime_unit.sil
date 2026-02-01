@@ -220,11 +220,11 @@ entry(%instance : @owned $MoE):
 // CHECK-LABEL: sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         apply {{%[^,]+}}()
+// CHECK:         destroy_value [[INSTANCE]] : $C
 // CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[DESTROY:bb[0-9]+]]
 // CHECK:       [[DIE]]:
 // CHECK:         unreachable
 // CHECK:       [[DESTROY]]:
-// CHECK:         destroy_value [[INSTANCE]] : $C
 // CHECK:         return
 // CHECK-LABEL: } // end sil function 'respect_boundary_edges_when_extending_to_deinit_barriers'
 // CHECK-LABEL: end running test 1 of 1 on respect_boundary_edges_when_extending_to_deinit_barriers
@@ -236,6 +236,7 @@ entry(%instance : @owned $C):
   cond_br undef, die, destroy
 
 die:
+  destroy_value [dead_end] %instance
   unreachable
 
 destroy:
@@ -268,6 +269,7 @@ die:
   br rlydie
 
 rlydie:
+  destroy_value [dead_end] %instance
   unreachable
 
 destroy:
@@ -298,6 +300,7 @@ entry(%instance : @owned $C):
 
 die:
   apply %barrier() : $@convention(thin) () -> ()
+  destroy_value [dead_end] %instance
   unreachable
 
 destroy:
@@ -800,7 +803,8 @@ exit:
 sil [ossa] @dead_arg_debug_dead_end : $@convention(thin) (@owned C) -> () {
 entry(%c : @owned $C):
   debug_value %c : $C
-  specify_test "ossa_canonicalize_lifetime true false true %c"
+  specify_test "ossa_canonicalize_lifetime false false true %c"
+  destroy_value [dead_end] %c
   unreachable
 }
 
@@ -831,6 +835,8 @@ bb3:
   %copy = copy_value %reborrow : $C
   %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
   apply %takeC(%copy) : $@convention(thin) (@owned C) -> ()
+  end_borrow %reborrow
+  destroy_value [dead_end] %instance2
   unreachable
 }
 
@@ -874,7 +880,7 @@ exit:
 
 // CHECK-LABEL: begin running test {{.*}} on consume_copy_before_use_in_dead_end
 // CHECK-LABEL: sil [ossa] @consume_copy_before_use_in_dead_end : {{.*}} {
-// CHECK-NOT:     destroy_value [dead_end]
+// CHECK:         destroy_value [dead_end]
 // CHECK-LABEL: } // end sil function 'consume_copy_before_use_in_dead_end'
 // CHECK-LABEL: end running test {{.*}} on consume_copy_before_use_in_dead_end
 sil [ossa] @consume_copy_before_use_in_dead_end : $@convention(thin) (@owned C) -> () {
@@ -896,12 +902,15 @@ die:
   apply undef() : $@convention(thin) () -> ()
   %reload = load_borrow %token
   apply undef(%reload) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %reload
+  end_borrow %token
+  destroy_value [dead_end] %copy
   unreachable
 }
 
 // CHECK-LABEL: begin running test {{.*}} on consume_copy_before_use_in_dead_end_2
 // CHECK-LABEL: sil [ossa] @consume_copy_before_use_in_dead_end_2 : {{.*}} {
-// CHECK-NOT:     destroy_value [dead_end]
+// CHECK:         destroy_value [dead_end]
 // CHECK-LABEL: } // end sil function 'consume_copy_before_use_in_dead_end_2'
 // CHECK-LABEL: end running test {{.*}} on consume_copy_before_use_in_dead_end_2
 sil [ossa] @consume_copy_before_use_in_dead_end_2 : $@convention(thin) (@owned C) -> () {
@@ -923,6 +932,9 @@ die:
   apply undef() : $@convention(thin) () -> ()
   %reload = load_borrow %token
   apply undef(%reload) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %reload
+  end_borrow %token
+  destroy_value [dead_end] %copy
   unreachable
 }
 
@@ -962,7 +974,7 @@ entry(%a: @owned $C):
 
 // CHECK-LABEL: begin running test {{.*}} on extend_lifetime_to_deadend_despite_copy_consume
 // CHECK-LABEL: sil [ossa] @extend_lifetime_to_deadend_despite_copy_consume : {{.*}} {
-// CHECK:         copy_value
+// CHECK-NOT:     copy_value
 // CHECK-LABEL: } // end sil function 'extend_lifetime_to_deadend_despite_copy_consume'
 // CHECK-LABEL: end running test {{.*}} on extend_lifetime_to_deadend_despite_copy_consume
 sil [ossa] @extend_lifetime_to_deadend_despite_copy_consume : $@convention(thin) (@owned C) -> () {
@@ -972,6 +984,7 @@ entry(%c : @owned $C):
   %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
   apply %takeC(%cc) : $@convention(thin) (@owned C) -> ()
   %run = function_ref @run : $@convention(thin) () -> Never
+  destroy_value [dead_end] %c
   unreachable
 }
 

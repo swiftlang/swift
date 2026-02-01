@@ -48,6 +48,7 @@ benefit of all Swift developers.
     - [Reproducing the Compiler Driver build steps](#reproducing-the-compiler-driver-build-steps)
     - [Installing the Compiler Driver](#installing-the-compiler-driver)
 - [Debugging Swift Executables](#debugging-swift-executables)
+    - [Debugging Swift Testing Executables with LLDB](#debugging-swift-testing-executables-with-lldb)
     - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
     - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
@@ -115,7 +116,7 @@ swiftc -g -emit-sil -O file.swift
 * **IRGen** To print the LLVM IR after IR generation:
 
 ```sh
-swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+swiftc -emit-irgen -O file.swift
 ```
 
 * **LLVM passes** To print the LLVM IR after LLVM passes:
@@ -130,10 +131,15 @@ swiftc -emit-ir -O file.swift
 swiftc -S -O file.swift
 ```
 
-Compilation stops at the phase where you print the output. So if you want to
-print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except `-dump-ast`) can be redirected
 with an additional `-o <file>` option.
+Compilation stops at the phase where you print the output.
+
+If you want to print the SIL or IR in addition to producing the regular output
+file (e.g an object file), use the `-save-sil`, `save-irgen` or `save-ir`
+options.
+Those options take a file argument and save the SIL or LLVM-IR before or after
+LLVM optimization, respectively.
 
 ## Debugging Diagnostic Emission
 
@@ -1096,6 +1102,12 @@ individual build actions (`clean`, `build`, `install`), the product build path
 One can use the previous tips for debugging the Swift compiler with Swift
 executables as well. Here are some additional useful techniques that one can use
 in Swift executables.
+
+## Debugging Swift Testing Executables with LLDB
+
+When debugging executables that use Swift Testing with LLDB, refer to the Swift
+Testing documentation for LLDB command-line debugging techniques:
+https://github.com/swiftlang/swift-testing/blob/main/Documentation/CommandlineDebugging.md
 
 ## Determining the mangled name of a function in LLDB
 

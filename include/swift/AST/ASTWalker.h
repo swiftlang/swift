@@ -610,6 +610,8 @@ public:
     return false;
   }
 
+  virtual bool shouldWalkIntoForEachDesugaredStmt() { return true; }
+
   /// This method configures how the walker should walk the initializers of
   /// lazy variables. These initializers are semantically different from other
   /// initializers in their context and so sometimes should be visited as part

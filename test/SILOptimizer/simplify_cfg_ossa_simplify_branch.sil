@@ -76,8 +76,8 @@ bb2(%7 : @reborrow $Klass):
 
 // CHECK-LABEL: sil [ossa] @test_simplify_term_with_identical_dest_blocks2 :
 // CHECK: bb0
-// CHECK: br bb2
-// CHECK: bb2
+// CHECK: br bb1
+// CHECK: bb1
 // CHECK-LABEL: } // end sil function 'test_simplify_term_with_identical_dest_blocks2'
 sil [ossa] @test_simplify_term_with_identical_dest_blocks2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):

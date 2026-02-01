@@ -93,13 +93,38 @@ class RegionAnalysisValueMap;
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
 ///
-/// We use a wrapper struct here so that we can inject "fake" actor-isolated
-/// values into the regions of values that become merged into an actor by
-/// calling a function without a non-sendable result.
+/// We model the following value kinds:
+///
+/// 1. SILValue: a normal value. Can be object or memory. If memory, represents
+/// a value stored in that memory.
+///
+/// 2. SILInstruction *: A "fake" actor-isolated values that we inject into the
+/// regions of values that become merged into an actor by calling an actor
+/// isolated function that does not have any non-Sendable results. This results
+/// in us having no value to use to inject the actor-isolatedness into the
+/// region. So we use a "fake" value to do so. We identify it with the
+/// instruction so we have a unique representation of it.
+///
+/// 3. Operand *: A value that was previously in a piece of memory but was
+/// assigned over. We do not want to drop that the given value was already in
+/// that piece of memory since otherwise we could lose that a region was actor
+/// isolated or task isolated. We use the operand of the assign that overwrites
+/// the value to uniquely identify the value in our data structures to ensure
+/// that we distinguish in between the values stored in a piece of memory that
+/// is overwritten multiple times. Example:
+///
+///   %0 = alloc_stack
+///   ...
+///   // Represent original value as the dest operand of
+///   // the assign (the operand referencing %0)....
+///   store %1 to [assign] %0
+///   ...
+///   // So we can distinguish it from this subsequent assignment.
+///   store %2 to [assign] %0
 class RepresentativeValue {
   friend llvm::DenseMapInfo<RepresentativeValue>;
 
-  using InnerType = PointerUnion<SILValue, SILInstruction *>;
+  using InnerType = PointerUnion<SILValue, SILInstruction *, Operand *>;
 
   /// If this is set to a SILValue then it is the actual represented value. If
   /// it is set to a SILInstruction, then this is a "fake" representative value
@@ -112,12 +137,18 @@ public:
   RepresentativeValue(SILValue value) : value(value) {}
   RepresentativeValue(SILInstruction *actorRegionInst)
       : value(actorRegionInst) {}
+  RepresentativeValue(Operand *memoryAssignment) : value(memoryAssignment) {}
 
   operator bool() const { return bool(value); }
 
   void print(llvm::raw_ostream &os) const {
     if (auto *inst = value.dyn_cast<SILInstruction *>()) {
       os << "ActorRegionIntroducingInst: " << *inst;
+      return;
+    }
+
+    if (auto *op = value.dyn_cast<Operand *>()) {
+      os << "Value from Overwritten Memory : " << *op;
       return;
     }
 
@@ -130,9 +161,13 @@ public:
   SILInstruction *getActorRegionIntroducingInst() const {
     return cast<SILInstruction *>(value);
   }
+  Operand *getOperand() const { return cast<Operand *>(value); }
+  Operand *maybeGetOperand() const { return value.dyn_cast<Operand *>(); }
 
   bool operator==(SILValue other) const {
     if (hasRegionIntroducingInst())
+      return false;
+    if (maybeGetOperand())
       return false;
     return getValue() == other;
   }
@@ -424,8 +459,27 @@ namespace swift {
 /// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
   /// Assign one value to the region of another, takes two args, second arg
-  /// must already be tracked with a non-sent region
-  Assign,
+  /// must already be tracked with a non-sent region.
+  ///
+  /// In this case, we do not care if there is a value already in the SSA value,
+  /// so this can be either an object value or an address value that is produced
+  /// from an instruction. It cannot be an address produced by a different
+  /// instruction that we are initializing or writing over.
+  AssignDirect,
+
+  /// Assign to a piece of memory produced by a different instruction
+  /// indirectly. Takes 3 arguments:
+  ///
+  /// - arg1 (dest): the element representing the memory location being written.
+  /// - arg2 (src): the element representing the value being stored.
+  /// - arg3 (overwritten): the element for the value that was in the memory
+  ///   before.
+  ///
+  /// NOTE: We do not care if there was actually a value in memory or not. We
+  /// will track a new value for the overwritten value. If there wasn't anything
+  /// in the memory location we will just have a disconnected value. We should
+  /// track destruction more closely in the future.
+  AssignIndirect,
 
   /// Assign one value to a fresh region, takes one arg.
   ///
@@ -512,6 +566,7 @@ private:
 
   std::optional<Element> opArg1;
   std::optional<Element> opArg2;
+  std::optional<Element> opArg3;
 
   PartitionOpKind opKind;
 
@@ -550,9 +605,17 @@ private:
               Operand *sourceOp = nullptr, Options options = {})
       : source(sourceOp), opArg1(arg1), opArg2(arg2), opKind(opKind),
         options(options) {
-    assert((opKind == PartitionOpKind::Assign ||
+    assert((opKind == PartitionOpKind::AssignDirect ||
             opKind == PartitionOpKind::Merge) &&
-           "Only supported for assign and merge");
+           "Only supported for assign_direct and merge");
+  }
+
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2, Element arg3,
+              Operand *sourceOp = nullptr, Options options = {})
+      : source(sourceOp), opArg1(arg1), opArg2(arg2), opArg3(arg3),
+        opKind(opKind), options(options) {
+    assert(opKind == PartitionOpKind::AssignIndirect &&
+           "Only supported for assign_indirect");
   }
 
   PartitionOp(PartitionOpKind opKind, SILInstruction *sourceInst,
@@ -562,9 +625,17 @@ private:
   friend class Partition;
 
 public:
-  static PartitionOp Assign(Element destElt, Element srcElt,
-                            Operand *srcOperand = nullptr) {
-    return PartitionOp(PartitionOpKind::Assign, destElt, srcElt, srcOperand);
+  static PartitionOp AssignDirect(Element destElt, Element srcElt,
+                                  Operand *srcOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::AssignDirect, destElt, srcElt,
+                       srcOperand);
+  }
+
+  static PartitionOp AssignIndirect(Element destElt, Element srcElt,
+                                    Element overwrittenDestValueElt,
+                                    Operand *srcOperand = nullptr) {
+    return PartitionOp(PartitionOpKind::AssignIndirect, destElt, srcElt,
+                       overwrittenDestValueElt, srcOperand);
   }
 
   static PartitionOp AssignFresh(Element elt,
@@ -620,7 +691,8 @@ public:
 
   bool operator==(const PartitionOp &other) const {
     return opKind == other.opKind && opArg1 == other.opArg1 &&
-           opArg2 == other.opArg2 && source == other.source;
+           opArg2 == other.opArg2 && opArg3 == other.opArg3 &&
+           source == other.source;
   };
 
   bool operator<(const PartitionOp &other) const {
@@ -634,7 +706,7 @@ public:
       // non-null >= null always.
       if (opArg1.has_value() && !other.opArg1.has_value())
         return false;
-      return *opArg1 < other.opArg1.has_value();
+      return *opArg1 < other.opArg1;
     }
 
     if (opArg2 != other.opArg2) {
@@ -644,7 +716,17 @@ public:
       // non-null >= null always.
       if (opArg2.has_value() && !other.opArg2.has_value())
         return false;
-      return *opArg2 < other.opArg2.has_value();
+      return *opArg2 < other.opArg2;
+    }
+
+    if (opArg3 != other.opArg3) {
+      // null < non-null always.
+      if (!opArg3.has_value() && other.opArg3.has_value())
+        return true;
+      // non-null >= null always.
+      if (opArg3.has_value() && !other.opArg3.has_value())
+        return false;
+      return *opArg3 < other.opArg3;
     }
 
     return source < other.source;
@@ -654,6 +736,7 @@ public:
 
   Element getOpArg1() const { return opArg1.value(); }
   Element getOpArg2() const { return opArg2.value(); }
+  Element getOpArg3() const { return opArg3.value(); }
 
   Options getOptions() const { return options; }
 
@@ -662,6 +745,8 @@ public:
       args.push_back(*opArg1);
     if (opArg2.has_value())
       args.push_back(*opArg2);
+    if (opArg3.has_value())
+      args.push_back(*opArg3);
   }
 
   SILInstruction *getSourceInst() const {
@@ -1569,13 +1654,39 @@ public:
     p.pushHistorySequenceBoundary(loc);
 
     switch (op.getKind()) {
-    case PartitionOpKind::Assign: {
+    case PartitionOpKind::AssignDirect: {
       assert(p.isTrackingElement(op.getOpArg2()) &&
              "Assign PartitionOp's source argument should be already tracked");
 
       // First emit any errors if we are assigning a non-disconnected thing into
       // a sending result.
       handleAssignNonDisconnectedIntoSendingResult(op);
+
+      // Then perform the actual assignment.
+      //
+      // NOTE: This does not emit any errors on purpose. We rely on requires and
+      // other instructions to emit errors.
+      p.assignElement(op.getOpArg1(), op.getOpArg2());
+      return;
+    }
+    case PartitionOpKind::AssignIndirect: {
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             "Assign PartitionOp's dest argument should be already tracked");
+      assert(p.isTrackingElement(op.getOpArg2()) &&
+             "Assign PartitionOp's source argument should be already tracked");
+      assert(
+          p.isTrackingElement(op.getOpArg3()) &&
+          "Assign PartitionOp's dest value argument should be already tracked");
+
+      // First emit any errors if we are assigning a non-disconnected thing into
+      // a sending result.
+      handleAssignNonDisconnectedIntoSendingResult(op);
+
+      // Create extra region for our dest and merge it into dest's region.
+      //
+      // We use an optional in case our evaluator does not support doing this.
+      p.trackNewElement(op.getOpArg3());
+      p.merge(op.getOpArg1(), op.getOpArg3());
 
       // Then perform the actual assignment.
       //

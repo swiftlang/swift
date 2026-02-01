@@ -18,6 +18,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -105,9 +106,10 @@ protected:
     SILOptions silOpts;
     CASOptions casOpts;
     SerializationOptions serializationOpts;
+    std::optional<clang::DarwinSDKInfo> SDKInfo;
     auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                clangImpOpts, symbolGraphOpts, casOpts,
-                               serializationOpts, sourceMgr, diags);
+                               serializationOpts, sourceMgr, diags, SDKInfo);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,

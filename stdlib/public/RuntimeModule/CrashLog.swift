@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(CrashLog)
+@available(Backtracing 6.2, *)
 public struct CrashLog<Address: FixedWidthInteger>: Codable {
     public struct Frame: Codable {
         enum CodingKeys: String, CodingKey {
@@ -216,12 +217,14 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
     }
 }
 
+@available(Backtracing 6.2, *)
 extension Backtrace.Address {
     func hexRepresentation<Address:FixedWidthInteger>(nullAs: Address.Type) -> String {
         return hex(Address(self) ?? 0)
     }
 }
 
+@available(Backtracing 6.2, *)
 extension CrashLog.Frame.SourceLocation {
     init?(_ symbol: SymbolicatedBacktrace.SourceLocation?) {
         guard let symbol else { return nil }
@@ -236,6 +239,7 @@ extension CrashLog.Frame.SourceLocation {
     }
 }
 
+@available(Backtracing 6.2, *)
 extension CrashLog.Frame {
     func richFrame() -> RichFrame<Address>? {
         switch (kind, CrashLog.addressFromString(address), count) {
@@ -356,6 +360,7 @@ extension CrashLog.Frame {
     }
 }
 
+@available(Backtracing 6.2, *)
 extension CrashLog.Image {
     func imageMapImage() -> ImageMap.Image {
         return .init(
@@ -379,6 +384,7 @@ extension CrashLog.Image {
     }
 }
 
+@available(Backtracing 6.2, *)
 public extension CrashLog.Thread {
     func backtrace(architecture: String, images: ImageMap?) -> Backtrace {
         let frames = self.frames.compactMap { $0.richFrame() }
@@ -403,10 +409,12 @@ public extension CrashLog.Thread {
     }
 }
 
+@available(Backtracing 6.2, *)
 extension Context {
   static var addressType: any FixedWidthInteger.Type { Address.self }
 }
 
+@available(Backtracing 6.2, *)
 extension CrashLog {
     private static func context(forArchitecture arch: String) -> (any Context.Type)? {
         switch arch {

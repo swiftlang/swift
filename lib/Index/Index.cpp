@@ -75,9 +75,9 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Read:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return true;
   }
 
@@ -1220,6 +1220,8 @@ private:
     return false;
   }
 
+  bool shouldWalkIntoForEachDesugaredStmt() override { return true; }
+
   /// Reports all implicit member value decl conformances that \p D introduces
   /// as implicit overrides at the source location of \p D, and returns the
   /// explicit ones so we can check against them later on when visiting them as
@@ -1479,6 +1481,15 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       if (witness.Member == D)
         addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, witness.Requirement);
     }
+
+    // For ObjC methods, also check if this satisfies an optional protocol
+    // requirement from an inherited conformance.
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      for (auto Req : findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/false)) {
+        addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Req);
+      }
+    }
+
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
       if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||

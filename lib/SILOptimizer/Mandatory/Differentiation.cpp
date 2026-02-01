@@ -1109,6 +1109,10 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
   builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
   builder.createUnreachable(loc);
+
+  // Replacing the whole function with an `fatalError` call and an `unreachable`
+  // does not create incomplete lifetimes.
+  f->setNeedCompleteLifetimes(false);
 }
 
 /// Returns true on error.

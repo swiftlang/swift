@@ -16,21 +16,70 @@ var _i: Int = 0
 // - unsafeAddress
 // - _read
 // - read
+// - yielding borrow
 // writers:
 // - set
 // - unsafeMutableAddress
 // - _modify
 // - modify
+// - yielding mutate
 
 // =============================================================================
-// Two reads
+// Multiple reads
 // =============================================================================
+
+// If feature is disabled, this looks like an implicit
+// getter that starts with an expression referring to
+// symbols `yielding` and `borrow`
+var iyb: Int {
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
+    fatalError()
+  }
+}
+
+var ir: Int {
+  read { // expected-enabled-warning{{old_coroutine_accessor}}
+    // expected-disabled-error@-1{{cannot_find_in_scope}}
+    fatalError()
+  }
+}
+
+// enabled: conflicting accessors
+// disabled: implicit getter
+var iybr: Int {
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
+    fatalError()
+  }
+  read { // expected-enabled-warning{{old_coroutine_accessor}}
+         // expected-enabled-error@-1{{duplicate_accessor}}
+         // expected-enabled-note@-5{{previous_accessor}}
+         // expected-disabled-error@-3{{expected_accessor_kw}}
+    fatalError()
+  }
+}
+
+// enabled: conflicting accessors
+// disabled: implicit getter
+var iryb: Int {
+  read {  // expected-enabled-warning{{old_coroutine_accessor}}
+    // expected-disabled-error@-1{{cannot_find_in_scope}}
+    fatalError()
+  }
+  yielding borrow { // expected-enabled-error{{duplicate_accessor}}
+      // expected-enabled-note@-5{{previous_accessor}}
+      // expected-disabled-error@-2{{cannot_find_in_scope}}
+      // expected-disabled-error@-3{{cannot_find_in_scope}}
+      // expected-disabled-error@-4{{statement_same_line_without_semi}}
+    fatalError()
+  }
+}
 
 // enabled: conflicting accessors
 // disabled: implicit getter.
 var ir_r: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
-         // expected-enabled-error@-1{{variable cannot provide both a 'read' accessor and a '_read' accessor}}
+  read {  // expected-enabled-warning{{old_coroutine_accessor}}
+          // expected-enabled-error@-1{{variable cannot provide both a 'yielding borrow' accessor and a '_read' accessor}}
+          // expected-disabled-error@-2{{cannot_find_in_scope}}
     fatalError()
   }
   _read { // expected-disabled-error{{cannot_find_in_scope}}
@@ -44,9 +93,10 @@ var igr: Int {
   get {
     1
   }
-  read { // expected-error{{variable cannot provide both a 'read' accessor and a getter}}
-         // expected-note@-4{{previous_accessor}}
-         // expected-disabled-error@-2{{'read' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  read { // expected-enabled-warning{{old_coroutine_accessor}}
+         // expected-enabled-error@-1{{variable cannot provide both a 'yielding borrow' accessor and a getter}}
+         // expected-enabled-note@-5{{previous_accessor}}
+         // expected-disabled-error@-3{{expected_accessor_kw}}
     yield _i
   }
 }
@@ -61,7 +111,7 @@ var igm: Int {
   get {
     0
   }
-  modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding mutate { // expected-disabled-error{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
     yield &_i
   }
 }
@@ -69,10 +119,10 @@ var igm: Int {
 // enabled: ok
 // disabled: implicit getter
 var img: Int {
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding mutate { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  get { // expected-disabled-error{{cannot_find_in_scope}}
+  get {
     0
   }
 }
@@ -83,7 +133,7 @@ var iuam: Int {
   unsafeAddress {
     UnsafePointer<Int>(bitPattern: 0x0)!
   }
-  modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding mutate { // expected-disabled-error{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
     yield &_i
   }
 }
@@ -91,10 +141,10 @@ var iuam: Int {
 // enabled: ok
 // disabled: bad keyword
 var imua: Int {
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding mutate { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  unsafeAddress { // expected-disabled-error{{cannot_find_in_scope}}
+  unsafeAddress {
     UnsafePointer<Int>(bitPattern: 0x0)!
   }
 }
@@ -105,7 +155,7 @@ var i_rm: Int {
   _read {
     yield _i
   }
-  modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding mutate { // expected-disabled-error{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
     yield &_i
   }
 }
@@ -113,10 +163,10 @@ var i_rm: Int {
 // enabled: ok
 // disabled: implicit getter.
 var im_r: Int {
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding mutate { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  _read { // expected-disabled-error{{cannot_find_in_scope}}
+  _read {
     fatalError()
   }
 }
@@ -124,10 +174,10 @@ var im_r: Int {
 // enabled: ok
 // disabled: implicit getter
 var irm: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding mutate { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
 }
@@ -135,10 +185,10 @@ var irm: Int {
 // enabled: ok
 // disabled: implicit getter.
 var imr: Int {
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding mutate { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  read { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
 }
@@ -146,10 +196,10 @@ var imr: Int {
 // enabled: ok
 // disabled: implicit getter
 var irs: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  set { // expected-disabled-error{{cannot_find_in_scope}}
+  set {
   }
 }
 
@@ -158,7 +208,7 @@ var irs: Int {
 var isr: Int {
   set {
   }
-  read { // expected-disabled-error{{'read' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding borrow { // expected-disabled-error{{'yielding borrow' accessor is only valid when experimental feature coroutine accessors is enabled}}
     fatalError()
   }
 }
@@ -166,10 +216,10 @@ var isr: Int {
 // enabled: ok
 // disabled: implicit getter.
 var iruma: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  unsafeMutableAddress { // expected-disabled-error{{cannot_find_in_scope}}
+  unsafeMutableAddress {
     UnsafeMutablePointer<Int>(bitPattern: 0x0)!
   }
 }
@@ -177,10 +227,10 @@ var iruma: Int {
 // enabled: ok
 // disabled: implicit getter.
 var iumar: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  unsafeMutableAddress { // expected-disabled-error{{cannot_find_in_scope}}
+  unsafeMutableAddress {
     UnsafeMutablePointer<Int>(bitPattern: 0x0)!
   }
 }
@@ -188,10 +238,10 @@ var iumar: Int {
 // enabled: ok
 // disabled: implicit getter
 var ir_m: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  _modify { // expected-disabled-error{{cannot_find_in_scope}}
+  _modify {
     fatalError()
   }
 }
@@ -202,7 +252,7 @@ var i_mr: Int {
   _modify {
     fatalError()
   }
-  read { // expected-disabled-error{{'read' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding borrow { // expected-disabled-error{{'yielding borrow' accessor is only valid when experimental feature coroutine accessors is enabled}}
     fatalError()
   }
 }
@@ -214,21 +264,20 @@ var i_mr: Int {
 // enabled: need a reader.
 // disabled: implicit getter.
 var ims: Int {
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
+  yielding mutate { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  set { // expected-enabled-error{{variable with a setter must also have a getter, addressor, or 'read' accessor}}
-        // expected-disabled-error@-1{{cannot_find_in_scope}}
+  set { // expected-error{{variable with a setter must also have a getter, addressor, or 'yielding borrow' accessor}}
   }
 }
 
 // enabled: need a reader
 // disabled: bad keyword
 var ism: Int {
-  set { // expected-error{{variable with a setter must also have a getter, addressor, or 'read' accessor}}
+  set { // expected-error{{variable with a setter must also have a getter, addressor, or 'yielding borrow' accessor}}
     fatalError()
   }
-  modify {// expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding mutate {// expected-disabled-error{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
     fatalError()
   }
 }
@@ -236,11 +285,12 @@ var ism: Int {
 // enabled: need a reader.
 // disabled: implicit getter.
 var imuma: Int {
-  modify { // expected-enabled-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-           // expected-disabled-error@-1{{cannot_find_in_scope}}
+  yielding mutate { // expected-error{{variable with a 'yielding mutate' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
+                   // expected-disabled-error@-1{{accessor_requires_coroutine_accessors}}
+
     fatalError()
   }
-  unsafeMutableAddress { // expected-disabled-error{{cannot_find_in_scope}}
+  unsafeMutableAddress {
     UnsafeMutablePointer<Int>(bitPattern: 0x0)!
   }
 }
@@ -251,8 +301,8 @@ var iumam: Int {
   unsafeMutableAddress {
     fatalError()
   }
-  modify { // expected-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-           // expected-disabled-error@-1{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  yielding mutate { // expected-error{{variable with a 'yielding mutate' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
+           // expected-disabled-error@-1{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
     fatalError()
   }
 }
@@ -260,13 +310,12 @@ var iumam: Int {
 // enabled: conflicting accessors.  need a reader.
 // disabled: implicit getter.
 var im_m: Int {
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
-           // expected-enabled-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
+  yielding mutate { // expected-error{{variable cannot provide both a 'yielding mutate' accessor and a '_modify' accessor}}
+                    // expected-note@+4{{'_modify' accessor defined here}}
+                    // expected-disabled-error@-2{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  _modify { // expected-enabled-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'read' accessor}}
-            // expected-disabled-error@-1{{cannot_find_in_scope}}
-            // expected-enabled-note@-2{{previous_accessor}}
+  _modify { // expected-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
     fatalError()
   }
 }
@@ -274,13 +323,12 @@ var im_m: Int {
 // enabled: need a reader.
 // disabled: implicit getter.
 var i_mm: Int {
-  _modify { // expected-enabled-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'read' accessor}}
-            // expected-disabled-error@-1{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-            // expected-note@-2{{previous_accessor}}
+  _modify { // expected-error{{variable with a '_modify' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
     fatalError()
   }
-  modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
-           // expected-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
+  yielding mutate { // expected-disabled-error{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
+            // expected-error@-1{{variable cannot provide both a 'yielding mutate' accessor and a '_modify' accessor}}
+            // expected-note@-5{{previous_accessor}}
     fatalError()
   }
 }
@@ -288,13 +336,13 @@ var i_mm: Int {
 // enabled: need a reader.
 // disabled: implicit getter.
 var imm: Int {
-  modify { // expected-enabled-error{{variable with a 'modify' accessor must also have a getter, addressor, or 'read' accessor}}
-           // expected-disabled-error@-1{{cannot_find_in_scope}}
+  yielding mutate { // expected-error{{variable with a 'yielding mutate' accessor must also have a getter, addressor, or 'yielding borrow' accessor}}
+                    // expected-disabled-error@-1{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  modify { // expected-enabled-error{{variable already has a 'modify' accessor}}
-           // expected-enabled-note@-5{{previous_accessor}}
-           // expected-disabled-error@-2{{cannot_find_in_scope}}
+  yielding mutate { // expected-error{{variable already has a 'yielding mutate' accessor}}
+                    // expected-note@-5{{previous_accessor}}
+                    // expected-disabled-error@-2{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
 }
@@ -309,8 +357,8 @@ var i_rm_m: Int {
   _read {
     yield _i
   }
-  modify { // expected-disabled-error{{'modify' accessor is only valid when experimental feature coroutine accessors is enabled}}
-           // expected-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
+  yielding mutate { // expected-disabled-error{{'yielding mutate' accessor is only valid when experimental feature coroutine accessors is enabled}}
+           // expected-error@-1{{variable cannot provide both a 'yielding mutate' accessor and a '_modify' accessor}}
     yield &_i
   }
   _modify { // expected-note{{previous_accessor}}
@@ -321,35 +369,37 @@ var i_rm_m: Int {
 // enabled: ok
 // disabled: implicit getter
 var ir_rm_m: Int {
-  read { // expected-disabled-error{{cannot_find_in_scope}}
-         // expected-enabled-error@-1{{variable cannot provide both a 'read' accessor and a '_read' accessor}}
+  yielding borrow { // expected-error{{variable cannot provide both a 'yielding borrow' accessor and a '_read' accessor}}
+        // expected-disabled-error@-1{{accessor_requires_coroutine_accessors}}
+
     fatalError()
   }
-  _read { // expected-disabled-error{{cannot_find_in_scope}}
-          // expected-enabled-note@-1{{previous_accessor}}
+  _read { // expected-note{{previous_accessor}}
     fatalError()
   }
-  modify { // expected-disabled-error{{cannot_find_in_scope}}
-           // expected-enabled-error@-1{{variable cannot provide both a 'modify' accessor and a '_modify' accessor}}
+  yielding mutate { // expected-error{{variable cannot provide both a 'yielding mutate' accessor and a '_modify' accessor}}
+         // expected-disabled-error@-1{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  _modify { // expected-disabled-error{{cannot_find_in_scope}}
-            // expected-enabled-note@-1{{previous_accessor}}
+  _modify { // expected-note{{previous_accessor}}
     fatalError()
   }
 }
 
 // =============================================================================
 // Protocol Requirements
+// Note that `yielding mutate` is not allowed as a protocol requirement
 // =============================================================================
 
 protocol P {
-  var goodP: Int { read set } //expected-disabled-error{{property in protocol must have explicit { get } or { get set } specifier}}
-                              //expected-disabled-error@-1{{expected get or set in a protocol property}}
-  var badP: Int { read modify } //expected-enabled-error{{expected get, read, or set in a protocol property}}
-                                //expected-disabled-error@-1{{property in protocol must have explicit { get } or { get set } specifier}}
-                                //expected-disabled-error@-2{{expected get or set in a protocol property}}
-  subscript(goodS goodS: Int) -> Int { read set } //expected-disabled-error{{expected get or set in a protocol property}}
-  subscript(badS badS: Int) -> Int { read modify } //expected-enabled-error{{expected get, read, or set in a protocol property}}
-                                                   //expected-disabled-error@-1{{expected get or set in a protocol property}}
+  var goodP: Int { yielding borrow set } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
+
+  var badP: Int { yielding borrow yielding mutate } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
+                                                    //expected-error@-1{{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+
+  subscript(goodS goodS: Int) -> Int { yielding borrow set } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
+
+  subscript(badS badS: Int) -> Int { yielding borrow yielding mutate }  //expected-disabled-error{{accessor_requires_coroutine_accessors}}
+                                                    //expected-error@-1{{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+
 }

@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "Relation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
@@ -892,11 +893,12 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
   return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
     if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return tupleType->getElementType(0);
+        return getStrippedType(tupleType->getElementType(0), ctx);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
-        elts.push_back(elt.getWithoutName());
+        auto eltTy = getStrippedType(elt.getType(), ctx);
+        elts.push_back(TupleTypeElt(eltTy));
       }
 
       return TupleType::get(elts, ctx);
@@ -906,7 +908,8 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
       auto params = funcType->getParams();
       SmallVector<AnyFunctionType::Param, 4> newParams;
       for (auto param : params) {
-        auto newParam = param;
+        auto newParam =
+            param.withType(getStrippedType(param.getPlainType(), ctx));
         switch (param.getParameterFlags().getOwnershipSpecifier()) {
         case ParamSpecifier::Borrowing:
         case ParamSpecifier::Consuming: {
@@ -922,9 +925,8 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
       }
       auto newExtInfo = funcType->getExtInfo().withRepresentation(
           AnyFunctionType::Representation::Swift);
-      return FunctionType::get(newParams,
-                               funcType->getResult(),
-                               newExtInfo);
+      return FunctionType::get(
+          newParams, getStrippedType(funcType->getResult(), ctx), newExtInfo);
     }
 
     return std::nullopt;
@@ -1081,6 +1083,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor().dyn_cast<Expr *>()) {
+      // FIXME: Hack to maintain ranking behavior for 'makeIterator' and 'next'
+      // in a 'for' loop. See the comment in `simplifyForEachElementConstraint`.
+      if (locator->isLastElement<LocatorPathElt::ImplicitForEachCompatMember>())
+        return 2;
+
       auto weight = cs.getExprDepth(anchor);
       if (weight)
         return *weight + 1;
@@ -1656,6 +1663,38 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   }
 
   SolutionDiff diff(viable);
+
+  // Debugging code to verify that compareSolutions() actually defines
+  // a transitive relation.
+  static bool verifySolutionOrder = false;
+
+  if (verifySolutionOrder) {
+    auto matrix = BooleanMatrix::forPredicate(
+        viable.begin(), viable.end(),
+        [&](Solution &s1, Solution &s2) {
+          unsigned idx1 = (&s1 - viable.begin());
+          unsigned idx2 = (&s2 - viable.begin());
+          return (compareSolutions(*this, viable, diff, idx1, idx2) ==
+                  SolutionCompareResult::Better);
+        });
+      if (!matrix.isAntiReflexive()) {
+        llvm::errs() << "Broken solution order: not anti-reflexive\n\n";
+        matrix.multiply(matrix).dump(llvm::errs());
+        abort();
+      }
+      if (!matrix.isAntiSymmetric()) {
+        llvm::errs() << "Broken solution order: not anti-symmetric\n\n";
+        matrix.multiply(matrix).dump(llvm::errs());
+        abort();
+      }
+    if (!matrix.isTransitive()) {
+      llvm::errs() << "Broken solution order: not transitive\n\n";
+      matrix.dump(llvm::errs());
+      llvm::errs() << "Square:\n";
+      matrix.multiply(matrix).dump(llvm::errs());
+      abort();
+    }
+  }
 
   // Find a potential best.
   SmallVector<bool, 16> losers(viable.size(), false);

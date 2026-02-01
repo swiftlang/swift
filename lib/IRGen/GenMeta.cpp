@@ -268,14 +268,17 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return {Flags::Kind::Setter, false};
     case AccessorKind::Read:
       return {Flags::Kind::ReadCoroutine, false};
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
       return {Flags::Kind::ReadCoroutine, true};
     case AccessorKind::Modify:
       return {Flags::Kind::ModifyCoroutine, false};
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
       return {Flags::Kind::ModifyCoroutine, true};
     case AccessorKind::DistributedGet:
       return {Flags::Kind::Getter, false};
+    case AccessorKind::Borrow:
+    case AccessorKind::Mutate:
+      return {Flags::Kind::Method, false};
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
@@ -2950,7 +2953,8 @@ void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
     if (!hasLayoutString &&
         IGM.Context.LangOpts.hasFeature(
             Feature::LayoutStringValueWitnessesInstantiation) &&
-        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation) {
+        IGM.getOptions().EnableLayoutStringValueWitnessesInstantiation &&
+        ti.isCopyable(ResilienceExpansion::Maximal)) {
       hasLayoutString |= needsSingletonMetadataInitialization(IGM, type) ||
                          (type->isGenericContext() && !isa<FixedTypeInfo>(ti));
     }

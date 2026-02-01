@@ -426,10 +426,15 @@ private func getLastUseWhileSourceIsNotModified(of copy: CopyLikeInstruction,
                                                 uses: InstructionSetWithCount,
                                                 _ context: FunctionPassContext) -> Instruction?
 {
-  if uses.isEmpty {
+  var numUsesFound = 0
+  if copy == copy.loadingInstruction {
+    // As we are starting the iteration at the next instruction after the copy's load instruction
+    // we pretend to having seen the copy instruction already.
+    numUsesFound += 1
+  }
+  if uses.count == numUsesFound {
     return copy
   }
-  var numUsesFound = 0
   let aliasAnalysis = context.aliasAnalysis
 
   // We already checked that the useful lifetime of the `alloc_stack` ends in the same block as the `copy`.
@@ -480,7 +485,7 @@ private struct UseCollector : AddressDefUseWalker {
     for use in allocStack.uses {
       switch use.instruction {
       case copy:
-        break
+        uses.insert(copy)
       case is DeallocStackInst:
         // Deallocations are allowed to be in a different block.
         break

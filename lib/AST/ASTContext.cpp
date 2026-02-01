@@ -591,6 +591,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<BuiltinFixedArrayType> BuiltinFixedArrayTypes;
+    llvm::FoldingSet<BuiltinBorrowType> BuiltinBorrowTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<ParameterizedProtocolType> ParameterizedProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
@@ -797,7 +798,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &serializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags,
+    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -812,7 +813,7 @@ ASTContext *ASTContext::get(
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, casOpts, serializationOpts,
-                 SourceMgr, Diags, std::move(OutputBackend));
+                 SourceMgr, Diags, DarwinSDKInfo, std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -821,7 +822,7 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &SerializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags,
+    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
@@ -867,6 +868,12 @@ ASTContext::ASTContext(
     Id_StringProcessing
   };
   StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
+
+  if (DarwinSDKInfo)
+    getImpl().SDKInfo.emplace(
+        std::make_unique<clang::DarwinSDKInfo>(*DarwinSDKInfo));
+  else
+    getImpl().SDKInfo.emplace();
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -2838,15 +2845,19 @@ bool ASTContext::canImportModule(ImportPath::Module moduleName, SourceLoc loc,
                                  bool underlyingVersion) {
   llvm::VersionTuple versionInfo;
   llvm::VersionTuple underlyingVersionInfo;
-  if (!canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
-                           versionInfo, underlyingVersionInfo))
-    return false;
+  bool canImport =
+      canImportModuleImpl(moduleName, loc, version, underlyingVersion, true,
+                          versionInfo, underlyingVersionInfo);
 
-  SmallString<64> fullModuleName;
-  moduleName.getString(fullModuleName);
-  
-  addSucceededCanImportModule(fullModuleName, versionInfo, underlyingVersionInfo);
-  return true;
+  // If found an import or resolved an version, recorded the module.
+  if (canImport || !versionInfo.empty() || !underlyingVersionInfo.empty()) {
+    SmallString<64> fullModuleName;
+    moduleName.getString(fullModuleName);
+
+    addSucceededCanImportModule(fullModuleName, versionInfo,
+                                underlyingVersionInfo);
+  }
+  return canImport;;
 }
 
 bool ASTContext::testImportModule(ImportPath::Module ModuleName,
@@ -3829,6 +3840,29 @@ BuiltinFixedArrayType *BuiltinFixedArrayType::get(CanType Size,
   return faTy;
 }
 
+CanBuiltinBorrowType BuiltinBorrowType::get(CanType Referent) {
+  RecursiveTypeProperties properties;
+  properties |= Referent->getRecursiveProperties();
+
+  AllocationArena arena = getArena(properties);
+
+  llvm::FoldingSetNodeID id;
+  BuiltinBorrowType::Profile(id, Referent);
+  auto &ctx = Referent->getASTContext();
+
+  void *insertPos;
+  if (BuiltinBorrowType *faTy
+        = ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+                 .FindNodeOrInsertPos(id, insertPos))
+    return CanBuiltinBorrowType(faTy);
+
+  BuiltinBorrowType *faTy
+    = new (ctx, arena) BuiltinBorrowType(Referent, properties);
+  ctx.getImpl().getArena(arena).BuiltinBorrowTypes
+      .InsertNode(faTy, insertPos);
+  return CanBuiltinBorrowType(faTy);
+}
+
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,
                                           Type elementType,
                                           unsigned numElements) {
@@ -4700,8 +4734,8 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               Type result, Type globalActor,
-                               Type thrownError) {
+                               Type result, Type globalActor, Type thrownError,
+                               Type sendableDependentType) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
@@ -4710,6 +4744,11 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
     properties |= globalActor->getRecursiveProperties();
   if (thrownError)
     properties |= thrownError->getRecursiveProperties();
+  if (sendableDependentType) {
+    ASSERT(sendableDependentType->hasTypeVariable());
+    properties |= RecursiveTypeProperties::SolverAllocated;
+    properties |= RecursiveTypeProperties::HasTypeVariable;
+  }
   properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
@@ -4892,13 +4931,15 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, std::optional<ExtInfo> info) {
   Type thrownError;
   Type globalActor;
+  Type sendableDependentType;
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
+    sendableDependentType = info->getSendableDependentType();
   }
 
   auto properties = getFunctionRecursiveProperties(
-      params, result, globalActor, thrownError);
+      params, result, globalActor, thrownError, sendableDependentType);
   auto arena = getArena(properties);
 
   if (info.has_value()) {
@@ -4930,7 +4971,8 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
-  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
+  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0) +
+                      (sendableDependentType ? 1 : 0);
 
   bool hasLifetimeDependenceInfo =
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
@@ -4990,13 +5032,19 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     auto clangTypeInfo = info.value().getClangTypeInfo();
     if (!clangTypeInfo.empty())
       *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
-    unsigned thrownErrorIndex = 0;
+    unsigned typeIdx = 0;
     if (Type globalActor = info->getGlobalActor()) {
-      getTrailingObjects<Type>()[0] = globalActor;
-      ++thrownErrorIndex;
+      getTrailingObjects<Type>()[typeIdx] = globalActor;
+      typeIdx += 1;
     }
-    if (Type thrownError = info->getThrownError())
-      getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
+    if (Type thrownError = info->getThrownError()) {
+      getTrailingObjects<Type>()[typeIdx] = thrownError;
+      typeIdx += 1;
+    }
+    if (Type sendableDependentType = info->getSendableDependentType()) {
+      getTrailingObjects<Type>()[typeIdx] = sendableDependentType;
+      typeIdx += 1;
+    }
     auto lifetimeDependenceInfo = info->getLifetimeDependencies();
     if (!lifetimeDependenceInfo.empty()) {
       *getTrailingObjects<size_t>() = lifetimeDependenceInfo.size();
@@ -5064,6 +5112,9 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (info.has_value()) {
     thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
+
+    // Generic functions can't currently have Sendable dependence.
+    ASSERT(!info->getSendableDependentType());
   }
 
   if (thrownError) {
@@ -6978,6 +7029,21 @@ SILLayout *SILLayout::get(ASTContext &C,
   return newLayout;
 }
 
+SILLayout *
+SILLayout::withMutable(ASTContext &ctx,
+                       std::initializer_list<std::pair<unsigned, bool>>
+                           fieldIndexMutabilityUpdatePairs) const {
+  // Copy the fields, setting the mutable field to newMutable.
+  SmallVector<SILField, 8> newFields;
+  llvm::copy(getFields(), std::back_inserter(newFields));
+  for (auto p : fieldIndexMutabilityUpdatePairs) {
+    newFields[p.first].setIsMutable(p.second);
+  }
+
+  return SILLayout::get(ctx, getGenericSignature(), newFields,
+                        capturesGenericEnvironment());
+}
+
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionMap Substitutions) {
@@ -7012,6 +7078,23 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto subMap = SubstitutionMap::get(singleGenericParamSignature, boxedType,
                                      LookUpConformanceInModule());
   return get(boxedType->getASTContext(), layout, subMap);
+}
+
+CanSILBoxType
+SILBoxType::withMutable(ASTContext &ctx,
+                        std::initializer_list<std::pair<unsigned, bool>>
+                            fieldIndexMutabilityUpdatePairs) const {
+  return SILBoxType::get(
+      ctx, getLayout()->withMutable(ctx, fieldIndexMutabilityUpdatePairs),
+      getSubstitutions());
+}
+
+ArrayRef<SILField> SILBoxType::getFields() const {
+  return getLayout()->getFields();
+}
+
+bool SILBoxType::isFieldMutable(unsigned index) const {
+  return getFields()[index].isMutable();
 }
 
 LayoutConstraint
@@ -7202,40 +7285,7 @@ bool ASTContext::isASCIIString(StringRef s) const {
 }
 
 clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
-  if (!getImpl().SDKInfo) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(*SourceMgr.getFileSystem(),
-                                                  SearchPathOpts.SDKPath);
-    if (!SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-                              // Ignore the error for now..
-                            });
-      getImpl().SDKInfo.emplace();
-    } else if (!*SDKInfoOrErr) {
-      getImpl().SDKInfo.emplace();
-    } else {
-      getImpl().SDKInfo.emplace(std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
-    }
-  }
-
   return getImpl().SDKInfo->get();
-}
-
-const clang::DarwinSDKInfo::RelatedTargetVersionMapping
-*ASTContext::getAuxiliaryDarwinPlatformRemapInfo(clang::DarwinSDKInfo::OSEnvPair Kind) const {
-  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
-    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(
-            *llvm::vfs::getRealFileSystem(),
-            *SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
-    if (!SDKInfoOrErr || !*SDKInfoOrErr) {
-      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
-                            [](const llvm::ErrorInfoBase &) {
-        // Ignore the error for now..
-      });
-    }
-    return (*SDKInfoOrErr)->getVersionMapping(Kind);
-  }
-  return nullptr;
 }
 
 /// The special Builtin.TheTupleType, which parents tuple extensions and

@@ -1588,8 +1588,7 @@ public:
              ->getType()
              .getASTType()
              ->getASTContext()
-             .isLanguageModeAtLeast(
-                 version::Version::getFutureMajorLanguageVersion()))
+             .isAtLeastFutureMajorLanguageMode())
       return DiagnosticBehavior::Warning;
 
     return sendingOperand->get()->getType().getConcurrencyDiagnosticBehavior(
@@ -2128,16 +2127,9 @@ bool SentNeverSendableDiagnosticInferrer::initForIsolatedPartialApply(
     // diagnostic that mentions that the reason we are emitting an error is b/c
     // the value is mutable.
     if (auto boxTy = op->get()->getType().getAs<SILBoxType>();
-        boxTy && boxTy->getLayout()->isMutable() &&
-        llvm::all_of(boxTy->getLayout()->getFields(),
-                     [&op](const SILField &field) -> bool {
-                       auto fieldTy = field.getAddressType();
-                       if (fieldTy.hasTypeParameter())
-                         fieldTy =
-                             op->getFunction()->mapTypeIntoEnvironment(fieldTy);
-                       return SILIsolationInfo::isSendableType(
-                           fieldTy, op->getFunction());
-                     })) {
+        boxTy && boxTy->getNumFields() == 1 && boxTy->isFieldMutable(0) &&
+        SILIsolationInfo::boxTypeContainsOnlySendableFields(
+            boxTy, op->getFunction())) {
       diagnosticEmitter.emitNamedFunctionArgumentClosureMutable(
           diagnosticOp->getUser()->getLoc(), rootValueAndName->first, crossing);
       return true;

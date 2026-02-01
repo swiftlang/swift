@@ -67,18 +67,22 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// The number of initialized bytes in this span.
   @_alwaysEmitIntoClient
-  public var byteCount: Int { _count }
+  @_semantics("fixed_storage.get_count")
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// The number of additional bytes that can be appended to this span.
   @_alwaysEmitIntoClient
+  @_transparent
   public var freeCapacity: Int { capacity &- _count }
 
   /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isFull: Bool { _count == capacity }
 }
 
@@ -208,6 +212,7 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// Appends the given value's bytes to this span's bytes.
   @_alwaysEmitIntoClient
+  @unsafe
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(_ value: T, as type: T.Type) {
     _precondition(
@@ -219,6 +224,7 @@ extension OutputRawSpan {
 
   /// Appends the given value's bytes repeatedly to this span's bytes.
   @_alwaysEmitIntoClient
+  @unsafe
   @lifetime(self: copy self)
   public mutating func append<T: BitwiseCopyable>(
     repeating repeatedValue: T, count: Int, as type: T.Type
@@ -237,6 +243,7 @@ extension OutputRawSpan {
 extension OutputRawSpan {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
+  @_transparent
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
@@ -248,6 +255,7 @@ extension OutputRawSpan {
 
   /// Exclusively borrow the underlying initialized memory for mutation.
   @_alwaysEmitIntoClient
+  @_transparent
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
     mutating get {
@@ -286,6 +294,7 @@ extension OutputRawSpan {
   /// this is an unsafe operation. Violating the invariants of `OutputRawSpan`
   /// may result in undefined behavior.
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, R: ~Copyable>(
     _ body: (
@@ -293,23 +302,9 @@ extension OutputRawSpan {
       _ initializedCount: inout Int
     ) throws(E) -> R
   ) throws(E) -> R {
-    guard let start = unsafe _pointer, capacity > 0 else {
-      let buffer = UnsafeMutableRawBufferPointer(_empty: ())
-      var initializedCount = 0
-      defer {
-        _precondition(initializedCount == 0, "OutputRawSpan capacity overflow")
-      }
-      return unsafe try body(buffer, &initializedCount)
-    }
-#if SPAN_COMPATIBILITY_STUB
-    let buffer = unsafe UnsafeMutableRawBufferPointer(
-      start: start, count: capacity
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: capacity
     )
-#else
-    let buffer = unsafe UnsafeMutableRawBufferPointer(
-      _uncheckedStart: start, count: capacity
-    )
-#endif
     var initializedCount = _count
     defer {
       _precondition(
@@ -318,7 +313,7 @@ extension OutputRawSpan {
       )
       _count = initializedCount
     }
-    return unsafe try body(buffer, &initializedCount)
+    return unsafe try body(bytes, &initializedCount)
   }
 }
 

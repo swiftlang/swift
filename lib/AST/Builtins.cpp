@@ -18,13 +18,11 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
 #include "swift/AST/ConformanceLookup.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -32,8 +30,6 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/ManagedStatic.h"
-#include <tuple>
 
 using namespace swift;
 
@@ -67,6 +63,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   auto kind =
       llvm::StringSwitch<std::optional<BuiltinTypeKind>>(Name)
           .Case("FixedArray", BuiltinTypeKind::BuiltinFixedArray)
+          .Case("Borrow", BuiltinTypeKind::BuiltinBorrow)
           .StartsWith("Vec", BuiltinTypeKind::BuiltinVector)
           .Case("RawPointer", BuiltinTypeKind::BuiltinRawPointer)
           .Case("RawUnsafeContinuation",
@@ -103,6 +100,9 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   switch (*kind) {
   case BuiltinTypeKind::BuiltinFixedArray:
     return BuiltinUnboundGenericType::get(TypeKind::BuiltinFixedArray, Context);
+
+  case BuiltinTypeKind::BuiltinBorrow:
+    return BuiltinUnboundGenericType::get(TypeKind::BuiltinBorrow, Context);
 
   case BuiltinTypeKind::BuiltinVector: {
     // Vectors are VecNxT, where "N" is the number of elements and
@@ -474,7 +474,7 @@ enum class BuiltinThrowsKind : uint8_t {
   Rethrows
 };
 
-}
+} // anonymous namespace
 
 /// Build a builtin function declaration.
 static FuncDecl *getBuiltinGenericFunction(
@@ -914,6 +914,17 @@ template <class T>
 static BuiltinFunctionBuilder::PackExpansionGenerator<T>
 makePackExpansion(const T &object) {
   return { object };
+}
+
+template <class G>
+static BuiltinFunctionBuilder::LambdaGenerator
+makeBuiltinBorrowType(const G &referentGenerator) {
+  return {
+    [=](BuiltinFunctionBuilder &builder) -> Type {
+      auto referent = referentGenerator.build(builder)->getCanonicalType();
+      return BuiltinBorrowType::get(referent);
+    },
+  };
 }
 
 /// Create a function with type <T> T -> ().
@@ -1395,15 +1406,18 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 
 static ValueDecl *getAutoDiffApplyDerivativeFunction(
     ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
-    unsigned arity, bool throws, Type thrownType) {
+    unsigned arity, bool throws) {
   assert(arity >= 1);
   // JVP:
-  //   <...T...(arity), R> (@differentiable(_forward) (...T) throws -> R, ...T)
-  //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
+  //   <...T...(arity), R, E: Error> (@differentiable(_forward) (...T) throws(E) -> R, ...T)
+  //       throws(E) -> (R, (...T.TangentVector) -> R.TangentVector)
   // VJP:
-  //   <...T...(arity), R> (@differentiable(reverse) (...T) throws -> R, ...T)
-  //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
-  unsigned numGenericParams = 1 + arity;
+  //   <...T...(arity), R, E: Error> (@differentiable(reverse) (...T) throws(E) -> R, ...T)
+  //       throws(E) -> (R, (R.TangentVector) -> ...T.TangentVector)
+  unsigned numGenericParams =
+    1 + /* result */
+    arity + /* params */
+    (throws ? 1 : 0);
   BuiltinFunctionBuilder builder(Context, numGenericParams);
   // Get the `Differentiable` protocol.
   auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
@@ -1416,6 +1430,13 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     builder.addConformanceRequirement(T, diffableProto);
     fnParamGens.push_back(T);
   }
+
+  decltype(fnResultGen) fnThrownTypeGen;
+  if (throws) {
+    fnThrownTypeGen = makeGenericParam(arity + 1);
+    builder.addConformanceRequirement(fnThrownTypeGen, KnownProtocolKind::Error);
+  }
+
   // Generator for the first argument, i.e. the `@differentiable` function.
   BuiltinFunctionBuilder::LambdaGenerator firstArgGen{
       // Generator for the function type at the argument position, i.e. the
@@ -1426,7 +1447,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
                 // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
                 .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
                 .withNoEscape()
-                .withThrows(throws, thrownType)
+                .withThrows(throws, throws? fnThrownTypeGen.build(builder) : Type())
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
@@ -1452,9 +1473,11 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   builder.addParameter(firstArgGen);
   for (auto argGen : fnParamGens)
     builder.addParameter(argGen);
-  if (throws)
-    builder.setRethrows();
   builder.setResult(resultGen);
+  if (throws) {
+    builder.setThrows();
+    builder.setThrownError(fnThrownTypeGen);
+  }
   return builder.build(Id);
 }
 
@@ -1993,6 +2016,11 @@ static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, {}, Int32Ty);
 }
 
+static ValueDecl *getInfiniteLoopTrueConditionOperation(ASTContext &C, Identifier Id) {
+  // () -> Int1
+  return getBuiltinFunction(Id, {}, BuiltinIntegerType::get(1, C));
+}
+
 static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   // <T> T -> ()
   BuiltinFunctionBuilder builder(C);
@@ -2410,6 +2438,28 @@ static ValueDecl *getTaskLocalValuePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _parameters(), _void);
 }
 
+static ValueDecl *getMakeBorrow(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(T, ParamSpecifier::Borrowing);
+  builder.setResult(makeBuiltinBorrowType(T));
+
+  return builder.build(id);
+}
+
+static ValueDecl *getDereferenceBorrow(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1);
+
+  auto T = makeGenericParam(0);
+
+  builder.addParameter(makeBuiltinBorrowType(T), ParamSpecifier::Borrowing);
+  builder.setResult(T);
+
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -2445,7 +2495,7 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
 };
 
 /// Determines if a builtin type falls within the given category.
-inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
+static bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
   switch (OK) {
   case OverloadedBuiltinKind::None:
     return false;  // always fail. 
@@ -2966,9 +3016,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyDerivativeConfig(
             OperationName, kind, arity, throws))
       return nullptr;
-    // TODO: Support somehow typed throws
-    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
-                                              throws, /*thrownType=*/Type());
+    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity, throws);
   }
   if (OperationName.starts_with("applyTranspose_")) {
     unsigned arity;
@@ -3229,6 +3277,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AssertConf:
     return getAssertConfOperation(Context, Id);
       
+  case BuiltinValueKind::InfiniteLoopTrueCondition:
+    return getInfiniteLoopTrueConditionOperation(Context, Id);
+
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
 
@@ -3516,6 +3567,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskLocalValuePop:
     return getTaskLocalValuePop(Context, Id);
+
+  case BuiltinValueKind::MakeBorrow:
+    return getMakeBorrow(Context, Id);
+
+  case BuiltinValueKind::DereferenceBorrow:
+    return getDereferenceBorrow(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");
@@ -3564,6 +3621,7 @@ bool BuiltinType::isBitwiseCopyable() const {
   case BuiltinTypeKind::BuiltinExecutor:
   case BuiltinTypeKind::BuiltinJob:
   case BuiltinTypeKind::BuiltinRawUnsafeContinuation:
+  case BuiltinTypeKind::BuiltinBorrow:
     return true;
   case BuiltinTypeKind::BuiltinNativeObject:
   case BuiltinTypeKind::BuiltinBridgeObject:
@@ -3695,6 +3753,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
   case BuiltinTypeKind::BuiltinFixedArray:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FIXEDARRAY);
     break;
+  case BuiltinTypeKind::BuiltinBorrow:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BORROW);
+    break;
   case BuiltinTypeKind::BuiltinUnboundGeneric: {
     auto bug = cast<BuiltinUnboundGenericType>(this);
     printer << MAYBE_GET_NAMESPACED_BUILTIN(bug->getBuiltinTypeName());
@@ -3711,6 +3772,8 @@ BuiltinUnboundGenericType::getBuiltinTypeName() const {
   switch (BoundGenericTypeKind) {
   case TypeKind::BuiltinFixedArray:
     return BUILTIN_TYPE_NAME_FIXEDARRAY;
+  case TypeKind::BuiltinBorrow:
+    return BUILTIN_TYPE_NAME_BORROW;
   case TypeKind::BuiltinInteger:
     return BUILTIN_TYPE_NAME_INT;
     
@@ -3736,6 +3799,13 @@ getBuiltinGenericSignature(ASTContext &C,
                                              GenericTypeParamKind::Type,
                                              0, 1, Type(), C);
     return GenericSignature::get({Count, Element}, {});
+  }
+
+  case TypeKind::BuiltinBorrow: {
+    auto Referent = GenericTypeParamType::get(C.getIdentifier("Referent"),
+                                             GenericTypeParamKind::Type,
+                                             0, 0, Type(), C);
+    return GenericSignature::get({Referent}, {});
   }
 
   case TypeKind::BuiltinInteger: {
@@ -3782,6 +3852,14 @@ getBuiltinBoundGenericType(ASTContext &C,
     }
     
     return BuiltinFixedArrayType::get(size, element);
+  }
+  
+  case TypeKind::BuiltinBorrow: {
+    auto types = subs.getReplacementTypes();
+  
+    auto referent = types[0]->getCanonicalType();
+
+    return BuiltinBorrowType::get(referent);
   }
   
   case TypeKind::BuiltinInteger: {
@@ -3845,6 +3923,7 @@ BuiltinGenericType::getSubstitutions() const {
     }
   
     BUILTIN_GENERIC_SUBCLASS(BuiltinFixedArrayType)
+    BUILTIN_GENERIC_SUBCLASS(BuiltinBorrowType)
     llvm_unreachable("unhandled BuiltinGenericType subclass");
   };
 
@@ -3857,6 +3936,13 @@ SubstitutionMap
 BuiltinFixedArrayType::buildSubstitutions() const {
   return SubstitutionMap::get(getGenericSignature(),
                               {getSize(), getElementType()},
+                              ArrayRef<ProtocolConformanceRef>{});
+}
+
+SubstitutionMap
+BuiltinBorrowType::buildSubstitutions() const {
+  return SubstitutionMap::get(getGenericSignature(),
+                              {getReferentType()},
                               ArrayRef<ProtocolConformanceRef>{});
 }
 

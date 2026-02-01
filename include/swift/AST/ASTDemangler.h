@@ -276,6 +276,8 @@ public:
 
   Type createBuiltinFixedArrayType(Type size, Type element);
 
+  Type createBuiltinBorrowType(Type referent);
+
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,
                          ArrayRef<BuiltRequirement> requirements);

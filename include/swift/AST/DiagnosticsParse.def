@@ -267,10 +267,11 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(expected_getset_in_protocol,none,
-      "expected get or set in a protocol property", ())
 ERROR(expected_getreadset_in_protocol,none,
-      "expected get, read, or set in a protocol property", ())
+      "expected 'get', 'yielding borrow', or 'set' in a protocol property", ())
+ERROR(expected_getreadborrowsetmutate_in_protocol,none,
+      "expected get, 'yielding borrow', borrow, set or mutate in a protocol property", ())
+
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
       "here; use extension instead", (StringRef))
@@ -312,11 +313,11 @@ ERROR(missing_getter,none,
       (unsigned, StringRef))
 ERROR(missing_reading_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
-      "a getter, addressor, or 'read' accessor",
+      "a getter, addressor, or 'yielding borrow' accessor",
       (unsigned, StringRef))
 ERROR(missing_borrow_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
-      "a 'borrow' accessor, getter, addressor or 'read' accessor",
+      "a 'borrow' accessor",
       (unsigned, StringRef))
 ERROR(observing_accessor_conflicts_with_accessor,none,
       "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
@@ -328,6 +329,8 @@ ERROR(getset_cannot_be_implied,none,
 ERROR(accessor_requires_coroutine_accessors,none,
       "%0 is only valid when experimental feature coroutine accessors is enabled",
       (StringRef))
+WARNING(old_coroutine_accessor,none,
+      "'%1' is deprecated; please use 'yielding %0' instead", (StringRef, StringRef))
 ERROR(accessor_requires_borrow_and_mutate_accessors,none,
       "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
       (StringRef))

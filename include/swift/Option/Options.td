@@ -2012,10 +2012,21 @@ def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"SPI group name to not diagnose about">;
 
+def ignore_spi_groups_new_api
+    : Separate<["-", "--"], "ignore-spi-group-new-api">,
+      Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+      HelpText<"Suppress “new API without '@available’ diagnostic for given "
+               "SPI group name">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,
   MetaVarName<"<path>">;
+
+def const_gather_protocols_list
+  : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,

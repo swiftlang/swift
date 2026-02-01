@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(CrashLog)
+@available(Backtracing 6.2, *)
 public class CrashLogCapture<Address: FixedWidthInteger> {
   public typealias Thread = CrashLog<Address>.Thread
 

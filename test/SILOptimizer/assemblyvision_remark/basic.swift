@@ -329,7 +329,7 @@ public func genericFunc<T>(_ t: T) { // expected-note @:30 {{from location 't'}}
 public func forEach<T>(_ elements: Array<T>, body: (borrowing T) -> Void) {
   elements.withUnsafeBufferPointer { buffer in
     for i in buffer.indices { // expected-remark @:5 {{Specialized function "Swift.IndexingIterator.next()" with type (@inout IndexingIterator<Range<Int>>) -> Optional<Int>}}
-                              // expected-remark @-1:21 {{Specialized function "Swift.Collection<>.makeIterator()" with type (Range<Int>) -> IndexingIterator<Range<Int>>}}
+                              // expected-remark @-1:14 {{Specialized function "Swift.Collection<>.makeIterator()" with type (Range<Int>) -> IndexingIterator<Range<Int>>}}
       body(/* copy */ buffer[i]) // expected-remark @:29 {{Memory copy of value with type 'T'}}
                                  // expected-remark @-1:32 {{Memory destroy of value with type 'T'}}
       // destroy of T

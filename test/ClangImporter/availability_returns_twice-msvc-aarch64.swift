@@ -12,6 +12,6 @@ func test_unavailable_returns_twice_function() {
 // CHECK: availability_returns_twice-msvc-aarch64.swift:{{[0-9]+}}:{{[0-9]+}}: error: unexpected error produced: cannot find type '_JBTYPE' in scope
 // CHECK-NEXT: typealias JumpBuffer = _JBTYPE
 // CHECK-NEXT:  ^
-// CHECK-NEXT: setjmp.h:{{[0-9]+}}:{{[0-9]+}}: note: diagnostic produced elsewhere: macro '_JBTYPE' unavailable: structure not supported
+// CHECK-NEXT: setjmp.h:{{[0-9]+}}:{{[0-9]+}}: error: unexpected note produced: macro '_JBTYPE' unavailable: structure not supported
 // CHECK-NEXT:   #define _JBTYPE unsigned __int64
 

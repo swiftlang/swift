@@ -866,6 +866,7 @@ private:
   }
 
   // These statements don't require any type-checking.
+  void visitOpaqueStmt(OpaqueStmt *opaqueStmt) {}
   void visitBreakStmt(BreakStmt *breakStmt) {}
   void visitContinueStmt(ContinueStmt *continueStmt) {}
   void visitDeferStmt(DeferStmt *deferStmt) {}
@@ -1816,6 +1817,8 @@ private:
     rewriter.addLocalDeclToTypeCheck(decl);
   }
 
+  ASTNode visitOpaqueStmt(OpaqueStmt *opaqueStmt) { return opaqueStmt; }
+
   ASTNode visitBreakStmt(BreakStmt *breakStmt) {
     // Force the target to be computed in case it produces diagnostics.
     (void)breakStmt->getTarget();
@@ -1971,11 +1974,6 @@ private:
 
     auto *body = cast<Stmt *>(visit(forEachStmt->getBody()));
     forEachStmt->setBody(cast<BraceStmt>(body));
-
-    // Check to see if the sequence expr is throwing (in async context),
-    // if so require the stmt to have a `try`.
-    diagnoseUnhandledThrowsInAsyncContext(context.getAsDeclContext(),
-                                          forEachStmt);
 
     return forEachStmt;
   }
@@ -2751,7 +2749,7 @@ void ConjunctionElement::findReferencedVariables(
     if (auto parent =
             locator->getLastElementAs<LocatorPathElt::SyntacticElement>()) {
       if (auto *forEach = getAsStmt<ForEachStmt>(parent->getElement())) {
-        if (auto *sequence = forEach->getParsedSequence())
+        if (auto *sequence = forEach->getSequence())
           sequence->walk(refFinder);
         return;
       }

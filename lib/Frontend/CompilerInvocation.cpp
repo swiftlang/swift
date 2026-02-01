@@ -198,9 +198,37 @@ void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
   SearchPathOpts.InProcessPluginServerPath = serverLibPath.str();
 }
 
-static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
-                                      const FrontendOptions &FrontendOpts,
-                                      const LangOptions &LangOpts) {
+static std::optional<clang::DarwinSDKInfo>
+parseSDKSettings(llvm::vfs::FileSystem &VFS, const LangOptions &LangOpts,
+                 const SearchPathOptions &SearchPathOpts,
+                 DiagnosticEngine &Diags) {
+  if (!LangOpts.Target.isOSDarwin() || SearchPathOpts.getSDKPath().empty())
+    return std::nullopt;
+  auto SDKInfoOrErr =
+      clang::parseDarwinSDKInfo(VFS, SearchPathOpts.getSDKPath());
+  if (!SDKInfoOrErr) {
+    llvm::consumeError(SDKInfoOrErr.takeError());
+    Diags.diagnose(SourceLoc(), diag::warning_darwin_sdk_invalid_settings);
+    return std::nullopt;
+  }
+  return *SDKInfoOrErr;
+}
+
+static void appendPlatformIncludePrefix(
+    SmallString<128> &Path, const llvm::Triple &Triple,
+    const std::optional<clang::DarwinSDKInfo> &SDKInfo) {
+  if (SDKInfo) {
+    const StringRef PlatformIncludePrefix = SDKInfo->getPlatformPrefix(Triple);
+    if (!PlatformIncludePrefix.empty())
+      llvm::sys::path::append(Path, PlatformIncludePrefix);
+  }
+}
+
+static void
+updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
+                          const FrontendOptions &FrontendOpts,
+                          const LangOptions &LangOpts,
+                          const std::optional<clang::DarwinSDKInfo> &SDKInfo) {
   const llvm::Triple &Triple = LangOpts.Target;
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
@@ -272,6 +300,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     }
 
     LibPath = SearchPathOpts.getSDKPath();
+    appendPlatformIncludePrefix(LibPath, Triple, SDKInfo);
     llvm::sys::path::append(LibPath, "usr", "lib", swiftDir);
     if (!Triple.isOSDarwin()) {
       // Use the non-architecture suffixed form with directory-layout
@@ -290,9 +319,9 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
 }
 
-static void
-updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
-                                   const LangOptions &LangOpts) {
+static void updateImplicitFrameworkSearchPaths(
+    SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    const std::optional<clang::DarwinSDKInfo> &SDKInfo) {
   if (SearchPathOpts.SkipAllImplicitImportPaths) {
     SearchPathOpts.setImplicitFrameworkSearchPaths({});
     return;
@@ -303,6 +332,7 @@ updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
     if (!SearchPathOpts.SkipSDKImportPaths &&
         !SearchPathOpts.getSDKPath().empty()) {
       SmallString<128> SDKPath(SearchPathOpts.getSDKPath());
+      appendPlatformIncludePrefix(SDKPath, LangOpts.Target, SDKInfo);
 
       SmallString<128> systemFrameworksScratch(SDKPath);
       llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
@@ -428,11 +458,7 @@ void CompilerInvocation::computeCXXStdlibOptions() {
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path.str();
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-}
-
-void CompilerInvocation::setPlatformAvailabilityInheritanceMapPath(StringRef Path) {
-  SearchPathOpts.PlatformAvailabilityInheritanceMapPath = Path.str();
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
@@ -441,14 +467,14 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
   SearchPathOpts.setSDKPath(Path);
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
 }
 
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
@@ -581,6 +607,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Opts.PreserveTypesAsWritten = false;
     diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                    "-module-interface-preserve-types-as-written",
+                   "-enable-module-selectors-in-module-interface");
+  }
+
+  if (Opts.AliasModuleNames && Opts.UseModuleSelectors) {
+    Opts.AliasModuleNames = false;
+    diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
+                   "-alias-module-names-in-module-interface",
                    "-enable-module-selectors-in-module-interface");
   }
 }
@@ -1168,8 +1201,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_access_control);
   }
 
-  Opts.ForceWorkaroundBrokenModules
-    |= Args.hasArg(OPT_force_workaround_broken_modules);
+  Opts.EnableWorkaroundBrokenModules
+    &= !Args.hasArg(OPT_disable_workaround_broken_modules);
 
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
@@ -1935,6 +1968,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoExplicitNonIsolated);
   }
 
+  if (FrontendOpts.ImportHeaderAsInternal)
+    Opts.enableFeature(Feature::CheckImplementationOnly);
+
   if (Opts.hasFeature(Feature::CheckImplementationOnlyStrict) &&
       !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY"))
     Opts.enableFeature(Feature::CheckImplementationOnly);
@@ -1991,6 +2027,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.SolverScopeThreshold);
   setUnsignedIntegerArgument(OPT_solver_trail_threshold_EQ,
                              Opts.SolverTrailThreshold);
+  setUnsignedIntegerArgument(OPT_solver_shuffle_disjunctions_EQ,
+                             Opts.ShuffleDisjunctionSeed);
+  setUnsignedIntegerArgument(OPT_solver_shuffle_choices_EQ,
+                             Opts.ShuffleDisjunctionChoicesSeed);
 
   Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
   Opts.DebugTimeExpressions |=
@@ -2049,9 +2089,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
         SWIFT_ONONE_SUPPORT);
   }
 
-  Opts.EnableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_enable_constraint_solver_performance_hacks);
-
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 
@@ -2085,6 +2122,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_solver_enable_prepared_overloads) ||
       Args.hasArg(OPT_solver_disable_prepared_overloads))
     Opts.SolverEnablePreparedOverloads = Args.hasArg(OPT_solver_enable_prepared_overloads);
+
+  if (Args.hasArg(OPT_solver_enable_prune_disjunctions) ||
+      Args.hasArg(OPT_solver_disable_prune_disjunctions))
+    Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
@@ -2213,14 +2254,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.BridgingHeaderIsInternal = importAsInternal;
   }
 
-  // Until we have some checking in place, internal bridging headers are a
-  // bit unsafe without library evolution.
-  if (Opts.BridgingHeaderIsInternal &&
-      !LangOpts.hasFeature(Feature::LibraryEvolution)) {
-    Diags.diagnose(SourceLoc(),
-                   diag::internal_bridging_header_without_library_evolution);
-  }
-
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
@@ -2237,8 +2270,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   }
 
   Opts.LoadVersionIndependentAPINotes |= Args.hasArg(OPT_version_independent_apinotes);
-
-  Opts.DisableSafeInteropWrappers |= FrontendOpts.ParseStdlib;
 
   if (FrontendOpts.DisableImplicitModules)
     Opts.DisableImplicitClangModules = true;
@@ -2548,9 +2579,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
-
-  if (const Arg *A = Args.getLastArg(OPT_platform_availability_inheritance_map_path))
-    Opts.PlatformAvailabilityInheritanceMapPath = A->getValue();
 
   for (auto A : Args.getAllArgValues(options::OPT_serialized_path_obfuscate)) {
     auto SplitMap = StringRef(A).split('=');
@@ -3324,17 +3352,21 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
+
+    // In the short term, we ignore -enforce-exclusivity=checked unless
+    // in Embedded Swift unless EmbeddedDynamicExclusivity is also enabled.
+    if (LangOpts.hasFeature(Feature::Embedded) &&
+        Opts.EnforceExclusivityDynamic &&
+        !LangOpts.hasFeature(Feature::EmbeddedDynamicExclusivity)) {
+      Diags.diagnose(SourceLoc(), diag::embedded_dynamic_exclusivity_staging);
+      Opts.EnforceExclusivityDynamic = false;
+    }
+  } else if (!Opts.RemoveRuntimeAsserts &&
+             LangOpts.hasFeature(Feature::Embedded)) {
+    // Embedded Swift defaults to -enforce-exclusivity=unchecked for now.
+    Opts.EnforceExclusivityStatic = true;
+    Opts.EnforceExclusivityDynamic = false;
   }
-
-  Opts.OSSACompleteLifetimes =
-      Args.hasFlag(OPT_enable_ossa_complete_lifetimes,
-                   OPT_disable_ossa_complete_lifetimes,
-                   Opts.OSSACompleteLifetimes);
-
-  Opts.OSSAVerifyComplete =
-      Args.hasFlag(OPT_enable_ossa_verify_complete,
-                   OPT_disable_ossa_verify_complete,
-                   Opts.OSSAVerifyComplete);
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
@@ -4296,9 +4328,12 @@ bool CompilerInvocation::parseArgs(
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
+  
+  SDKInfo = parseSDKSettings(*llvm::vfs::getRealFileSystem(), LangOpts,
+                             SearchPathOpts, Diags);
 
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts);
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
   setDefaultInProcessPluginServerPathIfNecessary();
@@ -4352,11 +4387,6 @@ bool CompilerInvocation::parseArgs(
     ParsedArgs.hasFlag(OPT_enable_aggressive_reg2mem,
                        OPT_disable_aggressive_reg2mem,
                        SILOpts.UseAggressiveReg2MemForCodeSize);
-
-  // We ran into an LLVM backend instruction selection failure.
-  // This is a workaround.
-  if (LangOpts.Target.isWasm())
-    SILOpts.UseAggressiveReg2MemForCodeSize = false;
 
   // With Swift 6, enable @_spiOnly by default. This also enables proper error
   // reporting of ioi references from spi decls.

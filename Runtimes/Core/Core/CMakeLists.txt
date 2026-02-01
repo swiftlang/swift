@@ -74,6 +74,7 @@ add_library(swiftCore
   EmptyCollection.swift
   EnumeratedSequence.swift
   Equatable.swift
+  Exclusivity.swift
   ErrorType.swift
   ExistentialCollection.swift
   Filter.swift

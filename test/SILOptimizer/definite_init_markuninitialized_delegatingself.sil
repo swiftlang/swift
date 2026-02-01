@@ -348,14 +348,9 @@ bb3:
   %19 = load [trivial] %3 : $*Int // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
   %20 = enum $Optional<Int>, #Optional.some!enumelt, %19 : $Int
   dealloc_stack %2 : $*Int
-  br bb5(%20 : $Optional<Int>)
+  br bb4(%20 : $Optional<Int>)
 
-bb4:
-  dealloc_stack %2 : $*Int
-  %24 = enum $Optional<Int>, #Optional.none!enumelt
-  br bb5(%24 : $Optional<Int>)
-
-bb5(%26 : $Optional<Int>):
+bb4(%26 : $Optional<Int>):
   return %26 : $Optional<Int>
 }
 

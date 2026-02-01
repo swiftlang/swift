@@ -41,6 +41,7 @@
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SIL/SILConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -1154,6 +1155,10 @@ void BridgedInstruction::setOperand(SwiftInt index, BridgedValue value) const {
 
 BridgedLocation BridgedInstruction::getLocation() const {
   return unbridged()->getDebugLocation();
+}
+
+void BridgedInstruction::setLocation(BridgedLocation loc) const {
+  return unbridged()->setDebugLocation(loc.getLoc());
 }
 
 BridgedMemoryBehavior BridgedInstruction::getMemBehavior() const {
@@ -2610,8 +2615,9 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
       swift::IsTake_t(takeSource), swift::IsInitialization_t(initializeDest))};
 }
 
-BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue())};
+BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+                                         swift::IsDeadEnd_t(isDeadEnd))};
 }
 
 BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
@@ -2620,6 +2626,10 @@ BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
 
 BridgedInstruction BridgedBuilder::createEndLifetime(BridgedValue op) const {
   return {unbridged().createEndLifetime(regularLoc(), op.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createExtendLifetime(BridgedValue op) const {
+  return {unbridged().createExtendLifetime(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDebugValue(BridgedValue op,
@@ -2949,6 +2959,14 @@ BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue or
   return {unbridged().createConvertEscapeToNoEscape(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), isLifetimeGuaranteed)};
 }
 
+BridgedInstruction BridgedBuilder::createMakeBorrow(BridgedValue referent) const {
+  return {unbridged().createMakeBorrow(regularLoc(), referent.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createMakeAddrBorrow(BridgedValue referent) const {
+  return {unbridged().createMakeAddrBorrow(regularLoc(), referent.getSILValue())};
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedBasicBlockSet
 //===----------------------------------------------------------------------===//
@@ -3219,6 +3237,10 @@ void BridgedContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstr
 
 void BridgedContext::copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
   inst.unbridged()->clone(beforeInst.unbridged());
+}
+
+void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
+  swift::salvageDebugInfo(inst.unbridged());
 }
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {

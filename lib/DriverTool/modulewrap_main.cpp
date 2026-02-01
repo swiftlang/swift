@@ -27,6 +27,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -189,17 +190,19 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   CASOptions CASOpts;
   SerializationOptions SerializationOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   LangOpts.Target = Invocation.getTargetTriple();
   LangOpts.EnableObjCInterop = Invocation.enableObjCInterop();
   ASTContext &ASTCtx = *ASTContext::get(
       LangOpts, TypeCheckOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
       SymbolGraphOpts, CASOpts, SerializationOpts, SrcMgr, Instance.getDiags(),
-      llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
+      SDKInfo, llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
 
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, "",
-                                               nullptr, nullptr,
+  IRGenOptions IRGenOpts;
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, &IRGenOpts,
+                                               "", nullptr, nullptr,
                                                true),
                          true);
   ModuleDecl *M =

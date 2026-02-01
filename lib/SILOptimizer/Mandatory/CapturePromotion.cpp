@@ -562,6 +562,10 @@ SILFunction *ClosureCloner::constructClonedFunction(
   ClosureCloner cloner(funcBuilder, origF, serializedKind, clonedName,
                        promotableIndices, resilienceExpansion);
   cloner.populateCloned();
+
+  // The cloner may clone `unreachable` instructions. However, cloning a
+  // whole function  does not introduce any incomplete lifetimes.
+  cloner.getCloned()->setNeedCompleteLifetimes(false);
   return cloner.getCloned();
 }
 
@@ -1512,7 +1516,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   unsigned opNo = 1;
   unsigned opCount = pai->getNumOperands() - pai->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> args;
-  auto numIndirectResults = calleeConv.getNumIndirectSILResults();
+  auto numIndirectResults = calleeConv.getSILArgIndexOfFirstParam();
   llvm::DenseMap<SILValue, SILValue> capturedMap;
   llvm::SmallSet<SILValue, 16> newCaptures;
   for (; opNo != opCount; ++opNo) {
@@ -1548,7 +1552,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     // alloc_box. Otherwise, it is on the specific iterated copy_value that we
     // started with.
     SILParameterInfo cpInfo = calleePInfo[index - numIndirectResults];
-    assert(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
+    ASSERT(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
                box->getType() &&
            "SILType of parameter info does not match type of parameter");
     releasePartialApplyCapturedArg(builder, pai->getLoc(), box, cpInfo);
@@ -1625,7 +1629,7 @@ namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
-    SmallVector<SILFunction *, 128> worklist;
+    SmallVector<SILFunction *, 8> worklist;
     for (auto &f : *getModule()) {
       if (f.wasDeserializedCanonical() || !f.hasOwnership())
         continue;

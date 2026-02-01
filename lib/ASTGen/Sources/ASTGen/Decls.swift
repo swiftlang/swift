@@ -378,7 +378,10 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  func generate(accessorSpecifier specifier: TokenSyntax) -> swift.AccessorKind? {
+  func generate(
+    accessorSpecifier specifier: TokenSyntax,
+    modifiers: DeclModifierListSyntax
+  ) -> swift.AccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -399,11 +402,21 @@ extension ASTGenVisitor {
     case .`init`:
       return .Init
     case .read:
-      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .read
+      return .yielding_borrow
     case .modify:
-      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .modify
+      return .yielding_mutate
+    case .borrow:
+      if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
+        return .yielding_borrow
+      }
+      precondition(ctx.langOpts.hasFeature(.BorrowAndMutateAccessors), "(compiler bug) 'borrow' accessor should only be parsed with 'BorrowAndMutateAccessors' feature")
+      return .borrow
+    case .mutate:
+      if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
+        return .yielding_mutate
+      }
+      precondition(ctx.langOpts.hasFeature(.BorrowAndMutateAccessors), "(compiler bug) 'mutate' accessor should only be parsed with 'BorrowAndMutateAccessors' feature")
+      return .mutate
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
@@ -421,14 +434,15 @@ extension ASTGenVisitor {
       attrs.add(attr)
     }
 
-    // The modifier
-    if
-      let modifier = node.modifier,
-      let attr = self.generate(declModifier: modifier) {
-      attrs.add(attr)
+    // The modifiers
+    for m in node.modifiers {
+        if let g = self.generate(declModifier: m) {
+            attrs.add(g)
+        }
     }
 
-    guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier) else {
+    guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
+                                   modifiers: node.modifiers) else {
       // TODO: We could potentially recover if this is the first accessor by treating
       // it as an implicit getter.
       return nil

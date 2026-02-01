@@ -149,6 +149,7 @@ private:
   /// got all of the expected diagnostics and check to see if there were any
   /// unexpected ones.
   Result verifyFile(unsigned BufferID);
+  bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx);
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
                                  ExpectedDiagnosticInfo &Expected);

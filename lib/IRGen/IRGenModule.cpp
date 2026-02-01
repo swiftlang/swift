@@ -108,50 +108,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGTI = Importer->getTargetInfo();
   auto &CGO = Importer->getCodeGenOpts();
-  CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
-  CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
+  // Here we set the AST-benign CodeGenOpts options only. Set the
+  // AST-affecting ones early in ClangImporter::create.
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
-  switch (Opts.DebugInfoLevel) {
-  case IRGenDebugInfoLevel::None:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
-    break;
-  case IRGenDebugInfoLevel::LineTables:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
-    break;
-  case IRGenDebugInfoLevel::ASTTypes:
-  case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
-    break;
-  }
   switch (Opts.DebugInfoFormat) {
   case IRGenDebugInfoFormat::None:
     break;
   case IRGenDebugInfoFormat::DWARF:
-    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
-                           Context.LangOpts.hasFeature(Feature::Embedded));
-    break;
   case IRGenDebugInfoFormat::CodeView:
-    CGO.EmitCodeView = true;
-    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    // This actually contains the debug flags for codeview.
     CGO.DwarfDebugFlags =
         Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
                            Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   }
-  if (!Opts.TrapFuncName.empty()) {
-    CGO.TrapFuncName = Opts.TrapFuncName;
-  }
-
-  // We don't need to perform coverage mapping for any Clang decls we've
-  // synthesized, as they have no user-written code. This is also needed to
-  // avoid a Clang crash when attempting to emit coverage for decls without
-  // source locations (rdar://100172217).
-  CGO.CoverageMapping = false;
 
   auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
@@ -1600,6 +1570,10 @@ llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
 
 llvm::ConstantInt *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
+}
+
+llvm::ConstantInt *IRGenModule::getBool(bool condition) {
+  return llvm::ConstantInt::get(Int1Ty, condition);
 }
 
 llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {

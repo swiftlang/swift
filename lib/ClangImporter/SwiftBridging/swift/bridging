@@ -80,7 +80,7 @@
 /// is presumed to be immortal, i.e. the reference to such object is presumed to
 /// always be valid. This annotation lets Swift import such a type as a reference
 /// type in Swift.
-////
+///
 /// This example shows how to use this macro to let Swift know that
 /// a singleton C++ class can be imported as a reference type in Swift:
 ///  ```c++
@@ -111,16 +111,59 @@
   __attribute__((swift_attr("release:immortal")))    \
   __attribute__((swift_attr("unsafe")))
 
-/// The annotated `class` or `struct` is a smart pointer to an intrusively
-/// reference counted object. The pointee type is expected to be a Swift shared
-/// reference. The presence of this annotation will introduce conversion
-/// functions between the smart pointer type and Swift's native reference type.
-/// The conversion function is expected to return a +0 raw pointer to a Swift
-/// shared reference type.
+/// This annotation makes smart pointers to intrusively reference counted
+/// objects more ergonomic to use in Swift by:
+///
+/// * introducing explicit conversions between the smart pointer type and
+///   the underlying reference type and
+/// * importing C++ APIs that return the smart pointer type or take it as a
+///   parameter as returning or taking the underlying reference type.
+///
+/// Place this annotation on a smart pointer class or struct. The argument
+/// to the annotation names an accessor function, which can be a file-scope
+/// function or (if prefixed by .) a member function of the smart pointer
+/// class. The return type of the accessor function determines the underlying
+/// reference type of the smart pointer; it must be a pointer to a class or
+/// struct with the SWIFT_SHARED_REFERENCE annotation. Note that
+/// SWIFT_SHARED_REFERENCE requires the underlying reference type
+/// to provide independent retain and release operations; Swift does not
+/// currently support this ergonomic import of smart pointers to objects
+/// that can only be managed through a smart pointer class.
+///
+/// The Swift importer will diagnose a class with this annotation as an
+/// error if it cannot determine an underlying reference type. If the class
+/// is templated, this applies to instantiations of the template, not to the
+/// template pattern. (That is, it is okay to have a templated smart pointer
+/// type as long as the concrete instantiations used in your C++ interface
+/// all have determinable underlying reference types.)
+///
+/// The smart pointer type is required to have a constructor that takes a raw
+/// pointer. This constructor is expected to perform a retain of the object.
+/// (In the +0 / +1 language of Objective-C reference counting, it would be
+/// said to take the object at +0: it does not take responsibility for a retain
+/// performed by its caller.) Generally, this kind of constructor matches with
+/// object models where the object constructor initializes the reference
+/// count to 0.
+///
+/// The argument of this annotation is required to be the name of an
+/// "accessor" method that returns a raw-pointer to the object. This method
+/// is required to return a raw pointer to the object without changing the
+/// reference count.
+///
+/// Swift will define conversion operations using these functions to
+/// convert between the raw pointer and the smart pointer representations.
+///
+/// By default, smart pointer types are assumed to have a valid null state.
+/// Passing a null pointer to the raw-pointer constructor will create a smart
+/// pointer in the null state, and calling the raw-pointer accessor method
+/// on a smart pointer in the null state will return a null pointer. In case the
+/// constructor and the raw-pointer accessor are annotated with _Nonnull, we
+/// assume the smart pointer does not have a null state.
 ///
 ///  ```c++
 ///   template <class T>
 ///   struct SWIFT_REFCOUNTED_PTR(.getPtr) Ptr {
+///     Ptr(T* ptr);
 ///     T *_Nullable getPtr() const { return ptr; }
 ///   };
 ///
@@ -134,6 +177,13 @@
 ///    let y = x.asReference
 ///  }
 ///  ```
+///
+/// Moreover, this annotation introduces implicit bridging for functions taking
+/// or returning smart pointers by value:
+///  ```c++
+///   PtrOfSharedRef foo(PtrOfSharedRef param);
+///  ```
+/// Imported with the signature `func foo(_ param: SharedRef) -> SharedRef`
 #define SWIFT_REFCOUNTED_PTR(_toRawPointer)                                            \
   __attribute__((swift_attr(                                                           \
       "@_refCountedPtr(ToRawPointer: \"" _CXX_INTEROP_STRINGIFY(_toRawPointer) "\")")))
@@ -322,16 +372,17 @@
 #define SWIFT_NAME(_name)
 #define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName)
 #define SWIFT_COMPUTED_PROPERTY
-#define SWIFT_MUTATING 
+#define SWIFT_MUTATING
 #define SWIFT_UNCHECKED_SENDABLE
 #define SWIFT_NONCOPYABLE
-#define SWIDT_NONCOPYABLE_WITH_DESTROY(_destroy)
+#define SWIFT_NONCOPYABLE_WITH_DESTROY(_destroy)
 #define SWIFT_COPYABLE_IF(...)
 #define SWIFT_NONESCAPABLE
 #define SWIFT_ESCAPABLE
 #define SWIFT_ESCAPABLE_IF(...)
 #define SWIFT_RETURNS_RETAINED
 #define SWIFT_RETURNS_UNRETAINED
+#define SWIFT_RETURNED_AS_UNRETAINED_BY_DEFAULT
 #define SWIFT_PRIVATE_FILEID(_fileID)
 #define SWIFT_UNSAFE
 #define SWIFT_SAFE

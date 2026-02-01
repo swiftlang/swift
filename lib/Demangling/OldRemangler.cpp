@@ -1347,7 +1347,7 @@ ManglingError Remangler::mangleReadAccessor(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "r", ctx, depth + 1);
 }
 
-ManglingError Remangler::mangleRead2Accessor(Node *node, EntityContext &ctx,
+ManglingError Remangler::mangleYieldingBorrowAccessor(Node *node, EntityContext &ctx,
                                              unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "y", ctx, depth + 1);
 }
@@ -1357,7 +1357,7 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, EntityContext &ctx,
   return mangleAccessor(node->getFirstChild(), "M", ctx, depth + 1);
 }
 
-ManglingError Remangler::mangleModify2Accessor(Node *node, EntityContext &ctx,
+ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, EntityContext &ctx,
                                                unsigned depth) {
   return mangleAccessor(node->getFirstChild(), "x", ctx, depth + 1);
 }
@@ -1564,6 +1564,10 @@ static bool stripPrefix(StringRef &string, const char (&data)[N]) {
 }
 
 ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
+}
+
+ManglingError Remangler::mangleBuiltinBorrow(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
 }
 

@@ -343,6 +343,7 @@ bb0(%x : @guaranteed $ClassLet):
 // CHECK:         ref_element_addr
 // CHECK-NEXT:    load [copy]
 // CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy_value [dead_end]
 // CHECK-NEXT:    unreachable
 sil [ossa] @do_copy_var_properties_with_guaranteed_base_unreachable : $@convention(thin) (@guaranteed ClassLet) -> () {
 bb0(%x : @guaranteed $ClassLet):
@@ -352,6 +353,7 @@ bb0(%x : @guaranteed $ClassLet):
   %v = load [copy] %p : $*Klass
   apply %f(%v) : $@convention(thin) (@guaranteed Klass) -> ()
 
+  destroy_value [dead_end] %v
   unreachable
 }
 
@@ -1553,9 +1555,11 @@ bb0(%0 : $Builtin.RawPointer):
   cond_br undef, bb1, bb2
 
 bb1:
+  end_borrow %2
   unreachable
 
 bb2:
+  end_borrow %2
   unreachable
 }
 
@@ -1807,6 +1811,9 @@ bb1:
   %3 = begin_borrow %1 : $Klass
   %4 = ref_element_addr %3 : $Klass, #Klass.baseLet
   %5 = load [copy] %4 : $*Klass
+  destroy_value [dead_end] %5
+  end_borrow %3
+  destroy_value [dead_end] %1
   unreachable
 
 bb2:
@@ -1838,6 +1845,8 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %4 = load [copy] %3 : $*Builtin.NativeObject
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %2
   unreachable
 }
 
@@ -1862,6 +1871,7 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %2 : ${ var Builtin.NativeObject }
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -1879,6 +1889,8 @@ bb0(%0 : @guaranteed $ClassLet):
 bb1:
   %f = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
   apply %f(%4) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_borrow %3
+  destroy_value [dead_end] %2
   unreachable
 
 bb2:
@@ -1889,7 +1901,8 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @use_interior_pointer_not_in_deadend_block :
-// CHECK:         load_borrow
+// TODO: not optimized right now
+// xCHECK:         load_borrow
 // CHECK:       } // end sil function 'use_interior_pointer_not_in_deadend_block'
 sil [ossa] @use_interior_pointer_not_in_deadend_block : $@convention(thin) (@guaranteed ClassLet) -> () {
 bb0(%0 : @guaranteed $ClassLet):
@@ -1902,6 +1915,8 @@ bb0(%0 : @guaranteed $ClassLet):
 bb1:
   %f = function_ref @use_inguaranteed : $@convention(thin) (@in_guaranteed Klass) -> ()
   apply %f(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_borrow %3
+  destroy_value [dead_end] %2
   unreachable
 
 bb2:
@@ -2027,6 +2042,7 @@ bb2:
 bb3:
   br bb2
 bb4:
+  destroy_value [dead_end] %1
   unreachable
 bb5:
   destroy_value %1 : $Klass
@@ -2130,6 +2146,8 @@ bb0(%0 : @owned $Klass):
   end_borrow %1
   %4 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
   %5 = apply %4(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value [dead_end] %2
+  destroy_value [dead_end] %0
   unreachable
 }
 

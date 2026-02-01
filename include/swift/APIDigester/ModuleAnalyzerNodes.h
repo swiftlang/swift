@@ -158,6 +158,7 @@ struct CheckerOptions {
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;
   llvm::StringSet<> SPIGroupNamesToIgnore;
+  llvm::StringSet<> SPIGroupNamesToIgnoreNewAPI;
 };
 
 class SDKContext {

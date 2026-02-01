@@ -147,6 +147,8 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_BUILD_STATIC_STDLIB:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', 'TRUE')
+        # Install clang builtin headers only, not the full clang resource dir including libs
+        self.cmake_options.define('SWIFT_STDLIB_INSTALL_ONLY_CLANG_RESOURCE_HEADERS:BOOL', 'TRUE')
         # TODO: Turn off library evolution once we establish a good way to teach
         # libraries including swift-testing whether to use the stable ABI.
         self.cmake_options.define('SWIFT_STDLIB_STABLE_ABI:BOOL', 'TRUE')
@@ -174,6 +176,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_VOLATILE:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING', 'TRUE')
 
         self.cmake_options.define('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB:BOOL', 'TRUE')
         self.cmake_options.define(
@@ -191,7 +194,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
         lit_test_paths = [
-            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded',
+            'IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded', 'AutoDiff', 'DebugInfo',
             # TODO(katei): Enable all interpreter tests
             'Interpreter/enum.swift',
         ]
@@ -203,7 +206,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         test_driver_options = [
             # compiler-rt is not installed in the final toolchain, so use one
             # in build dir
-            '-Xclang-linker', '-resource-dir=' + self._wasi_sysroot_path(target_triple),
+            '-Xclang-linker', '-resource-dir=' + self._wasi_resource_dir_path(target_triple),
         ]
         # Leading space is needed to separate from other options
         self.cmake_options.define('SWIFT_DRIVER_TEST_OPTIONS:STRING',
@@ -268,6 +271,10 @@ class WasmStdlib(cmake_product.CMakeProduct):
     def _wasi_sysroot_path(self, target_triple):
         build_root = os.path.dirname(self.build_dir)
         return wasisysroot.WASILibc.sysroot_install_path(build_root, target_triple)
+
+    def _wasi_resource_dir_path(self, target_triple):
+        build_root = os.path.dirname(self.build_dir)
+        return wasisysroot.WASILibc.resource_dir_install_path(build_root, target_triple)
 
     def should_install(self, host_target):
         return False

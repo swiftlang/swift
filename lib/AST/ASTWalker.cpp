@@ -881,23 +881,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
-    if (auto &keyConv = E->getKeyConversion()) {
-      auto kConv = keyConv.Conversion;
-      if (!kConv) {
-        return nullptr;
-      } else if (Expr *E2 = doIt(kConv)) {
-        E->setKeyConversion({keyConv.OrigValue, E2});
+    if (auto keyConv = E->getKeyConversion()) {
+      if (Expr *E2 = doIt(keyConv)) {
+        E->setKeyConversion(cast<ClosureExpr>(E2));
       } else {
         return nullptr;
       }
     }
 
-    if (auto &valueConv = E->getValueConversion()) {
-      auto vConv = valueConv.Conversion;
-      if (!vConv) {
-        return nullptr;
-      } else if (Expr *E2 = doIt(vConv)) {
-        E->setValueConversion({valueConv.OrigValue, E2});
+    if (auto valueConv = E->getValueConversion()) {
+      if (Expr *E2 = doIt(valueConv)) {
+        E->setValueConversion(cast<ClosureExpr>(E2));
       } else {
         return nullptr;
       }
@@ -1896,6 +1890,11 @@ Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
   return S;
 }
 
+Stmt *Traversal::visitOpaqueStmt(OpaqueStmt *OS) {
+  // We do not want to visit it.
+  return OS;
+}
+
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
     if (auto *SubExpr = Elem.dyn_cast<Expr*>()) {
@@ -2066,28 +2065,11 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The iterator decl is built directly on top of the sequence
-  // expression, so don't visit both.
-  //
-  // If for-in is already type-checked, the type-checked version
-  // of the sequence is going to be visited as part of `iteratorVar`.
-  if (auto IteratorVar = S->getIteratorVar()) {
-    if (doIt(IteratorVar))
+  if (Expr *Sequence = S->getSequence()) {
+    if ((Sequence = doIt(Sequence)))
+      S->setSequence(Sequence);
+    else
       return nullptr;
-
-    if (auto NextCall = S->getNextCall()) {
-      if ((NextCall = doIt(NextCall)))
-        S->setNextCall(NextCall);
-      else
-        return nullptr;
-    }
-  } else {
-    if (Expr *Sequence = S->getParsedSequence()) {
-      if ((Sequence = doIt(Sequence)))
-        S->setParsedSequence(Sequence);
-      else
-        return nullptr;
-    }
   }
 
   if (Expr *Where = S->getWhere()) {
@@ -2097,18 +2079,20 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getConvertElementExpr()) {
-    if ((IteratorNext = doIt(IteratorNext)))
-      S->setConvertElementExpr(IteratorNext);
-    else
-      return nullptr;
-  }
-
   if (Stmt *Body = S->getBody()) {
     if ((Body = doIt(Body)))
       S->setBody(cast<BraceStmt>(Body));
     else
       return nullptr;
+  }
+
+  if (Walker.shouldWalkIntoForEachDesugaredStmt()) {
+    if (Stmt *Desugared = S->getCachedDesugaredStmt()) {
+      if ((Desugared = doIt(Desugared)))
+        S->setDesugaredStmt(cast<BraceStmt>(Desugared));
+      else
+        return nullptr;
+    }
   }
 
   return S;
@@ -2241,6 +2225,8 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   }
   return nullptr;
 }
+
+Pattern *Traversal::visitOpaquePattern(OpaquePattern *P) { return P; }
 
 Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {

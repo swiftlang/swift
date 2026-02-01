@@ -151,6 +151,14 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
+  /// Return a copy of this trackable state with the id being \p newID instead
+  /// of whatever is stored in this state.
+  TrackableValueState getWithNewID(unsigned newID) const {
+    auto newVal = *this;
+    newVal.id = newID;
+    return newVal;
+  }
+
   SILIsolationInfo getIsolationRegionInfo() const {
     if (!regionInfo) {
       return SILIsolationInfo::getDisconnected(false);
@@ -408,6 +416,12 @@ public:
   /// exists. Returns nullptr otherwise.
   SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
 
+  /// Given the value of use \p op that is mapped to memory that will be
+  /// overwritten, produce a new TrackableValue that represents the value that
+  /// was in that memory.
+  TrackableValue
+  getRepresentativeValueForValueFromOverwrittenMemory(Operand *op) const;
+
   SILIsolationInfo getIsolationRegion(Element trackableValueID) const;
   SILIsolationInfo getIsolationRegion(SILValue trackableValueID) const;
 
@@ -440,6 +454,7 @@ private:
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
+
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   Element lookupValueID(SILValue value);
 

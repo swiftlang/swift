@@ -29,6 +29,8 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/IDE/complete_decl_attribute_feature_requirement.swift"),
     # Uses the pseudo-feature ApproachableConcurrency
     pathlib.Path("test/Concurrency/approachable_concurrency.swift"),
+    # Uses a script that hides usage of the CoroutineAccessor feature.
+    pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
 ]
 
 ENABLE_FEATURE_RE = re.compile(

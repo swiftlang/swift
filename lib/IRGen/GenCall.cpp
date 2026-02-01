@@ -6689,7 +6689,7 @@ void irgen::emitAsyncReturn(
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
                             SILType funcResultTypeInContext,
                             CanSILFunctionType fnType, Explosion &result,
-                            Explosion &error) {
+                            Explosion &error, SILType funcErrorTypeInContext) {
   assert((fnType->hasErrorResult() && !error.empty()) ||
          (!fnType->hasErrorResult() && error.empty()));
 
@@ -6705,8 +6705,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   if (fnType->hasErrorResult() && !conv.hasIndirectSILResults() &&
       !conv.hasIndirectSILErrorResults() && !nativeSchema.requiresIndirect() &&
       conv.isTypedError()) {
-    auto errorType = conv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
-    auto &errorTI = IGM.getTypeInfo(errorType);
+    auto &errorTI = IGM.getTypeInfo(funcErrorTypeInContext);
     auto &nativeError = errorTI.nativeReturnValueSchema(IGM);
     if (!nativeError.shouldReturnTypedErrorIndirectly()) {
       assert(!error.empty() && "Direct error return must have error value");

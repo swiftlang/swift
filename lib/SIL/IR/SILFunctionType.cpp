@@ -1710,6 +1710,34 @@ public:
   }
 };
 
+/// Query whether the original type is thrown indirectly for the purpose
+/// of reabstraction given complete lowering information about its
+/// substitution.
+bool isFormallyThrownIndirectly(TypeConverter &TC,
+                                AbstractionPattern origType,
+                                CanType substType,
+                                const TypeLowering &substTL) {
+  // If the substituted type is returned indirectly, so must the
+  // unsubstituted type.
+  if ((origType.isTypeParameter()
+       && !origType.isConcreteType()
+       && !origType.requiresClass())
+      || substTL.isAddressOnly()) {
+    return true;
+
+  // If the substitution didn't change the type, then a negative
+  // response to the above is determinative as well.
+  } else if (origType.getType() == substType &&
+             !origType.getType()->hasTypeParameter()) {
+    return false;
+
+  // Otherwise, query specifically for the original type.
+  } else {
+    return SILType::isFormallyThrownIndirectly(
+        origType.getType(), TC, origType.getGenericSignature());
+  }
+}
+
 static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
                                                  const clang::Type *clangTy,
                                                  CanType substTy) {
@@ -2864,8 +2892,8 @@ static CanSILFunctionType getSILFunctionType(
     auto &errorTLConv = TC.getTypeLowering(origErrorType, errorType,
                                            TypeExpansionContext::minimal());
 
-    bool isFormallyIndirectError =
-        origErrorType.isTypeParameter() || errorTLConv.isAddressOnly();
+    bool isFormallyIndirectError = isFormallyThrownIndirectly(
+        TC, origErrorType, errorType, errorTLConv);
 
     errorResult = SILResultInfo(errorTLConv.getLoweredType().getASTType(),
                                 isFormallyIndirectError

@@ -546,20 +546,25 @@ public:
       : stateOrAlias(original)
     {
     }
-    
+
+    AddressableBuffer(const AddressableBuffer &other) = delete;
+    AddressableBuffer &operator=(const AddressableBuffer &other) = delete;
+
     AddressableBuffer(AddressableBuffer &&other)
-      : stateOrAlias(other.stateOrAlias)
+      : stateOrAlias(other.stateOrAlias), insertPoint(other.insertPoint),
+        cleanupPoints(std::move(other.cleanupPoints))
     {
+      // Make sure we clear out the state on `other` since we don't want its
+      // destructor to do anything.
       other.stateOrAlias = (State*)nullptr;
-      cleanupPoints.swap(other.cleanupPoints);
+      other.insertPoint = nullptr;
     }
     
     AddressableBuffer &operator=(AddressableBuffer &&other) {
-      if (auto state = stateOrAlias.dyn_cast<State*>()) {
-        delete state;
+      if (&other != this) {
+        this->~AddressableBuffer();
+        new (this) AddressableBuffer(std::move(other));
       }
-      stateOrAlias = other.stateOrAlias;
-      cleanupPoints.swap(other.cleanupPoints);
       return *this;
     }
 
@@ -1765,12 +1770,10 @@ public:
                             CanType existentialType,
                             SGFContext C = SGFContext());
 
-  RValue emitCollectionConversion(SILLocation loc,
-                                  FuncDecl *fn,
-                                  CanType fromCollection,
-                                  CanType toCollection,
-                                  ManagedValue mv,
-                                  SGFContext C);
+  RValue emitCollectionConversion(SILLocation loc, FuncDecl *fn,
+                                  CanType fromCollection, CanType toCollection,
+                                  ManagedValue mv, ClosureExpr *keyConversion,
+                                  ClosureExpr *valueConversion, SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -1801,7 +1804,8 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
+  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
+                         Stmt *parentStmt,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
 
@@ -2086,7 +2090,7 @@ public:
                                         bool isOnSelfParameter);
 
   ManagedValue applyBorrowMutateAccessor(SILLocation loc, ManagedValue fn,
-                                         bool canUnwind, SubstitutionMap subs,
+                                         SubstitutionMap subs,
                                          ArrayRef<ManagedValue> args,
                                          CanSILFunctionType substFnType,
                                          ApplyOptions options);
@@ -2450,6 +2454,13 @@ public:
   void emitOpenExistentialExpr(OpenExistentialExpr *e, F emitSubExpr) {
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
+
+  /// A mapping from opaque statements to the statements that should be emitted.
+  llvm::SmallDenseMap<OpaqueStmt *, Stmt *> OpaqueStmts;
+
+  /// A mapping from OpaqueValueExprs to the whole expressions that should be
+  /// emitted.
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *> OpaqueExprs;
 
   /// Mapping from OpaqueValueExpr/PackElementExpr to their values.
   llvm::SmallDenseMap<Expr *, ManagedValue> OpaqueValues;
@@ -2862,9 +2873,11 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  InitializationPtr
-  emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
-                                   bool generateDebugInfo = true);
+  InitializationPtr emitPatternBindingInitialization(
+      Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
+      ProfileCounter numTrueTaken = ProfileCounter(),
+      ProfileCounter numFalseTaken = ProfileCounter(),
+      std::optional<SILLocation> customInitLoc = std::nullopt);
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.

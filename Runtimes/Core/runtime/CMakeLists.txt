@@ -12,6 +12,7 @@ add_library(swiftRuntime OBJECT
     Array.cpp
     AutoDiffSupport.cpp
     Bincompat.cpp
+    Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
     CrashReporter.cpp

@@ -175,28 +175,32 @@ typedef struct {
 } ExistentialValue;
 
 static inline void
-_swift_embedded_existential_destroy(void *exist) {
+_swift_embedded_existential_destroy(void *exist, void (*releaseBoxFn) (void *)) {
   ExistentialValue* existVal = (ExistentialValue*)exist;
   void *metadata = existVal->metadata;
   EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
   ValueWitnessTableFlags isNonInlineMask = IsNonInline;
   if (fullmeta->vwt->flags & IsNonInline) {
-    void *addrInBox = _swift_embedded_box_project(existVal->inlineBuffer[0], fullmeta);
-    fullmeta->vwt->destroyFn(addrInBox, metadata);
+    releaseBoxFn(existVal->inlineBuffer[0]);
   } else {
     fullmeta->vwt->destroyFn(&(existVal->inlineBuffer[0]), metadata);
   }
 }
 
 static inline void
-_swift_embedded_existential_init_with_take(void *dst, void *srcExist) {
+_swift_embedded_existential_init_with_take(void *dst, void *srcExist,
+                                           void (*releaseBoxFn) (void *)) {
   ExistentialValue* existVal = (ExistentialValue*)srcExist;
   void *metadata = existVal->metadata;
   EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
   ValueWitnessTableFlags isNonInlineMask = IsNonInline;
   if (fullmeta->vwt->flags & IsNonInline) {
     void *addrInBox = _swift_embedded_box_project(existVal->inlineBuffer[0], fullmeta);
-    fullmeta->vwt->initializeWithTakeFn(dst, addrInBox, metadata);
+    // Need to call initWithCopy (instead of initWithTake) so that we can call
+    // swift_releaseBox which will also destroy the value in the box (if the
+    // refcount == 1).
+    fullmeta->vwt->initializeWithCopyFn(dst, addrInBox, metadata);
+    releaseBoxFn(existVal->inlineBuffer[0]);
   } else {
     fullmeta->vwt->initializeWithTakeFn(dst, &(existVal->inlineBuffer[0]), metadata);
   }
@@ -204,7 +208,7 @@ _swift_embedded_existential_init_with_take(void *dst, void *srcExist) {
 
 static inline void
 _swift_embedded_existential_init_with_copy(void *dst, void *srcExist) {
-ExistentialValue* existVal = (ExistentialValue*)srcExist;
+  ExistentialValue* existVal = (ExistentialValue*)srcExist;
   void *metadata = existVal->metadata;
   EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
   ValueWitnessTableFlags isNonInlineMask = IsNonInline;

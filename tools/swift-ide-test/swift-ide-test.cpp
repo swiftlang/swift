@@ -3140,7 +3140,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
     }
     {
       GroupNamesPrinter Printer(llvm::outs());
-      llvm::SmallVector<Decl*, 256> Results;
+      llvm::SmallVector<Decl*> Results;
       swift::getTopLevelDeclsForDisplay(M, Results);
       for (auto R : Results) {
         Printer.addDecl(R);
@@ -3626,13 +3626,13 @@ public:
       case AccessorKind::Read:
         OS << "<read accessor for ";
         break;
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
         OS << "<read2 accessor for ";
         break;
       case AccessorKind::Modify:
         OS << "<modify accessor for ";
         break;
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
         OS << "<modify2 accessor for ";
         break;
       case AccessorKind::Init:

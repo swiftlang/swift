@@ -192,7 +192,7 @@ internal func _Float16ToASCII(
   // We need a MutableRawSpan in order to use wide store/load operations
   // TODO: Tune this value down to the actual minimum for Float16
   precondition(utf8Buffer.count >= 32)
-  var buffer = utf8Buffer.mutableBytes
+  var buffer = unsafe utf8Buffer.mutableBytes
 
   // Step 1: Handle various input cases:
   let binaryExponent: Int
@@ -488,7 +488,7 @@ internal func _Float32ToASCII(
   // TODO: Tune this limit down to the actual minimum we need here
   // TODO: `assert` that the buffer is filled with 0x30 bytes (in debug builds)
   precondition(utf8Buffer.count >= 32)
-  var buffer = utf8Buffer.mutableBytes
+  var buffer = unsafe utf8Buffer.mutableBytes
 
   // Step 1: Handle the special cases, decompose the input
 
@@ -734,7 +734,7 @@ internal func _Float64ToASCII(
 ) -> Range<Int> {
   // We need a MutableRawSpan in order to use wide store/load operations
   precondition(utf8Buffer.count >= 32)
-  var buffer = utf8Buffer.mutableBytes
+  var buffer = unsafe utf8Buffer.mutableBytes
 
   //
   // Step 1: Handle the special cases, decompose the input
@@ -1239,7 +1239,7 @@ internal func _Float80ToASCII(
 ) -> Range<Int> {
   // We need a MutableRawSpan in order to use wide store/load operations
   precondition(utf8Buffer.count >= 32)
-  var buffer = utf8Buffer.mutableBytes
+  var buffer = unsafe utf8Buffer.mutableBytes
 
   // Step 1: Handle special cases, decompose the input
 

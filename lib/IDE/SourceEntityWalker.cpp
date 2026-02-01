@@ -25,10 +25,10 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
-#include "clang/Basic/Module.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/Module.h"
 
 using namespace swift;
 
@@ -57,6 +57,10 @@ private:
 
   bool shouldWalkSerializedTopLevelInternalDecls() override {
     return false;
+  }
+
+  bool shouldWalkIntoForEachDesugaredStmt() override {
+    return SEWalker.shouldWalkIntoForEachDesugaredStmt();
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -270,29 +274,31 @@ ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPostProper(Decl *D) {
 
 ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
-  if (TraverseChildren) {
-    if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
-      // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
-      // walk into the body.
-      if (auto *FD = DeferS->getTempDecl()) {
-        auto *Body = FD->getBody();
-        if (!Body)
-          return Action::Stop();
+  if (!TraverseChildren)
+    return Action::SkipNode(S);
 
-        auto *RetS = Body->walk(*this);
-        if (!RetS)
-          return Action::Stop();
-        assert(RetS == Body);
-      }
-      bool Continue = SEWalker.walkToStmtPost(DeferS);
-      if (!Continue)
+  if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
+    // walk into the body.
+    if (auto *FD = DeferS->getTempDecl()) {
+      auto *Body = FD->getBody();
+      if (!Body)
         return Action::Stop();
 
-      // Already walked children.
-      return Action::SkipNode(DeferS);
+      auto *RetS = Body->walk(*this);
+      if (!RetS)
+        return Action::Stop();
+      assert(RetS == Body);
     }
+    bool Continue = SEWalker.walkToStmtPost(DeferS);
+    if (!Continue)
+      return Action::Stop();
+
+    // Already walked children.
+    return Action::SkipNode(DeferS);
   }
-  return Action::VisitNodeIf(TraverseChildren, S);
+
+  return Action::Continue(S);
 }
 
 ASTWalker::PostWalkResult<Stmt *> SemaAnnotator::walkToStmtPost(Stmt *S) {
@@ -360,13 +366,20 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       return Action::Continue(E);
     }
+
+    // Skip implicit DeclRefExprs that will be handled via CtorRefs in
+    // passReference. This matches the location check in passReference.
+    if (DRE->isImplicit() && !CtorRefs.empty() &&
+        CtorRefs.back()->getFn()->getLoc() == DRE->getLoc())
+      return Action::Continue(E);
   }
 
   if (!isa<InOutExpr>(E) && !isa<LoadExpr>(E) && !isa<OpenExistentialExpr>(E) &&
       !isa<MakeTemporarilyEscapableExpr>(E) &&
       !isa<CollectionUpcastConversionExpr>(E) && !isa<OpaqueValueExpr>(E) &&
       !isa<SubscriptExpr>(E) && !isa<KeyPathExpr>(E) && !isa<LiteralExpr>(E) &&
-      !isa<CollectionExpr>(E) && E->isImplicit())
+      !isa<CollectionExpr>(E) && !isa<DeclRefExpr>(E) && !isa<MemberRefExpr>(E) &&
+      E->isImplicit())
     return Action::Continue(E);
 
   if (auto LE = dyn_cast<LiteralExpr>(E)) {
@@ -395,7 +408,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
                       ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
-                                        OpAccess))) {
+                                        OpAccess, DRE->isImplicit()))) {
       return Action::Stop();
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
@@ -421,7 +434,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
-                                         OpAccess))) {
+                                         OpAccess, MRE->isImplicit()))) {
       return Action::Stop();
     }
     // We already visited the children.
@@ -451,8 +464,33 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return Action::Stop();
     }
 
-    if (!SE->getArgs()->walk(*this))
-      return Action::Stop();
+    // For regular subscripts (not dynamic member lookups), the index expressions
+    // are always read, regardless of how the subscript is being used (read or write).
+    // Do not propagate a write access kind into the subscript arguments.
+    // However, for dynamic member lookup subscripts, the argument represents
+    // a member being accessed, so it should reflect the access kind.
+    bool isKeyPathDynamicMemberLookup = false;
+    if (auto *SD = dyn_cast_or_null<SubscriptDecl>(SubscrD)) {
+      // Check if the base type has @dynamicMemberLookup
+      Type baseType = SE->getBase()->getType();
+      if (baseType) {
+        baseType = baseType->getWithoutSpecifierType();
+        if (baseType->hasDynamicMemberLookupAttribute() &&
+            isValidKeyPathDynamicMemberLookup(SD)) {
+          isKeyPathDynamicMemberLookup = true;
+        }
+      }
+    }
+
+    if (!isKeyPathDynamicMemberLookup) {
+      llvm::SaveAndRestore<std::optional<AccessKind>>
+          C(this->OpAccess, std::nullopt);
+      if (!SE->getArgs()->walk(*this))
+        return Action::Stop();
+    } else {
+      if (!SE->getArgs()->walk(*this))
+        return Action::Stop();
+    }
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))

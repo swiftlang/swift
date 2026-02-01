@@ -88,6 +88,12 @@ module StdFunction {
   export *
 }
 
+module StdVariant {
+  header "std-variant.h"
+  requires cplusplus
+  export *
+}
+
 module NoCXXStdlib {
   header "no-cxx-stdlib.h"
   requires cplusplus
@@ -102,6 +108,12 @@ module CustomSmartPtr {
 
 module StdExpected {
   header "std-expected.h"
+  requires cplusplus
+  export *
+}
+
+module StdEnableSharedFromThis {
+  header "std-enable-shared-from-this.h"
   requires cplusplus
   export *
 }

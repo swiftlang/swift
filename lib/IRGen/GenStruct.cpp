@@ -39,6 +39,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Sema/Sema.h"
@@ -553,7 +554,10 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      return importer::findCopyConstructor(cxxRecordDecl);
+      if (auto *cctor = importer::findCopyConstructor(cxxRecordDecl);
+          cctor && cctor->getAccess() == clang::AS_public)
+        return cctor;
+      return nullptr;
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
@@ -622,6 +626,9 @@ namespace {
       auto &ctx = IGF.IGM.Context;
       auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
+      auto &diagEngine = importer->getClangSema().getDiagnostics();
+      clang::DiagnosticErrorTrap trap(diagEngine);
+
       if (copyConstructor->isDefaulted() &&
           copyConstructor->getAccess() == clang::AS_public &&
           !copyConstructor->isDeleted() &&
@@ -642,8 +649,6 @@ namespace {
               const_cast<clang::CXXConstructorDecl *>(copyConstructor));
       }
 
-      auto &diagEngine = importer->getClangSema().getDiagnostics();
-      clang::DiagnosticErrorTrap trap(diagEngine);
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
 

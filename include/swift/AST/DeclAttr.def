@@ -370,7 +370,7 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
 
 DECL_ATTR(c, CDecl,
   OnFunc | OnAccessor | OnEnum,
-  LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   63)
 DECL_ATTR_ALIAS(_cdecl, CDecl)
 
@@ -608,7 +608,10 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
   110)
 
-// Unused '111'
+SIMPLE_DECL_ATTR(_owned, Owned,
+  OnVar | OnSubscript,
+  NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  111)
 
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
   OnFunc | OnConstructor | OnDestructor | OnVar | OnSubscript | OnProtocol | OnExtension | OnClass | OnStruct | OnEnum,

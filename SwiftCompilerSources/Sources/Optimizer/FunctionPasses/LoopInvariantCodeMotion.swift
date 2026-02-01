@@ -680,10 +680,9 @@ private extension MovableInstructions {
 
   /// Hoist and sink scoped instructions.
   mutating func hoistWithSinkScopedInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    // Since we don't sink scoped instructions to dead exit blocks, we need to check there's
-    // at least one exit block to which we can sink end instructions. Otherwise we could end up
-    // with partially hoisted scoped instruction that could lead to e.g. value overconsumption.
-    guard !loop.hasNoExitBlocks, loop.exitBlocks.contains(where: { !context.deadEndBlocks.isDeadEnd($0) }) else {
+    // For infinite loops we could end up with partially hoisted scoped instruction that could
+    // lead to e.g. value overconsumption.
+    if loop.hasNoExitBlocks {
       return false
     }
     
@@ -1021,7 +1020,7 @@ private extension Instruction {
     let copyValue = headerBuilder.createCopyValue(operand: preheaderLoadBorrow)
     loadCopyInst.replace(with: copyValue, context)
     
-    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
+    for exitBlock in loop.exitBlocks {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       let exitBlockBuilder = Builder(before: exitBlock.instructions.first!, context)
@@ -1032,7 +1031,7 @@ private extension Instruction {
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
 
-    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
+    for exitBlock in loop.exitBlocks {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if changed {

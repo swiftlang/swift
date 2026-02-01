@@ -1,5 +1,5 @@
-module Constructor {
-  header "constructor.h"
+module FRTConstructors {
+  header "frt-constructors.h"
   requires cplusplus
 }
 

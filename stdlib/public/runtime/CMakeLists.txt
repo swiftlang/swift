@@ -36,6 +36,7 @@ set(swift_runtime_sources
     Array.cpp
     AutoDiffSupport.cpp
     Bincompat.cpp
+    Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
     CrashReporter.cpp

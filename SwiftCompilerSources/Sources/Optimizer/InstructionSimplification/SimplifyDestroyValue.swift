@@ -51,6 +51,11 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
 
+    if isDeadEnd {
+      // Dead-end destroys are no-ops, anyway. Don't try to move them away from an `unreachable` instruction.
+      return
+    }
+
     let destroyedInst: Instruction
     switch destroyedValue {
     case is StructInst,

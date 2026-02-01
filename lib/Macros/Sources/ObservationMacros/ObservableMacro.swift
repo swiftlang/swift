@@ -220,7 +220,7 @@ extension AccessorDeclSyntax {
     return AccessorDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: attributes,
-      modifier: modifier,
+      modifiers: modifiers,
       accessorSpecifier: accessorSpecifier,
       parameters: parameters,
       effectSpecifiers: effectSpecifiers,

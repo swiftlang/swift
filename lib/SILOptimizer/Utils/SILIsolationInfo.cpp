@@ -302,7 +302,7 @@ static SILValue lookThroughNonVarDeclOwnershipInsts(SILValue v) {
 static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
   bool foundOneNonIsolatedUnsafe = false;
   for (auto &op : pai->getArgumentOperands()) {
-    if (SILIsolationInfo::isSendableType(op.get()))
+    if (SILIsolationInfo::isSendable(op.get()))
       continue;
 
     // Normally we would not look through copy_value, begin_borrow, or
@@ -852,7 +852,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       }
     } else {
       // Ok, we have a temporary. If it is non-Sendable...
-      if (SILIsolationInfo::isNonSendableType(asi)) {
+      if (SILIsolationInfo::isNonSendable(asi)) {
         if (auto isolation = inferIsolationInfoForTempAllocStack(asi))
           return isolation;
       }
@@ -922,7 +922,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
 SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Return early if we do not have a non-Sendable type.
-  if (!SILIsolationInfo::isNonSendableType(arg->getType(), arg->getFunction()))
+  if (!SILIsolationInfo::isNonSendable(arg))
     return {};
 
   // Handle a switch_enum from a global-actor-isolated type.
@@ -1580,6 +1580,49 @@ void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
   }
 }
 
+bool SILIsolationInfo::isSendable(SILValue value) {
+  // If the type system says we are sendable, then we are always sendable.
+  if (isSendableType(value->getType(), value->getFunction()))
+    return true;
+
+  if (auto *fArg = dyn_cast<SILFunctionArgument>(value);
+      fArg && fArg->isClosureCapture() && fArg->isInferredImmutable()) {
+    CanSILBoxType boxType = fArg->getType().getAs<SILBoxType>();
+    if (!boxType || boxType->getNumFields() != 1)
+      return false;
+    auto innerType = boxType->getFieldType(*fArg->getFunction(), 0);
+    // We can only do this if the underlying type is Sendable.
+    if (isNonSendableType(innerType, fArg->getFunction()))
+      return false;
+    // For now to be conservative, only do this if we have a weak parameter.
+    if (auto ownership = innerType.getReferenceStorageOwnership();
+        !ownership || *ownership != ReferenceOwnership::Weak)
+      return false;
+    // Ok, we can treat this as Sendable.
+    return true;
+  }
+
+  if (auto *abi = dyn_cast<AllocBoxInst>(lookThroughOwnershipInsts(value));
+      abi && abi->isInferredImmutable()) {
+    CanSILBoxType boxType = abi->getType().castTo<SILBoxType>();
+    if (boxType->getNumFields() != 1)
+      return false;
+
+    auto innerType = boxType->getFieldType(*abi->getFunction(), 0);
+    if (isNonSendableType(innerType, abi->getFunction()))
+      return false;
+
+    // For now to be conservative, only do this if we have a weak parameter.
+    if (auto ownership = innerType.getReferenceStorageOwnership();
+        !ownership || *ownership != ReferenceOwnership::Weak)
+      return false;
+
+    return true;
+  }
+
+  return false;
+}
+
 // Check if the passed in type is NonSendable.
 //
 // NOTE: We special case RawPointer and NativeObject to ensure they are
@@ -1608,6 +1651,20 @@ bool SILIsolationInfo::isNonSendableType(SILType type, SILFunction *fn) {
   // only want to trigger that if we analyze a non-Sendable type.
   if (type.isSendable(fn))
     return false;
+
+  // See if we have an immutable box that contains only Sendable things. In such
+  // a case, we treat the box itself as Sendable.
+  //
+  // One example of such a type is a Sendable noncopyable let that is captured
+  // by an escaping closure.
+  if (auto *boxTy = type.getASTType()->getAs<SILBoxType>();
+      boxTy &&
+      llvm::all_of(range(boxTy->getNumFields()), [&](unsigned index) -> bool {
+        return !boxTy->isFieldMutable(index) &&
+               isSendableType(boxTy->getFieldType(*fn, index), fn);
+      })) {
+    return false;
+  }
 
   // Grab out behavior. If it is none, then we have a type that we want to treat
   // as non-Sendable.
@@ -1823,6 +1880,39 @@ static FunctionTest
                                                           llvm::outs());
                               llvm::outs() << "\n";
                             });
+
+// Test: sil_isolation_info_is_sendable
+//
+// Checks whether a SILValue is considered Sendable by the region-based
+// isolation analysis. This is different from sil_isolation_info_inference which
+// returns the *isolation* of a value (task-isolated, actor-isolated, etc.).
+//
+// Use this test to verify Sendable inference for:
+// - Box types (alloc_box), especially immutable boxes with Sendable contents
+// - Values where Sendability affects region analysis but not isolation
+//
+// Arguments:
+// - SILValue: value to run SILIsolationInfo::isSendable upon
+//
+// Output format:
+//   Input Value: <SIL instruction>
+//   IsSendable: yes|no
+//
+// Example usage in .sil test:
+//   specify_test "sil_isolation_info_is_sendable @trace[0]"
+//   %0 = alloc_box ${ let MyActor }
+//   debug_value [trace] %0
+//   // CHECK: IsSendable: yes
+static FunctionTest
+    IsSendableInference("sil_isolation_info_is_sendable",
+                        [](auto &function, auto &arguments, auto &test) {
+                          auto value = arguments.takeValue();
+
+                          bool isSendable = SILIsolationInfo::isSendable(value);
+                          llvm::outs() << "Input Value: " << *value;
+                          llvm::outs() << "IsSendable: "
+                                       << (isSendable ? "yes\n" : "no\n");
+                        });
 
 // Arguments:
 // - SILValue: first value to merge

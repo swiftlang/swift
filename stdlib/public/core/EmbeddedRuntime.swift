@@ -150,7 +150,7 @@ func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
 }
 
 @c
-public func swift_coroFrameAlloc(_ size: Int, _ type: UInt) -> UnsafeMutableRawPointer? {
+public func swift_coroFrameAlloc(_ size: Int, _ type: UInt64) -> UnsafeMutableRawPointer? {
   return unsafe alignedAlloc(
     size: size,
     alignment: _swift_MinAllocationAlignment)
@@ -308,7 +308,7 @@ public func swifft_makeBoxUnique(buffer: Builtin.RawPointer, metadata: Builtin.R
   if !swift_isUniquelyReferenced_native(object: box) {
     let refAndObjectAddr = swift_allocBox(metadata)
     unsafe _swift_embedded_initialize_box(UnsafeMutableRawPointer(metadata), UnsafeMutableRawPointer(refAndObjectAddr.1), oldObjectAddr)
-    swift_releaseBox(box)
+    unsafe swift_releaseBox(UnsafeMutableRawPointer(box))
     unsafe addrOfHeapObjectPtr.pointee = refAndObjectAddr.0
     return refAndObjectAddr
   } else {
@@ -380,7 +380,8 @@ public func swift_dynamicCast(
     }
     if !success {
       if isDestroyOnFailure {
-        unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src))
+        unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src),
+                                                   swift_releaseBox)
       }
 
       if isUnconditionalCast {
@@ -403,7 +404,8 @@ public func swift_dynamicCast(
   let success = srcMetadata == dstMetadata
   if !success {
     if isDestroyOnFailure {
-      unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src))
+      unsafe _swift_embedded_existential_destroy(UnsafeMutableRawPointer(src),
+                                                 swift_releaseBox)
     }
 
     if isUnconditionalCast {
@@ -414,7 +416,8 @@ public func swift_dynamicCast(
   if isTakeOnSuccess {
     // take from an existential to a concrete type
     unsafe _swift_embedded_existential_init_with_take(
-             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src))
+             UnsafeMutableRawPointer(dest), UnsafeMutableRawPointer(src),
+             swift_releaseBox)
   } else {
     // copy from an existential to a concrete type
     unsafe _swift_embedded_existential_init_with_copy(
@@ -585,7 +588,8 @@ func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32, isBo
 }
 
 @c
-public func swift_releaseBox(_ object: Builtin.RawPointer) {
+public func swift_releaseBox(_ box: UnsafeMutableRawPointer) {
+  let object = box._rawValue
   if !isValidPointerForNativeRetain(object: object) {
     fatalError("not a valid pointer for releaseBox")
   }
@@ -649,20 +653,6 @@ fileprivate func storeRelease(_ atomic: UnsafeMutablePointer<Int>, newValue: Int
 fileprivate func storeRelaxed(_ atomic: UnsafeMutablePointer<Int>, newValue: Int) {
   Builtin.atomicstore_monotonic_Word(atomic._rawValue, newValue._builtinWordValue)
 }
-
-/// Exclusivity checking
-
-@c
-public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
-  // TODO: Add actual exclusivity checking.
-}
-
-@c
-public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
-  // TODO: Add actual exclusivity checking.
-}
-
-
 
 // Once
 
@@ -734,6 +724,13 @@ func _embeddedReportFatalError(prefix: StaticString, message: StaticString) {
 }
 
 @inline(never)
+func _embeddedReportFatalError(prefix: StaticString, message: UnsafeBufferPointer<UInt8>) {
+  print(prefix, terminator: "")
+  if message.count > 0 { print(": ", terminator: "") }
+  unsafe print(message)
+}
+
+@inline(never)
 func _embeddedReportFatalErrorInFile(prefix: StaticString, message: StaticString, file: StaticString, line: UInt) {
   print(file, terminator: ":")
   print(line, terminator: ": ")
@@ -749,6 +746,38 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
   unsafe print(message)
+}
+
+extension Access.Action {
+  func printName() {
+    switch self {
+    case .read:
+      print("read", terminator: "")
+    case .modify:
+      print("modify", terminator: "")
+    }
+  }
+}
+
+@inline(never)
+func _embeddedReportExclusivityViolation(
+  oldAction: Access.Action, oldPC: UnsafeRawPointer?,
+  newAction: Access.Action, newPC: UnsafeRawPointer?,
+  pointer: UnsafeRawPointer
+) {
+  print("Simultaneous access to 0x", terminator: "")
+  printAsHex(Int(bitPattern: pointer), terminator: "")
+  print(", but modification requires exclusive access")
+
+  print("Previous access (a ", terminator: "")
+  oldAction.printName()
+  print(") started at 0x", terminator: "")
+  printAsHex(Int(bitPattern: oldPC))
+
+  print("Current access (a ", terminator: "")
+  newAction.printName()
+  print(") started at 0x", terminator: "")
+  printAsHex(Int(bitPattern: newPC))
 }
 
 // CXX Exception Personality

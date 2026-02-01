@@ -445,12 +445,15 @@ namespace {
     bool SuppressDiagnostics;
 
     ExprRewriter(ConstraintSystem &cs, Solution &solution,
-                 std::optional<SyntacticElementTarget> target,
-                 bool suppressDiagnostics)
-        : ctx(cs.getASTContext()), cs(cs),
-          dc(target ? target->getDeclContext() : cs.DC),
+                 SyntacticElementTarget target, bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs), dc(target.getDeclContext()),
           solution(solution), target(target),
           SuppressDiagnostics(suppressDiagnostics) {}
+
+    ExprRewriter(ConstraintSystem &cs, Solution &solution, DeclContext &dc,
+                 bool suppressDiagnostics)
+        : ctx(cs.getASTContext()), cs(cs), dc(&dc), solution(solution),
+          target(std::nullopt), SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -4529,7 +4532,7 @@ namespace {
         Expr *sub = expr->getSubExpr();
         auto subLoc =
             cs.getConstraintLocator(sub, ConstraintLocator::CoercionOperand);
-        sub = solution.coerceToType(sub, expr->getCastType(), subLoc);
+        sub = solution.coerceToType(sub, expr->getCastType(), subLoc, *dc);
         if (!sub)
           return nullptr;
 
@@ -5793,8 +5796,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     SmallString<16> toLabelStr;
     concatLabels(labels, toLabelStr);
 
-    using namespace version;
-    if (ctx.isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion())) {
+    if (ctx.isAtLeastFutureMajorLanguageMode()) {
       ctx.Diags.diagnose(expr->getLoc(), diag::reordering_tuple_shuffle,
                          fromLabelStr, toLabelStr);
     } else {
@@ -6706,11 +6708,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
   return rewriter.coerceToType(element, destType, locator);
 }
 
-static CollectionUpcastConversionExpr::ConversionPair
-buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
-                             Type srcType, Type destType,
-                             bool bridged, ConstraintLocatorBuilder locator,
-                             unsigned typeArgIndex) {
+static ConversionPair buildOpaqueElementConversion(
+    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
+    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
   // Build the conversion.
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
@@ -6723,6 +6723,69 @@ buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
       opaque);
 
   return { opaque, conversion };
+}
+
+static ClosureExpr *buildClosureElementConversion(
+    ExprRewriter &rewriter, SourceRange srcRange, Type srcType, Type destType,
+    bool bridged, ConstraintLocatorBuilder locator, unsigned typeArgIndex) {
+  // Build the conversion.
+  auto &cs = rewriter.getConstraintSystem();
+  ASTContext &Context = cs.getASTContext();
+
+  DeclContext *declContext = rewriter.dc;
+
+  DeclAttributes attributes;
+  SourceRange bracketRange;
+  VarDecl *capturedSelfDecl = nullptr;
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+  TypeExpr *thrownType = nullptr;
+  SourceLoc arrowLoc;
+  TypeExpr *explicitResultType = nullptr;
+  SourceLoc inLoc;
+
+  ClosureExpr *closure = new (Context) ClosureExpr(
+      attributes, bracketRange, capturedSelfDecl, nullptr, asyncLoc, throwsLoc,
+      thrownType, arrowLoc, inLoc, explicitResultType, declContext);
+  closure->setImplicit(true);
+  closure->setIsConversionClosure(true);
+
+  Identifier ident = Context.getDollarIdentifier(0);
+  ParamDecl *param = new (Context) ParamDecl(
+      SourceLoc(), SourceLoc(), Identifier(), SourceLoc(), ident, closure);
+
+  param->setSpecifier(ParamSpecifier::Default);
+  param->setInterfaceType(srcType->mapTypeOutOfEnvironment());
+  param->setImplicit();
+
+  ParameterList *params =
+      ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
+  closure->setParameterList(params);
+
+  auto srcExp = rewriter.cs.cacheType(
+      new (Context) DeclRefExpr(param, DeclNameLoc(srcRange.Start), true,
+                                AccessSemantics::Ordinary, srcType));
+
+  Expr *conversion = buildElementConversion(
+      rewriter, srcRange, srcType, destType, bridged,
+      locator.withPathElement(LocatorPathElt::GenericArgument(typeArgIndex)),
+      srcExp);
+
+  auto *RS = ReturnStmt::createImplicit(Context, conversion);
+  ASTNode bodyNode(RS);
+  auto *BS = BraceStmt::createImplicit(Context, ArrayRef(bodyNode));
+  closure->setBody(BS);
+
+  auto closureParam = AnyFunctionType::Param(srcType);
+  auto extInfo =
+      FunctionType::ExtInfo().withNoEscape().withSendable().withoutIsolation();
+  auto *fnTy = FunctionType::get(ArrayRef(closureParam), destType, extInfo);
+  closure->setType(fnTy);
+
+  closure->setCaptureInfo(CaptureInfo::empty());
+
+  rewriter.cs.cacheType(closure);
+  return closure;
 }
 
 void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
@@ -6859,10 +6922,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
   // Build the first value conversion.
   auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
   auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
-  auto conv =
-    buildOpaqueElementConversion(*this, expr->getLoc(),
-                                 fromArgs[0], toArgs[0],
-                                 bridged, locator, 0);
+  auto conv = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[0],
+                                            toArgs[0], bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (toType->isArray() || ConstraintSystem::isSetType(toType)) {
@@ -6874,10 +6935,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 =
-    buildOpaqueElementConversion(*this, expr->getLoc(),
-                                 fromArgs[1], toArgs[1],
-                                 bridged, locator, 1);
+  auto conv2 = buildClosureElementConversion(*this, expr->getLoc(), fromArgs[1],
+                                             toArgs[1], bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
@@ -6959,7 +7018,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // Use the requirements of any parameterized protocols to build out fake
   // argument conversions that can be used to infer opaque types.
-  SmallVector<CollectionUpcastConversionExpr::ConversionPair, 4> argConversions;
+  SmallVector<ConversionPair, 4> argConversions;
 
   auto fromConstraintType = fromInstanceType;
   if (auto existential = fromConstraintType->getAs<ExistentialType>())
@@ -9231,7 +9290,8 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
 
   auto locator = cs.getConstraintLocator(
       target.getAsExpr(), LocatorPathElt::ContextualType(CTP_Initialization));
-  initializer = solution.coerceToType(initializer, initType, locator);
+  initializer = solution.coerceToType(initializer, initType, locator,
+                                      *rewriter.getCurrentDC());
   if (!initializer)
     return std::nullopt;
 
@@ -9326,157 +9386,6 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   return resultTarget;
 }
 
-static std::optional<SequenceIterationInfo>
-applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
-                                   SequenceIterationInfo info, DeclContext *dc,
-                                   SyntacticElementTargetRewriter &rewriter) {
-  auto &solution = rewriter.getSolution();
-  auto &cs = solution.getConstraintSystem();
-  auto &ctx = cs.getASTContext();
-
-  auto *parsedSequence = stmt->getParsedSequence();
-  bool isAsync = stmt->getAwaitLoc().isValid();
-
-  // Simplify the various types.
-  info.sequenceType = solution.simplifyType(info.sequenceType);
-  info.elementType = solution.simplifyType(info.elementType);
-  info.initType = solution.simplifyType(info.initType);
-
-  // First, let's apply the solution to the expression.
-  auto *makeIteratorVar = info.makeIteratorVar;
-
-  auto makeIteratorTarget = *cs.getTargetFor({makeIteratorVar, /*index=*/0});
-
-  auto rewrittenTarget = rewriter.rewriteTarget(makeIteratorTarget);
-  if (!rewrittenTarget)
-    return std::nullopt;
-
-  // Set type-checked initializer and mark it as such.
-  {
-    makeIteratorVar->setInit(/*index=*/0, rewrittenTarget->getAsExpr());
-    makeIteratorVar->setInitializerChecked(/*index=*/0);
-  }
-
-  stmt->setIteratorVar(makeIteratorVar);
-
-  // Now, `$iterator.next()` call.
-  {
-    auto nextTarget = *cs.getTargetFor(info.nextCall);
-
-    auto rewrittenTarget = rewriter.rewriteTarget(nextTarget);
-    if (!rewrittenTarget)
-      return std::nullopt;
-
-    Expr *nextCall = rewrittenTarget->getAsExpr();
-    // Wrap a call to `next()` into `try await` since `AsyncIteratorProtocol`
-    // witness could be `async throws`.
-    if (isAsync) {
-      // Cannot use `forEachChildExpr` here because we need to
-      // to wrap a call in `try` and then stop immediately after.
-      struct TryInjector : ASTWalker {
-        ASTContext &C;
-        const Solution &S;
-
-        bool ShouldStop = false;
-
-        TryInjector(ASTContext &ctx, const Solution &solution)
-            : C(ctx), S(solution) {}
-
-        MacroWalking getMacroWalkingBehavior() const override {
-          return MacroWalking::Expansion;
-        }
-
-        PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-          if (ShouldStop)
-            return Action::Stop();
-
-          if (auto *call = dyn_cast<CallExpr>(E)) {
-            // There is a single call expression in `nextCall`.
-            ShouldStop = true;
-
-            auto nextRefType =
-                S.getResolvedType(call->getFn())->castTo<FunctionType>();
-
-            // If the inferred witness is throwing, we need to wrap the call
-            // into `try` expression.
-            if (nextRefType->isThrowing()) {
-              auto *tryExpr = TryExpr::createImplicit(
-                  C, /*tryLoc=*/call->getStartLoc(), call, call->getType());
-              // Cannot stop here because we need to make sure that
-              // the new expression gets injected into AST.
-              return Action::SkipNode(tryExpr);
-            }
-          }
-
-          return Action::Continue(E);
-        }
-      };
-
-      nextCall->walk(TryInjector(ctx, solution));
-    }
-
-    stmt->setNextCall(nextCall);
-  }
-
-  // Convert that std::optional<Element> value to the type of the pattern.
-  auto optPatternType = OptionalType::get(info.initType);
-  Type nextResultType = OptionalType::get(info.elementType);
-  if (!optPatternType->isEqual(nextResultType)) {
-    OpaqueValueExpr *elementExpr = new (ctx) OpaqueValueExpr(
-        stmt->getInLoc(), nextResultType->getOptionalObjectType(),
-        /*isPlaceholder=*/false);
-    cs.cacheExprTypes(elementExpr);
-
-    auto *loc = cs.getConstraintLocator(parsedSequence,
-                                        ConstraintLocator::SequenceElementType);
-    auto *convertExpr = solution.coerceToType(elementExpr, info.initType, loc);
-    if (!convertExpr)
-      return std::nullopt;
-
-    stmt->setElementExpr(elementExpr);
-    stmt->setConvertElementExpr(convertExpr);
-  }
-
-  // Get the conformance of the sequence type to the Sequence protocol.
-  auto sequenceProto = TypeChecker::getProtocol(
-      ctx, stmt->getForLoc(),
-      stmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
-                                    : KnownProtocolKind::Sequence);
-
-  auto type = info.sequenceType->getRValueType();
-  if (type->isExistentialType()) {
-    auto *contextualLoc = solution.getConstraintLocator(
-        parsedSequence, LocatorPathElt::ContextualType(CTP_ForEachSequence));
-    type = Type(solution.OpenedExistentialTypes[contextualLoc]);
-  }
-  auto sequenceConformance = checkConformance(type, sequenceProto);
-  assert(!sequenceConformance.isInvalid() &&
-         "Couldn't find sequence conformance");
-  stmt->setSequenceConformance(type, sequenceConformance);
-
-  return info;
-}
-
-static std::optional<PackIterationInfo>
-applySolutionToForEachStmtPreamble(ForEachStmt *stmt, PackIterationInfo info,
-                                   SyntacticElementTargetRewriter &rewriter) {
-  auto &solution = rewriter.getSolution();
-  auto &cs = solution.getConstraintSystem();
-  auto *sequenceExpr = stmt->getParsedSequence();
-  PackExpansionExpr *expansion = cast<PackExpansionExpr>(sequenceExpr);
-
-  // First, let's apply the solution to the pack expansion.
-  auto makeExpansionTarget = *cs.getTargetFor(expansion);
-  auto rewrittenTarget = rewriter.rewriteTarget(makeExpansionTarget);
-  if (!rewrittenTarget)
-    return std::nullopt;
-
-  // Simplify the pattern type of the pack expansion.
-  info.patternType = solution.simplifyType(info.patternType);
-
-  return info;
-}
-
 /// Apply the given solution to the for-each statement target.
 ///
 /// \returns the resulting initialization expression.
@@ -9484,29 +9393,17 @@ static std::optional<SyntacticElementTarget>
 applySolutionToForEachStmtPreamble(SyntacticElementTarget target,
                                    SyntacticElementTargetRewriter &rewriter) {
   auto resultTarget = target;
-  auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
+  auto &solution = rewriter.getSolution();
   auto *stmt = target.getAsForEachStmt();
 
-  Type rewrittenPatternType;
-
-  if (auto *info = forEachStmtInfo.dyn_cast<SequenceIterationInfo>()) {
-    auto resultInfo = applySolutionToForEachStmtPreamble(
-        stmt, *info, target.getDeclContext(), rewriter);
-    if (!resultInfo) {
+  {
+    auto *sequenceExpr = stmt->getSequence();
+    auto sequenceTarget = *solution.getTargetFor(sequenceExpr);
+    auto rewrittenTarget = rewriter.rewriteTarget(sequenceTarget);
+    if (!rewrittenTarget)
       return std::nullopt;
-    }
 
-    forEachStmtInfo = *resultInfo;
-    rewrittenPatternType = resultInfo->initType;
-  } else {
-    auto resultInfo = applySolutionToForEachStmtPreamble(
-        stmt, forEachStmtInfo.get<PackIterationInfo>(), rewriter);
-    if (!resultInfo) {
-      return std::nullopt;
-    }
-
-    forEachStmtInfo = *resultInfo;
-    rewrittenPatternType = resultInfo->patternType;
+    stmt->setSequence(rewrittenTarget->getAsExpr());
   }
 
   // Coerce the pattern to the element type.
@@ -9520,6 +9417,8 @@ applySolutionToForEachStmtPreamble(SyntacticElementTarget target,
 
     // Apply the solution to the pattern as well.
     auto contextualPattern = target.getContextualPattern();
+    auto rewrittenPatternType =
+        solution.getResolvedType(contextualPattern.getPattern());
     auto coercedPattern = TypeChecker::coercePatternToType(
         contextualPattern, rewrittenPatternType, options, tryRewritePattern);
     if (!coercedPattern)
@@ -9898,10 +9797,10 @@ ConstraintSystem::applySolution(Solution &solution,
   return resultTarget;
 }
 
-Expr *
-Solution::coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) {
+Expr *Solution::coerceToType(Expr *expr, Type toType,
+                             ConstraintLocator *locator, DeclContext &dc) {
   auto &cs = getConstraintSystem();
-  ExprRewriter rewriter(cs, *this, std::nullopt, /*suppressDiagnostics=*/false);
+  ExprRewriter rewriter(cs, *this, dc, /*suppressDiagnostics=*/false);
   Expr *result = rewriter.coerceToType(expr, toType, locator);
   if (!result)
     return nullptr;

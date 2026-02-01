@@ -5532,22 +5532,6 @@ public:
   bool isCached() const { return true; }
 };
 
-class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
-    : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
-                           bool(const ModuleDecl *),
-                           RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
-
-public:
-  bool isCached() const { return true; }
-};
-
 class AvailabilityDomainForDeclRequest
     : public SimpleRequest<AvailabilityDomainForDeclRequest,
                            std::optional<AvailabilityDomain>(ValueDecl *),
@@ -5589,6 +5573,25 @@ public:
     auto *domain = std::get<0>(getStorage());
     return extractNearestSourceLoc(domain->getDecl());
   }
+};
+
+class DesugarForEachStmtRequest
+    : public SimpleRequest<DesugarForEachStmtRequest,
+                           BraceStmt *(ForEachStmt *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  BraceStmt *evaluate(Evaluator &evaluator, ForEachStmt *FES) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<BraceStmt *> getCachedResult() const;
+  void cacheResult(BraceStmt *stmt) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

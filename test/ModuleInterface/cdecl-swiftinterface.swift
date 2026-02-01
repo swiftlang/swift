@@ -39,9 +39,13 @@ public func objcImplFunc() { }
 /// Print other @c functions.
 @c
 public func bareCDecl() {}
-// CHECK: @c
+// CHECK: #if compiler(>=5.3) && hasAttribute(c)
+// CHECK-NEXT: @c
 // CHECK-NEXT: public func bareCDecl
-
+// CHECK-NEXT: #else
+// CHECK-NEXT: @_cdecl("bareCDecl")
+// CHECK-NEXT: public func bareCDecl
+// CHECK-NEXT: #endif
 @c(c_name)
 public func namedCDecl() {}
 // CHECK: @c(c_name)

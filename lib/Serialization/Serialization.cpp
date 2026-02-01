@@ -517,7 +517,8 @@ static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
   case swift::OpaqueReadOwnership::KIND:                      \
     return uint8_t(serialization::OpaqueReadOwnership::KIND);
   CASE(Owned)
-  CASE(Borrowed)
+  CASE(YieldingBorrow)
+  CASE(Borrow)
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
@@ -534,7 +535,7 @@ static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
-  CASE(Read2)
+  CASE(YieldingBorrow)
   CASE(Borrow)
 #undef CASE
   }
@@ -553,7 +554,7 @@ static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(Mutate)
 #undef CASE
   }
@@ -570,7 +571,7 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
   CASE(Mutate)
@@ -670,18 +671,25 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
   return TypesToSerialize.addRef(typeToSerialize);
 }
 
-serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty) {
+serialization::ClangTypeID Serializer::addClangTypeRef(const clang::Type *ty,
+                                                       bool forFunction) {
   if (!ty) return 0;
 
   // Try to serialize the non-canonical type, but fall back to the
   // canonical type if necessary.
   auto loader = getASTContext().getClangModuleLoader();
   bool isSerializable;
-  if (loader->isSerializable(ty, false)) {
+  auto info = loader->isSerializable(ty, false);
+  if (info.Serializable) {
+    if (forFunction && info.HasSwiftDecl)
+      return 0;
     isSerializable = true;
   } else if (!ty->isCanonicalUnqualified()) {
     ty = ty->getCanonicalTypeInternal().getTypePtr();
-    isSerializable = loader->isSerializable(ty, false);
+    info = loader->isSerializable(ty, false);
+    if (forFunction && info.HasSwiftDecl)
+      return 0;
+    isSerializable = info.Serializable;
   } else {
     isSerializable = false;
   }
@@ -4034,11 +4042,13 @@ private:
       writePattern(typed->getSubPattern());
       break;
     }
+
     case PatternKind::Is:
     case PatternKind::EnumElement:
     case PatternKind::OptionalSome:
     case PatternKind::Bool:
     case PatternKind::Expr:
+    case PatternKind::Opaque:
       llvm_unreachable("Refutable patterns cannot be serialized");
 
     case PatternKind::Binding: {
@@ -4180,7 +4190,7 @@ public:
       writeABIOnlyCounterpart(abiRole.getCounterpartUnchecked());
 
     // Emit attributes (if any).
-    for (auto Attr : D->getAttrs())
+    for (auto Attr : D->getSemanticAttrs())
       writeDeclAttribute(D, Attr);
 
     if (auto *value = dyn_cast<ValueDecl>(D))
@@ -5746,6 +5756,14 @@ public:
         S.addTypeRef(ty->getElementType()));
   }
 
+  void visitBuiltinBorrowType(BuiltinBorrowType *ty) {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[BuiltinBorrowTypeLayout::Code];
+    BuiltinBorrowTypeLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode,
+        S.addTypeRef(ty->getReferentType()));
+  }
+
   void visitSILTokenType(SILTokenType *ty) {
     // This is serialized like a BuiltinType, even though it isn't one.
     visitBuiltinTypeImpl(ty);
@@ -6023,7 +6041,8 @@ public:
         shouldSerializeClangType = false;
     }
     auto clangType = shouldSerializeClangType
-                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
+                         ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType(),
+                                             /*forFunction=*/true)
                          : ClangTypeID(0);
 
     auto isolation = encodeIsolation(fnTy->getIsolation());
@@ -6455,6 +6474,7 @@ void Serializer::writeAllDeclsAndTypes() {
   using namespace decls_block;
   registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
   registerDeclTypeAbbr<BuiltinFixedArrayTypeLayout>();
+  registerDeclTypeAbbr<BuiltinBorrowTypeLayout>();
   registerDeclTypeAbbr<TypeAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();

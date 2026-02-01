@@ -38,8 +38,28 @@
 #define GRAPH_NODE_CHANGE(Name) CHANGE(Name)
 #endif
 
+#ifndef COMMON_BINDING_INFORMATION_ADDITION
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  GRAPH_NODE_CHANGE(Added##PropertyName)
+#endif
+
+#ifndef COMMON_BINDING_INFORMATION_RETRACTION
+#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+  GRAPH_NODE_CHANGE(Retracted##PropertyName)
+#endif
+
 #ifndef BINDING_RELATION_CHANGE
 #define BINDING_RELATION_CHANGE(Name) CHANGE(Name)
+#endif
+
+#ifndef BINDING_RELATION_ADDITION
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  BINDING_RELATION_CHANGE(Added##RelationName)
+#endif
+
+#ifndef BINDING_RELATION_RETRACTION
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  BINDING_RELATION_CHANGE(Retracted##RelationName)
 #endif
 
 #ifndef SCORE_CHANGE
@@ -74,17 +94,31 @@ CONSTRAINT_CHANGE(GeneratedConstraint)
 
 GRAPH_NODE_CHANGE(AddedConstraint)
 GRAPH_NODE_CHANGE(RemovedConstraint)
-GRAPH_NODE_CHANGE(InferredBindings)
-GRAPH_NODE_CHANGE(RetractedBindings)
+GRAPH_NODE_CHANGE(AddedConstraintToInference)
+GRAPH_NODE_CHANGE(RetractedConstraintFromInference)
+GRAPH_NODE_CHANGE(AddedLiteral)
 GRAPH_NODE_CHANGE(RetractedLiteral)
-GRAPH_NODE_CHANGE(RetractedDelayedBy)
-GRAPH_NODE_CHANGE(RetractedProtocol)
-GRAPH_NODE_CHANGE(RetractedDefault)
 
-BINDING_RELATION_CHANGE(RetractedAdjacentVar)
-BINDING_RELATION_CHANGE(RetractedSubtypeOf)
-BINDING_RELATION_CHANGE(RetractedSupertypeOf)
-BINDING_RELATION_CHANGE(RetractedEquivalentTo)
+COMMON_BINDING_INFORMATION_ADDITION(DelayedBy, DelayedBy)
+COMMON_BINDING_INFORMATION_RETRACTION(DelayedBy, DelayedBy)
+
+COMMON_BINDING_INFORMATION_ADDITION(Protocol, Protocols)
+COMMON_BINDING_INFORMATION_RETRACTION(Protocol, Protocols)
+
+COMMON_BINDING_INFORMATION_ADDITION(Default, Defaults)
+COMMON_BINDING_INFORMATION_RETRACTION(Default, Defaults)
+
+BINDING_RELATION_ADDITION(AdjacentVar, AdjacentVars)
+BINDING_RELATION_RETRACTION(AdjacentVar, AdjacentVars)
+
+BINDING_RELATION_ADDITION(SubtypeOf, SubtypeOf)
+BINDING_RELATION_RETRACTION(SubtypeOf, SubtypeOf)
+
+BINDING_RELATION_ADDITION(SupertypeOf, SupertypeOf)
+BINDING_RELATION_RETRACTION(SupertypeOf, SupertypeOf)
+
+BINDING_RELATION_ADDITION(EquivalentTo, EquivalentTo)
+BINDING_RELATION_RETRACTION(EquivalentTo, EquivalentTo)
 
 SCORE_CHANGE(IncreasedScore)
 SCORE_CHANGE(DecreasedScore)
@@ -109,6 +143,7 @@ CHANGE(RecordedPotentialThrowSite)
 CHANGE(RecordedIsolatedParam)
 CHANGE(RecordedKeyPath)
 CHANGE(RetiredConstraint)
+CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
 
 LAST_CHANGE(RetractedBinding)
@@ -118,7 +153,11 @@ LAST_CHANGE(RetractedBinding)
 #undef CLOSURE_CHANGE
 #undef CONSTRAINT_CHANGE
 #undef GRAPH_NODE_CHANGE
+#undef COMMON_BINDING_INFORMATION_ADDITION
+#undef COMMON_BINDING_INFORMATION_RETRACTION
 #undef BINDING_RELATION_CHANGE
+#undef BINDING_RELATION_ADDITION
+#undef BINDING_RELATION_RETRACTION
 #undef SCORE_CHANGE
 #undef LAST_CHANGE
 #undef CHANGE

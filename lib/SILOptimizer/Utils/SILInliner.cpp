@@ -23,6 +23,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -121,6 +122,8 @@ public:
     return BeginApplySite(BeginApply, Loc, Builder);
   }
 
+  bool needCompleteValues() const { return !EndBorrows.empty(); }
+
   void preprocess(SILBasicBlock *returnToBB,
                   SmallVectorImpl<SILInstruction *> &endBorrowInsertPts) {
     SmallVector<EndApplyInst *, 1> endApplyInsts;
@@ -136,6 +139,9 @@ public:
       auto *abortApply = abortApplyInsts.pop_back_val();
       collectAbortApply(abortApply);
       endBorrowInsertPts.push_back(&*std::next(abortApply->getIterator()));
+    }
+    for (auto *eb : EndBorrows) {
+      endBorrowInsertPts.push_back(&*std::next(eb->getIterator()));
     }
 
     // We may have a mark_dependence/mark_dependence_addr on the coroutine's
@@ -270,7 +276,7 @@ public:
   /// Complete the begin_apply-specific inlining work. Delete vestiges of the
   /// apply site except the callee value. Return a valid iterator after the
   /// original begin_apply.
-  void complete() {
+  void complete(ArrayRef<SILValue> valuesToComplete, SILPassManager *pm) {
     // If there was no yield in the coroutine, then control never reaches
     // the end of the begin_apply, so all the downstream code is unreachable.
     // Make sure the function is well-formed, since we otherwise rely on
@@ -297,8 +303,6 @@ public:
       EndApply->eraseFromParent();
     if (AbortApply)
       AbortApply->eraseFromParent();
-    for (auto *EndBorrow : EndBorrows)
-      EndBorrow->eraseFromParent();
 
     if (auto allocation = BeginApply->getCalleeAllocationResult()) {
       SmallVector<SILInstruction *, 4> users(allocation->getUsers());
@@ -306,6 +310,20 @@ public:
         auto *dsi = cast<DeallocStackInst>(user);
         dsi->eraseFromParent();
       }
+    }
+
+    llvm::SmallVector<SILInstruction *, 2> endBorrowInsts;
+    for (EndBorrowInst *endBorrow : EndBorrows) {
+      endBorrowInsts.push_back(endBorrow);
+    }
+
+    // Complete lifetimes of all inlined values at the point where the `begin_apply`
+    // is ended with an `end_borrow`.
+    // See `SILInlineCloner::valuesToComplete`.
+    completeLifetimes(pm, ArrayRef(valuesToComplete), ArrayRef(endBorrowInsts));
+
+    for (EndBorrowInst *endBorrow : EndBorrows) {
+      endBorrow->eraseFromParent();
     }
 
     assert(!BeginApply->hasUsesOfAnyResult());
@@ -342,6 +360,14 @@ class SILInlineCloner
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       InlinedScopeCache;
 
+  // If an inlined `begin_apply` has some `end_borrow` scope-ending uses, all
+  // values of the inlined function must be completed, because such an
+  // `end_borrow` is effectively like an `unreachable` which cuts off the
+  // control flow at the `yield`. In other words: the continuation of the co-
+  // routine is not executed and we need to complete lifetimes which begin
+  // before the yield.
+  llvm::SmallVector<SILValue, 16> valuesToComplete;
+
   // Block in the original caller serving as the successor of the inlined
   // control path.
   SILBasicBlock *ReturnToBB = nullptr;
@@ -357,6 +383,16 @@ public:
   void cloneInline(ArrayRef<SILValue> AppliedArgs);
 
 protected:
+  void mapValue(SILValue origValue, SILValue mappedValue) {
+    if (BeginApply.has_value() && BeginApply->needCompleteValues() &&
+        (mappedValue->getOwnershipKind() != OwnershipKind::None ||
+         isa<BeginAccessInst>(mappedValue) ||
+         isa<StoreBorrowInst>(mappedValue))) {
+      valuesToComplete.push_back(mappedValue);
+    }
+    SuperTy::mapValue(origValue, mappedValue);
+  }
+
   SILValue borrowFunctionArgument(SILValue callArg, unsigned index);
   SILValue moveFunctionArgument(SILValue callArg, unsigned index);
 
@@ -581,9 +617,17 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
         callerBlock->split(std::next(Apply.getInstruction()->getIterator()));
     endBorrowInsertPts.push_back(&*ReturnToBB->begin());
 
+    auto resultOwnership = OwnershipKind::Owned;
+
+    if (AI->hasGuaranteedResult()) {
+      resultOwnership = OwnershipKind::Guaranteed;
+    } else if (AI->hasAddressResult()) {
+      resultOwnership = OwnershipKind::None;
+    }
+
     // Create an argument on the return-to BB representing the returned value.
     auto *retArg =
-        ReturnToBB->createPhiArgument(AI->getType(), OwnershipKind::Owned);
+        ReturnToBB->createPhiArgument(AI->getType(), resultOwnership);
     // Replace all uses of the ApplyInst with the new argument.
     AI->replaceAllUsesWith(retArg);
     break;
@@ -731,7 +775,7 @@ void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
   // "Completing" the BeginApply only fixes the end of the apply scope. The
   // begin_apply itself lingers.
   if (BeginApply)
-    BeginApply->complete();
+    BeginApply->complete(valuesToComplete, &FuncBuilder.getPassManager());
 }
 
 void SILInlineCloner::postFixUp(SILFunction *calleeFunction) {
@@ -951,6 +995,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::IgnoredUseInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
   case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     return InlineCost::Free;
 
   // Typed GEPs are free.

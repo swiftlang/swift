@@ -92,6 +92,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     return Location(bridged: bridged.getLocation())
   }
 
+  final public func set(location: Location, _ context: some MutatingContext) {
+    bridged.setLocation(location.bridged)
+    context.notifyInstructionsChanged()
+  }
+
   public final func move(before otherInstruction: Instruction, _ context: some MutatingContext) {
     BridgedContext.moveInstructionBefore(bridged, otherInstruction.bridged)
     context.notifyInstructionsChanged()
@@ -2167,4 +2172,45 @@ final public class IgnoredUseInst : Instruction, UnaryInstruction {
 }
 
 final public class ImplicitActorToOpaqueIsolationCastInst
+  : SingleValueInstruction, UnaryInstruction {}
+
+final public class MakeBorrowInst
+  : SingleValueInstruction, UnaryInstruction {
+  public var referent: Value {
+    operands[0].value
+  }
+}
+
+final public class DereferenceBorrowInst
+  : SingleValueInstruction, UnaryInstruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+}
+
+final public class MakeAddrBorrowInst
+  : SingleValueInstruction, UnaryInstruction {
+  public var referent: Value {
+    operands[0].value
+  }
+}
+
+final public class DereferenceAddrBorrowInst
+  : SingleValueInstruction, UnaryInstruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+}
+
+final public class InitBorrowAddrInst: Instruction {
+  public var borrow: Value {
+    operands[0].value
+  }
+
+  public var referent: Value {
+    operands[1].value
+  }
+}
+
+final public class DereferenceBorrowAddrInst
   : SingleValueInstruction, UnaryInstruction {}

@@ -243,6 +243,12 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(StructElementAddr)
   NO_UPDATE_NEEDED(TupleElementAddr)
   NO_UPDATE_NEEDED(UncheckedTakeEnumDataAddr)
+  NO_UPDATE_NEEDED(MakeBorrow)
+  NO_UPDATE_NEEDED(MakeAddrBorrow)
+  NO_UPDATE_NEEDED(InitBorrowAddr)
+  NO_UPDATE_NEEDED(DereferenceBorrow)
+  NO_UPDATE_NEEDED(DereferenceAddrBorrow)
+  NO_UPDATE_NEEDED(DereferenceBorrowAddr)
 #undef NO_UPDATE_NEEDED
 
   bool eliminateIdentityCast(SingleValueInstruction *svi) {

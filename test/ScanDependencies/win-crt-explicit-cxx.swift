@@ -33,8 +33,6 @@
 
 // RUN: %swift_frontend_plain @%t/SAL.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/vcruntime.cmd 2>&1
-// RUN: %swift_frontend_plain @%t/SwiftShims.cmd 2>&1
-// RUN: %swift_frontend_plain @%t/Swift.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_Builtin_stddef.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/corecrt.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/std_config.cmd 2>&1
@@ -43,6 +41,8 @@
 // RUN: %swift_frontend_plain @%t/_stdlib.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_malloc.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_Builtin_intrinsics.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/SwiftShims.cmd 2>&1
+// RUN: %swift_frontend_plain @%t/Swift.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/ucrt.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/std.cmd 2>&1
 // RUN: %swift_frontend_plain @%t/_complex.cmd 2>&1

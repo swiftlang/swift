@@ -228,6 +228,14 @@ struct CheckIsolatedFunctionTypes {
   }
 }
 
+// Make sure we emit the correct diagnostics under a DiagnosticTransaction, e.g
+// in a default expr.
+func checkInDiagnosticTransation(fn: () -> Void = {
+  // expected-warning@+2 {{function type cannot have global actor and 'isolated' parameter; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{function type cannot have more than one 'isolated' parameter; this is an error in the Swift 6 language mode}}
+  func bar(_ fn: @MainActor @Sendable (isolated A, isolated A) -> Void) {}
+}) {}
+
 @available(SwiftStdlib 5.1, *)
 func checkIsolatedAndGlobalClosures(_ a: A) {
   let _: @MainActor (isolated A) -> Void // expected-warning {{function type cannot have global actor and 'isolated' parameter; this is an error in the Swift 6 language mode}}

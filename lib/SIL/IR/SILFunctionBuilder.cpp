@@ -66,46 +66,50 @@ void SILFunctionBuilder::addFunctionAttributes(
       M.getOptions().EnableGlobalAssemblyVision)
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
 
-  // Propagate @_specialize.
-  for (auto *A : Attrs.getAttributes<AbstractSpecializeAttr>()) {
-    auto *SA = cast<AbstractSpecializeAttr>(A);
-    auto kind =
-        SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
-            ? SILSpecializeAttr::SpecializationKind::Full
-            : SILSpecializeAttr::SpecializationKind::Partial;
-    assert(!constant.isNull());
-    SILFunction *targetFunction = nullptr;
-    auto *attributedFuncDecl = constant.getAbstractFunctionDecl();
-    auto *targetFunctionDecl = SA->getTargetFunctionDecl(attributedFuncDecl);
-    // Filter out _spi.
-    auto spiGroups = SA->getSPIGroups();
-    bool hasSPI = !spiGroups.empty();
-    if (hasSPI) {
-      if (attributedFuncDecl->getModuleContext() != M.getSwiftModule() &&
-          !M.getSwiftModule()->isImportedAsSPI(SA, attributedFuncDecl)) {
-        continue;
+  if (F->getRepresentation() != SILFunctionTypeRepresentation::ObjCMethod) {
+    // Propagate @_specialize.
+    for (auto *A : Attrs.getAttributes<AbstractSpecializeAttr>()) {
+      auto *SA = cast<AbstractSpecializeAttr>(A);
+      auto kind = SA->getSpecializationKind() ==
+                          SpecializeAttr::SpecializationKind::Full
+                      ? SILSpecializeAttr::SpecializationKind::Full
+                      : SILSpecializeAttr::SpecializationKind::Partial;
+      assert(!constant.isNull());
+      SILFunction *targetFunction = nullptr;
+      auto *attributedFuncDecl = constant.getAbstractFunctionDecl();
+      auto *targetFunctionDecl = SA->getTargetFunctionDecl(attributedFuncDecl);
+      // Filter out _spi.
+      auto spiGroups = SA->getSPIGroups();
+      bool hasSPI = !spiGroups.empty();
+      if (hasSPI) {
+        if (attributedFuncDecl->getModuleContext() != M.getSwiftModule() &&
+            !M.getSwiftModule()->isImportedAsSPI(SA, attributedFuncDecl)) {
+          continue;
+        }
       }
-    }
-    assert(spiGroups.size() <= 1 && "SIL does not support multiple SPI groups");
-    Identifier spiGroupIdent;
-    if (hasSPI) {
-      spiGroupIdent = spiGroups[0];
-    }
-    auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
-        attributedFuncDecl, SA, M.getSwiftModule()->getASTContext());
-    auto specializedSignature = SA->getSpecializedSignature(attributedFuncDecl);
-    if (targetFunctionDecl) {
-      SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
-      targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
-      F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, specializedSignature, SA->getTypeErasedParams(),
-          SA->isExported(), kind, targetFunction, spiGroupIdent,
-          attributedFuncDecl->getModuleContext(), availability));
-    } else {
-      F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, specializedSignature, SA->getTypeErasedParams(),
-          SA->isExported(), kind, nullptr, spiGroupIdent,
-          attributedFuncDecl->getModuleContext(), availability));
+      assert(spiGroups.size() <= 1 &&
+             "SIL does not support multiple SPI groups");
+      Identifier spiGroupIdent;
+      if (hasSPI) {
+        spiGroupIdent = spiGroups[0];
+      }
+      auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
+          attributedFuncDecl, SA, M.getSwiftModule()->getASTContext());
+      auto specializedSignature =
+          SA->getSpecializedSignature(attributedFuncDecl);
+      if (targetFunctionDecl) {
+        SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
+        targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
+        F->addSpecializeAttr(SILSpecializeAttr::create(
+            M, specializedSignature, SA->getTypeErasedParams(),
+            SA->isExported(), kind, targetFunction, spiGroupIdent,
+            attributedFuncDecl->getModuleContext(), availability));
+      } else {
+        F->addSpecializeAttr(SILSpecializeAttr::create(
+            M, specializedSignature, SA->getTypeErasedParams(),
+            SA->isExported(), kind, nullptr, spiGroupIdent,
+            attributedFuncDecl->getModuleContext(), availability));
+      }
     }
   }
 

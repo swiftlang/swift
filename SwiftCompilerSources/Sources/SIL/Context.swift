@@ -210,6 +210,7 @@ extension MutatingContext {
 
   public func erase(instructionIncludingDebugUses inst: Instruction) {
     precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
+    salvageDebugInfo(of: inst)
     erase(instructionIncludingAllUsers: inst)
   }
 
@@ -217,4 +218,9 @@ extension MutatingContext {
     _bridged.eraseBlock(block.bridged)
   }
 
+  /// Transfer debug info associated with (the result of) `instruction` to a
+  /// new `debug_value` instruction before `instruction` is deleted.
+  public func salvageDebugInfo(of instruction: Instruction) {
+    BridgedContext.salvageDebugInfo(instruction.bridged)
+  }
 }

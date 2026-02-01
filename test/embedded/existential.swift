@@ -405,8 +405,8 @@ struct Main {
 // OUTPUT-NOT:  deinit called
     test5(LargeMyStruct())
 // OUTPUT: test any as? MyStruct
-// OUTPUT:  deinit called
 // OUTPUT: cast failed
+// OUTPUT:  deinit called
 // OUTPUT-NOT:  deinit called
     test5(GenericStructWithClass<Int>())
 // OUTPUT: test any as? MyStruct

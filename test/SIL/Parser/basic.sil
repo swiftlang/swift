@@ -1774,6 +1774,51 @@ bb0:
   return %0 : $()
 }
 
+// CHECK-LABEL: sil @value_borrow :
+sil @value_borrow : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK: bb0([[VALUE:%[0-9]+]] :
+entry(%value : $AnyObject):
+  // CHECK: [[BORROW:%.*]] = make_borrow [[VALUE]]
+  %borrow = make_borrow %value
+  // CHECK: [[VALUE2:%.*]] = dereference_borrow [[BORROW]]
+  %value2 = dereference_borrow %borrow
+
+  %f = function_ref @value_borrow : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %r = apply %f(%value2) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @addr_borrow :
+sil @addr_borrow : $@convention(thin) (@in_guaranteed String) -> () {
+// CHECK: bb0([[ADDR:%[0-9]+]] :
+entry(%addr : $*String):
+  // CHECK: [[BORROW:%.*]] = make_addr_borrow [[ADDR]]
+  %borrow = make_addr_borrow %addr
+  // CHECK: [[ADDR:%.*]] = dereference_addr_borrow [[BORROW]]
+  %addr2 = dereference_addr_borrow %borrow
+
+  %f = function_ref @addr_borrow : $@convention(thin) (@in_guaranteed String) -> ()
+  %r = apply %f(%addr2) : $@convention(thin) (@in_guaranteed String) -> ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @addr_only_borrow :
+sil @addr_only_borrow : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK: bb0([[ADDR:%[0-9]+]] :
+entry(%addr : $*T):
+  // CHECK: [[BORROW_BUF:%.*]] = alloc_stack
+  %borrow_buf = alloc_stack $Builtin.Borrow<T>
+  // CHECK: init_borrow_addr [[BORROW_BUF]] : $*Builtin.Borrow<T> with [[ADDR]] : $*T
+  init_borrow_addr %borrow_buf with %addr
+  // CHECK: [[ADDR2:%.*]] = dereference_borrow_addr [[BORROW_BUF]]
+  %addr2 = dereference_borrow_addr %borrow_buf
+
+  %f = function_ref @addr_only_borrow : $@convention(thin) <U> (@in_guaranteed U) -> ()
+  %r = apply %f<T>(%addr2) : $@convention(thin) <U> (@in_guaranteed U) -> ()
+  dealloc_stack %borrow_buf
+  return %r : $()
+}
+
 class Foo2: Foo {}
 
 // CHECK-LABEL: sil_vtable Foo {

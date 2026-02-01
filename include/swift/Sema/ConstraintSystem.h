@@ -1701,7 +1701,8 @@ public:
   /// \param locator Locator used to describe the location of this expression.
   ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator);
+  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator,
+                     DeclContext &dc);
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
@@ -1963,9 +1964,6 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
-
-  /// Enable old type-checker performance hacks.
-  EnablePerformanceHacks = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1991,10 +1989,6 @@ struct MemberLookupResult {
   /// This is a list of viable candidates that were matched.
   ///
   SmallVector<OverloadChoice, 4> ViableCandidates;
-  
-  /// If there is a favored candidate in the viable list, this indicates its
-  /// index.
-  unsigned FavoredChoice = ~0U;
 
   /// The number of optional unwraps that were applied implicitly in the
   /// lookup, for contexts where that is permitted.
@@ -2074,10 +2068,6 @@ struct MemberLookupResult {
   void addUnviable(OverloadChoice candidate, UnviableReason reason) {
     UnviableCandidates.push_back(candidate);
     UnviableReasons.push_back(reason);
-  }
-
-  std::optional<unsigned> getFavoredIndex() const {
-    return (FavoredChoice == ~0U) ? std::optional<unsigned>() : FavoredChoice;
   }
 };
 
@@ -2464,75 +2454,13 @@ public:
   llvm::DenseMap<ConstraintLocator *, ProtocolDecl *>
       SynthesizedConformances;
 
+  /// A mapping between an input expr and a custom simulated initial depth for
+  /// the constraint system's depth map.
+  /// FIXME: This only exists for a narrow compatibility hack and should be
+  /// removed.
+  llvm::DenseMap<Expr *, unsigned> InputExprSimulatedDepths;
+
 private:
-  /// Describe the candidate expression for partial solving.
-  /// This class used by shrink & solve methods which apply
-  /// variation of directional path consistency algorithm in attempt
-  /// to reduce scopes of the overload sets (disjunctions) in the system.
-  class Candidate {
-    Expr *E;
-    DeclContext *DC;
-    llvm::BumpPtrAllocator &Allocator;
-
-    // Contextual Information.
-    Type CT;
-    ContextualTypePurpose CTP;
-
-  public:
-    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
-              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
-
-    /// Return underlying expression.
-    Expr *getExpr() const { return E; }
-
-    /// Try to solve this candidate sub-expression
-    /// and re-write it's OSR domains afterwards.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    ///
-    /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
-
-    /// Apply solutions found by solver as reduced OSR sets for
-    /// for current and all of it's sub-expressions.
-    ///
-    /// \param solutions The solutions found by running solver on the
-    /// this candidate expression.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    void applySolutions(
-        llvm::SmallVectorImpl<Solution> &solutions,
-        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
-
-    /// Check if attempt at solving of the candidate makes sense given
-    /// the current conditions - number of shrunk domains which is related
-    /// to the given candidate over the total number of disjunctions present.
-    static bool
-    isTooComplexGiven(ConstraintSystem *const cs,
-                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
-      SmallVector<Constraint *, 8> disjunctions;
-      cs->collectDisjunctions(disjunctions);
-
-      unsigned unsolvedDisjunctions = disjunctions.size();
-      for (auto *disjunction : disjunctions) {
-        auto *locator = disjunction->getLocator();
-        if (!locator)
-          continue;
-
-        if (auto *OSR = getAsExpr<OverloadSetRefExpr>(locator->getAnchor())) {
-          if (shrunkExprs.count(OSR) > 0)
-            --unsolvedDisjunctions;
-        }
-      }
-
-      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
-      return unsolvedDisjunctions >= 10;
-    }
-  };
-
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -3489,12 +3417,6 @@ public:
     return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
   }
 
-  /// Check whether old type-checker performance hacks has been explicitly
-  /// enabled.
-  bool performanceHacksEnabled() const {
-    return Options.contains(ConstraintSystemFlags::EnablePerformanceHacks);
-  }
-
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1,
@@ -3590,7 +3512,8 @@ public:
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
                                          ContextualTypePurpose purpose,
-                                         ConstraintLocator *locator);
+                                         ConstraintLocator *locator,
+                                         bool shouldOpenOpaqueType = true);
 
   /// Convenience function to pass an \c ArrayRef to \c addJoinConstraint
   Type addJoinConstraint(ConstraintLocator *locator,
@@ -3753,26 +3676,6 @@ public:
                                    useDC, functionRefInfo,
                                    getConstraintLocator(locator)));
       }
-      break;
-    }
-  }
-
-  /// Add a value witness constraint to the constraint system.
-  void addValueWitnessConstraint(
-      Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
-      FunctionRefInfo functionRefInfo, ConstraintLocatorBuilder locator) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(requirement);
-    assert(useDC);
-    switch (simplifyValueWitnessConstraint(
-        ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
-        functionRefInfo, TMF_GenerateConstraints, locator)) {
-    case SolutionKind::Unsolved:
-      llvm_unreachable("Unsolved result when generating constraints!");
-
-    case SolutionKind::Solved:
-    case SolutionKind::Error:
       break;
     }
   }
@@ -4302,8 +4205,7 @@ public:
   void openGenericRequirement(DeclContext *outerDC,
                               GenericSignature signature,
                               unsigned index,
-                              const Requirement &requirement,
-                              bool skipProtocolSelfConstraint,
+                              Requirement requirement,
                               ConstraintLocatorBuilder locator,
                               llvm::function_ref<Type(Type)> subst,
                               PreparedOverloadBuilder *preparedOverload);
@@ -4501,8 +4403,7 @@ public:
   /// Add a new overload set to the list of unresolved overload
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
-                      DeclContext *useDC, ConstraintLocator *locator,
-                      std::optional<unsigned> favoredIndex = std::nullopt);
+                      DeclContext *useDC, ConstraintLocator *locator);
 
   void addOverloadSet(ArrayRef<Constraint *> choices,
                       ConstraintLocator *locator);
@@ -4603,9 +4504,6 @@ public:
   ///
   /// \param locator The locator to use when generating constraints.
   ///
-  /// \param favoredIndex If there is a "favored" or preferred choice
-  /// this is its index in the set of choices.
-  ///
   /// \param requiresFix Determines whether choices require a fix to
   /// be included in the result. If the fix couldn't be provided by
   /// `getFix` for any given choice, such choice would be filtered out.
@@ -4617,7 +4515,6 @@ public:
       SmallVectorImpl<Constraint *> &constraints, Type type,
       ArrayRef<OverloadChoice> choices, DeclContext *useDC,
       ConstraintLocator *locator,
-      std::optional<unsigned> favoredIndex = std::nullopt,
       bool requiresFix = false,
       llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
           getFix = [](unsigned, const OverloadChoice &) { return nullptr; });
@@ -4705,6 +4602,13 @@ public:
   TypeMatchResult matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
+
+  /// Match the @Sendable bit between two functions.
+  TypeMatchResult matchFunctionSendability(FunctionType *func1,
+                                           FunctionType *func2,
+                                           ConstraintKind kind,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
@@ -5016,11 +4920,18 @@ private:
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify the given value witness constraint.
-  SolutionKind simplifyValueWitnessConstraint(
-      ConstraintKind kind, Type baseType, ValueDecl *member, Type memberType,
-      DeclContext *useDC, FunctionRefInfo functionRefInfo,
-      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
+  /// Lookup a dependent member, returning a null Type and recording a fix on
+  /// failure.
+  Type lookupDependentMember(Type base, AssociatedTypeDecl *assocTy,
+                             bool openExistential,
+                             ConstraintLocatorBuilder locator,
+                             ProtocolConformanceRef *conformanceOut = nullptr);
+
+  /// Attempt to simplify the ForEachElement constraint.
+  SolutionKind
+  simplifyForEachElementConstraint(Type first, Type second,
+                                   TypeMatchOptions flags,
+                                   ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
@@ -5266,8 +5177,7 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  const BindingSet *determineBestBindings(
-      llvm::function_ref<void(const BindingSet &)> onCandidate);
+  const BindingSet *determineBestBindings();
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
@@ -5346,23 +5256,14 @@ private:
   /// \returns true if an error occurred, false otherwise.
   bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
-  /// Find reduced domains of disjunction constraints for given
-  /// expression, this is achieved to solving individual sub-expressions
-  /// and combining resolving types. Such algorithm is called directional
-  /// path consistency because it goes from children to parents for all
-  /// related sub-expressions taking union of their domains.
-  ///
-  /// \param expr The expression to find reductions for.
-  void shrink(Expr *expr);
-
   /// Pick a disjunction from the InactiveConstraints list.
   ///
   /// \returns The selected disjunction and a set of it's favored choices.
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
 
-  /// The old method that is only used when performance hacks are enabled.
-  Constraint *selectDisjunctionWithHacks();
+  void pruneDisjunction(Constraint *disjunction,
+                        Constraint *applicableFn);
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///
@@ -5554,11 +5455,6 @@ public:
   /// \returns true if solution cannot be applied.
   bool applySolutionToBody(TapExpr *tapExpr,
                            SyntacticElementTargetRewriter &rewriter);
-
-  /// Reorder the disjunctive clauses for a given expression to
-  /// increase the likelihood that a favored constraint will be successfully
-  /// resolved before any others.
-  void optimizeConstraints(Expr *e);
 
   /// Set the current sub-expression (of a multi-statement closure, etc) for
   /// the purposes of diagnosing "reasonable time" errors.

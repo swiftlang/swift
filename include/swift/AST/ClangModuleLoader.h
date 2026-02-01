@@ -204,6 +204,10 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Returns a decl that was imported earlier or null if it was not found in
+  /// the cache.
+  virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) = 0;
+
   /// Clones an imported \param decl from its base class to its derived class
   /// \param newContext where it is inherited. Its access level is determined
   /// with respect to \param inheritance, which signifies whether \param decl
@@ -266,6 +270,11 @@ public:
   virtual const clang::Decl *
   resolveStableSerializationPath(const StableSerializationPath &path) const = 0;
 
+  struct SerializableInfo {
+    bool Serializable;
+    bool HasSwiftDecl;
+  };
+
   /// Determine whether the given type is serializable.
   ///
   /// If \c checkCanonical is true, checks the canonical type,
@@ -288,8 +297,8 @@ public:
   /// least, it's probably best to use conservative predicates
   /// that work both ways so that language behavior doesn't differ
   /// based on subtleties like the target module interface format.
-  virtual bool isSerializable(const clang::Type *type,
-                              bool checkCanonical) const = 0;
+  virtual SerializableInfo isSerializable(const clang::Type *type,
+                                          bool checkCanonical) const = 0;
 
   virtual clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,
@@ -338,6 +347,10 @@ public:
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
 
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
   virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
 
   virtual DeclName

@@ -258,7 +258,7 @@ class BuildScriptInvocation(object):
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
         if args.build_early_swift_driver:
-            configuration = 'release' if str(args.swift_build_variant) in [
+            configuration = 'release' if str(args.build_variant) in [
                 'Release',
                 'RelWithDebInfo'
             ] else 'debug'

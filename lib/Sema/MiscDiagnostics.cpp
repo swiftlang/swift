@@ -47,6 +47,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -89,7 +90,8 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
-                                         bool isExprStmt) {
+                                         bool isExprStmt,
+                                         bool inForEachPreamble) {
   class DiagnoseWalker : public BaseDiagnosticWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
@@ -735,41 +737,35 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
-      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+      auto *ParentExpr = Parent.getAsExpr();
 
-      if (auto *ParentExpr = Parent.getAsExpr()) {
-        if (ParentExpr->isValidParentOfTypeExpr(E))
-          return;
+      if (ParentExpr && ParentExpr->isValidParentOfTypeExpr(E))
+        return;
 
-        // In Swift < 6 warn about
-        // - plain type name passed as an argument to a subscript, dynamic
-        //   subscript, or ObjC literal since it used to be accepted.
-        // - member type expressions rooted on non-identifier types, e.g.
-        //   '[X].Y' since they used to be accepted without the '.self'.
-        if (!Ctx.isLanguageModeAtLeast(6)) {
-          if (isa<SubscriptExpr>(ParentExpr) ||
-              isa<DynamicSubscriptExpr>(ParentExpr) ||
-              isa<ObjectLiteralExpr>(ParentExpr)) {
-            auto *argList = ParentExpr->getArgs();
-            assert(argList);
-            if (argList->isUnlabeledUnary())
-              behavior = DiagnosticBehavior::Warning;
-          } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
-            if (auto *QualIdentTR = dyn_cast_or_null<QualifiedIdentTypeRepr>(
-                    TE->getTypeRepr())) {
-              if (!isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot())) {
-                behavior = DiagnosticBehavior::Warning;
-              }
-            }
+      // In Swift < 6 warn about
+      // - plain type name passed as an argument to a subscript, dynamic
+      //   subscript, or ObjC literal since it used to be accepted.
+      // - member type expressions rooted on non-identifier types, e.g.
+      //   '[X].Y' since they used to be accepted without the '.self'.
+      bool downgradeToWarningUntil6 = false;
+      if (!Ctx.isLanguageModeAtLeast(6)) {
+        if (ParentExpr && (isa<SubscriptExpr>(ParentExpr) ||
+                           isa<DynamicSubscriptExpr>(ParentExpr) ||
+                           isa<ObjectLiteralExpr>(ParentExpr))) {
+          auto *argList = ParentExpr->getArgs();
+          assert(argList);
+          downgradeToWarningUntil6 = argList->isUnlabeledUnary();
+        } else if (auto *TE = dyn_cast<TypeExpr>(E)) {
+          if (auto *QualIdentTR =
+                  dyn_cast_or_null<QualifiedIdentTypeRepr>(TE->getTypeRepr())) {
+            downgradeToWarningUntil6 =
+                !isa<UnqualifiedIdentTypeRepr>(QualIdentTR->getRoot());
           }
         }
       }
 
-      // Is this a protocol metatype?
-      Ctx.Diags
-          .diagnose(E->getStartLoc(), diag::value_of_metatype_type,
-                    behavior == DiagnosticBehavior::Warning)
-          .limitBehavior(behavior);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .warnUntilLanguageModeIf(downgradeToWarningUntil6, 6);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
@@ -1506,11 +1502,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
   // Diagnose uses of collection literals with defaulted types at the top
   // level.
-  if (auto collection =
-          dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
-    if (collection->isTypeDefaulted()) {
-      Walker.checkTypeDefaultedCollectionExpr(
-          const_cast<CollectionExpr *>(collection));
+  if (!inForEachPreamble) {
+    if (auto collection =
+            dyn_cast<CollectionExpr>(E->getSemanticsProvidingExpr())) {
+      if (collection->isTypeDefaulted()) {
+        Walker.checkTypeDefaultedCollectionExpr(
+            const_cast<CollectionExpr *>(collection));
+      }
     }
   }
 }
@@ -4685,7 +4683,7 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   } else if (auto SS = dyn_cast<SwitchStmt>(S)) {
     checkStmtConditionTrailingClosure(ctx, SS->getSubjectExpr());
   } else if (auto FES = dyn_cast<ForEachStmt>(S)) {
-    checkStmtConditionTrailingClosure(ctx, FES->getParsedSequence());
+    checkStmtConditionTrailingClosure(ctx, FES->getSequence());
     checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
@@ -4963,9 +4961,9 @@ public:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:
-          case AccessorKind::Read2:
+          case AccessorKind::YieldingBorrow:
           case AccessorKind::Modify:
-          case AccessorKind::Modify2:
+          case AccessorKind::YieldingMutate:
           case AccessorKind::Init:
           case AccessorKind::Borrow:
           case AccessorKind::Mutate:
@@ -5395,13 +5393,17 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     /// Returns true iff the collection upcast coercion is an Optional-to-Any
     /// coercion.
-    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
-                                   conversion) {
-      if (!conversion.OrigValue || !conversion.Conversion)
+    bool isOptionalToAnyCoercion(ClosureExpr *conversion) {
+      if (!conversion)
         return false;
 
-      auto srcType = conversion.OrigValue->getType();
-      auto destType = conversion.Conversion->getType();
+      auto fnType = conversion->getType()->getAs<FunctionType>();
+      if (!fnType)
+        return false;
+
+      assert(fnType->getNumParams() == 1);
+      auto srcType = fnType->getParams()[0].getPlainType();
+      auto destType = fnType->getResult();
       return isOptionalToAnyCoercion(srcType, destType);
     }
 
@@ -5547,10 +5549,13 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // We're handling the coercion of the entire collection, so we don't need
       // to re-visit a nested ErasureExpr for the value.
-      if (auto conversionExpr = valueConversion.Conversion)
+      if (valueConversion) {
+        Expr *body = valueConversion->getSingleExpressionBody();
         if (auto *erasureExpr =
-              findErasureExprThroughOptionalInjections(conversionExpr))
+                findErasureExprThroughOptionalInjections(body)) {
           IgnoredExprs.insert(erasureExpr);
+        }
+      }
 
       if (coercion.shouldSuppressDiagnostic() ||
           !isOptionalToAnyCoercion(valueConversion))
@@ -6352,7 +6357,10 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 
 static bool isReturningFRT(const clang::NamedDecl *ND,
                            clang::QualType &outReturnType, ASTContext &Ctx) {
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
+  if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
+    outReturnType =
+        CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+  else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
     outReturnType = FD->getReturnType();
   else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
     outReturnType = MD->getReturnType();
@@ -6396,8 +6404,8 @@ static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
       return false;
 
     if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl>(methodDecl))
-        // Ownership attrs are not yet supported for ctors and dtors if FRTs
+      if (isa<clang::CXXDestructorDecl>(methodDecl))
+        // Ownership attrs are not yet supported for dtors if FRTs
         return false;
 
       if (methodDecl->isOverloadedOperator())
@@ -6482,10 +6490,11 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
                                             bool isExprStmt,
-                                            bool isConstInitExpr) {
+                                            bool isConstInitExpr,
+                                            bool inForEachPreamble) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
-  diagSyntacticUseRestrictions(E, DC, isExprStmt);
+  diagSyntacticUseRestrictions(E, DC, isExprStmt, inForEachPreamble);
   diagRecursivePropertyAccess(E, DC);
   diagnoseImplicitSelfUseInClosure(E, DC);
   diagnoseUnintendedOptionalBehavior(E, DC);
@@ -6495,7 +6504,8 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (!ctx.isLanguageModeAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
+    diagnoseExprAvailability(E, const_cast<DeclContext *>(DC),
+                             /*preconcurrency=*/false);
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
@@ -6829,21 +6839,6 @@ std::optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   }
 
   return std::nullopt;
-}
-
-bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                                  ForEachStmt *forEach) {
-  auto &ctx = dc->getASTContext();
-  if (auto thrownError = TypeChecker::canThrow(ctx, forEach)) {
-    if (forEach->getTryLoc().isInvalid()) {
-      ctx.Diags
-          .diagnose(forEach->getAwaitLoc(), diag::throwing_call_unhandled, "call")
-          .fixItInsert(forEach->getAwaitLoc(), "try");
-      return true;
-    }
-  }
-
-  return false;
 }
 
 void DeferredDiag::emit(swift::ASTContext &ctx) {

@@ -954,7 +954,8 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   // result.
 
   DeclContext *DC;
-  if (const clang::Module *module = getClangOwningModule(macroNode)) {
+  if (const clang::Module *module =
+          importer::getClangOwningModule(macroNode, getClangASTContext())) {
     // Get the parent module because currently we don't model Clang submodules
     // in Swift.
     DC = getWrapperForModule(module->getTopLevelModule());

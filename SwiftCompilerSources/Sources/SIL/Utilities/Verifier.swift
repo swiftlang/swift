@@ -56,6 +56,40 @@ extension Function {
         }
       }
     }
+
+    if hasOwnership, isDefinition {
+      verifyNoUnreachableBlocks(context)
+      verifyNoInfiniteLoops(context)
+    }
+  }
+
+  private func verifyNoUnreachableBlocks(_ context: VerifierContext) {
+    var reachableBlocks = BasicBlockWorklist(context)
+    defer { reachableBlocks.deinitialize() }
+    reachableBlocks.transitivelyAddBlockWithSuccessors(startingAt: entryBlock)
+
+    for block in blocks {
+      require(reachableBlocks.hasBeenPushed(block),
+              "block is unreachable",
+              atInstruction: block.instructions.first!)
+    }
+  }
+
+  private func verifyNoInfiniteLoops(_ context: VerifierContext) {
+    var noInfiniteLoops = BasicBlockWorklist(context)
+    defer { noInfiniteLoops.deinitialize() }
+
+    for block in blocks {
+      if block.successors.isEmpty {
+        noInfiniteLoops.transitivelyAddBlockWithPredecessors(startingAt: block)
+      }
+    }
+
+    for block in blocks {
+      require(noInfiniteLoops.hasBeenPushed(block),
+              "function has infinite loop",
+              atInstruction: block.instructions.first!)
+    }
   }
 }
 
@@ -87,12 +121,8 @@ private extension Argument {
 
       phi.verifyBorrowedFromUse()
 
-      // TODO: enable this check once we have complete OSSA lifetimes.
-      // In a dead-end block an end_borrow might have been deleted.
-      /*
       require(phi.isReborrow == phi.hasBorrowEndingUse,
-              "\(self) has stale reborrow flag");
-      */
+              "\(self) has stale reborrow flag", atArgument: self);
     }
   }
 
@@ -150,11 +180,19 @@ private extension Value {
     switch ownership {
     case .owned:
       return true
+    case .none:
+      // "none" is like "owned" and can happen e.g. if a non-trivial enum is constructed with a trivial case:
+      // ```
+      //   %1 = enum $Optional<AnyObject>, #Optional.none!enumelt   // ownership: none
+      //   ...
+      //   %3 = borrowed %phi from (%1)
+      // ```
+      return true
     case .guaranteed:
       return BeginBorrowValue(self) != nil ||
              self is BorrowedFromInst ||
              forwardingInstruction != nil
-    case .none, .unowned:
+    case .unowned:
       return false
     }
   }

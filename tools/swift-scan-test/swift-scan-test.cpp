@@ -79,7 +79,8 @@ static int printError(swiftscan_string_ref_t err) {
 }
 
 static int action_compute_cache_key(swiftscan_cas_t cas, StringRef input,
-                                    std::vector<const char *> &Args) {
+                                    std::vector<const char *> &Args,
+                                    llvm::raw_ostream &os) {
   if (input.empty()) {
     llvm::errs() << "-input is not specified for compute_cache_key\n";
     return EXIT_FAILURE;
@@ -91,15 +92,16 @@ static int action_compute_cache_key(swiftscan_cas_t cas, StringRef input,
   if (key.length == 0)
     return printError(err_msg);
 
-  llvm::outs() << toString(key) << "\n";
+  os << toString(key) << "\n";
   swiftscan_string_dispose(key);
 
   return EXIT_SUCCESS;
 }
 
-static int
-action_compute_cache_key_from_index(swiftscan_cas_t cas, StringRef index,
-                                    std::vector<const char *> &Args) {
+static int action_compute_cache_key_from_index(swiftscan_cas_t cas,
+                                               StringRef index,
+                                               std::vector<const char *> &Args,
+                                               llvm::raw_ostream &os) {
   unsigned inputIndex = 0;
   if (!to_integer(index, inputIndex)) {
     llvm::errs() << "-input is not a number for compute_cache_key_from_index\n";
@@ -112,17 +114,17 @@ action_compute_cache_key_from_index(swiftscan_cas_t cas, StringRef index,
   if (key.length == 0)
     return printError(err_msg);
 
-  llvm::outs() << toString(key) << "\n";
+  os << toString(key) << "\n";
   swiftscan_string_dispose(key);
 
   return EXIT_SUCCESS;
 }
 
 static int print_cached_compilation(swiftscan_cached_compilation_t comp,
-                                    const char *key) {
+                                    const char *key, llvm::raw_ostream &os) {
   auto numOutput = swiftscan_cached_compilation_get_num_outputs(comp);
-  llvm::outs() << "Cached Compilation for key \"" << key << "\" has "
-               << numOutput << " outputs: \n";
+  os << "Cached Compilation for key \"" << key << "\" has " << numOutput
+     << " outputs: \n";
 
   for (unsigned i = 0; i < numOutput; ++i) {
     swiftscan_cached_output_t out =
@@ -130,14 +132,15 @@ static int print_cached_compilation(swiftscan_cached_compilation_t comp,
     swiftscan_string_ref_t id = swiftscan_cached_output_get_casid(out);
     swiftscan_string_ref_t kind = swiftscan_cached_output_get_name(out);
     SWIFT_DEFER { swiftscan_string_dispose(kind); };
-    llvm::outs() << toString(kind) << ": " << toString(id) << "\n";
+    os << toString(kind) << ": " << toString(id) << "\n";
     swiftscan_string_dispose(id);
   }
-  llvm::outs() << "\n";
+  os << "\n";
   return EXIT_SUCCESS;
 }
 
-static int action_cache_query(swiftscan_cas_t cas, const char *key) {
+static int action_cache_query(swiftscan_cas_t cas, const char *key,
+                              llvm::raw_ostream &os) {
   swiftscan_string_ref_t err_msg;
   auto comp = swiftscan_cache_query(cas, key, /*globally=*/false, &err_msg);
   if (err_msg.length != 0)
@@ -149,11 +152,12 @@ static int action_cache_query(swiftscan_cas_t cas, const char *key) {
   }
 
   SWIFT_DEFER { swiftscan_cached_compilation_dispose(comp); };
-  return print_cached_compilation(comp, key);
+  return print_cached_compilation(comp, key, os);
 }
 
 static int action_replay_result(swiftscan_cas_t cas, const char *key,
-                                std::vector<const char *> &Args) {
+                                std::vector<const char *> &Args,
+                                raw_ostream &os) {
   swiftscan_string_ref_t err_msg;
   auto comp = swiftscan_cache_query(cas, key, /*globally=*/false, &err_msg);
   if (!comp) {
@@ -196,20 +200,21 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
 
   SWIFT_DEFER { swiftscan_cache_replay_result_dispose(result); };
 
-  llvm::outs() << toString(swiftscan_cache_replay_result_get_stdout(result));
-  llvm::errs() << toString(swiftscan_cache_replay_result_get_stderr(result));
+  // Print both stdout and stderr from cache replay to output stream.
+  os << toString(swiftscan_cache_replay_result_get_stdout(result));
+  os << toString(swiftscan_cache_replay_result_get_stderr(result));
   return EXIT_SUCCESS;
 }
 
-static int action_scan_dependency(std::vector<const char *> &Args,
+static int action_scan_dependency(swiftscan_scanner_t scanner,
+                                  std::vector<const char *> &Args,
                                   StringRef WorkingDirectory,
-                                  bool PrintChainedBridgingHeader) {
-  auto scanner = swiftscan_scanner_create();
+                                  bool PrintChainedBridgingHeader,
+                                  llvm::raw_ostream &os) {
   auto invocation = swiftscan_scan_invocation_create();
   auto error = [&](StringRef msg) {
     llvm::errs() << msg << "\n";
     swiftscan_scan_invocation_dispose(invocation);
-    swiftscan_scanner_dispose(scanner);
     return EXIT_FAILURE;
   };
 
@@ -254,12 +259,11 @@ static int action_scan_dependency(std::vector<const char *> &Args,
     auto content =
         swiftscan_swift_textual_detail_get_chained_bridging_header_content(
             details);
-    llvm::outs() << toString(content);
+    os << toString(content);
   } else
-    swift::dependencies::writeJSON(llvm::outs(), graph);
+    swift::dependencies::writeJSON(os, graph);
 
   swiftscan_scan_invocation_dispose(invocation);
-  swiftscan_scanner_dispose(scanner);
   return EXIT_SUCCESS;
 }
 
@@ -311,27 +315,46 @@ int main(int argc, char *argv[]) {
   llvm::StringSaver Saver(Alloc);
   auto Args = createArgs(SwiftCommands, Saver, Action);
 
+  swiftscan_scanner_t scanner = nullptr;
+  if (Action == scan_dependency || Action == get_chained_bridging_header)
+    scanner = swiftscan_scanner_create();
+  SWIFT_DEFER {
+    if (scanner)
+      swiftscan_scanner_dispose(scanner);
+  };
+
   std::atomic<int> Ret = 0;
+  llvm::raw_null_ostream nullOS;
+  std::vector<llvm::raw_null_ostream> nullStreams(Threads - 1);
+  // Get the output stream for the thread. Only the first thread writes the
+  // output to stdout and all other threads write to their own null stream.
+  auto getOutputStream = [&](unsigned id) -> llvm::raw_ostream & {
+    if (id == 0)
+      return llvm::outs();
+    return nullStreams[id - 1];
+  };
   llvm::StdThreadPool Pool(llvm::hardware_concurrency(Threads));
   for (unsigned i = 0; i < Threads; ++i) {
+    llvm::raw_ostream &os = getOutputStream(i);
     Pool.async([&]() {
       switch (Action) {
       case compute_cache_key:
-        Ret += action_compute_cache_key(cas, Input, Args);
+        Ret += action_compute_cache_key(cas, Input, Args, os);
         break;
       case compute_cache_key_from_index:
-        Ret += action_compute_cache_key_from_index(cas, Input, Args);
+        Ret += action_compute_cache_key_from_index(cas, Input, Args, os);
         break;
       case cache_query:
-        Ret += action_cache_query(cas, CASID.c_str());
+        Ret += action_cache_query(cas, CASID.c_str(), os);
         break;
       case replay_result:
-        Ret += action_replay_result(cas, CASID.c_str(), Args);
+        Ret += action_replay_result(cas, CASID.c_str(), Args, os);
         break;
       case scan_dependency:
       case get_chained_bridging_header:
-        Ret += action_scan_dependency(Args, WorkingDirectory,
-                                      Action == get_chained_bridging_header);
+        Ret +=
+            action_scan_dependency(scanner, Args, WorkingDirectory,
+                                   Action == get_chained_bridging_header, os);
       }
     });
   }

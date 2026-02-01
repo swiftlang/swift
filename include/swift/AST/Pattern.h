@@ -140,9 +140,11 @@ public:
   /// equivalent to matching this pattern.
   ///
   /// Looks through ParenPattern, BindingPattern, and TypedPattern.
-  Pattern *getSemanticsProvidingPattern();
-  const Pattern *getSemanticsProvidingPattern() const {
-    return const_cast<Pattern*>(this)->getSemanticsProvidingPattern();
+  Pattern *getSemanticsProvidingPattern(bool lookThroughOpaque = false);
+  const Pattern *
+  getSemanticsProvidingPattern(bool lookThroughOpaque = false) const {
+    return const_cast<Pattern *>(this)->getSemanticsProvidingPattern(
+        lookThroughOpaque);
   }
 
   /// Returns whether this pattern has been type-checked yet.
@@ -212,8 +214,22 @@ public:
     const_cast<Pattern *>(this)->forEachNode(f2);
   }
 
+  /// Return true if this pattern is a top-level refutable pattern. This avoids
+  /// recursing into non-semantic patterns and things like tuples. This is
+  /// unlikely to be the correct thing to check in general, `isRefutablePattern`
+  /// includes checks for sub-patterns.
+  bool isSingleRefutablePattern(bool allowIsPatternCoercion) const;
+
   /// Return true if this pattern (or a subpattern) is refutable.
-  bool isRefutablePattern() const;
+  ///
+  /// \param allowIsPatternCoercion If true, allow IsPattern to be treated as
+  /// irrefutable if its cast is determined to be a coercion.
+  /// FIXME: This behavior is currently broken since the 'coercion' is
+  /// implemented using a runtime cast which cannot properly handle things like
+  /// function type subtyping. We ought to properly implement coercion handling
+  /// such that it matches what we do for expressions.
+  /// https://github.com/swiftlang/swift/issues/86705
+  bool isRefutablePattern(bool allowIsPatternCoercion) const;
 
   bool isNeverDefaultInitializable() const;
 
@@ -253,6 +269,29 @@ public:
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
   Pattern *walk(ASTWalker &&walker) { return walk(walker); }
+};
+
+/// OpaquePattern - Wrapper class for patterns in Swift.
+/// Its initial purpose is to serve as a wrapper for the element pattern in the
+/// context of desugaring ForEachStmt into WhileStmt, to avoid duplicate
+/// traversal of that node when typechecking the synthesized statement.
+class OpaquePattern : public Pattern {
+  Pattern *SubPattern = nullptr;
+
+public:
+  OpaquePattern(Pattern *p) : Pattern(PatternKind::Opaque), SubPattern(p) {
+    setImplicit();
+  }
+
+  SourceLoc getLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const { return SourceRange(); }
+
+  Pattern *getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+
+  static bool classof(const Pattern *P) {
+    return P->getKind() == PatternKind::Opaque;
+  }
 };
 
 /// A pattern consisting solely of grouping parentheses around a
@@ -863,13 +902,18 @@ public:
   }
 };
 
-inline Pattern *Pattern::getSemanticsProvidingPattern() {
+inline Pattern *Pattern::getSemanticsProvidingPattern(bool lookThroughOpaque) {
   if (auto *pp = dyn_cast<ParenPattern>(this))
-    return pp->getSubPattern()->getSemanticsProvidingPattern();
+    return pp->getSubPattern()->getSemanticsProvidingPattern(lookThroughOpaque);
   if (auto *tp = dyn_cast<TypedPattern>(this))
-    return tp->getSubPattern()->getSemanticsProvidingPattern();
+    return tp->getSubPattern()->getSemanticsProvidingPattern(lookThroughOpaque);
   if (auto *vp = dyn_cast<BindingPattern>(this))
-    return vp->getSubPattern()->getSemanticsProvidingPattern();
+    return vp->getSubPattern()->getSemanticsProvidingPattern(lookThroughOpaque);
+  if (lookThroughOpaque) {
+    if (auto *op = dyn_cast<OpaquePattern>(this))
+      return op->getSubPattern()->getSemanticsProvidingPattern(
+          lookThroughOpaque);
+  }
   return this;
 }
 

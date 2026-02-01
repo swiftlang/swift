@@ -127,6 +127,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::Deinterleave:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
     case BuiltinValueKind::StringObjectOr:
     case BuiltinValueKind::UToSCheckedTrunc:
     case BuiltinValueKind::SToUCheckedTrunc:

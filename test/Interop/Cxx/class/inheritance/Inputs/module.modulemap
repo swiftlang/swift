@@ -53,3 +53,8 @@ module CircularInheritance {
   header "circular-inheritance.h"
   requires cplusplus
 }
+
+module ProtectedSpecialMember {
+  header "protected-special-member.h"
+  requires cplusplus
+}

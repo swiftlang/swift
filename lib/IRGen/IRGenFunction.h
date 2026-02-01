@@ -104,7 +104,9 @@ public:
 
   friend class Scope;
 
-  Address createErrorResultSlot(SILType errorType, bool isAsync, bool setSwiftErrorFlag = true, bool isTypedError = false);
+  Address createErrorResultSlot(SILType errorType, bool isAsync,
+                                bool setSwiftErrorFlag = true,
+                                bool isTypedError = false);
 
   //--- Function prologue and epilogue
   //-------------------------------------------
@@ -112,8 +114,8 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
                         Explosion &scalars, bool isSwiftCCReturn,
-                        bool isOutlined, bool mayPeepholeLoad = false,
-                        SILType errorType = {});
+                        bool isOutlined, bool mayPeepholeLoad,
+                        SILType errorType);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();

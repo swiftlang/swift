@@ -17,6 +17,9 @@ func globalCallerFunc() async -> () {}
 @concurrent
 func globalConcurrentFunc() async -> () {}
 
+@MainActor
+func globalGlobalActorIsolatedFunc() async -> () {}
+
 class NonSendableKlass {
   init() {}
 }
@@ -684,4 +687,29 @@ func testNonisolatedNonsendingClosureInGlobalActorContext() {
     await S.compute { _ in
     }
   }
+}
+
+// CHECK-LABEL: // localVariableAssignmentConversion()
+// CHECK: // Isolation: caller_isolation_inheriting
+// CHECK: sil hidden [ossa] @$s21attr_execution_silgen33localVariableAssignmentConversionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK: bb0([[ACTOR:%.*]] : @guaranteed
+// CHECK:   [[GLOBAL_ACTOR_FUNC:%.*]] = function_ref @$s21attr_execution_silgen29globalGlobalActorIsolatedFuncyyYaF : $@convention(thin) @async () -> ()
+// FIVE:    [[GLOBAL_ACTOR_FUNC_TT_CVT:%.*]] = thin_to_thick_function [[GLOBAL_ACTOR_FUNC]] to $@async @callee_guaranteed () -> ()
+// SIX:     [[GLOBAL_ACTOR_FUNC_TT:%.*]] = thin_to_thick_function [[GLOBAL_ACTOR_FUNC]] to $@async @callee_guaranteed () -> ()
+// SIX:     [[GLOBAL_ACTOR_FUNC_TT_CVT:%.*]] = convert_function [[GLOBAL_ACTOR_FUNC_TT]] to $@Sendable @async @callee_guaranteed () -> ()
+// CHECK:   [[MV_VALUE:%.*]] = move_value [lexical] [var_decl] [[GLOBAL_ACTOR_FUNC_TT_CVT]]
+// CHECK:   debug_value [[MV_VALUE]], let, name "c1"
+
+// CHECK:   [[NONISOLATED_NONSENDING_FUNC:%.*]] = function_ref @$s21attr_execution_silgen16globalCallerFuncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// FIVE:    [[NONISOLATED_NONSENDING_FUNC_CVT_TT:%.*]] = thin_to_thick_function [[NONISOLATED_NONSENDING_FUNC]] to $@async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// SIX:     [[NONISOLATED_NONSENDING_FUNC_CVT:%.*]] = convert_function [[NONISOLATED_NONSENDING_FUNC]] to $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// SIX:     [[NONISOLATED_NONSENDING_FUNC_CVT_TT:%.*]] = thin_to_thick_function [[NONISOLATED_NONSENDING_FUNC_CVT]] to $@Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK:   [[MV_VALUE:%.*]] = move_value [lexical] [var_decl] [[NONISOLATED_NONSENDING_FUNC_CVT_TT]]
+// CHECK:   debug_value [[MV_VALUE]], let, name "c2"
+// CHECK: } // end sil function '$s21attr_execution_silgen33localVariableAssignmentConversionyyYaF'
+nonisolated(nonsending) func localVariableAssignmentConversion() async {
+  let c1 = globalGlobalActorIsolatedFunc
+  await c1()
+  let c2 = globalCallerFunc
+  await c2()
 }

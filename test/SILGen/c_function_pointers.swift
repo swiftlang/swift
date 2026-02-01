@@ -108,3 +108,11 @@ class Selfless {
     // expected-error@-1 {{a C function pointer cannot be formed from a closure that captures dynamic Self type}}
   }
 }
+
+enum E {
+    case x(@convention(c) (Float, Bool) -> UnsafeRawPointer?)
+}
+
+func non_trivial_conversion() -> E {
+  return E.x { x, y in nil }
+}

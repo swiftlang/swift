@@ -401,6 +401,10 @@ if(SWIFT_USE_SYMLINKS)
   set(SWIFT_COPY_OR_SYMLINK_DIR "create_symlink")
 endif()
 
+option(SWIFT_STDLIB_INSTALL_ONLY_CLANG_RESOURCE_HEADERS
+  "If enabled, install only Clang builtin headers and modulemaps under lib/swift[/swift_static]/clang instead of the entire resource directory."
+  OFF)
+
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")

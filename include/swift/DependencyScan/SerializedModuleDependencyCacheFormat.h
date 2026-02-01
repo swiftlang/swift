@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 10;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 4;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 5;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -81,6 +81,7 @@ using FileIDArrayIDField = IdentifierIDField;
 using ContextHashIDField = IdentifierIDField;
 using ModuleCacheKeyIDField = IdentifierIDField;
 using ImportArrayIDField = IdentifierIDField;
+using VisibleModulesArrayIDField = IdentifierIDField;
 using LinkLibrariesArrayIDField = IdentifierIDField;
 using MacroDependenciesArrayIDField = IdentifierIDField;
 using SearchPathArrayIDField = IdentifierIDField;
@@ -109,6 +110,7 @@ enum {
   MACRO_DEPENDENCY_ARRAY_NODE,
   SEARCH_PATH_NODE,
   SEARCH_PATH_ARRAY_NODE,
+  VISIBLE_MODULES_NODE,
   IMPORT_STATEMENT_NODE,
   IMPORT_STATEMENT_ARRAY_NODE,
   OPTIONAL_IMPORT_STATEMENT_ARRAY_NODE,
@@ -187,6 +189,14 @@ using SearchPathLayout =
 using SearchPathArrayLayout =
     BCRecordLayout<SEARCH_PATH_ARRAY_NODE, IdentifierIDArryField>;
 
+// A record capturing information about all Clang modules visible
+// from a given named Clang module dependency query
+using VisibleModulesLayout =
+  BCRecordLayout<VISIBLE_MODULES_NODE,        // ID
+                 IdentifierIDField,           // moduleIdentifier
+                 VisibleModulesArrayIDField   // visibleModulesArrayIdentifier
+                 >;
+
 // A record capturing information about a given 'import' statement
 // captured in a dependency node, including its source location.
 using ImportStatementLayout =
@@ -199,6 +209,7 @@ using ImportStatementLayout =
                    IsExportedImport,             // isExported
                    AccessLevelField              // accessLevel
                    >;
+
 using ImportStatementArrayLayout =
     BCRecordLayout<IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;
 using OptionalImportStatementArrayLayout =

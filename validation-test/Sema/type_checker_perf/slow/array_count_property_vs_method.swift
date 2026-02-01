@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -solver-scope-threshold=5000
 // REQUIRES: tools-release,no_asan
-// REQUIRES: OS=macosx
+
+// Valid expression, type checks with default limits but slow
 
 // FIXME: Array literals are considered "speculative" bindings at the moment but they cannot actually
 // assume different types unlike integer and floating-pointer literals.

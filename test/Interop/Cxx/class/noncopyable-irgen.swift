@@ -3,8 +3,10 @@
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST1- -D TEST1
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST2- -D TEST2
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST3- -D TEST3
-// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST4- -D TEST4 -Xcc -std=c++20
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST4- -D TEST4 -Xcc -DTEST4 -Xcc -std=c++20
 // RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST5- -D TEST5
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST6- -D TEST6
+// RUN: %target-swift-frontend -cxx-interoperability-mode=default -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -I %t%{fs-sep}Inputs %t%{fs-sep}test.swift -Xcc -fignore-exceptions -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}noncopyable.h -verify-additional-prefix TEST7-%target-os-family- -verify-additional-prefix TEST7-%target-os- -D TEST7 -Xcc -DTEST7 -Xcc -std=c++20 -verify-ignore-unrelated
 
 //--- Inputs/module.modulemap
 module Test {
@@ -24,6 +26,7 @@ struct NonCopyable {
     // expected-TEST2-note@-2 {{'NonCopyable' has been explicitly marked deleted here}}
     // expected-TEST3-note@-3 {{'NonCopyable' has been explicitly marked deleted here}}
     // expected-TEST4-note@-4 {{'NonCopyable' has been explicitly marked deleted here}}
+    // expected-TEST6-note@-5 {{'NonCopyable' has been explicitly marked deleted here}}
     NonCopyable(NonCopyable&& other) = default;
 
     int number = 0;
@@ -39,6 +42,12 @@ struct OwnsT {
     // expected-TEST1-error@-3 {{failed to copy 'OwnsT<NonCopyable>'; did you mean to import 'OwnsT<NonCopyable>' as ~Copyable?}}
     // expected-TEST1-note@-4 {{use 'requires' (since C++20) to specify the constraints under which the copy constructor is available}}
     // expected-TEST1-note@-5 {{annotate a type with SWIFT_COPYABLE_IF(<T>) in C++ to specify that the type is Copyable if <T> is Copyable}}
+    // expected-TEST7-DARWIN-error@-6 {{call to implicitly-deleted copy constructor of 'std::unique_ptr<int>'}}
+    // expected-TEST7-linux-android-error@-7 {{call to implicitly-deleted copy constructor of 'std::unique_ptr<int>'}}
+    // expected-TEST7-linux-androideabi-error@-8 {{call to implicitly-deleted copy constructor of 'std::unique_ptr<int>'}}
+    // expected-TEST7-linux-gnu-error@-9 {{call to deleted constructor of 'std::unique_ptr<int>'}}
+    // expected-TEST7-DARWIN-note@-10 {{in instantiation of member function 'OwnsT<std::unique_ptr<int>>::OwnsT' requested here}}
+    // expected-TEST7-LINUX-note@-11 {{in instantiation of member function 'OwnsT<std::unique_ptr<int>>::OwnsT' requested here}}
     OwnsT(OwnsT&& other) {}
 };
 
@@ -66,7 +75,7 @@ template <typename T> struct SWIFT_COPYABLE_IF(T) Annotated {
 
 using AnnotatedOwnsNonCopyable = Annotated<OwnsT<NonCopyable>>;
 
-#if __cplusplus >= 202002L
+#if TEST4
 template <typename T> struct Requires {
     T element;
     Requires() : element() {}
@@ -85,6 +94,35 @@ struct HasSubscript {
     NonCopyable &operator[](int idx) { return nc; }
     NonCopyable nc;
 };
+
+template <typename T> struct DefaultedCopyConstructor : OwnsT<T> {
+    public:
+    constexpr DefaultedCopyConstructor() : OwnsT<T>() { }
+    constexpr DefaultedCopyConstructor(const DefaultedCopyConstructor&) = default;
+    // expected-TEST6-error@-1 {{failed to copy 'DefaultedCopyConstructor<NonCopyable>'; did you mean to import 'DefaultedCopyConstructor<NonCopyable>' as ~Copyable?}}
+    // expected-TEST6-note@-2 {{use 'requires' (since C++20) to specify the constraints under which the copy constructor is available}}
+    // expected-TEST6-note@-3 {{annotate a type with SWIFT_COPYABLE_IF(<T>) in C++ to specify that the type is Copyable if <T> is Copyable}}
+    // expected-TEST6-note@-4 {{annotate a type with SWIFT_NONCOPYABLE in C++ to import it as ~Copyable}}
+    // expected-TEST7-DARWIN-error@-5 {{failed to copy 'DefaultedCopyConstructor<std::unique_ptr<int>>'; did you mean to import 'DefaultedCopyConstructor<std::unique_ptr<int>>' as ~Copyable?}}
+    // expected-TEST7-LINUX-error@-6 {{failed to copy 'DefaultedCopyConstructor<std::unique_ptr<int>>'; did you mean to import 'DefaultedCopyConstructor<std::unique_ptr<int>>' as ~Copyable?}}
+    // expected-TEST7-DARWIN-note@-7 {{use 'requires' (since C++20) to specify the constraints under which the copy constructor is available}}
+    // expected-TEST7-LINUX-note@-8 {{use 'requires' (since C++20) to specify the constraints under which the copy constructor is available}}
+    // expected-TEST7-DARWIN-note@-9 {{annotate a type with SWIFT_COPYABLE_IF(<T>) in C++ to specify that the type is Copyable if <T> is Copyable}}
+    // expected-TEST7-LINUX-note@-10 {{annotate a type with SWIFT_COPYABLE_IF(<T>) in C++ to specify that the type is Copyable if <T> is Copyable}}
+    // expected-TEST7-DARWIN-note@-11 {{annotate a type with SWIFT_NONCOPYABLE in C++ to import it as ~Copyable}}
+    // expected-TEST7-LINUX-note@-12 {{annotate a type with SWIFT_NONCOPYABLE in C++ to import it as ~Copyable}}
+
+    constexpr DefaultedCopyConstructor(DefaultedCopyConstructor&&) = default;
+
+    ~DefaultedCopyConstructor() = default;
+};
+
+using DefaultedCopyConstructorNonCopyable = DefaultedCopyConstructor<NonCopyable>;
+
+#if TEST7
+#include <memory>
+using DefaultedCopyConstructorUniquePtr = DefaultedCopyConstructor<std::unique_ptr<int>>;
+#endif
 
 //--- test.swift
 import Test
@@ -130,5 +168,17 @@ func useSubscript() {
     
     func borrow(_ x: borrowing NonCopyable) -> Int32 { return x.number; }
     let _ = borrow(obj[42])
+}
+
+#elseif TEST6
+func derivedWithDefaultedCopyConstructor() {
+    let s = DefaultedCopyConstructorNonCopyable()
+    takeCopyable(s)
+}
+
+#elseif TEST7 && (canImport(Darwin) || os(Android) || os(Linux))
+func stdUniquePtr() {
+    let s = DefaultedCopyConstructorUniquePtr()
+    takeCopyable(s)
 }
 #endif

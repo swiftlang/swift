@@ -140,7 +140,6 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          // HERE, need to look up base decl
           Result.add(LookupResultEntry(baseDC, baseDecl, result), isOuter);
           if (isOuter)
             FoundOuterDecls.push_back(result);
@@ -205,12 +204,15 @@ namespace {
       }
 
       // Dig out the witness.
-      ValueDecl *witness = nullptr;
       auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
+        auto *witness = concrete->getTypeWitnessAndDecl(assocType)
+            .getWitnessDecl();
+        ASSERT(witness != assocType);
+        if (witness)
+          addResult(witness);
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found);
+        auto *witness = concrete->getWitnessDecl(found);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -221,22 +223,18 @@ namespace {
           addResult(found);
           return;
         }
+
+        // If we have an imported conformance or the witness could
+        // not be deserialized, getWitnessDecl() will just return
+        // the requirement, so just drop the lookup result here.
+        if (witness && witness != found)
+          addResult(witness);
       } else if (isa<NominalTypeDecl>(found)) {
         // Declaring nested types inside other types is currently
         // not supported by lookup would still return such members
         // so we have to account for that here as well.
         addResult(found);
-        return;
       }
-
-      // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-      // default implementations in protocols.
-      //
-      // If we have an imported conformance or the witness could
-      // not be deserialized, getWitnessDecl() will just return
-      // the requirement, so just drop the lookup result here.
-      if (witness && !isa<ProtocolDecl>(witness->getDeclContext()))
-        addResult(witness);
     }
   };
 } // end anonymous namespace
@@ -563,11 +561,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto *concrete = conformance.getConcrete();
       auto *normal = concrete->getRootNormalConformance();
 
-      // This is the only case where NormalProtocolConformance::
-      // getTypeWitnessAndDecl() returns a null type.
-      if (dc->getASTContext().evaluator.hasActiveRequest(
-            ResolveTypeWitnessesRequest{normal})) {
-        continue;
+      if (!concrete->hasTypeWitness(assocType)) {
+        // This is the only case where NormalProtocolConformance::
+        // getTypeWitnessAndDecl() returns a null type.
+        if (dc->getASTContext().evaluator.hasActiveRequest(
+              ResolveTypeWitnessesRequest{normal})) {
+          continue;
+        }
       }
 
       auto *typeDecl =

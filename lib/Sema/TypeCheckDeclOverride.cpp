@@ -1615,6 +1615,7 @@ namespace  {
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(Owned)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(Nonexhaustive)
     UNINTERESTING_ATTR(NoLocks)
@@ -2370,9 +2371,9 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:
       break;
@@ -2412,11 +2413,13 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
+      case AccessorKind::Borrow:
         break;
 
       case AccessorKind::Modify:
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
+      case AccessorKind::Mutate:
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

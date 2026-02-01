@@ -1715,12 +1715,6 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.setSDKPath(SearchPathOpts.getSDKPath().str());
   }
 
-  if (SearchPathOpts.PlatformAvailabilityInheritanceMapPath) {
-    GenericArgs.push_back("-platform-availability-inheritance-map-path");
-    GenericArgs.push_back(ArgSaver.save(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath));
-    genericSubInvocation.setPlatformAvailabilityInheritanceMapPath(*SearchPathOpts.PlatformAvailabilityInheritanceMapPath);
-  }
-
   // Inherit the plugin search opts but do not inherit the arguments.
   genericSubInvocation.getSearchPathOptions().PluginSearchOpts =
       SearchPathOpts.PluginSearchOpts;

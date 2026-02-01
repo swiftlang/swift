@@ -440,29 +440,24 @@ suite.test("suffix extracting() functions")
 }
 
 suite.test("withUnsafeBufferPointer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity: UInt8 = 64
-  let a = Array(0..<capacity)
-  a.withUnsafeBufferPointer {
-    ub in
-    let span = Span(_unsafeElements: ub)
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  var a = ContiguousArray(0..<10)
+  a.withUnsafeMutableBufferPointer {
+    let span = Span(_unsafeElements: $0)
     span.withUnsafeBufferPointer {
-      let i = Int.random(in: 0..<$0.count)
-      expectEqual($0[i], ub[i])
+      expectEqual($0.count, capacity)
+      for i in $0.indices {
+        expectEqual($0[i], i)
+      }
     }
 
-    let emptyBuffer = UnsafeBufferPointer(rebasing: ub[0..<0])
-    expectEqual(emptyBuffer.baseAddress, ub.baseAddress)
-
+    let emptyBuffer = UnsafeBufferPointer(rebasing: $0[0..<0])
+    expectEqual(emptyBuffer.baseAddress, $0.baseAddress)
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBufferPointer {
-      expectNil($0.baseAddress)
+      expectEqual($0.count, 0)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -491,7 +486,8 @@ suite.test("withUnsafeBytes()")
 
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBytes {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }

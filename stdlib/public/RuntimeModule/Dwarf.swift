@@ -302,6 +302,7 @@ private enum DwarfError: Error {
 
 // .. Dwarf utilities for ImageSource ..........................................
 
+@available(Backtracing 6.2, *)
 extension ImageSource {
 
   func fetchULEB128(from a: Address) throws -> (Address, UInt64) {
@@ -428,6 +429,7 @@ extension ImageSource {
 
 // .. Dwarf utilities for ImageSourceCursor .....................................
 
+@available(Backtracing 6.2, *)
 extension ImageSourceCursor {
 
   mutating func readULEB128() throws -> UInt64 {
@@ -496,12 +498,14 @@ enum DwarfSection {
   case debugTuIndex
 }
 
+@available(Backtracing 6.2, *)
 protocol DwarfSource {
 
   func getDwarfSection(_ section: DwarfSection) -> ImageSource?
 
 }
 
+@available(Backtracing 6.2, *)
 struct DwarfReader<S: DwarfSource & AnyObject> {
 
   typealias Source = S
@@ -847,8 +851,13 @@ struct DwarfReader<S: DwarfSource & AnyObject> {
       // .6 minimum_instruction_length
       let minimumInstructionLength = UInt(try cursor.read(as: Dwarf_Byte.self))
 
-      // .7 maximum_operations_per_instruction
-      let maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
+      let maximumOpsPerInstruction: UInt
+      if version >= 4 {
+        // .7 maximum_operations_per_instruction
+        maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
+      } else {
+        maximumOpsPerInstruction = 1
+      }
 
       // .8 default_is_stmt
       let defaultIsStmt = try cursor.read(as: Dwarf_Byte.self) != 0
@@ -1798,6 +1807,7 @@ struct DwarfLineNumberState: CustomStringConvertible {
   }
 }
 
+@available(Backtracing 6.2, *)
 struct DwarfLineNumberInfo {
   typealias Address = UInt64
 
@@ -2006,6 +2016,7 @@ struct DwarfLineNumberInfo {
 // .. Testing ..................................................................
 
 @_spi(DwarfTest)
+@available(Backtracing 6.2, *)
 public func testDwarfReaderFor(path: String) -> Bool {
   guard let source = try? ImageSource(path: path) else {
     print("\(path) was not accessible")

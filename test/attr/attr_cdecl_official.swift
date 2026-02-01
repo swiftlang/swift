@@ -4,6 +4,12 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s \
 // RUN:    -disable-objc-interop
 
+#if hasAttribute(c)
+// good
+#else
+#error("missing the attribute we're using???")
+#endif
+
 @c(cdecl_foo) func foo(x: Int) -> Int { return x }
 
 @c(not an identifier) func invalidName() {}

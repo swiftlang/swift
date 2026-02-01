@@ -50,6 +50,7 @@ public protocol BacktraceJSONWriter {
 }
 
 @_spi(Formatting)
+@available(Backtracing 6.2, *)
 public struct BacktraceJSONFormatter<
 Address: FixedWidthInteger,
 Writer: BacktraceJSONWriter> {
@@ -77,6 +78,7 @@ Writer: BacktraceJSONWriter> {
   }
 }
 
+@available(Backtracing 6.2, *)
 internal extension BacktraceJSONFormatter {
   func write(_ string: String, flush: Bool) {
     writer.write(string, flush: flush)
@@ -103,6 +105,7 @@ internal extension BacktraceJSONFormatter {
 }
 
 @_spi(Formatting)
+@available(Backtracing 6.2, *)
 public extension BacktraceJSONFormatter {
   mutating func writeCrashLog(now: String) {
     writePreamble(now: now)
@@ -114,6 +117,7 @@ public extension BacktraceJSONFormatter {
 }
 
 @_spi(Formatting)
+@available(Backtracing 6.2, *)
 public extension BacktraceJSONFormatter {
   func writePreamble(now: String) {
     guard let description = getDescription(),
@@ -222,6 +226,7 @@ public extension BacktraceJSONFormatter {
   }
 }
 
+@available(Backtracing 6.2, *)
 internal extension BacktraceJSONFormatter {
   func writeThreadRegisters(thread: Log.Thread) {
     guard let registers = thread.registers else { return }

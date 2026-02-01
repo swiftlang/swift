@@ -276,7 +276,8 @@ namespace irgen {
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        SILType funcResultTypeInContext,
                        CanSILFunctionType fnType, Explosion &result,
-                       Explosion &error);
+                       Explosion &error,
+                       SILType funcErrorTypeInContext);
   void emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
                                     SILType funcResultType, SILType returnResultType);
 

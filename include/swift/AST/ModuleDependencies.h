@@ -30,10 +30,9 @@
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/StringSaver.h"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -277,10 +276,9 @@ public:
   /// The macro dependencies.
   std::map<std::string, MacroPluginDependency> macroDependencies;
 
-  /// A list of Clang modules that are visible to this Swift module. This
-  /// includes both direct Clang modules as well as transitive Clang
-  /// module dependencies when they are exported
-  llvm::StringSet<> visibleClangModules;
+  /// A list of Clang modules that are visible to this Swift module
+  /// as re-exported modular includes of its bridging header.
+  std::vector<std::string> bridgingHeaderVisibleClangModules;
 
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
   /// and inputs).
@@ -893,14 +891,12 @@ public:
       llvm_unreachable("Unexpected module dependency kind");
   }
 
-  llvm::StringSet<> &getVisibleClangModules() const {
-    return storage->visibleClangModules;
+  ArrayRef<std::string> getHeaderVisibleClangModules() const {
+    return storage->bridgingHeaderVisibleClangModules;
   }
-
-  void
-  addVisibleClangModules(const std::vector<std::string> &moduleNames) const {
-    storage->visibleClangModules.insert(moduleNames.begin(),
-                                        moduleNames.end());
+  void setHeaderVisibleClangModules(
+      const std::vector<std::string> &moduleNames) const {
+    storage->bridgingHeaderVisibleClangModules = moduleNames;
   }
 
   /// Whether explicit input paths of all the module dependencies
@@ -1036,6 +1032,12 @@ using BridgeClangDependencyCallback = llvm::function_ref<ModuleDependencyInfo(
 /// A carrier of state shared among possibly multiple invocations of the
 /// dependency scanner.
 class SwiftDependencyScanningService {
+  /// BumpPtrAllocator for data matching the life-time of ScanningService.
+  llvm::BumpPtrAllocator Alloc;
+
+  /// StringSaver for data matching the life-time of ScanningService.
+  llvm::StringSaver Saver;
+
   /// The CASOption created the Scanning Service if used.
   std::optional<clang::CASOptions> CASOpts;
 
@@ -1057,6 +1059,9 @@ public:
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 
+  /// Allocate string inside ScanningService.
+  StringRef save(StringRef str);
+
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
@@ -1073,6 +1078,12 @@ class ModuleDependenciesCache {
 private:
   /// Discovered dependencies
   ModuleDependenciesKindMap ModuleDependenciesMap;
+  /// A map from Clang module name to all visible modules to a client
+  /// of a by-name import of this Clang module
+  llvm::StringMap<std::vector<std::string>> clangModulesVisibleFromNamedLookup;
+  /// A set of module identifiers for which a scanning action failed
+  /// to discover a Swift module dependency
+  llvm::StringSet<> negativeSwiftDependencyCache;
   /// Set containing all of the Clang modules that have already been seen.
   llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
@@ -1107,10 +1118,14 @@ public:
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
                      std::optional<ModuleDependencyKind> kind) const;
-  /// Whether we have cached dependency information for the given module Name.
-  bool hasDependency(StringRef moduleName) const;
-  /// Whether we have cached dependency information for the given Swift module.
-  bool hasSwiftDependency(StringRef moduleName) const;
+  /// Whether we have cached dependency information for the given Clang module.
+  bool hasClangDependency(StringRef moduleName) const;
+
+  /// Whether we have cached dependency information for the given Swift module,
+  /// or have previously failed a lookup of a Swift dependency for the
+  /// given identifier.
+  bool hasQueriedSwiftDependency(StringRef moduleName) const;
+
   /// Report the number of recorded Clang dependencies
   int numberOfClangDependencies() const;
   /// Report the number of recorded Swift dependencies
@@ -1152,9 +1167,20 @@ public:
   /// Query all cross-import overlay dependencies
   llvm::ArrayRef<ModuleDependencyID>
   getCrossImportOverlayDependencies(const ModuleDependencyID &moduleID) const;
+
   /// Query all visible Clang modules for a given Swift dependency
-  llvm::StringSet<>&
-  getVisibleClangModules(ModuleDependencyID moduleID) const;
+  llvm::StringSet<>
+  getAllVisibleClangModules(ModuleDependencyID moduleID) const;
+  /// Query all Clang modules visible via a by-name lookup of given
+  /// Clang dependency
+  llvm::ArrayRef<std::string>
+  getVisibleClangModulesFromLookup(StringRef moduleName) const;
+  bool hasVisibleClangModulesFromLookup(StringRef moduleName) const;
+  /// Query all Clang modules visible from a given Swift module's
+  /// bridging header
+  llvm::ArrayRef<std::string>
+  getVisibleClangModulesViaHeader(ModuleDependencyID moduleID) const;
+  bool hasVisibleClangModulesViaHeader(ModuleDependencyID moduleID) const;
 
   /// Look for module dependencies for a module with the given ID
   ///
@@ -1230,8 +1256,10 @@ public:
     const ModuleDependencyIDCollectionView dependencyIDs);
   /// Add to this module's set of visible Clang modules
   void
-  addVisibleClangModules(ModuleDependencyID moduleID,
-                         const std::vector<std::string> &moduleNames);
+  setVisibleClangModulesFromLookup(ModuleDependencyID clangModuleID,
+                                   const std::vector<std::string> &moduleNames);
+  /// Add an identifier to the set of failed Swift module queries
+  void recordFailedSwiftDependencyLookup(StringRef moduleIdentifier);
 
   StringRef getMainModuleName() const { return mainScanModuleName; }
 

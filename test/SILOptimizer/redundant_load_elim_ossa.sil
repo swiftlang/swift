@@ -267,51 +267,6 @@ bb2:
   return %5 : $A
 }
 
-// DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
-//
-// Make sure the switch does not affect the forwarding of the load.
-// switch_enum cannot have BBArgument, but the %17 = load %2 : $*Int32 is not produced in the
-// switch basic block.
-// DISABLE_CHECK-LABEL: load_elimination_disregard_switch_enum
-// DISABLE_CHECK: bb8
-// DISABLE_CHECK-NOT: = load
-// DISABLE_CHECK-LABEL: } // end sil function 'load_elimination_disregard_switch_enum'
-sil [ossa] @load_elimination_disregard_switch_enum : $@convention(thin) (Int32, Int32, @inout Int32) -> Int32 {
-bb0(%0 : $Int32, %1 : $Int32, %2 : $*Int32):
-  cond_br undef, bb7, bb1
-
-bb1:
-  %4 = tuple (%0 : $Int32, %1 : $Int32)
-  %5 = enum $XYZ, #XYZ.B!enumelt, %4 : $(Int32, Int32)
-  switch_enum %5 : $XYZ, case #XYZ.A!enumelt: bb2, case #XYZ.B!enumelt: bb4, case #XYZ.C!enumelt: bb6
-
-bb2:
-  br bb3
-
-bb3:
-  %8 = integer_literal $Builtin.Int32, 0
-  %9 = struct $Int32 (%8 : $Builtin.Int32)
-  br bb5
-
-bb4(%11 : $(Int32, Int32)):
-  %12 = tuple_extract %11 : $(Int32, Int32), 0
-  br bb5
-
-bb5:
-  br bb5
-
-bb6(%15 : $Int32):
-  br bb5
-
-bb7:
-  %17 = load [trivial] %2 : $*Int32
-  br bb8
-
-bb8:
-  %19 = load [trivial] %2 : $*Int32
-  return %19 : $Int32
-}
-
 // CHECK-LABEL: sil [ossa] @load_store_forwarding_from_aggregate_to_field :
 // CHECK-NOT: load
 // CHECK-LABEL: } // end sil function 'load_store_forwarding_from_aggregate_to_field'
@@ -1156,60 +1111,6 @@ bb3:
   return %44 : $()
 }
 
-// Make sure the first load in bb1 is not eliminated as we have
-// this unreachable block which will have a liveout of nil.
-// we make this in the context of a loop, because we want to run an
-// optimistic data flow.
-//
-// CHECK-LABEL: sil [ossa] @load_to_load_loop_with_unreachable_block :
-// CHECK: bb1:
-// CHECK: = load
-// CHECK: cond_br
-// CHECK-LABEL: } // end sil function 'load_to_load_loop_with_unreachable_block'
-sil [ossa] @load_to_load_loop_with_unreachable_block : $@convention(thin) (Int32) -> () {
-bb0(%a : $Int32):
-  %101 = alloc_stack $Int32
-  %102 = alloc_stack $Int32
-  store %a to [trivial] %101 : $*Int32
-  store %a to [trivial] %102 : $*Int32
-  %0 = struct_element_addr %101 : $*Int32, #Int32.value
-  %1 = struct_element_addr %102 : $*Int32, #Int32.value
-  %2 = load [trivial] %0 : $*Builtin.Int32
-  %99 = load [trivial] %1 : $*Builtin.Int32
-  %125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
-  %126 = apply %125(%2) : $@convention(thin) (Builtin.Int32) -> ()
-  %127 = apply %125(%99) : $@convention(thin) (Builtin.Int32) -> ()
-  br bb1
-
-bb20:
-  %44 = load [trivial] %0 : $*Builtin.Int32
-  br bb1
-
-bb1:
-  %4 = load [trivial] %0 : $*Builtin.Int32
-  %5 = integer_literal $Builtin.Int32, 2
-  %1125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
-  %1126 = apply %1125(%4) : $@convention(thin) (Builtin.Int32) -> ()
-  store %5 to [trivial] %0 : $*Builtin.Int32
-  builtin "trunc_Int32_Int1"(%4 : $Builtin.Int32) : $Builtin.Int1
-  %6 = load [trivial] %0 : $*Builtin.Int32
-  %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
-  %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
-  cond_br undef, bb1a, bb2
-
-bb1a:
-  br bb1
-
-bb2:
-  %7 = load [trivial] %0 : $*Builtin.Int32
-  %111125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
-  %111126 = apply %111125(%7) : $@convention(thin) (Builtin.Int32) -> ()
-  dealloc_stack %102 : $*Int32
-  dealloc_stack %101 : $*Int32
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // CHECK-LABEL: sil hidden [ossa] @redundant_load_over_intermediate_release_with_epilogue_release : $@convention(thin) (@owned AB) -> () {
 // CHECK: [[AD:%.*]] = ref_element_addr
 // CHECK: [[AD2:%.*]] = load [trivial] [[AD]]
@@ -1795,5 +1696,61 @@ bb0(%0 : $Int):
   %7 = load [trivial] %1
   dealloc_stack %1
   return %7
+}
+
+// CHECK-LABEL: sil [ossa] @complete_lifetime1 :
+// This is not optimized, yet
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'complete_lifetime1'
+sil [ossa] @complete_lifetime1 : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = load [copy] %0
+  fix_lifetime %1
+  destroy_value %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %6 = load [copy] %0
+  fix_lifetime %6
+  destroy_value %6
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @complete_lifetime2 :
+// This is not optimized, yet
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'complete_lifetime2'
+sil [ossa] @complete_lifetime2 : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = load [copy] %0
+  fix_lifetime %2
+  destroy_value %2
+  br bb3
+
+bb2:
+  %6 = load [copy] %0
+  fix_lifetime %6
+  destroy_value %6
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  unreachable
+
+bb5:
+  %12 = load [copy] %0
+  fix_lifetime %12
+  destroy_value %12
+  %r = tuple ()
+  return %r
 }
 

@@ -1063,8 +1063,23 @@ bool swift::diagnoseNonSendableTypes(
   if (auto *expansion = type->getAs<PackExpansionType>())
     type = PackType::get(ctx, {expansion});
 
+  // Check each element of a tuple individually because this check could be
+  // used recursively during conformance lookup and passing tuples to
+  // recursive calls to \c lookupConformance defeats circularity checking
+  // in the request because \c ImplicitKnownProtocolConformanceRequest
+  // operates on nominal types.
+  if (auto *tuple = type->getAs<TupleType>()) {
+    bool anyMissing = false;
+    for (Type elementTy : tuple->getElementTypes()) {
+      anyMissing |= diagnoseNonSendableTypes(
+          elementTy, fromContext, inDerivedConformance, loc, diagnose);
+    }
+    return anyMissing;
+  }
+
   // FIXME: More detail for unavailable conformances.
-  auto conformance = lookupConformance(type, proto, /*allowMissing=*/true);
+  auto conformance =
+      lookupConformance(type->getCanonicalType(), proto, /*allowMissing=*/true);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
@@ -6339,12 +6354,12 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
     if (mainIsolation) {
-      if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
-        if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
-                           mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
-        }
+      // If an explicit attribute is anything other than `@MainActor`, complain.
+      if (isolationFromAttr &&
+          !(isolationFromAttr->isGlobalActor() &&
+            areTypesEqual(isolationFromAttr->getGlobalActor(),
+                          mainIsolation->getGlobalActor()))) {
+        fd->diagnose(diag::main_function_must_be_mainActor);
       }
       return {
         *mainIsolation,

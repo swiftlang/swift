@@ -15,6 +15,8 @@ import StdlibUnittest
 import Synchronization
 import Dispatch
 
+@_spi(ExperimentalCustomExecutors) import _Concurrency
+
 typealias DefaultExecutorFactory = SimpleExecutorFactory
 
 struct SimpleExecutorFactory: ExecutorFactory {

@@ -659,10 +659,6 @@ SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,
               evaluator::SideEffect(ModuleDecl *),
               Cached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
-              bool(const ModuleDecl *),
-              Cached, NoLocationInfo)
-
 SWIFT_REQUEST(TypeChecker, AvailabilityDomainForDeclRequest,
               std::optional<AvailabilityDomain>(ValueDecl *),
               Cached | SplitCached, NoLocationInfo)
@@ -674,3 +670,7 @@ SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
 SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
               evaluator::SideEffect(SourceFile *),
               Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, DesugarForEachStmtRequest,
+              BraceStmt *(ForEachStmt *),
+              SeparatelyCached, NoLocationInfo)

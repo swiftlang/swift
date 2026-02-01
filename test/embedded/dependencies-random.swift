@@ -1,28 +1,46 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern %s -c -o %t/a.o
-
-// RUN: if [[ %target-os =~ "wasi" ]]; then pattern="DEP\:\|DEP-WASM\:"; else pattern="DEP\:"; fi; grep "$pattern" %s | sed "s#// .*\: ##" | sort > %t/allowed-dependencies.txt
-
-// Linux/ELF and Wasm don't use the "_" prefix in symbol mangling.
-// RUN: if [ %target-os == "linux-gnu" ] || [[ %target-os =~ "wasi" ]]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern %t/test.swift -c -o %t/a.o
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
 // Fail if there is any entry in actual-dependencies.txt that's not in allowed-dependencies.txt
-// RUN: test -z "`comm -13 %t/allowed-dependencies.txt %t/actual-dependencies.txt`"
+// RUN: %if OS=linux-gnu %{ comm -13 %t/allowed-dependencies_linux.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if OS=macosx %{ comm -13 %t/allowed-dependencies_macos.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: %if OS=wasip1 %{ comm -13 %t/allowed-dependencies_wasi.txt %t/actual-dependencies.txt > %t/extra.txt %}
+// RUN: test ! -s %t/extra.txt
 
-// DEP-WASM: ___indirect_function_table
-// DEP-WASM: ___memory_base
-// DEP: ___stack_chk_fail
-// DEP: ___stack_chk_guard
-// DEP-WASM: ___stack_pointer
-// DEP: _arc4random_buf
-// DEP: _free
-// DEP: _memmove
-// DEP: _memset
-// DEP: _putchar
-// DEP: _posix_memalign
+//--- allowed-dependencies_macos.txt
+___stack_chk_fail
+___stack_chk_guard
+_arc4random_buf
+_free
+_memmove
+_memset
+_posix_memalign
+_putchar
 
+//--- allowed-dependencies_linux.txt
+__stack_chk_fail
+__stack_chk_guard
+arc4random_buf
+free
+memmove
+memset
+posix_memalign
+putchar
+//--- allowed-dependencies_wasi.txt
+__indirect_function_table
+__memory_base
+__stack_chk_fail
+__stack_chk_guard
+__stack_pointer
+__table_base
+arc4random_buf
+free
+posix_memalign
+putchar
+//--- test.swift
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang -x c -c %S/Inputs/linux-rng-support.c -o %t/linux-rng-support.o
 // RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out

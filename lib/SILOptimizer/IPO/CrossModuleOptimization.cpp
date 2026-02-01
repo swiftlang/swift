@@ -160,6 +160,12 @@ public:
   InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, VisitMode visitMode) :
     SILCloner(F), CMS(CMS), mode(visitMode) {}
 
+  ~InstructionVisitor() {
+    // We use the cloner for type visiting which may clone `unreachable` instructions.
+    // However, this does not introduce any incomplete lifetimes.
+    Builder.getFunction().setNeedCompleteLifetimes(false);
+  }
+
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
       Ty = Ty.subst(getBuilder().getModule(),

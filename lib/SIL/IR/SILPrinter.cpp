@@ -16,6 +16,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -187,6 +188,7 @@ struct SILValuePrinterInfo {
   bool IsCapture = false;
   bool IsReborrow = false;
   bool IsEscaping = false;
+  bool IsInferredImmutable = false;
   bool needPrintType = false;
 
   SILValuePrinterInfo(ID ValueID) : ValueID(ValueID), Type(), OwnershipKind() {}
@@ -198,18 +200,22 @@ struct SILValuePrinterInfo {
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsNoImplicitCopy,
                       LifetimeAnnotation Lifetime, bool IsCapture,
-                      bool IsReborrow, bool IsEscaping, bool needPrintType)
+                      bool IsReborrow, bool IsEscaping,
+                      bool IsInferredImmutable, bool needPrintType)
       : ValueID(ValueID), Type(Type), OwnershipKind(OwnershipKind),
         IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
         IsCapture(IsCapture), IsReborrow(IsReborrow), IsEscaping(IsEscaping),
-        needPrintType(needPrintType){}
+        IsInferredImmutable(IsInferredImmutable), needPrintType(needPrintType) {
+  }
   SILValuePrinterInfo(ID ValueID, SILType Type, bool IsNoImplicitCopy,
                       LifetimeAnnotation Lifetime, bool IsCapture,
-                      bool IsReborrow, bool IsEscaping, bool needPrintType)
+                      bool IsReborrow, bool IsEscaping,
+                      bool IsInferredImmutable, bool needPrintType)
       : ValueID(ValueID), Type(Type), OwnershipKind(),
         IsNoImplicitCopy(IsNoImplicitCopy), Lifetime(Lifetime),
         IsCapture(IsCapture), IsReborrow(IsReborrow), IsEscaping(IsEscaping),
-        needPrintType(needPrintType) {}
+        IsInferredImmutable(IsInferredImmutable), needPrintType(needPrintType) {
+  }
   SILValuePrinterInfo(ID ValueID, SILType Type,
                       ValueOwnershipKind OwnershipKind, bool IsReborrow,
                       bool IsEscaping, bool needPrintType)
@@ -393,11 +399,11 @@ void SILDeclRef::print(raw_ostream &OS) const {
     case AccessorKind::Init:
       OS << "!init";
       break;
-    case AccessorKind::Read2:
-      OS << "!read2";
+    case AccessorKind::YieldingBorrow:
+      OS << "!yielding_borrow";
       break;
-    case AccessorKind::Modify2:
-      OS << "!modify2";
+    case AccessorKind::YieldingMutate:
+      OS << "!yielding_mutate";
       break;
     case AccessorKind::Borrow:
       OS << "!borrow";
@@ -759,10 +765,16 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(SILDeclRef)
   SIMPLE_PRINTER(APInt)
   SIMPLE_PRINTER(ValueOwnershipKind)
-  SIMPLE_PRINTER(UUID)
   SIMPLE_PRINTER(GenericSignature)
   SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
+
+  SILPrinter &operator<<(UUID value) {
+    llvm::SmallString<UUID::StringBufferSize> str;
+    ASTPrinter::getUUIDStringForPrinting(value, str);
+    PrintState.OS << str;
+    return *this;
+  }
 
   SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
@@ -796,6 +808,10 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
     }
     if (i.IsEscaping) {
       *this << separator << "@pointer_escape";
+      separator = " ";
+    }
+    if (i.IsInferredImmutable) {
+      *this << separator << "@inferredImmutable";
       separator = " ";
     }
     if (!i.IsReborrow && i.OwnershipKind && *i.OwnershipKind != OwnershipKind::None) {
@@ -856,7 +872,8 @@ public:
     return {Ctx.getID(arg),          arg->getType(),
             arg->isNoImplicitCopy(), arg->getLifetimeAnnotation(),
             arg->isClosureCapture(), arg->isReborrow(),
-            arg->hasPointerEscape(), /*needPrintType=*/true};
+            arg->hasPointerEscape(), arg->isInferredImmutable(),
+            /*needPrintType=*/true};
   }
   SILValuePrinterInfo getIDAndType(SILArgument *arg) {
     return {Ctx.getID(arg), arg->getType(), /*needPrintType=*/true};
@@ -874,6 +891,7 @@ public:
             arg->isClosureCapture(),
             arg->isReborrow(),
             arg->hasPointerEscape(),
+            arg->isInferredImmutable(),
             /*needPrintType=*/true};
   }
   SILValuePrinterInfo getIDAndTypeAndOwnership(SILArgument *arg) {
@@ -1684,13 +1702,17 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     if (ABI->hasDynamicLifetime())
       *this << "[dynamic_lifetime] ";
-    
+
     if (ABI->emitReflectionMetadata()) {
       *this << "[reflection] ";
     }
 
     if (ABI->hasPointerEscape()) {
       *this << "[pointer_escape] ";
+    }
+
+    if (ABI->isInferredImmutable()) {
+      *this << "[inferred_immutable] ";
     }
 
     if (ABI->usesMoveableValueDebugInfo() &&
@@ -1921,6 +1943,30 @@ public:
 
     // "Bytes" are always output in a hexadecimal form.
     *this << '"' << llvm::toHex(SLI->getValue()) << '"';
+  }
+
+  void visitMakeBorrowInst(MakeBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *I) {
+    *this << getIDAndType(I->getDest()) << " with " << getIDAndType(I->getReferent());
   }
 
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {

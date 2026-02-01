@@ -11,6 +11,17 @@
 // APPLE-NEXT: [1] SOURCE_DIR/test/Inputs/clang-importer-sdk/usr/lib/swift
 // APPLE-NEXT: (End of search path lists.)
 
+// Apple paths with a system prefix.
+// RUN: %swift_frontend_plain -target arm64-apple-macos15.4 -sdk %S/Inputs/MacOSX26.1.systemprefix.sdk -parse-stdlib -parse %s -Rmodule-loading 2>&1 | %FileCheck --sanitize SDKROOT=%S/Inputs/MacOSX26.1.systemprefix.sdk -check-prefix=SYSTEMPREFIX %s
+// SYSTEMPREFIX: Implicit framework search paths:
+// SYSTEMPREFIX-NEXT: [0] SDKROOT/System/macOSSupport/System/Library/Frameworks
+// SYSTEMPREFIX-NEXT: [1] SDKROOT/System/macOSSupport/System/Library/SubFrameworks
+// SYSTEMPREFIX-NEXT: [2] SDKROOT/System/macOSSupport/Library/Frameworks
+// SYSTEMPREFIX-NEXT: Runtime library import search paths:
+// SYSTEMPREFIX-NEXT: [0] BUILD_DIR/lib/swift/macosx
+// SYSTEMPREFIX-NEXT: [1] SDKROOT/System/macOSSupport/usr/lib/swift
+// SYSTEMPREFIX-NEXT: (End of search path lists.)
+
 // Non-Apple platforms don't have any implicit framework search paths.
 // RUN: %swift_frontend_plain -target x86_64-unknown-linux-android %clang-importer-sdk-nosource -parse-stdlib -parse %s -Rmodule-loading 2>&1 | %FileCheck -check-prefix=ANDROID %s
 // ANDROID: Implicit framework search paths:

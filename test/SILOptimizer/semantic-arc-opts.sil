@@ -533,6 +533,8 @@ bb0:
   end_borrow %2 : $NativeObjectPair
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -556,6 +558,7 @@ bb0:
   end_borrow %2 : $NativeObjectPair
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -571,6 +574,7 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   %4 = copy_value %3 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -579,7 +583,7 @@ bb0(%0 : @guaranteed $NativeObjectPair):
 // eliminate the copy.
 //
 // CHECK-LABEL: sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'borrowed_val_used_by_postdominating_no_return_function'
 sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
 bb0(%0 : @owned $NativeObjectPair):
@@ -588,6 +592,9 @@ bb0(%0 : @owned $NativeObjectPair):
   %3 = copy_value %2 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %3
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 
@@ -1250,6 +1257,8 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %4 = load [copy] %3 : $*Builtin.NativeObject
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %2
   unreachable
 }
 
@@ -1512,6 +1521,7 @@ some(%obj : @owned $AnyObject):
     br die
 
 die:
+    destroy_value [dead_end] %opt
     unreachable
 
 none:
@@ -1550,41 +1560,46 @@ bb0:
     %opt = apply undef() : $@convention(thin) () -> (@owned FakeOptional<AnyObject>)
     %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
     %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
-    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none
+    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb7
 
-some(%obj : @owned $AnyObject):
+bb1(%obj : @owned $AnyObject):
     %obj_borrow = begin_borrow [lexical] %obj : $AnyObject
     %obj_borrow_copy = copy_value %obj_borrow : $AnyObject
-    try_apply undef(%obj_borrow_copy) : $@convention(method) (@owned AnyObject) -> (@owned AnyObject, @error Error), normal good, error bad
+    try_apply undef(%obj_borrow_copy) : $@convention(method) (@owned AnyObject) -> (@owned AnyObject, @error Error), normal bb2, error bb5
 
-good(%obj2 : @owned $AnyObject):
+bb2(%obj2 : @owned $AnyObject):
     %obj3 = apply undef(%obj2) : $@convention(method) (@guaranteed AnyObject) -> @owned FakeOptional<AnyObject>
     destroy_value %obj2 : $AnyObject
-    switch_enum %obj3 : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: good_some, case #FakeOptional.none!enumelt: good_none
+    switch_enum %obj3 : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: bb3, case #FakeOptional.none!enumelt: bb4
 
-good_some(%obj4 : @owned $AnyObject):
+bb3(%obj4 : @owned $AnyObject):
     destroy_value %obj4 : $AnyObject
     end_borrow %obj_borrow : $AnyObject
     destroy_value %obj : $AnyObject
-    br exit
+    br bb8
 
-good_none:
+bb4:
     end_borrow %opt_borrow : $FakeOptional<AnyObject>
     end_borrow %obj_borrow : $AnyObject
     destroy_value %obj : $AnyObject
     destroy_value %opt : $FakeOptional<AnyObject>
-    br die
+    br bb6
 
-bad(%error1 : @owned $Error):
-    br die
+bb5(%error1 : @owned $Error):
+    destroy_value [dead_end] %error1
+    end_borrow %obj_borrow
+    destroy_value [dead_end] %obj
+    end_borrow %opt_borrow
+    destroy_value [dead_end] %opt
+    br bb6
 
-die:
+bb6:
     unreachable
 
-none:
-    br exit
+bb7:
+    br bb8
 
-exit:
+bb8:
     end_borrow %opt_borrow : $FakeOptional<AnyObject>
     destroy_value %opt : $FakeOptional<AnyObject>
     %res = tuple ()

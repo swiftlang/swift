@@ -38,7 +38,7 @@ actor Container {
       num += 1 // no error, this runs synchronously on caller context
     } onCancel: {
       // this should error because cancellation is invoked concurrently
-      num += 10 // expected-error{{actor-isolated property 'num' can not be mutated from a Sendable closure}}
+      num += 10 // expected-error{{actor-isolated property 'num' can not be mutated from a nonisolated context}}
     }
   }
 }

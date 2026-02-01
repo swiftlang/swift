@@ -164,7 +164,7 @@ param
 
   # SBoM Support
   [switch] $IncludeSBoM = $false,
-  [string] $SyftVersion = "1.29.1",
+  [string] $SyftVersion = "1.40.0",
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
@@ -221,8 +221,7 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary,
-  [switch] $ToBatch
+  [switch] $Summary
 )
 
 ## Prepare the build environment.
@@ -520,6 +519,18 @@ $KnownSyft = @{
       SHA256 = "3C67CD9AF40CDCC7FFCE041C8349B4A77F33810184820C05DF23440C8E0AA1D7"
       Path = [IO.Path]::Combine("$BinaryCache\syft-1.29.1", "syft.exe")
     }
+  };
+  "1.40.0" = @{
+    AMD64 = @{
+      URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_amd64.zip"
+      SHA256 = "3F4021EC098B4BCBAF19BBA7028CF7704FEF12936970778CEC3C6D669B740E6D"
+      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+    };
+    ARM64 = @{
+      URL = "https://github.com/anchore/syft/releases/download/v1.40.0/syft_1.40.0_windows_arm64.zip"
+      SHA256 = "CE7129DBCC39809542C9BC5032B179131DFEE72C68C5B3741E3270A3D9ED46E4"
+      Path = [IO.Path]::Combine("$BinaryCache\syft-1.40.0", "syft.exe")
+    };
   }
 }
 
@@ -969,39 +980,22 @@ function Copy-File($Src, $Dst) {
   # Create the directory tree first so Copy-Item succeeds
   # If $Dst is the target directory, make sure it ends with "\"
   $DstDir = [IO.Path]::GetDirectoryName($Dst)
-  if ($ToBatch) {
-    Write-Output "md `"$DstDir`""
-    Write-Output "copy /Y `"$Src`" `"$Dst`""
-  } else {
-    New-Item -ItemType Directory -ErrorAction Ignore $DstDir | Out-Null
-    Copy-Item -Force `
-      -Path $Src `
-      -Destination $Dst
-  }
+  New-Item -ItemType Directory -ErrorAction Ignore $DstDir | Out-Null
+  Copy-Item -Force -Path $Src -Destination $Dst
 }
 
 function Copy-Directory($Src, $Dst) {
-  if ($ToBatch) {
-    Write-Output "md `"$Dst`""
-    Write-Output "copy /Y `"$Src`" `"$Dst`""
-  } else {
-    New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
-    Copy-Item -Force -Recurse `
-      -Path $Src `
-      -Destination $Dst
-  }
+  New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
+  Copy-Item -Force -Recurse -Path $Src -Destination $Dst
 }
 
 function Move-Directory($Src, $Dst) {
-  if ($ToBatch) {
-  } else {
-    $Destination = Join-Path -Path $Dst -ChildPath (Split-Path -Path $Src -Leaf)
-    if (Test-Path -Path $Destination -Type Container) {
-      Remove-Item -Path $Destination -Recurse -Force | Out-Null
-    }
-    New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
-    Move-Item -Path $Src -Destination $Destination -Force | Out-Null
+  $Destination = Join-Path -Path $Dst -ChildPath (Split-Path -Path $Src -Leaf)
+  if (Test-Path -Path $Destination -Type Container) {
+    Remove-Item -Path $Destination -Recurse -Force | Out-Null
   }
+  New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
+  Move-Item -Path $Src -Destination $Destination -Force | Out-Null
 }
 
 function Invoke-Program() {
@@ -1018,88 +1012,47 @@ function Invoke-Program() {
     [string[]] $ExecutableArgs
   )
 
-  if ($ToBatch) {
-    # Print the invocation in batch file-compatible format
-    $OutputLine = "`"$Executable`""
-    $ShouldBreakLine = $false
-    for ($i = 0; $i -lt $ExecutableArgs.Length; $i++) {
-      if ($ShouldBreakLine -or $OutputLine.Length -ge 40) {
-        $OutputLine += " ^"
-        Write-Output $OutputLine
-        $OutputLine = "  "
-      }
-
-      $Arg = $ExecutableArgs[$i]
-      if ($Arg.Contains(" ")) {
-        $OutputLine += " `"$Arg`""
-      } else {
-        $OutputLine += " $Arg"
-      }
-
-      # Break lines after non-switch arguments
-      $ShouldBreakLine = -not $Arg.StartsWith("-")
-    }
-
-    if ($OutNull) {
-      $OutputLine += " > nul"
-    } elseif ($Silent) {
-      $OutputLine += " *> nul"
-    } else {
-      if ($OutFile) { $OutputLine += " > `"$OutFile`"" }
-      if ($ErrorFile) { $OutputLine += " 2> `"$ErrorFile`"" }
-    }
-
-    Write-Output $OutputLine
+  if ($OutNull) {
+    & $Executable @ExecutableArgs | Out-Null
+  } elseif ($Silent) {
+    & $Executable @ExecutableArgs | Out-Null 2>&1| Out-Null
+  } elseif ($OutFile -and $ErrorFile) {
+    & $Executable @ExecutableArgs | Out-File -FilePath $OutFile -Encoding UTF8 2>&1| Out-File -FilePath $ErrorFile -Encoding UTF8
+  } elseif ($OutFile) {
+    & $Executable @ExecutableArgs | Out-File -FilePath $OutFile -Encoding UTF8
+  } elseif ($ErrorFile) {
+    & $Executable @ExecutableArgs 2>&1| Out-File -FilePath $ErrorFile -Encoding UTF8
   } else {
-    if ($OutNull) {
-      & $Executable @ExecutableArgs | Out-Null
-    } elseif ($Silent) {
-      & $Executable @ExecutableArgs | Out-Null 2>&1| Out-Null
-    } elseif ($OutFile -and $ErrorFile) {
-      & $Executable @ExecutableArgs | Out-File -FilePath $OutFile -Encoding UTF8 2>&1| Out-File -FilePath $ErrorFile -Encoding UTF8
-    } elseif ($OutFile) {
-      & $Executable @ExecutableArgs | Out-File -FilePath $OutFile -Encoding UTF8
-    } elseif ($ErrorFile) {
-      & $Executable @ExecutableArgs 2>&1| Out-File -FilePath $ErrorFile -Encoding UTF8
-    } else {
-      & $Executable @ExecutableArgs
+    & $Executable @ExecutableArgs
+  }
+
+  if ($LastExitCode -ne 0) {
+    $ErrorMessage = "Error: $([IO.Path]::GetFileName($Executable)) exited with code $($LastExitCode).`n"
+
+    $ErrorMessage += "Invocation:`n"
+    $ErrorMessage += "  $Executable $ExecutableArgs`n"
+
+    $ErrorMessage += "Call stack:`n"
+    foreach ($Frame in @(Get-PSCallStack)) {
+      $ErrorMessage += "  $Frame`n"
     }
 
-    if ($LastExitCode -ne 0) {
-      $ErrorMessage = "Error: $([IO.Path]::GetFileName($Executable)) exited with code $($LastExitCode).`n"
-
-      $ErrorMessage += "Invocation:`n"
-      $ErrorMessage += "  $Executable $ExecutableArgs`n"
-
-      $ErrorMessage += "Call stack:`n"
-      foreach ($Frame in @(Get-PSCallStack)) {
-        $ErrorMessage += "  $Frame`n"
-      }
-
-      throw $ErrorMessage
-    }
+    throw $ErrorMessage
   }
 }
 
 function Invoke-IsolatingEnvVars([scriptblock]$Block) {
-  if ($ToBatch) {
-    Write-Output "setlocal enableextensions enabledelayedexpansion"
-  }
-
   $OldVars = @{}
   foreach ($Var in (Get-ChildItem env:*).GetEnumerator()) {
     $OldVars.Add($Var.Key, $Var.Value)
   }
+
   try {
     & $Block
   } finally {
     Remove-Item env:*
     foreach ($Var in $OldVars.GetEnumerator()) {
       New-Item -Path "env:\$($Var.Key)" -Value $Var.Value -ErrorAction Ignore | Out-Null
-    }
-
-    if ($ToBatch) {
-      Write-Output "endlocal"
     }
   }
 }
@@ -1117,33 +1070,29 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $DevCmdArguments += " -winsdk=$WinSDKVersion"
   }
 
-  if ($ToBatch) {
-    Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
-  } else {
-    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
-    Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
-    Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+  # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
+  Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+  Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
 
-    if ($CustomWinSDKRoot) {
-      # Using a non-installed Windows SDK. Setup environment variables manually.
-      $WinSDKVerIncludeRoot = "$CustomWinSDKRoot\include\$WinSDKVersion"
-      $WinSDKIncludePath = "$WinSDKVerIncludeRoot\ucrt;$WinSDKVerIncludeRoot\um;$WinSDKVerIncludeRoot\shared;$WinSDKVerIncludeRoot\winrt;$WinSDKVerIncludeRoot\cppwinrt"
-      $WinSDKVerLibRoot = "$CustomWinSDKRoot\lib\$WinSDKVersion"
+  if ($CustomWinSDKRoot) {
+    # Using a non-installed Windows SDK. Setup environment variables manually.
+    $WinSDKVerIncludeRoot = "$CustomWinSDKRoot\include\$WinSDKVersion"
+    $WinSDKIncludePath = "$WinSDKVerIncludeRoot\ucrt;$WinSDKVerIncludeRoot\um;$WinSDKVerIncludeRoot\shared;$WinSDKVerIncludeRoot\winrt;$WinSDKVerIncludeRoot\cppwinrt"
+    $WinSDKVerLibRoot = "$CustomWinSDKRoot\lib\$WinSDKVersion"
 
-      $env:WindowsLibPath = "$CustomWinSDKRoot\UnionMetadata\$WinSDKVersion;$CustomWinSDKRoot\References\$WinSDKVersion"
-      $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
-      $env:WindowsSDKLibVersion = "$WinSDKVersion\"
-      $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
-      $env:WindowsSDKVersion = "$WinSDKVersion\"
+    $env:WindowsLibPath = "$CustomWinSDKRoot\UnionMetadata\$WinSDKVersion;$CustomWinSDKRoot\References\$WinSDKVersion"
+    $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
+    $env:WindowsSDKLibVersion = "$WinSDKVersion\"
+    $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+    $env:WindowsSDKVersion = "$WinSDKVersion\"
 
-      $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
-      $env:INCLUDE += ";$WinSDKIncludePath"
-      $env:LIB += ";$WinSDKVerLibRoot\ucrt\$($Platform.Architecture.ShortName);$WinSDKVerLibRoot\um\$($Platform.Architecture.ShortName)"
-      $env:LIBPATH += ";$env:WindowsLibPath"
-      $env:PATH += ";$env:WindowsSdkVerBinPath\$($Platform.Architecture.ShortName);$env:WindowsSdkBinPath\$($Platform.Architecture.ShortName)"
-      $env:UCRTVersion = $WinSDKVersion
-      $env:UniversalCRTSdkDir = $CustomWinSDKRoot
-    }
+    $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
+    $env:INCLUDE += ";$WinSDKIncludePath"
+    $env:LIB += ";$WinSDKVerLibRoot\ucrt\$($Platform.Architecture.ShortName);$WinSDKVerLibRoot\um\$($Platform.Architecture.ShortName)"
+    $env:LIBPATH += ";$env:WindowsLibPath"
+    $env:PATH += ";$env:WindowsSdkVerBinPath\$($Platform.Architecture.ShortName);$env:WindowsSdkBinPath\$($Platform.Architecture.ShortName)"
+    $env:UCRTVersion = $WinSDKVersion
+    $env:UniversalCRTSdkDir = $CustomWinSDKRoot
   }
 }
 
@@ -1170,22 +1119,13 @@ function Get-Dependencies {
     $WebClient = New-Object Net.WebClient
 
     function DownloadAndVerify($URL, $Destination, $Hash) {
-      if (Test-Path $Destination) {
-        return
-      }
+      if (Test-Path $Destination) { return }
 
-      # Write-Output "$Destination not found. Downloading ..."
-      if ($ToBatch) {
-        Write-Output "md `"$(Split-Path -Path $Destination -Parent)`""
-        Write-Output "curl.exe -sL $URL -o $Destination"
-        Write-Output "(certutil -HashFile $Destination SHA256) == $Hash || (exit /b)"
-      } else {
-        New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
-        $WebClient.DownloadFile($URL, $Destination)
-        $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
-        if ($SHA256.Hash -ne $Hash) {
-          throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
-        }
+      New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
+      $WebClient.DownloadFile($URL, $Destination)
+      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+      if ($SHA256.Hash -ne $Hash) {
+        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
       }
     }
 
@@ -1297,10 +1237,8 @@ function Get-Dependencies {
       $Python = Get-KnownPython $ArchName $EmbeddedPython
       $FileName = $(if ($EmbeddedPython) { "EmbeddedPython$ArchName-$PythonVersion" } else { "Python$ArchName-$PythonVersion" })
       DownloadAndVerify $Python.URL "$BinaryCache\$FileName.zip" $Python.SHA256
-      if (-not $ToBatch) {
-        Expand-ZipFile "$FileName.zip" "$BinaryCache" "$FileName"
-        Write-Success "$ArchName Python $PythonVersion"
-      }
+      Expand-ZipFile "$FileName.zip" "$BinaryCache" "$FileName"
+      Write-Success "$ArchName Python $PythonVersion"
     }
 
     function Install-PIPIfNeeded {
@@ -1370,7 +1308,7 @@ function Get-Dependencies {
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
-      $FileExtension = if ($SCCache.URL -match '/[^/]+(\..+)$') { $Matches[1] } else {
+      $FileExtension = if ($SCCache.URL -match '\.(?:tar\.\w+|zip)$') { $Matches[0] } else {
           throw "Invalid sccache URL"
       }
       DownloadAndVerify $SCCache.URL "$BinaryCache\sccache-$SCCacheVersion$FileExtension" $SCCache.SHA256
@@ -1441,10 +1379,8 @@ function Get-Dependencies {
       }
     }
 
-    if (-not $ToBatch) {
-      Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)"
-      Write-Host ""
-    }
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Get-Dependencies took $($Stopwatch.Elapsed)"
+    Write-Host ""
   }
 }
 
@@ -1537,12 +1473,7 @@ function Build-CMakeProject {
     [string[]] $BuildTargets = @()
   )
 
-  if ($ToBatch) {
-    Write-Output ""
-    Write-Output "echo Building '$Src' to '$Bin' ..."
-  } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
-  }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building '$Src' to '$Bin' ..."
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
@@ -1864,11 +1795,6 @@ function Build-CMakeProject {
             "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
           )
 
-          # FIXME(compnerd) remove this once we have the early swift-driver
-          if ($SwiftSDK) {
-            $SwiftFlags += @("-Xclang-linker", "-L", "-Xclang-linker", [IO.Path]::Combine($SwiftSDK, "usr", "lib", "swift", "android", $Platform.Architecture.LLVMName))
-          }
-
           $SwiftFlags += if ($DebugInfo) { @("-g") } else { @("-gnone") }
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
@@ -1955,12 +1881,8 @@ function Build-CMakeProject {
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
       $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
     }
-    if ($ToBatch) {
-      Write-Output ""
-      Write-Output "echo $cmake $cmakeGenerateArgs"
-    } else {
-      Write-Host "$cmake $cmakeGenerateArgs"
-    }
+
+    Write-Host "$cmake $cmakeGenerateArgs"
     Invoke-Program $cmake @cmakeGenerateArgs
 
     # Build all requested targets
@@ -1977,10 +1899,8 @@ function Build-CMakeProject {
     }
   }
 
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
-    Write-Host ""
-  }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
+  Write-Host ""
 }
 
 enum SPMBuildAction {
@@ -2011,12 +1931,7 @@ function Build-SPMProject {
     TestParallel { "Testing" }
   }
 
-  if ($ToBatch) {
-    Write-Output ""
-    Write-Output "echo $ActionForOutput '$Src' to '$Bin' ..."
-  } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' ..."
-  }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $ActionForOutput '$Src' to '$Bin' ..."
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
@@ -2058,10 +1973,8 @@ function Build-SPMProject {
     Invoke-Program swift $ActionName @Arguments @AdditionalArguments
   }
 
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
-    Write-Host ""
-  }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
+  Write-Host ""
 }
 
 function Build-WiXProject() {
@@ -2516,7 +2429,7 @@ function Build-CompilerRuntime([Hashtable] $Platform) {
   $LLVMBinaryCache = $(Get-ProjectBinaryCache $HostPlatform Compilers)
 
   $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMBinaryCache\bin\llvm-lit.py" --version)
-  if (-not $ToBatch -and -not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
+  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
     throw "Unexpected version string '$LITVersionStr' output from llvm-lit.py"
   }
   $LLVMVersionMajor = $Matches.1
@@ -2567,7 +2480,6 @@ function Build-Brotli([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
     }
 }
 
@@ -2804,6 +2716,13 @@ function Test-Runtime([Hashtable] $Platform) {
     throw "LIT test utilities not found in $CompilersBinaryCache\bin"
   }
 
+  $PlatformDefines = @{}
+  if ($Platform.OS -eq [OS]::Android) {
+    $PlatformDefines += @{
+      SWIFT_ANDROID_API_LEVEL = "$AndroidAPILevel";
+    }
+  }
+
   Invoke-IsolatingEnvVars {
     # Filter known issues when testing on Windows
     Load-LitTestOverrides $PSScriptRoot/windows-swift-android-lit-test-overrides.txt
@@ -2815,13 +2734,13 @@ function Test-Runtime([Hashtable] $Platform) {
       -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
-      -Defines @{
+      -Defines ($PlatformDefines + @{
         SWIFT_INCLUDE_TESTS = "YES";
         SWIFT_INCLUDE_TEST_BINARIES = "YES";
         SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
         SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
         LLVM_LIT_ARGS = "-vv";
-      }
+      })
   }
 }
 
@@ -3449,7 +3368,6 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         -SwiftSDK ${SDKROOT} `
         -Defines @{
           BUILD_SHARED_LIBS = "NO";
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -4008,8 +3926,6 @@ function Build-TestingMacros([Hashtable] $Platform) {
 }
 
 function Install-HostToolchain() {
-  if ($ToBatch) { return }
-
   # We've already special-cased $HostPlatform.ToolchainInstallRoot to point to $ToolchainInstallRoot.
   # There are only a few extra restructuring steps we need to take care of.
 
@@ -4145,21 +4061,13 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   }
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
-  if ($ToBatch) {
-    Write-Output "md `"$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)`""
-  } else {
-    New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
-  }
+  New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
   Invoke-Program "$($WiX.Path)\wix.exe" -- burn detach "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
 }
 
 function Build-NoAssertsToolchain() {
-  if ($ToBatch) {
-    Write-Output ""
-    Write-Output "Building NoAsserts Toolchain ..."
-  } else {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building NoAsserts Toolchain ..."
-  }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building NoAsserts Toolchain ..."
+
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts"
@@ -4178,10 +4086,8 @@ function Build-NoAssertsToolchain() {
   #   /NP: Do not show progress indicator
   &robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
 
-  if (-not $ToBatch) {
-    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building Instalting NoAsserts Toolchain in $($Stopwatch.Elapsed)"
-    Write-Host ""
-  }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Building Instalting NoAsserts Toolchain in $($Stopwatch.Elapsed)"
+  Write-Host ""
 }
 
 #-------------------------------------------------------------------

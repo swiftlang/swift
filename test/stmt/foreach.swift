@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -disable-typo-correction
 
 // Bad containers and ranges
 struct BadContainer1 {
@@ -352,6 +352,18 @@ do {
   }
 }
 
+protocol PSeq: Sequence where Self.Element: P {}
+
+protocol HasPSeq {
+  associatedtype X: PSeq
+  func pseq() -> X
+}
+
+// Make sure we can type-check the existential erasure in this case.
+func testExistentialElementErasure(_ x: any HasPSeq) {
+  for _ in x.pseq() {}
+}
+
 // Make sure the bodies still type-check okay if the preamble is invalid.
 func testInvalidPreamble() {
   func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
@@ -363,4 +375,23 @@ func testInvalidPreamble() {
     let b: Int = x  // No type error, `x` is invalid.
     _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   }
+}
+
+func testFlatMap() {
+  struct S {
+    var ys: [Int]
+  }
+  func foo(_ xs: [S]) {
+    // Make sure we pick the flattening overload instead of the compactMap
+    // compatibility overload.
+    for x in xs.flatMap({ $0.ys }) {
+      let _: Int = x
+    }
+  }
+}
+
+func testInvalidContainerNotInScope(){
+  for x in (a,b) {} // expected-error {{for-in loop requires '(_, _)' to conform to 'Sequence'}}
+  // expected-error@-1 {{cannot find 'a' in scope}} 
+  // expected-error@-2 {{cannot find 'b' in scope}}
 }

@@ -740,7 +740,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     decls_block::SILLayoutLayout::readRecord(scratch, rawGenericSig,
                                              capturesGenerics,
                                              numFields, types);
-    
+
     SmallVector<SILField, 4> fields;
     for (auto fieldInfo : types.slice(0, numFields)) {
       bool isMutable = fieldInfo & 0x80000000U;
@@ -749,7 +749,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
         SILField(getType(typeId)->getCanonicalType(),
                  isMutable));
     }
-    
+
     CanGenericSignature canSig;
     if (auto sig = getGenericSignature(rawGenericSig))
       canSig = sig.getCanonicalSignature();
@@ -2251,15 +2251,15 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
     break;
   }
-      
+
   case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
     IdentifierID DefiningDeclNameID;
-    
+
     XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
-    
+
     auto name = getIdentifier(DefiningDeclNameID);
     pathTrace.addOpaqueReturnType(name);
-    
+
     if (auto opaque = baseModule->lookupOpaqueResultType(name.str())) {
       values.push_back(opaque);
     }
@@ -2351,7 +2351,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         IdentifierID IID;
         XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, IID);
         auto mangledName = getIdentifier(IID);
-        
+
         SmallString<64> buf;
         {
           llvm::raw_svector_ostream os(buf);
@@ -2359,7 +2359,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           os << mangledName.str();
           os << ">>";
         }
-        
+
         result = getContext().getIdentifier(buf);
         break;
       }
@@ -2484,11 +2484,13 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                                        mismatchingTypes);
 
     // If we want to workaround broken modularization, we can keep going if
-    // we found a matching top-level decl in a different module. This is
-    // obviously dangerous as it could just be some other decl that happens to
-    // match.
-    if (getContext().LangOpts.ForceWorkaroundBrokenModules &&
+    // we found a matching top-level decl in a different module. The risk
+    // here would be to pick an unrelated decl that happens to share the same
+    // signature. Even if we recover, print as a warning the errors we skip.
+    if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
+        baseModule->findUnderlyingClangModule() &&
+        foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
       // Print the error as a warning and notify of the recovery attempt.
       llvm::handleAllErrors(std::move(error),
@@ -2615,7 +2617,7 @@ giveUpFastPath:
         ctorInit = getActualCtorInitializerKind(kind);
         break;
       }
-        
+
       default:
         fatal(llvm::make_error<InvalidRecordKindError>(recordID,
                                                        "Unhandled path piece"));
@@ -2831,16 +2833,16 @@ giveUpFastPath:
 
       break;
     }
-        
+
     case XREF_OPAQUE_RETURN_TYPE_PATH_PIECE: {
       values.clear();
       IdentifierID DefiningDeclNameID;
-      
+
       XRefOpaqueReturnTypePathPieceLayout::readRecord(scratch, DefiningDeclNameID);
-      
+
       auto name = getIdentifier(DefiningDeclNameID);
       pathTrace.addOpaqueReturnType(name);
-    
+
       auto lookupModule = M ? M : baseModule;
       if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
@@ -3229,7 +3231,8 @@ getActualOpaqueReadOwnership(unsigned rawKind) {
   case serialization::OpaqueReadOwnership::KIND: \
     return swift::OpaqueReadOwnership::KIND;
   CASE(Owned)
-  CASE(Borrowed)
+  CASE(YieldingBorrow)
+  CASE(Borrow)
   CASE(OwnedOrBorrowed)
 #undef CASE
   }
@@ -3247,7 +3250,7 @@ getActualReadImplKind(unsigned rawKind) {
   CASE(Inherited)
   CASE(Address)
   CASE(Read)
-  CASE(Read2)
+  CASE(YieldingBorrow)
   CASE(Borrow)
 #undef CASE
   }
@@ -3267,7 +3270,7 @@ getActualWriteImplKind(unsigned rawKind) {
   CASE(InheritedWithObservers)
   CASE(MutableAddress)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(Mutate)
 #undef CASE
   }
@@ -3285,7 +3288,7 @@ getActualReadWriteImplKind(unsigned rawKind) {
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
-  CASE(Modify2)
+  CASE(YieldingMutate)
   CASE(StoredWithDidSet)
   CASE(InheritedWithDidSet)
   CASE(Mutate)
@@ -4907,7 +4910,7 @@ public:
     ctx.evaluator.cacheOutput(
         OperatorPrecedenceGroupRequest{result},
         std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
-    
+
     declOrOffset = result;
     return result;
   }
@@ -5122,7 +5125,7 @@ public:
     if (isObjC) {
       theEnum->setHasFixedRawValues();
     }
-    
+
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -5313,7 +5316,7 @@ public:
     SET_OR_RETURN_ERROR(genericParams, MF.maybeReadGenericParams(parent));
     if (declOrOffset.isComplete())
       return declOrOffset;
-    
+
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
     if (!staticSpelling.has_value())
       return MF.diagnoseFatal();
@@ -6654,7 +6657,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::RawLayoutDeclAttrLayout::
           readRecord(scratch, isImplicit, typeID, countID, rawSize, rawAlign,
                      movesAsLike);
-        
+
         if (typeID) {
           auto type = MF.getTypeChecked(typeID);
           if (!type) {
@@ -6680,7 +6683,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             break;
           }
         }
-        
+
         Attr = new (ctx) RawLayoutAttr(rawSize, rawAlign,
                                        SourceLoc(), SourceRange());
         break;
@@ -6867,7 +6870,7 @@ DeclDeserializer::getDeclCheckedImpl(
     declOrOffset = resolved.get();
     break;
   }
-  
+
   default:
     // We don't know how to deserialize this kind of decl.
     MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
@@ -7020,7 +7023,7 @@ getActualSILParameterOptions(uint8_t raw) {
     options -= serialization::SILParameterInfoFlags::ImplicitLeading;
     result |= SILParameterInfo::ImplicitLeading;
   }
-  
+
   if (options.contains(serialization::SILParameterInfoFlags::Const)) {
     options -= serialization::SILParameterInfoFlags::Const;
     result |= SILParameterInfo::Const;
@@ -7142,23 +7145,37 @@ DESERIALIZE_TYPE(BUILTIN_FIXED_ARRAY_TYPE)(
   TypeID elementTypeID;
   decls_block::BuiltinFixedArrayTypeLayout::readRecord(scratch, sizeID,
                                                        elementTypeID);
-                                                       
-  
+
   auto sizeOrError = MF.getTypeChecked(sizeID);
   if (!sizeOrError) {
     return sizeOrError.takeError();
   }
   auto size = sizeOrError.get()->getCanonicalType();
-  
+
   auto elementTypeOrError = MF.getTypeChecked(elementTypeID);
   if (!elementTypeOrError) {
     return elementTypeOrError.takeError();
   }
   auto elementType = elementTypeOrError.get()->getCanonicalType();
-  
+
   return BuiltinFixedArrayType::get(size, elementType);
 }
 
+Expected<Type>
+DESERIALIZE_TYPE(BUILTIN_BORROW_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData)
+{
+  TypeID referentID;
+  decls_block::BuiltinBorrowTypeLayout::readRecord(scratch, referentID);
+
+  auto referentOrError = MF.getTypeChecked(referentID);
+  if (!referentOrError) {
+    return referentOrError.takeError();
+  }
+  auto referent = referentOrError.get()->getCanonicalType();
+
+  return BuiltinBorrowType::get(referent);
+}
 
 Expected<Type> DESERIALIZE_TYPE(NAME_ALIAS_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
@@ -8303,7 +8320,7 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
                                               StringRef blobData) {
   auto &ctx = MF.getContext();
   bool isNegative;
-  
+
   decls_block::IntegerTypeLayout::readRecord(scratch, isNegative);
 
   return IntegerType::get(blobData, isNegative, ctx);
@@ -9196,12 +9213,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   bool needToFillInOpaqueValueWitnesses = false;
   while (valueCount--) {
     ValueDecl *req;
-    
+
     auto trySetWitness = [&](Witness w) {
       if (req)
         conformance->setWitness(req, w);
     };
-    
+
     auto deserializedReq = getDeclChecked(*rawIDIter++);
     if (deserializedReq) {
       req = cast_or_null<ValueDecl>(*deserializedReq);
@@ -9212,7 +9229,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     } else {
       fatal(deserializedReq.takeError());
     }
-    
+
     bool isOpaque = false;
     ValueDecl *witness;
     auto deserializedWitness = getDeclChecked(*rawIDIter++);
@@ -9278,7 +9295,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           witness, witnessSubstitutions.get(), enterIsolation));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
-  
+
   // Fill in opaque value witnesses if we need to.
   if (needToFillInOpaqueValueWitnesses) {
     for (auto member : proto->getMembers()) {
@@ -9287,7 +9304,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       if (!valueMember || !valueMember->isProtocolRequirement()
           || isa<AssociatedTypeDecl>(valueMember))
         continue;
-      
+
       if (!conformance->hasWitness(valueMember))
         conformance->setWitness(valueMember, Witness::forOpaque(valueMember));
     }

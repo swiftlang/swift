@@ -396,6 +396,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// The representation for a position in `Span`.
@@ -507,9 +508,14 @@ extension Span where Element: BitwiseCopyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
+  /// Construct a raw span over the memory represented by this span.
+  ///
+  /// - Returns: a RawSpan over the memory represented by this span
+  @_alwaysEmitIntoClient
+  @_transparent
+  @unsafe
   public var bytes: RawSpan {
     @lifetime(copy self)
-    @_alwaysEmitIntoClient
     get {
       let rawSpan = RawSpan(_elements: self)
       return unsafe _overrideLifetime(rawSpan, copying: self)
@@ -694,18 +700,17 @@ extension Span where Element: ~Copyable  {
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let pointer = unsafe _pointer, _count > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    // manual memory rebinding to avoid recalculating the alignment checks
-    let binding = Builtin.bindMemory(
-      pointer._rawValue, count._builtinWordValue, Element.self
+    let bytes = unsafe UnsafeRawBufferPointer(
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
-    defer { Builtin.rebindMemory(pointer._rawValue, binding) }
-    return try unsafe body(.init(start: .init(pointer._rawValue), count: count))
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> Result in
+      try unsafe body(buffer)
+    }
   }
 }
 
@@ -730,15 +735,14 @@ extension Span where Element: BitwiseCopyable {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let _pointer = unsafe _pointer, _count > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    return try unsafe body(
-      .init(start: _pointer, count: _count &* MemoryLayout<Element>.stride)
+    let bytes = unsafe UnsafeRawBufferPointer(
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
+    return try unsafe body(bytes)
   }
 }
 

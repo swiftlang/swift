@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 
@@ -293,6 +294,7 @@ namespace {
       DataStreamBasicWriter<ClangTypeSerializationChecker> {
     ClangImporter::Implementation &Impl;
     bool IsSerializable = true;
+    bool HasSwiftDecl = false;
 
     ClangTypeSerializationChecker(ClangImporter::Implementation &impl)
       : DataStreamBasicWriter<ClangTypeSerializationChecker>(
@@ -306,8 +308,15 @@ namespace {
         IsSerializable = false;
     }
     void writeDeclRef(const clang::Decl *decl) {
-      if (decl && !Impl.findStableSerializationPath(decl))
+      if (!decl)
+        return;
+      auto path = Impl.findStableSerializationPath(decl);
+      if (!path) {
         IsSerializable = false;
+        return;
+      }
+      if (Impl.SwiftContext.getSwiftDeclForExportedClangDecl(decl))
+        HasSwiftDecl = true;
     }
     void writeSourceLocation(clang::SourceLocation loc) {
       // If a source location is written into a type, it's likely to be
@@ -336,13 +345,15 @@ namespace {
   };
 }
 
-bool ClangImporter::isSerializable(const clang::Type *type,
-                                   bool checkCanonical) const {
+ClangModuleLoader::SerializableInfo
+ClangImporter::isSerializable(const clang::Type *type,
+                              bool checkCanonical) const {
   return Impl.isSerializable(clang::QualType(type, 0), checkCanonical);
 }
 
-bool ClangImporter::Implementation::isSerializable(clang::QualType type,
-                                                   bool checkCanonical) {
+ClangModuleLoader::SerializableInfo
+ClangImporter::Implementation::isSerializable(clang::QualType type,
+                                              bool checkCanonical) {
   if (checkCanonical)
     type = getClangASTContext().getCanonicalType(type);
 
@@ -350,5 +361,5 @@ bool ClangImporter::Implementation::isSerializable(clang::QualType type,
   // anything that we can't stably serialize.
   ClangTypeSerializationChecker checker(*this);
   checker.writeQualType(type);
-  return checker.IsSerializable;
+  return {checker.IsSerializable, checker.HasSwiftDecl};
 }

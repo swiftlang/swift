@@ -24,6 +24,9 @@
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
 
+WARNING(warning_darwin_sdk_invalid_settings, none,
+        "SDK settings were ignored as 'SDKSettings.json' could not be parsed", ())
+
 ERROR(error_no_frontend_args, none,
       "no arguments provided to '-frontend'", ())
 
@@ -584,12 +587,10 @@ ERROR(min_ptr_value_without_embedded,none,
       "-min-valid-pointer-value is only applicable with embedded Swift.", ())
 ERROR(no_swift_sources_with_embedded,none,
       "embedded swift cannot be enabled in a compiler built without Swift sources", ())
-
+WARNING(embedded_dynamic_exclusivity_staging,none,
+        "'-enforce-exclusivity=checked' is ignored in Embedded Swift unless also enabled by '-enable-experimental-feature EmbeddedDynamicExclusivity'", ())
 ERROR(package_cmo_requires_library_evolution, none,
         "Library evolution must be enabled for Package CMO", ())
-
-WARNING(internal_bridging_header_without_library_evolution,none,
-        "using internal bridging headers without library evolution can cause instability", ())
 
 ERROR(error_invalid_clang_header_access_level, none,
       "invalid minimum clang header access level '%0'; chose from "

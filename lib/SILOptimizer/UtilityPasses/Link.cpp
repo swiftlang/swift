@@ -123,12 +123,20 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     SILModule &M = *getModule();
 
     bool allocating = false;
-    for (RuntimeEffect rt : effects)
+    bool exclusivity = false;
+    for (RuntimeEffect rt : effects) {
       if (rt == RuntimeEffect::Allocating || rt == RuntimeEffect::Deallocating)
         allocating = true;
+      if (rt == RuntimeEffect::ExclusivityChecking)
+        exclusivity = true;
+    }
 
     // Don't link allocating runtime functions in -no-allocations mode.
     if (M.getOptions().NoAllocations && allocating) return;
+
+    // Don't link exclusivity-checking functions in
+    // -enforce-exclusivity=unchecked mode.
+    if (!M.getOptions().EnforceExclusivityDynamic && exclusivity) return;
 
     // Swift Runtime functions are all expected to be SILLinkage::PublicExternal
     linkUsedFunctionByName(name, SILLinkage::PublicExternal, byAsmName);

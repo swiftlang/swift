@@ -34,7 +34,7 @@ import Builtin
 
 sil [ossa] @testTBI : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 bb0(%0 : $Builtin.Int64):
-  %1 = integer_literal $Builtin.Int64, 0x00FFFFFFFFFFFFFF
+  %1 = integer_literal $Builtin.Int64, 0x0FFFFFFFFFFFFFFF
   %2 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
   %3 = builtin "inttoptr_Int64"(%2 : $Builtin.Int64) : $Builtin.RawPointer
   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Int64

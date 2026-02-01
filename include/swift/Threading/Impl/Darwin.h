@@ -285,6 +285,8 @@ inline tls_key_t tls_get_key(tls_key k) {
     return __PTK_FRAMEWORK_SWIFT_KEY5;
   case tls_key::observation_transaction:
     return __PTK_FRAMEWORK_SWIFT_KEY6;
+  case tls_key::exclusivity:
+    return __PTK_FRAMEWORK_SWIFT_KEY7;
   }
 }
 

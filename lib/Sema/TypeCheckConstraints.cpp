@@ -353,7 +353,8 @@ public:
       }
 
       performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt,
-                                      isConstInitExpr);
+                                      isConstInitExpr,
+                                      Target.isForEachPreamble());
     }
     ExprDepth += 1;
     return Action::Continue(E);
@@ -459,13 +460,6 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
-  if (Context.TypeCheckerOpts.EnableConstraintSolverPerformanceHacks ||
-      evaluateOrDefault(Context.evaluator,
-                        ModuleHasTypeCheckerPerformanceHacksEnabledRequest{
-                            dc->getParentModule()},
-                        false))
-    csOptions |= ConstraintSystemFlags::EnablePerformanceHacks;
-
   ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {
@@ -473,10 +467,6 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
     // diagnostics and is a hint for various performance optimizations.
     cs.setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Try to shrink the system by reducing disjunction domains. This
-    // goes through every sub-expression and generate its own sub-system, to
-    // try to reduce the domains of those subexpressions.
-    cs.shrink(expr);
     target.setExpr(expr);
   }
 
@@ -689,8 +679,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      if (!anchor->hasCurriedSelf() || ctx.isLanguageModeAtLeast(futureVersion))
+      if (!anchor->hasCurriedSelf() || ctx.isAtLeastFutureMajorLanguageMode())
         return Type();
 
       diag.warnUntilFutureLanguageMode();
@@ -710,8 +699,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   {
     auto recordRequirement = [&](unsigned index, Requirement requirement,
                                  ConstraintLocator *locator) {
-      cs.openGenericRequirement(DC->getParent(), signature, index, requirement,
-                                /*skipSelfProtocolConstraint=*/false, locator,
+      cs.openGenericRequirement(DC->getParent(), signature, index, requirement, locator,
                                 [&](Type type) -> Type {
                                   return cs.openType(type, genericParameters, locator,
                                                      /*preparedOverload=*/nullptr);
@@ -914,16 +902,12 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     }
   }
 
-  // Check to see if the sequence expr is throwing (in async context),
-  // if so require the stmt to have a `try`.
-  if (diagnoseUnhandledThrowsInAsyncContext(dc, stmt))
-    return true;
-
   return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
-  ASSERT(!expr->getType() && "the bool condition is already type checked");
+  ASSERT(!expr->getType() || isa<OpaqueValueExpr>(expr)
+         && "the bool condition is already type checked");
 
   auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
@@ -1292,7 +1276,7 @@ void OverloadChoice::dump(Type adjustedOpenedType, SourceManager *sm,
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
     out << "dynamic member lookup root " << getBaseType()->getString(PO)
-        << " name='" << getName();
+        << " name='" << getName() << "'";
     break;
 
   case OverloadChoiceKind::TupleIndex:
@@ -2422,12 +2406,4 @@ void ConstraintSystem::forEachExpr(
   };
 
   expr->walk(ChildWalker(*this, callback));
-}
-
-bool ModuleHasTypeCheckerPerformanceHacksEnabledRequest::evaluate(
-    Evaluator &evaluator, const ModuleDecl *module) const {
-  auto name = module->getRealName().str();
-  return module->getASTContext().blockListConfig.hasBlockListAction(
-      name, BlockListKeyKind::ModuleName,
-      BlockListAction::ShouldUseTypeCheckerPerfHacks);
 }

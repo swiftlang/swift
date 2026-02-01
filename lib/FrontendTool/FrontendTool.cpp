@@ -89,6 +89,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -110,6 +111,10 @@
 #include <utility>
 
 using namespace swift;
+
+static llvm::cl::opt<std::string> SaveSIL(
+    "save-sil", llvm::cl::Hidden,
+    llvm::cl::desc("Save SIL to a file after SIL optimizations"));
 
 static std::vector<std::string>
 collectSupplementaryOutputPaths(ArrayRef<const char *> Args,
@@ -610,8 +615,9 @@ static bool emitConstValuesForWholeModuleIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
-                                                     Instance.getDiags(), Protocols);
+  bool inputParseSuccess = parseProtocolListFromFile(
+      constExtractProtocolListPath, Instance.getDiags(),
+      Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return true;
   auto ConstValues = gatherConstValuesForModule(Protocols,
@@ -635,8 +641,9 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(constExtractProtocolListPath,
-                                                     Instance.getDiags(), Protocols);
+  bool inputParseSuccess = parseProtocolListFromFile(
+      constExtractProtocolListPath, Instance.getDiags(),
+      Instance.getFileSystem(), Protocols);
   if (!inputParseSuccess)
     return;
   for (auto *SF : Instance.getPrimarySourceFiles()) {
@@ -2053,11 +2060,11 @@ static bool performCompileStepsPostSILGen(
     return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
   }
 
-  // In lazy typechecking mode, SILGen may have triggered requests which
-  // resulted in errors. We don't want to proceed with optimization or
-  // serialization if there were errors since the SIL may be incomplete or
-  // invalid.
-  if (Context.TypeCheckerOpts.EnableLazyTypecheck && Context.hadError())
+  // SILGen emits certain diagnostics of its own, and it can also trigger
+  // requests which result in errors. We don't want to proceed with
+  // optimization or serialization if there were errors since the SIL
+  // may be incomplete or invalid.
+  if (!Context.LangOpts.AllowModuleWithCompilerErrors && Context.hadError())
     return true;
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
@@ -2156,6 +2163,12 @@ static bool performCompileStepsPostSILGen(
     if (writeSIL(*SM, Instance.getMainModule(), Invocation.getSILOptions(),
                  PSPs.SupplementaryOutputs.SILOutputPath,
                  Instance.getOutputBackend()))
+      return true;
+  }
+
+  if (!SaveSIL.empty()) {
+    if (writeSIL(*SM, Instance.getMainModule(), Invocation.getSILOptions(),
+                 SaveSIL, Instance.getOutputBackend()))
       return true;
   }
 

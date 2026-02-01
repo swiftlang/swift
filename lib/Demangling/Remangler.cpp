@@ -22,7 +22,6 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -903,6 +902,12 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
 ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "BV";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBuiltinBorrow(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "BW";
   return ManglingError::Success;
 }
 
@@ -2442,7 +2447,7 @@ ManglingError Remangler::mangleModifyAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "M", depth + 1);
 }
 
-ManglingError Remangler::mangleModify2Accessor(Node *node, unsigned depth) {
+ManglingError Remangler::mangleYieldingMutateAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "x", depth + 1);
 }
 
@@ -3110,7 +3115,7 @@ ManglingError Remangler::mangleReadAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "r", depth + 1);
 }
 
-ManglingError Remangler::mangleRead2Accessor(Node *node, unsigned depth) {
+ManglingError Remangler::mangleYieldingBorrowAccessor(Node *node, unsigned depth) {
   return mangleAbstractStorage(node->getFirstChild(), "y", depth + 1);
 }
 

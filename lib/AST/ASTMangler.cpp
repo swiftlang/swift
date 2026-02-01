@@ -43,7 +43,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -54,11 +53,9 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -146,9 +143,9 @@ static StringRef getCodeForAccessorKind(AccessorKind kind) {
     return "au";
   case AccessorKind::Init:
     return "i";
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return "x";
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return "y";
   case AccessorKind::Borrow:
     return "b";
@@ -1469,6 +1466,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendType(bfa->getElementType(), sig, forDecl);
       return appendOperator("BV");
     }
+    case TypeKind::BuiltinBorrow: {
+      auto bfa = cast<BuiltinBorrowType>(tybase);
+      appendType(bfa->getReferentType(), sig, forDecl);
+      return appendOperator("BW");
+    }
     
     case TypeKind::SILToken:
       return appendOperator("Bt");
@@ -2112,6 +2114,7 @@ static bool isRetroactiveConformance(const RootProtocolConformance *root) {
 
 template<typename Fn>
 static bool forEachConditionalConformance(const ProtocolConformance *conformance,
+                                          bool allowMarkerProtocols,
                                           Fn fn) {
   auto *rootConformance = conformance->getRootConformance();
 
@@ -2139,6 +2142,10 @@ static bool forEachConditionalConformance(const ProtocolConformance *conformance
       continue;
 
     ProtocolDecl *proto = req.getProtocolDecl();
+
+    if (!allowMarkerProtocols && proto->isMarkerProtocol())
+      continue;
+
     auto conformance = subMap.lookupConformance(
         req.getFirstType()->getCanonicalType(), proto);
     if (fn(req.getFirstType().subst(subMap), conformance))
@@ -2175,7 +2182,8 @@ static bool containsRetroactiveConformance(
 
   // If the conformance is conditional and any of the substitutions used to
   // satisfy the conditions are retroactive, it's retroactive.
-  return forEachConditionalConformance(conformance,
+  return forEachConditionalConformance(
+    conformance, /*allowMarkerProtocols=*/false,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       return containsRetroactiveConformance(substConf);
     });
@@ -2661,6 +2669,9 @@ namespace {
     }
     VarDecl *visitAnyPattern(AnyPattern *P) {
       return nullptr;
+    }
+    VarDecl *visitOpaquePattern(OpaquePattern *P) {
+      return visit(P->getSubPattern());
     }
 
     // Refutable patterns shouldn't ever come up.
@@ -4226,8 +4237,12 @@ CanType ASTMangler::getDeclTypeForMangling(
   // If this declaration predates concurrency, adjust its type to not
   // contain type features that were not available pre-concurrency. This
   // cannot alter the ABI in any way.
+  //
+  // `dropIsolation` is set here as a workaround because `dropGlobalActor`
+  // used to call `withoutIsolation` unconditionally before.
   if (decl->preconcurrency()) {
-    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
+    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
+                              /*dropIsolation=*/true);
   }
 
   // Map any local archetypes out of context.
@@ -4587,10 +4602,10 @@ void ASTMangler::appendAnyProtocolConformance(
                                            CanType conformingType,
                                            ProtocolConformanceRef conformance) {
   // If we have a conformance to a marker protocol but we aren't allowed to
-  // emit marker protocols, skip it.
-  if (!AllowMarkerProtocols &&
-      conformance.getProtocol()->isMarkerProtocol())
-    return;
+  // emit marker protocols, it's too late. The caller should have handled this,
+  // because otherwise they don't know if they should emit a list separator or
+  // not.
+  ASSERT(AllowMarkerProtocols || !conformance.getProtocol()->isMarkerProtocol());
 
   // While all invertible protocols are marker protocols, do not mangle them
   // as a dependent conformance. See `conformanceRequirementIndex` which skips
@@ -4651,7 +4666,7 @@ void ASTMangler::appendConcreteProtocolConformance(
 
   // Conditional conformance requirements.
   bool firstRequirement = true;
-  forEachConditionalConformance(conformance,
+  forEachConditionalConformance(conformance, AllowMarkerProtocols,
     [&](Type substType, ProtocolConformanceRef substConf) -> bool {
       if (substType->hasArchetype())
         substType = substType->mapTypeOutOfEnvironment();

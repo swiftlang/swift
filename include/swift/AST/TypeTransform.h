@@ -120,6 +120,7 @@ case TypeKind::Id:
       return t;
 
     // BuiltinGenericType subclasses
+    case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {
       auto bgaTy = cast<BuiltinGenericType>(base);
 
@@ -761,16 +762,17 @@ case TypeKind::Id:
       if (!anyChanged)
         return t;
 
-      if (asDerived().shouldUnwrapVanishingTuples()) {
-        // Handle vanishing tuples -- If the transform would yield a singleton
-        // tuple, and we didn't start with one, flatten to produce the
-        // element type.
-        if (elements.size() == 1 &&
-            !elements[0].getType()->is<PackExpansionType>() &&
-            !(tuple->getNumElements() == 1 &&
-              !tuple->getElementType(0)->is<PackExpansionType>())) {
-          return elements[0].getType();
-        }
+      // Handle vanishing tuples -- If the transform would yield a singleton
+      // tuple, and we didn't start with one, flatten to produce the
+      // element type. Avoid flattening if we have a type variable singeton,
+      // since it could be subtituted with a pack, TypeSimplifier handles the
+      // flattening in this case.
+      if (elements.size() == 1 &&
+          !elements[0].getType()->is<PackExpansionType>() &&
+          !elements[0].getType()->is<TypeVariableType>() &&
+          !(tuple->getNumElements() == 1 &&
+            !tuple->getElementType(0)->is<PackExpansionType>())) {
+        return elements[0].getType();
       }
 
       return TupleType::get(elements, ctx);
@@ -883,6 +885,21 @@ case TypeKind::Id:
             isUnchanged = false;
 
           extInfo = extInfo->withGlobalActor(globalActorType);
+        }
+
+        // Transform the sendable dependent type if present.
+        if (auto sendableDep = origExtInfo.getSendableDependentType()) {
+          auto [newSendableDep, isSendable] =
+              asDerived().transformSendableDependentType(sendableDep);
+          if (!newSendableDep) {
+            // If we're no longer sendable dependent, update the @Sendable bit.
+            extInfo = extInfo->withSendableDependentType(Type());
+            extInfo = extInfo->withSendable(isSendable);
+            isUnchanged = false;
+          } else if (newSendableDep.getPointer() != sendableDep.getPointer()) {
+            extInfo = extInfo->withSendableDependentType(newSendableDep);
+            isUnchanged = false;
+          }
         }
       }
 
@@ -1138,9 +1155,11 @@ case TypeKind::Id:
     return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
 
-  bool shouldUnwrapVanishingTuples() const { return true; }
-
   bool shouldDesugarTypeAliases() const { return false; }
+
+  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    return std::make_pair(ty, false);
+  }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();

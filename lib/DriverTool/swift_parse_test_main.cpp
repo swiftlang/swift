@@ -19,6 +19,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Subsystems.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 
@@ -82,9 +83,10 @@ struct LibParseExecutor {
     symbolgraphgen::SymbolGraphOptions symbolOpts;
     CASOptions casOpts;
     SerializationOptions serializationOpts;
+    std::optional<clang::DarwinSDKInfo> SDKInfo;
     std::unique_ptr<ASTContext> ctx(ASTContext::get(
         langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
-        casOpts, serializationOpts, SM, diagEngine));
+        casOpts, serializationOpts, SM, diagEngine, SDKInfo));
     auto &eval = ctx->evaluator;
     registerParseRequestFunctions(eval);
     registerTypeCheckerRequestFunctions(eval);
@@ -154,13 +156,14 @@ struct ASTGenExecutor {
     CASOptions casOpts;
     symbolgraphgen::SymbolGraphOptions symbolOpts;
     SerializationOptions serializationOpts;
+    std::optional<clang::DarwinSDKInfo> SDKInfo;
 
     // Enable ASTGen.
     langOpts.enableFeature(Feature::ParserASTGen);
 
     std::unique_ptr<ASTContext> ctx(ASTContext::get(
         langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
-        casOpts, serializationOpts, SM, diagEngine));
+        casOpts, serializationOpts, SM, diagEngine, SDKInfo));
     auto &eval = ctx->evaluator;
     registerParseRequestFunctions(eval);
     registerTypeCheckerRequestFunctions(eval);

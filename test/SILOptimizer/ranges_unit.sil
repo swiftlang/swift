@@ -59,8 +59,8 @@ bb6:
 // CHECK-NEXT: interiors:
 // CHECK-NEXT: Block range in loops:
 // CHECK-NEXT: begin:     bb1
-// CHECK-NEXT: range:     [bb5, bb3, bb2, bb4, bb1]
-// CHECK-NEXT: inclrange: [bb6, bb5, bb3, bb2, bb4, bb1]
+// CHECK-NEXT: range:     [bb5, bb3, bb2, bb1, bb4]
+// CHECK-NEXT: inclrange: [bb6, bb5, bb3, bb2, bb1, bb4]
 // CHECK-NEXT: ends:      [bb6]
 // CHECK-NEXT: exits:     [bb7]
 // CHECK-NEXT: interiors: []
@@ -109,6 +109,27 @@ bb0:
   specify_test "ranges"
   %0 = string_literal utf8 "begin"
   %1 = string_literal utf8 "end"
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: Instruction range in empty:
+// CHECK-NEXT: begin:      %0 = string_literal utf8 "begin"
+// CHECK-NEXT: ends:
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: Block range in empty:
+// CHECK-NEXT: begin:     bb0
+// CHECK-NEXT: range:     []
+// CHECK-NEXT: inclrange: []
+// CHECK-NEXT: ends:      []
+// CHECK-NEXT: exits:     []
+// CHECK-NEXT: interiors: []
+// CHECK-NEXT: End function empty
+sil @empty : $@convention(thin) () -> () {
+bb0:
+  specify_test "ranges"
+  %0 = string_literal utf8 "begin"
   %r = tuple()
   return %r : $()
 }

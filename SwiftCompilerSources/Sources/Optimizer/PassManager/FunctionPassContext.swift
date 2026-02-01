@@ -52,6 +52,12 @@ struct FunctionPassContext : MutatingContext {
     return LoopTree(bridged: bridgedLT, context: self)
   }
 
+  /// Updates all analysis.
+  /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
+  func updateAnalysis() {
+    bridgedPassContext.updateAnalysis()
+  }
+
   func notifyNewFunction(function: Function, derivedFrom: Function) {
     bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
   }
@@ -219,6 +225,31 @@ struct FunctionPassContext : MutatingContext {
       notifyInstructionsChanged()
     }
   }
+
+  /// True if the pass has notified that stack nesting needs to be fixed.
+  /// In this case the pass needs to call `fixStackNesting`.
+  var needFixStackNesting: Bool { bridgedPassContext.getNeedFixStackNesting() }
+
+  /// True if the pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might have become an infinite
+  /// loop. Infinite loops must be eliminated by calling `breakInfiniteLoops`.
+  var needBreakInfiniteLoops: Bool { bridgedPassContext.getNeedBreakInfiniteLoops() }
+
+  /// If `value` is true, notifies that a pass has deleted a basic block which might end up in an infinite loop.
+  /// A pass can set the notification to `false` again if a basic block has been deleted but the pass knows
+  /// that this cannot cause any infinite loops.
+  func setNeedBreakInfiniteLoops(to value: Bool) { bridgedPassContext.setNeedBreakInfiniteLoops(value) }
+
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off and must be completed
+  /// by calling `completeLifetimes`.
+  var needCompleteLifetimes: Bool { bridgedPassContext.getNeedCompleteLifetimes() }
+
+  /// If `value` is true, notifies that a pass has inserted an `unreachable` instruction which might
+  /// have cut off any lifetimes.
+  /// A pass can set the notification to `false` again if an `unreachable` was inserted but the pass
+  /// knows that this didn't cut off any lifetimes.
+  func setNeedCompleteLifetimes(to value: Bool) { bridgedPassContext.setNeedCompleteLifetimes(value) }
 
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)

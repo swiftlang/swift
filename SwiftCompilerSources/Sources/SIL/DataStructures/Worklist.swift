@@ -123,6 +123,22 @@ public typealias SpecificInstructionWorklist<InstType: Instruction> = Worklist<S
 public typealias ValueWorklist = Worklist<ValueSet>
 public typealias OperandWorklist = Worklist<OperandSet>
 
+extension BasicBlockWorklist {
+  public mutating func transitivelyAddBlockWithPredecessors(startingAt startBlock: BasicBlock) {
+    pushIfNotVisited(startBlock)
+    while let block = pop() {
+      pushIfNotVisited(contentsOf: block.predecessors)
+    }
+  }
+
+  public mutating func transitivelyAddBlockWithSuccessors(startingAt startBlock: BasicBlock) {
+    pushIfNotVisited(startBlock)
+    while let block = pop() {
+      pushIfNotVisited(contentsOf: block.successors)
+    }
+  }
+}
+
 extension InstructionWorklist {
   public mutating func pushPredecessors(of inst: Instruction, ignoring ignoreInst: Instruction? = nil) {
     if let prev = inst.previous {

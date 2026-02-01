@@ -170,10 +170,10 @@
 public var _i: Int = 0
 
 public var i: Int {
-  read {
+  yielding borrow {
     yield _i
   }
-  modify {
+  yielding mutate {
     yield &_i
   }
 }
@@ -306,7 +306,7 @@ public var force_yield_once_convention : () {
 }
 
 public var force_yield_once_2_convention : () {
-  read {
+  yielding borrow {
     let nothing: () = ()
     yield nothing
   }
@@ -345,7 +345,7 @@ public var force_yield_once_2_convention : () {
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
   @_silgen_name("increment_i_yield_once_2")
-  modify {
+  yielding mutate {
     increment(&i)
 
     var nothing: () = ()

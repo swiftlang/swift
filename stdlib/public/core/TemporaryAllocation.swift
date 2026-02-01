@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,16 +15,14 @@ import SwiftShims
 // MARK: Support functions
 
 /// What is the byte count required for an allocation with the specified
-/// capacity and stride?
+/// type and capacity?
 ///
 /// - Parameters:
-///   - byteCount: The number of bytes to temporarily allocate. `byteCount` must
+///   - type: The type of the elements in the buffer being temporarily allocated.
+///   - capacity: The number of elements to temporarily allocate. `capacity` must
 ///     not be negative.
-///   - alignment: The alignment of the temporary allocation. `alignment` must
-///     be a whole power of 2.
 ///
-/// - Returns: Whether or not there is sufficient space on the stack to allocate
-///   `byteCount` bytes of memory.
+/// - Returns: The number of bytes required for the allocation.
 @_alwaysEmitIntoClient @_transparent
 internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
   of type: T.Type,
@@ -105,13 +103,13 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 #endif
 }
 
-/// Provides scoped access to a raw buffer pointer with the specified byte count
-/// and alignment.
+/// Provides scoped access to a raw buffer pointer with the specified type,
+/// capacity, and alignment.
 ///
 /// - Parameters:
 ///   - type: The type of the elements in the buffer being temporarily
 ///     allocated. For untyped buffers, use `Int8.self`.
-///   - stride: The element stride. `stride` must not be negative.
+///   - capacity: The number of elements to allocate. `capacity` must not be negative.
 ///   - alignment: The alignment of the new, temporary region of allocated
 ///     memory, in bytes. `alignment` must be a whole power of 2.
 ///   - body: A closure to invoke and to which the allocated buffer pointer
@@ -332,7 +330,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 /// cannot be used afterward.
 @_alwaysEmitIntoClient @_transparent
 public func withUnsafeTemporaryAllocation<
-  T: ~Copyable,R: ~Copyable,
+  T: ~Copyable, R: ~Copyable,
   E: Error
 >(
   of type: T.Type,

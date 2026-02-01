@@ -249,6 +249,8 @@ bb0(%0 : $Float, %1 : $Float):
 
 bb1:
   %16 = load [trivial] %2a : $*Float
+  destroy_value [dead_end] %3
+  destroy_value [dead_end] %2
   unreachable
 
 bb2:

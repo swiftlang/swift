@@ -54,7 +54,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << '_';
     return;
   }
-  p = p->getSemanticsProvidingPattern();
+  p = p->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
   switch (p->getKind()) {
   case PatternKind::Any:
     os << '_';
@@ -97,6 +97,7 @@ static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
     os << (cast<BoolPattern>(p)->getValue() ? "true" : "false");
     return;
 
+  case PatternKind::Opaque:
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
@@ -130,7 +131,9 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
-    return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
+  case PatternKind::Opaque:
+    return isDirectlyRefutablePattern(
+        p->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true));
   }  
   llvm_unreachable("bad pattern");
 }
@@ -191,7 +194,9 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
-    return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
+  case PatternKind::Opaque:
+    return getNumSpecializationsRecursive(
+        p->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true), n);
   }  
   llvm_unreachable("bad pattern");
 }
@@ -232,7 +237,9 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
-    return isWildcardPattern(p->getSemanticsProvidingPattern());
+  case PatternKind::Opaque:
+    return isWildcardPattern(
+        p->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true));
   }
 
   llvm_unreachable("Unhandled PatternKind in switch.");
@@ -244,7 +251,7 @@ static Pattern *getSpecializingPattern(Pattern *p) {
   // Empty entries are basically AnyPatterns.
   if (!p) return nullptr;
 
-  p = p->getSemanticsProvidingPattern();
+  p = p->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
   return (isWildcardPattern(p) ? nullptr : p);
 }
 
@@ -257,7 +264,7 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   assert(first && getSpecializingPattern(first) == first);
 
   // Map down to the semantics-providing pattern.
-  p = p->getSemanticsProvidingPattern();
+  p = p->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
 
   // If the patterns are exactly the same kind, we might be able to treat them
   // similarly.
@@ -291,7 +298,8 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     }
     return nullptr;
   }
-    
+
+  case PatternKind::Opaque:
   case PatternKind::Paren:
   case PatternKind::Binding:
   case PatternKind::Typed:
@@ -1228,7 +1236,9 @@ bindRefutablePatterns(const ClauseRow &row, ArgArray args,
     if (!row[i]) // We use null patterns to mean artificial AnyPatterns
       continue;
 
-    Pattern *pattern = row[i]->getSemanticsProvidingPattern();
+    Pattern *pattern =
+        row[i]->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
+
     switch (pattern->getKind()) {
     // Irrefutable patterns that we'll handle in a later pass.
     case PatternKind::Any:
@@ -1267,7 +1277,8 @@ void PatternMatchEmission::bindIrrefutablePatterns(const ClauseRow &row,
     if (!row[i]) // We use null patterns to mean artificial AnyPatterns
       continue;
 
-    Pattern *pattern = row[i]->getSemanticsProvidingPattern();
+    Pattern *pattern =
+        row[i]->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
     switch (pattern->getKind()) {
     case PatternKind::Any: // We can just drop Any values.
       break;
@@ -1295,7 +1306,8 @@ void PatternMatchEmission::bindIrrefutableBorrows(const ClauseRow &row,
     if (!row[i]) // We use null patterns to mean artificial AnyPatterns
       continue;
 
-    Pattern *pattern = row[i]->getSemanticsProvidingPattern();
+    Pattern *pattern =
+        row[i]->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
     switch (pattern->getKind()) {
     case PatternKind::Any: // We can just drop Any values.
       break;
@@ -1332,7 +1344,8 @@ PatternMatchEmission::unbindAndEndBorrows(const ClauseRow &row,
     if (!column) // We use null patterns to mean artificial AnyPatterns
       continue;
 
-    Pattern *pattern = column->getSemanticsProvidingPattern();
+    Pattern *pattern =
+        column->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true);
     switch (pattern->getKind()) {
     case PatternKind::Any: // We can just drop Any values.
       break;
@@ -1585,6 +1598,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
+  case PatternKind::Opaque:
     llvm_unreachable("non-semantic pattern kind!");
   
   case PatternKind::Tuple:
@@ -2176,7 +2190,8 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
         bool hasNonAny =
             llvm::any_of(specializedRows, [&](const SpecializedRow &row) {
               auto *p = row.Patterns[0];
-              return p && !isa<AnyPattern>(p->getSemanticsProvidingPattern());
+              return p && !isa<AnyPattern>(p->getSemanticsProvidingPattern(
+                              /*lookThroughOpaque*/ true));
             });
         if (hasNonAny) {
           return ConsumableManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
@@ -2347,8 +2362,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
       bool hasNonAny = false;
       for (auto &specRow : specializedRows) {
         auto pattern = specRow.Patterns[0];
-        if (pattern &&
-            !isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) {
+        if (pattern && !isa<AnyPattern>(pattern->getSemanticsProvidingPattern(
+                           /*lookThroughOpaque*/ true))) {
           hasNonAny = true;
           break;
         }
@@ -2750,6 +2765,9 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
       return visit(P->getSubPattern(), mv);
     }
     void visitTypedPattern(TypedPattern *P, ManagedValue mv) {
+      return visit(P->getSubPattern(), mv);
+    }
+    void visitOpaquePattern(OpaquePattern *P, ManagedValue mv) {
       return visit(P->getSubPattern(), mv);
     }
   };
@@ -3350,9 +3368,9 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       // Get returns an owned value.
       return false;
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       // Read, modify, and addressors yield a borrowable reference.

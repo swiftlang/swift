@@ -31,15 +31,16 @@ struct Wrapper {
     }
   }
   var k4: Klass {
-    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a 'read' accessor}}
+    borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a 'yielding borrow' accessor}}
       return _k
     }
-    read { // expected-note{{'read' accessor defined here}}
+    // expected-warning@+1{{'read' is deprecated; please use 'yielding borrow' instead}}
+    read { // expected-note{{'yielding borrow' accessor defined here}}
       yield _k
     }
   }
   var k5: Klass {
-    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor, getter, addressor or 'read' accessor}}
+    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor}}
       return &_otherK
     }
   }

@@ -1081,6 +1081,7 @@ bb7:
   br bb6
 
 bb8(%err : @owned $Error):
+  destroy_value [dead_end] %err
   unreachable
 }
 
@@ -1515,6 +1516,8 @@ bb3:
   cond_br undef, bb5, bb4
 
 bb4:
+  end_borrow %2
+  destroy_value [dead_end] %1
   unreachable
 
 bb5:
@@ -1542,11 +1545,18 @@ bb6:
 bb7:
   end_borrow %17
   dealloc_stack %16
+  end_borrow %15
+  end_borrow %14
+  end_borrow %12
+  end_borrow %2
+  destroy_value [dead_end] %1
   unreachable
 
 bb8:
   end_borrow %6
   dealloc_stack %5
+  end_borrow %2
+  destroy_value [dead_end] %1
   unreachable
 
 bb9:

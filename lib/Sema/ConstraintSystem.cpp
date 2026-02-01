@@ -47,6 +47,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
 #include <cmath>
+#include <random>
 
 using namespace swift;
 using namespace constraints;
@@ -784,7 +785,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
       break;
     case ComponentKind::UnresolvedApply:
     case ComponentKind::Apply:
-      return getConstraintLocator(anchor, *componentElt);
+      return getConstraintLocator(anchor, LocatorPathElt::KeyPathComponent(componentElt->getIndex() - 1));
     case ComponentKind::Invalid:
     case ComponentKind::OptionalForce:
     case ComponentKind::OptionalChain:
@@ -1045,9 +1046,9 @@ void ConstraintSystem::recordPackElementExpansion(
 
 /// Extend the given depth map by adding depths for all of the subexpressions
 /// of the given expression.
-static void extendDepthMap(
-   Expr *expr,
-   llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
+static void
+extendDepthMap(Expr *expr, unsigned initialDepth,
+               llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap) {
   // If we already have an entry in the map, we don't need to update it. This
   // avoids invalidating previous entries when solving a smaller component of a
   // larger AST node, e.g during conjunction solving.
@@ -1062,8 +1063,9 @@ static void extendDepthMap(
     unsigned Depth = 0;
 
     explicit RecordingTraversal(
+        unsigned initialDepth,
         llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
-        : DepthMap(depthMap) {}
+        : DepthMap(depthMap), Depth(initialDepth) {}
 
     MacroWalking getMacroWalkingBehavior() const override {
       return MacroWalking::ArgumentsAndExpansion;
@@ -1121,7 +1123,7 @@ static void extendDepthMap(
     }
   };
 
-  RecordingTraversal traversal(depthMap);
+  RecordingTraversal traversal(initialDepth, depthMap);
   expr->walk(traversal);
 }
 
@@ -1129,7 +1131,12 @@ std::optional<std::pair<unsigned, Expr *>>
 ConstraintSystem::getExprDepthAndParent(Expr *expr) {
   // Bring the set of expression weights up to date.
   while (NumInputExprsInWeights < InputExprs.size()) {
-    extendDepthMap(InputExprs[NumInputExprsInWeights], ExprWeights);
+    auto *E = InputExprs[NumInputExprsInWeights];
+    unsigned initialDepth = 0;
+    auto depthIter = InputExprSimulatedDepths.find(E);
+    if (depthIter != InputExprSimulatedDepths.end())
+      initialDepth = depthIter->second;
+    extendDepthMap(E, initialDepth, ExprWeights);
     ++NumInputExprsInWeights;
   }
 
@@ -1299,8 +1306,7 @@ Type ConstraintSystem::getWrappedPropertyType(
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
-                                      ConstraintLocator *locator,
-                                      std::optional<unsigned> favoredIndex) {
+                                      ConstraintLocator *locator) {
   // If there is a single choice, add the bind overload directly.
   if (choices.size() == 1) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
@@ -1308,8 +1314,7 @@ void ConstraintSystem::addOverloadSet(Type boundType,
   }
 
   SmallVector<Constraint *, 4> candidates;
-  generateOverloadConstraints(candidates, boundType, choices, useDC, locator,
-                              favoredIndex);
+  generateOverloadConstraints(candidates, boundType, choices, useDC, locator);
   // For an overload set (disjunction) from newly generated candidates.
   addOverloadSet(candidates, locator);
 }
@@ -1434,7 +1439,8 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
           pattern = isp->getSubPattern()->getSemanticsProvidingPattern();
         }
       }
-      if (pattern && pattern->isRefutablePattern()) {
+      if (pattern &&
+          pattern->isRefutablePattern(/*allowIsPatternCoercion*/ true)) {
         return false;
       }
 
@@ -1605,7 +1611,7 @@ void ConstraintSystem::buildDisjunctionForOptionalVsUnderlying(
 
 namespace {
 
-struct TypeSimplifier {
+struct TypeSimplifier : public TypeTransform<TypeSimplifier> {
   ConstraintSystem &CS;
   llvm::function_ref<Type(TypeVariableType *)> GetFixedTypeFn;
 
@@ -1617,9 +1623,12 @@ struct TypeSimplifier {
 
   TypeSimplifier(ConstraintSystem &CS,
                  llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn)
-    : CS(CS), GetFixedTypeFn(getFixedTypeFn) {}
+      : TypeTransform(CS.getASTContext()), CS(CS),
+        GetFixedTypeFn(getFixedTypeFn) {}
 
-  std::optional<Type> operator()(TypeBase *type) {
+  Type simplify(Type ty) { return doIt(ty, TypePosition::Invariant); }
+
+  std::optional<Type> transform(TypeBase *type, /*unused*/ TypePosition) {
     if (auto tvt = dyn_cast<TypeVariableType>(type)) {
       auto fixedTy = GetFixedTypeFn(tvt);
 
@@ -1653,7 +1662,7 @@ struct TypeSimplifier {
       if (tuple->getNumElements() == 1) {
         auto element = tuple->getElement(0);
         auto elementType = element.getType();
-        auto resolvedType = elementType.transformRec(*this);
+        auto resolvedType = simplify(elementType);
 
         // If this is a single-element tuple with pack expansion
         // variable inside, let's unwrap it if pack is flattened.
@@ -1699,8 +1708,8 @@ struct TypeSimplifier {
       }
 
       // Transform the count type, ignoring any active pack expansions.
-      auto countType = expansion->getCountType().transformRec(
-          TypeSimplifier(CS, GetFixedTypeFn));
+      auto countType = TypeSimplifier(CS, GetFixedTypeFn)
+                           .simplify(expansion->getCountType());
 
       if (!countType->is<PackType>() &&
           !countType->is<PackArchetypeType>()) {
@@ -1724,7 +1733,7 @@ struct TypeSimplifier {
           ActivePackExpansions.back().isPackExpansion =
             (countExpansion != nullptr);
 
-          auto elt = expansion->getPatternType().transformRec(*this);
+          auto elt = simplify(expansion->getPatternType());
           if (countExpansion)
             elt = PackExpansionType::get(elt, countExpansion->getCountType());
           elts.push_back(elt);
@@ -1738,7 +1747,7 @@ struct TypeSimplifier {
         return PackType::get(CS.getASTContext(), elts);
       } else {
         ActivePackExpansions.push_back({true, 0});
-        auto patternType = expansion->getPatternType().transformRec(*this);
+        auto patternType = simplify(expansion->getPatternType());
         ActivePackExpansions.pop_back();
         return PackExpansionType::get(patternType, countType);
       }
@@ -1748,7 +1757,7 @@ struct TypeSimplifier {
     // the base to a non-type-variable, perform lookup.
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       // Simplify the base.
-      Type newBase = depMemTy->getBase().transformRec(*this);
+      Type newBase = simplify(depMemTy->getBase());
 
       if (newBase->isPlaceholder()) {
         return PlaceholderType::get(CS.getASTContext(), depMemTy);
@@ -1808,13 +1817,24 @@ struct TypeSimplifier {
 
     return std::nullopt;
   }
+
+  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    ty = simplify(ty);
+
+    // If we still have type variables, we keep the dependence.
+    if (ty->hasTypeVariable())
+      return std::pair(ty, false);
+
+    // Otherwise we've flattened the dependence, evaluate Sendable.
+    return std::make_pair(Type(), ty->isSendableType());
+  }
 };
 
 } // end anonymous namespace
 
 Type ConstraintSystem::simplifyTypeImpl(Type type,
     llvm::function_ref<Type(TypeVariableType *)> getFixedTypeFn) {
-  return type.transformRec(TypeSimplifier(*this, getFixedTypeFn));
+  return TypeSimplifier(*this, getFixedTypeFn).simplify(type);
 }
 
 Type ConstraintSystem::simplifyType(Type type) {
@@ -3472,7 +3492,7 @@ void OpenGenericTypeRequirements::operator()(GenericTypeDecl *decl,
   auto openType = [&](Type ty) -> Type {
     return cs.openType(ty, replacements, locator, preparedOverload);
   };
-  cs.openGenericRequirements(outerDC, sig, /*skipProtocolSelf*/ false, locator,
+  cs.openGenericRequirements(outerDC, sig, /*skipProtocolSelfConstraint=*/false, locator,
                              openType, preparedOverload);
 }
 
@@ -3706,7 +3726,8 @@ void constraints::simplifyLocator(ASTNode &anchor,
     }
 
     case ConstraintLocator::GlobalActorType:
-    case ConstraintLocator::ContextualType: {
+    case ConstraintLocator::ContextualType:
+    case ConstraintLocator::FunctionSendability: {
       // This was just for identifying purposes, strip it off.
       path = path.slice(1);
       continue;
@@ -3911,6 +3932,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
     case ConstraintLocator::FallbackType:
     case ConstraintLocator::KeyPathSubscriptIndex:
+    case ConstraintLocator::ImplicitForEachCompatMember:
     case ConstraintLocator::ExistentialMemberAccessConversion:
       break;
     }
@@ -4012,41 +4034,24 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
 void ConstraintSystem::generateOverloadConstraints(
     SmallVectorImpl<Constraint *> &constraints, Type type,
     ArrayRef<OverloadChoice> choices, DeclContext *useDC,
-    ConstraintLocator *locator, std::optional<unsigned> favoredIndex,
-    bool requiresFix,
+    ConstraintLocator *locator, bool requiresFix,
     llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
         getFix) {
-  auto recordChoice = [&](SmallVectorImpl<Constraint *> &choices,
-                          unsigned index, const OverloadChoice &overload,
-                          bool isFavored = false) {
-    auto *fix = getFix(index, overload);
+  for (auto index : indices(choices)) {
+    auto *fix = getFix(index, choices[index]);
     // If fix is required but it couldn't be determined, this
     // choice has be filtered out.
     if (requiresFix && !fix)
-      return;
-
-    auto *choice = Constraint::createBindOverload(*this, type, overload,
-                                                  useDC, fix, locator);
-
-    if (isFavored)
-      choice->setFavored();
-
-    choices.push_back(choice);
-  };
-
-  if (favoredIndex) {
-    const auto &choice = choices[*favoredIndex];
-    assert(
-        (!choice.isDecl() || !isDeclUnavailable(choice.getDecl(), locator)) &&
-        "Cannot make unavailable decl favored!");
-    recordChoice(constraints, *favoredIndex, choice, /*isFavored=*/true);
-  }
-
-  for (auto index : indices(choices)) {
-    if (favoredIndex && (*favoredIndex == index))
       continue;
 
-    recordChoice(constraints, index, choices[index]);
+    auto *choice = Constraint::createBindOverload(*this, type, choices[index],
+                                                  useDC, fix, locator);
+    constraints.push_back(choice);
+  }
+
+  if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionChoicesSeed) {
+    std::mt19937 g(seed);
+    std::shuffle(constraints.begin(), constraints.end(), g);
   }
 }
 

@@ -3,7 +3,7 @@
 
 // https://github.com/swiftlang/swift/issues/62778
 
-// This is invalid; we're applying | to UInt vs Int.
+// Invalid expression, because there is no (UInt, Int) overload of |.
 
 func slow() {
   let pieces = [1, 2, 3, 4]

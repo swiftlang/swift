@@ -322,6 +322,9 @@ bb3(%25 : @owned $any Error):
   throw %25 : $any Error
 
 bb4(%29 : @owned $any Error):
+  destroy_value [dead_end] %29
+  destroy_value [dead_end] %15
+  destroy_value [dead_end] %13
   unreachable
 }
 

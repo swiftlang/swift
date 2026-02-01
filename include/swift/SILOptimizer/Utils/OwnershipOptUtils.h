@@ -369,6 +369,16 @@ void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 /// Replaces phis with the unique incoming values if all incoming values are the same.
 void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 
+/// Complete lifetimes which were cut off by an `unreachable` instruction.
+/// For details see the swift implementation `completeLifetimes(in: Function)`.
+void completeAllLifetimes(SILPassManager *pm, SILFunction *f, bool includeTrivialVars = false);
+
+/// Complete lifetimes of all `values` at `deadEnds` instructions.
+/// Instead of completing the lifetimes at `unreachable` instructions, they are
+/// complete at custom `deadEnd` points.
+/// The `values` must be in dominance order.
+void completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, ArrayRef<SILInstruction *> deadEnds);
+
 bool hasOwnershipOperandsOrResults(SILInstruction *inst);
 
 } // namespace swift

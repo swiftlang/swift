@@ -180,6 +180,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_VEC = {
     "Builtin.Vec"};
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_FIXEDARRAY = {
     "Builtin.FixedArray"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BORROW = {
+    "Builtin.Borrow"};
 /// The name of the Builtin type for SILToken
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
     "Builtin.SILToken"};

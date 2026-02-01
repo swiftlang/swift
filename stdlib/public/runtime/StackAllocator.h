@@ -86,7 +86,12 @@ private:
   uint32_t numAllocatedSlabs:31;
 
   /// The configuration object.
-  [[no_unique_address]] SlabAllocatorConfiguration configuration;
+#if defined(_MSC_VER)
+  [[msvc::no_unique_address]]
+#elif defined(__clang__)
+  [[no_unique_address]]
+#endif
+  SlabAllocatorConfiguration configuration;
 
   /// The minimal alignment of allocated memory.
   static constexpr size_t alignment = MaximumAlignment;

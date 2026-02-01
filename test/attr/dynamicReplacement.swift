@@ -84,7 +84,7 @@ struct ImplicitModifier {
 }
 
 extension ImplicitModifier {
-  @_dynamicReplacement(for: i) // expected-error{{replaced 'modify' accessor for 'i' is not explicitly defined}}
+  @_dynamicReplacement(for: i) // expected-error{{replaced '_modify' accessor for 'i' is not explicitly defined}}
   var _i: Int {
     get {
       0

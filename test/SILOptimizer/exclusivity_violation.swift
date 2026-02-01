@@ -3,6 +3,9 @@
 
 // REQUIRES: executable_test
 
+// For some reason we don't get exclusivity violations on older OSes
+// UNSUPPORTED: back_deployment_runtime
+
 import StdlibUnittest
 
 

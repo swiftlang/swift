@@ -688,6 +688,9 @@ func r23641896() {
 
 }
 
+extension Array {
+  fileprivate mutating func appendLocal(_ newElement: Element) {}
+}
 
 // <rdar://problem/23718859> QoI: Incorrectly flattening ((Int,Int)) argument list to (Int,Int) when printing note
 func test17875634() {
@@ -695,7 +698,7 @@ func test17875634() {
   var row = 1
   var col = 2
   
-  match.append(row, col)  // expected-error {{instance method 'append' expects a single parameter of type '(Int, Int)'}} {{16-16=(}} {{24-24=)}}
+  match.appendLocal(row, col)  // expected-error {{instance method 'appendLocal' expects a single parameter of type '(Int, Int)'}} {{21-21=(}} {{29-29=)}}
 }
 
 // <https://github.com/apple/swift/pull/1205> Improved diagnostics for enums with associated values

@@ -1565,23 +1565,6 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   auto baseType = getMemberBaseType();
   auto locator = getLocator();
 
-  // If this is an issue with `makeIterator` having an optional
-  // result, it would be diagnosed by fix on the base type.
-  if (auto anchor = locator->getAnchor()) {
-    if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-      if (UDE->isImplicit()) {
-        auto &solution = getSolution();
-        auto *baseLoc = solution.getConstraintLocator(
-            UDE->getBase(),
-            LocatorPathElt::ContextualType(CTP_ForEachSequence));
-
-        if (hasFixFor(solution, baseLoc))
-          return false;
-      }
-    }
-  }
-
-
   bool resultIsOptional = ResultTypeIsOptional;
 
   // If we've resolved the member overload to one that returns an optional
@@ -4804,9 +4787,9 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
     case AccessorKind::Get:
     case AccessorKind::DistributedGet:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
     case AccessorKind::Borrow:

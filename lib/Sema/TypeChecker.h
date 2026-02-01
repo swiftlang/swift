@@ -66,11 +66,11 @@ namespace constraints {
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
   Normal,
-  
+
   /// The type(of:) declaration, which performs a "dynamic type" operation,
   /// with different behavior for existential and non-existential arguments.
   TypeOf,
-  
+
   /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
@@ -294,7 +294,7 @@ public:
         RequirementFailureInfo{Req, SubstReq, { }, IsolatedConformances,
                                IsolatedConformanceProto});
   }
-  
+
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Kind == CheckRequirementsResult::RequirementFailure);
 
@@ -1160,10 +1160,6 @@ void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
 
-/// Whether the given for..each statement can throw, and if so, the thrown
-/// error type.
-std::optional<Type> canThrow(ASTContext &ctx, ForEachStmt *forEach);
-
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.
 ///
@@ -1347,14 +1343,6 @@ bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
 BoundGenericType *
 getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
                                      bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                       bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.

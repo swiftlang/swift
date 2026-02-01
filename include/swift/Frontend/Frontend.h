@@ -43,6 +43,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
@@ -95,6 +96,7 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -247,8 +249,6 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
-
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
@@ -322,6 +322,11 @@ public:
   symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() { return SymbolGraphOpts; }
   const symbolgraphgen::SymbolGraphOptions &getSymbolGraphOptions() const {
     return SymbolGraphOpts;
+  }
+
+  std::optional<clang::DarwinSDKInfo> &getSDKInfo() { return SDKInfo; }
+  const std::optional<clang::DarwinSDKInfo> &getSDKInfo() const {
+    return SDKInfo;
   }
 
   SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }

@@ -99,16 +99,6 @@ static bool shouldYieldThread() {
 
 namespace {
 
-/// An extremely silly class which exists to make pointer
-/// default-initialization constexpr.
-template <class T> struct Pointer {
-  T *Value;
-  constexpr Pointer() : Value(nullptr) {}
-  constexpr Pointer(T *value) : Value(value) {}
-  operator T *() const { return Value; }
-  T *operator->() const { return Value; }
-};
-
 /// A class which encapsulates the information we track about
 /// the current thread and active executor.
 class ExecutorTrackingInfo {
@@ -123,7 +113,7 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                                  tls_key::concurrency_executor_tracking_info)
       ActiveInfoInThread;
 
@@ -200,7 +190,7 @@ public:
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
                                  tls_key::concurrency_task) Value;
 
 public:
@@ -212,10 +202,10 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
 ActiveTask::Value;
 
-SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
@@ -2500,14 +2490,31 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   SWIFT_TASK_DEBUG_LOG("Task %p can give up thread?", task);
   if (currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
-      !shouldYieldThread() &&
-      tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG(
-        "switch succeeded, task %p assumed thread for executor %p", task,
-        newExecutor.getIdentity());
+      !shouldYieldThread()) {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+    // With actors-as-locks, tryAssumeThreadForSwitch always succeeds. We must
+    // give up the thread first, or else we may deadlock due to holding the old
+    // actor while trying to acquire the new one.
     giveUpThreadForSwitch(currentExecutor);
+    bool success = tryAssumeThreadForSwitch(newExecutor, newTaskExecutor);
+    assert(success);
+    SWIFT_TASK_DEBUG_LOG(
+        "switched to new actor, task %p assumed thread for executor %p", task,
+        newExecutor.getIdentity());
     // 'return' forces tail call
     return runOnAssumedThread(task, newExecutor, trackingInfo);
+#else
+    // Without actors-as-locks, tryAssumeThreadForSwitch can fail. Try it first,
+    // and give up the thread only if it succeeds.
+    if (tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
+      SWIFT_TASK_DEBUG_LOG(
+          "switch succeeded, task %p assumed thread for executor %p", task,
+          newExecutor.getIdentity());
+      giveUpThreadForSwitch(currentExecutor);
+      // 'return' forces tail call
+      return runOnAssumedThread(task, newExecutor, trackingInfo);
+    }
+#endif
   }
 
   // Otherwise, just asynchronously enqueue the task on the given

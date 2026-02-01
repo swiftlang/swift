@@ -1535,6 +1535,10 @@ static std::optional<AccessorKind> isAccessorLabel(const Token &token) {
     for (auto accessor : allAccessorKinds())
       if (tokText == getAccessorLabel(accessor))
         return accessor;
+    if (tokText == "yielding borrow")
+      return AccessorKind::YieldingBorrow;
+    if (tokText == "yielding mutate")
+      return AccessorKind::YieldingMutate;
   }
   return std::nullopt;
 }
@@ -7979,7 +7983,9 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return true;
 
   case AccessorKind::Address:
@@ -7988,16 +7994,11 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return false;
 
   case AccessorKind::Init:
     return forSIL;
-
-  // TODO: Add support for borrow/mutate constraints in protocols
-  case AccessorKind::Borrow:
-  case AccessorKind::Mutate:
-    return false;
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -8029,7 +8030,7 @@ struct Parser::ParsedAccessors {
     if (Init) return Init;
     if (Set) return Set;
     if (Modify) return Modify;
-    if (Modify2) return Modify2;
+    if (YieldingMutate) return YieldingMutate;
     if (MutableAddress) return MutableAddress;
     if (Mutate)
       return Mutate;
@@ -8081,28 +8082,59 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
     return Status;
   }
 #define ACCESSOR_KEYWORD(KEYWORD)
-// Existing source code may have an implicit getter whose first expression is a
-// call to a function named experimental_accessor passing a trailing closure.
-// To maintain compatibility, if the feature corresponding to
-// experimental_accessor is not enabled, do not parse the token as an
-// introducer, so that it can be parsed as such a function call.
-#define EXPERIMENTAL_COROUTINE_ACCESSOR(ID, KEYWORD, FEATURE)                  \
-  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
-    if (!P.Context.LangOpts.hasFeature(Feature::FEATURE)) {                    \
-      if (featureUnavailable)                                                  \
-        *featureUnavailable = true;                                            \
-      if (isFirstAccessor) {                                                   \
-        Status.setIsParseError();                                              \
-        return Status;                                                         \
-      }                                                                        \
-    }                                                                          \
-    Kind = AccessorKind::ID;                                                   \
-  }
+
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
   }
 #include "swift/AST/AccessorKinds.def"
+
+  // Support the old `read` and `modify` spellings used before SE-0474 was
+  // finalized:
+  // * Support them in interface files, to avoid breaking .swiftinterface
+  //   while we transition to the new spellings.  (The compiler continued
+  //   to write `read`/`modify` to interfaces while we transitioned.)
+  // * Support them in Swift code ONLY IF the user has explicitly opted
+  //   into the CoroutineAccessors flag.
+  // TODO: After CoroutineAccessors gets turned on by default, we should
+  // ONLY accept these in interface files.
+  // TODO: Someday in the future (after 2026), we can stop accepting these
+  // entirely.  Accepting them in interface files is a temporary
+  // compatibility bridge to avoid immediate breakage during the switch
+  // to the new terminology.
+  else if (P.Tok.getRawText() == "read"
+	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
+	       "borrow", "read");
+    Kind = AccessorKind::YieldingBorrow;
+  }
+  else if (P.Tok.getRawText() == "modify"
+	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
+	       "mutate", "modify");
+    Kind = AccessorKind::YieldingMutate;
+  }
+  // Support `yielding borrow` and `yielding mutate`
+  else if (P.Tok.getRawText() == "yielding") {
+    // If there's a "yielding" token, see if this is
+    // "yielding mutate" or "yielding borrow"
+    Loc = P.consumeToken();
+    // Only expand "yielding mutate" and "yielding borrow"
+#define ACCESSOR(ID, KEYWORD)
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)              \
+    if (P.Tok.getRawText() == #YIELDING_KEYWORD) {                             \
+      if (!P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {       \
+        if (featureUnavailable)                                                \
+          *featureUnavailable = true;                                          \
+      }                                                                        \
+      Kind = AccessorKind::ID;                                                 \
+    }
+#include "swift/AST/AccessorKinds.def"
+  }
+
   else {
     Status.setIsParseError();
     return Status;
@@ -8224,7 +8256,8 @@ bool Parser::parseAccessorAfterIntroducer(
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
-    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension)) {
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension) &&
+        !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
                                             /*underscored*/ false));
@@ -8349,10 +8382,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
-                        ? diag::expected_getreadset_in_protocol
-                        : diag::expected_getset_in_protocol;
-        diagnose(Tok, diag);
+        diagnose(Tok, diag::expected_getreadset_in_protocol);
         Status |= makeParserError();
         break;
       }
@@ -8386,9 +8416,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      auto diag = Context.LangOpts.hasFeature(Feature::CoroutineAccessors)
-                      ? diag::expected_getreadset_in_protocol
-                      : diag::expected_getset_in_protocol;
+      auto diag = diag::expected_getreadset_in_protocol;
+      if (Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
+        diag = diag::expected_getreadborrowsetmutate_in_protocol;
+      }
       diagnose(Loc, diag);
       continue;
     }
@@ -8673,9 +8704,9 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 static std::optional<AccessorKind>
 getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
   switch (kind) {
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return {AccessorKind::Modify};
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -8756,18 +8787,18 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // 'get', '_read', 'read' and a non-mutable addressor are all exclusive.
   if (Get) {
     diagnoseConflictingAccessors(P, Get, Read);
-    diagnoseConflictingAccessors(P, Get, Read2);
+    diagnoseConflictingAccessors(P, Get, YieldingBorrow);
     diagnoseConflictingAccessors(P, Get, Address);
     diagnoseConflictingAccessors(P, Get, Borrow);
   } else if (Read) {
-    diagnoseConflictingAccessors(P, Read, Read2);
+    diagnoseConflictingAccessors(P, Read, YieldingBorrow);
     diagnoseConflictingAccessors(P, Read, Address);
     diagnoseConflictingAccessors(P, Read, Borrow);
-  } else if (Read2) {
-    diagnoseConflictingAccessors(P, Read2, Address);
-    diagnoseConflictingAccessors(P, Read2, Borrow);
+  } else if (YieldingBorrow) {
+    diagnoseConflictingAccessors(P, YieldingBorrow, Address);
+    diagnoseConflictingAccessors(P, YieldingBorrow, Borrow);
   } else if (Address) {
-    diagnoseConflictingAccessors(P, Read2, Borrow);
+    diagnoseConflictingAccessors(P, YieldingBorrow, Borrow);
   } else if (Borrow) {
     // Nothing can go wrong.
 
@@ -8778,7 +8809,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(mutator->getLoc(),
                  // Don't mention the more advanced accessors if the user
                  // only provided a setter without a getter.
-                 (MutableAddress || Modify || Modify2)
+                 (MutableAddress || Modify || YieldingMutate)
                      ? diag::missing_reading_accessor
                  : Mutate ? diag::missing_borrow_accessor
                           : diag::missing_getter,
@@ -8802,7 +8833,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     diagnoseConflictingAccessors(P, Set, MutableAddress);
     diagnoseConflictingAccessors(P, Set, Mutate);
   } else if (Modify) {
-    diagnoseConflictingAccessors(P, Modify, Modify2);
+    diagnoseConflictingAccessors(P, Modify, YieldingMutate);
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
   } else if (Mutate) {
     diagnoseConflictingAccessors(P, Mutate, MutableAddress);

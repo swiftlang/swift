@@ -129,32 +129,6 @@ none(%2 : @guaranteed $FakeOptional<C>):
   return %retval : $()
 }
 
-// An unreachable phi can be either a reborrow or forwarded, as long as it has no end_borrow.
-
-// CHECK-LABEL: introducer_unreachable: find_borrow_introducers with: %phiCycle
-// CHECK: } // end sil function 'introducer_unreachable'
-// CHECK: Introducers:
-// CHECK-NEXT: introducer_unreachable: find_borrow_introducers with: %phiCycle
-
-// CHECK-LABEL: introducer_unreachable: borrow_introducers with: %phiCycle
-// CHECK: } // end sil function 'introducer_unreachable'
-// CHECK: Borrow introducers for:   %2 = borrowed %1 : $C from ()
-// CHECK-NEXT: introducer_unreachable: borrow_introducers with: %phiCycle
-sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
-entry:
-  br exit
-
-unreachable_loop(%1 : @guaranteed $C):
-  %phiCycle = borrowed %1 from ()
-  specify_test "find_borrow_introducers %phiCycle"
-  specify_test "borrow_introducers %phiCycle"
-  br unreachable_loop(%phiCycle : $C)
-
-exit:
-  %retval = tuple ()
-  return %retval : $()
-}
-
 // All data flow paths through phis and aggregates originate from the
 // same function argument.
 

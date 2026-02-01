@@ -12,47 +12,71 @@
 
 import Glibc
 
+@usableFromInline
+@_transparent
+func errstr(_ no: Int32) -> String {
+  unsafe withUnsafeTemporaryAllocation(of: CChar.self, capacity: Int(NL_TEXTMAX)) { buf in
+    unsafe strerror_r(no, buf.baseAddress!, buf.count)
+    return unsafe String(validatingCString: buf.baseAddress!)
+      ?? "An unknown error occurred (\(no))."
+  }
+}
+
 @available(SwiftStdlib 6.0, *)
 @frozen
 @_staticExclusiveOnly
+@safe
 public struct _MutexHandle: ~Copyable {
   @usableFromInline
+  @safe
   let value: _Cell<pthread_mutex_t?>
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    var mx = pthread_mutex_t(bitPattern: 0)
-    pthread_mutex_init(&mx, nil)
-    value = _Cell(mx)
+    var mx = unsafe pthread_mutex_t(bitPattern: 0)
+    let r = unsafe pthread_mutex_init(&mx, nil)
+    if r != 0 {
+      fatalError("couldn't initialize mutex: \(errstr(errno))")
+    }
+    value = unsafe _Cell(mx)
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _lock() {
-    pthread_mutex_lock(value._address)
+    let r = unsafe pthread_mutex_lock(value._address)
+    if r != 0 {
+      fatalError("couldn't lock mutex: \(errstr(errno))")
+    }
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _tryLock() -> Bool {
-    pthread_mutex_trylock(value._address) == 0
+    unsafe pthread_mutex_trylock(value._address) == 0
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal borrowing func _unlock() {
-    pthread_mutex_unlock(value._address)
+    let r = unsafe pthread_mutex_unlock(value._address)
+    if r != 0 {
+      fatalError("couldn't unlock mutex: \(errstr(errno))")
+    }
   }
 
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
   deinit {
-    pthread_mutex_destroy(value._address)
+    let r = unsafe pthread_mutex_destroy(value._address)
+    if r != 0 {
+      fatalError("couldn't destroy mutex: \(errstr(errno))")
+    }
   }
 }

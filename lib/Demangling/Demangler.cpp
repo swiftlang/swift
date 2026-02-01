@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Demangling/Demangler.h"
 #include "DemanglerAssert.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1508,6 +1507,14 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinFixedArray);
       Ty->addChild(size, *this);
       Ty->addChild(element, *this);
+      break;
+    }
+    case 'W': {
+      NodePointer referent = popNode(Node::Kind::Type);
+      if (!referent)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinBorrow);
+      Ty->addChild(referent, *this);
       break;
     }
     case 'O':
@@ -4123,9 +4130,9 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'w': Kind = Node::Kind::WillSet; break;
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
-    case 'y': Kind = Node::Kind::Read2Accessor; break;
+    case 'y': Kind = Node::Kind::YieldingBorrowAccessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
-    case 'x': Kind = Node::Kind::Modify2Accessor; break;
+    case 'x': Kind = Node::Kind::YieldingMutateAccessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
     case 'b':
       Kind = Node::Kind::BorrowAccessor;

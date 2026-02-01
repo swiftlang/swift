@@ -537,7 +537,6 @@ SILGenFunction::emitFlowSensitiveSelfIsolation(SILLocation loc,
         getBuiltinName(BuiltinValueKind::FlowSensitiveSelfIsolation));
     conformance = getActorConformance(*this, actorType);
   }
-  SGM.useConformance(conformance);
 
   SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
       conformance.getProtocol(), actorType, conformance);

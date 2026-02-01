@@ -8,6 +8,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -83,9 +84,10 @@ TEST(ClangImporterTest, emitPCHInMemory) {
   swift::SerializationOptions serializationOpts;
   swift::SourceManager sourceMgr;
   swift::DiagnosticEngine diags(sourceMgr);
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   std::unique_ptr<ASTContext> context(ASTContext::get(
       langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags));
+      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags, SDKInfo));
   auto importer = ClangImporter::create(*context);
 
   std::string PCH = createFilename(cache, "bridging.h.pch");
@@ -199,6 +201,7 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   ClangImporterOptions options;
   CASOptions casOpts;
   SerializationOptions serializationOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   options.clangPath = "/usr/bin/clang";
   options.ExtraArgs.push_back(
       (llvm::Twine("--gcc-toolchain=") + "/opt/rh/devtoolset-9/root/usr")
@@ -206,14 +209,14 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
   options.ExtraArgs.push_back("--gcc-toolchain");
   std::unique_ptr<ASTContext> context(ASTContext::get(
       langOpts, typecheckOpts, silOpts, searchPathOpts, options,
-      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags));
+      symbolGraphOpts, casOpts, serializationOpts, sourceMgr, diags, SDKInfo));
 
   {
     LibStdCxxInjectionVFS vfs;
     vfs.devtoolSet("9").libstdCxxModulemap("\n");
     auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
     ASSERT_TRUE(paths.redirectedFiles.size() == 2);
-    ASSERT_TRUE(paths.overridenFiles.empty());
+    ASSERT_TRUE(paths.overridenFiles.size() == 1);
     EXPECT_EQ(paths.redirectedFiles[0].first,
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/libstdcxx.h");
     EXPECT_EQ(paths.redirectedFiles[0].second,
@@ -229,14 +232,14 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
     vfs.devtoolSet("9").cxxStdlibHeader("string_view").libstdCxxModulemap();
     auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
     ASSERT_TRUE(paths.redirectedFiles.size() == 1);
-    ASSERT_TRUE(paths.overridenFiles.size() == 1);
+    ASSERT_TRUE(paths.overridenFiles.size() == 2);
     EXPECT_EQ(paths.redirectedFiles[0].first,
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/libstdcxx.h");
     EXPECT_EQ(paths.redirectedFiles[0].second,
               "/usr/lib/swift/linux/libstdcxx.h");
-    EXPECT_EQ(paths.overridenFiles[0].first,
+    EXPECT_EQ(paths.overridenFiles[0]->getBufferIdentifier(),
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/module.modulemap");
-    EXPECT_NE(paths.overridenFiles[0].second.find(
+    EXPECT_NE(paths.overridenFiles[0]->getBuffer().find(
                   "header \"string_view\"\n  /// additional headers."),
               StringRef::npos);
   }
@@ -255,15 +258,15 @@ TEST(ClangImporterTest, libStdCxxInjectionTest) {
         .libstdCxxModulemap();
     auto paths = swift::getClangInvocationFileMapping(*context, vfs.vfs);
     ASSERT_TRUE(paths.redirectedFiles.size() == 1);
-    ASSERT_TRUE(paths.overridenFiles.size() == 1);
+    ASSERT_TRUE(paths.overridenFiles.size() == 2);
     EXPECT_EQ(paths.redirectedFiles[0].first,
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/libstdcxx.h");
     EXPECT_EQ(paths.redirectedFiles[0].second,
               "/usr/lib/swift/linux/libstdcxx.h");
-    EXPECT_EQ(paths.overridenFiles[0].first,
+    EXPECT_EQ(paths.overridenFiles[0]->getBufferIdentifier(),
               "/opt/rh/devtoolset-9/root/usr/include/c++/9/module.modulemap");
     EXPECT_NE(
-        paths.overridenFiles[0].second.find(
+        paths.overridenFiles[0]->getBuffer().find(
             "header \"codecvt\"\n  header \"any\"\n  header \"charconv\"\n  "
             "header \"filesystem\"\n  header \"memory_resource\"\n  header "
             "\"optional\"\n  header \"string_view\"\n  header \"variant\"\n  "

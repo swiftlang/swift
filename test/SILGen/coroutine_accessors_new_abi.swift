@@ -13,7 +13,7 @@ struct S {
 
 var one: Int = 1
 var i: Int {
-  read {
+  yielding borrow {
     yield one
   }
 }

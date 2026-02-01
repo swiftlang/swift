@@ -98,6 +98,10 @@ module MissingHeader {
   header "this-header-does-not-exist.h"
 }
 
+module SimpleSwiftNewtypes {
+  header "SimpleSwiftNewtypes.h"
+}
+
 module MoreSwiftNewtypes {
   header "MoreSwiftNewtypes.h"
 }

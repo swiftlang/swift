@@ -15,9 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenKeyPath.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExtInfo.h"
@@ -29,19 +27,16 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeExpansionContext.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -58,7 +53,6 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Constant.h"
@@ -73,12 +67,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
 #include "GenArchetype.h"
+#include "GenBorrow.h"
 #include "GenBuiltin.h"
 #include "GenCall.h"
 #include "GenCast.h"
@@ -91,6 +85,7 @@
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenIntegerLiteral.h"
+#include "GenKeyPath.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
@@ -1565,6 +1560,13 @@ public:
   void visitHasSymbolInst(HasSymbolInst *i);
 
   void visitTypeValueInst(TypeValueInst *i);
+
+  void visitMakeBorrowInst(MakeBorrowInst *i);
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *i);
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *i);
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *i);
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *i);
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i);
 
   void visitWeakCopyValueInst(swift::WeakCopyValueInst *i);
   void visitUnownedCopyValueInst(swift::UnownedCopyValueInst *i);
@@ -4555,6 +4557,13 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   auto funcResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
       conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
+  SILType funcErrorType;
+  if (fnType->hasErrorResult() && conv.isTypedError() &&
+      !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
+    funcErrorType = IGF.CurSILFn->mapTypeIntoEnvironment(
+        conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+  }
+
   if (IGF.isAsync()) {
     // If we're generating an async function, store the result into the buffer.
     auto asyncLayout = getAsyncContextLayout(IGF);
@@ -4563,20 +4572,15 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       error.add(getNullErrorValue());
     }
 
-    emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result, error);
+    emitAsyncReturn(IGF, asyncLayout, funcResultType,
+                    fnType, result, error, funcErrorType);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
     assert(swiftCCReturn ||
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
-    SILType errorType;
-    if (fnType->hasErrorResult() && conv.isTypedError() &&
-        !conv.hasIndirectSILResults() && !conv.hasIndirectSILErrorResults()) {
-      errorType = IGF.CurSILFn->mapTypeIntoEnvironment(
-          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-    }
-    IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn, false,
-                         mayPeepholeLoad, errorType);
+    IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn,
+                         /*isOutlined=*/false, mayPeepholeLoad, funcErrorType);
   }
 }
 
@@ -4693,15 +4697,14 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
     auto layout = getAsyncContextLayout(*this);
     auto funcResultType = CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+    SILType funcErrorType;
 
     if (conv.isTypedError()) {
-      auto silErrorTy = CurSILFn->mapTypeIntoEnvironment(
+      funcErrorType = CurSILFn->mapTypeIntoEnvironment(
           conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
-      auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silErrorTy));
+      auto &errorTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(funcErrorType));
 
-      auto silResultTy = CurSILFn->mapTypeIntoEnvironment(
-          conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
-      auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(silResultTy));
+      auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(funcResultType));
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGM);
       auto &errorSchema = errorTI.nativeReturnValueSchema(IGM);
 
@@ -4716,7 +4719,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         Explosion nativeAgg;
         auto combined =
             combineResultAndTypedErrorType(IGM, resultSchema, errorSchema);
-        buildDirectError(*this, combined, errorSchema, silErrorTy, exn,
+        buildDirectError(*this, combined, errorSchema, funcErrorType, exn,
                          /*forAsync*/ true, nativeAgg);
         assert(exn.empty() && "Unclaimed typed error results");
 
@@ -4740,7 +4743,8 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
 
     Explosion empty;
     emitAsyncReturn(*this, layout, funcResultType,
-                    i->getFunction()->getLoweredFunctionType(), empty, exn);
+                    i->getFunction()->getLoweredFunctionType(), empty,
+                    exn, funcErrorType);
   }
 }
 
@@ -4769,6 +4773,8 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
     auto layout = getAsyncContextLayout(*this);
     auto funcResultType = CurSILFn->mapTypeIntoEnvironment(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+    auto funcErrorType = CurSILFn->mapTypeIntoEnvironment(
+        conv.getSILErrorType(IGM.getMaximalTypeExpansionContext()));
 
     llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
     flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
@@ -4778,7 +4784,8 @@ void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
 
     Explosion empty;
     emitAsyncReturn(*this, layout, funcResultType,
-                    i->getFunction()->getLoweredFunctionType(), empty, exn);
+                    i->getFunction()->getLoweredFunctionType(), empty,
+                    exn, funcErrorType);
   }
 }
 
@@ -6261,6 +6268,64 @@ void IRGenSILFunction::visitUnownedCopyValueInst(
       "unowned_copy_value not lowered by AddressLowering!?");
 }
 
+void IRGenSILFunction::visitMakeBorrowInst(MakeBorrowInst *i) {
+  auto borrowTy = i->getType();
+  Explosion borrow;
+  Explosion referent = getLoweredExplosion(i->getOperand());
+  
+  emitMakeBorrow(*this, borrowTy, referent, borrow);
+
+  setLoweredExplosion(i, borrow);
+}
+
+void IRGenSILFunction::visitMakeAddrBorrowInst(MakeAddrBorrowInst *i) {
+  auto borrowTy = i->getType();
+  Explosion borrow;
+  Address referent = getLoweredAddress(i->getOperand());
+  
+  emitMakeBorrowFromAddress(*this, borrowTy, referent, borrow);
+
+  setLoweredExplosion(i, borrow);
+}
+
+void IRGenSILFunction::visitInitBorrowAddrInst(InitBorrowAddrInst *i) {
+  auto borrowTy = i->getDest()->getType();
+  Address destBorrow = getLoweredAddress(i->getDest());
+  Address srcReferent = getLoweredAddress(i->getReferent());
+
+  emitInitBorrowAtAddress(*this, borrowTy, destBorrow, srcReferent);
+}
+
+void IRGenSILFunction::visitDereferenceBorrowInst(DereferenceBorrowInst *i) {
+  auto borrowTy = i->getOperand()->getType();
+  Explosion referent;
+  Explosion borrow = getLoweredExplosion(i->getOperand());
+
+  emitDereferenceBorrow(*this, borrowTy, borrow, referent);
+
+  setLoweredExplosion(i, referent);
+}
+
+void
+IRGenSILFunction::visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *i) {
+  auto borrowTy = i->getOperand()->getType();
+  Explosion borrow = getLoweredExplosion(i->getOperand());
+
+  Address referent = emitDereferenceBorrowToAddress(*this, borrowTy, borrow);
+
+  setLoweredAddress(i, referent);
+}
+
+void
+IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
+  auto borrowTy = i->getOperand()->getType();
+  Address borrow = getLoweredAddress(i->getOperand());
+
+  Address referent = emitDereferenceBorrowAtAddress(*this, borrowTy, borrow);
+
+  setLoweredAddress(i, referent);
+}
+
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   void IRGenSILFunction::visitLoad##Name##Inst(swift::Load##Name##Inst *i) { \
     Address source = getLoweredAddress(i->getOperand()); \
@@ -6905,8 +6970,13 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
   if (enforcement == SILAccessEnforcement::Dynamic &&
       IGF.IGM.getTypeInfo(access->getSource()->getType())
              .isKnownEmpty(ResilienceExpansion::Maximal)) {
-    enforcement = SILAccessEnforcement::Unsafe;
+    return SILAccessEnforcement::Unsafe;
   }
+
+  // Don't use dynamic enforcement if it has been disabled on the command line.
+  if (enforcement == SILAccessEnforcement::Dynamic &&
+      !IGF.getSILModule().getOptions().EnforceExclusivityDynamic)
+    return SILAccessEnforcement::Unsafe;
 
   return enforcement;
 }

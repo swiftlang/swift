@@ -1114,7 +1114,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(DebugAssert);
     return;
   }
-  
+
+  case BuiltinValueKind::InfiniteLoopTrueCondition:
+    out.add(IGF.Builder.getTrue());
+    return;
+
   case BuiltinValueKind::DestroyArray: {
     // The input type is (T.Type, Builtin.RawPointer, Builtin.Word).
     /* metatype (which may be thin) */

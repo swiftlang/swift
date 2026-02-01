@@ -459,6 +459,13 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
+InFlightDiagnostic::limitBehaviorIfMorePermissive(DiagnosticBehavior limit) {
+  auto prev = getDiag().getBehaviorLimit();
+  getDiag().setBehaviorLimit(prev.merge(limit));
+  return *this;
+}
+
+InFlightDiagnostic &
 InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
                                                    unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
@@ -520,12 +527,12 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   llvm::SaveAndRestore<DiagnosticBehavior> limit(
       Diag.BehaviorLimit, DiagnosticBehavior::Unspecified);
 
-  ActiveDiag.WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
-      Diag, /* includeDiagnosticName= */ false));
+  ActiveDiag.WrappedDiagnostics.push_back(std::make_unique<DiagnosticInfo>(
+      Engine->diagnosticInfoForDiagnostic(Diag, /*diagName*/ false).value()));
 
   Engine->state.swap(tempState);
 
-  auto &wrapped = ActiveDiag.WrappedDiagnostics.back();
+  auto &wrapped = *ActiveDiag.WrappedDiagnostics.back();
 
   // Copy and update its arg list.
   ActiveDiag.WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
@@ -1863,6 +1870,17 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
+}
+
+DiagnosticQueue::DiagnosticQueue(DiagnosticEngine &engine,
+                                 bool emitOnDestruction)
+    : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
+      EmitOnDestruction(emitOnDestruction) {
+  // Open a transaction to avoid emitting any diagnostics for the temporary
+  // engine.
+  QueueEngine.TransactionCount++;
+
+  QueueEngine.setLanguageVersion(engine.languageVersion);
 }
 
 void DiagnosticQueue::forEach(

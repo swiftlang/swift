@@ -792,8 +792,7 @@ public:
       if (!shouldVerify(cast<Stmt>(S)))
         return false;
 
-      if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
         if (!shouldVerify(expansion)) {
           return false;
         }
@@ -802,29 +801,35 @@ public:
         ForEachPatternSequences.insert(expansion);
       }
 
-      if (!S->getElementExpr())
-        return true;
-
-      assert(!OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues[S->getElementExpr()] = 0;
+      if (S->getCachedDesugaredStmt()) {
+        ASSERT(S->getOpaqueSequenceExpr());
+        ASSERT(!OpaqueValues.count(S->getOpaqueSequenceExpr()));
+        OpaqueValues[S->getOpaqueSequenceExpr()] = 0;
+        if (S->getWhere()) {
+          ASSERT(S->getOpaqueWhereExpr());
+          ASSERT(!OpaqueValues.count(S->getOpaqueWhereExpr()));
+          OpaqueValues[S->getOpaqueWhereExpr()] = 0;
+        }
+      }
       return true;
     }
 
     void cleanup(ForEachStmt *S) {
-      if (auto *expansion =
-              dyn_cast<PackExpansionExpr>(S->getParsedSequence())) {
+      if (auto *expansion = dyn_cast<PackExpansionExpr>(S->getSequence())) {
         assert(ForEachPatternSequences.count(expansion) != 0);
         ForEachPatternSequences.erase(expansion);
 
         // Clean up for real.
         cleanup(expansion);
       }
-
-      if (!S->getElementExpr())
-        return;
-
-      assert(OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues.erase(S->getElementExpr());
+      if (S->getCachedDesugaredStmt()) {
+        ASSERT(OpaqueValues.count(S->getOpaqueSequenceExpr()));
+        OpaqueValues.erase(S->getOpaqueSequenceExpr());
+        if (S->getWhere()) {
+          ASSERT(OpaqueValues.count(S->getOpaqueWhereExpr()));
+          OpaqueValues.erase(S->getOpaqueWhereExpr());
+        }
+      }
     }
 
     bool shouldVerify(InterpolatedStringLiteralExpr *expr) {
@@ -965,24 +970,6 @@ public:
     void cleanup(OptionalEvaluationExpr *expr) {
       assert(OptionalEvaluations.back() == expr);
       OptionalEvaluations.pop_back();
-    }
-
-    // Register the OVEs in a collection upcast.
-    bool shouldVerify(CollectionUpcastConversionExpr *expr) {
-      if (!shouldVerify(cast<Expr>(expr)))
-        return false;
-
-      if (auto keyConversion = expr->getKeyConversion())
-        OpaqueValues[keyConversion.OrigValue] = 0;
-      if (auto valueConversion = expr->getValueConversion())
-        OpaqueValues[valueConversion.OrigValue] = 0;
-      return true;
-    }
-    void cleanup(CollectionUpcastConversionExpr *expr) {
-      if (auto keyConversion = expr->getKeyConversion())
-        OpaqueValues.erase(keyConversion.OrigValue);
-      if (auto valueConversion = expr->getValueConversion())
-        OpaqueValues.erase(valueConversion.OrigValue);
     }
 
     /// Canonicalize the given DeclContext pointer, in terms of
@@ -1902,7 +1889,7 @@ public:
         //        currently visiting arguments of an apply when we
         //        find these conversions.
         if (auto *upcast = dyn_cast<CollectionUpcastConversionExpr>(subExpr)) {
-          subExpr = upcast->getValueConversion().Conversion;
+          subExpr = upcast->getValueConversion();
           continue;
         }
 
@@ -3459,7 +3446,7 @@ public:
             // _modify/modify, observer, or mutable addressor.
             !(FD->isSetter() &&
               (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
-               storageDecl->getWriteImpl() == WriteImplKind::Modify2 ||
+               storageDecl->getWriteImpl() == WriteImplKind::YieldingMutate ||
                storageDecl->getWriteImpl() ==
                    WriteImplKind::StoredWithObservers ||
                storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
@@ -3467,7 +3454,7 @@ public:
             // We allow a non dynamic getter if there is a dynamic read.
             !(FD->isGetter() &&
               (storageDecl->getReadImpl() == ReadImplKind::Read ||
-               storageDecl->getReadImpl() == ReadImplKind::Read2 ||
+               storageDecl->getReadImpl() == ReadImplKind::YieldingBorrow ||
                storageDecl->getReadImpl() == ReadImplKind::Address) &&
               storageDecl->shouldUseNativeDynamicDispatch())) {
           Out << "Property and accessor do not match for 'dynamic'\n";

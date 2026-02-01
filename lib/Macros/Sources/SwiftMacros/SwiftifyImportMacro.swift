@@ -63,6 +63,12 @@ func getSwiftifyExprType(_ funcDecl: FunctionParts, _ expr: SwiftifyExpr) -> Typ
   case .return:
     return funcDecl.signature.returnClause!.type
   case .self:
+    let isMutating = funcDecl.modifiers.contains(where: { mod in
+      return mod.name.text == "mutating"
+    })
+    if isMutating {
+      return TypeSyntax("inout Self")
+    }
     return TypeSyntax(IdentifierTypeSyntax(name: TokenSyntax("Self")))
   }
 }
@@ -1554,24 +1560,29 @@ func renameParameterNamesIfNeeded(_ funcComponents: FunctionParts) -> (FunctionP
     // Keeps source locations for diagnostics, in the common case where nothing was renamed
     funcComponents.signature
   }
-  return (FunctionParts(signature: newSig, name: funcComponents.name, attributes: funcComponents.attributes),
-          CountExprRewriter(renamedParams))
+  return (
+    FunctionParts(
+      signature: newSig, name: funcComponents.name, attributes: funcComponents.attributes,
+      modifiers: funcComponents.modifiers),
+    CountExprRewriter(renamedParams)
+  )
 }
 
 struct FunctionParts {
   let signature: FunctionSignatureSyntax
   let name: TokenSyntax
   let attributes: AttributeListSyntax
+  let modifiers: DeclModifierListSyntax
 }
 
 func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> FunctionParts {
   if let origFuncDecl = declaration.as(FunctionDeclSyntax.self) {
     return FunctionParts(signature: origFuncDecl.signature, name: origFuncDecl.name,
-                         attributes: origFuncDecl.attributes)
+                         attributes: origFuncDecl.attributes, modifiers: origFuncDecl.modifiers)
   }
   if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
     return FunctionParts(signature: origInitDecl.signature, name: origInitDecl.initKeyword,
-                         attributes: origInitDecl.attributes)
+                         attributes: origInitDecl.attributes, modifiers: origInitDecl.modifiers)
   }
   throw DiagnosticError("@_SwiftifyImport only works on functions and initializers", node: declaration)
 }

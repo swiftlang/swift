@@ -203,7 +203,11 @@ if #available(SwiftStdlib 6.2, *) {
     }
 
     let a = Span<UInt8>()
-    let b: Span<UInt8> = "isTriviallyIdentical(to:)".utf8.span
+
+    var s = "isTriviallyIdentical(to:)"
+    s.makeContiguousUTF8()
+    guard let b = expectNotNil(s.utf8._span) else { return }
+
     let c = b.extracting(first: 20)
     let d = b.extracting(last: 23)
     let e = c.extracting(last: 18)

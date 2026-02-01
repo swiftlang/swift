@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #if SWIFT_ENABLE_REFLECTION
 
 #include "llvm/Support/MathExtras.h"
@@ -220,6 +221,13 @@ public:
 
     case TypeInfoKind::Array: {
       printHeader("array");
+      printBasic(TI);
+      stream << ")";
+      return;
+    }
+
+    case TypeInfoKind::Borrow: {
+      printHeader("borrow");
       printBasic(TI);
       stream << ")";
       return;
@@ -1861,6 +1869,10 @@ public:
   bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return visit(BA->getElementType());
   }
+
+  bool visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return visit(BA->getReferentType());
+  }
 };
 
 bool TypeConverter::hasFixedSize(const TypeRef *TR) {
@@ -2021,7 +2033,11 @@ public:
   }
 
   MetatypeRepresentation visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
-    return visit(BA->getElementType());
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return MetatypeRepresentation::Thin;
   }
 };
 
@@ -2688,6 +2704,12 @@ public:
     auto size = cast<IntegerTypeRef>(BA->getSizeType())->getValue();
 
     return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
+  }
+
+  const TypeInfo *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    llvm_unreachable("not implemented");
+    // auto referentTI = visit(BA->getReferentType());
+    // return TC.makeTypeInfo<BorrowTypeInfo>(referentTI);
   }
 };
 

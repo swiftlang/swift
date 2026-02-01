@@ -838,9 +838,9 @@ RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
       return static_cast<bool>(
           storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
   } else {
-    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+    if (storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed)
       return static_cast<bool>(
-          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+          storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine);
   }
   return std::nullopt;
 }
@@ -852,8 +852,8 @@ void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
   } else {
-    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
-    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine = value;
   }
 }
 
@@ -2889,4 +2889,21 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
 
   domain->flags.isPermanentlyEnabledComputed = true;
   domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
+}
+
+//----------------------------------------------------------------------------//
+// DesugarForEachStmtRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {
+  auto *fes = std::get<0>(getStorage());
+  if (!fes->desugaredStmtAndComputed.getInt()) {
+    return std::nullopt;
+  }
+  return fes->desugaredStmtAndComputed.getPointer();
+}
+
+void DesugarForEachStmtRequest::cacheResult(BraceStmt *stmt) const {
+  auto *fes = std::get<0>(getStorage());
+  fes->desugaredStmtAndComputed.setInt(true);
+  fes->setDesugaredStmt(stmt);
 }
