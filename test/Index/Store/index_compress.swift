@@ -1,4 +1,4 @@
-// REQUIRES: shell
+// UNSUPPORTED: OS=windows-msvc
 
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -index-store-path %t/idx -index-store-compress -o %t.o -typecheck %s
