@@ -3198,6 +3198,12 @@ function Test-XCTest {
 }
 
 function Build-Testing([Hashtable] $Platform) {
+  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
+    @();
+  } else {
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-testing `
     -Bin (Get-ProjectBinaryCache $Platform Testing) `
@@ -3208,6 +3214,7 @@ function Build-Testing([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }
