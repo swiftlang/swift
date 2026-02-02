@@ -522,7 +522,8 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-extension Optional: Equatable where Wrapped: Equatable {
+@_preInverseGenerics
+extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -567,25 +568,45 @@ extension Optional: Equatable where Wrapped: Equatable {
   /// - Parameters:
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
+  @_preInverseGenerics
   @_transparent
-  public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
-    switch (lhs, rhs) {
-    case let (l?, r?):
-      return l == r
-    case (nil, nil):
-      return true
-    default:
-      return false
+  public static func ==(lhs: borrowing Wrapped?, rhs: borrowing Wrapped?) -> Bool {
+    // FIXME: refactor to use `switch (lhs, rhs) { ... }` once noncopyable tuples
+    // are supported.
+    switch lhs {
+    case let l?:
+      switch rhs {
+      case let r?:
+        return l == r
+      case nil:
+        return false
+      }
+    case nil:
+      switch rhs {
+      case _?:
+        return false
+      case nil:
+        return true
+      }
     }
   }
 }
 
-extension Optional: Hashable where Wrapped: Hashable {
+@_preInverseGenerics
+extension Optional: Hashable where Wrapped: Hashable & ~Copyable {
+  // Declare this manually to mark it as @_preInverseGenerics.
+  @_preInverseGenerics
+  @inlinable
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
+  @_preInverseGenerics
   @inlinable
   public func hash(into hasher: inout Hasher) {
     switch self {
