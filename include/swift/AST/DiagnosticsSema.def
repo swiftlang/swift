@@ -1017,18 +1017,18 @@ ERROR(cxx_stdlib_kind_mismatch,none,
       (Identifier, StringRef, StringRef))
 
 ERROR(modularization_issue_decl_moved,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "%1 was expected to be in %2, but now a candidate is found only in %3",
-      (bool, DeclName, const ModuleDecl*, const ModuleDecl*))
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "'%1' was expected to be in %2, but now a candidate is found only in %3",
+      (bool, StringRef, const ModuleDecl*, const ModuleDecl*))
 ERROR(modularization_issue_decl_type_changed,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "the declaration kind of '%1' %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and now a candidate is found only in %4}5",
-      (bool, DeclName, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
+      (bool, StringRef, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "%1 is not found, it was expected to be in %2",
-      (bool, DeclName, const ModuleDecl*))
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "'%1' is not found, it was expected to be in %2",
+      (bool, StringRef, const ModuleDecl*))
 
 NOTE(modularization_issue_note_expected,none,
      "the %select{declaration|type}0 was expected to be found in module %1 at '%2'",
@@ -1066,9 +1066,9 @@ NOTE(modularization_issue_layering_found_local,none,
      "the local module %1 for a reference from the distributed module %0",
      (const ModuleDecl*, const ModuleDecl*))
 NOTE(modularization_issue_related_modules,none,
-     "the %select{declaration|type}0 %1 moved between related modules; "
+     "the %select{declaration|type}0 '%1' moved between related modules; "
      "clang preprocessor macros may affect headers shared between these modules",
-     (bool, DeclName))
+     (bool, StringRef))
 NOTE(interface_block_listed_broken,none,
      "textual interface for %0 is blocklisted as broken; "
      "interface verification errors are downgraded to warnings", (StringRef))
