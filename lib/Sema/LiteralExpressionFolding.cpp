@@ -223,7 +223,6 @@ private:
     ASTContext &Ctx;
     llvm::DenseMap<Expr *, FoldingErrorOr<ConstantValuePtr>>
         ConstValuesOrErrors;
-
   public:
     ConstantWalker(ASTContext &ctx) : Ctx(ctx) {}
 
