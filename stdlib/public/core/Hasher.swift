@@ -351,7 +351,7 @@ public struct Hasher {
   @inlinable
   @inline(__always)
   @_preInverseGenerics
-  public mutating func combine<H: Hashable & ~Copyable>(_ value: borrowing H) {
+  public mutating func combine<H: Hashable & ~Copyable & ~Escapable>(_ value: borrowing H) {
     value.hash(into: &self)
   }
 
