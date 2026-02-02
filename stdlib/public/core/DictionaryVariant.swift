@@ -465,15 +465,15 @@ extension Dictionary._Variant {
   }
 
   @inlinable
-  internal func mapValuesWithKeys<T>(
-    _ transform: (Key, Value) throws -> T
-  ) rethrows -> _NativeDictionary<Key, T> {
+  internal func mapValuesWithKeys<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
 #if _runtime(_ObjC)
     guard isNative else {
-      return try asCocoa.mapValues(transform)
+      return try asCocoa.mapValuesWithKeys(transform)
     }
 #endif
-    return try asNative.mapValues(transform)
+    return try asNative.mapValuesWithKeys(transform)
   }
 
   @inlinable
