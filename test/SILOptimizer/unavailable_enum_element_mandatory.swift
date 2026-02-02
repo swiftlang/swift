@@ -45,7 +45,7 @@ public func testFullyCoveredSwitchResilient(_ e: ResilientEnumWithUnavailableCas
 }
 
 // CHECK-LABEL: sil @$s4Test37testUnknownDefaultCaseSwitchResilientyy14resilient_enum0g19EnumWithUnavailableE0OF : $@convention(thin) (@in_guaranteed ResilientEnumWithUnavailableCase) -> () {
-// CHECK:         switch_enum_addr %2 : $*ResilientEnumWithUnavailableCase, case #ResilientEnumWithUnavailableCase.available!enumelt: [[AVAILBB:bb[0-9]+]], default [[DEFAULTBB:bb[0-9]+]]
+// CHECK:         switch_enum_addr %0 : $*ResilientEnumWithUnavailableCase, case #ResilientEnumWithUnavailableCase.available!enumelt: [[AVAILBB:bb[0-9]+]], default [[DEFAULTBB:bb[0-9]+]]
 // CHECK:       [[DEFAULTBB]]:
 // CHECK:         function_ref @$s4Test3fooyyF
 // CHECK-NEXT:    apply
@@ -113,7 +113,7 @@ public func testAvailableElementIfCase(_ e: HasUnavailableElement) {
 }
 
 // CHECK-LABEL: sil @$s4Test35testAvailableElementIfCaseResilientyy14resilient_enum0g19EnumWithUnavailableF0OF : $@convention(thin) (@in_guaranteed ResilientEnumWithUnavailableCase) -> () {
-// CHECK:         switch_enum_addr %2 : $*ResilientEnumWithUnavailableCase, case #ResilientEnumWithUnavailableCase.available!enumelt: [[AVAILBB:bb[0-9]+]], default [[DEFAULTBB:bb[0-9]+]]
+// CHECK:         switch_enum_addr %0 : $*ResilientEnumWithUnavailableCase, case #ResilientEnumWithUnavailableCase.available!enumelt: [[AVAILBB:bb[0-9]+]], default [[DEFAULTBB:bb[0-9]+]]
 // CHECK:       [[DEFAULTBB]]:
 // CHECK-NOT:     unreachable
 // CHECK:       } // end sil function '$s4Test35testAvailableElementIfCaseResilientyy14resilient_enum0g19EnumWithUnavailableF0OF'
@@ -137,7 +137,7 @@ public func testUnavailableElementIfCase(_ e: HasUnavailableElement) {
 }
 
 // CHECK-LABEL: sil @$s4Test37testUnavailableElementIfCaseResilientyy14resilient_enum0g8EnumWithcF0OF : $@convention(thin) (@in_guaranteed ResilientEnumWithUnavailableCase) -> () {
-// CHECK:         switch_enum_addr %2 : $*ResilientEnumWithUnavailableCase, default [[DEFAULTBB:bb[0-9]+]]
+// CHECK:         switch_enum_addr %0 : $*ResilientEnumWithUnavailableCase, default [[DEFAULTBB:bb[0-9]+]]
 // CHECK:       [[DEFAULTBB]]:
 // CHECK-NOT:     unreachable
 // CHECK:       } // end sil function '$s4Test37testUnavailableElementIfCaseResilientyy14resilient_enum0g8EnumWithcF0OF'

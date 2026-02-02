@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t) 
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil >%t/output.sil
-// RUN: %FileCheck %s < %t/output.sil
+// RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK1 %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
 
 // RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output6.sil
-// RUN: %FileCheck %s < %t/output6.sil
+// RUN: %FileCheck --check-prefix=CHECK --check-prefix=CHECK2 %s < %t/output6.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
 
 // RUN: %target-build-swift -O %s -o %t/a.out
@@ -471,8 +471,11 @@ func testOptionalChain(_ s: SimpleStruct) -> Int? {
 // CHECK: switch_enum [[O:%[0-9]+]]
 // CHECK: bb{{.*}}:
 //         Unwrap value
-//     CHECK: [[U:%[0-9]+]] = unchecked_enum_data [[O]]
-//     CHECK: [[I:%[0-9]+]] = struct_extract [[U]]
+//     CHECK1: [[U:%[0-9]+]] = unchecked_enum_data [[O]]
+//     CHECK1: [[I:%[0-9]+]] = struct_extract [[U]]
+//     CHECK2: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[E2]]
+//     CHECK2: [[SE:%[0-9]+]] = struct_element_addr [[U]]
+//     CHECK2: [[I:%[0-9]+]] = load [[SE]]
 //     CHECK: [[R1:%[0-9]+]] = enum $Optional<Int>, #Optional.some!enumelt, [[I]]
 //     CHECK: br [[CONTINUATION:bb.]]([[R1]] : $Optional<Int>)
 // CHECK: {{bb.}}:
@@ -541,13 +544,13 @@ func testGetOptionalForce(_ s: SimpleStruct) -> Int {
 // CHECK-LABEL: sil {{.*}}testGetOptionalForceClass
 // CHECK: [[R1:%[0-9]+]] = ref_element_addr
 // CHECK: [[R2:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
-// CHECK: [[I:%[0-9]+]] = load [[R2]]
 // CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
 // CHECK: cond_fail [[F]]
-// CHECK: [[E2:%[0-9]+]] = unchecked_enum_data [[I]]
-// CHECK: [[E3:%[0-9]+]] = struct_extract [[E2]]
+// CHECK: [[E2:%[0-9]+]] = unchecked_take_enum_data_addr [[R2]]
+// CHECK: [[E3:%[0-9]+]] = struct_element_addr [[E2]]
+// CHECK: [[I:%[0-9]+]] = load [[E3]]
 // CHECK: end_access [[R2]]
-// CHECK: return [[E3]]
+// CHECK: return [[I]]
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
 func testGetOptionalForceClass(_ s: SimpleClass) -> Int {
