@@ -2998,7 +2998,7 @@ AllMembersRequest::evaluate(
 
 static bool isTypeInferredByTypealias(TypeAliasDecl *typealias,
                                       NominalTypeDecl *nominal) {
-  if (!nominal->isGeneric()){
+  if (!nominal->hasGenericParamList()){
     return false;
   }
 
