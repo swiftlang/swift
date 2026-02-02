@@ -20,8 +20,6 @@
 // NOTE: `%target-cpu`-specific FileCheck lines exist because lowered function types in LLVM IR differ between architectures.
 
 
-// UNSUPPORTED: OS=wasip1
-
 sil_stage raw
 
 import Swift
