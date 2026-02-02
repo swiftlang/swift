@@ -80,14 +80,14 @@ class DerivedFromOpen<T> : OpenClass<T> { }
 
 func testProtocolsAndClasses() {
   // CHECK-OUTPUT: false
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test20checkIfClassConformsyyxlFSi_Ttg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test20checkIfClassConformsyyxlFSi_Tg5
   checkIfClassConforms(27)
   // CHECK-OUTPUT: false
   // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test24checkIfClassConforms_genyyxlF
   checkIfClassConforms_gen(27)
   // CHECK-OUTPUT: 123
   // CHECK-OUTPUT: 1234
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test7callFooyyxlFSi_Ttg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test7callFooyyxlFSi_Tg5
   // CHECK-SIL-DAG: sil [{{.*}}] @$s4Test19printFooExistential33_{{.*}} : $@convention(thin)
   callFoo(27)
   // CHECK-OUTPUT: 123
