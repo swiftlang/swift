@@ -732,6 +732,22 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
               if (ProtocolDecl *decl = p->getDecl())
                 if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
                   continue;
+
+              // During normal type-checking filter inferred protocols based on
+              // whether they have the member or not. There is no reason to
+              // attempt unrelated protocols and adding them as bindings affects
+              // type variable selection as well. They can be attempted during
+              // diagnostics mode in case the member is misspelled or
+              // inaccessible.
+              if (!CS.shouldAttemptFixes()) {
+                auto memberRef =
+                    castToExpr<UnresolvedMemberExpr>(locator->getAnchor());
+
+                auto &results = CS.lookupMember(
+                    protocolTy, memberRef->getName(), memberRef->getLoc());
+                if (results.empty())
+                  continue;
+              }
             }
 
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
