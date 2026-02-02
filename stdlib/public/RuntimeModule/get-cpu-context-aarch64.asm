@@ -39,7 +39,7 @@ _swift_get_cpu_context PROC PUBLIC
         str x30,      [x8, #0x100]
         mov  x1, #0x1ffffffff
         str  x1,      [x8, #0x108]
-        blr
+        ret
 _swift_get_cpu_context ENDP
 
         END
