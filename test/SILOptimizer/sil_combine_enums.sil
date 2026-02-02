@@ -605,10 +605,10 @@ bb3:
   return %11 : $()
 }
 
-// CHECK-LABEL: sil @dont_expand_alloc_stack_of_enum_multiple_cases
-// CHECK:   alloc_stack $MP
-// CHECK: } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
-sil @dont_expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (S) -> () {
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum_multiple_cases2
+// CHECK:   alloc_stack $S
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_multiple_cases2'
+sil @expand_alloc_stack_of_enum_multiple_cases2 : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
   cond_br undef, bb1, bb2
