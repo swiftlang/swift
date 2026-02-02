@@ -13,6 +13,10 @@ struct NonTrivialStruct {
   var s: String
 }
 
+struct S6: ~Copyable {
+  deinit
+}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
 sil_global [let] @g3 : $Int32
@@ -248,6 +252,25 @@ bb0(%0 : $Int):
   return %12
 }
 
+// CHECK-LABEL: sil [serialized] [no_allocation] [perf_constraint] [ossa] @devirtualze_hidden_deinit :
+// CHECK:         function_ref @s6_deinit
+// CHECK-NEXT:    apply
+// CHECK:       } // end sil function 'devirtualze_hidden_deinit'
+sil [serialized] [no_allocation] [ossa] @devirtualze_hidden_deinit : $@convention(thin) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  destroy_value %0
+  %r = tuple()
+  return %r
+}
+
+// CHECK-LABEL: sil [perf_constraint] [ossa] @s6_deinit :
+sil hidden [ossa] @s6_deinit : $@convention(method) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  end_lifetime %0
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
 // CHECK:         [[F:%.*]] = function_ref @$s12metatype_argTf4ndn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
 // CHECK:         [[A:%.*]] = apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
@@ -382,3 +405,7 @@ bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
 // CHECK:         return %1 : $Builtin.NativeObject
 // CHECK:       } // end sil function '$s12metatype_argTf4ndn_n'
 
+
+sil_moveonlydeinit S6 {
+  @s6_deinit
+}

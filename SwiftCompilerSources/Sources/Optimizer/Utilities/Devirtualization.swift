@@ -16,28 +16,31 @@ import SIL
 ///
 /// This may be a no-op if the destroy doesn't call any deinitializers.
 /// Returns true if all deinitializers could be devirtualized.
-func devirtualizeDeinits(of destroy: DestroyValueInst, _ context: some MutatingContext) -> Bool {
-  return devirtualize(destroy: destroy, context)
+func devirtualizeDeinits(of destroy: DestroyValueInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+  return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
 }
 
 /// Devirtualizes all value-type deinitializers of a `destroy_addr`.
 ///
 /// This may be a no-op if the destroy doesn't call any deinitializers.
 /// Returns true if all deinitializers could be devirtualized.
-func devirtualizeDeinits(of destroy: DestroyAddrInst, _ context: some MutatingContext) -> Bool {
-  return devirtualize(destroy: destroy, context)
+func devirtualizeDeinits(of destroy: DestroyAddrInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+  return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
 }
 
-func devirtualizeDeinits(of builtin: BuiltinInst, _ context: some MutatingContext) -> Bool {
+func devirtualizeDeinits(of builtin: BuiltinInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
   switch builtin.id {
   case .DestroyArray:
-    return devirtualize(builtinDestroyArray: builtin, context)
+    return devirtualize(builtinDestroyArray: builtin, isMandatory: isMandatory, context)
   default:
     return true
   }
 }
 
-private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some MutatingContext) -> Bool {
+private func devirtualize(destroy: some DevirtualizableDestroy,
+                          isMandatory: Bool,
+                          _ context: some MutatingContext
+) -> Bool {
   let type = destroy.type
   if !type.isMoveOnly {
     return true
@@ -58,9 +61,14 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false
     }
-    let serialized = destroy.parentFunction.serializedKind
-    guard serialized == .notSerialized || deinitFunc.hasValidLinkageForFragileRef(serialized) else {
-      return false
+    // In mandatory mode, de-virtualization might create function references to functions with wrong linkage.
+    // MandatoryPerformanceOptimization fixes this later.
+    if !isMandatory {
+      // In non-mandatory mode, we don't allow this.
+      let serialized = destroy.parentFunction.serializedKind
+      guard serialized == .notSerialized || deinitFunc.hasValidLinkageForFragileRef(serialized) else {
+        return false
+      }
     }
 
     if deinitFunc.linkage == .shared && !deinitFunc.isDefinition {
@@ -74,10 +82,10 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
   // If there is no deinit to be called for the original type we have to recursively visit
   // the struct fields or enum cases.
   if type.isStruct {
-    return destroy.devirtualizeStructFields(context)
+    return destroy.devirtualizeStructFields(isMandatory: isMandatory, context)
   }
   if type.isEnum {
-    return destroy.devirtualizeEnumPayloads(context)
+    return destroy.devirtualizeEnumPayloads(isMandatory: isMandatory, context)
   }
   precondition(type.isClass, "unknown non-copyable type")
   // A class reference cannot be further de-composed.
@@ -88,15 +96,18 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
 private protocol DevirtualizableDestroy : UnaryInstruction {
   var shouldDropDeinit: Bool { get }
   func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext)
-  func devirtualizeStructFields(_ context: some MutatingContext) -> Bool
-  func devirtualizeEnumPayload(enumCase: EnumCase, in block: BasicBlock, _ context: some MutatingContext) -> Bool
+  func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool
+  func devirtualizeEnumPayload(enumCase: EnumCase,
+                               in block: BasicBlock,
+                               isMandatory: Bool,
+                               _ context: some MutatingContext) -> Bool
   func createSwitchEnum(atEndOf block: BasicBlock, cases: [(Int, BasicBlock)], _ context: some MutatingContext)
 }
 
 private extension DevirtualizableDestroy {
   var type: Type { operand.value.type }
 
-  func devirtualizeEnumPayloads(_ context: some MutatingContext) -> Bool {
+  func devirtualizeEnumPayloads(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     guard let cases = type.getEnumCases(in: parentFunction) else {
       return false
     }
@@ -120,7 +131,7 @@ private extension DevirtualizableDestroy {
       caseBlocks.append((enumCase.index, caseBlock))
       let builder = Builder(atEndOf: caseBlock, location: location, context)
       builder.createBranch(to: endBlock)
-      if !devirtualizeEnumPayload(enumCase: enumCase, in: caseBlock, context) {
+      if !devirtualizeEnumPayload(enumCase: enumCase, in: caseBlock, isMandatory: isMandatory, context) {
         result = false
       }
     }
@@ -146,7 +157,7 @@ extension DestroyValueInst : DevirtualizableDestroy {
     }
   }
 
-  fileprivate func devirtualizeStructFields(_ context: some MutatingContext) -> Bool {
+  fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     guard let fields = type.getNominalFields(in: parentFunction) else {
       return false
     }
@@ -165,7 +176,7 @@ extension DestroyValueInst : DevirtualizableDestroy {
 
     for fieldValue in destructure.results where !fieldValue.type.isTrivial(in: parentFunction) {
       let destroyField = builder.createDestroyValue(operand: fieldValue)
-      if !devirtualizeDeinits(of: destroyField, context) {
+      if !devirtualizeDeinits(of: destroyField, isMandatory: isMandatory, context) {
         result = false
       }
     }
@@ -175,6 +186,7 @@ extension DestroyValueInst : DevirtualizableDestroy {
   fileprivate func devirtualizeEnumPayload(
     enumCase: EnumCase,
     in block: BasicBlock,
+    isMandatory: Bool,
     _ context: some MutatingContext
   ) -> Bool {
     let builder = Builder(atBeginOf: block, location: location, context)
@@ -182,7 +194,7 @@ extension DestroyValueInst : DevirtualizableDestroy {
       let payload = block.addArgument(type: payloadTy, ownership: .owned, context)
       if !payloadTy.isTrivial(in: parentFunction) {
         let destroyPayload = builder.createDestroyValue(operand: payload)
-        return devirtualizeDeinits(of: destroyPayload, context)
+        return devirtualizeDeinits(of: destroyPayload, isMandatory: isMandatory, context)
       }
     }
     return true
@@ -216,7 +228,7 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     }
   }
 
-  fileprivate func devirtualizeStructFields(_ context: some MutatingContext) -> Bool {
+  fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let builder = Builder(before: self, context)
 
     guard let fields = type.getNominalFields(in: parentFunction) else {
@@ -235,7 +247,7 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     {
       let fieldAddr = builder.createStructElementAddr(structAddress: destroyedAddress, fieldIndex: fieldIdx)
       let destroyField = builder.createDestroyAddr(address: fieldAddr)
-      if !devirtualizeDeinits(of: destroyField, context) {
+      if !devirtualizeDeinits(of: destroyField, isMandatory: isMandatory, context) {
         result = false
       }
     }
@@ -245,6 +257,7 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   fileprivate func devirtualizeEnumPayload(
     enumCase: EnumCase,
     in block: BasicBlock,
+    isMandatory: Bool,
     _ context: some MutatingContext
   ) -> Bool {
     let builder = Builder(atBeginOf: block, location: location, context)
@@ -253,7 +266,7 @@ extension DestroyAddrInst : DevirtualizableDestroy {
     {
       let caseAddr = builder.createUncheckedTakeEnumDataAddr(enumAddress: destroyedAddress, caseIndex: enumCase.index)
       let destroyPayload = builder.createDestroyAddr(address: caseAddr)
-      return devirtualizeDeinits(of: destroyPayload, context)
+      return devirtualizeDeinits(of: destroyPayload, isMandatory: isMandatory, context)
     }
     return true
   }
@@ -268,7 +281,10 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   }
 }
 
-private func devirtualize(builtinDestroyArray: BuiltinInst, _ context: some MutatingContext) -> Bool {
+private func devirtualize(builtinDestroyArray: BuiltinInst,
+                          isMandatory: Bool,
+                          _ context: some MutatingContext
+) -> Bool {
   let function = builtinDestroyArray.parentFunction
   let elementType = builtinDestroyArray.substitutionMap.replacementType.loweredType(in: function)
   guard elementType.isMoveOnly,
@@ -318,7 +334,7 @@ private func devirtualize(builtinDestroyArray: BuiltinInst, _ context: some Muta
 
   context.erase(instruction: builtinDestroyArray)
 
-  return devirtualize(destroy: destroy, context)
+  return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
 }
 
 private extension EnumCases {
