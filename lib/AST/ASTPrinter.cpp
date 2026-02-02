@@ -4518,7 +4518,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
-  auto *raw = elt->getStructuralRawValueExpr();
+  auto *raw = elt->getRawValueExpr();
   if (!raw || raw->isImplicit())
     return;
 

@@ -99,7 +99,7 @@ SWIFT_REQUEST(TypeChecker, SpecializeAttrTargetDeclRequest,
               ValueDecl *(const ValueDecl *, AbstractSpecializeAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
-              evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
+              evaluator::SideEffect (EnumDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *), Cached, NoLocationInfo)
