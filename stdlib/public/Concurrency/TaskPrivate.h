@@ -853,20 +853,29 @@ struct AsyncTask::PrivateStorage {
     // here, before the task-local storage elements are destroyed; in order to
     // respect stack-discipline of the task-local allocator.
     {
-      if (task->hasInitialTaskNameRecord()) {
-        task->dropInitialTaskNameRecord();
-      }
       if (task->hasInitialTaskExecutorPreferenceRecord()) {
         task->dropInitialTaskExecutorPreferenceRecord();
       }
+      // We specifically DO NOT drop the task name record here, even if present,
+      // as it is possible to read it off a task handle (`task.name`).
     }
 
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      assert(oldStatus.getInnermostRecord() == NULL &&
+      #ifndef NDEBUG
+      if (task->hasInitialTaskNameRecord()) {
+        // While we generally drop all task records during complete, the task name record is allowed to
+        // stay until destruction, because we allow reading the name from a task handle: `task.name`.
+        assert((oldStatus.getInnermostRecord() &&
+               (oldStatus.getInnermostRecord()->getKind() == TaskStatusRecordKind::TaskName)) &&
+          "The only remaining task record allowed after complete() is a task name, but was differe!");
+      } else {
+        assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
+      }
+      #endif
       assert(oldStatus.isRunning());
 
       // Remove drainer, enqueued and override bit if any
