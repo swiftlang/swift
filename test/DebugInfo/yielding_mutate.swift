@@ -26,4 +26,18 @@ var state = S()
 USE(&state.computed_property)
 FINISH()
 // CHECK: call swiftcc void @"{{.*}}FINISH
-// CHECK: ![[DBG]] = !DILocation(line: [[@LINE-3]],
+
+
+// CHECK-LABEL: define {{.*}} @{{.*}}computed_property
+// CHECK-SAME:  ptr swiftself {{.*}} %[[self:.*]])
+// CHECK: %[[self_alloca:.*]] = alloca ptr
+// CHECK: #dbg_declare(ptr %[[self_alloca]], ![[SELF_DBG:.*]], !DIExpression(DW_OP_deref)
+// CHECK: call {{.*}} @llvm.coro.begin
+// CHECK: store ptr %[[self]], ptr %[[self_alloca]]
+// CHECK: call void asm sideeffect "", "r"(ptr %[[self_alloca]])
+// CHECK: call {{.*}} @llvm.coro.suspend.retcon
+// CHECK: call void asm sideeffect "", "r"(ptr %[[self_alloca]])
+// CHECK: call {{.*}} @llvm.coro.end
+
+
+// CHECK: ![[DBG]] = !DILocation(line: [[@LINE-17]],
