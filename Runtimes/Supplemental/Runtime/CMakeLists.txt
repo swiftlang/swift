@@ -44,7 +44,10 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
 find_package(SwiftCore REQUIRED)
 find_package(SwiftOverlay REQUIRED)
 find_package(SwiftCxxOverlay REQUIRED)
+
+if(APPLE)
 find_package(SwiftDarwin)
+endif()
 
 include(GNUInstallDirs)
 
@@ -197,11 +200,12 @@ target_compile_options(swiftRuntime PRIVATE
 # pulling in headers from the compiler.
 target_include_directories(swiftRuntime PRIVATE
   "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include")
-target_link_libraries(swiftRuntime PRIVATE
+target_link_libraries(swiftRuntime PUBLIC
   swiftShims
   swiftCore
   swift_Concurrency
   swiftCxxStdlib
+  swiftCxx
   $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Linux>:swiftGlibc>

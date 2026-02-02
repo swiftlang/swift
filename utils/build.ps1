@@ -917,6 +917,7 @@ enum Project {
   SwiftInspect
   ExperimentalDynamicRuntime
   ExperimentalDynamicOverlay
+  ExperimentalDynamicRuntimeModule
   ExperimentalDynamicStringProcessing
   ExperimentalDynamicSynchronization
   ExperimentalDynamicDistributed
@@ -927,6 +928,7 @@ enum Project {
   ExperimentalDynamicFoundation
   ExperimentalStaticRuntime
   ExperimentalStaticOverlay
+  ExperimentalStaticRuntimeModule
   ExperimentalStaticStringProcessing
   ExperimentalStaticSynchronization
   ExperimentalStaticDistributed
@@ -2808,39 +2810,45 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     }
 
     $StringProcessingBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticStringProcessing
+      Get-ProjectBinaryCache $Platform ExperimentalStaticStringProcessing
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicStringProcessing
     }
 
     $SynchronizationBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticSynchronization
+      Get-ProjectBinaryCache $Platform ExperimentalStaticSynchronization
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicSynchronization
     }
 
     $DistributedBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticDistributed
+      Get-ProjectBinaryCache $Platform ExperimentalStaticDistributed
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicDistributed
     }
 
     $ObservationBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticObservation
+      Get-ProjectBinaryCache $Platform ExperimentalStaticObservation
     } else {
-      Get-ProjectBinaryCache $Platform ExperimentalDynamicObservation
+      Get-ProjectBinarycache $Platform ExperimentalDynamicObservation
     }
 
     $DifferentiationBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticDifferentiation
+      Get-ProjectBinaryCache $Platform ExperimentalStaticDifferentiation
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicDifferentiation
     }
 
     $VolatileBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticVolatile
+      Get-ProjectBinaryCache $Platform ExperimentalStaticVolatile
     } else {
-      Get-ProjectBinaryCache $Platform ExperimentalDynamicVolatile
+      Get-ProjectBinarycache $Platform ExperimentalDynamicVolatile
+    }
+
+    $RuntimeModuleBinaryCache = if ($Static) {
+      Get-ProjectBinaryCache $Platform ExperimentalStaticRuntimeModule
+    } else {
+      Get-ProjectBinarycache $Platform ExperimentalDynamicRuntimeModule
     }
 
     Build-CMakeProject `
@@ -2899,6 +2907,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftStringProcessing_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2918,6 +2927,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2939,6 +2949,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftDistributed_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2960,6 +2971,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftObservation_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2979,6 +2991,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2999,9 +3012,32 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Runtime `
+      -Bin $RuntimeModuleBinaryCache `
+      -InstallTo "${SDKROOT}\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+        SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+        SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+        SwiftCxxOverlay_DIR = "${OverlayBinaryCache}\Cxx\cmake\SwiftCxxOverlay";
+
+        # FIXME(compnerd) this currently causes a build failure on Windows, but
+        # this should be enabled when building the dynamic runtime.
+        SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
       }
   }
 }
