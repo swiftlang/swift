@@ -43,7 +43,9 @@ private extension AllocStackInst {
   ///   %4 = load %0
   /// ```
   func optimizeEnum(_ context: SimplifyContext) -> Bool {
-    guard let (payloadType, isSingleInitTakePair) = getEnumInfo() else {
+    guard let payloadType = getUniqueEnumPayloadType(),
+          let nonPayloadDestroys = getNonPayloadDestroys(context)
+    else {
       return false
     }
 
@@ -59,30 +61,23 @@ private extension AllocStackInst {
     }
     self.replace(with: newAlloc, context)
 
+    context.erase(instructions: nonPayloadDestroys)
+
+    newAlloc.rewriteStore(context)
+
     for use in newAlloc.uses {
       switch use.instruction {
       case let iea as InjectEnumAddrInst:
         context.erase(instruction: iea)
-      case let da as DestroyAddrInst:
-        if isSingleInitTakePair {
-          // It's not possible that the enum has a payload at the destroy_addr, because it must have already
-          // been taken by the take of the single init-take pair.
-          // We _have_ to remove the destroy_addr, because we also remove all inject_enum_addrs which might
-          // inject a payload-less case before the destroy_addr.
-          // Otherwise the enum payload can still be valid at the destroy_addr, so we have to keep the destroy_addr.
-          // Just replace the enum with the payload (and because it's not a singleInitTakePair, we can be sure
-          // that the enum cannot have any other case than the payload case).
-          context.erase(instruction: da)
-        }
       case let ieda as InitEnumDataAddrInst:
         ieda.replace(with: newAlloc, context)
       case let uteda as UncheckedTakeEnumDataAddrInst:
         uteda.replace(with: newAlloc, context)
-      case is DeallocStackInst:
-        break
       case let dv as DebugValueInst:
         // TODO: Add support for op_enum_fragment
         dv.operand.set(to: Undef.get(type: oldAllocType, context), context)
+      case is DestroyAddrInst, is DeallocStackInst, is StoreInst:
+        break
       default:
         fatalError("unexpected alloc_stack user");
       }
@@ -90,62 +85,233 @@ private extension AllocStackInst {
     return true
   }
 
-  func getEnumInfo() -> (payloadType: Type, isSingleInitTakePair: Bool)? {
+  /// Replace
+  /// ```
+  ///   store %enum to %allocstack
+  /// ```
+  /// ->
+  /// ```
+  ///   %p = unchecked_enum_data %enum, #E.a
+  ///   store %p to %newAlloc
+  /// ```
+  private func rewriteStore(_ context: SimplifyContext) {
+    // Handle a `store` before replacing all other uses because we need the `unchecked_take_enum_data_addr`
+    // not to be replaced, yet.
+    guard let store = uses.users(ofType: StoreInst.self).singleElement else {
+      return
+    }
+    guard let take = uses.users(ofType: UncheckedTakeEnumDataAddrInst.self).singleElement else {
+      fatalError("a store requires a single unchecked_take_enum_data_addr")
+    }
+
+    // The new store is placed immediately before the `unchecked_take_enum_data_addr` because the original
+    // store might still store a different enum case, e.g.
+    // ```
+    //   store %enum to %allocstack                              // might store Optional.none!
+    //   switch_enum %e, case #Optional.some: bb1
+    // bb1:
+    //   %a = unchecked_take_enum_data_addr %enum, #Optional.some
+    // ```
+    let builder = Builder(before: take, context)
+    let type = take.type.objectType
+    let ued = builder.createUncheckedEnumData(enum: store.source, caseIndex: take.caseIndex, resultType: type)
+
+    assert(store.storeOwnership != .assign, "single store can only initialize")
+
+    if store.parentBlock != take.parentBlock && store.storeOwnership == .initialize {
+      assert(store.parentBlock == ued.parentBlock.singlePredecessor)
+      // Insert compensating destroys for all branches where the enum is not used
+      for succ in store.parentBlock.successors {
+        if succ != ued.parentBlock {
+          Builder(atBeginOf: succ, context).createDestroyValue(operand: store.source)
+        }
+      }
+    }
+
+    // Even if the enum itself is not trivial, the specific case value can be trivial.
+    let ownership = store.storeOwnership == .initialize && type.isTrivial(in: parentFunction)
+                      ? .trivial
+                      : store.storeOwnership
+    builder.createStore(source: ued, destination: self, ownership: ownership)
+    context.erase(instruction: store)
+  }
+
+  private func getUniqueEnumPayloadType() -> Type? {
     if !type.isEnum {
       return nil
     }
-    var numInits = 0
-    var numTakes = 0
-    var initBlock: BasicBlock? = nil
-    var takeBlock: BasicBlock? = nil
-    var caseIndex: Int? = nil
     var payloadType: Type? = nil
+    let store = uses.users(ofType: StoreInst.self).first
+
     for use in uses {
       switch use.instruction {
-      case is DestroyAddrInst,
-           is DeallocStackInst,
-           is DebugValueInst,
-           // We'll check init_enum_addr below.
+      case is DestroyAddrInst, is DeallocStackInst, is DebugValueInst,
+           // We accept `inject_enum_addr` with different cases. Such can only be non-payload cases because
+           // otherwise there would be a corresponding `init_enum_data_addr` or `unchecked_take_enum_data_addr`.
            is InjectEnumAddrInst:
         break
       case let ieda as InitEnumDataAddrInst:
-        if let previouslyFoundCase = caseIndex, previouslyFoundCase != ieda.caseIndex {
+        if let previouslyFoundPayloadType = payloadType, previouslyFoundPayloadType != ieda.type {
           return nil
         }
-        caseIndex = ieda.caseIndex
-        assert(payloadType == nil || payloadType! == ieda.type)
+        if store != nil {
+          // For simplicity, if there is a store we don't handle any other initializations of the enum.
+          return nil
+        }
         payloadType = ieda.type
-        numInits += 1
-        initBlock = ieda.parentBlock
       case let uted as UncheckedTakeEnumDataAddrInst:
-        if let previouslyFoundCase = caseIndex, previouslyFoundCase != uted.caseIndex {
+        if let previouslyFoundPayloadType = payloadType, previouslyFoundPayloadType != uted.type {
           return nil
         }
-        caseIndex = uted.caseIndex
-        numTakes += 1
-        takeBlock = uted.parentBlock
+        if let store {
+          if payloadType != nil {
+            // For simplicity, we don't support multiple `unchecked_take_enum_data_addr` in case of a `store`.
+            return nil
+          }
+          let storeBlock = store.parentBlock
+          let takeBlock = uted.parentBlock
+          // If the store is in the take-block then we know that the store is already storing the right enum case.
+          // Or it is in a predecessor. Then we check later in `getNonPayloadDestroys` that in adjacent successors
+          // the (potentially) other enum cases are not used.
+          guard takeBlock == storeBlock || takeBlock.singlePredecessor == storeBlock else {
+            return nil
+          }
+        }
+        payloadType = uted.type
+      case let s as StoreInst:
+        if s != store {
+          // For simplicity we only handle a single store to the enum.
+          return nil
+        }
       default:
         return nil
       }
     }
+    return payloadType
+  }
 
-    guard let caseIndex, let payloadType else {
+  /// Returns the list of `destroy_addr`s which destroy payload-free injected enum cases.
+  /// Such destroys must be removed once the `alloc_stack` is replaced with the "regular" payload case.
+  /// ```
+  ///   %1 = alloc_stack $Optional<T>
+  ///   cond_br %c, bb1, bb2
+  /// bb1:
+  ///   %3 = init_enum_data_addr %1, #Optional.some   // our "regular" payload case
+  ///   ...
+  ///   inject_enum_addr %1, #Optional.some
+  ///   ...
+  ///   destroy_addr %1                               // not a non-payload destroy
+  /// bb2:
+  ///   inject_enum_addr %1, #Optional.none
+  ///   destroy_addr %1                               // a non-payload destroy
+  /// ```
+  /// Returns nil if such destroys cannot be uniquely identified.
+  ///
+  private func getNonPayloadDestroys(_ context: SimplifyContext) -> [DestroyAddrInst]? {
+
+    var payloadLiverange = InstructionWorklist(context)
+    defer { payloadLiverange.deinitialize() }
+    var noPayloadLiverange = InstructionWorklist(context)
+    defer { noPayloadLiverange.deinitialize() }
+
+    initialize(payloadLiverange: &payloadLiverange, noPayloadLiverange: &noPayloadLiverange)
+
+    var useBlocks = EnumCaseUseBlocks(forUsesOf: self, context)
+    defer { useBlocks.deinitialize() }
+
+    guard hasValidUsesForStore(useBlocks) else {
       return nil
     }
 
-    // If the enum has a single init-take pair in a single block, we know that the enum cannot contain any
-    // valid payload outside that init-take pair.
-    //
-    // This also means that we can ignore any inject_enum_addr of another enum case, because this can only
-    // inject a case without a payload.
-    if numInits == 1 && numTakes == 1 && initBlock == takeBlock {
-      return (payloadType, isSingleInitTakePair: true)
+    if noPayloadLiverange.isEmpty {
+      return []
     }
-    // No single init-take pair: We cannot ignore inject_enum_addrs with a mismatching case.
-    if uses.users(ofType: InjectEnumAddrInst.self).contains(where: { $0.caseIndex != caseIndex}) {
-      return nil
+
+    var interstingBlocks = BasicBlockSet(context)
+    defer { interstingBlocks.deinitialize() }
+    interstingBlocks.insert(contentsOf: users.filter(isInteresting).map { $0.parentBlock })
+
+    while let inst = payloadLiverange.pop() {
+      switch inst {
+      case let destroy as DestroyAddrInst where destroy.destroyedAddress == self:
+        break
+      case let dealloc as DeallocStackInst where dealloc.allocatedValue == self:
+        break
+      default:
+        payloadLiverange.pushSuccessors(of: inst, isTransparent: { !interstingBlocks.contains($0) })
+      }
     }
-    return (payloadType, isSingleInitTakePair: false)
+
+    var nonPayloadDestroys = [DestroyAddrInst]()
+
+    // Check if the payload and non-payload liveranges are strictly not overlapping.
+    while let inst = noPayloadLiverange.pop() {
+      if useBlocks.blocks.contains(inst.parentBlock) {
+        return nil
+      }
+      switch inst {
+      case let destroy as DestroyAddrInst where destroy.destroyedAddress == self:
+        if payloadLiverange.hasBeenPushed(destroy) {
+          // Both liferanges overlap at this `destroy_addr`.
+          return nil
+        }
+        nonPayloadDestroys.append(destroy)
+      case let dealloc as DeallocStackInst where dealloc.allocatedValue == self:
+        break
+      default:
+        noPayloadLiverange.pushSuccessors(of: inst, isTransparent: { !interstingBlocks.contains($0) })
+      }
+    }
+    return nonPayloadDestroys
+  }
+
+  private func initialize(payloadLiverange: inout InstructionWorklist, noPayloadLiverange: inout InstructionWorklist) {
+    for use in uses {
+      switch use.instruction {
+      case let inject as InjectEnumAddrInst:
+        if inject.element.hasAssociatedValues {
+          payloadLiverange.pushIfNotVisited(inject)
+        } else {
+          noPayloadLiverange.pushIfNotVisited(inject)
+        }
+      case let store as StoreInst:
+        let take = uses.users(ofType: UncheckedTakeEnumDataAddrInst.self).singleElement!
+        if store.parentBlock == take.parentBlock {
+          payloadLiverange.pushIfNotVisited(store)
+        } else {
+          assert(take.parentBlock.singlePredecessor == store.parentBlock)
+          for succ in store.parentBlock.successors {
+            if succ == take.parentBlock {
+              payloadLiverange.pushIfNotVisited(succ.instructions.first!)
+            } else {
+              noPayloadLiverange.pushIfNotVisited(succ.instructions.first!)
+            }
+          }
+        }
+      default:
+        break
+      }
+    }
+  }
+
+  /// In case of a `store` to the enum we require that at an `unchecked_take_enum_data_addr` we can assume
+  /// the enum has that specific case. This is not true in general because `unchecked_take_enum_data_addr`
+  /// is a side-effect free address projection (for some enums). E.g
+  /// ```
+  ///   store %1 to %allocstack
+  ///   %2 = unchecked_take_enum_data_addr %allocstack, #Optional.some // Here we don't know the case, yet
+  ///   cond_br %c, bb1, bb2
+  /// bb1:
+  ///   %3 = load %2   // Only here we know that %allocstack is an Optional.some
+  /// ```
+  private func hasValidUsesForStore(_ useBlocks: EnumCaseUseBlocks) -> Bool {
+    if uses.users(ofType: StoreInst.self).isEmpty {
+      return true
+    }
+    // Only if there is an actual use of the enum in the same block as the `unchecked_take_enum_data_addr`,
+    // we know that the enum has the `unchecked_take_enum_data_addr`'s case.
+    let take = uses.users(ofType: UncheckedTakeEnumDataAddrInst.self).singleElement!
+    return useBlocks.blocks.contains(take.parentBlock)
   }
 
   /// Replaces an alloc_stack of an existential by an alloc_stack of the concrete type.
@@ -312,5 +478,44 @@ private extension AllocStackInst {
       return nil
     }
     return concreteType
+  }
+}
+
+/// Returns true if an enum user `inst` is relevant for enum case liverange computation
+private func isInteresting(_ inst: Instruction) -> Bool {
+  switch inst {
+  case is DestroyAddrInst, is DeallocStackInst, is InjectEnumAddrInst, is StoreInst:
+    return true
+  default:
+    return false
+  }
+}
+
+/// Collects all blocks where a memory-located enum case is used.
+private struct EnumCaseUseBlocks : AddressDefUseWalker {
+  private(set) var blocks: BasicBlockSet
+
+  init(forUsesOf allocStack: AllocStackInst, _ context: SimplifyContext) {
+    self.blocks = BasicBlockSet(context)
+
+    for use in allocStack.uses {
+      switch use.instruction {
+      case let uted as UncheckedTakeEnumDataAddrInst:
+        _  = walkDownUses(ofAddress: uted, path: UnusedWalkingPath())
+      case let ieda as InitEnumDataAddrInst:
+        _  = walkDownUses(ofAddress: ieda, path: UnusedWalkingPath())
+      default:
+        break
+      }
+    }
+  }
+
+  mutating func deinitialize() {
+    blocks.deinitialize()
+  }
+
+  mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    blocks.insert(address.instruction.parentBlock)
+    return .continueWalk
   }
 }
