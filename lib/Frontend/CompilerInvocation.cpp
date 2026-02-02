@@ -2127,6 +2127,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_solver_disable_prune_disjunctions))
     Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
 
+  if (Args.hasArg(OPT_solver_enable_optimize_operator_defaults) ||
+      Args.hasArg(OPT_solver_disable_optimize_operator_defaults))
+    Opts.SolverOptimizeOperatorDefaults = Args.hasArg(OPT_solver_enable_optimize_operator_defaults);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
