@@ -1,6 +1,7 @@
 // This test ensures a certain set of arguments allows both compiler and sourcekitd invocations to share the same module cache.
 // NOTE: Do not change this test without a review from @akyrtzi
 
+// https://github.com/swiftlang/swift/issues/86930
 // UNSUPPORTED: OS=windows-msvc
 
 // RUN: %empty-directory(%t)
