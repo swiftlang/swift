@@ -4435,24 +4435,18 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 }
 
 void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
-  // LLVM's retcon lowering is a bit imcompatible with Swift
-  // model. Essentially it assumes that unwind destination is kind of terminal -
-  // it cannot return back to caller and must somehow terminate the process /
-  // thread. Therefore we are always use normal LLVM coroutine termination.
-  // However, for yield_once coroutines we need also specify undef results on
-  // unwind path. Eventually, we'd get rid of these crazy phis...
+  // LLVM's retcon lowering assumes the unwind destination cannot return back to
+  // caller and must terminate the process, which is incompatible with the Swift
+  // model. To avoid this, use the normal LLVM coroutine termination.
 
-  // If the coroutine exit block already exists, just branch to it.
-  auto *coroEndBB = getCoroutineExitBlock();
-  auto *unwindBB = Builder.GetInsertBlock();
-
-  // If the coroutine exit block already exists, just branch to it.
-  if (coroEndBB) {
+  // If the coroutine exit block already exists, branch to it.
+  if (auto *coroEndBB = getCoroutineExitBlock()) {
+    auto *unwindBB = Builder.GetInsertBlock();
     Builder.CreateBr(coroEndBB);
 
     if (!isAsync()) {
-      // If there are any result values we need to add undefs for all values
-      // coming from unwind block
+      // For yield_once coroutines, it's also necessary to specify undef results
+      // on the unwind path. TODO: get rid of these phis.
       for (auto &phi : coroutineResults)
         cast<llvm::PHINode>(phi)->addIncoming(llvm::UndefValue::get(phi->getType()),
                                               unwindBB);
@@ -4462,7 +4456,7 @@ void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
   }
 
   // Otherwise, create it and branch to it.
-  coroEndBB = createBasicBlock("coro.end");
+  llvm::BasicBlock *coroEndBB = createBasicBlock("coro.end");
   setCoroutineExitBlock(coroEndBB);
   Builder.CreateBr(coroEndBB);
   Builder.emitBlock(coroEndBB);
