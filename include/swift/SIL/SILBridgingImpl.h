@@ -1411,6 +1411,10 @@ SwiftInt BridgedInstruction::UncheckedTakeEnumDataAddrInst_caseIndex() const {
   return getAs<swift::UncheckedTakeEnumDataAddrInst>()->getCaseIndex();
 }
 
+bool BridgedInstruction::UncheckedTakeEnumDataAddrInst_isDestructive() const {
+  return getAs<swift::UncheckedTakeEnumDataAddrInst>()->isDestructive();
+}
+
 SwiftInt BridgedInstruction::InjectEnumAddrInst_caseIndex() const {
   return getAs<swift::InjectEnumAddrInst>()->getCaseIndex();
 }
