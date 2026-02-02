@@ -7,7 +7,7 @@ func foo() {
   /*HERE*/
 }
 
-// REQUIRES: shell
+// UNSUPPORTED: OS=windows-msvc
 
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)
