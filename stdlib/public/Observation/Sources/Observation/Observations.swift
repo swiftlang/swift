@@ -89,7 +89,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     // install a willChange continuation into the set of continuations
     // this must take a locally unique id (to the active calls of next)
     static func willChange(isolation iterationIsolation: isolated (any Actor)? = #isolation, state: _ManagedCriticalState<State>, id: Int) async {
-      return await withUnsafeContinuation(isolation: iterationIsolation) { continuation in
+      return await withUnsafeContinuation { continuation in
         state.withCriticalRegion { state in
           defer { state.dirty = false }
           switch state.continuations[id] {
@@ -236,7 +236,7 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
           // back to the trailing edges of the mutations. In short, this enables the transactionality bounded by the
           // isolation of the mutation.
           await withTaskCancellationHandler(operation: {
-            await State.willChange(isolation: iterationIsolation, state: state, id: id)
+            await State.willChange(state: state, id: id)
           }, onCancel: {
             // ensure to clean out our continuation uon cancellation
             State.cancel(state, id: id)

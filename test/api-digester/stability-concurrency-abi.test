@@ -79,22 +79,9 @@ Protocol Actor has added inherited protocol SendableMetatype
 Protocol Executor has added inherited protocol SendableMetatype
 Protocol SerialExecutor has added inherited protocol SendableMetatype
 
-// #isolated adoption in with...Continuation
-// api-digester is not aware of silgen_name trickery we do to keep this ABI compatible
-Func withCheckedContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
-Func withCheckedContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, Swift.Never>) -> () to Swift.String
-Func withCheckedThrowingContinuation(function:_:) has been renamed to Func withCheckedThrowingContinuation(isolation:function:_:)
-Func withCheckedThrowingContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedThrowingContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A' to '_Concurrency.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A'
-Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
-Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> () to Swift.String
-
 // #isolation adoption for cancellation handlers; old APIs are kept ABI compatible
 Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func withTaskCancellationHandler(operation:onCancel:isolation:)
 Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
-
-// #isolated was adopted and the old methods kept: $ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF
-Func withCheckedContinuation(function:_:) has been renamed to Func withCheckedContinuation(isolation:function:_:)
-Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency.withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
 
 // AsyncStream.init(unfolding:onCancel:) uses @_silgen_name to preserve mangling after adding @preconcurrency.
 Constructor AsyncStream.init(unfolding:onCancel:) has mangled name changing from 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<@Sendable () -> ()>) -> Swift.AsyncStream<A>' to 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<() -> ()>) -> Swift.AsyncStream<A>'
@@ -114,21 +101,55 @@ Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 Func Executor.enqueue(_:) is a new API without '@available'
 
 // Adopt #isolation in TaskLocal.withValue APIs
-Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)
+// Update: Moved back to public API being nonisolated(nonsending) based, so no explicit 'isolated:' parameter anymore
+// Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)
 Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, file: Swift.String, line: Swift.UInt) async throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1'
-Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
+// Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () async throws -> τ_1_0 to () throws -> τ_1_0
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () throws -> τ_1_0 to () async throws -> τ_1_0
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 2 type change from Swift.String to (any _Concurrency.Actor)?
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change from Swift.UInt to Swift.String
-Func withTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.TaskGroup<τ_0_0>) async -> τ_0_1 to (any _Concurrency.Actor)?
-Func withThrowingTaskGroup(of:returning:body:) has been renamed to Func withThrowingTaskGroup(of:returning:isolation:body:)
-Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
-Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
-Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
-Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
+// Update, moved to nonisolated(nonsending)
+Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValueImpl(_:operation:isolation:file:line:)
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValueImpl<A>(_: __owned A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 0 changing from Default to Owned
+Func TaskLocal.withValue(_:operation:file:line:) has removed default argument from parameter 2
 
 Func pthread_main_np() is a new API without '@available'
+
+// TaskGroups adopting nonisolated(nonsending), ABI checker doesn't fully understand ABI compat pattern we're doing to keep old ABI
+
+// API digester is not able to track ABI compat trickery we do when adopting nonisolated(nonsending),
+// on occasion we do break source compatibility by removing the `isolation:` parameter as well:
+
+Func TaskGroup.Iterator.next() has been renamed to Func next(isolation:)
+Func TaskGroup.Iterator.next() has mangled name changing from 'Swift.TaskGroup.Iterator.next() async -> Swift.Optional<A>' to 'Swift.TaskGroup.Iterator.next(isolation: isolated Swift.Optional<Swift.Actor>) async -> Swift.Optional<A>'
+
+Func TaskGroup.next() has been renamed to Func _noParam_next()
+Func TaskGroup.next() has mangled name changing from 'Swift.TaskGroup.next() async -> Swift.Optional<A>' to 'Swift.TaskGroup._noParam_next() async -> Swift.Optional<A>'
+
+Func ThrowingTaskGroup.Iterator.next() has been renamed to Func next(isolation:)
+Func ThrowingTaskGroup.Iterator.next() has mangled name changing from 'Swift.ThrowingTaskGroup.Iterator.next() async throws -> Swift.Optional<A>' to 'Swift.ThrowingTaskGroup.Iterator.next(isolation: isolated Swift.Optional<Swift.Actor>) async throws(B) -> Swift.Optional<A>'
+Func ThrowingTaskGroup.next() has been renamed to Func next(isolation:)
+Func ThrowingTaskGroup.next() has mangled name changing from 'Swift.ThrowingTaskGroup.next() async throws -> Swift.Optional<A>' to 'Swift.ThrowingTaskGroup.next(isolation: isolated Swift.Optional<Swift.Actor>) async throws -> Swift.Optional<A>'
+
+Func withCheckedContinuation(function:_:) has been renamed to Func _isolatedParam_withCheckedContinuation(isolation:function:_:)
+Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency._isolatedParam_withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
+Func withCheckedContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
+Func withCheckedContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, Swift.Never>) -> () to Swift.String
+
+Func withCheckedThrowingContinuation(function:_:) has been renamed to Func _isolatedParam_withCheckedThrowingContinuation(isolation:function:_:)
+Func withCheckedThrowingContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedThrowingContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A' to '_Concurrency._isolatedParam_withCheckedThrowingContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A'
+Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
+Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, any Swift.Error>) -> () to Swift.String
+
+Func withTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.TaskGroup<τ_0_0>) async -> τ_0_1 to (any _Concurrency.Actor)?
+Func withTaskGroup(of:returning:body:) has been renamed to Func _isolatedParameter_withTaskGroup(of:returning:isolation:body:)
+Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency._isolatedParameter_withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
+
+Func withThrowingTaskGroup(of:returning:body:) has been renamed to Func _isolatedParameter_withThrowingTaskGroup(of:returning:isolation:body:)
+Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency._isolatedParameter_withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
+Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
