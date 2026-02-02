@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer -inline  | %FileCheck %s --check-prefix=CHECK-DEVIRT
-// RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt  | %FileCheck %s --check-prefix=CHECK-SPECDEVIRT
 // RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining  | %FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
 
 sil_stage canonical
@@ -444,11 +443,6 @@ bb0(%0 : $@thick CP2.Type):
 }
 
 
-// Check that -specdevirt can devirtualize it
-// CHECK-SPECDEVIRT-LABEL: sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt1FCS_4BaseGSqVs5Int32_
-// CHECK-SPECDEVIRT: checked_cast_br [exact]
-// CHECK-SPECDEVIRT: }
-
 sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt1FCS_4BaseGSqVs5Int32_ : $@convention(thin) (@owned Base) -> Optional<Int32> {
 bb0(%0 : $Base):
   %1 = alloc_stack $Optional<Int32>
@@ -483,11 +477,6 @@ bb4(%20 : $Error):
 
 sil [transparent] [serialized] @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <T> (@thin Optional<T>.Type) -> @out Optional<T>
 
-
-// Check that -specdevirt can devirtualize it
-// CHECK-SPECDEVIRT-LABEL: sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt2FCS_4BaseGSqS0__
-// CHECK-SPECDEVIRT: checked_cast_br [exact]
-// CHECK-SPECDEVIRT: }
 
 sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt2FCS_4BaseGSqS0__ : $@convention(thin) (@owned Base) -> @owned Optional<Base> {
 bb0(%0 : $Base):
@@ -524,11 +513,6 @@ bb4(%24 : $Error):
   br bb3
 }
 
-
-// Check that -specdevirt can devirtualize it
-// CHECK-SPECDEVIRT-LABEL: sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt3FCS_4BaseGSqS0__
-// CHECK-SPECDEVIRT: checked_cast_br [exact]
-// CHECK-SPECDEVIRT: }
 
 sil [noinline] @_TF16devirt_try_apply19testTryApplyDevirt3FCS_4BaseGSqS0__ : $@convention(thin) (@owned Base) -> @owned Optional<Base> {
 bb0(%0 : $Base):
@@ -608,11 +592,6 @@ bb0:
   return %6 : $()
 }
 
-
-// Check that -specdevirt can devirtualize it
-// CHECK-SPECDEVIRT-LABEL: sil @_TF16devirt_try_apply5test4FT_Vs5Int32
-// CHECK-SPECDEVIRT: checked_cast_br [exact]
-// CHECK-SPECDEVIRT: }
 
 // CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test4FT_Vs5Int32
 // CHECK-DEVIRT-NOT: checked_cast_br [exact]
@@ -695,10 +674,6 @@ bb4(%23 : $Error):
 
 // Check that devirtualization happens even at -inline, without an explicit invocation of the -devirtualize.
 
-// CHECK-SPECDEVIRT-LABEL: sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_
-// CHECK-SPECDEVIRT: checked_cast_br [exact]
-// CHECK-SPECDEVIRT: }
-
 // CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test6FT_GSqVs5Int32_
 // CHECK-DEVIRT-NOT: class_method
 // CHECK-DEVIRT: }
@@ -735,11 +710,6 @@ bb3:
 bb4(%20 : $Error):
   br bb3
 }
-
-// Check that -specdevirt can devirtualize it
-// CHECK-SPECDEVIRT-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
-// CHECK-SPECDEVIRT: checked_cast_br [exact]
-// CHECK-SPECDEVIRT: }
 
 // CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test7FT_Vs5Int32
 // CHECK-DEVIRT-NOT: checked_cast_br [exact]

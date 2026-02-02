@@ -639,7 +639,7 @@ class subject_subscriptInvalid4 {
 class subject_subscriptInvalid5 {
   @objc // bad-access-note-move{{subject_subscriptInvalid5.subscript(_:)}}
   subscript(a: PlainEnum) -> Int { // access-note-adjust{{@objc}} expected-error {{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}}
-    // expected-note@-1{{enums cannot be represented in Objective-C}}
+    // expected-note@-1{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
@@ -765,7 +765,7 @@ class infer_instanceFunc1 {
   @objc // bad-access-note-move{{infer_instanceFunc1.func11_(a:)}}
   func func11_(a: PlainEnum) {}
   // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
+  // expected-note@-2{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 
   func func12(a: PlainProtocol) {}
 // CHECK-LABEL: {{^}} func func12(a: any PlainProtocol) {
@@ -881,7 +881,7 @@ class infer_instanceFunc1 {
   // access-note-adjust{{@objc}} expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter 1 cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // access-note-adjust{{@objc}} expected-error@-3 {{instance method cannot be marked '@objc' because the type of the parameter 2 cannot be represented in Objective-C}}
-  // expected-note@-4 {{non-'@objc' enums cannot be represented in Objective-C}}
+  // expected-note@-4{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
   // Produces an extra: expected-note@-5 * {{attribute 'objc' was added by access note for fancy tests}}
 
   @objc // access-note-move{{infer_instanceFunc1.func_UnnamedParam1(_:)}}
@@ -1101,7 +1101,7 @@ class infer_instanceVar1 {
   @objc // bad-access-note-move{{infer_instanceVar1.var_PlainEnum_}}
   var var_PlainEnum_: PlainEnum
   // access-note-adjust{{@objc}} expected-error@-1 {{property cannot be marked '@objc' because its type cannot be represented in Objective-C}}
-  // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
+  // expected-note@-2{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 
   var var_PlainProtocol: PlainProtocol
 // CHECK-LABEL: {{^}}  var var_PlainProtocol: any PlainProtocol
@@ -2268,6 +2268,11 @@ extension Protocol_ObjC1 {
 //===---
 //===--- Error handling
 //===---
+enum ObjCError: Int, Error {
+  case Others
+}
+protocol MyError: Error { }
+
 // CHECK-LABEL: class ClassThrows1
 class ClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
@@ -2317,7 +2322,7 @@ class ClassThrows1 {
   @objc // bad-access-note-move{{ClassThrows1.fooWithErrorEnum1(x:)}}
   func fooWithErrorEnum1(x: ErrorEnum) {}
   // access-note-adjust{{@objc}} expected-error@-1{{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2{{non-'@objc' enums cannot be represented in Objective-C}}
+  // expected-note@-2{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 
   // CHECK: {{^}} func fooWithErrorEnum2(x: ErrorEnum)
   func fooWithErrorEnum2(x: ErrorEnum) {}
@@ -2329,6 +2334,15 @@ class ClassThrows1 {
 
   // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: any Error & Protocol_ObjC1)
   func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1) { }
+
+  @objc func throwsError() throws(Error) {}
+  @objc func throwsMyError() throws(MyError) {}
+  // expected-error@-1{{typed 'throws' instance method cannot be represented in Objective-C}}
+  // expected-error@-2{{thrown type 'any MyError' does not conform to the 'Error' protocol}}
+  @objc func throwsObjCError() throws(ObjCError) {}
+  // expected-error@-1{{typed 'throws' instance method cannot be represented in Objective-C}}
+  @objc static func throwsObjCErrorClass() throws(ObjCError) {}
+  // expected-error@-1{{typed 'throws' static method cannot be represented in Objective-C}}
 }
 
 

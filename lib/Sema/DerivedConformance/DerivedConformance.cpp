@@ -72,9 +72,10 @@ Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredInterfaceType();
 }
 
-bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
-                                                    NominalTypeDecl *Nominal,
-                                                    ProtocolDecl *Protocol) {
+bool DerivedConformance::derivesProtocolConformance(
+      NormalProtocolConformance *Conformance) {
+  auto *Protocol = Conformance->getProtocol();
+
   const auto derivableKind = Protocol->getKnownDerivableProtocolKind();
   if (!derivableKind)
     return false;
@@ -84,6 +85,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::OptionSet) {
     return false;
   }
+
+  auto *DC = Conformance->getDeclContext();
+  auto *Nominal = DC->getSelfNominalTypeDecl();
 
   if (*derivableKind == KnownDerivableProtocolKind::Hashable) {
     // We can always complete a partial Hashable implementation, and we can
@@ -95,8 +99,6 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
 
-  if (*derivableKind == KnownDerivableProtocolKind::Identifiable)
-    return canDeriveIdentifiable(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
@@ -189,7 +191,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!checkConformance(DC->mapTypeIntoContext(type), protocol)) {
+    if (!checkConformance(DC->mapTypeIntoEnvironment(type), protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -272,6 +274,9 @@ void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
     shouldDiagnose = !isa<EnumDecl>(nominal);
   }
 
+  if (isa<BuiltinTupleDecl>(nominal))
+    shouldDiagnose = false;
+
   if (shouldDiagnose) {
     auto &ctx = nominal->getASTContext();
     ctx.Diags.diagnose(nominal->getLoc(),
@@ -296,10 +301,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     auto conformance = lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
-    if (conformance) {
-      auto DC = conformance.getConcrete()->getDeclContext();
+    if (conformance.isConcrete()) {
       // Check whether this nominal type derives conformances to the protocol.
-      if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
+      if (!DerivedConformance::derivesProtocolConformance(
+            conformance.getConcrete()->getRootNormalConformance()))
         return nullptr;
     }
 
@@ -345,14 +350,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::Actor);
       }
     }
-
-    // DistributedActor.id
-    if (name.isSimpleName(ctx.Id_id))
-      return getRequirement(KnownProtocolKind::DistributedActor);
-
-    // DistributedActor.actorSystem
-    if (name.isSimpleName(ctx.Id_actorSystem))
-      return getRequirement(KnownProtocolKind::DistributedActor);
 
     return nullptr;
   }
@@ -566,7 +563,7 @@ DerivedConformance::declareDerivedProperty(SynthesizedIntroducer intro,
   propDecl->setInterfaceType(propertyInterfaceType);
 
   auto propertyContextType =
-      getConformanceContext()->mapTypeIntoContext(propertyInterfaceType);
+      getConformanceContext()->mapTypeIntoEnvironment(propertyInterfaceType);
 
   Pattern *propPat =
       NamedPattern::createImplicit(Context, propDecl, propertyContextType);
@@ -798,9 +795,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
     assignExpr->setType(TupleType::getEmpty(C));
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body vardecls*/ std::nullopt));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   // generate: switch enumVar { }
@@ -834,7 +830,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (checkConformance(DC->mapTypeIntoContext(type), protocol).isInvalid()) {
+      if (checkConformance(DC->mapTypeIntoEnvironment(type), protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -960,9 +956,7 @@ CaseStmt *DerivedConformance::unavailableEnumElementCaseStmt(
   auto *callExpr =
       DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(C);
   auto body = BraceStmt::create(C, SourceLoc(), {callExpr}, SourceLoc());
-  return CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem,
-                          SourceLoc(), SourceLoc(), body, {},
-                          /*implicit*/ true);
+  return CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body);
 }
 
 /// Creates a named variable based on a prefix character and a numeric index.

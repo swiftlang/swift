@@ -38,6 +38,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OperatorKinds.h"
@@ -58,10 +59,6 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 
 using namespace swift;
 using namespace importer;
-
-// Commonly-used Clang classes.
-using clang::CompilerInstance;
-using clang::CompilerInvocation;
 
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
@@ -646,9 +643,12 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   if (version > ImportNameVersion::swift2()) {
     // FIXME: Until Apple gets a chance to update UIKit's API notes, always use
     // the new name for certain properties.
-    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl))
+    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl)) {
       if (importer::isSpecialUIKitStructZeroProperty(namedDecl))
         version = ImportNameVersion::swift4_2();
+      if (importer::isSpecialAppKitFunctionKeyProperty(namedDecl))
+        return std::nullopt;
+    }
 
     // Dig out the attribute that specifies the Swift name.
     std::optional<AnySwiftNameAttr> activeAttr;
@@ -1502,7 +1502,7 @@ static StringRef renameUnsafeMethod(ASTContext &ctx,
                                     const clang::NamedDecl *decl,
                                     StringRef name) {
   if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl}), {})) {
+      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
     return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
   }
 
@@ -1530,6 +1530,15 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   // being "named" declarations.
   if (isa<clang::ObjCCategoryDecl>(D))
     return ImportedName();
+
+  // C++ interop was not available in Swift 2
+  if (!swift3OrLaterName && isa<clang::CXXMethodDecl>(D)) {
+    return ImportedName();
+  }
+  // If this function uses C++23 deducing this, bail.
+  if (auto functionDecl = dyn_cast<clang::FunctionDecl>(D))
+    if (functionDecl->hasCXXExplicitFunctionObjectParameter())
+      return {};
 
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
@@ -1699,6 +1708,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         skipCustomName = true;
         result.info.hasInvalidCustomName = true;
       }
+    }
+
+    // `swift_name` attribute is not supported in virtual methods overrides
+    if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+      if (method->isVirtual() && method->size_overridden_methods() > 0)
+        skipCustomName = true;
     }
 
     if (!skipCustomName) {
@@ -1937,6 +1952,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!functionDecl)
       return ImportedName();
 
+    // We do not import && qualified operators yet.
+    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
+      if (method->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+        return ImportedName();
+    }
+
     switch (op) {
     case clang::OverloadedOperatorKind::OO_Plus:
     case clang::OverloadedOperatorKind::OO_Minus:
@@ -1950,6 +1971,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Caret:
     case clang::OverloadedOperatorKind::OO_Amp:
     case clang::OverloadedOperatorKind::OO_Pipe:
+    case clang::OverloadedOperatorKind::OO_Tilde:
     case clang::OverloadedOperatorKind::OO_Exclaim:
     case clang::OverloadedOperatorKind::OO_Less:
     case clang::OverloadedOperatorKind::OO_Greater:
@@ -2279,28 +2301,48 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> newName;
   // Check if we need to rename the C++ method to disambiguate it.
   if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    bool shouldAddMutable = false;
+    bool shouldAddConsuming = false;
     if (!method->isConst() && !method->isOverloadedOperator() && !method->isStatic()) {
       // See if any other methods within the same struct have the same name, but
       // differ in constness.
       auto otherDecls = dc->lookup(method->getDeclName());
-      bool shouldRename = false;
       for (auto otherDecl : otherDecls) {
         if (otherDecl == D)
           continue;
         if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
           // TODO: what if the other method is also non-const?
           if (otherMethod->isConst()) {
-            shouldRename = true;
+            shouldAddMutable = true;
             break;
           }
         }
       }
-
-      if (shouldRename) {
-        newName = baseName;
-        newName += "Mutating";
-        baseName = newName;
+    }
+    if (method->getRefQualifier() == clang::RefQualifierKind::RQ_RValue &&
+        !method->isOverloadedOperator()) {
+      // See if any other methods within the same struct have the same name, but
+      // differ in ref qualifier.
+      auto otherDecls = dc->lookup(method->getDeclName());
+      for (auto otherDecl : otherDecls) {
+        if (otherDecl == D)
+          continue;
+        if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
+          if (otherMethod->getRefQualifier() ==
+              clang::RefQualifierKind::RQ_LValue) {
+            shouldAddConsuming = true;
+            break;
+          }
+        }
       }
+    }
+    if (shouldAddMutable || shouldAddConsuming) {
+      newName = baseName;
+      if (shouldAddMutable)
+        newName += "Mutating";
+      if (shouldAddConsuming)
+        newName += "Consuming";
+      baseName = newName;
     }
     if (method->isImplicit() &&
         baseName.starts_with("__synthesizedVirtualCall_")) {
@@ -2309,6 +2351,42 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       // callable from Swift.
       newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
       baseName = newName;
+    }
+    if (method->isVirtual()) {
+      // The name should be imported from the base method
+      if (method->size_overridden_methods() > 0) {
+        DeclName overriddenName;
+        bool foundDivergentMethod = false;
+        for (auto overriddenMethod : method->overridden_methods()) {
+          ImportedName importedName =
+              importName(overriddenMethod, version, givenName);
+          if (!overriddenName) {
+            overriddenName = importedName.getDeclName();
+          } else if (overriddenName.compare(importedName.getDeclName())) {
+            importerImpl->insertUnavailableMethod(method->getParent(),
+                                                  importedName.getDeclName());
+            foundDivergentMethod = true;
+          }
+        }
+
+        if (foundDivergentMethod) {
+          // The method we want to mark as unavailable will be generated
+          // lazily, when we clone the methods from base classes to the derived
+          // class method->getParent().
+          // Since we don't have the actual method here, we store this
+          // information to be accessed when we generate the actual method.
+          importerImpl->insertUnavailableMethod(method->getParent(),
+                                                overriddenName);
+          return ImportedName();
+        }
+
+        baseName = overriddenName.getBaseIdentifier().str();
+        // Also inherit argument names from base method
+        argumentNames.clear();
+        llvm::for_each(overriddenName.getArgumentNames(), [&](Identifier arg) {
+          argumentNames.push_back(arg.str());
+        });
+      }
     }
   }
 

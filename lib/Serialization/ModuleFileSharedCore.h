@@ -114,9 +114,6 @@ class ModuleFileSharedCore {
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
 
-  /// \c true if this module was compiled with -enable-ossa-modules.
-  bool RequiresOSSAModules;
-
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
 
@@ -126,6 +123,7 @@ public:
   public:
     const StringRef RawPath;
     const StringRef RawSPIs;
+    const StringRef BinaryModulePath;
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
@@ -140,27 +138,26 @@ public:
       return static_cast<ImportFilterKind>(1 << RawImportControl);
     }
 
-    Dependency(StringRef path, StringRef spiGroups, bool isHeader,
-               ImportFilterKind importControl, bool isScoped)
-        : RawPath(path),
-          RawSPIs(spiGroups),
+    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
+               bool isHeader, ImportFilterKind importControl, bool isScoped)
+        : RawPath(path), RawSPIs(spiGroups), BinaryModulePath(binaryModulePath),
           RawImportControl(rawControlFromKind(importControl)),
-          IsHeader(isHeader),
-          IsScoped(isScoped) {
+          IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
 
   public:
-   Dependency(StringRef path, StringRef spiGroups,
-              ImportFilterKind importControl, bool isScoped)
-       : Dependency(path, spiGroups, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups, StringRef binaryModulePath,
+               ImportFilterKind importControl, bool isScoped)
+        : Dependency(path, spiGroups, binaryModulePath, false, importControl,
+                     isScoped) {}
 
-   static Dependency forHeader(StringRef headerPath, bool exported) {
-     auto importControl =
-         exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
-     return Dependency(headerPath, StringRef(), true, importControl, false);
+    static Dependency forHeader(StringRef headerPath, bool exported) {
+      auto importControl =
+          exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
+      return Dependency(headerPath, {}, {}, true, importControl, false);
     }
 
     bool isExported() const {
@@ -421,8 +418,11 @@ private:
     /// Whether this module enabled strict memory safety.
     unsigned StrictMemorySafety : 1;
 
+    /// Whether this module used deferred code generation.
+    unsigned DeferredCodeGen : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 2;
+    unsigned : 1;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -442,8 +442,8 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
       bool isFramework,
-      bool requiresOSSAModules,
       StringRef requiredSDK,
+      std::optional<llvm::Triple> target,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -569,8 +569,10 @@ public:
   /// of the buffer, even if there's an error in loading.
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
-  /// \param requiresOSSAModules If true, this requires dependent modules to be
-  /// compiled with -enable-ossa-modules.
+  /// \param requiredSDK A string denoting the name of the currently-used SDK,
+  /// to ensure that the loaded module was built with a compatible SDK.
+  /// \param target The target triple of the current compilation for
+  /// validating that the module we are attempting to load is compatible.
   /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
@@ -579,14 +581,15 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, bool requiresOSSAModules,
-       StringRef requiredSDK, PathObfuscator &pathRecoverer,
+       bool isFramework,
+       StringRef requiredSDK, std::optional<llvm::Triple> target,
+       PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, info,
+        requiredSDK, target, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -647,6 +650,11 @@ public:
     return Bits.IsStaticLibrary;
   }
 
+  /// Was this module built with C++ interop enabled.
+  bool isBuiltWithCxxInterop() const {
+    return Bits.HasCxxInteroperability;
+  }
+
   llvm::VersionTuple getUserModuleVersion() const {
     return UserModuleVersion;
   }
@@ -656,10 +664,14 @@ public:
     return MacroModuleNames;
   }
 
+  ArrayRef<serialization::SearchPath> getSearchPaths() const {
+    return SearchPaths;
+  }
+
   /// Get embedded bridging header.
-  std::string getEmbeddedHeader() const {
+  StringRef getEmbeddedHeader() const {
     // Don't include the '\0' in the end.
-    return importedHeaderInfo.contents.drop_back().str();
+    return importedHeaderInfo.contents.drop_back();
   }
 
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
@@ -680,6 +692,8 @@ public:
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
 
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
+
+  bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

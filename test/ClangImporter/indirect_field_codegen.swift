@@ -17,17 +17,17 @@ extension StructWithIndirectField2Copy {
 // The names look complex because we assign names to unnamed unions/structs
 // using a mangling scheme which the Swift demangler doesn't understand.
 
-// CHECK-DAG: sil shared @$So24StructWithIndirectField2V34__Unnamed_union___Anonymous_field0V02__e10_struct___G7_field1V$x$getter : $@convention(c) (StructWithIndirectField2.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
+// CHECK-DAG: sil shared {{.*}}@$sSo24StructWithIndirectField2V34__Unnamed_union___Anonymous_field0V02__e10_struct___G7_field1V1xs6UInt32VvgTo : $@convention(c) (StructWithIndirectField2.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
 
-// CHECK-DAG: sil shared @$So24StructWithIndirectField2V34__Unnamed_union___Anonymous_field0V02__e10_struct___G7_field1V$y$getter : $@convention(c) (StructWithIndirectField2.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
+// CHECK-DAG: sil shared {{.*}}@$sSo24StructWithIndirectField2V34__Unnamed_union___Anonymous_field0V02__e10_struct___G7_field1V1ys6UInt32VvgTo : $@convention(c) (StructWithIndirectField2.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
 
-// CHECK-DAG: sil shared @$So28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V$x$getter : $@convention(c) (StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
+// CHECK-DAG: sil shared {{.*}}@$sSo28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V1xs6UInt32VvgTo : $@convention(c) (StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
 
-// CHECK-DAG: sil shared @$So28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V$x$setter : $@convention(c) (UInt32, @inout StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> ()
+// CHECK-DAG: sil shared {{.*}}@$sSo28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V1xs6UInt32VvsTo : $@convention(c) (UInt32, @inout StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> ()
 
-// CHECK-DAG: sil shared @$So28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V$y$getter : $@convention(c) (StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
+// CHECK-DAG: sil shared {{.*}}@$sSo28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V1ys6UInt32VvgTo : $@convention(c) (StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> UInt32
 
-// CHECK-DAG: sil shared @$So28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V$y$setter : $@convention(c) (UInt32, @inout StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> ()
+// CHECK-DAG: sil shared {{.*}}@$sSo28StructWithIndirectField2CopyV34__Unnamed_union___Anonymous_field0V02__f10_struct___H7_field1V1ys6UInt32VvsTo : $@convention(c) (UInt32, @inout StructWithIndirectField2Copy.__Unnamed_union___Anonymous_field0.__Unnamed_struct___Anonymous_field1) -> ()
 
 func test() -> UInt32 {
   var s = StructWithIndirectField2Copy(x: 1, y: 2)

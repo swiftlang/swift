@@ -10,11 +10,10 @@ let dict2: [Character: _] = ["h": 0]
 
 let arr = [_](repeating: "hi", count: 3)
 
-func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder may not appear in top-level parameter}}
-// expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
+func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder not allowed here}}
 
 let foo = _.foo // expected-error {{type placeholder not allowed here}}
-let zero: _ = .zero // expected-error {{cannot infer contextual base in reference to member 'zero'}}
+let zero: _ = .zero // expected-error {{reference to member 'zero' cannot be resolved without a contextual type}}
 
 struct S<T> {
     var x: T
@@ -78,33 +77,25 @@ where T: ExpressibleByIntegerLiteral, U: ExpressibleByIntegerLiteral {
 }
 
 extension Bar {
-  func frobnicate2() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the inferred type 'T'}}
-    // expected-note@-2 {{replace the placeholder with the inferred type 'U'}}
+  func frobnicate2() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
     return Bar(t: 42, u: 42)
   }
   func frobnicate3() -> Bar {
     return Bar<_, _>(t: 42, u: 42)
   }
-  func frobnicate4() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
-    // expected-note@-2 {{replace the placeholder with the inferred type 'Int'}}
+  func frobnicate4() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
     return Bar<_, _>(t: 42, u: 42)
   }
-  func frobnicate5() -> Bar<_, U> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the inferred type 'T'}}
+  func frobnicate5() -> Bar<_, U> { // expected-error {{type placeholder not allowed here}}
     return Bar(t: 42, u: 42)
   }
   func frobnicate6() -> Bar {
     return Bar<_, U>(t: 42, u: 42)
   }
-  func frobnicate7() -> Bar<_, _> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
-    // expected-note@-2 {{replace the placeholder with the inferred type 'U'}}
+  func frobnicate7() -> Bar<_, _> { // expected-error {{type placeholder not allowed here}}
     return Bar<_, U>(t: 42, u: 42)
   }
-  func frobnicate8() -> Bar<_, U> { // expected-error {{type placeholder may not appear in function return type}}
-    // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
+  func frobnicate8() -> Bar<_, U> { // expected-error {{type placeholder not allowed here}}
     return Bar<_, _>(t: 42, u: 42)
   }
 }
@@ -244,11 +235,11 @@ let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setF
 // diagnostic.
 func mismatchedDefault<T>(_ x: [_] = [String: T]()) {} // expected-error {{type placeholder not allowed here}}
 
-func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder may not appear in function return type}}
+func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder not allowed here}}
   if true {
-    return "" // expected-note@-2 {{replace the placeholder with the inferred type 'String'}}
+    return ""
   } else {
-    return 0.5 // expected-note@-4 {{replace the placeholder with the inferred type 'Double'}}
+    return 0.5
   }
 }
 
@@ -257,12 +248,12 @@ func mismatchedReturnTypes() -> _ { // expected-error {{type placeholder may not
 @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
 func opaque() -> some _ { // expected-error {{type placeholder not allowed here}}
   return Just<Int>().setFailureType(to: _.self)
+  // expected-error@-1 {{type placeholder not allowed here}}
 }
 
 enum EnumWithPlaceholders {
-  case topLevelPlaceholder(x: _) // expected-error {{type placeholder may not appear in top-level parameter}}
-  case placeholderWithDefault(x: _ = 5) // expected-error {{type placeholder may not appear in top-level parameter}}
-  // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
+  case topLevelPlaceholder(x: _) // expected-error {{type placeholder not allowed here}}
+  case placeholderWithDefault(x: _ = 5) // expected-error {{type placeholder not allowed here}}
 }
 
 func deferredInit(_ c: Bool) {
@@ -289,4 +280,71 @@ do {
   test {
     _ = X(content: <#T##() -> _#>) // expected-error {{editor placeholder in source file}}
   }
+}
+
+// Make sure we reject placeholders here.
+protocol TestPlaceholderRequirement {
+  func foo(_:_) // expected-error {{type placeholder not allowed here}}
+  func bar() -> _ // expected-error {{type placeholder not allowed here}}
+  func baz() -> [_] // expected-error {{type placeholder not allowed here}}
+  func qux(_: [_]) // expected-error {{type placeholder not allowed here}}
+
+  subscript(_: _) -> Void { get } // expected-error {{type placeholder not allowed here}}
+  subscript() -> _ { get } // expected-error {{type placeholder not allowed here}}
+}
+
+func testPlaceholderFn1(_:_) {} // expected-error {{type placeholder not allowed here}}
+func testPlaceholderFn2() -> _ {} // expected-error {{type placeholder not allowed here}}
+
+var testPlaceholderComputed1: _ { 0 } // expected-error {{type placeholder not allowed here}}
+var testPlaceholderComputed2: [_] { [0] } // expected-error {{type placeholder not allowed here}}
+
+struct TestPlaceholderSubscript {
+  subscript(_: _) -> Void { () } // expected-error {{type placeholder not allowed here}}
+  subscript(_: [_]) -> Void { () } // expected-error {{type placeholder not allowed here}}
+  subscript() -> _ { () } // expected-error {{type placeholder not allowed here}}
+  subscript() -> [_] { [0] } // expected-error {{type placeholder not allowed here}}
+}
+
+enum TestPlaceholderInEnumElement {
+  case a(_) // expected-error {{type placeholder not allowed here}}
+  case b([_]) // expected-error {{type placeholder not allowed here}}
+}
+
+@freestanding(expression) macro testPlaceholderMacro(_ x: _) -> String = #file
+// expected-error@-1 {{type placeholder not allowed here}}
+
+@freestanding(expression) macro testPlaceholderMacro(_ x: [_]) -> String = #file
+// expected-error@-1 {{type placeholder not allowed here}}
+
+@freestanding(expression) macro testPlaceholderMacro() -> _ = #file
+// expected-error@-1 {{type placeholder not allowed here}}
+
+// Make sure we can use decls with placeholders in their interface type.
+func usePlaceholderDecls(
+  _ fromProto: some TestPlaceholderRequirement, _ hasSubscript: TestPlaceholderSubscript
+) {
+  _ = optInt
+
+  _ = testPlaceholderComputed1
+  _ = testPlaceholderComputed2
+
+  fromProto.foo(0)
+  _ = fromProto.bar()
+  _ = fromProto.baz()
+  fromProto.qux([])
+  fromProto[0]
+
+  _ = hasSubscript[0]
+
+  _ = TestPlaceholderInEnumElement.a(0)
+  _ = TestPlaceholderInEnumElement.b([])
+
+  // There are marked invalid so get removed from the overload set.
+  // FIXME: We ought to turn them into holes instead
+  _ = #testPlaceholderMacro(0) // expected-error {{no macro named 'testPlaceholderMacro'}}
+  _ = #testPlaceholderMacro([]) // expected-error {{no macro named 'testPlaceholderMacro'}}
+
+  _ = testPlaceholderFn1(0)
+  _ = testPlaceholderFn2()
 }

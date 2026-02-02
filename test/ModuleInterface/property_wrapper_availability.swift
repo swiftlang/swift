@@ -29,7 +29,7 @@ public struct UnavailableWrapper<T> {
 // CHECK: public struct HasWrappers {
 public struct HasWrappers {
   // CHECK: @available(macOS 10.15.4, iOS 13.4, watchOS 6.2, tvOS 13.4, *)
-  // CHECK-NEXT: @Library.ConditionallyAvailableWrapper public var x: Swift.Int {
+  // CHECK-NEXT: @Library.ConditionallyAvailableWrapper<Swift.Int> public var x: Swift.Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT:   @available(iOS 13.4, tvOS 13.4, watchOS 6.2, macOS 10.15.4, *)
   // CHECK-NEXT:   set
@@ -50,7 +50,7 @@ public struct HasWrappers {
 @available(watchOS, unavailable)
 @available(tvOS, unavailable)
 public struct UnavailableHasWrappers {
-  // CHECK-LABEL:   @Library.UnavailableWrapper public var x: Swift.Int {
+  // CHECK-LABEL:   @Library.UnavailableWrapper<Swift.Int> public var x: Swift.Int {
   // CHECK-NEXT:      get
   // CHECK-NEXT:      @available(iOS, unavailable)
   // CHECK-NEXT:      @available(tvOS, unavailable)

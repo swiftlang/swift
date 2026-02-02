@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -update-borrowed-from -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 //
 // These tests case are converted to OSSA form, but aren't yet
 // optimized in OSSA mode. Move them to one of these files when
@@ -126,6 +126,7 @@ bb5(%0cC : @owned $C):
 
 bb6:
   %34 = builtin "int_trap"() : $()
+  destroy_value [dead_end] %0
   unreachable
 
 bb7:
@@ -248,20 +249,21 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = enum $Optional<Klass>, #Optional.some!enumelt, %0 : $Klass
-  %2a = begin_borrow %2 : $Optional<Klass>
-  br bb3(%2a : $Optional<Klass>)
+  %3 = enum $Optional<Klass>, #Optional.some!enumelt, %0
+  %4 = begin_borrow %3
+  br bb3(%4)
 
 bb2:
-  %3 = enum $Optional<Klass>, #Optional.some!enumelt, %1 : $Klass
-  %3a = begin_borrow %3 : $Optional<Klass>
-  br bb3(%3a : $Optional<Klass>)
+  %6 = enum $Optional<Klass>, #Optional.some!enumelt, %1
+  %7 = begin_borrow %6
+  br bb3(%7)
 
-bb3(%4 : @guaranteed $Optional<Klass>):
-  %5 = unchecked_enum_data %4 : $Optional<Klass>, #Optional.some!enumelt
-  %5a = copy_value %5 : $Klass
-  end_borrow %4 : $Optional<Klass>
-  return %5a : $Klass
+bb3(%9 : @reborrow $Optional<Klass>):
+  %10 = borrowed %9 from (%1, %0)
+  %11 = unchecked_enum_data %10, #Optional.some!enumelt
+  %12 = copy_value %11
+  end_borrow %10
+  return %12
 }
 
 // CHECK-LABEL: sil [ossa] @unpack_enum_arg_non_trivial_guaranteed_load_borrow :
@@ -275,28 +277,29 @@ bb3(%4 : @guaranteed $Optional<Klass>):
 // CHECK: bb2:
 // CHECK:   [[E2:%.*]] = enum $Optional<Klass>, #Optional.some!enumelt, [[LD2]] : $Klass
 // CHECK:   [[B2:%.*]] = begin_borrow [[E2]] : $Optional<Klass>
-// CHECK:   br bb3([[B2]] : $Optional<Klass>)
 sil [ossa] @unpack_enum_arg_non_trivial_guaranteed_load_borrow : $@convention(thin) (@in_guaranteed Klass, @in_guaranteed Klass) -> @owned Klass {
 bb0(%0 : $*Klass, %1 : $*Klass):
-  %0a = load_borrow %0 : $*Klass
-  %1a = load_borrow %1 : $*Klass
+  %2 = load_borrow %0
+  %3 = load_borrow %1
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = enum $Optional<Klass>, #Optional.some!enumelt, %0a : $Klass
-  %2a = begin_borrow %2 : $Optional<Klass>
-  br bb3(%2a : $Optional<Klass>)
+  %5 = enum $Optional<Klass>, #Optional.some!enumelt, %2
+  %6 = begin_borrow %5
+  br bb3(%6)
 
 bb2:
-  %3 = enum $Optional<Klass>, #Optional.some!enumelt, %1a : $Klass
-  %3a = begin_borrow %3 : $Optional<Klass>
-  br bb3(%3a : $Optional<Klass>)
+  %8 = enum $Optional<Klass>, #Optional.some!enumelt, %3
+  %9 = begin_borrow %8
+  br bb3(%9)
 
-bb3(%4 : @guaranteed $Optional<Klass>):
-  %5 = unchecked_enum_data %4 : $Optional<Klass>, #Optional.some!enumelt
-  %5a = copy_value %5 : $Klass
-  end_borrow %4 : $Optional<Klass>
-  end_borrow %1a : $Klass
-  end_borrow %0a : $Klass
-  return %5a : $Klass
+bb3(%11 : @reborrow $Optional<Klass>):
+  %12 = borrowed %11 from (%3, %2)
+  %13 = unchecked_enum_data %12, #Optional.some!enumelt
+  %14 = copy_value %13
+  end_borrow %12
+  end_borrow %3
+  end_borrow %2
+  return %14
 }
+// CHECK:   br bb3([[B2]] : $Optional<Klass>)

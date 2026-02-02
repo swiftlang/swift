@@ -21,7 +21,6 @@ set(sources
   System.h
   Target.h
   ThreadLocalStorage.h
-  UnicodeData.h
   Visibility.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
@@ -155,6 +154,10 @@ add_custom_command_target(unused_var
 
 add_dependencies(copy_shim_headers symlink_clang_headers_static)
 
+# Add dependency to ensure that the static headers are installed. This is needed because no target
+# depends on the static headers, so they would not be installed otherwise.
+add_dependencies(symlink_clang_headers symlink_clang_headers_static)
+
 if(NOT SWIFT_BUILT_STANDALONE)
   if(TARGET clang-resource-headers) # LLVM > 8
     set(clang_resource_headers clang-resource-headers)
@@ -236,15 +239,27 @@ endif()
 
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.
-swift_install_in_component(DIRECTORY "${clang_headers_location}/"
-                           DESTINATION "lib/swift/clang"
-                           COMPONENT clang-builtin-headers
-                           REGEX "\.(h|modulemap)$")
+if(SWIFT_STDLIB_INSTALL_ONLY_CLANG_RESOURCE_HEADERS)
+  set(clang_headers_source "${clang_headers_location}/include/")
+  set(clang_headers_dest_suffix "/include")
+  set(clang_headers_filter
+      FILES_MATCHING
+      REGEX "\.(h|modulemap)$")
+else()
+  set(clang_headers_source "${clang_headers_location}/")
+  set(clang_headers_dest_suffix "")
+  set(clang_headers_filter)
+endif()
 
-swift_install_in_component(DIRECTORY "${clang_headers_location}/"
-  DESTINATION "lib/swift_static/clang"
+swift_install_in_component(DIRECTORY "${clang_headers_source}"
+                           DESTINATION "lib/swift/clang${clang_headers_dest_suffix}"
+                           COMPONENT clang-builtin-headers
+                           ${clang_headers_filter})
+
+swift_install_in_component(DIRECTORY "${clang_headers_source}"
+  DESTINATION "lib/swift_static/clang${clang_headers_dest_suffix}"
   COMPONENT clang-builtin-headers
-  REGEX "\.(h|modulemap)$")
+  ${clang_headers_filter})
 
 if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
   # This will still link against the Swift-forked clang headers if the Swift

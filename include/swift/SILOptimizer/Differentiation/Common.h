@@ -274,19 +274,27 @@ inline void createEntryArguments(SILFunction *f) {
   for (auto indResTy :
        conv.getIndirectSILResultTypes(f->getTypeExpansionContext())) {
     if (indResTy.hasArchetype())
-      indResTy = indResTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
+      indResTy = indResTy.mapTypeOutOfEnvironment();
+    createFunctionArgument(f->mapTypeIntoEnvironment(indResTy).getAddressType());
   }
+  if (auto indErrorResTy =
+          conv.getIndirectErrorResultType(f->getTypeExpansionContext())) {
+    if (indErrorResTy.hasArchetype())
+      indErrorResTy = indErrorResTy.mapTypeOutOfEnvironment();
+    createFunctionArgument(
+        f->mapTypeIntoEnvironment(indErrorResTy).getAddressType());
+  }
+
   for (auto paramTy : conv.getParameterSILTypes(f->getTypeExpansionContext())) {
     if (paramTy.hasArchetype())
-      paramTy = paramTy.mapTypeOutOfContext();
-    createFunctionArgument(f->mapTypeIntoContext(paramTy));
+      paramTy = paramTy.mapTypeOutOfEnvironment();
+    createFunctionArgument(f->mapTypeIntoEnvironment(paramTy));
   }
 }
 
 /// Cloner that remaps types using the target function's generic environment.
 class BasicTypeSubstCloner final
-    : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<BasicTypeSubstCloner> {
 
   static SubstitutionMap getSubstitutionMap(SILFunction *target) {
     if (auto *targetGenEnv = target->getGenericEnvironment())

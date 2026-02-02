@@ -8,7 +8,7 @@
 // RUN: %empty-directory(%t-scratch)
 
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.0-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -parse-as-library -I %t %S/../Inputs/FakeDistributedActorSystems.swift -dump-macro-expansions %s 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -parse-as-library -I %t %S/../Inputs/FakeDistributedActorSystems.swift -dump-macro-expansions %s 2>&1
 
 import Distributed
 
@@ -26,10 +26,19 @@ distributed actor Caplin {
   typealias ActorSystem = FakeActorSystem
 }
 
-@Resolvable // expected-note 4{{in expansion of macro 'Resolvable' on protocol 'Fail' here}}
+@Resolvable // expected-note 5{{in expansion of macro 'Resolvable' on protocol 'Fail' here}}
 protocol Fail: DistributedActor {
   distributed func method() -> String
 }
+/*
+expected-expansion@-2:2{{
+  expected-error@1:19{{distributed actor '$Fail' does not declare ActorSystem it can be used with}}
+  expected-note@1:13{{you can provide a module-wide default actor system by declaring:}}
+  expected-error@1:19{{type '$Fail' does not conform to protocol 'DistributedActor'}}
+  expected-note@1:19{{add stubs for conformance}}
+  expected-error@1:19{{type '$Fail' does not conform to protocol 'Identifiable'}}
+}}
+*/
 
 @Resolvable // expected-note2{{in expansion of macro 'Resolvable' on protocol 'SomeRoot' here}}
 public protocol SomeRoot: DistributedActor, Sendable
@@ -39,3 +48,9 @@ public protocol SomeRoot: DistributedActor, Sendable
   static var staticValue: String { get }
   var value: String { get }
 }
+/*
+expected-expansion@-2:2{{
+  expected-error@1:27{{type '$SomeRoot<ActorSystem>' does not conform to protocol 'SomeRoot'}}
+  expected-note@1:27{{add stubs for conformance}}
+}}
+*/

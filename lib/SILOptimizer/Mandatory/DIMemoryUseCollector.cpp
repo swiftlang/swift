@@ -39,17 +39,22 @@ static bool isVariableOrResult(MarkUninitializedInst *MUI) {
 static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
                                       DIElementUseInfo &useInfo) {
   auto *uninitMemory = memoryInfo.getUninitializedValue();
+  auto origUninitMemory = uninitMemory;
+
+  if (auto mui = dyn_cast<MarkUnresolvedNonCopyableValueInst>(uninitMemory)) {
+    origUninitMemory = cast<SingleValueInstruction>(mui->getOperand());
+  }
 
   // The uninitMemory must be used on an alloc_box, alloc_stack, or global_addr.
   // If we have an alloc_stack or a global_addr, there is nothing further to do.
-  if (isa<AllocStackInst>(uninitMemory->getOperand(0)) ||
-      isa<GlobalAddrInst>(uninitMemory->getOperand(0)) ||
-      isa<SILArgument>(uninitMemory->getOperand(0)) ||
+  if (isa<AllocStackInst>(origUninitMemory->getOperand(0)) ||
+      isa<GlobalAddrInst>(origUninitMemory->getOperand(0)) ||
+      isa<SILArgument>(origUninitMemory->getOperand(0)) ||
       // FIXME: We only support pointer to address here to not break LLDB. It is
       // important that long term we get rid of this since this is a situation
       // where LLDB is breaking SILGen/DI invariants by not creating a new
       // independent stack location for the pointer to address.
-      isa<PointerToAddressInst>(uninitMemory->getOperand(0))) {
+      isa<PointerToAddressInst>(origUninitMemory->getOperand(0))) {
     return;
   }
 
@@ -58,8 +63,8 @@ static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
   //
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
-  assert(isa<ProjectBoxInst>(uninitMemory));
-  auto value = uninitMemory->getOperand(0);
+  assert(isa<ProjectBoxInst>(origUninitMemory));
+  auto value = origUninitMemory->getOperand(0);
   if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
     value = bbi->getOperand();
   }
@@ -181,17 +186,23 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
 
 static SingleValueInstruction *
 getUninitializedValue(MarkUninitializedInst *MemoryInst) {
-  SILValue inst = MemoryInst;
-  if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
-    inst = bbi;
+  SingleValueInstruction *inst = MemoryInst;
+  SILValue projectBoxUser = inst;
+  
+  // Check for a project_box instruction (possibly via a borrow).
+  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
+    projectBoxUser = bbi;
+  }
+  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
+    inst = pbi;
   }
 
-  if (SingleValueInstruction *svi =
-          inst->getSingleUserOfType<ProjectBoxInst>()) {
-    return svi;
+  // Access move-only values through their marker.
+  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
+    inst = mui;
   }
 
-  return MemoryInst;
+  return inst;
 }
 
 SingleValueInstruction *DIMemoryObjectInfo::getUninitializedValue() const {
@@ -386,7 +397,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
 static void getPathStringToElementRec(TypeExpansionContext context,
-                                      SILModule &Module, SILType T,
+                                      const SILFunction &func, SILType T,
                                       unsigned EltNo, std::string &Result) {
   CanTupleType TT = T.getAs<TupleType>();
   if (!TT) {
@@ -395,11 +406,17 @@ static void getPathStringToElementRec(TypeExpansionContext context,
     return;
   }
 
+  if (T.isEmptyTuple(func)) {
+    // Tuple has no elements, return.
+    return;
+  }
+
   unsigned FieldNo = 0;
   for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
-    unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
+    unsigned NumFieldElements =
+        getElementCountRec(context, func.getModule(), FieldTy, false);
 
     if (EltNo < NumFieldElements) {
       Result += '.';
@@ -407,7 +424,7 @@ static void getPathStringToElementRec(TypeExpansionContext context,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToElementRec(context, Module, FieldTy, EltNo, Result);
+      return getPathStringToElementRec(context, func, FieldTy, EltNo, Result);
     }
 
     EltNo -= NumFieldElements;
@@ -450,7 +467,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
           } else {
             Result += VD->getName().str();
           }
-          getPathStringToElementRec(expansionContext, Module, FieldType,
+          getPathStringToElementRec(expansionContext,
+                                    *MemoryInst->getFunction(), FieldType,
                                     Element, Result);
           return VD;
         }
@@ -473,8 +491,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
   }
 
   // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(expansionContext, Module, MemorySILType, Element,
-                            Result);
+  getPathStringToElementRec(expansionContext, *MemoryInst->getFunction(),
+                            MemorySILType, Element, Result);
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
@@ -578,7 +596,7 @@ bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
   // assign_by_wrapper calls functions to assign a value. This is not
   // considered as trivial.
-  if (isa<AssignByWrapperInst>(Inst) || isa<AssignOrInitInst>(Inst))
+  if (isa<AssignOrInitInst>(Inst))
     return false;
 
   auto *F = Inst->getFunction();
@@ -851,15 +869,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 #include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
-         isa<AssignByWrapperInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
         Op->getOperandNumber() == 1) {
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User) || isa<AssignByWrapperInst>(User))
+      else if (isa<AssignInst>(User))
         Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
@@ -1141,8 +1158,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByWrapper(PAI))
-        continue;
 
       if (onlyUsedByAssignOrInit(PAI))
         continue;
@@ -1244,13 +1259,24 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
   /// that the flag is dropped before calling \c addElementUses.
   llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
 
-  auto *typeDC = Inst->getReferencedInitAccessor()
-                     ->getDeclContext()
-                     ->getSelfNominalTypeDecl();
+  NominalTypeDecl *typeDC = nullptr;
+  if (auto declContext = Inst->getDeclContextOrNull()->getSelfNominalTypeDecl())
+    typeDC = declContext;
 
   auto expansionContext = TypeExpansionContext(TheMemory.getFunction());
+  auto selfOrLocalTy = Inst->getSelfOrLocalOperand()->getType();
 
-  auto selfTy = Inst->getSelf()->getType();
+  if (!typeDC) {
+    // Local context: objTy holds the projection value for the backing storage
+    // local
+    auto objTy = selfOrLocalTy.getObjectType();
+    unsigned N =
+        getElementCountRec(expansionContext, Module, objTy, /*isSelf=*/false);
+    trackUse(DIMemoryUse(Inst, DIUseKind::InitOrAssign,
+                         /*firstEltRelToObj=*/BaseEltNo,
+                         /*NumElements=*/N));
+    return;
+  }
 
   auto addUse = [&](VarDecl *property, DIUseKind useKind) {
     unsigned fieldIdx = 0;
@@ -1260,15 +1286,14 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
 
       fieldIdx += getElementCountRec(
           expansionContext, Module,
-          selfTy.getFieldType(VD, Module, expansionContext), false);
+          selfOrLocalTy.getFieldType(VD, Module, expansionContext), false);
     }
 
-    auto type = selfTy.getFieldType(property, Module, expansionContext);
+    auto type = selfOrLocalTy.getFieldType(property, Module, expansionContext);
     addElementUses(fieldIdx, type, Inst, useKind, property);
   };
 
-  auto initializedElts = Inst->getInitializedProperties();
-  if (initializedElts.empty()) {
+  if (Inst->getNumInitializedProperties() == 0) {
     auto initAccessorProperties = typeDC->getInitAccessorProperties();
     auto initFieldAt = typeDC->getStoredProperties().size();
 
@@ -1286,8 +1311,8 @@ ElementUseCollector::collectAssignOrInitUses(AssignOrInitInst *Inst,
       ++initFieldAt;
     }
   } else {
-    for (auto *property : initializedElts)
-      addUse(property, DIUseKind::InitOrAssign);
+    Inst->forEachInitializedProperty(
+        [&](VarDecl *property) { addUse(property, DIUseKind::InitOrAssign); });
   }
 
   for (auto *property : Inst->getAccessedProperties())
@@ -1704,8 +1729,6 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is a partial application of self, then this is an escape point
     // for it.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByWrapper(PAI))
-        continue;
 
       if (onlyUsedByAssignOrInit(PAI))
         continue;

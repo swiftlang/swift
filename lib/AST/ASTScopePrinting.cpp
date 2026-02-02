@@ -53,8 +53,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
   llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
                << "***\n";
-  auto *parentModule = getSourceFile()->getParentModule();
-  auto *locScope = findInnermostEnclosingScope(parentModule, loc, &llvm::errs());
+  auto *locScope = findInnermostEnclosingScope(loc, &llvm::errs());
   locScope->print(llvm::errs(), 0, false, false);
 
   namelookup::ASTScopeDeclGatherer gatherer;

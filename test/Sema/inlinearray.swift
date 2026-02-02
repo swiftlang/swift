@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature InlineArrayTypeSugar
-
-// REQUIRES: swift_feature_InlineArrayTypeSugar
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 let a: InlineArray = [1, 2, 3] // Ok, InlineArray<3, Int>
 let b: InlineArray<_, Int> = [1, 2, 3] // Ok, InlineArray<3, Int>

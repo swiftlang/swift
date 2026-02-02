@@ -226,6 +226,15 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::UnsupportedPackSameType: {
+      if (error.getRequirement().hasError())
+        break;
+
+      ctx.Diags.diagnose(loc, diag::unsupported_pack_same_type);
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::InvalidValueGenericType: {
       auto req = error.getRequirement();
 
@@ -238,14 +247,14 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
-    case RequirementError::Kind::InvalidValueGenericConformance: {
+    case RequirementError::Kind::InvalidValueGenericConstraint: {
       auto req = error.getRequirement();
 
       if (req.hasError())
         break;
 
-      ctx.Diags.diagnose(loc, diag::invalid_value_generic_conformance,
-                         req.getFirstType(), req.getSecondType());
+      ctx.Diags.diagnose(loc, diag::invalid_value_generic_constraint,
+                         req.getFirstType());
       diagnosedError = true;
       break;
     }

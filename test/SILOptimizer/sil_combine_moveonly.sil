@@ -11,6 +11,11 @@ struct S : ~Copyable {
   deinit {}
 }
 
+struct S2 : ~Copyable {
+  @_hasStorage var a: Int { get set }
+  @_hasStorage var b: Int { get set }
+}
+
 struct FileDescriptor: ~Copyable {
   var fd: Builtin.Int64
 
@@ -29,6 +34,17 @@ enum MaybeFileDescriptor: ~Copyable {
 
 struct Wrapper<T>: ~Copyable {
   var t: T
+}
+
+struct NonCopyableForwardingStruct : ~Copyable {
+  var some: Int
+  deinit
+}
+
+enum NonCopyableForwardingEnum : ~Copyable {
+  case some(Int)
+  case nothing
+  deinit
 }
 
 sil @getWrappedValue : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> @out T
@@ -110,3 +126,88 @@ bb0(%0 : @owned $S):
   %64 = tuple ()
   return %64 : $()
 }
+
+// Test a "dead" non-Copyable struct-with-deinit that forwards a
+// single trivial value. The destroy_value cannot be eliminated
+// without first devirtualizing the deinit.
+//
+// CHECK-LABEL: sil [ossa] @testNonCopyableForwardingStructDeinit : $@convention(thin) (Int) -> () {
+// CHECK: [[STRUCT:%[0-9]+]] = struct $NonCopyableForwardingStruct (%0 : $Int)
+// CHECK: destroy_value [[STRUCT]]
+// CHECK-LABEL: } // end sil function 'testNonCopyableForwardingStructDeinit'
+sil [ossa] @testNonCopyableForwardingStructDeinit : $@convention(thin) (Int) -> () {
+bb0(%0: $Int):
+  %1 = struct $NonCopyableForwardingStruct(%0 : $Int)
+  destroy_value %1
+  %13 = tuple ()
+  return %13
+}
+
+// Test a "dead" non-Copyable enum-with-deinit that forwards a single
+// trivial value. The destroy_value cannot be eliminated without first
+// devirtualizing the deinit.
+//
+// CHECK-LABEL: sil [ossa] @testNonCopyableForwardingEnumDeinit : $@convention(thin) (Int) -> () {
+// CHECK:   [[ENUM:%[0-9]+]] = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.some!enumelt, %0
+// CHECK:   destroy_value [[ENUM]]
+// CHECK-LABEL: } // end sil function 'testNonCopyableForwardingEnumDeinit'
+sil [ossa] @testNonCopyableForwardingEnumDeinit : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.some!enumelt, %0
+  destroy_value %1
+  %13 = tuple ()
+  return %13
+}
+
+// Test a "dead" non-Copyable enum-with-deinit and an empty case. The
+// destroy_value cannot be eliminated without first devirtualizing the
+// deinit.
+//
+// CHECK-LABEL: sil [ossa] @testNonCopyableEmptyEnumDeinit : $@convention(thin) () -> () {
+// CHECK:   [[ENUM:%[0-9]+]] = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.nothing
+// CHECK:   destroy_value [[ENUM]]
+// CHECK-LABEL: } // end sil function 'testNonCopyableEmptyEnumDeinit'
+sil [ossa] @testNonCopyableEmptyEnumDeinit : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $NonCopyableForwardingEnum, #NonCopyableForwardingEnum.nothing
+  destroy_value %0
+  %13 = tuple ()
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_destructure_struct_of_non_copyable :
+// CHECK:         destructure_struct
+// CHECK-LABEL: } // end sil function 'dont_remove_destructure_struct_of_non_copyable'
+sil [ossa] @dont_remove_destructure_struct_of_non_copyable : $@convention(method) (@owned S2) -> () {
+bb0(%0 : @owned $S2):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_fold_destroy_of_take_enum_with_deinit_ossa :
+// CHECK:       bb0(%0 : $*MaybeFileDescriptor):
+// CHECK-NEXT:    %1 = unchecked_take_enum_data_addr %0
+// CHECK-NEXT:    destroy_addr %1
+// CHECK:       } // end sil function 'dont_fold_destroy_of_take_enum_with_deinit_ossa'
+sil [ossa] @dont_fold_destroy_of_take_enum_with_deinit_ossa : $@convention(thin) (@in MaybeFileDescriptor) -> () {
+bb0(%0 : $*MaybeFileDescriptor):
+  %1 = unchecked_take_enum_data_addr %0, #MaybeFileDescriptor.some!enumelt
+  destroy_addr %1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_fold_destroy_of_take_enum_with_deinit :
+// CHECK:       bb0(%0 : $*MaybeFileDescriptor):
+// CHECK-NEXT:    %1 = unchecked_take_enum_data_addr %0
+// CHECK-NEXT:    destroy_addr %1
+// CHECK:       } // end sil function 'dont_fold_destroy_of_take_enum_with_deinit'
+sil @dont_fold_destroy_of_take_enum_with_deinit : $@convention(thin) (@in MaybeFileDescriptor) -> () {
+bb0(%0 : $*MaybeFileDescriptor):
+  %1 = unchecked_take_enum_data_addr %0, #MaybeFileDescriptor.some!enumelt
+  destroy_addr %1
+  %r = tuple ()
+  return %r : $()
+}
+

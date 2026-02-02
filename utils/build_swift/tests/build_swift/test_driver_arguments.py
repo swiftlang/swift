@@ -605,6 +605,11 @@ class TestDriverArgumentParser(
             ['--test-optimize-none-with-implicit-dynamic'])
         self.assertTrue(namespace.test)
 
+    def test_implied_defaults_test_optimize_none_with_opaque_values(self):
+        namespace = self.parse_default_args(
+            ['--test-optimize-none-with-opaque-values'])
+        self.assertTrue(namespace.test)
+
     def test_implied_defaults_skip_all_tests(self):
         namespace = self.parse_default_args([
             '--test', '0',

@@ -72,9 +72,11 @@ struct APIAvailability {
   std::string introduced;
   std::string obsoleted;
   bool unavailable = false;
+  bool spiAvailable = false;
 
   bool empty() {
-    return introduced.empty() && obsoleted.empty() && !unavailable;
+    return introduced.empty() && obsoleted.empty() && !unavailable &&
+           !spiAvailable;
   }
 };
 

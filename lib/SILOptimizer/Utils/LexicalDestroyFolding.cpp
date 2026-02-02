@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-/// After ShrinkBorrowScope and CanonicalizeOSSALifetime both run, when a final
+/// After ShrinkBorrowScope and OSSACanonicalizeOwned both run, when a final
 /// use of the extended simple lifetime of a begin_borrow [lexical] is as an
 /// owned argument, we will have the following pattern:
 ///
@@ -89,9 +89,9 @@
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -218,7 +218,7 @@ private:
   ///
   ///     apply
   ///     end_borrow
-  ///     ...           // instructions which CanonicalizeOSSALifetime will not
+  ///     ...           // instructions which OSSACanonicalizeOwned will not
   ///                   // hoist destroys over
   ///     destroy_value %borrowee
   ///
@@ -235,13 +235,13 @@ private:
   /// sequence of "inconsequential" instructions the last of which destroys
   /// %borrowee.
   ///
-  /// CanonicalizeOSSALifetime will put destroy_value instructions after every
+  /// OSSACanonicalizeOwned will put destroy_value instructions after every
   /// final non-consuming use of %borrowee.  So it will put a
   /// destroy_value after an
   ///     end_borrow %lifetime
   /// if there are no subsequent uses of %borrowee.  However, if there
   /// is already one or more other instructions whose opcodes satisfy
-  /// CanonicalizeOSSALifetime::ignoredByDestroyHoisting just after
+  /// OSSACanonicalizeOwned::ignoredByDestroyHoisting just after
   ///     end_borrow %lifetime,
   /// it won't hoist the
   ///     destroy_value %borrowee
@@ -692,9 +692,9 @@ FindCandidates::definesMatchingInstructionSequence(SILInstruction *inst) const {
 DestroyValueInst *
 FindCandidates::findNextBorroweeDestroy(SILInstruction *from) const {
   for (auto *inst = from; inst; inst = inst->getNextInstruction()) {
-    if (!CanonicalizeOSSALifetime::ignoredByDestroyHoisting(inst->getKind())) {
-      // This is not an instruction that CanonicalizeOSSALifetime would not
-      // hoist a destroy above.  In other words, CanonicalizeOSSALifetime would
+    if (!OSSACanonicalizeOwned::ignoredByDestroyHoisting(inst->getKind())) {
+      // This is not an instruction that OSSACanonicalizeOwned would not
+      // hoist a destroy above.  In other words, OSSACanonicalizeOwned would
       // have hoisted
       //     destroy_value %borrowee
       // over this instruction if it could have.  Stop looking.

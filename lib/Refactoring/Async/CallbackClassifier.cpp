@@ -178,9 +178,10 @@ CallbackClassifier::classifyCallbackCondition(const CallbackCondition &Cond,
 
   // If the condition involves a refutable pattern, we can't currently handle
   // it.
-  if (Cond.BindPattern && Cond.BindPattern->isRefutablePattern())
+  if (Cond.BindPattern &&
+      Cond.BindPattern->isRefutablePattern(/*allowIsPatternCoercion*/ true)) {
     return std::nullopt;
-
+  }
   auto *SubjectParam = dyn_cast<ParamDecl>(Cond.Subject);
   if (!SubjectParam)
     return std::nullopt;

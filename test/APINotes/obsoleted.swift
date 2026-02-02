@@ -1,6 +1,6 @@
-// RUN: not %target-swift-frontend -typecheck -verify -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 4 %s
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 4.2 %s
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 5 %s
+// RUN: not %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 4 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 4.2 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %S/Inputs/custom-modules -F %S/Inputs/custom-frameworks -swift-version 5 %s
 // REQUIRES: objc_interop
 import ObsoletedAPINotesTest
 

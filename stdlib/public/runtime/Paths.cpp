@@ -548,8 +548,9 @@ _swift_initRuntimePath(void *) {
     // this is needed with Musl when statically linking because in that case
     // dladdr() does nothing.
     char pathBuf[4096];
-    ssize_t len = readlink("/proc/self/exe", pathBuf, sizeof(pathBuf));
-    if (len > 0 && len < sizeof(pathBuf)) {
+    ssize_t len = readlink("/proc/self/exe", pathBuf, sizeof(pathBuf)-1);
+    if (len > 0 ) {
+      pathBuf[len] = '\0';
       runtimePath = ::strdup(pathBuf);
       return;
     }

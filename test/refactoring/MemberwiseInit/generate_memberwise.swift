@@ -31,6 +31,7 @@ struct Place {
   let callback: Callback
   @MyWrapper var wrapped: String
   var `protocol`: String
+  var `some raw identifier`: Int
 }
 
 protocol Thing {
@@ -58,9 +59,9 @@ struct MyWrapper {
 // RUN: %refactor -memberwise-init -source-filename %s -pos=22:8 > %t.result/struct_members.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/struct_members.swift.expected %t.result/struct_members.swift
 
-// RUN: %refactor -memberwise-init -source-filename %s -pos=44:8 > %t.result/only_computed_members.swift
+// RUN: %refactor -memberwise-init -source-filename %s -pos=45:8 > %t.result/only_computed_members.swift
 // RUN: diff -u %S/Outputs/generate_memberwise/only_computed_members.swift.expected %t.result/only_computed_members.swift
 
-// RUN: not %refactor -memberwise-init -source-filename %s -pos=36:10 > %t.result/protocol_members.swift
-// RUN: not %refactor -memberwise-init -source-filename %s -pos=40:6 > %t.result/enum_members.swift
+// RUN: not %refactor -memberwise-init -source-filename %s -pos=37:10 > %t.result/protocol_members.swift
+// RUN: not %refactor -memberwise-init -source-filename %s -pos=41:6 > %t.result/enum_members.swift
 

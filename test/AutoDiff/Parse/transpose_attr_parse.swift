@@ -61,7 +61,7 @@ func transpose(v: Float) -> Float
 @transpose(of: foo, wrt)
 func transpose(v: Float) -> Float
 
-// expected-error @+1 {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}} {{19-20=}}
 @transpose(of: foo,)
 func transpose(v: Float) -> Float
 
@@ -95,7 +95,7 @@ func transpose(v: Float) -> Float
 func transpose(v: Float) -> Float
 
 // TF-1168: missing comma before `wrt:`.
-// expected-error @+2 {{expected ',' separator}}
+// expected-error @+2 {{expected ',' separator}} {{19-19=,}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: foo wrt: x)
 func transpose(v: Float) -> Float

@@ -903,3 +903,79 @@ func getEnumTag<T>(_ x: T) -> Builtin.Int32 {
 func injectEnumTag<T>(_ x: inout T, tag: Builtin.Int32) {
   Builtin.injectEnumTag(&x, tag)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF : $@convention(thin) @async () -> (UnsafeRawPointer, UnsafeRawPointer) {
+// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU_ : $@convention(thin) () -> ()
+// CHECK:   [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
+// CHECK:   [[RESULT_VALUE:%.*]] = builtin "taskAddCancellationHandler"([[CLOSURE]] : $@noescape @callee_guaranteed () -> ()) : $UnsafeRawPointer
+// CHECK:   [[RESULT:%.*]] = move_value [var_decl] [[RESULT_VALUE]]
+// CHECK:   [[CLOSURE_FN_2:%.*]] = function_ref @$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU0_ : $@convention(thin) (@guaranteed String) -> ()
+// CHECK:   [[CLOSURE_PA:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_FN_2]]({{%.*}}) :
+// CHECK:   [[CLOSURE_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_PA]]
+// CHECK:   [[RESULT_VALUE_2:%.*]] = builtin "taskAddCancellationHandler"([[CLOSURE_CVT]] : $@noescape @callee_guaranteed () -> ()) : $UnsafeRawPointer
+// CHECK:   [[RESULT_2:%.*]] = move_value [var_decl] [[RESULT_VALUE_2]]
+// CHECK:   [[TUPLE:%.*]] = tuple ([[RESULT]] : $UnsafeRawPointer, [[RESULT_2]] : $UnsafeRawPointer)
+// CHECK:   return [[TUPLE]]
+// CHECK: } // end sil function '$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF'
+func testTaskAddCancellationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
+  let result = Builtin.taskAddCancellationHandler {
+  }
+  let x = "123"
+  let result2 = Builtin.taskAddCancellationHandler { print(x) }
+  return (result, result2)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins33testTaskRemoveCancellationHandleryySVYaF : $@convention(thin) @async (UnsafeRawPointer) -> ()
+// CHECK: bb0([[PTR:%.*]] : $UnsafeRawPointer):
+// CHECK:   builtin "taskRemoveCancellationHandler"([[PTR]] : $UnsafeRawPointer) : $()
+// CHECK: } // end sil function '$s8builtins33testTaskRemoveCancellationHandleryySVYaF'
+func testTaskRemoveCancellationHandler(_ x: UnsafeRawPointer) async {
+  Builtin.taskRemoveCancellationHandler(record: x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins36testTaskAddPriorityEscalationHandlerSVyYaF : $@convention(thin) @async () -> UnsafeRawPointer {
+// CHECK:   [[CLOSURE_FN:%.*]] = function_ref @$s8builtins36testTaskAddPriorityEscalationHandlerSVyYaFys5UInt8V_ADtXEfU_ : $@convention(thin) (UInt8, UInt8) -> ()
+// CHECK:   [[CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE_FN]]
+// CHECK:   [[RESULT_VALUE:%.*]] = builtin "taskAddPriorityEscalationHandler"([[CLOSURE]] : $@noescape @callee_guaranteed (UInt8, UInt8) -> ()) : $UnsafeRawPointer
+// CHECK:   [[RESULT:%.*]] = move_value [var_decl] [[RESULT_VALUE]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '$s8builtins36testTaskAddPriorityEscalationHandlerSVyYaF'
+func testTaskAddPriorityEscalationHandler() async -> UnsafeRawPointer {
+  let result = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
+    _ = x
+    _ = y
+  }
+  return result
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins39testTaskRemovePriorityEscalationHandleryySVYaF : $@convention(thin) @async (UnsafeRawPointer) -> () {
+// CHECK: bb0([[PTR:%.*]] : $UnsafeRawPointer):
+// CHECK:   builtin "taskRemovePriorityEscalationHandler"(%0 : $UnsafeRawPointer) : $()
+// CHECK: } // end sil function '$s8builtins39testTaskRemovePriorityEscalationHandleryySVYaF'
+func testTaskRemovePriorityEscalationHandler(_ x: UnsafeRawPointer) async {
+  Builtin.taskRemovePriorityEscalationHandler(record: x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins22testTaskLocalValuePushyyBp_xntYalF : $@convention(thin) @async <Value> (Builtin.RawPointer, @in Value) -> () {
+// CHECK: bb0([[PTR_ARG:%.*]] : $Builtin.RawPointer, [[VALUE:%.*]] : @noImplicitCopy @_eagerMove $*Value):
+// CHECK:   [[CONSUME_BOX:%.*]] = alloc_box $<τ_0_0> { var @moveOnly τ_0_0 } <Value>, var, name "value"
+// CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [var_decl] [[CONSUME_BOX]]
+// CHECK:   [[PROJECT_BOX:%.*]] = project_box [[BORROW_BOX]]
+// CHECK:   [[WRAPPER:%.*]] = moveonlywrapper_to_copyable_addr [[PROJECT_BOX]]
+// CHECK:   copy_addr [take] [[VALUE]] to [init] [[WRAPPER]]
+// CHECK:   [[DEINIT_ADDR:%.*]] = begin_access [deinit] [unknown] [[PROJECT_BOX]]
+// CHECK:   [[MOVE_ONLY_ADDR:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[DEINIT_ADDR]]
+// CHECK:   [[STACK:%.*]] = alloc_stack $@moveOnly Value
+// CHECK:   copy_addr [[MOVE_ONLY_ADDR]] to [init] [[STACK]]
+// CHECK:   builtin "taskLocalValuePush"<Value>([[PTR_ARG]] : $Builtin.RawPointer, [[STACK]] : $*@moveOnly Value) : $()
+// CHECK: } // end sil function '$s8builtins22testTaskLocalValuePushyyBp_xntYalF'
+func testTaskLocalValuePush<Value>(_ key: Builtin.RawPointer, _ value: consuming Value) async {
+  Builtin.taskLocalValuePush(key, value)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins21testTaskLocalValuePopyyYaF : $@convention(thin) @async () -> () {
+// CHECK:   builtin "taskLocalValuePop"() : $()
+// CHECK: } // end sil function '$s8builtins21testTaskLocalValuePopyyYaF'
+func testTaskLocalValuePop() async {
+  Builtin.taskLocalValuePop()
+}

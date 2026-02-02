@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -loop-rotate -update-borrowed-from -looprotate-single-block-loop=true -looprotate-infinite-budget %s | %FileCheck %s
+// RUN: %target-sil-opt -loop-rotate -looprotate-single-block-loop=true -looprotate-infinite-budget %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -114,29 +114,30 @@ bb3:
 // CHECK: bb1:
 // CHECK-LABEL: } // end sil function 'testLoopBorrow2'
 sil [ossa] @testLoopBorrow2 : $@convention(thin) (Int32, @owned Klass) -> () {
-bb0(%0 : $Int32, %1: @owned $Klass):
-  %2 = struct_extract %0 : $Int32, #Int32._value
-  %one = integer_literal $Builtin.Int32, 1
-  %borrow = begin_borrow %1 : $Klass
-  br bb1(%2 : $Builtin.Int32, %borrow : $Klass)
+bb0(%0 : $Int32, %1 : @owned $Klass):
+  %2 = struct_extract %0, #Int32._value
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = begin_borrow %1
+  br bb1(%2, %4)
 
-bb1(%3 : $Builtin.Int32, %reborrow : @guaranteed $Klass):
-  %f1 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
-  %c1 = apply %f1(%reborrow) : $@convention(thin) (@guaranteed Klass) -> ()
-  %f2 = function_ref @increment : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
-  %c2 = apply %f2(%3) : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
-  %5 = struct $Int32 (%c2 : $Builtin.Int32)
-  %6 = builtin "cmp_eq_Word"(%5 : $Int32, %one : $Builtin.Int32) : $Builtin.Int1
-  cond_br %6, bb3, bb2
+bb1(%6 : $Builtin.Int32, %7 : @reborrow $Klass):
+  %8 = borrowed %7 from (%1)
+  %9 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
+  %11 = function_ref @increment : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+  %12 = apply %11(%6) : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+  %13 = struct $Int32 (%12)
+  %14 = builtin "cmp_eq_Word"(%13, %3) : $Builtin.Int1
+  cond_br %14, bb3, bb2
 
 bb2:
-  br bb1(%c2 : $Builtin.Int32, %reborrow : $Klass)
+  br bb1(%12, %8)
 
 bb3:
-  end_borrow %reborrow : $Klass
-  destroy_value %1 : $Klass
-  %res = tuple ()
-  return %res : $()
+  end_borrow %8
+  destroy_value %1
+  %19 = tuple ()
+  return %19
 }
 
 // CHECK-LABEL: sil [ossa] @testLoopBorrow3 : 
@@ -145,58 +146,60 @@ bb3:
 // CHECK: bb1:
 // CHECK-LABEL: } // end sil function 'testLoopBorrow3'
 sil [ossa] @testLoopBorrow3 : $@convention(thin) (Int32, @owned Klass) -> () {
-bb0(%0 : $Int32, %1: @owned $Klass):
-  %2 = struct_extract %0 : $Int32, #Int32._value
-  %one = integer_literal $Builtin.Int32, 1
-  %borrow = begin_borrow %1 : $Klass
-  br bb1(%2 : $Builtin.Int32, %borrow : $Klass)
+bb0(%0 : $Int32, %1 : @owned $Klass):
+  %2 = struct_extract %0, #Int32._value
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = begin_borrow %1
+  br bb1(%2, %4)
 
-bb1(%3 : $Builtin.Int32, %reborrow1 : @guaranteed $Klass):
-  %f1 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
-  %c1 = apply %f1(%reborrow1) : $@convention(thin) (@guaranteed Klass) -> ()
-  %f2 = function_ref @increment : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
-  %c2 = apply %f2(%3) : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
-  %5 = struct $Int32 (%c2 : $Builtin.Int32)
-  %6 = builtin "cmp_eq_Word"(%5 : $Int32, %one : $Builtin.Int32) : $Builtin.Int1
-  end_borrow %reborrow1 : $Klass
-  %reborrow2 = begin_borrow %1 : $Klass
-  cond_br %6, bb3, bb2
+bb1(%6 : $Builtin.Int32, %7 : @reborrow $Klass):
+  %8 = borrowed %7 from (%1)
+  %9 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
+  %11 = function_ref @increment : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+  %12 = apply %11(%6) : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+  %13 = struct $Int32 (%12)
+  %14 = builtin "cmp_eq_Word"(%13, %3) : $Builtin.Int1
+  end_borrow %8
+  %16 = begin_borrow %1
+  cond_br %14, bb3, bb2
 
 bb2:
-  br bb1(%c2 : $Builtin.Int32, %reborrow2 : $Klass)
+  br bb1(%12, %16)
 
 bb3:
-  end_borrow %reborrow2 : $Klass
-  destroy_value %1 : $Klass
-  %res = tuple ()
-  return %res : $()
+  end_borrow %16
+  destroy_value %1
+  %21 = tuple ()
+  return %21
 }
 
 // CHECK-LABEL: sil [ossa] @guaranteed_phi_argument : $@convention(thin) (@owned Klass) -> () {
 // CHECK:         {{bb[0-9]+}}({{%[^,]+}} : @reborrow $Klass):
 // CHECK-LABEL: } // end sil function 'guaranteed_phi_argument'
 sil [ossa] @guaranteed_phi_argument : $@convention(thin) (@owned Klass) -> () {
-entry(%instance : @owned $Klass):
-  %lifetime_1 = begin_borrow [lexical] %instance : $Klass
-  br loop_header(%lifetime_1 : $Klass)
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow [lexical] %0
+  br bb1(%1)
 
-loop_header(%lifetime_2 : @guaranteed $Klass):
-  cond_br undef, loop_back_1, loop_back_2_or_exit
+bb1(%3 : @reborrow $Klass):
+  %4 = borrowed %3 from (%0)
+  cond_br undef, bb2, bb3
 
-loop_back_1:
-  br loop_header(%lifetime_2 : $Klass)
+bb2:
+  br bb1(%4)
 
-loop_back_2_or_exit:
-  cond_br undef, loop_back_2, exit
+bb3:
+  cond_br undef, bb4, bb5
 
-loop_back_2:
-  br loop_header(%lifetime_2 : $Klass)
+bb4:
+  br bb1(%4)
 
-exit:
-  end_borrow %lifetime_2 : $Klass
-  destroy_value %instance : $Klass
-  %retval = tuple ()
-  return %retval : $()
+bb5:
+  end_borrow %4
+  destroy_value %0
+  %11 = tuple ()
+  return %11
 }
 
 // A guaranteed value whose ownership has been forwarded must not be reborrowed. 
@@ -241,6 +244,7 @@ bb8:
   br bb1
 
 bb9:
+  destroy_value [dead_end] %0
   unreachable
 }
 

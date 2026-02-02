@@ -1,0 +1,311 @@
+// RUN: %target-sil-opt -sil-disable-input-verify -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [ossa] @test_simple
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-LABEL: // end sil function 'test_simple'
+sil [ossa] @test_simple : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  integer_literal $Builtin.Int32, 2
+  dealloc_stack %a
+  dealloc_stack %b
+  integer_literal $Builtin.Int32, 3
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_flow
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-LABEL: // end sil function 'test_flow'
+sil [ossa] @test_flow : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  cond_br %cond, bb1, bb2
+
+bb1:
+  dealloc_stack %a
+  br bb3
+
+bb2:
+  %c = alloc_stack $Int
+  dealloc_stack %a
+  dealloc_stack %c
+  br bb3
+
+bb3:
+  dealloc_stack %b
+  integer_literal $Builtin.Int32, 2
+  %ret = tuple ()
+  return %ret : $()
+}
+
+//   The dealloc_stack of %a is out of order and needs to be sunk past
+//   the dealloc_stack of %b, which doesn't exist on this dead-end path.
+// CHECK-LABEL: sil [ossa] @test_simple_dead
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: // end sil function 'test_simple_dead'
+sil [ossa] @test_simple_dead : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  integer_literal $Builtin.Int32, 2
+  dealloc_stack %a
+  integer_literal $Builtin.Int32, 3
+  unreachable
+}
+
+//   The dealloc_stack of %a is out of order and needs to be sunk.
+//   Sinking it on the dead-end path actually means removing it.
+// CHECK-LABEL: sil [ossa] @test_flow_dead
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    unreachable
+// CHECK:       bb2:
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-LABEL: // end sil function 'test_flow_dead'
+sil [ossa] @test_flow_dead : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  dealloc_stack %a
+  cond_br %cond, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  dealloc_stack %b
+  integer_literal $Builtin.Int32, 2
+  %ret = tuple ()
+  return %ret : $()
+}
+
+//   The dealloc_stack of %a is out of order and needs to be sunk.
+//   In this case, there's a dealloc on both paths, despite one of them being
+//   dead.
+// CHECK-LABEL: sil [ossa] @test_flow_dead_2
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    unreachable
+// CHECK:       bb2:
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-LABEL: // end sil function 'test_flow_dead_2'
+sil [ossa] @test_flow_dead_2 : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  dealloc_stack %a
+  cond_br %cond, bb1, bb2
+
+bb1:
+  dealloc_stack %b
+  unreachable
+
+bb2:
+  dealloc_stack %b
+  integer_literal $Builtin.Int32, 2
+  %ret = tuple ()
+  return %ret : $()
+}
+
+//   We need to delete the dealloc_stacks in bb3 because the stack is in
+//   an incoherent state entering that block.
+// CHECK-LABEL: sil [ossa] @test_merge_alloc
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: // end sil function 'test_merge_alloc'
+sil [ossa] @test_merge_alloc : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  cond_br %cond, bb1, bb2
+
+bb1:
+  %c = alloc_stack $Int
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %a
+  dealloc_stack %b
+  unreachable
+}
+
+//   We need to delete the dealloc_stack in bb3 because the stack is in
+//   an incoherent state entering bb3.
+// CHECK-LABEL: sil [ossa] @test_merge_dealloc
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: // end sil function 'test_merge_dealloc'
+sil [ossa] @test_merge_dealloc : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  cond_br %cond, bb1, bb2
+
+bb1:
+  dealloc_stack %b
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %a
+  unreachable
+}
+
+//   We need to delete the dealloc_stacks in bb3 because the stack is in
+//   an incoherent state entering bb3. The allocation and deallocation in
+//   the loop is required, however.
+// CHECK-LABEL: sil @test_merge_alloc_dead_end_loop
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb4
+// CHECK:       bb4:
+// CHECK-NEXT:    [[D:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    br bb5
+// CHECK:       bb5:
+// CHECK-NEXT:    dealloc_stack [[D]]
+// CHECK-NEXT:    br bb4
+
+// CHECK-LABEL: // end sil function 'test_merge_alloc_dead_end_loop'
+sil @test_merge_alloc_dead_end_loop : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack $Int
+  %b = alloc_stack $Int
+  cond_br %cond, bb1, bb2
+
+bb1:
+  %c = alloc_stack $Int
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %b
+  dealloc_stack %a
+  br bb4
+
+bb4:
+  %d = alloc_stack $Int
+  br bb5
+
+bb5:
+  dealloc_stack %d
+  br bb4
+}
+
+// We only re-order b and c. We leave a alone.
+// CHECK-LABEL: sil [ossa] @test_simple_non_nested
+// CHECK:         integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack [non_nested] $Int
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    [[C:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:    dealloc_stack [[A]]
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK-NEXT:    dealloc_stack [[B]]
+// CHECK-NEXT:    integer_literal $Builtin.Int32, 3
+// CHECK-LABEL: // end sil function 'test_simple_non_nested'
+sil [ossa] @test_simple_non_nested : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%cond: $Builtin.Int1):
+  specify_test "stack_nesting_fixup"
+  integer_literal $Builtin.Int32, 1
+  %a = alloc_stack [non_nested] $Int
+  %b = alloc_stack $Int
+  %c = alloc_stack $Int
+  integer_literal $Builtin.Int32, 2
+  dealloc_stack %a
+  dealloc_stack %b
+  dealloc_stack %c
+  integer_literal $Builtin.Int32, 3
+  %ret = tuple ()
+  return %ret : $()
+}

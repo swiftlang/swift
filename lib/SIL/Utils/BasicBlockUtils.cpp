@@ -25,6 +25,7 @@
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SCCIterator.h"
 
 using namespace swift;
 
@@ -234,6 +235,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
     return;
 
   case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ReturnBorrowInst:
   case SILInstructionKind::ThrowInst:
   case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::UnwindInst:
@@ -362,7 +364,11 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
   // Move the instruction from the successor block to the current block.
   BB->spliceAtEnd(succBB);
 
+  bool needBreakInfiniteLoops = BB->getParent()->needBreakInfiniteLoops();
   succBB->eraseFromParent();
+  // Don't unnecessarily trigger infinite-loop breaking because we know that
+  // merging two basic blocks cannot create an infinite loop.
+  BB->getParent()->setNeedBreakInfiniteLoops(needBreakInfiniteLoops);
 }
 
 //===----------------------------------------------------------------------===//
@@ -446,6 +452,196 @@ static FunctionTest DeadEndBlocksTest("dead_end_blocks", [](auto &function,
   }
 #endif
 });
+
+// Arguments:
+// - none
+// Dumps:
+// - message
+static FunctionTest HasAnyDeadEndBlocksTest(
+    "has_any_dead_ends", [](auto &function, auto &arguments, auto &test) {
+      auto deb = test.getDeadEndBlocks();
+      llvm::outs() << (deb->isEmpty() ? "no dead ends\n" : "has dead ends\n");
+    });
+} // end namespace swift::test
+
+//===----------------------------------------------------------------------===//
+//                               DeadEndEdges
+//===----------------------------------------------------------------------===//
+
+DeadEndEdges::DeadEndEdges(SILFunction *F,
+                           DeadEndBlocks *existingDeadEndBlocks) {
+  // Hilariously, C++ does not permit these to be written in
+  // the class definition.
+  static_assert(!isDeadEndRegion(UnreachableRegionData), "");
+  static_assert(!isDeadEndRegion(NonDeadEndRegionData), "");
+
+  std::optional<DeadEndBlocks> localDeadEndBlocks;
+  if (!existingDeadEndBlocks) {
+    localDeadEndBlocks.emplace(F);
+  }
+  DeadEndBlocks &deadEndBlocks =
+    (existingDeadEndBlocks ? *existingDeadEndBlocks : *localDeadEndBlocks);
+
+  // If there are no dead-end blocks, exit immediately, leaving
+  // regionDataForBlock empty.
+  if (deadEndBlocks.isEmpty()) {
+    numDeadEndRegions = 0;
+    return;
+  }
+
+  // Initialize regionDataForBlock to consider all blocks to be unreachable.
+  regionDataForBlock.emplace(F, [](SILBasicBlock *bb) {
+    return UnreachableRegionData;
+  });
+
+  unsigned nextDeadRegionIndex = 0;
+
+  // Iterate the strongly connected components of the CFG.
+  //
+  // We might be able to specialize the SCC algorithm to both (1) detect
+  // dead-end SCCs directly and (2) maybe even eagerly count the dead-end
+  // edges into each block. But that would require rewriting the algorithm,
+  // and this doesn't seem problematic.
+  //
+  // Note that only reachable blocks can be found by SCC iteration.
+  // So we're implicitly leaving regionDataForBlock filled with
+  // UnreachableRegionData for any unreachable blocks.
+  for (auto sccIt = scc_begin(F); !sccIt.isAtEnd(); ++sccIt) {
+    const auto &scc = *sccIt;
+
+    // If this SCC is not dead-end, just record that all of its blocks
+    // are reachable. We can check any block in the SCC for this: they
+    // can all reach each other by definition, so if any of them can
+    // reach an exit, they all can.
+    auto repBB = scc[0];
+    if (!deadEndBlocks.isDeadEnd(repBB)) {
+      for (auto *block : scc) {
+        (*regionDataForBlock)[block] = NonDeadEndRegionData;
+      }
+      continue;
+    }
+
+    // Allocate a new region index.
+    unsigned regionIndex = nextDeadRegionIndex++;
+
+    // Encode the region data.
+    unsigned regionData = (regionIndex + IndexOffset) << IndexShift;
+    if (sccIt.hasCycle()) {
+      regionData |= HasCycleMask;
+    }
+
+    assert(getIndexFromRegionData(regionData) == regionIndex);
+
+    // Assign the encoded region data to the every block in the region.
+    for (auto *block : scc) {
+      (*regionDataForBlock)[block] = regionData;
+    }
+  }
+
+  // The entry block can technically be a dead-end region if there are
+  // no reachable exits in the function, but we don't care about tracking
+  // it because we only care about edges *into* regions, and the entry
+  // region never has in-edges. So avoid the weird corner case of a region
+  // with no in-edges *and* save some space in VisitingSets by removing it.
+  auto &entryRegionData = (*regionDataForBlock).entry().data;
+  if (isDeadEndRegion(entryRegionData)) {
+    // SCC iteration is in reverse topological order, so the entry block
+    // is always the last region. It's also always the only block in
+    // its region, so it's really easy to retroactively erase from the
+    // records.
+    assert(getIndexFromRegionData(entryRegionData) == nextDeadRegionIndex - 1);
+    nextDeadRegionIndex--;
+    entryRegionData = NonDeadEndRegionData;
+  }
+
+  numDeadEndRegions = nextDeadRegionIndex;
+}
+
+DeadEndEdges::VisitingSet::VisitingSet(const DeadEndEdges &edges,
+                                       bool includeUnreachableEdges)
+    : edges(edges) {
+
+  // Skip all of this if there are no dead-end regions.
+  if (edges.numDeadEndRegions == 0)
+    return;
+
+  // Initialize all of the totals to 0.
+  remainingEdgesForRegion.resize(edges.numDeadEndRegions, 0);
+
+  // Simultaneously iterate the blocks of the function and the
+  // region data we have for each block.
+  for (auto blockAndData : *edges.regionDataForBlock) {
+    SILBasicBlock *bb = &blockAndData.block;
+    unsigned regionData = blockAndData.data;
+
+    // Ignore blocks in non-dead-end regions.
+    if (!isDeadEndRegion(regionData))
+      continue;
+
+    // Count the edges to the block that begin in other regions.
+    // But ignore edges from unreachable blocks unless requested.
+    unsigned numDeadEndEdgesToBlock = 0;
+    for (SILBasicBlock *pred : bb->getPredecessorBlocks()) {
+      auto predRegionData = (*edges.regionDataForBlock)[pred];
+      if (predRegionData != regionData &&
+          (predRegionData != UnreachableRegionData ||
+           includeUnreachableEdges)) {
+        numDeadEndEdgesToBlock++;
+      }
+    }
+
+    // Add that to the total for the block's region.
+    auto regionIndex = getIndexFromRegionData(regionData);
+    remainingEdgesForRegion[regionIndex] += numDeadEndEdgesToBlock;
+  }
+
+#ifndef NDEBUG
+  // We should have found at least one edge for every dead-end
+  // region, since they're all supposed to be reachable from the
+  // entry block. 
+  for (auto count : remainingEdgesForRegion) {
+    assert(count && "didn't find any edges to region?");
+  }
+#endif
+}
+
+namespace swift::test {
+// Arguments:
+// - none
+// Prints:
+// - a bunch of lines like
+//     %bb3 -> %bb6 (region 2; more edges remain)
+//     %bb5 -> %bb6 (region 2; last edge)
+// - either "Visited all edges" or "Did not visit all edges"
+static FunctionTest DeadEndEdgesTest("dead_end_edges", [](auto &function,
+                                                          auto &arguments,
+                                                          auto &test) {
+  DeadEndEdges edges(&function);
+  auto visitingSet = edges.createVisitingSet(/*includeUnreachable*/ true);
+
+  auto &out = llvm::outs();
+  SILPrintContext ctx(out);
+  for (auto &srcBB : function) {
+    for (auto *dstBB : srcBB.getSuccessorBlocks()) {
+      if (auto regionIndex = edges.entersDeadEndRegion(&srcBB, dstBB)) {
+        out << ctx.getID(&srcBB) << " -> " << ctx.getID(dstBB)
+            << " (region " << *regionIndex << "; ";
+        if (visitingSet.visitEdgeTo(dstBB)) {
+          out << "last edge)";
+        } else {
+          out << "more edges remain)";
+        }
+        out << "\n";
+      }
+    }
+  }
+  if (visitingSet.visitedAllEdges()) {
+    out << "visited all edges\n";
+  } else {
+    out << "did not visit all edges\n";
+  }
+});
+
 } // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
@@ -532,11 +728,14 @@ void swift::findJointPostDominatingSet(
           if (!visitedBlocks.contains(succBlock) &&
               // For this purpose also the initial blocks count as "visited",
               // although they are not added to the visitedBlocks set.
-              !initialBlocks.contains(succBlock) &&
+              !initialBlocks.contains(succBlock)
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
               // Ignore blocks which end in an unreachable. This is a very
               // simple check, but covers most of the cases, e.g. block which
               // calls fatalError().
-              !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)) {
+              && !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)
+#endif
+            ) {
             assert(succBlock->getSinglePredecessorBlock() == predBlock &&
                    "CFG must not contain critical edge");
             // Note that since there are no critical edges in the CFG, we are

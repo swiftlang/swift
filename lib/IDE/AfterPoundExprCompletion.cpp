@@ -13,7 +13,6 @@
 #include "swift/IDE/AfterPoundExprCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -28,7 +27,7 @@ void AfterPoundExprCompletion::sawSolutionImpl(const constraints::Solution &S) {
 
   // If ExpectedTy is a duplicate of any other result, ignore this solution.
   auto IsEqual = [&](const Result &R) {
-    return R.ExpectedTy->isEqual(ExpectedTy);
+    return nullableTypesEqual(R.ExpectedTy, ExpectedTy);
   };
   if (!llvm::any_of(Results, IsEqual)) {
     bool IsImpliedResult = isImpliedResult(S, CompletionExpr);

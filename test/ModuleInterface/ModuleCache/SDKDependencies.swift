@@ -221,7 +221,6 @@
 //
 // DEPCHANGE-DAG: SdkLib.swiftinterface
 // DEPCHANGE-DAG: ExportedLib.swiftinterface
-// DEPCHANGE-DAG: SDKDependencies.swift
 
 import SdkLib
 

@@ -81,6 +81,13 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   DeclRef,
 };
 
+enum class ExtraStringFlavor : uint8_t {
+  /// asmname attributes
+  AsmName,
+  /// section attribute
+  Section,
+};
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID
@@ -107,6 +114,7 @@ namespace sil_index_block {
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+    SIL_ASM_NAMES,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -186,6 +194,7 @@ namespace sil_block {
     SIL_SOURCE_LOC_REF,
     SIL_DEBUG_VALUE_DELIMITER,
     SIL_DEBUG_VALUE,
+    SIL_EXTRA_STRING,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -294,8 +303,11 @@ namespace sil_block {
     BCFixed<2>,          // serialized
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
+    BCFixed<1>,          // Is this marked as "used".
+    BCVBR<8>,            // # of trailing records
     TypeIDField,
-    DeclIDField
+    DeclIDField,
+    ModuleIDField        // Parent ModuleDecl *
   >;
 
   using DifferentiabilityWitnessLayout = BCRecordLayout<
@@ -374,8 +386,9 @@ namespace sil_block {
                      BCFixed<3>,  // perfConstraints
                      BCFixed<2>,  // classSubclassScope
                      BCFixed<1>,  // hasCReferences
+                     BCFixed<1>,  // markedAsUsed
                      BCFixed<3>,  // side effect info.
-                     BCVBR<8>,    // number of specialize attributes
+                     BCVBR<8>,    // number of trailing records
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // force weak linking
                      BC_AVAIL_TUPLE, // availability for weak linking
@@ -414,6 +427,14 @@ namespace sil_block {
                      BCVBR<8>,          // argumentIndex
                      BCFixed<1>,        // argumentIndexValid
                      BCFixed<1>         // isDerived
+                     >;
+
+  /// Used for additional strings that can be associated with a record,
+  /// written out as records that trail
+  using SILExtraStringLayout =
+      BCRecordLayout<SIL_EXTRA_STRING,
+                     BCFixed<8>,    // string flavor
+                     BCBlob       // string data
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.
@@ -521,7 +542,7 @@ namespace sil_block {
 
   // SIL instructions with one type. (alloc_stack)
   using SILOneTypeLayout = BCRecordLayout<SIL_ONE_TYPE, SILInstOpCodeField,
-                                          BCFixed<4>, // Optional attributes
+                                          BCFixed<5>, // Optional attributes
                                           TypeIDField, SILTypeCategoryField>;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)

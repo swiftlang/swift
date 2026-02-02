@@ -246,7 +246,9 @@ testSuite.test("ResilientNSObject")
   expectEqual(ResilientSubclassOfConcreteNSObject().subvalue.i, 7)
 }
 
-testSuite.test("NotPresent") {
+testSuite.test("NotPresent")
+  .skip(.osxMinorRange(10, 0...15, reason: "test crashes, runtime fix not available on old OSes"))
+  .code {
   // This class does not exist.
   expectNil(NSClassFromString("main.ThisClassDoesNotExist"));
 
@@ -257,11 +259,14 @@ testSuite.test("NotPresent") {
   expectNil(NSClassFromString("Si"))
 
   // Mangled names with byte sequences that look like symbolic references
-  // should not be demangled.
-  expectNil(NSClassFromString("\u{1}badnews"));
-  expectNil(NSClassFromString("$s\u{1}badnews"));
-  expectNil(NSClassFromString("_T\u{1}badnews"));
-
+  // should not be demangled. Use indirect references to test. Direct
+  // references often resolve to readable memory, and then the data there
+  // often looks like a descriptor with an unknown kind and the lookup code
+  // then fails gracefully. With an indirect reference, the indirected pointer
+  // is typically garbage and dereferencing it will crash.
+  expectNil(NSClassFromString("\u{2}badnews"));
+  expectNil(NSClassFromString("$s\u{2}badnews"));
+  expectNil(NSClassFromString("_T\u{2}badnews"));
   // Correct mangled names with additional text afterwards should not resolve.
   expectNil(NSClassFromString("_TtC4main20MangledSwiftSubclass_"))
   expectNil(NSClassFromString("_TtC4main22MangledSwiftSuperclassXYZ"))

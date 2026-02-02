@@ -31,6 +31,7 @@ enum ImageSourceError: Error {
   case posixError(Int32)
 }
 
+@available(Backtracing 6.2, *)
 struct ImageSource {
 
   private class Storage {
@@ -343,6 +344,7 @@ struct ImageSource {
 }
 
 // MemoryReader support
+@available(Backtracing 6.2, *)
 extension ImageSource: MemoryReader {
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
@@ -379,6 +381,7 @@ extension ImageSource: MemoryReader {
 }
 
 /// Used as a cursor by the DWARF code
+@available(Backtracing 6.2, *)
 struct ImageSourceCursor {
   typealias Address = ImageSource.Address
   typealias Size = ImageSource.Size

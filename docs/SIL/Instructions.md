@@ -832,7 +832,7 @@ load-ownership-kind ::= 'take'
 ```
 
 Loads the value at address `%0` from memory. `T` must be a loadable
-type. This does not affect the reference count, if any, of the loaded
+type. An unqualified load does not affect the reference count, if any, of the loaded
 value; the value must be retained explicitly if necessary. It is
 undefined behavior to load from uninitialized memory or to load from an
 address that points to deallocated storage.
@@ -840,8 +840,8 @@ address that points to deallocated storage.
 In OSSA the ownership kind specifies how to handle ownership:
 -  **trivial**: the loaded value is trivial and no further action must be taken
                 than to load the raw bits of the value
--  **copy**: the loaded value is copied and the original value stays in the
-             memory location.
+-  **copy**: the loaded value is copied (e.g., retained) and the original value
+                stays in the memory location.
 -  **take**: the value is _moved_ from the memory location without copying.
              After the `load`, the memory location remains uninitialized.
 
@@ -1032,7 +1032,7 @@ extend_lifetime %0 : $X
 ```
 
 Indicates that a value's linear lifetime extends to this point.
-Inserted by OSSALifetimeCompletion(AvailabilityBoundary) in order to
+Inserted by OSSACompleteLifetime(AvailabilityBoundary) in order to
 provide the invariant that a value is either consumed OR has an
 `extend_lifetime` user on all paths and furthermore that all
 uses are within the boundary defined by that set of instructions (the
@@ -1064,43 +1064,49 @@ a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as
 appropriate by the definitive initialization pass.
 
-### assign_by_wrapper
+### assign_or_init 
 
 ```
-sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+sil-instruction ::= 'assign_or_init' mode? attached-property ',' self-or-local ',' sil-operand ',' 'value' ',' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-mode ::= '[init]' | '[assign]' | '[assign_wrapped_value]'
+mode ::= '[init]' | '[assign]'
+attached-property ::= '#' sil-decl-ref
+self-or-local ::= 'self' | 'local'
 
-assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
-// $S can be a value or address type
-// $T must be the type of a property wrapper.
-// $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
-// $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
+// Nominal Context:
+assign_or_init #MyStruct.x, self %A, value %V, init %I, set %S
+// Local Context (only emitted with compiler synthesized thunks currently):   
+assign_or_init #x, local %L, value %V, init %I, set %S
 ```
 
-Similar to the [assign](#assign) instruction, but the assignment is done
-via a delegate.
+Assigns or initializes a computed property with an attached init accessor. 
+This instruction is emitted during SILGen without an explicit mode. 
+The definitive initialization (DI) pass resolves the mode and rewrites
+the instruction accordingly:
 
-Initially the instruction is created with no mode. Once the mode is
-decided (by the definitive initialization pass), the instruction is
-lowered as follows:
+- `[init]`: In this mode, the init accessor `%I` is called with `%V` 
+as an argument. 
+- `[assign]`: In this mode, the setter function `%S` is called with `%V`
+as an argument.
 
-If the mode is `initialization`, the function `%2` is called with `%0`
-as argument. The result is stored to `%1`. In case of an address type,
-`%1` is simply passed as a first out-argument to `%2`.
+This instruction is only valid in Raw SIL and is rewritten as appropriate by
+the DI pass.
 
-The `assign` mode works similar to `initialization`, except that the
-destination is "assigned" rather than "initialized". This means that
-the existing value in the destination is destroyed before the new value
-is stored.
-
-If the mode is `assign_wrapped_value`, the function `%3` is called with
-`%0` as argument. As `%3` is a setter (e.g. for the property in the
-containing nominal type), the destination address `%1` is not used in
-this case.
-
-This instruction is only valid in Raw SIL and is rewritten as
-appropriate by the definitive initialization pass.
+Operand Roles:
+- `attached-property`: The property being written to. For nominal contexts, this 
+refers to a property with an attached init accessor (e.g. `#MyStruct.x`). For local 
+contexts, it refers to a local variable name (e.g. `#x`).
+- `self-or-local`: 
+  - `self %A`: Refers to the instance of the type that owns the property with the 
+  attached init accessor.
+  - `local %L`: Indicates the assignment is to a local variable (`%L`) rather than 
+  a property of a nominal type. While init accessors are not currently available to be 
+  used in local contexts in user-authored code, the compiler can synthesize an `assign_or_init`
+  in local contexts using an init accessor thunk in special cases.
+- `value %V`: The input value passed to either the `init` or `set` function, depending on 
+the selected DI mode.
+- `init %I`: A partially applied function implementing the property's init accessor.
+- `set %S`: A partially applied function implementing the property's setter.
 
 ### mark_uninitialized
 
@@ -1192,6 +1198,17 @@ It is expected that the `init-case` is passed some sort of storage and
 the `set` case is passed `self`.
 
 This is only valid in Raw SIL.
+
+### unchecked_ownership
+
+```
+sil-instruction ::= 'unchecked_ownership' sil-operand
+
+unchecked_ownership %1 : $T
+```
+
+unchecked_ownership disables the ownership verification of it's operand. This used in cases 
+we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
 
 ### copy_addr
 
@@ -2615,11 +2632,11 @@ except:
     instead of its normal results.
 
 The final (in the case of `@yield_once`) or penultimate (in the case of
-`@yield_once_2`) result of a `begin_apply` is a "token", a special
-value which can only be used as the operand of an `end_apply` or
-`abort_apply` instruction. Before this second instruction is executed,
-the coroutine is said to be "suspended", and the token represents a
-reference to its suspended activation record.
+`@yield_once_2`) result of a `begin_apply` is a "token", a special value which
+can only be used as the operand of an `end_apply`, `abort_apply`, or
+`end_borrow` instruction. Before this second instruction is executed, the
+coroutine is said to be "suspended", and the token represents a reference to its
+suspended activation record.
 
 If the coroutine's kind `yield_once_2`, its final result is an address
 of a "token", representing the allocation done by the callee
@@ -4549,6 +4566,9 @@ copy.
 The resulting value must meet the usual ownership requirements; for
 example, a trivial type must have '.none' ownership.
 
+NOTE: A guaranteed result value is assumed to be a non-dependent guaranteed
+value like a function argument.
+
 ### ref_to_raw_pointer
 
 ```
@@ -4865,6 +4885,27 @@ TODO
 
 TODO
 
+### cast_implicitactor_to_opaqueisolation
+
+```
+sil-instruction ::= 'cast_implicitactor_to_opaqueisolation' sil-operand
+
+%1 = cast_implicitactor_to_opaqueisolation %0 : $Builtin.ImplicitActor
+// %0 must have guaranteed ownership
+// %1 must have guaranteed ownership
+// %1 will have type $Optional<any Actor>
+```
+
+Convert a `$Builtin.ImplicitActor` to a `$Optional<any Actor>` masking out any
+bits that we have stolen from the witness table pointer.
+
+At IRGen time, we lower this to the relevant masking operations, allowing us to
+avoid exposing these low level details to the SIL optimizer. On platforms where
+we support TBI, IRGen uses a mask that is the bottom 2 bits of the top nibble of
+the pointer. On 64 bit platforms this is bit 60,61. If the platform does not
+support TBI, then IRGen uses the bottom two tagged pointer bits of the pointer
+(bits 0,1).
+
 ## Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime
@@ -4972,6 +5013,20 @@ does not apply in the `raw` SIL stage.
 `return` does not retain or release its operand or any other values.
 
 A function must not contain more than one `return` instruction.
+
+### return_borrow
+
+```
+sil-terminator ::= 'return_borrow' sil-operand 'from_scopes' '(' (sil-operand (',' sil-operand)*)? ')'
+
+return_borrow %0 : $T from_scopes (%1, %2 ...)
+// %0 must be a @guaranteed value
+// %1, %2, ... must be borrow introducers for %0, like `load_borrow`
+// $T must be the return type of the current function
+```
+
+return_borrow instruction is valid only for functions @guaranteed results.
+It is used to a return a @guaranteed value that maybe produced within borrow scopes local to the function.
 
 ### throw
 
@@ -5653,6 +5708,108 @@ sil-instruction ::= 'has_symbol' sil-decl-ref
 Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
+
+## `Builtin.Borrow` support
+
+The `Builtin.Borrow` type is the primitive building block for forming first-
+class borrowed accesses to other values. Some Swift values never have
+a fixed memory address, but address-only values are always fixed in memory, and
+some loadable types have dependencies that take the address of an in-memory
+representation. As such, `Builtin.Borrow<T>` may have one of two
+representations, depending on the properties of `T`:
+
+- `Builtin.Borrow<T>` may contain a bitwise copy of the representation of
+  the referenced `T`.
+- `Builtin.Borrow<T>` may contain the address of the referenced `T` in memory.
+
+The layout of `Builtin.Borrow<T>` for any specific concrete type `T` is always
+the same, so when the layout of `T` is fully known, `Builtin.Borrow<T>` is
+always loadable even if that `T` is not. On the other hand, for a `T` with
+unknown layout, `Builtin.Borrow<T>` will also have unknown layout and be
+treated as address-only. This leaves three cases for SIL to represent:
+
+- Both `T` and `Builtin.Borrow<T>` are loadable. Values of `Builtin.Borrow<T>`
+  are created by `make_borrow`, and the referenced value is dereferenced with
+  `dereference_borrow`.
+- `T` is address-only, or has address-dependent references, but
+  `Builtin.Borrow<T>` is loadable. Values of `Builtin.Borrow<T>` are created
+  by `make_addr_borrow`, and the address of the referenced value is retrieved
+  with `dereference_addr_borrow`.
+- `T` and `Builtin.Borrow<T>` are both address-only. Memory locations of type
+  `Builtin.Borrow<T>` are initialized using `init_borrow_addr`, and the address
+  of the referenced value is retrieved with `dereference_borrow_addr`.
+
+### make_borrow
+
+```none
+sil-instruction ::= 'make_borrow' sil-value
+
+%borrow: $Builtin.Borrow<T> = make_borrow %target: $T
+```
+
+Returns a `Builtin.Borrow` value referencing the given value.
+
+The result `%borrow` has a lifetime dependency on borrowing `%target`.
+
+### dereference_borrow
+
+```none
+sil-instruction ::= 'dereference_borrow' sil-value
+
+%target: $T = dereference_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the value referenced by a `Builtin.Borrow`. The result `%target` is
+a borrow of the original value, scoped by the lifetime of `%borrow`.
+
+### make_addr_borrow
+
+```none
+sil-instruction ::= 'make_addr_borrow' sil-value
+
+%borrow: $Builtin.Borrow<T> = make_addr_borrow %target: $*T
+```
+
+Returns a `Builtin.Borrow` value referencing the value at the given memory
+location.
+
+The result `%borrow` has a lifetime dependency on the borrow stored
+at the memory location `%target`.
+
+### dereference_addr_borrow
+
+```none
+sil-instruction ::= 'dereference_addr_borrow' sil-value
+
+%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the address of the value referenced by a `Builtin.Borrow`.
+
+### init_borrow_addr
+
+```none
+sil-instruction ::= 'init_borrow_addr' sil-value 'with' sil-value
+
+init_borrow_addr %borrow : $*Builtin.Borrow<T> with $target : $*T
+```
+
+Initializes a `Builtin.Borrow` in memory to reference a target value in
+memory.
+
+The value stored to `%borrow` has a lifetime dependency on the borrow stored
+at the memory location `%target`.
+
+### dereference_addr_borrow
+
+```none
+sil-instruction ::= 'dereference_addr_borrow' sil-value
+
+%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the address of the value referenced by a `Builtin.Borrow` in memory.
+
 
 ## Miscellaneous instructions
 

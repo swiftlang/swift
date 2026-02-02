@@ -6,7 +6,7 @@
 // RUN:   -import-objc-header %t/src/Test.h \
 // RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature SendableCompletionHandlers \
-// RUN:   -module-name main -I %t -verify
+// RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_SendableCompletionHandlers
@@ -211,3 +211,7 @@ extension TestDR {
   @_dynamicReplacement(for: test(completion:))
   func __replaceObjCFunc(_: @escaping () -> Void) {} // Ok
 }
+
+@MainActor
+class InvalidIsolated: NSObject, @MainActor P {}
+// expected-warning@-1 {{cannot form main actor-isolated conformance of 'InvalidIsolated' to SendableMetatype-inheriting protocol 'P'}}

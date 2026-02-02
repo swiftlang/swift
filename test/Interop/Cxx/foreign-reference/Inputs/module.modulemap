@@ -1,5 +1,5 @@
-module Constructor {
-  header "constructor.h"
+module FRTConstructors {
+  header "frt-constructors.h"
   requires cplusplus
 }
 
@@ -35,13 +35,17 @@ module WitnessTable {
 
 module ReferenceCounted {
   header "reference-counted.h"
-  requires cplusplus
 }
 
 module ReferenceCountedObjCProperty {
   header "reference-counted-objc-property.h"
   requires cplusplus
   export *
+}
+
+module LifetimeOperationMethods {
+  header "lifetime-operation-methods.h"
+  requires cplusplus
 }
 
 module MemberLayout {
@@ -61,5 +65,40 @@ module DerivedFieldGetterReturnsOwnedFRT {
 
 module FunctionsAndMethodsReturningFRT {
   header "cxx-functions-and-methods-returning-frt.h"
+  requires cplusplus
+}
+
+module PassAsParameter {
+  header "pass-as-parameter.h"
+  requires cplusplus
+}
+
+module Printed {
+  header "printed.h"
+  requires cplusplus
+}
+
+module VirtMethodWithRvalRef {
+  header "virtual-methods-with-rvalue-reference.h"
+  requires cplusplus
+}
+
+module VirtMethodWitMoveOnly {
+  header "virtual-methods-move-only-type.h"
+  requires cplusplus
+}
+
+module LoggingFrts {
+    header "logging-frts.h"
+    requires cplusplus
+}
+
+module FRTReferenceReturns {
+  header "frt-reference-returns.h"
+  requires cplusplus
+}
+
+module RefCountedSmartPtrs {
+  header "refcounted-smartptrs.h"
   requires cplusplus
 }

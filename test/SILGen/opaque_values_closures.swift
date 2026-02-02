@@ -374,7 +374,7 @@ func captureBoxNonopaqueOwnedEscaping_vend() -> C { return C() }
 // CHECK:         destroy_value [[VAR]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF'
 // CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
-// CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, 
+// CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>,
 // CHECK-SAME:      %1 :
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF'
 func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
@@ -385,4 +385,3 @@ func captureBoxNonopaqueOwnedNonescaping<U>(_ get: () -> U) {
   }
   local()
 }
-

@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify -verify-additional-prefix ni- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify -verify-additional-prefix ni-ns- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -37,6 +39,8 @@ final class FinalKlassWithNonSendableStructPair {
 }
 
 func useValue<T>(_ t: T) {}
+func useValueAndReturnGeneric<T>(_ t: T) -> T { t }
+func useNonSendableKlassAndReturn(_ t: NonSendableKlass) -> NonSendableKlass { t }
 func getAny() -> Any { fatalError() }
 
 actor Custom {
@@ -54,6 +58,8 @@ struct CustomActor {
 
 func throwingFunction() throws { fatalError() }
 
+func getBool() -> Bool { false }
+
 func transferArg(_ x: sending NonSendableKlass) {
 }
 
@@ -63,10 +69,21 @@ func transferArgAsync(_ x: sending NonSendableKlass) async {
 func transferArgWithOtherParam(_ x: sending NonSendableKlass, _ y: NonSendableKlass) {
 }
 
+@MainActor
+func transferArgWithOtherParamIsolationCrossing(_ x: sending NonSendableKlass, _ y: NonSendableKlass) async {
+}
+
 func transferArgWithOtherParam2(_ x: NonSendableKlass, _ y: sending NonSendableKlass) {
 }
 
+@MainActor
+func transferArgWithOtherParam2IsolationCrossing(_ x: NonSendableKlass, _ y: sending NonSendableKlass) async {
+}
+
 func twoTransferArg(_ x: sending NonSendableKlass, _ y: sending NonSendableKlass) {}
+
+@MainActor
+func twoTransferArgIsolationCrossing(_ x: sending NonSendableKlass, _ y: sending NonSendableKlass) async {}
 
 @MainActor var globalKlass = NonSendableKlass()
 
@@ -108,8 +125,23 @@ func testSimpleTransferUseOfOtherParamNoError2() {
   useValue(k)
 }
 
-@MainActor func transferToMain2(_ x: sending NonSendableKlass, _ y: NonSendableKlass, _ z: NonSendableKlass) async {
+func testSimpleTransferUseOfOtherParamError() async {
+  let k = NonSendableKlass()
+  await transferArgWithOtherParamIsolationCrossing(k, k) // expected-warning {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to main actor-isolated global function 'transferArgWithOtherParamIsolationCrossing' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{access can happen concurrently}}
+}
 
+// TODO: Improve this error message. We should say that we are emitting an
+// error. Also need to add SILLocation to ApplyInst.
+func testSimpleTransferUseOfOtherParam2Error() async {
+  let k = NonSendableKlass()
+  await transferArgWithOtherParam2IsolationCrossing(k, k) // expected-warning {{sending 'k' risks causing data races}}
+  // expected-note @-1 {{sending 'k' to main actor-isolated global function 'transferArgWithOtherParam2IsolationCrossing' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{access can happen concurrently}}
+}
+
+@MainActor func transferToMain2(_ x: sending NonSendableKlass, _ y: NonSendableKlass, _ z: NonSendableKlass) async {
 }
 
 // TODO: How to test this?
@@ -353,6 +385,13 @@ func doubleArgument() async {
   // expected-note @-2 {{access can happen concurrently}}
 }
 
+func doubleArgumentIsolationCrossing() async {
+  let x = NonSendableKlass()
+  await twoTransferArgIsolationCrossing(x, x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' used after being passed as a 'sending' parameter}}
+  // expected-note @-2 {{access can happen concurrently}}
+}
+
 func testTransferSrc(_ x: sending NonSendableKlass) async {
   let y = NonSendableKlass()
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
@@ -432,86 +471,9 @@ func testNoCrashWhenSendingNoEscapeClosure() async {
   await test { print(c) }
 }
 
-///////////////////////////////
-// MARK: InOut Sending Tests //
-///////////////////////////////
-
-func testInOutSendingReinit(_ x: inout sending NonSendableKlass) async {
-  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-} // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
-
-func testInOutSendingReinit2(_ x: inout sending NonSendableKlass) async {
-  await transferToMain(x)
-  x = NonSendableKlass()
-}
-
-func testInOutSendingReinit3(_ x: inout sending NonSendableKlass) async throws {
-  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-
-  try throwingFunction() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
-
-  x = NonSendableKlass()
-}
-
-func testInOutSendingReinit4(_ x: inout sending NonSendableKlass) async throws {
-  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-
-  do {
-    try throwingFunction()
-    x = NonSendableKlass()
-  } catch {
-    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
-  }
-
-  x = NonSendableKlass()
-}
-
-func testInOutSendingReinit5(_ x: inout sending NonSendableKlass) async throws {
-  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-
-  do {
-    try throwingFunction()
-  } catch {
-    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
-  }
-
-  x = NonSendableKlass()
-}
-
-func testInOutSendingReinit6(_ x: inout sending NonSendableKlass) async throws {
-  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-
-  do {
-    try throwingFunction()
-  } catch {
-    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
-  }
-} // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
-
-actor InOutSendingWrongIsolationActor {
-  var ns = NonSendableKlass()
-  func testWrongIsolation(_ x: inout sending NonSendableKlass) {
-    x = ns
-  } // expected-warning {{'inout sending' parameter 'x' cannot be 'self'-isolated at end of function}}
-  // expected-note @-1 {{'self'-isolated 'x' risks causing races in between 'self'-isolated uses and caller uses since caller assumes value is not actor isolated}}
-
-  func testWrongIsolation2(_ x: inout sending NonSendableKlass) {
-    let z = ns
-    x = z
-  } // expected-warning {{'inout sending' parameter 'x' cannot be 'self'-isolated at end of function}}
-  // expected-note @-1 {{'self'-isolated 'x' risks causing races in between 'self'-isolated uses and caller uses since caller assumes value is not actor isolated}}
-}
-
-@MainActor
-func testWrongIsolationGlobalIsolation(_ x: inout sending NonSendableKlass) {
-  x = globalKlass
-} // expected-warning {{'inout sending' parameter 'x' cannot be main actor-isolated at end of function}}
-// expected-note @-1 {{main actor-isolated 'x' risks causing races in between main actor-isolated uses and caller uses since caller assumes value is not actor isolated}}
+//////////////////////
+// MARK: Misc Tests //
+//////////////////////
 
 func taskIsolatedCaptureInSendingClosureLiteral(_ x: NonSendableKlass) {
   Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}

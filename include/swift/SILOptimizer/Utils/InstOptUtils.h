@@ -213,14 +213,6 @@ castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
 /// ```
 bool layoutIsTypeDependent(NominalTypeDecl *decl);
 
-/// Peek through trivial Enum initialization, typically for pointless
-/// Optionals.
-///
-/// The returned InitEnumDataAddr dominates the given
-/// UncheckedTakeEnumDataAddrInst.
-InitEnumDataAddrInst *
-findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai);
-
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
@@ -625,6 +617,8 @@ SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
 
 bool isDestructorSideEffectFree(SILInstruction *mayRelease,
                                 DestructorAnalysis *DA);
+
+bool shouldRemoveCondFail(StringRef withMessage, StringRef functionName);
 
 } // end namespace swift
 

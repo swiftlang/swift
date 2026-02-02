@@ -299,7 +299,7 @@ static unsigned getBaseMachOPlatformID(const llvm::Triple &TT) {
   case llvm::Triple::XROS:
     return llvm::MachO::PLATFORM_XROS;
   default:
-    return /*Unknown platform*/ 0;
+    return llvm::MachO::PLATFORM_UNKNOWN;
   }
 }
 
@@ -307,11 +307,18 @@ llvm::Value *
 IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
                                               llvm::Value *minor,
                                               llvm::Value *patch) {
-  auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
+  // compiler-rt in the NDK does not include __isPlatformVersionAtLeast
+  // but only __isOSVersionAtLeast
+  if (IGM.Triple.isAndroid()) {
+    auto fn = IGM.getOSVersionAtLeastFunctionPointer();
+    return Builder.CreateCall(fn, {major, minor, patch});
+  } else {
+    auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
 
-  llvm::Value *platformID =
-    llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
-  return Builder.CreateCall(fn, {platformID, major, minor, patch});
+    llvm::Value *platformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
+    return Builder.CreateCall(fn, {platformID, major, minor, patch});
+  }
 }
 
 llvm::Value *
@@ -404,7 +411,7 @@ llvm::Value *IRGenFunction::emitLoadOfCompactFunctionPointer(
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
                                       Explosion &explosion) {
   if (!isa<LoadableTypeInfo>(type)) {
-    explosion.add(llvm::UndefValue::get(type.getStorageType()->getPointerTo()));
+    explosion.add(llvm::UndefValue::get(IGM.PtrTy));
     return;
   }
 
@@ -412,7 +419,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
   for (auto &element : schema) {
     llvm::Type *elementType;
     if (element.isAggregate()) {
-      elementType = element.getAggregateType()->getPointerTo();
+      elementType = IGM.PtrTy;
     } else {
       elementType = element.getScalarType();
     }
@@ -465,8 +472,7 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
     Size objectSize(IGM.DataLayout.getTypeAllocSize(objectTy));
     if (byteOffset.isMultipleOf(objectSize)) {
       // Cast to T*.
-      auto objectPtrTy = objectTy->getPointerTo();
-      base = Builder.CreateBitCast(base, objectPtrTy);
+      base = Builder.CreateBitCast(base, IGM.PtrTy);
 
       // GEP to the slot, computing the index as a signed number.
       auto scaledIndex =
@@ -480,7 +486,7 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
 
   // GEP to the slot.
   auto offsetValue = offset.getAsValue(*this);
-  auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
+  auto slotPtr = emitByteOffsetGEP(base, offsetValue);
   return Address(slotPtr, objectTy, objectAlignment);
 }
 
@@ -525,8 +531,8 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   }
 
   // Emit the trap instruction.
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
+      &IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }
@@ -878,8 +884,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto &resumeTI = cast<LoadableTypeInfo>(getTypeInfo(resumeTy));
     auto resultStorageTy = resumeTI.getStorageType();
     auto resultAddr =
-        Address(Builder.CreateBitOrPointerCast(resultAddrVal,
-                                               resultStorageTy->getPointerTo()),
+        Address(Builder.CreateBitOrPointerCast(resultAddrVal, IGM.PtrTy),
                 resultStorageTy, resumeTI.getFixedAlignment());
     resumeTI.loadAsTake(*this, resultAddr, outDirectResult);
   }
@@ -900,8 +905,8 @@ void IRGenFunction::emitResumeAsyncContinuationReturning(
   // pointer type.
   Address context = emitLoadOfContinuationContext(*this, continuation);
   auto destPtrAddr = emitAddrOfContinuationNormalResultPointer(*this, context);
-  auto destPtr = Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr),
-                                     valueTI.getStorageType()->getPointerTo());
+  auto destPtr =
+      Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr), IGM.PtrTy);
   Address destAddr = valueTI.getAddressForPointer(destPtr);
 
   valueTI.initializeWithTake(*this, destAddr, srcAddr, valueTy,

@@ -1,0 +1,4 @@
+module ObjCTypes {
+  header "objc-types.h"
+  export *
+}

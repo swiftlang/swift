@@ -1,12 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature StrictMemorySafety -enable-experimental-feature LifetimeDependence -enable-experimental-feature CImplementation -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -enable-experimental-feature AddressableParameters -enable-experimental-feature NoImplicitCopy -enable-experimental-feature StrictMemorySafety -enable-experimental-feature Lifetimes -import-bridging-header %S/Inputs/attr_abi.h -parse-as-library -debugger-support
 
 // REQUIRES: swift_feature_AddressableParameters
-// REQUIRES: swift_feature_CImplementation
 // REQUIRES: swift_feature_Extern
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_NoImplicitCopy
 // REQUIRES: swift_feature_StrictMemorySafety
-// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 import _Differentiation
 
@@ -992,18 +990,18 @@ func fnExtInfoTest(
 // FIXME: Not sure how to reach tryNormalizeOutermostType() generic func
 
 @abi(
-  func testMarkerProtocols<A, B: Sendable>(
-    _: A, _: B,
-    _: Any, _: Sendable,
-    _: AnyKeyPath, _: AnyKeyPath & Sendable,
-    _: Any, _: Sendable & BitwiseCopyable
+  func testMarkerProtocols<A, B: Sendable, C, D: SendableMetatype>(
+    _: A, _: B, _: C, _: D,
+    _: Any, _: Sendable, _: Any, _: SendableMetatype,
+    _: AnyKeyPath, _: AnyKeyPath & Sendable, _: AnyKeyPath, _: AnyKeyPath & SendableMetatype,
+    _: Any, _: Sendable & BitwiseCopyable, _: Any, _: SendableMetatype & BitwiseCopyable
   )
 )
-func testMarkerProtocols<A: Sendable, B>(
-  _: A, _: B,
-  _: Sendable, _: Any,
-  _: AnyKeyPath & Sendable, _: AnyKeyPath,
-  _: Sendable & BitwiseCopyable, _: Any
+func testMarkerProtocols<A: Sendable, B, C: SendableMetatype, D>(
+  _: A, _: B, _: C, _: D,
+  _: Sendable, _: Any, _: SendableMetatype, _: Any,
+  _: AnyKeyPath & Sendable, _: AnyKeyPath, _: AnyKeyPath & SendableMetatype, _: AnyKeyPath,
+  _: Sendable & BitwiseCopyable, _: Any, _: SendableMetatype & BitwiseCopyable, _: Any
 ) {}
 
 @abi(
@@ -1592,15 +1590,15 @@ func extern2() {}
 @abi(func extern3())
 @_extern(c) @_extern(wasm, module: "foo", name: "bar") func extern3()
 
-// @_used -- banned in @abi
-@abi(@_used func used1()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
-@_used func used1() {}
+// @used -- banned in @abi
+@abi(@used func used1()) // expected-error {{unused 'used' attribute in '@abi'}} {{6-11=}}
+@used func used1() {}
 
-@abi(@_used func used2()) // expected-error {{unused '_used' attribute in '@abi'}} {{6-12=}}
+@abi(@used func used2()) // expected-error {{unused 'used' attribute in '@abi'}} {{6-11=}}
 func used2() {}
 
 @abi(func used3())
-@_used func used3() {}
+@used func used3() {}
 
 // weak, unowned, unowned(unsafe) -- banned in @abi
 class ReferenceOwnership {
@@ -1863,15 +1861,15 @@ func expose2() {}
 @abi(func expose3())
 @_expose(Cxx) func expose3() {}
 
-// @_section -- banned in @abi
-@abi(@_section("fnord") func section1()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
-@_section("fnord") func section1() {}
+// @section -- banned in @abi
+@abi(@section("fnord") func section1()) // expected-error {{unused 'section' attribute in '@abi'}} {{6-23=}}
+@section("fnord") func section1() {}
 
-@abi(@_section("fnord") func section2()) // expected-error {{unused '_section' attribute in '@abi'}} {{6-24=}}
+@abi(@section("fnord") func section2()) // expected-error {{unused 'section' attribute in '@abi'}} {{6-23=}}
 func section2() {}
 
 @abi(func section3())
-@_section("fnord") func section3() {}
+@section("fnord") func section3() {}
 
 // @inlinable -- banned in @abi
 // Although the inlining *does* occasionally get mangled, it's only done in the
@@ -2051,22 +2049,22 @@ protocol BorrowedAttr {
   var v3: Int { get set }
 }
 
-// @lifetime -- must match in @abi
+// @_lifetime -- must match in @abi
 // TODO: Probably possible to make these unconstrained as long as we ensure
 // that `@_addressableForDependencies` doesn't cause a calling convention
 // change.
 struct Lifetime: ~Escapable {
-  @abi(@lifetime(borrow i1) init(i1: UnsafeRawPointer))
-  @lifetime(borrow i1) init(i1: UnsafeRawPointer) {}
+  @abi(@_lifetime(borrow i1) init(i1: UnsafeRawPointer))
+  @_lifetime(borrow i1) init(i1: UnsafeRawPointer) {}
 
-  @abi(@lifetime(borrow i2) init(i2: UnsafeRawPointer)) // expected-error {{extra 'lifetime' attribute in '@abi'}} {{8-28=}}
+  @abi(@_lifetime(borrow i2) init(i2: UnsafeRawPointer)) // expected-error {{extra '_lifetime' attribute in '@abi'}} {{8-29=}}
   init(i2: UnsafeRawPointer) {}
 
-  @abi(init(i3: UnsafeRawPointer)) // expected-error {{missing 'lifetime' attribute in '@abi'}} {{8-8=@lifetime(borrow i3) }}
-  @lifetime(borrow i3) init(i3: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
+  @abi(init(i3: UnsafeRawPointer)) // expected-error {{missing '_lifetime' attribute in '@abi'}} {{8-8=@_lifetime(borrow i3) }}
+  @_lifetime(borrow i3) init(i3: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
 
-  @abi(@lifetime(borrow i4) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer)) // expected-error {{'lifetime' attribute in '@abi' should match '@lifetime(borrow i4a)'}} {{8-28=@lifetime(borrow i4a)}}
-  @lifetime(borrow i4a) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
+  @abi(@_lifetime(borrow i4) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer)) // expected-error {{'_lifetime' attribute in '@abi' should match '@_lifetime(borrow i4a)'}} {{8-29=@_lifetime(borrow i4a)}}
+  @_lifetime(borrow i4a) init(i4: UnsafeRawPointer, i4a: UnsafeRawPointer) {} // expected-note {{should match attribute here}}
 }
 
 // @_unsafeNonescapableResult -- must match in @abi

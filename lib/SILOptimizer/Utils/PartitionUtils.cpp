@@ -46,7 +46,7 @@ void PartitionOpError::SentNeverSendableError::print(
      << "        ID:  %%" << sentElement << "\n"
      << "        Rep: " << *info.getRepresentative(sentElement)
      << "        Dynamic Isolation Region: ";
-  isolationRegionInfo.printForOneLineLogging(os);
+  isolationRegionInfo.printForOneLineLogging(info.getFunction(), os);
   os << '\n';
   if (auto isolatedValue = isolationRegionInfo->maybeGetIsolatedValue()) {
     os << "        Isolated Value: " << isolatedValue;
@@ -90,7 +90,7 @@ void PartitionOpError::InOutSendingNotDisconnectedAtExitError::print(
      << "        ID:  %%" << inoutSendingElement << "\n"
      << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
      << "        Dynamic Isolation Region: ";
-  isolationInfo.printForOneLineLogging(os);
+  isolationInfo.printForOneLineLogging(valueMap.getFunction(), os);
   os << '\n';
 }
 
@@ -102,6 +102,27 @@ void PartitionOpError::NonSendableIsolationCrossingResultError::print(
      << '\n';
 }
 
+void PartitionOpError::InOutSendingReturnedError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingReturnedError!\n"
+     << "        ID:  %%" << inoutSendingElement << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
+     << "        Returned Value ID:  %%" << returnedValue << '\n'
+     << "        Rep: " << valueMap.getRepresentativeValue(returnedValue);
+}
+
+void PartitionOpError::InOutSendingParametersInSameRegionError::print(
+    llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const {
+  os << "    Emitting Error. Kind: InOutSendingParametersInSameRegion!\n"
+     << "        First ID:  %%" << firstInoutSendingParam
+     << "        First Rep: "
+     << valueMap.getRepresentativeValue(firstInoutSendingParam);
+  for (auto other : otherInOutSendingParams) {
+    os << "        Other ID:  %%" << other
+       << "        Other Rep: " << valueMap.getRepresentativeValue(other);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: PartitionOp
 //===----------------------------------------------------------------------===//
@@ -109,11 +130,19 @@ void PartitionOpError::NonSendableIsolationCrossingResultError::print(
 void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   constexpr static char extraSpaceLiteral[10] = "     ";
   switch (opKind) {
-  case PartitionOpKind::Assign: {
-    os << "assign ";
+  case PartitionOpKind::AssignDirect: {
+    os << "assign_direct ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << getOpArg1() << " = %%" << getOpArg2();
+    break;
+  }
+  case PartitionOpKind::AssignIndirect: {
+    os << "assign_indirect ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2()
+       << ". Overwritten Value: " << getOpArg3();
     break;
   }
   case PartitionOpKind::AssignFresh:

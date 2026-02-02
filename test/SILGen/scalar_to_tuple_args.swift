@@ -55,8 +55,9 @@ tupleWithDefaults(x: (x,x))
 
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[MEMORY]]
-// CHECK: [[ADDR:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[BB:%.*]] = begin_borrow [[ARRAY]]
+// CHECK:            = struct_extract [[BB]]
+// CHECK: [[ADDR:%.*]] = ref_tail_addr
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: copy_addr [[READ]] to [init] [[ADDR]]
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF

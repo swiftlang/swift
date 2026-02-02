@@ -260,6 +260,7 @@ public:
     PartialApplyStack,
     MarkDependenceNonEscaping,
     BeginAsyncLet,
+    MakeBorrow,
   };
 
 private:
@@ -294,6 +295,8 @@ public:
       return Kind::PartialApplyStack;
     case SILInstructionKind::MarkDependenceInst:
       return Kind::MarkDependenceNonEscaping;
+    case SILInstructionKind::MakeBorrowInst:
+      return Kind::MakeBorrow;
     case SILInstructionKind::BuiltinInst: {
       auto bi = cast<BuiltinInst>(i);
       if (bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
@@ -415,6 +418,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::PartialApplyStack:
     case BorrowingOperandKind::MarkDependenceNonEscaping:
     case BorrowingOperandKind::BeginAsyncLet:
+    case BorrowingOperandKind::MakeBorrow:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -482,6 +486,7 @@ public:
     SILFunctionArgument,
     Phi,
     BeginApplyToken,
+    DereferenceBorrow,
   };
 
 private:
@@ -519,7 +524,10 @@ public:
         return Kind::BeginApplyToken;
       }
       return Kind::Invalid;
+    case ValueKind::DereferenceBorrowInst:
+      return Kind::DereferenceBorrow;
     }
+       
   }
 
   BorrowedValueKind(Kind newValue) : value(newValue) {}
@@ -538,6 +546,7 @@ public:
       llvm_unreachable("Using invalid case?!");
     case BorrowedValueKind::BeginBorrow:
     case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::DereferenceBorrow:
     case BorrowedValueKind::Phi:
     case BorrowedValueKind::BeginApplyToken:
       return true;
@@ -629,6 +638,21 @@ struct BorrowedValue {
   /// includes reborrow scopes that are reachable from this borrow scope but not
   /// necessarilly dominated by the borrow scope.
   void computeTransitiveLiveness(MultiDefPrunedLiveness &liveness) const;
+
+  /// Whether \p insts are completely within this borrow introducer's local
+  /// scope.
+  ///
+  /// Precondition: \p insts are dominated by the local borrow introducer.
+  ///
+  /// This ignores reborrows. The assumption is that, since \p insts are
+  /// dominated by this local scope, checking the extended borrow scope should
+  /// not be necessary to determine they are within the scope.
+  ///
+  /// \p deadEndBlocks is optional during transition. It will be completely
+  /// removed in an upcoming commit.
+  template <typename Instructions>
+  bool areWithinExtendedScope(Instructions insts,
+                              DeadEndBlocks *deadEndBlocks) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.
@@ -1425,6 +1449,43 @@ bool isRedundantMoveValue(MoveValueInst *mvi);
 /// Sets the reborrow flags for all transitively incoming phi-arguments of
 /// `forEndBorrowValue`, which is the operand value of an `end_borrow`.
 void updateReborrowFlags(SILValue forEndBorrowValue);
+
+/// A location at which a value is used.  Abstracts over explicit uses
+/// (operands) and implicit uses (instructions).
+struct UsePoint {
+  using Value = llvm::PointerUnion<SILInstruction *, Operand *>;
+  Value value;
+
+  UsePoint(Operand *op) : value(op) {}
+  UsePoint(SILInstruction *inst) : value(inst) {}
+  UsePoint(Value value) : value(value) {}
+
+  SILInstruction *getInstruction() const {
+    if (auto *op = dyn_cast<Operand *>(value)) {
+      return op->getUser();
+    }
+    return cast<SILInstruction *>(value);
+  }
+
+  Operand *getOperandOrNull() const { return dyn_cast<Operand *>(value); }
+
+  Operand *getOperand() const { return cast<Operand *>(value); }
+};
+
+struct UsePointToInstruction {
+  SILInstruction *operator()(const UsePoint point) const {
+    return point.getInstruction();
+  }
+};
+
+using UsePointInstructionRange =
+    TransformRange<ArrayRef<UsePoint>, UsePointToInstruction>;
+
+struct PointToOperand {
+  Operand *operator()(const UsePoint point) const { return point.getOperand(); }
+};
+
+using PointOperandRange = TransformRange<ArrayRef<UsePoint>, PointToOperand>;
 
 } // namespace swift
 

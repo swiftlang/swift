@@ -64,7 +64,6 @@ namespace {
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
-    SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
     SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
@@ -419,16 +418,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
-  // Remove "dead" begin_access.
-  if (llvm::all_of(BAI->getUses(), [](Operand *operand) -> bool {
-        return isIncidentalUse(operand->getUser());
-      })) {
-    return BAI->getOperand();
-  }
-  return SILValue();
-}
-
 SILValue InstSimplifier::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // Eliminate round trip convert_function. Non round-trip is performed in
   // SILCombine.
@@ -752,10 +741,12 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
 
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   // If we weren't passed a dead end blocks, we can't optimize without ownership
   // enabled.
   if (!deadEndBlocks)
     return next;
+#endif
 
   OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
   OwnershipRAUWHelper helper(ctx, svi, result);

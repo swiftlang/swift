@@ -1138,3 +1138,35 @@ bb0(%0 : $B, %1: $B):
   return %5 : $()
 }
 
+enum NCEnum : ~Copyable {
+  case some([Int])
+  case none
+}
+
+sil @use_ncenum : $@convention(thin) (@guaranteed Array<Int>) -> ()
+
+// CHECK-LABEL: sil hidden @testNoncopyable : $@convention(thin) (@guaranteed NCEnum) -> () {
+// CHECK-NOT: retain_value %0
+// CHECK: retain_value
+// CHECK-LABEL: } // end sil function 'testNoncopyable'
+sil hidden @testNoncopyable : $@convention(thin) (@guaranteed NCEnum) -> () {
+bb0(%0 : $NCEnum):
+  switch_enum %0, case #NCEnum.none!enumelt: bb1, case #NCEnum.some!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2(%4 : $Array<Int>):
+  %5 = alloc_stack [var_decl] $Array<Int>, var, name "array"
+  retain_value %4
+  store %4 to %5
+  %11 = function_ref @use_ncenum : $@convention(thin) (@guaranteed Array<Int>) -> ()
+  %12 = apply %11(%4) : $@convention(thin) (@guaranteed Array<Int>) -> ()
+  destroy_addr %5
+  dealloc_stack %5
+  br bb3
+bb3:
+  %16 = tuple ()
+  return %16
+}
+

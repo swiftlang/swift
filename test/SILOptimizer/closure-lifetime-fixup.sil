@@ -164,19 +164,37 @@ bb1:
   return %86 : $()
 }
 
-sil [ossa] @closureImpl :  $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+sil [ossa] @closureImpl1 :  $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+sil [ossa] @closureImpl2 :  $@convention(thin) (@guaranteed Klass, @in_guaranteed Klass) -> Bool
 sil [ossa] @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
 
 // Don't crash.
-// CHECK-LABEL: sil hidden [ossa] @testUndefined
+// CHECK-LABEL: sil hidden [ossa] @testUndefined1
 // CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
 // CHECK:  destroy_value [[PA]] : $@noescape @callee_guaranteed () -> Bool
 // CHECK:  destroy_value
-sil hidden [ossa] @testUndefined : $@convention(method) (@guaranteed Klass, @guaranteed Klass) -> () {
+sil hidden [ossa] @testUndefined1 : $@convention(method) (@guaranteed Klass, @guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
-  %4 = function_ref @closureImpl : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+  %4 = function_ref @closureImpl1 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
   %5 = copy_value %1 : $Klass
   %6 = partial_apply [callee_guaranteed] %4(%5, undef) : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+  %7 = convert_escape_to_noescape [not_guaranteed] %6 : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+  %21 = function_ref @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+  %22 = apply %21(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+  destroy_value %7 : $@noescape @callee_guaranteed () -> Bool
+  destroy_value %6 : $@callee_guaranteed () -> Bool
+  %42 = tuple ()
+  return %42 : $()
+}
+
+// Don't crash on undef in insertDeallocOfCapturedArguments
+// CHECK-LABEL: sil hidden [ossa] @testUndefined2 :
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+sil hidden [ossa] @testUndefined2 : $@convention(method) (@guaranteed Klass, @in_guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : $*Klass):
+  %4 = function_ref @closureImpl2 : $@convention(thin) (@guaranteed Klass, @in_guaranteed Klass) -> Bool
+  %5 = copy_value %0 : $Klass
+  %6 = partial_apply [callee_guaranteed] %4(%5, undef) : $@convention(thin) (@guaranteed Klass, @in_guaranteed Klass) -> Bool
   %7 = convert_escape_to_noescape [not_guaranteed] %6 : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
   %21 = function_ref @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
   %22 = apply %21(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
@@ -304,6 +322,9 @@ bb3(%25 : @owned $any Error):
   throw %25 : $any Error
 
 bb4(%29 : @owned $any Error):
+  destroy_value [dead_end] %29
+  destroy_value [dead_end] %15
+  destroy_value [dead_end] %13
   unreachable
 }
 

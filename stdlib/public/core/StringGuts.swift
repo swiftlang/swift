@@ -17,6 +17,7 @@ import SwiftShims
 // functionality and guidance for efficiently working with Strings.
 //
 @frozen
+@_addressableForDependencies
 public // SPI(corelibs-foundation)
 struct _StringGuts: @unchecked Sendable {
   @usableFromInline
@@ -414,6 +415,13 @@ extension _StringGuts {
       r = r._copyingAlignment(from: i)
     }
     return r._knownUTF16
+  }
+}
+
+extension _StringGuts {
+  @inline(__always) // Performance
+  internal func isTriviallyIdentical(to other: Self) -> Bool {
+    self.rawBits == other.rawBits
   }
 }
 

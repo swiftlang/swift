@@ -93,7 +93,37 @@ func useConformance() {
 
 ////
 
-extension Tuple: Equatable where repeat each Element: Equatable {
+
+// Tuples cannot yet have conformances conditional on more than one thing,
+// and ~Copyable packs aren't yet supported, so redefining these protocols
+// as copyable-only versions
+
+public protocol CopyableEquatable {
+  static func ==(lhs: Self, rhs: Self) -> Bool
+}
+
+public protocol CopyableComparable: CopyableEquatable {
+  static func <(lhs: Self, rhs: Self) -> Bool
+}
+
+public protocol CopyableHashable: CopyableEquatable {
+  func hash(into hasher: inout Hasher)
+}
+
+public extension CopyableEquatable {
+    static func !=(lhs: Self, rhs: Self) -> Bool {
+        !(lhs == rhs)
+    }
+}
+
+extension CopyableComparable {
+    static func >(lhs: Self, rhs: Self) -> Bool {
+        !(lhs > rhs) && lhs != rhs
+    }
+}
+
+
+extension Tuple: CopyableEquatable where repeat each Element: CopyableEquatable {
   // FIXME: Hack
   @_disfavoredOverload
   public static func ==(lhs: Self, rhs: Self) -> Bool {
@@ -104,7 +134,7 @@ extension Tuple: Equatable where repeat each Element: Equatable {
   }
 }
 
-extension Tuple: Hashable where repeat each Element: Hashable {
+extension Tuple: CopyableHashable where repeat each Element: CopyableHashable {
   public func hash(into hasher: inout Hasher) {
     for elt in repeat each self {
       elt.hash(into: &hasher)
@@ -112,7 +142,7 @@ extension Tuple: Hashable where repeat each Element: Hashable {
   }
 }
 
-extension Tuple: Comparable where repeat each Element: Comparable {
+extension Tuple: CopyableComparable where repeat each Element: CopyableComparable {
   // FIXME: Hack
   @_disfavoredOverload
   public static func <(lhs: Self, rhs: Self) -> Bool {

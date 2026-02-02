@@ -19,7 +19,7 @@ class CrashTest {
 CrashTest().returnSelf(["": 0]).something
 
 class CrashTest2 {
-// CHECK: [[@LINE+1]]:8 | instance-method/Swift | bar
+// CHECK: [[@LINE+1]]:8 | instance-method(internal)/Swift | bar
   func bar() {
     someClosure { [weak self] in
       guard let sSelf = self else { return }

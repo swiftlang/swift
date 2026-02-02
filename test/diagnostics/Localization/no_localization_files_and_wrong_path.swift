@@ -6,7 +6,7 @@
 _ = "HI!
 // expected-error@-1{{unterminated string literal}}
 var self1 = self1
-// expected-note@-1 2{{through reference here}}
+// expected-note@-1 {{through reference here}}
 // expected-error@-2 {{circular reference}}
 
 struct Broken {

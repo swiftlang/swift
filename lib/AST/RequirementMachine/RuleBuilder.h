@@ -83,11 +83,15 @@ struct RuleBuilder {
   /// Used to ensure the initWith*() methods are only called once.
   unsigned Initialized : 1;
 
+  /// Whether completion failed for any of our upstream protocol components.
+  unsigned Failed : 1;
+
   RuleBuilder(RewriteContext &ctx,
               llvm::DenseSet<const ProtocolDecl *> &referencedProtocols)
       : Context(ctx), ReferencedProtocols(referencedProtocols) {
     Dump = ctx.getASTContext().LangOpts.DumpRequirementMachine;
     Initialized = 0;
+    Failed = 0;
   }
 
   void initWithGenericSignature(ArrayRef<GenericTypeParamType *> genericParams,

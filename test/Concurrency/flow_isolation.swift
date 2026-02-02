@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
-// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -enable-upcoming-feature RegionBasedIsolation
 
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 func randomBool() -> Bool { return false }
 func logTransaction(_ i: Int) {}
@@ -30,13 +28,6 @@ struct Money {
   var euros: Int {
     return dollars * 2
   }
-}
-
-actor OtherActorBackingActor { }
-
-@globalActor
-struct OtherActor {
-  static let shared = OtherActorBackingActor()
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -839,78 +830,17 @@ func testActorWithInitAccessorInit() {
 
 @available(SwiftStdlib 5.1, *)
 actor TestNonisolatedUnsafe {
-  private nonisolated(unsafe) var child: MyOtherActor!
+  private nonisolated(unsafe) var child: OtherActor!
   init() {
-    child = MyOtherActor(parent: self)
+    child = OtherActor(parent: self)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-actor MyOtherActor {
+actor OtherActor {
   unowned nonisolated let parent: any Actor
 
   init(parent: any Actor) {
     self.parent = parent
-  }
-}
-
-func globalActorNonIsolatedInitializerTests() {
-  @MainActor
-  class C {
-    let ns: NonSendableType
-
-    nonisolated init() {
-      self.ns = NonSendableType()
-    }
-
-    nonisolated init(x: NonSendableType) {
-      self.ns = x
-    }
-
-    nonisolated func doSomething() {}
-
-    nonisolated init(x2 x: NonSendableType) {
-      self.ns = x
-      doSomething() // expected-note {{after calling instance method 'doSomething()', only nonisolated properties of 'self' can be accessed from this init}}
-      print(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer}}
-    }
-  }
-
-  // Make sure this does not apply in cases where self is not actor isolated.
-  class D {
-    @MainActor let ns: NonSendableType // expected-note {{mutation of this property is only permitted within the actor}}
-
-    nonisolated init() {
-      self.ns = NonSendableType() // expected-warning {{main actor-isolated property 'ns' can not be mutated from a nonisolated context}}
-    }
-  }
-
-  actor A {
-    @MainActor let ns: NonSendableType
-
-    init() {
-      self.ns = NonSendableType()
-    }
-  }
-
-  @MainActor
-  class C2 {
-    @OtherActor let ns: NonSendableType
-
-    nonisolated init() {
-      self.ns = NonSendableType()
-    }
-
-    nonisolated init(_ x: NonSendableType) {
-      self.ns = x
-    }
-
-    nonisolated func doSomething() {}
-
-    nonisolated init(x2 x: NonSendableType) {
-      self.ns = x
-      doSomething() // expected-note {{after calling instance method 'doSomething()', only nonisolated properties of 'self' can be accessed from this init}}
-      print(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer}}
-    }
   }
 }

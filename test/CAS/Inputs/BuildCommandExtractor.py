@@ -31,7 +31,8 @@ with open(input_json, "r") as file:
         cmd = info["bridgingHeader"]["commandLine"][1:]
         printCmd(cmd)
         # print input file name.
-        print(info["chainedBridgingHeaderPath"])
+        if "chainedBridgingHeaderPath" in info:
+            print(info["chainedBridgingHeaderPath"])
     else:
         module_names = deps["modules"][::2]
         module_details = deps["modules"][1::2]

@@ -14,6 +14,6 @@ struct S {
 
 // rdar://147751795 - Make sure we don't end up with a duplicate closure scope.
 // CHECK:      PatternEntryInitializerScope {{.*}}, [8:15 - 10:3] entry 0 'x'
-// CHECK-NEXT:   `-ClosureParametersScope {{.*}}, [8:28 - 10:3]
-// CHECK-NEXT:     `-BraceStmtScope {{.*}}, [8:28 - 10:3]
+// CHECK-NEXT:   `-ClosureParametersScope {{.*}}, [9:5 - 10:3]
+// CHECK-NEXT:     `-BraceStmtScope {{.*}}, [9:5 - 10:3]
 // CHECK-EMPTY:

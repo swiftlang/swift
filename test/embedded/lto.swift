@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -lto=llvm-full %s -enable-experimental-feature Embedded -emit-bc -o %t/a.o
-// RUN: %target-clang %t/a.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
 
 // For LTO, the linker dlopen()'s the libLTO library, which is a scenario that
 // ASan cannot work in ("Interceptors are not working, AddressSanitizer is

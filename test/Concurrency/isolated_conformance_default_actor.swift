@@ -2,6 +2,8 @@
 
 // REQUIRES: concurrency
 
+@MainActor func onMain() { }
+
 nonisolated
 protocol P {
   func f()
@@ -12,8 +14,14 @@ protocol Q {
   func g()
 }
 
+// expected-note@+4{{turn data races into runtime errors with '@preconcurrency'}}
+// expected-note@+3{{isolate this conformance to the main actor with '@MainActor'}}
+// expected-note@+2{{mark all declarations used in the conformance 'nonisolated'}}
+// expected-error@+1{{conformance of 'CImplicitMainActorNonisolatedConformance' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
 class CImplicitMainActorNonisolatedConformance: nonisolated P {
-  func f() { } // error: explicitly nonisolated conformance
+  func f() { // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+    onMain() // okay, f is on @MainActor
+  }
 }
 
 
@@ -73,9 +81,6 @@ func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
 nonisolated func testConformancesFromNonisolated() {
-  let _: any P = CExplicitMainActor() // okay
-  let _: any P = CImplicitMainActor() // okay
-
   let _: any P = CNonIsolated()
   let _: any P = CImplicitMainActorNonisolatedConformance()
 
@@ -84,6 +89,10 @@ nonisolated func testConformancesFromNonisolated() {
   let _: any Q = CImplicitMainActor()
 
   // Error, these are main-actor-isolated conformances
+  let _: any P = CExplicitMainActor() // expected-error{{main actor-isolated conformance of 'CExplicitMainActor' to 'P' cannot be used in nonisolated context}}
+  let _: any P = CImplicitMainActor() // expected-error{{main actor-isolated conformance of 'CImplicitMainActor' to 'P' cannot be used in nonisolated context}}
+
+
   let _: any Equatable.Type = EquatableStruct.self // expected-error{{main actor-isolated conformance of 'EquatableStruct' to 'Equatable' cannot be used in nonisolated context}}
   let _: any Hashable.Type = HashableStruct.self // expected-error{{main actor-isolated conformance of 'HashableStruct' to 'Hashable' cannot be used in nonisolated context}}
   let _: any RawRepresentable.Type = RawRepresentableEnum.self

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 extension BinaryInteger {
   init(bytes: [UInt8]) { fatalError() }

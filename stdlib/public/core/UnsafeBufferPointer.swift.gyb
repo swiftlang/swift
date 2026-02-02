@@ -126,7 +126,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   @safe
   public var baseAddress: Unsafe${Mutable}Pointer<Element>? {
@@ -212,7 +212,7 @@ extension Unsafe${Mutable}BufferPointer: @unsafe Sequence {
     return (unsafe Iterator(_position: s + n, _end: s + count), n)
   }
 
-  @inlinable
+  @inlinable @_transparent
   @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -240,7 +240,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// The `startIndex` property of an `Unsafe${Mutable}BufferPointer` instance
   /// is always zero.
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   @safe
   public var startIndex: Int { 0 }
@@ -250,20 +250,20 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// The `endIndex` property of an `Unsafe${Mutable}BufferPointer` instance is
   /// always identical to `count`.
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   @safe
   public var endIndex: Int { count }
 
-  @inlinable
-  @safe
+  @_transparent
   @_preInverseGenerics
+  @safe
   public var indices: Range<Int> {
     // Not checked because init forbids negative count.
     unsafe Range(uncheckedBounds: (0, count))
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func index(after i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -281,7 +281,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func formIndex(after i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -295,7 +295,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     i = result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func index(before i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -309,7 +309,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func formIndex(before i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -323,7 +323,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     i = result.partialValue
   }
 
-  @inlinable
+  @_transparent
   @_preInverseGenerics
   public func index(_ i: Int, offsetBy n: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -572,16 +572,43 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
   }
+}
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @unsafe
-  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @_transparent
     get {
-      let span = unsafe Span(_unsafeElements: self)
-      return unsafe _overrideLifetime(span, borrowing: self)
+      unsafe Span(_unsafeElements: self)
     }
+  }
+%if Mutable:
+
+  @unsafe
+  @_alwaysEmitIntoClient
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(borrow self)
+    @_transparent
+    get {
+      unsafe MutableSpan(_unsafeElements: self)
+    }
+  }
+%end
+}
+
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @safe
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._position == other._position) && (self.count == other.count)
   }
 }
 
@@ -765,7 +792,7 @@ extension Unsafe${Mutable}BufferPointer:
     return try unsafe body(&self)
   }
 
-  @inlinable
+  @inlinable @_transparent
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -778,6 +805,15 @@ extension Unsafe${Mutable}BufferPointer:
     return try unsafe body(&self)
   }
 %  end
+}
+
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned() -> Bool {
+    guard let p = baseAddress else { return true }
+    return p._isWellAligned()
+  }
 }
 
 extension Unsafe${Mutable}BufferPointer {
@@ -801,7 +837,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// - `rebased.count == slice.count`
   ///
   /// - Parameter slice: The buffer slice to rebase.
-  @inlinable // unsafe-performance
+  @inlinable @_transparent // unsafe-performance
   public init(rebasing slice: Slice<UnsafeBufferPointer<Element>>) {
     // NOTE: `Slice` does not guarantee that its start/end indices are valid
     // in `base` -- it merely ensures that `startIndex <= endIndex`.
@@ -840,7 +876,7 @@ extension Unsafe${Mutable}BufferPointer {
   /// - `rebased.count == slice.count`
   ///
   /// - Parameter slice: The buffer slice to rebase.
-  @inlinable // unsafe-performance
+  @inlinable @_transparent // unsafe-performance
   public init(rebasing slice: Slice<UnsafeMutableBufferPointer<Element>>) {
     let base = unsafe slice.base.baseAddress?.advanced(by: slice.startIndex)
     let count = unsafe slice.endIndex &- slice.startIndex
@@ -969,7 +1005,7 @@ extension UnsafeMutableBufferPointer {
   ///     initialize the buffer's storage.
   /// - Returns: The index one past the last element of the buffer initialized
   ///     by this function.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent 
   public func initialize(
     fromContentsOf source: some Collection<Element>
   ) -> Index {
@@ -1197,7 +1233,7 @@ extension UnsafeMutableBufferPointer {
 }
 
 extension UnsafeMutableBufferPointer where Element: ~Copyable {
-  /// Updates this buffer's initialized memory initialized memory by moving
+  /// Updates this buffer's initialized memory by moving
   /// every element from the source buffer, leaving the source memory
   /// uninitialized.
   ///
@@ -1394,7 +1430,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///     method.
   ///   - buffer: The buffer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     _ body: (_ buffer: ${Self}<T>) throws(E) -> Result

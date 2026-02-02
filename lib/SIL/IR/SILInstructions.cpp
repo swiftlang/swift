@@ -231,6 +231,7 @@ AllocStackInst::AllocStackInst(
   sharedUInt8().AllocStackInst.fromVarDecl = (bool)isFromVarDecl;
   sharedUInt8().AllocStackInst.usesMoveableValueDebugInfo =
       (bool)usesMoveableValueDebugInfo || elementType.isMoveOnly();
+  setStackAllocationIsNested(StackAllocationIsNested);
   sharedUInt32().AllocStackInst.numOperands = TypeDependentOperands.size();
 
   // VarInfo must be initialized after
@@ -378,7 +379,7 @@ AllocBoxInst::AllocBoxInst(
     std::optional<SILDebugVariable> Var,
     HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
-    HasPointerEscape_t hasPointerEscape)
+    HasPointerEscape_t hasPointerEscape, bool inferredImmutable)
     : NullaryInstructionWithTypeDependentOperandsBase(
           Loc, TypeDependentOperands, SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -396,6 +397,7 @@ AllocBoxInst::AllocBoxInst(
       (bool)usesMoveableValueDebugInfo;
 
   sharedUInt8().AllocBoxInst.pointerEscape = (bool)hasPointerEscape;
+  sharedUInt8().AllocBoxInst.inferredImmutable = inferredImmutable;
 }
 
 AllocBoxInst *
@@ -403,15 +405,17 @@ AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                      SILFunction &F, std::optional<SILDebugVariable> Var,
                      HasDynamicLifetime_t hasDynamicLifetime, bool reflection,
                      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
-                     HasPointerEscape_t hasPointerEscape) {
+                     HasPointerEscape_t hasPointerEscape,
+                     bool inferredImmutable) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
-  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
-                                  hasDynamicLifetime, reflection,
-                                  usesMoveableValueDebugInfo, hasPointerEscape);
+  return ::new (Buf)
+      AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
+                   hasDynamicLifetime, reflection, usesMoveableValueDebugInfo,
+                   hasPointerEscape, inferredImmutable);
 }
 
 SILType AllocBoxInst::getAddressType() const {
@@ -525,7 +529,7 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
                          ArrayRef<SILValue> allOperands,
                          unsigned numNormalOperands)
     : InstructionBaseWithTrailingOperands(allOperands, Loc, ReturnType),
-      Name(Name), Substitutions(Subs), numNormalOperands(numNormalOperands) {}
+      Name(Name), Substitutions(Subs.getCanonical()), numNormalOperands(numNormalOperands) {}
 
 IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
     SILDebugLocation Loc, unsigned CounterIdx, StringRef PGOFuncName,
@@ -539,7 +543,7 @@ IncrementProfilerCounterInst *IncrementProfilerCounterInst::create(
       Loc, CounterIdx, PGOFuncNameLength, NumCounters, PGOFuncHash);
 
   std::uninitialized_copy(PGOFuncName.begin(), PGOFuncName.end(),
-                          Inst->getTrailingObjects<char>());
+                          Inst->getTrailingObjects());
   return Inst;
 }
 
@@ -554,7 +558,7 @@ SpecifyTestInst *SpecifyTestInst::create(SILDebugLocation Loc,
       ::new (Buffer) SpecifyTestInst(Loc, ArgumentsSpecificationLength);
   std::uninitialized_copy(ArgumentsSpecification.begin(),
                           ArgumentsSpecification.end(),
-                          Inst->getTrailingObjects<char>());
+                          Inst->getTrailingObjects());
   return Inst;
 }
 
@@ -1121,7 +1125,7 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBase(Loc, Ty) {
   sharedUInt32().IntegerLiteralInst.numBits = Value.getBitWidth();
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
-                            getTrailingObjects<llvm::APInt::WordType>());
+                            getTrailingObjects());
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
@@ -1142,10 +1146,11 @@ IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
-static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
+static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value,
+                      bool treatAsSigned) {
   // If we're forming a fixed-width type, build using the greatest width.
   if (auto intTy = dyn_cast<BuiltinIntegerType>(anyIntTy))
-    return APInt(intTy->getGreatestWidth(), value);
+    return APInt(intTy->getGreatestWidth(), value, treatAsSigned);
 
   // Otherwise, build using the size of the type and then truncate to the
   // minimum width necessary.
@@ -1154,11 +1159,12 @@ static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
   return result;
 }
 
-IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
-                                               SILType Ty, intmax_t Value,
+IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc, SILType Ty,
+                                               intmax_t Value,
+                                               bool treatAsSigned,
                                                SILModule &M) {
   auto intTy = Ty.castTo<AnyBuiltinIntegerType>();
-  return create(Loc, Ty, getAPInt(intTy, Value), M);
+  return create(Loc, Ty, getAPInt(intTy, Value, treatAsSigned), M);
 }
 
 static SILType getGreatestIntegerType(Type type, SILModule &M) {
@@ -1180,8 +1186,7 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
   auto numBits = sharedUInt32().IntegerLiteralInst.numBits;
-  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
-                         getWordsForBitWidth(numBits)});
+  return APInt(numBits, getTrailingObjects(getWordsForBitWidth(numBits)));
 }
 
 FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
@@ -1189,7 +1194,7 @@ FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBase(Loc, Ty) {
   sharedUInt32().FloatLiteralInst.numBits = Bits.getBitWidth();
   std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                            getTrailingObjects<llvm::APInt::WordType>());
+                            getTrailingObjects());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
@@ -1220,8 +1225,7 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 
 APInt FloatLiteralInst::getBits() const {
   auto numBits = sharedUInt32().FloatLiteralInst.numBits;
-  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
-                         getWordsForBitWidth(numBits)});
+  return APInt(numBits, getTrailingObjects(getWordsForBitWidth(numBits)));
 }
 
 APFloat FloatLiteralInst::getValue() const {
@@ -1234,7 +1238,7 @@ StringLiteralInst::StringLiteralInst(SILDebugLocation Loc, StringRef Text,
     : InstructionBase(Loc, Ty) {
   sharedUInt8().StringLiteralInst.encoding = uint8_t(encoding);
   sharedUInt32().StringLiteralInst.length = Text.size();
-  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
+  memcpy(getTrailingObjects(), Text.data(), Text.size());
 
   // It is undefined behavior to feed ill-formed UTF-8 into `Swift.String`;
   // however, the compiler creates string literals in many places, so there's a
@@ -1260,7 +1264,7 @@ CondFailInst::CondFailInst(SILDebugLocation DebugLoc, SILValue Operand,
                            StringRef Message)
       : UnaryInstructionBase(DebugLoc, Operand),
         MessageSize(Message.size()) {
-  memcpy(getTrailingObjects<char>(), Message.data(), Message.size());
+  memcpy(getTrailingObjects(), Message.data(), Message.size());
 }
 
 CondFailInst *CondFailInst::create(SILDebugLocation DebugLoc, SILValue Operand,
@@ -1315,35 +1319,26 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   sharedUInt8().AssignInst.ownershipQualifier = uint8_t(Qualifier);
 }
 
-AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
-                                         SILValue Src, SILValue Dest,
-                                         SILValue Initializer, SILValue Setter,
-                                         AssignByWrapperInst::Mode mode)
-    : AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
-  assert(Initializer->getType().is<SILFunctionType>());
-  sharedUInt8().AssignByWrapperInst.mode = uint8_t(mode);
-}
-
 AssignOrInitInst::AssignOrInitInst(SILDebugLocation Loc, VarDecl *P,
-                                   SILValue Self, SILValue Src,
+                                   SILValue SelfOrLocal, SILValue Src,
                                    SILValue Initializer, SILValue Setter,
                                    AssignOrInitInst::Mode Mode)
     : InstructionBase<SILInstructionKind::AssignOrInitInst,
                       NonValueInstruction>(Loc),
-      Operands(this, Self, Src, Initializer, Setter), Property(P) {
+      Operands(this, SelfOrLocal, Src, Initializer, Setter), Property(P) {
   assert(Initializer->getType().is<SILFunctionType>());
   sharedUInt8().AssignOrInitInst.mode = uint8_t(Mode);
   Assignments.resize(getNumInitializedProperties());
 }
 
 void AssignOrInitInst::markAsInitialized(VarDecl *property) {
-  auto toInitProperties = getInitializedProperties();
-  for (unsigned index : indices(toInitProperties)) {
-    if (toInitProperties[index] == property) {
-      markAsInitialized(index);
-      break;
+  unsigned idx = 0;
+  this->forEachInitializedProperty([&](VarDecl *p) {
+    if (p == property) {
+      markAsInitialized(idx);
     }
-  }
+    idx++;
+  });
 }
 
 void AssignOrInitInst::markAsInitialized(unsigned propertyIdx) {
@@ -1364,14 +1359,28 @@ AccessorDecl *AssignOrInitInst::getReferencedInitAccessor() const {
   return Property->getOpaqueAccessor(AccessorKind::Init);
 }
 
-unsigned AssignOrInitInst::getNumInitializedProperties() const {
-  return getInitializedProperties().size();
+DeclContext *AssignOrInitInst::getDeclContextOrNull() const {
+  if (auto accessorDecl = getReferencedInitAccessor())
+    return accessorDecl->getDeclContext();
+  return getProperty()->getDeclContext();
 }
 
-ArrayRef<VarDecl *> AssignOrInitInst::getInitializedProperties() const {
-  if (auto *accessor = getReferencedInitAccessor())
-    return accessor->getInitializedProperties();
-  return {};
+unsigned AssignOrInitInst::getNumInitializedProperties() const {
+  unsigned count = 0;
+  forEachInitializedProperty([&](VarDecl *property) { count++; });
+  return count;
+}
+
+void AssignOrInitInst::forEachInitializedProperty(
+    llvm::function_ref<void(VarDecl *)> callback) const {
+  if (auto *accessor = getReferencedInitAccessor()) {
+    for (auto *property : accessor->getInitializedProperties())
+      callback(property);
+  } else {
+    // Only the backing storage property/local variavle
+    auto *backingVar = Property->getPropertyWrapperBackingProperty();
+    callback(backingVar);
+  }
 }
 
 ArrayRef<VarDecl *> AssignOrInitInst::getAccessedProperties() const {
@@ -1441,15 +1450,16 @@ UncheckedRefCastAddrInst::create(SILDebugLocation Loc, SILValue src,
 }
 
 UnconditionalCheckedCastAddrInst::UnconditionalCheckedCastAddrInst(
-    SILDebugLocation Loc, CastingIsolatedConformances isolatedConformances,
+    SILDebugLocation Loc, CheckedCastInstOptions options,
     SILValue src, CanType srcType, SILValue dest,
     CanType targetType, ArrayRef<SILValue> TypeDependentOperands)
     : AddrCastInstBase(Loc, src, srcType, dest, targetType,
         TypeDependentOperands),
-      IsolatedConformances(isolatedConformances) {}
+      Options(options) {}
 
 UnconditionalCheckedCastAddrInst *
-UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc, CastingIsolatedConformances isolatedConformances, SILValue src,
+UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc,
+        CheckedCastInstOptions options, SILValue src,
         CanType srcType, SILValue dest, CanType targetType, SILFunction &F) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 4> allOperands;
@@ -1458,12 +1468,12 @@ UnconditionalCheckedCastAddrInst::create(SILDebugLocation Loc, CastingIsolatedCo
       totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastAddrInst));
   return ::new (Buffer) UnconditionalCheckedCastAddrInst(
-    Loc, isolatedConformances, src, srcType, dest, targetType, allOperands);
+    Loc, options, src, srcType, dest, targetType, allOperands);
 }
 
 CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(
   SILDebugLocation DebugLoc,
-  CastingIsolatedConformances isolatedConformances,
+  CheckedCastInstOptions options,
   CastConsumptionKind consumptionKind,
   SILValue src, CanType srcType, SILValue dest, CanType targetType,
   ArrayRef<SILValue> TypeDependentOperands,
@@ -1472,14 +1482,14 @@ CheckedCastAddrBranchInst::CheckedCastAddrBranchInst(
       : AddrCastInstBase(DebugLoc, src, srcType, dest,
             targetType, TypeDependentOperands, consumptionKind,
             successBB, failureBB, Target1Count, Target2Count),
-        IsolatedConformances(isolatedConformances) {
+        Options(options) {
   assert(consumptionKind != CastConsumptionKind::BorrowAlways &&
          "BorrowAlways is not supported on addresses");
 }
 
 CheckedCastAddrBranchInst *
 CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
-         CastingIsolatedConformances isolatedConformances,
+         CheckedCastInstOptions options,
          CastConsumptionKind consumptionKind,
          SILValue src, CanType srcType, SILValue dest, CanType targetType,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
@@ -1492,7 +1502,7 @@ CheckedCastAddrBranchInst::create(SILDebugLocation DebugLoc,
       totalSizeToAlloc<swift::Operand>(2 + allOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastAddrBranchInst));
   return ::new (Buffer) CheckedCastAddrBranchInst(
-    DebugLoc, isolatedConformances, consumptionKind,
+    DebugLoc, options, consumptionKind,
     src, srcType, dest, targetType, allOperands,
     successBB, failureBB, Target1Count, Target2Count);
 }
@@ -1508,8 +1518,9 @@ StructInst *StructInst::create(SILDebugLocation Loc, SILType Ty,
 StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
                        ArrayRef<SILValue> Elems,
                        ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBaseWithTrailingOperands(Elems, Loc, Ty,
-                                          forwardingOwnershipKind) {
+    : InstructionBaseWithTrailingOperands(
+      Elems, Loc, Ty, forwardingOwnershipKind.forwardToInit(Ty))
+{
   assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
 }
 
@@ -1807,6 +1818,7 @@ bool TermInst::isFunctionExiting() const {
   case TermKind::YieldInst:
     return false;
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -1828,6 +1840,7 @@ bool TermInst::isProgramTerminating() const {
   case TermKind::CheckedCastBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
@@ -1843,8 +1856,7 @@ bool TermInst::isProgramTerminating() const {
 
 TermInst::SuccessorBlockArgumentListTy
 TermInst::getSuccessorBlockArgumentLists() const {
-  function_ref<ArrayRef<SILArgument *>(const SILSuccessor &)> op;
-  op = [](const SILSuccessor &succ) -> ArrayRef<SILArgument *> {
+  auto op = [](const SILSuccessor &succ) -> ArrayRef<SILArgument *> {
     return succ.getBB()->getArguments();
   };
   return SuccessorBlockArgumentListTy(getSuccessors(), op);
@@ -1855,6 +1867,7 @@ const Operand *TermInst::forwardedOperand() const {
   case TermKind::UnwindInst:
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
+  case TermKind::ReturnBorrowInst:
   case TermKind::ThrowInst:
   case TermKind::ThrowAddrInst:
   case TermKind::YieldInst:
@@ -2691,7 +2704,7 @@ UncheckedBitwiseCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
-    SILDebugLocation DebugLoc, CastingIsolatedConformances isolatedConformances,
+    SILDebugLocation DebugLoc, CheckedCastInstOptions options,
     SILValue Operand, SILType DestLoweredTy,
     CanType DestFormalTy, SILFunction &F,
     ValueOwnershipKind forwardingOwnershipKind) {
@@ -2702,13 +2715,13 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(
-      DebugLoc, isolatedConformances, Operand, TypeDependentOperands,
+      DebugLoc, options, Operand, TypeDependentOperands,
       DestLoweredTy, DestFormalTy, forwardingOwnershipKind);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
     SILDebugLocation DebugLoc, bool IsExact,
-    CastingIsolatedConformances isolatedConformances, SILValue Operand,
+    CheckedCastInstOptions options, SILValue Operand,
     CanType SrcFormalTy, SILType DestLoweredTy, CanType DestFormalTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
     ProfileCounter Target1Count, ProfileCounter Target2Count,
@@ -2722,7 +2735,7 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
       totalSizeToAlloc<swift::Operand>(3 + TypeDependentOperands.size());
   void *Buffer = module.allocateInst(size, alignof(CheckedCastBranchInst));
   return ::new (Buffer) CheckedCastBranchInst(
-      DebugLoc, IsExact, isolatedConformances, Operand, SrcFormalTy,
+      DebugLoc, IsExact, options, Operand, SrcFormalTy,
       TypeDependentOperands,
       DestLoweredTy, DestFormalTy, SuccessBB, FailureBB, Target1Count,
       Target2Count, forwardingOwnershipKind, preservesOwnership);
@@ -3064,14 +3077,14 @@ KeyPathPattern::KeyPathPattern(CanGenericSignature signature,
     Signature(signature), RootType(rootType), ValueType(valueType),
     ObjCString(objcString)
 {
-  auto *componentsBuf = getTrailingObjects<KeyPathPatternComponent>();
+  auto *componentsBuf = getTrailingObjects();
   std::uninitialized_copy(components.begin(), components.end(),
                           componentsBuf);
 }
 
 ArrayRef<KeyPathPatternComponent>
 KeyPathPattern::getComponents() const {
-  return {getTrailingObjects<KeyPathPatternComponent>(), NumComponents};
+  return getTrailingObjects(NumComponents);
 }
 
 void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
@@ -3172,10 +3185,10 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
     Pattern(Pattern),
     numPatternOperands(numPatternOperands),
     numTypeDependentOperands(allOperands.size() - numPatternOperands),
-    Substitutions(Subs)
+    Substitutions(Subs.getCanonical())
 {
   assert(allOperands.size() >= numPatternOperands);
-  auto *operandsBuf = getTrailingObjects<Operand>();
+  auto *operandsBuf = getTrailingObjects();
   for (unsigned i = 0; i < allOperands.size(); ++i) {
     ::new ((void*)&operandsBuf[i]) Operand(this, allOperands[i]);
   }
@@ -3188,7 +3201,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
 
 MutableArrayRef<Operand>
 KeyPathInst::getAllOperands() {
-  return {getTrailingObjects<Operand>(), numPatternOperands + numTypeDependentOperands};
+  return getTrailingObjects(numPatternOperands + numTypeDependentOperands);
 }
 
 KeyPathInst::~KeyPathInst() {
@@ -3422,6 +3435,26 @@ ReturnInst::ReturnInst(SILFunction &func, SILDebugLocation debugLoc,
          "result info?!");
 }
 
+ReturnBorrowInst *ReturnBorrowInst::create(SILDebugLocation DebugLoc,
+                                           SILValue returnValue,
+                                           ArrayRef<SILValue> enclosingValues,
+                                           SILModule &M) {
+  auto Size = totalSizeToAlloc<swift::Operand>(enclosingValues.size() + 1);
+  auto Buffer = M.allocateInst(Size, alignof(ReturnBorrowInst));
+  SmallVector<SILValue, 8> operands;
+  operands.push_back(returnValue);
+  for (SILValue ev : enclosingValues) {
+    operands.push_back(ev);
+  }
+  return ::new (Buffer) ReturnBorrowInst(DebugLoc, operands);
+}
+
+ReturnBorrowInst::ReturnBorrowInst(SILDebugLocation DebugLoc,
+                                   ArrayRef<SILValue> operands)
+    : InstructionBaseWithTrailingOperands(operands, DebugLoc) {
+  assert(operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
+}
+
 // This may be called in an invalid SIL state. SILCombine creates new
 // terminators in non-terminator position and defers deleting the original
 // terminator until after all modification.
@@ -3517,3 +3550,10 @@ MergeIsolationRegionInst::create(SILDebugLocation loc, ArrayRef<SILValue> args,
   auto buffer = mod.allocateInst(size, alignof(MergeIsolationRegionInst));
   return ::new (buffer) MergeIsolationRegionInst(loc, args);
 }
+
+ImplicitActorToOpaqueIsolationCastInst::ImplicitActorToOpaqueIsolationCastInst(
+    SILDebugLocation loc, SILValue value)
+    : UnaryInstructionBase(loc, value,
+                           SILType::getOpaqueIsolationType(
+                               value->getFunction()->getASTContext()),
+                           OwnershipKind::Guaranteed) {}

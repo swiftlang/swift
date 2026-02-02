@@ -151,6 +151,14 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
+  /// Return a copy of this trackable state with the id being \p newID instead
+  /// of whatever is stored in this state.
+  TrackableValueState getWithNewID(unsigned newID) const {
+    auto newVal = *this;
+    newVal.id = newID;
+    return newVal;
+  }
+
   SILIsolationInfo getIsolationRegionInfo() const {
     if (!regionInfo) {
       return SILIsolationInfo::getDisconnected(false);
@@ -179,16 +187,16 @@ public:
 
   void removeFlag(TrackableValueFlag flag) { flagSet -= flag; }
 
-  void print(llvm::raw_ostream &os) const {
+  void print(SILFunction *fn, llvm::raw_ostream &os) const {
     os << "TrackableValueState[id: " << id
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().printForOneLineLogging(os);
+    getIsolationRegionInfo().printForOneLineLogging(fn, os);
     os << "].";
   }
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) { print(fn, llvm::dbgs()); }
 
 private:
   bool hasIsolationRegionInfo() const { return bool(regionInfo); }
@@ -249,26 +257,26 @@ public:
   /// parameter.
   bool isSendingParameter() const;
 
-  void printIsolationInfo(SmallString<64> &outString) const {
+  void printIsolationInfo(SILFunction *fn, SmallString<64> &outString) const {
     llvm::raw_svector_ostream os(outString);
-    getIsolationRegionInfo().printForDiagnostics(os);
+    getIsolationRegionInfo().printForDiagnostics(fn, os);
   }
 
-  void print(llvm::raw_ostream &os) const {
+  void print(SILFunction *fn, llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
-    valueState.print(os);
+    valueState.print(fn, os);
     os << "\n    Rep Value: ";
     getRepresentative().print(os);
   }
 
-  void printVerbose(llvm::raw_ostream &os) const {
+  void printVerbose(SILFunction *fn, llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
-    valueState.print(os);
+    valueState.print(fn, os);
     os << "\n    Rep Value: " << getRepresentative();
   }
 
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) {
+    print(fn, llvm::dbgs());
     llvm::dbgs() << '\n';
   }
 };
@@ -288,8 +296,8 @@ struct regionanalysisimpl::TrackableValueLookupResult {
   /// TrackableValue.
   std::optional<TrackableValue> base;
 
-  void print(llvm::raw_ostream &os) const;
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  void print(SILFunction *fn, llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMPER(dumper(SILFunction *fn)) { print(fn, llvm::dbgs()); }
 };
 
 class RegionAnalysis;
@@ -390,6 +398,8 @@ public:
     return getUnderlyingTrackedValue(value).value;
   }
 
+  SILFunction *getFunction() const { return fn; }
+
   /// Returns the value for this instruction if it isn't a fake "represenative
   /// value" to inject actor isolation. Asserts in such a case.
   SILValue getRepresentative(Element trackableValueID) const;
@@ -405,6 +415,12 @@ public:
   /// Returns the fake "representative value" for this element if it
   /// exists. Returns nullptr otherwise.
   SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
+
+  /// Given the value of use \p op that is mapped to memory that will be
+  /// overwritten, produce a new TrackableValue that represents the value that
+  /// was in that memory.
+  TrackableValue
+  getRepresentativeValueForValueFromOverwrittenMemory(Operand *op) const;
 
   SILIsolationInfo getIsolationRegion(Element trackableValueID) const;
   SILIsolationInfo getIsolationRegion(SILValue trackableValueID) const;
@@ -438,6 +454,7 @@ private:
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
+
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   Element lookupValueID(SILValue value);
 
@@ -541,6 +558,10 @@ public:
   SILFunction *getFunction() const { return fn; }
 
   bool isSupportedFunction() const { return supportedFunction; }
+
+  NullablePtr<BlockPartitionState> getBlockState(SILBasicBlock *block) const {
+    return blockStates->get(block);
+  }
 
   using iterator = BasicBlockData::iterator;
   using const_iterator = BasicBlockData::const_iterator;

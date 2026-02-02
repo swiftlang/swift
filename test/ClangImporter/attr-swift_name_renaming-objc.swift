@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -I %/S/Inputs/custom-modules -Xcc -w -typecheck -verify %s -verify-additional-file %/S/Inputs/custom-modules%{fs-sep}SwiftName.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -I %/S/Inputs/custom-modules -Xcc -w -typecheck -verify -verify-ignore-unrelated %s -verify-additional-file %/S/Inputs/custom-modules%{fs-sep}SwiftName.h
 
 import SwiftName
 

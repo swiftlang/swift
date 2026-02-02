@@ -14,6 +14,7 @@
 #define SWIFT_BRIDGING_MACROS_H
 
 #include "swift/Basic/BasicBridging.h"
+#include "swift/AST/ASTBridging.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,13 +41,13 @@ void swift_Macros_freeExpansionReplacements(
     ptrdiff_t *_Nullable replacementsPtr, ptrdiff_t numReplacements);
 
 ptrdiff_t swift_Macros_expandFreestandingMacro(
-    void *_Nonnull diagEngine, const void *_Nonnull macro,
+    BridgedASTContext cContext, const void *_Nonnull macro,
     const char *_Nonnull discriminator, uint8_t rawMacroRole,
     void *_Nonnull sourceFile, const void *_Nullable sourceLocation,
     BridgedStringRef *_Nonnull evaluatedSourceOut);
 
 ptrdiff_t swift_Macros_expandAttachedMacro(
-    void *_Nonnull diagEngine, const void *_Nonnull macro,
+    BridgedASTContext cContext, const void *_Nonnull macro,
     const char *_Nonnull discriminator, const char *_Nonnull qualifiedType,
     const char *_Nonnull conformances, uint8_t rawMacroRole,
     void *_Nonnull customAttrSourceFile,

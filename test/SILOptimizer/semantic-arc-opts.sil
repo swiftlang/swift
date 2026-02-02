@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -update-borrowed-from -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts -onone-simplification -simplify-instruction=begin_borrow %s | %FileCheck %s
 
 sil_stage raw
 
@@ -53,6 +53,10 @@ protocol MyFakeAnyObject : Klass {
 final class Klass {
   var base: Klass
   let baseLet: Klass
+}
+
+struct Wrapper {
+  let _k: Klass
 }
 
 extension Klass : MyFakeAnyObject {
@@ -529,6 +533,8 @@ bb0:
   end_borrow %2 : $NativeObjectPair
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -552,6 +558,7 @@ bb0:
   end_borrow %2 : $NativeObjectPair
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -567,6 +574,7 @@ bb0(%0 : @guaranteed $NativeObjectPair):
   %4 = copy_value %3 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -575,7 +583,7 @@ bb0(%0 : @guaranteed $NativeObjectPair):
 // eliminate the copy.
 //
 // CHECK-LABEL: sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
-// CHECK: copy_value
+// CHECK-NOT: copy_value
 // CHECK: } // end sil function 'borrowed_val_used_by_postdominating_no_return_function'
 sil [ossa] @borrowed_val_used_by_postdominating_no_return_function : $@convention(thin) (@owned NativeObjectPair) -> MyNever {
 bb0(%0 : @owned $NativeObjectPair):
@@ -584,6 +592,9 @@ bb0(%0 : @owned $NativeObjectPair):
   %3 = copy_value %2 : $Builtin.NativeObject
   %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
   apply %func(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  destroy_value [dead_end] %3
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 
@@ -732,14 +743,15 @@ bb3:
 // CHECK: } // end sil function 'do_eliminate_begin_borrow_consumed_by_guaranteed_phi'
 sil [ossa] @do_eliminate_begin_borrow_consumed_by_guaranteed_phi : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = begin_borrow %0 : $Builtin.NativeObject
-  br bb1(%1 : $Builtin.NativeObject)
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-bb1(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
-  destroy_value %0 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
+bb1(%3 : @reborrow $Builtin.NativeObject):
+  %4 = borrowed %3 from (%0)
+  end_borrow %4
+  destroy_value %0
+  %7 = tuple ()
+  return %7
 }
 
 // Make sure we can chew through this and get rid of all ARC traffic.
@@ -1245,6 +1257,8 @@ bb2(%2 : @owned ${ var Builtin.NativeObject }):
   %4 = load [copy] %3 : $*Builtin.NativeObject
   %user = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %user(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value [dead_end] %4
+  destroy_value [dead_end] %2
   unreachable
 }
 
@@ -1507,6 +1521,7 @@ some(%obj : @owned $AnyObject):
     br die
 
 die:
+    destroy_value [dead_end] %opt
     unreachable
 
 none:
@@ -1545,41 +1560,46 @@ bb0:
     %opt = apply undef() : $@convention(thin) () -> (@owned FakeOptional<AnyObject>)
     %opt_borrow = begin_borrow [lexical] %opt : $FakeOptional<AnyObject>
     %opt_borrow_copy = copy_value %opt_borrow : $FakeOptional<AnyObject>
-    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: some, case #FakeOptional.none!enumelt: none
+    switch_enum %opt_borrow_copy : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb7
 
-some(%obj : @owned $AnyObject):
+bb1(%obj : @owned $AnyObject):
     %obj_borrow = begin_borrow [lexical] %obj : $AnyObject
     %obj_borrow_copy = copy_value %obj_borrow : $AnyObject
-    try_apply undef(%obj_borrow_copy) : $@convention(method) (@owned AnyObject) -> (@owned AnyObject, @error Error), normal good, error bad
+    try_apply undef(%obj_borrow_copy) : $@convention(method) (@owned AnyObject) -> (@owned AnyObject, @error Error), normal bb2, error bb5
 
-good(%obj2 : @owned $AnyObject):
+bb2(%obj2 : @owned $AnyObject):
     %obj3 = apply undef(%obj2) : $@convention(method) (@guaranteed AnyObject) -> @owned FakeOptional<AnyObject>
     destroy_value %obj2 : $AnyObject
-    switch_enum %obj3 : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: good_some, case #FakeOptional.none!enumelt: good_none
+    switch_enum %obj3 : $FakeOptional<AnyObject>, case #FakeOptional.some!enumelt: bb3, case #FakeOptional.none!enumelt: bb4
 
-good_some(%obj4 : @owned $AnyObject):
+bb3(%obj4 : @owned $AnyObject):
     destroy_value %obj4 : $AnyObject
     end_borrow %obj_borrow : $AnyObject
     destroy_value %obj : $AnyObject
-    br exit
+    br bb8
 
-good_none:
+bb4:
     end_borrow %opt_borrow : $FakeOptional<AnyObject>
     end_borrow %obj_borrow : $AnyObject
     destroy_value %obj : $AnyObject
     destroy_value %opt : $FakeOptional<AnyObject>
-    br die
+    br bb6
 
-bad(%error1 : @owned $Error):
-    br die
+bb5(%error1 : @owned $Error):
+    destroy_value [dead_end] %error1
+    end_borrow %obj_borrow
+    destroy_value [dead_end] %obj
+    end_borrow %opt_borrow
+    destroy_value [dead_end] %opt
+    br bb6
 
-die:
+bb6:
     unreachable
 
-none:
-    br exit
+bb7:
+    br bb8
 
-exit:
+bb8:
     end_borrow %opt_borrow : $FakeOptional<AnyObject>
     destroy_value %opt : $FakeOptional<AnyObject>
     %res = tuple ()
@@ -1639,5 +1659,28 @@ bb3(%11 : @reborrow $FakeOptional<Klass>, %12 : @owned $FakeOptional<Klass>):
   destroy_value %12
   %16 = tuple ()
   return %16
+}
+
+sil [ossa] @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper._k
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+sil [ossa] @call_borrow_accessor : $@convention(thin) (@guaranteed Wrapper) -> () {
+bb0(%0 : @guaranteed $Wrapper):
+  %stk = alloc_stack $Wrapper
+  %sbi = store_borrow %0 to %stk
+  %func = function_ref @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %k = apply %func(%sbi) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %copy = copy_value %k
+  end_borrow %sbi
+  %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %copy
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r
 }
 

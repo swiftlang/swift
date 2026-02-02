@@ -646,8 +646,7 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
     result = tupleOffset;
   }
 
-  auto *gep =
-      IGF.emitByteOffsetGEP(tuple.getAddress(), result, IGF.IGM.OpaqueTy);
+  auto *gep = IGF.emitByteOffsetGEP(tuple.getAddress(), result);
   auto elementAddress = Address(gep, IGF.IGM.OpaqueTy,
                                 IGF.IGM.getPointerAlignment());
   return IGF.Builder.CreateElementBitCast(elementAddress,

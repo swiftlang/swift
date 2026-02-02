@@ -9,9 +9,10 @@ public protocol MyProtocol: AnyObject {
 }
 
 func test_some(p: some MyProtocol) {
-    p.foo(ptr: nil, value: 0) // expected-error {{a protocol type cannot contain a generic method 'foo(ptr:value:)' in embedded Swift}}
+  p.foo(ptr: nil, value: 0) // expected-error {{a protocol type cannot contain a generic method 'foo(ptr:value:)' in embedded Swift}}
 }
 
 public func test_any(p: any MyProtocol) {
-    test_some(p: p)
+  test_some(p: p)
+  // expected-warning@-1{{cannot use generic global function 'test_some(p:)' on a value of type 'any MyProtocol' in Embedded Swift}}
 }

@@ -165,6 +165,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
+#include <complex>
+
 using namespace swift;
 using llvm::SmallSetVector;
 
@@ -241,7 +243,13 @@ visitCallResults(FullApplySite apply,
   if (auto *destructure = getCallDestructure(apply)) {
     return visitCallMultiResults(destructure, fnConv, visitor);
   }
-  return visitor(apply.getResult(), *fnConv.getDirectSILResults().begin());
+  // Visit the single direct result, if any.
+  auto directResults = fnConv.getDirectSILResults();
+  if (!directResults.empty()) {
+    assert(std::distance(directResults.begin(), directResults.end()) == 1);
+    return visitor(apply.getResult(), *directResults.begin());
+  }
+  return true;
 }
 
 /// Return true if the given value is either a "fake" tuple that represents all
@@ -683,8 +691,9 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
 }
 
 /// Before populating the ValueStorageMap, insert function arguments for any
-/// @out result type. Return the number of indirect result arguments added.
-static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
+/// @out result type or @error_indirect.
+/// \returns the number of indirect result and error arguments added.
+static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
   auto *declCtx = pass.function->getDeclContext();
@@ -695,14 +704,14 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
     declCtx = pass.function->getModule().getSwiftModule();
   }
 
-  unsigned argIdx = 0;
-  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx)) {
-    auto resultTyInContext = pass.function->mapTypeIntoContext(resultTy);
+  auto createIndirectResult = [&](SILType resultTy, StringRef internalName,
+                                  unsigned argIdx) {
+    auto resultTyInContext = pass.function->mapTypeIntoEnvironment(resultTy);
     auto bodyResultTy = pass.function->getModule().Types.getLoweredType(
         resultTyInContext.getASTType(), *pass.function);
-    auto var = new (astCtx) ParamDecl(
-        SourceLoc(), SourceLoc(), astCtx.getIdentifier("$return_value"),
-        SourceLoc(), astCtx.getIdentifier("$return_value"), declCtx);
+    auto var = new (astCtx)
+        ParamDecl(SourceLoc(), SourceLoc(), astCtx.getIdentifier(internalName),
+                  SourceLoc(), astCtx.getIdentifier(internalName), declCtx);
     var->setSpecifier(ParamSpecifier::InOut);
 
     SILFunctionArgument *funcArg =
@@ -713,10 +722,22 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
     //
     // This is the only case where a value defines its own storage.
     pass.valueStorageMap.insertValue(funcArg, funcArg);
+  };
 
-    ++argIdx;
-  }
+  unsigned argIdx = 0;
+  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx))
+    createIndirectResult(resultTy, "$return_value", argIdx++);
+
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults());
+
+  // Next, add the indirect error result, if needed.
+  // This must happen after all indirect result types have been added, to match
+  // the convention.
+  if (auto errorTy = pass.loweredFnConv.getIndirectErrorResultType(typeCtx))
+    createIndirectResult(errorTy, "$error", argIdx++);
+
+  assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults() +
+                       pass.loweredFnConv.getNumIndirectSILErrorResults());
   return argIdx;
 }
 
@@ -907,8 +928,8 @@ static void prepareValueStorage(AddressLoweringState &pass) {
   // Fixup this function's argument types with temporary loads.
   convertDirectToIndirectFunctionArgs(pass);
 
-  // Create a new function argument for each indirect result.
-  insertIndirectReturnArgs(pass);
+  // Create a new function argument for each indirect result or error.
+  insertIndirectReturnOrErrorArgs(pass);
 
   // Populate valueStorageMap.
   OpaqueValueVisitor(pass).mapValueStorage();
@@ -2348,15 +2369,35 @@ protected:
     return bb->begin();
   }
 
+  SILBasicBlock::iterator getErrorInsertionPoint() {
+    switch (apply.getKind()) {
+      case FullApplySiteKind::ApplyInst:
+      case FullApplySiteKind::BeginApplyInst:
+        llvm_unreachable("no error block exists for these instructions");
+
+      case FullApplySiteKind::TryApplyInst:
+        return cast<TryApplyInst>(apply)->getErrorBB()->begin();
+    }
+  }
+
   void makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs);
 
   SILBasicBlock::iterator getResultInsertionPoint();
 
-  SILValue materializeIndirectResultAddress(SILValue oldResult, SILType argTy);
+  /// Indicator for the kind of output value from apply instructions.
+  enum class ApplyOutput {
+    Result,  // A returned value
+    Error    // A thrown error
+  };
+
+  SILValue materializeIndirectOutputAddress(ApplyOutput kind,
+                                            SILValue oldResult, SILType argTy);
 
   void rewriteApply(ArrayRef<SILValue> newCallArgs);
 
   void rewriteTryApply(ArrayRef<SILValue> newCallArgs);
+
+  void replaceBlockArg(SILArgument *arg, SILType newType, SILValue repl);
 
   void replaceDirectResults(DestructureTupleInst *oldDestructure);
 };
@@ -2510,7 +2551,8 @@ void ApplyRewriter::makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs) {
            "canonical call results are always direct");
 
     if (loweredCalleeConv.isSILIndirect(resultInfo)) {
-      SILValue indirectResultAddr = materializeIndirectResultAddress(
+      SILValue indirectResultAddr = materializeIndirectOutputAddress(
+          ApplyOutput::Result,
           result, loweredCalleeConv.getSILType(resultInfo, typeCtx));
       // Record the new indirect call argument.
       newCallArgs[newResultArgIdx++] = indirectResultAddr;
@@ -2518,6 +2560,18 @@ void ApplyRewriter::makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs) {
     return true;
   };
   visitCallResults(apply, visitCallResult);
+
+  // Handle a try_apply for @error_indirect, who in the opaque convention has
+  // a direct error result, but needs an indirect error result when lowered.
+  if (auto errResult = apply.getDirectErrorResult()) {
+    if (auto errorInfo = loweredCalleeConv.getIndirectErrorResult()) {
+      SILValue indirectErrorAddr = materializeIndirectOutputAddress(
+          ApplyOutput::Error,
+          errResult, loweredCalleeConv.getSILType(*errorInfo, typeCtx));
+      // Record the new indirect call argument.
+      newCallArgs[newResultArgIdx++] = indirectErrorAddr;
+    }
+  }
 
   // Append the existing call arguments to the SIL argument list. They were
   // already lowered to addresses by CallArgRewriter.
@@ -2544,13 +2598,16 @@ SILBasicBlock::iterator ApplyRewriter::getResultInsertionPoint() {
   }
 }
 
-/// Return the storage address for the indirect result corresponding to the
+/// Return the storage address for the indirect output corresponding to the
 /// \p oldResult. Allocate temporary argument storage for an
-/// indirect result that isn't mapped to storage because it is either loadable
+/// indirect output that isn't mapped to storage because it is either loadable
 /// or unused.
 ///
 /// \p oldResult is invalid for an unused result.
-SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
+///
+/// \param kind is the kind of output we're materializing an address for.
+SILValue ApplyRewriter::materializeIndirectOutputAddress(ApplyOutput kind,
+                                                         SILValue oldResult,
                                                          SILType argTy) {
   if (oldResult && oldResult->getType().isAddressOnly(*pass.function)) {
     // Results that project into their uses have not yet been materialized.
@@ -2573,7 +2630,10 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
   if (oldResult && !oldResult->use_empty()) {
     // Insert reloads immediately after the call. Get the reload insertion
     // point after emitting dealloc to ensure the reload happens first.
-    auto reloadBuilder = pass.getBuilder(getResultInsertionPoint());
+    auto insertionPt = kind == ApplyOutput::Result
+                           ? getResultInsertionPoint()
+                           : getErrorInsertionPoint();
+    auto reloadBuilder = pass.getBuilder(insertionPt);
 
     // This is a formally indirect argument, but is loadable.
     auto *loadInst = reloadBuilder.createTrivialLoadOr(
@@ -2694,6 +2754,22 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   }
 }
 
+/// Utility to replace all uses of a block's argument with a SILValue,
+/// preserving the argument by creating a fresh, unused argument of the given
+/// type.
+///
+/// \param arg the block argument to be replaced
+/// \param newType the type of the fresh block argument to be created
+/// \param repl the value to replace uses of the old argument with
+void ApplyRewriter::replaceBlockArg(SILArgument *arg, SILType newType,
+                                    SILValue repl) {
+  const unsigned idx = arg->getIndex();
+  auto ownership = newType.isTrivial(*pass.function) ? OwnershipKind::None
+                                                     : OwnershipKind::Owned;
+  arg->replaceAllUsesWith(repl);
+  arg->getParent()->replacePhiArgument(idx, newType, ownership, arg->getDecl());
+}
+
 // Replace \p tryApply with a new try_apply using \p newCallArgs.
 //
 // If the old result was a single opaque value, then create and return a
@@ -2758,7 +2834,37 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
 //   // no uses of %d1
 //
 void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
-  auto typeCtx = pass.function->getTypeExpansionContext();
+  // Util to rewrite the argument to one of the successor blocks of a try_apply.
+  auto rewriteTryApplySuccBlockArg = [&](SILArgument *arg, SILType newArgTy,
+                                         SILBuilder &builder) {
+    assert(arg);
+    assert(arg->getIndex() == 0);
+
+    // Handle a single opaque result value.
+    if (pass.valueStorageMap.contains(arg)) {
+      // Storage was materialized by materializeIndirectOutputAddress.
+      auto &origStorage = pass.valueStorageMap.getStorage(arg);
+      assert(origStorage.isRewritten);
+      (void)origStorage;
+
+      // Rewriting try_apply with a new function type requires erasing the opaque
+      // block argument.  Create a dummy load-copy until all uses have been
+      // rewritten.
+      LoadInst *loadArg = builder.createLoad(
+          callLoc, origStorage.storageAddress, LoadOwnershipQualifier::Copy);
+
+      pass.valueStorageMap.replaceValue(arg, loadArg);
+      replaceBlockArg(arg, newArgTy, loadArg);
+      return;
+    }
+    // Loadable results were loaded by materializeIndirectOutputAddress.
+    // Temporarily redirect all uses to Undef. They will be fixed in
+    // replaceDirectResults().
+    auto undefVal =
+        SILUndef::get(pass.function, arg->getType().getAddressType());
+    replaceBlockArg(arg, newArgTy, undefVal);
+  };
+
   auto *tryApply = cast<TryApplyInst>(apply.getInstruction());
 
   auto *newCallInst = argBuilder.createTryApply(
@@ -2766,45 +2872,37 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
       tryApply->getNormalBB(), tryApply->getErrorBB(),
       tryApply->getApplyOptions(), tryApply->getSpecializationInfo());
 
-  auto *resultArg = cast<SILArgument>(apply.getResult());
-
-  auto replaceTermResult = [&](SILValue newResultVal) {
-    SILType resultTy = loweredCalleeConv.getSILResultType(typeCtx);
-    auto ownership = resultTy.isTrivial(*pass.function) ? OwnershipKind::None
-                                                        : OwnershipKind::Owned;
-
-    resultArg->replaceAllUsesWith(newResultVal);
-    assert(resultArg->getIndex() == 0);
-    resultArg->getParent()->replacePhiArgument(0, resultTy, ownership,
-                                               resultArg->getDecl());
-  };
   // Immediately delete the old try_apply (old applies hang around until
   // dead code removal because they directly define values).
   pass.deleter.forceDelete(tryApply);
   this->apply = FullApplySite(newCallInst);
 
-  // Handle a single opaque result value.
-  if (pass.valueStorageMap.contains(resultArg)) {
-    // Storage was materialized by materializeIndirectResultAddress.
-    auto &origStorage = pass.valueStorageMap.getStorage(resultArg);
-    assert(origStorage.isRewritten);
-    (void)origStorage;
+  auto typeCtx = pass.function->getTypeExpansionContext();
+  auto &astCtx = pass.getModule()->getASTContext();
+  auto calleeFnTy = apply.getSubstCalleeType();
+  SILArgument *resultArg = nullptr, *errorArg = nullptr;
 
-    // Rewriting try_apply with a new function type requires erasing the opaque
-    // block argument.  Create a dummy load-copy until all uses have been
-    // rewritten.
-    LoadInst *loadArg = resultBuilder.createLoad(
-        callLoc, origStorage.storageAddress, LoadOwnershipQualifier::Copy);
-
-    pass.valueStorageMap.replaceValue(resultArg, loadArg);
-    replaceTermResult(loadArg);
-    return;
+  if (calleeFnTy->hasIndirectFormalResults()) {
+    resultArg = cast<SILArgument>(apply.getResult());
+    SILType resultTy = loweredCalleeConv.getSILResultType(typeCtx);
+    rewriteTryApplySuccBlockArg(resultArg, resultTy, resultBuilder);
   }
-  // Loadable results were loaded by materializeIndirectResultAddress.
-  // Temporarily redirect all uses to Undef. They will be fixed in
-  // replaceDirectResults().
-  replaceTermResult(
-      SILUndef::get(pass.function, resultArg->getType().getAddressType()));
+
+  if (calleeFnTy->hasIndirectErrorResult()) {
+    errorArg = cast<SILArgument>(apply.getDirectErrorResult());
+    auto *errBB = errorArg->getParentBlock();
+    SILBuilder errorBuilder = pass.getBuilder(getErrorInsertionPoint());
+
+    // A made-up type, since we're going to delete the argument.
+    auto dummyTy = SILType::getEmptyTupleType(astCtx);
+    rewriteTryApplySuccBlockArg(errorArg, dummyTy, errorBuilder);
+
+    // We must delete the error block's argument for an @error_indirect
+    assert(errBB->getNumArguments() == 1);
+    errBB->eraseArgument(0);
+  }
+
+  assert((resultArg || errorArg) && "should have rewritten something?");
 }
 
 // Replace all formally direct results by rewriting the destructure_tuple.
@@ -2924,7 +3022,7 @@ public:
     }
 
     termBuilder.createCheckedCastAddrBranch(
-        castLoc, ccb->getIsolatedConformances(),
+        castLoc, ccb->getCheckedCastOptions(),
         CastConsumptionKind::TakeOnSuccess, srcAddr,
         ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
         successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
@@ -3021,7 +3119,7 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   }
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), uncondCheckedCast->getIsolatedConformances(),
+      uncondCheckedCast->getLoc(), uncondCheckedCast->getCheckedCastOptions(),
       srcAddr, srcAddr->getType().getASTType(),
       destAddr, destAddr->getType().getASTType());
   auto afterBuilder =
@@ -3062,9 +3160,11 @@ public:
       : pass(pass), opaqueFnConv(pass.function->getConventions()) {}
 
   void rewriteReturns();
+  void rewriteThrows();
 
 protected:
   void rewriteReturn(ReturnInst *returnInst);
+  void rewriteThrow(ThrowInst *throwInst);
 
   void rewriteElement(SILValue oldResult, SILArgument *newResultArg,
                       SILBuilder &returnBuilder);
@@ -3079,18 +3179,42 @@ void ReturnRewriter::rewriteReturns() {
   }
 }
 
-void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
-  auto &astCtx = pass.getModule()->getASTContext();
-  auto typeCtx = pass.function->getTypeExpansionContext();
+void ReturnRewriter::rewriteThrows() {
+  for (SILInstruction *termInst : pass.exitingInsts) {
+    if (auto *throwInst = dyn_cast<ThrowInst>(termInst))
+      rewriteThrow(throwInst);
+    else
+      assert(isa<ReturnInst>(termInst));
+  }
+}
 
-  // Find the point before allocated storage has been deallocated.
-  auto insertPt = SILBasicBlock::iterator(returnInst);
-  for (auto bbStart = returnInst->getParent()->begin(); insertPt != bbStart;
+// Find the point just before allocated storage has been deallocated,
+// immediately prior to this instruction.
+static SILBasicBlock::iterator beforeStorageDeallocs(SILInstruction *inst) {
+  auto insertPt = SILBasicBlock::iterator(inst);
+  for (auto bbStart = inst->getParent()->begin(); insertPt != bbStart;
        --insertPt) {
     if (!isa<DeallocStackInst>(*std::prev(insertPt)))
       break;
   }
-  auto returnBuilder = pass.getBuilder(insertPt);
+  return insertPt;
+}
+
+void ReturnRewriter::rewriteThrow(ThrowInst *throwInst) {
+  auto idx = pass.loweredFnConv.getArgumentIndexOfIndirectErrorResult();
+  SILArgument *errorResultAddr = pass.function->getArgument(idx.value());
+
+  auto throwBuilder = pass.getBuilder(beforeStorageDeallocs(throwInst));
+  rewriteElement(throwInst->getOperand(), errorResultAddr, throwBuilder);
+  throwBuilder.createThrowAddr(throwInst->getLoc());
+  pass.deleter.forceDelete(throwInst);
+}
+
+void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
+  auto &astCtx = pass.getModule()->getASTContext();
+  auto typeCtx = pass.function->getTypeExpansionContext();
+
+  auto returnBuilder = pass.getBuilder(beforeStorageDeallocs(returnInst));
 
   // Gather direct function results.
   unsigned numOldResults = opaqueFnConv.getNumDirectSILResults();
@@ -3126,7 +3250,7 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
 
   assert(newDirectResults.size() ==
          pass.loweredFnConv.getNumDirectSILResults());
-  assert(newResultArgIdx == pass.loweredFnConv.getSILArgIndexOfFirstParam());
+  assert(newResultArgIdx == pass.loweredFnConv.getNumIndirectSILResults());
 
   // Generate a new return_inst for the new direct results.
   SILValue newReturnVal;
@@ -3210,7 +3334,7 @@ void YieldRewriter::rewriteYield(YieldInst *yieldInst) {
 void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   auto info = opaqueFnConv.getYieldInfoForOperandIndex(index);
   auto convention = info.getConvention();
-  auto ty = pass.function->mapTypeIntoContext(
+  auto ty = pass.function->mapTypeIntoEnvironment(
       opaqueFnConv.getSILType(info, pass.function->getTypeExpansionContext()));
   if (ty.isAddressOnly(*pass.function)) {
     assert(yieldInst->getOperand(index)->getType().isAddress() &&
@@ -3363,6 +3487,11 @@ protected:
   void visitYieldInst(YieldInst *yield) {
     SILValue addr = addrMat.materializeAddress(use->get());
     yield->setOperand(use->getOperandNumber(), addr);
+  }
+
+  void visitIgnoredUseInst(IgnoredUseInst *ignored) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    ignored->setOperand(addr);
   }
 
   void visitValueMetatypeInst(ValueMetatypeInst *vmi) {
@@ -3524,6 +3653,11 @@ protected:
 
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
+    // opaque value rewriting.
+  }
+
+  void visitThrowInst(ThrowInst *throwInst) {
+    // Throws are rewritten for any function with an @error_indirect after
     // opaque value rewriting.
   }
 
@@ -4229,7 +4363,9 @@ static void rewriteIndirectApply(ApplySite anyApply,
   switch (apply.getKind()) {
   case FullApplySiteKind::ApplyInst:
   case FullApplySiteKind::TryApplyInst: {
-    if (!apply.getSubstCalleeType()->hasIndirectFormalResults()) {
+    auto calleeFnTy = apply.getSubstCalleeType();
+    if (!calleeFnTy->hasIndirectFormalResults() &&
+        !calleeFnTy->hasIndirectErrorResult()) {
       return;
     }
     // If the call has indirect results and wasn't already rewritten, rewrite it
@@ -4337,6 +4473,8 @@ static void rewriteFunction(AddressLoweringState &pass) {
     ReturnRewriter(pass).rewriteReturns();
   if (pass.function->getLoweredFunctionType()->hasIndirectFormalYields())
     YieldRewriter(pass).rewriteYields();
+  if (pass.function->getLoweredFunctionType()->hasIndirectErrorResult())
+    ReturnRewriter(pass).rewriteThrows();
 }
 
 // Given an array of terminator operand values, produce an array of

@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol P {}
+
+sil_scope 2 { loc "test.swift":1:6 parent @testit : $@convention(thin) (@in_guaranteed any P) -> () }
+sil_scope 3 { loc "test.swift":2:7 parent 2 }
+
+// Check that the verifier does not complain about two alloc_stacks with the same variable but different existential archetypes.
+
+sil @testit : $@convention(thin) (@in_guaranteed any P) -> () {
+bb0(%0 : $*any P):
+  %1 = open_existential_addr immutable_access %0 to $*@opened("2A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self 
+  %2 = alloc_stack [lexical] $@opened("2A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self, var, name "x", loc "test.swift":2:7, scope 3
+  dealloc_stack %2
+  %4 = open_existential_addr immutable_access %0 to $*@opened("3A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self 
+  %5 = alloc_stack [lexical] $@opened("3A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self, var, name "x", loc "test.swift":2:7, scope 3
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+}
+

@@ -20,7 +20,7 @@
 
 /// No errors when extended recovery is enabled.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -experimental-allow-module-with-compiler-errors -verify
+// RUN:   -experimental-allow-module-with-compiler-errors -verify -verify-ignore-unrelated
 
 /// Case 2: Remove a requirement from one lib, leave the other as stale and
 /// rebuild client. Error on the mismatch.
@@ -34,7 +34,7 @@
 
 /// No errors when extended recovery is enabled.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -experimental-allow-module-with-compiler-errors -verify
+// RUN:   -experimental-allow-module-with-compiler-errors -verify -verify-ignore-unrelated
 
 /// Combined case: Remove both the conformance and the requirement.
 /// Fail on the removed conformance only as it was first.
@@ -62,10 +62,10 @@ extension Counter: SimpleProto {}
 public protocol ProtoUser {
   associatedtype Element
 #if DROP_REQUIREMENT
-// CHECK-REMARK-REQUIREMENT: MiddleLib.swiftmodule:1:1: error: Conformances of 'OneToAThousand' do not match requirement signature of 'ProtoUser'; 5 conformances for 6 requirements
-// CHECK-REMARK-REQUIREMENT: Requirements:
+// CHECK-REMARK-REQUIREMENT: MiddleLib.swiftmodule:1:1: error: Listed conformances of 'OneToAThousand' do not match current requirement signature of 'ProtoUser'; 5 conformances for 6 requirements
+// CHECK-REMARK-REQUIREMENT: Requirements seen by this invocation:
 // Skipping implicits.
-// CHECK-REMARK-REQUIREMENT: Conformances:
+// CHECK-REMARK-REQUIREMENT: Conformances written in the swiftmodule:
 // Skipping implicits.
 // CHECK-REMARK-REQUIREMENT: (specialized_conformance type="OneToAThousand.Impl" protocol="SimpleProto"
 // CHECK-REMARK-REQUIREMENT:   (normal_conformance type="Counter<T>" protocol="SimpleProto"{{.*}} lazy))

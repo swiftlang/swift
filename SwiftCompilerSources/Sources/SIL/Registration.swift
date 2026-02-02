@@ -13,6 +13,11 @@
 import Basic
 import SILBridging
 
+public func registerSIL() {
+  registerSILClasses()
+  registerUtilities()
+}
+
 private func register<T: AnyObject>(_ cl: T.Type) {
   "\(cl)"._withBridgedStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
@@ -20,7 +25,7 @@ private func register<T: AnyObject>(_ cl: T.Type) {
   }
 }
 
-public func registerSILClasses() {
+private func registerSILClasses() {
   Function.register()
   register(BasicBlock.self)
   register(GlobalVariable.self)
@@ -38,7 +43,6 @@ public func registerSILClasses() {
   register(StoreUnownedInst.self)
   register(StoreBorrowInst.self)
   register(AssignInst.self)
-  register(AssignByWrapperInst.self)
   register(AssignOrInitInst.self)
   register(CopyAddrInst.self)
   register(ExplicitCopyAddrInst.self)
@@ -116,6 +120,7 @@ public func registerSILClasses() {
   register(MoveOnlyWrapperToCopyableBoxInst.self)
   register(CopyableToMoveOnlyWrapperAddrInst.self)
   register(MoveOnlyWrapperToCopyableAddrInst.self)
+  register(UncheckedOwnershipInst.self) 
   register(ObjectInst.self)
   register(VectorInst.self)
   register(VectorBaseAddrInst.self)
@@ -243,6 +248,7 @@ public func registerSILClasses() {
 
   register(UnreachableInst.self)
   register(ReturnInst.self)
+  register(ReturnBorrowInst.self)
   register(ThrowInst.self)
   register(ThrowAddrInst.self)
   register(YieldInst.self)
@@ -261,4 +267,17 @@ public func registerSILClasses() {
   register(ThunkInst.self)
   register(MergeIsolationRegionInst.self)
   register(IgnoredUseInst.self)
+  register(ImplicitActorToOpaqueIsolationCastInst.self)
+
+  register(MakeBorrowInst.self)
+  register(DereferenceBorrowInst.self)
+  register(MakeAddrBorrowInst.self)
+  register(DereferenceAddrBorrowInst.self)
+  register(InitBorrowAddrInst.self)
+  register(DereferenceBorrowAddrInst.self)
+}
+
+private func registerUtilities() {
+  registerVerifier()
+  registerPhiUpdater()
 }

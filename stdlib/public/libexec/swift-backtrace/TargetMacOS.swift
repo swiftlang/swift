@@ -410,7 +410,7 @@ class Target {
     print("""
             From another shell, please run
 
-            lldb --attach-pid \(target.pid) -o c
+            lldb --attach-pid \(pid) -o c
             """)
     body()
     #endif

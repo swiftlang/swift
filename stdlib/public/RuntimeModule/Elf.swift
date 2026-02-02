@@ -971,6 +971,7 @@ struct Elf64Traits: ElfTraits {
 
 // .. ElfStringSection .........................................................
 
+@available(Backtracing 6.2, *)
 struct ElfStringSection {
   let source: ImageSource
 
@@ -1016,6 +1017,7 @@ protocol ElfSymbolTableProtocol {
   func lookupSymbol(address: Traits.Address) -> Symbol?
 }
 
+@available(Backtracing 6.2, *)
 protocol ElfSymbolLookupProtocol {
   associatedtype Traits: ElfTraits
   typealias CallSiteInfo = DwarfReader<ElfImage<Traits>>.CallSiteInfo
@@ -1026,6 +1028,7 @@ protocol ElfSymbolLookupProtocol {
   func sourceLocation(for address: Traits.Address) throws -> SourceLocation?
 }
 
+@available(Backtracing 6.2, *)
 struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
   typealias Traits = SomeElfTraits
 
@@ -1064,8 +1067,8 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
           continue
         }
 
-        // Ignore anything undefined
-        if symbol.st_shndx == SHN_UNDEF {
+        // Ignore anything undefined or absolute
+        if symbol.st_shndx == SHN_UNDEF || symbol.st_shndx == SHN_ABS {
           continue
         }
 
@@ -1173,6 +1176,7 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
   }
 }
 
+@available(Backtracing 6.2, *)
 final class ElfImage<SomeElfTraits: ElfTraits>
   : DwarfSource, ElfSymbolLookupProtocol {
   typealias Traits = SomeElfTraits
@@ -1189,6 +1193,8 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   var programHeaders: [Traits.Phdr]
   var sectionHeaders: [Traits.Shdr]?
   var shouldByteSwap: Bool { return header.shouldByteSwap }
+
+  var imageBase: ImageSource.Address
 
   @_specialize(kind: full, where SomeElfTraits == Elf32Traits)
   @_specialize(kind: full, where SomeElfTraits == Elf64Traits)
@@ -1222,11 +1228,21 @@ final class ElfImage<SomeElfTraits: ElfTraits>
 
     var phdrs: [Traits.Phdr] = []
     var phAddr = ImageSource.Address(header.e_phoff)
+    var minAddr: Traits.Address? = nil
     for _ in 0..<header.e_phnum {
       let phdr = maybeSwap(try source.fetch(from: phAddr, as: Traits.Phdr.self))
       phdrs.append(phdr)
       phAddr += ImageSource.Address(header.e_phentsize)
+
+      if phdr.p_type == .PT_LOAD {
+        if let oldMinAddr = minAddr {
+          minAddr = min(oldMinAddr, phdr.p_vaddr)
+        } else {
+          minAddr = phdr.p_vaddr
+        }
+      }
     }
+    imageBase = ImageSource.Address(exactly: minAddr ?? 0)!
     programHeaders = phdrs
 
     if source.isMappedImage {
@@ -1463,6 +1479,11 @@ final class ElfImage<SomeElfTraits: ElfTraits>
       let stringSect = ElfStringSection(source: stringSource)
 
       for shdr in sectionHeaders {
+        // All other fields are undefined for SHT_NULL
+        if shdr.sh_type == .SHT_NULL {
+          continue
+        }
+
         guard let name = stringSect.getStringAt(index: Int(shdr.sh_name)) else {
           continue
         }
@@ -1600,6 +1621,11 @@ final class ElfImage<SomeElfTraits: ElfTraits>
         let stringSect = ElfStringSection(source: stringSource)
 
         for shdr in sectionHeaders {
+          // All other fields are undefined for SHT_NULL
+          if shdr.sh_type == .SHT_NULL {
+            continue
+          }
+
           guard let sname
                   = stringSect.getStringAt(index: Int(shdr.sh_name)) else {
             continue
@@ -1872,7 +1898,10 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   }
 }
 
+@available(Backtracing 6.2, *)
 typealias Elf32Image = ElfImage<Elf32Traits>
+
+@available(Backtracing 6.2, *)
 typealias Elf64Image = ElfImage<Elf64Traits>
 
 // .. Checking for ELF images ..................................................
@@ -1886,6 +1915,7 @@ typealias Elf64Image = ElfImage<Elf64Traits>
 #if os(Linux)
 @_specialize(kind: full, where R == MemserverMemoryReader)
 #endif
+@available(Backtracing 6.2, *)
 func getElfImageInfo<R: MemoryReader>(at address: R.Address,
                                       using reader: R)
   -> (endOfText: R.Address, uuid: [UInt8]?)?
@@ -1926,6 +1956,7 @@ func getElfImageInfo<R: MemoryReader>(at address: R.Address,
 @_specialize(kind: full, where R == MemserverMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == MemserverMemoryReader, Traits == Elf64Traits)
 #endif
+@available(Backtracing 6.2, *)
 func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
   at address: R.Address,
   using reader: R,
@@ -2025,6 +2056,7 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
 // .. Testing ..................................................................
 
 @_spi(ElfTest)
+@available(Backtracing 6.2, *)
 public func testElfImageAt(path: String) -> Bool {
   guard let source = try? ImageSource(path: path) else {
     print("\(path) was not accessible")

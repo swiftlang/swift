@@ -18,6 +18,8 @@
 // CHECK: typealias WrappedMagicIntFixedSizeArr1 = MagicWrapper<Vector<CInt, 123>>
 // CHECK: typealias WrappedMagicIntFixedSizeArr2 = MagicWrapper<Vector<CInt, 124>>
 // CHECK: typealias WrappedMagicNullPtr = MagicWrapper<__cxxNullPtrT>
+// CHECK: typealias WrappedMagicConstIntArr = MagicWrapper<__cxxConst<[CInt]>>
+// CHECK: typealias WrappedVolatileIntRef = EmptyWrapper<__cxxLRef<__cxxVolatile<CInt>>>
 
 // CHECK: typealias DoubleWrappedInt = DoubleWrapper<MagicWrapper<CInt>>
 // CHECK: typealias DoubleWrappedIntConst = DoubleWrapper<MagicWrapper<__cxxConst<CInt>>>

@@ -25,7 +25,7 @@ struct Empty {
   init() {}
 }
 
-struct Test<T> where T : P { // expected-note {{where 'T' = 'Generic<(Empty, _)>'}}
+struct Test<T> where T : P { // expected-note {{where 'T' = 'Generic<(Empty, C1)>'}}
   init(@Builder _: () -> T) {}
 }
 
@@ -34,5 +34,5 @@ let x = G {
   Test { Empty() }
   // expected-error@-1 {{static method 'buildBlock' requires that 'Empty' conform to 'P'}}
   // expected-error@-2 {{missing argument for parameter #2 in call}}
-  // expected-error@-3 {{generic struct 'Test' requires that 'Generic<(Empty, _)>' conform to 'P'}}
+  // expected-error@-3 {{generic struct 'Test' requires that 'Generic<(Empty, C1)>' conform to 'P'}}
 }

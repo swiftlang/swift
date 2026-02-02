@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-elimination | %FileCheck %s
 
 import Swift
 import Builtin
@@ -84,14 +84,14 @@ struct AddressOnlyPayload {
 //
 // CHECK-LABEL: sil @test_initialize_struct :
 // CHECK:      bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
-// HECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
-// HECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
-// HECK-NEXT:   [[A:%[0-9]+]] = struct_element_addr [[LEFT]]
-// HECK-NEXT:   copy_addr %1 to [init] [[A]]
-// HECK-NEXT:   [[I:%[0-9]+]] = struct_element_addr [[LEFT]]
-// HECK-NEXT:   store %2 to [[I]]
-// HECK-NEXT:   inject_enum_addr [[E]]
-// HECK-NOT:    copy_addr
+// CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
+// CHECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
+// CHECK-NEXT:   [[A:%[0-9]+]] = struct_element_addr [[LEFT]]
+// CHECK-NEXT:   copy_addr %1 to [init] [[A]]
+// CHECK-NEXT:   [[I:%[0-9]+]] = struct_element_addr [[LEFT]]
+// CHECK-NEXT:   store %2 to [[I]]
+// CHECK-NEXT:   inject_enum_addr [[E]]
+// CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_initialize_struct'
 sil @test_initialize_struct : $@convention(method) (@in Any, Int) -> @out TestStruct {
 bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
@@ -165,14 +165,14 @@ struct StructWithEnum : Proto {
 
 // CHECK-LABEL: sil @move_projections :
 // CHECK:      bb0(%0 : $*any Proto, %1 : $*Any):
-// HECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*any Proto, $StructWithEnum
-// HECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
-// HECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
-// HECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
-// HECK-NEXT:   copy_addr [take] %1 to [init] [[OPTIONAL]] : $*Any
-// HECK-NEXT:   inject_enum_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
-// HECK-NEXT:   inject_enum_addr [[E]] : $*Enum, #Enum.A!enumelt
-// HECK-NOT:    copy_addr
+// CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*any Proto, $StructWithEnum
+// CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
+// CHECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
+// CHECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[OPTIONAL]] : $*Any
+// CHECK-NEXT:   inject_enum_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
+// CHECK-NEXT:   inject_enum_addr [[E]] : $*Enum, #Enum.A!enumelt
+// CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'move_projections'
 sil @move_projections : $@convention(thin) (@in Any) -> @out Proto {
 bb0(%0 : $*Proto, %1 : $*Any):
@@ -290,8 +290,9 @@ enum FakeOptional {
 sil @initfn : $@convention(thin) () -> @out Klass
 
 // CHECK-LABEL: sil @test_enum
-// CHECK: alloc_stack
-// CHECK: alloc_stack
+// CHECK:         [[I:%.*]] = init_enum_data_addr %0
+// CHECK:         [[S:%.*]] = alloc_stack $Klass
+// CHECK:         copy_addr [take] [[S]] to [init] [[I]]
 // CHECK-LABEL: } // end sil function 'test_enum'
 sil @test_enum : $@convention(thin) () -> @out FakeOptional {
 bb0(%0 : $*FakeOptional):

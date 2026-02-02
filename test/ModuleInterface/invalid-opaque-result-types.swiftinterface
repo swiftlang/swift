@@ -1,0 +1,29 @@
+// Test that we emit a diagnostic (and don't crash) when we cannot resolve
+// an opaque result type reference.
+//
+// RUN: %target-typecheck-verify-swift -module-name OpaqueTypes
+//
+
+public struct G<T> {
+  public func f() -> some Any
+}
+
+// Type doesn't demangle
+public typealias Bad1 = @_opaqueReturnTypeOf("nonsense", 0) __
+// expected-error@-1 {{unable to resolve type for _opaqueReturnTypeOf attribute}}
+
+// Type demangles but doesn't name an opaque return type
+public typealias Bad2 = @_opaqueReturnTypeOf("$sSi", 0) __
+// expected-error@-1 {{unable to resolve type for _opaqueReturnTypeOf attribute}}
+
+// Bad index
+public typealias Bad3 = @_opaqueReturnTypeOf("$s11OpaqueTypes1GV1fQryF", 5) __<Int>
+// expected-error@-1 {{unable to resolve type for _opaqueReturnTypeOf attribute}}
+
+// Bad generic argument
+public typealias Bad4 = @_opaqueReturnTypeOf("$s11OpaqueTypes1GV1fQryF", 0) __<InvalidType>
+// expected-error@-1 {{cannot find type 'InvalidType' in scope}}
+
+// Missing generic argument
+public typealias Bad5 = @_opaqueReturnTypeOf("$s11OpaqueTypes1GV1fQryF", 0) __
+// expected-error@-1 {{unable to resolve type for _opaqueReturnTypeOf attribute}}

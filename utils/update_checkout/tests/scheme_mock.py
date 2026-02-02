@@ -21,17 +21,17 @@ import unittest
 # For now we only use a config with a single scheme. We should add support for
 # handling multiple schemes.
 MOCK_REMOTE = {
-    'repo1': [
+    "repo1": [
         # This is a series of changes to repo1. (File, NewContents)
-        ('A.txt', 'A'),
-        ('B.txt', 'B'),
-        ('A.txt', 'a'),
+        ("A.txt", "A"),
+        ("B.txt", "B"),
+        ("A.txt", "a"),
     ],
-    'repo2': [
+    "repo2": [
         # This is a series of changes to repo2. (File, NewContents)
-        ('X.txt', 'X'),
-        ('Y.txt', 'Y'),
-        ('X.txt', 'z'),
+        ("X.txt", "X"),
+        ("Y.txt", "Y"),
+        ("X.txt", "z"),
     ],
 }
 
@@ -39,25 +39,40 @@ MOCK_CONFIG = {
     # This is here just b/c we expect it. We should consider consolidating
     # clone-patterns into a dictionary where we map protocols (i.e. ['ssh,
     # 'https'] to patterns). Then we can define this issue.
-    'ssh-clone-pattern': 'DO_NOT_USE',
+    "ssh-clone-pattern": "DO_NOT_USE",
     # We reset this value with our remote path when we process
-    'https-clone-pattern': '',
-    'repos': {
-        'repo1': {
-            'remote': {'id': 'repo1'},
+    "https-clone-pattern": "",
+    "repos": {
+        "repo1": {
+            "remote": {"id": "repo1"},
         },
-        'repo2': {
-            'remote': {'id': 'repo2'},
+        "repo2": {
+            "remote": {"id": "repo2"},
         },
     },
-    'default-branch-scheme': 'main',
-    'branch-schemes': {
-        'main': {
-            'aliases': ['main'],
-            'repos': {
-                'repo1': 'main',
-                'repo2': 'main',
-            }
+    "default-branch-scheme": "main",
+    "branch-schemes": {
+        "main": {
+            "aliases": ["main"],
+            "repos": {
+                "repo1": "main",
+                "repo2": "main",
+            },
+        }
+    },
+}
+
+MOCK_ADDITIONAL_SCHEME = {
+    "branch-schemes": {
+        "extra": {
+            "aliases": ["extra"],
+            "repos": {
+                # Spell this differently just to make it distinguishable in
+                # test output, even though we only have one branch.
+                # TODO: Support multiple test branches in the repo instead.
+                "repo1": "refs/heads/main",
+                "repo2": "refs/heads/main",
+            },
         }
     }
 }
@@ -70,18 +85,22 @@ class CallQuietlyException(Exception):
         self.output = output
 
     def __str__(self):
-        return f"Command returned a non-zero exit status {self.returncode}:\n"\
-               f"Command: {' '.join(self.command)}\n" \
-               f"Output: {self.output.decode('utf-8')}"
+        return (
+            f"Command returned a non-zero exit status {self.returncode}:\n"
+            f"Command: {' '.join(self.command)}\n"
+            f"Output: {self.output.decode('utf-8')}"
+        )
 
 
 def call_quietly(*args, **kwargs):
-    kwargs['stderr'] = subprocess.STDOUT
+    kwargs["stderr"] = subprocess.STDOUT
+    kwargs["encoding"] = "utf-8"
     try:
-        subprocess.check_output(*args, **kwargs)
+        return subprocess.check_output(*args, **kwargs)
     except subprocess.CalledProcessError as e:
-        raise CallQuietlyException(command=e.cmd, returncode=e.returncode,
-                                   output=e.stdout) from e
+        raise CallQuietlyException(
+            command=e.cmd, returncode=e.returncode, output=e.stdout
+        ) from e
 
 
 def create_dir(d):
@@ -90,67 +109,82 @@ def create_dir(d):
 
 
 def teardown_mock_remote(base_dir):
-    call_quietly(['rm', '-rf', base_dir])
+    call_quietly(["rm", "-rf", base_dir])
 
 
 def get_config_path(base_dir):
-    return os.path.join(base_dir, 'test-config.json')
+    return os.path.join(base_dir, "test-config.json")
+
+
+def get_additional_config_path(base_dir):
+    return os.path.join(base_dir, "test-additional-config.json")
 
 
 def setup_mock_remote(base_dir, base_config):
     create_dir(base_dir)
 
     # We use local as a workspace for creating commits.
-    LOCAL_PATH = os.path.join(base_dir, 'local')
+    LOCAL_PATH = os.path.join(base_dir, "local")
     # We use remote as a directory that simulates our remote unchecked out
     # repo.
-    REMOTE_PATH = os.path.join(base_dir, 'remote')
+    REMOTE_PATH = os.path.join(base_dir, "remote")
 
     create_dir(REMOTE_PATH)
     create_dir(LOCAL_PATH)
 
-    for (k, v) in MOCK_REMOTE.items():
+    for k, v in MOCK_REMOTE.items():
         local_repo_path = os.path.join(LOCAL_PATH, k)
         remote_repo_path = os.path.join(REMOTE_PATH, k)
         create_dir(remote_repo_path)
         create_dir(local_repo_path)
-        call_quietly(['git', 'init', '--bare', remote_repo_path])
-        call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
-                     cwd=remote_repo_path)
-        call_quietly(['git', 'clone', '-l', remote_repo_path, local_repo_path])
-        call_quietly(['git', 'config', '--local', 'user.name', 'swift_test'],
-                     cwd=local_repo_path)
-        call_quietly(['git', 'config', '--local', 'user.email', 'no-reply@swift.org'],
-                     cwd=local_repo_path)
-        call_quietly(['git', 'config', '--local', 'commit.gpgsign', 'false'],
-                     cwd=local_repo_path)
-        call_quietly(['git', 'symbolic-ref', 'HEAD', 'refs/heads/main'],
-                     cwd=local_repo_path)
-        for (i, (filename, contents)) in enumerate(v):
+        call_quietly(["git", "init", "--bare", remote_repo_path])
+        call_quietly(
+            ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=remote_repo_path
+        )
+        call_quietly(["git", "clone", "-l", remote_repo_path, local_repo_path])
+        call_quietly(
+            ["git", "config", "--local", "user.name", "swift_test"], cwd=local_repo_path
+        )
+        call_quietly(
+            ["git", "config", "--local", "user.email", "no-reply@swift.org"],
+            cwd=local_repo_path,
+        )
+        call_quietly(
+            ["git", "config", "--local", "commit.gpgsign", "false"], cwd=local_repo_path
+        )
+        call_quietly(
+            ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=local_repo_path
+        )
+        for i, (filename, contents) in enumerate(v):
             filename_path = os.path.join(local_repo_path, filename)
-            with open(filename_path, 'w') as f:
+            with open(filename_path, "w") as f:
                 f.write(contents)
-            call_quietly(['git', 'add', filename], cwd=local_repo_path)
-            call_quietly(['git', 'commit', '-m', 'Commit %d' % i],
-                         cwd=local_repo_path)
-            call_quietly(['git', 'push', 'origin', 'main'],
-                         cwd=local_repo_path)
+            call_quietly(["git", "add", filename], cwd=local_repo_path)
+            call_quietly(["git", "commit", "-m", "Commit %d" % i], cwd=local_repo_path)
+            call_quietly(["git", "push", "origin", "main"], cwd=local_repo_path)
 
-    https_clone_pattern = os.path.join('file://%s' % REMOTE_PATH, '%s')
-    base_config['https-clone-pattern'] = https_clone_pattern
+    https_clone_pattern = os.path.join("file://%s" % REMOTE_PATH, "%s")
+    base_config["https-clone-pattern"] = https_clone_pattern
 
-    with open(get_config_path(base_dir), 'w') as f:
+    with open(get_config_path(base_dir), "w") as f:
         json.dump(base_config, f)
+
+    with open(get_additional_config_path(base_dir), "w") as f:
+        json.dump(MOCK_ADDITIONAL_SCHEME, f)
 
     return (LOCAL_PATH, REMOTE_PATH)
 
 
-BASEDIR_ENV_VAR = 'UPDATECHECKOUT_TEST_WORKSPACE_DIR'
+BASEDIR_ENV_VAR = "UPDATECHECKOUT_TEST_WORKSPACE_DIR"
 CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPDATE_CHECKOUT_PATH = os.path.abspath(os.path.join(CURRENT_FILE_DIR,
-                                                    os.path.pardir,
-                                                    os.path.pardir,
-                                                    'update-checkout'))
+UPDATE_CHECKOUT_EXECUTABLE = (
+    "update-checkout.cmd" if os.name == "nt" else "update-checkout"
+)
+UPDATE_CHECKOUT_PATH = os.path.abspath(
+    os.path.join(
+        CURRENT_FILE_DIR, os.path.pardir, os.path.pardir, UPDATE_CHECKOUT_EXECUTABLE
+    )
+)
 
 
 class SchemeMockTestCase(unittest.TestCase):
@@ -161,15 +195,19 @@ class SchemeMockTestCase(unittest.TestCase):
         self.config = MOCK_CONFIG.copy()
         self.workspace = os.getenv(BASEDIR_ENV_VAR)
         if self.workspace is None:
-            raise RuntimeError('Misconfigured test suite! Environment '
-                               'variable %s must be set!' % BASEDIR_ENV_VAR)
+            raise RuntimeError(
+                "Misconfigured test suite! Environment "
+                "variable %s must be set!" % BASEDIR_ENV_VAR
+            )
         self.config_path = get_config_path(self.workspace)
+        self.additional_config_path = get_additional_config_path(self.workspace)
         self.update_checkout_path = UPDATE_CHECKOUT_PATH
         if not os.access(self.update_checkout_path, os.X_OK):
-            raise RuntimeError('Error! Could not find executable '
-                               'update-checkout at path: %s'
-                               % self.update_checkout_path)
-        self.source_root = os.path.join(self.workspace, 'source_root')
+            raise RuntimeError(
+                "Error! Could not find executable "
+                "update-checkout at path: %s" % self.update_checkout_path
+            )
+        self.source_root = os.path.join(self.workspace, "source_root")
 
     def setUp(self):
         create_dir(self.source_root)
@@ -181,8 +219,8 @@ class SchemeMockTestCase(unittest.TestCase):
         teardown_mock_remote(self.workspace)
 
     def call(self, *args, **kwargs):
-        kwargs['cwd'] = self.source_root
-        call_quietly(*args, **kwargs)
+        kwargs["cwd"] = self.source_root
+        return call_quietly(*args, **kwargs)
 
     def get_all_repos(self):
         return list(self.config["repos"].keys())

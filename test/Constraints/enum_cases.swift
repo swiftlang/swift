@@ -182,13 +182,13 @@ enum CompassPoint {
 }
 
 func isNorth(c : CompassPoint) -> Bool {
-  // expected-error@+1{{member 'North' expects argument of type 'Int'}}
+  // FIXME: After improving property lookup fix, this message is not selected. Separate debug to reinstate {{member 'North' expects argument of type 'Int'}}
   return c == .North // expected-error {{binary operator '==' cannot be applied to two 'CompassPoint' operands}}
   // expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 }
 
 func isNorth2(c : CompassPoint) -> Bool {
-  // expected-error@+1{{member 'North' expects argument of type 'Int'}}
+  // FIXME: {{member 'North' expects argument of type 'Int'}}
   return .North == c // expected-error {{binary operator '==' cannot be applied to two 'CompassPoint' operands}}
   // expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
 }

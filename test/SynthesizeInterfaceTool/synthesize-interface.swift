@@ -1,4 +1,5 @@
 // RUN: %target-swift-synthesize-interface -module-name m1 -I %S/Inputs -o - | %FileCheck %s
+// RUN: %swift-synthesize-interface -module-name m1 -I %S/Inputs -o - | %FileCheck %s
 
 // CHECK:     public struct MyStruct {
 // CHECK-DAG:     public init()

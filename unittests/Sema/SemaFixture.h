@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/TargetParser/Host.h"
@@ -46,6 +47,7 @@ public:
   SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
 
   SemaTestBase() : Diags(SourceMgr) {
     LangOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
@@ -80,8 +82,8 @@ protected:
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
-  static BindingSet inferBindings(ConstraintSystem &cs,
-                                  TypeVariableType *typeVar);
+  static const BindingSet &inferBindings(ConstraintSystem &cs,
+                                         TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

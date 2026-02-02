@@ -160,11 +160,19 @@ RUNTIME_VERSION(
 
 RUNTIME_VERSION(
   (6, 2),
-  FUTURE
+  PLATFORM(macOS,   (26, 0, 0))
+  PLATFORM(iOS,     (26, 0, 0))
+  PLATFORM(watchOS, (26, 0, 0))
+  PLATFORM(visionOS,(26, 0, 0))
 )
 
 RUNTIME_VERSION(
   (6, 3),
+  FUTURE
+)
+
+RUNTIME_VERSION(
+  (6, 4),
   FUTURE
 )
 

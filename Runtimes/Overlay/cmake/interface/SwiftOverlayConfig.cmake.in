@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+include("${CMAKE_CURRENT_LIST_DIR}/SwiftOverlayTargets.cmake")
+
+set(SwiftOverlay_ENABLE_REFLECTION  @SwiftOverlay_ENABLE_REFLECTION@)

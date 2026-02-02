@@ -10,7 +10,8 @@ name: ⚙️ Track a task
 description: >
   Tasks can be used to track internal work, extract individual subtasks from a
   larger issue, and can serve as umbrella issues themselves.
-labels: [task, triage needed]
+labels: [triage needed]
+type: Task
 body:
   - type: markdown
     attributes:
@@ -18,7 +19,7 @@ body:
         This repository hosts the Swift compiler, the Swift standard library,
         the Swift runtime, SourceKit, and IDE support for the Swift language.
         It does *not* track feedback on Xcode and other closed source Apple
-        deeloper software such as SwiftUI and UIKit; please direct it to
+        developer software such as SwiftUI and UIKit; please direct it to
         [Feedback Assistant](https://developer.apple.com/bug-reporting)
         instead.
   - type: textarea

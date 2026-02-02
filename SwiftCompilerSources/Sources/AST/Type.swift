@@ -50,6 +50,8 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var staticTypeOfDynamicSelf: Type { Type(bridged: bridged.getStaticTypeOfDynamicSelf()) }
 
+  public var interfaceTypeOfArchetype: Type { Type(bridged: bridged.getInterfaceTypeOfArchetype()) }
+
   public var superClassType: Type? {
     precondition(isClass)
     let bridgedSuperClassTy = bridged.getSuperClassType()
@@ -61,8 +63,47 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var builtinVectorElementType: Type { Type(bridged: bridged.getBuiltinVectorElementType()) }
 
+  public var optionalObjectType: Type {
+    assert(self.isOptional)
+    return genericArgumentsOfBoundGenericType[0]
+  }
+
+  public var optionalType: Type {
+    return Type(bridged: bridged.getOptionalType())
+  }
+
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
+  }
+
+  public func mapOutOfEnvironment() -> Type {
+    return Type(bridged: bridged.mapOutOfEnvironment())
+  }
+
+  /// Returns a stronger canonicalization which folds away equivalent
+  /// associated types, or type parameters that have been made concrete.
+  public func getReducedType(of signature: GenericSignature) -> CanonicalType {
+    CanonicalType(bridged: bridged.getReducedType(signature.bridged))
+  }
+
+  public var nameOfGenericTypeParameter: Identifier {
+    bridged.GenericTypeParam_getName()
+  }
+
+  public var depthOfGenericTypeParameter: Int {
+    bridged.GenericTypeParam_getDepth()
+  }
+
+  public var indexOfGenericTypeParameter: Int {
+    bridged.GenericTypeParam_getIndex()
+  }
+
+  public var kindOfGenericTypeParameter: GenericTypeParameterKind {
+    bridged.GenericTypeParam_getParamKind()
+  }
+
+  public var genericArgumentsOfBoundGenericType: TypeArray {
+    TypeArray(bridged: bridged.BoundGenericType_getGenericArgs())
   }
 }
 
@@ -134,6 +175,8 @@ extension TypeProperties {
   public var isArchetype: Bool { rawType.bridged.isArchetype() }
   public var isExistentialArchetype: Bool { rawType.bridged.isExistentialArchetype() }
   public var isExistentialArchetypeWithError: Bool { rawType.bridged.isExistentialArchetypeWithError() }
+  public var isRootArchetype: Bool { rawType.interfaceTypeOfArchetype.isGenericTypeParameter }
+  public var isRootExistentialArchetype: Bool { isExistentialArchetype && isRootArchetype }
   public var isExistential: Bool { rawType.bridged.isExistential() }
   public var isClassExistential: Bool { rawType.bridged.isClassExistential() }
   public var isGenericTypeParameter: Bool { rawType.bridged.isGenericTypeParam() }
@@ -141,15 +184,11 @@ extension TypeProperties {
   public var isMetatype: Bool { rawType.bridged.isMetatypeType() }
   public var isExistentialMetatype: Bool { rawType.bridged.isExistentialMetatypeType() }
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
-
-  /// True if this is the type which represents an integer literal used in a type position.
-  /// For example `N` in `struct T<let N: Int> {}`
-  public var isInteger: Bool { rawType.bridged.isInteger() }
+  public var isBox: Bool { rawType.bridged.isBox() }
+  public var isPack: Bool { rawType.bridged.isPack() }
+  public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
-
-  /// True if this the nominal type `Swift.Optional`.
-  public var isOptional: Bool { rawType.bridged.isOptional() }
 
   /// True if this type is a value type (struct/enum) that defines a `deinit`.
   public var isValueTypeWithDeinit: Bool {
@@ -157,6 +196,34 @@ extension TypeProperties {
       return true
     }
     return false
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                      Checks for stdlib types
+  //===--------------------------------------------------------------------===//
+
+  /// True if this is the type which represents an integer literal used in a type position.
+  /// For example `N` in `struct T<let N: Int> {}`
+  public var isInteger: Bool { rawType.bridged.isInteger() }
+
+  /// True if this the nominal type `Swift.Optional`.
+  public var isOptional: Bool { rawType.bridged.isOptional() }
+
+  /// A non-nil result type implies isUnsafe[Raw][Mutable]Pointer. A raw
+  /// pointer has a `void` element type.
+  public var unsafePointerElementType: Type? {
+    Type(bridgedOrNil: rawType.bridged.getAnyPointerElementType())
+  }
+
+  public var isAnyUnsafePointer: Bool {
+    unsafePointerElementType != nil
+  }
+
+  public var isAnyUnsafeBufferPointer: Bool {
+    rawType.bridged.isUnsafeBufferPointerType()
+      || rawType.bridged.isUnsafeMutableBufferPointerType()
+      || rawType.bridged.isUnsafeRawBufferPointerType()
+      || rawType.bridged.isUnsafeMutableRawBufferPointerType()
   }
 
   //===--------------------------------------------------------------------===//
@@ -171,6 +238,25 @@ extension TypeProperties {
 
   public var invocationGenericSignatureOfFunction: GenericSignature {
     GenericSignature(bridged: rawType.bridged.getInvocationGenericSignatureOfFunctionType())
+  }
+
+  public var functionTypeRepresentation: FunctionTypeRepresentation {
+    switch rawType.bridged.getFunctionTypeRepresentation() {
+      case .Thick:                 return .thick
+      case .Block:                 return .block
+      case .Thin:                  return .thin
+      case .CFunctionPointer:      return .cFunctionPointer
+      case .Method:                return .method
+      case .ObjCMethod:            return .objCMethod
+      case .WitnessMethod:         return .witnessMethod
+      case .Closure:               return .closure
+      case .CXXMethod:             return .cxxMethod
+      case .KeyPathAccessorGetter: return .keyPathAccessorGetter
+      case .KeyPathAccessorSetter: return .keyPathAccessorSetter
+      case .KeyPathAccessorEquals: return .keyPathAccessorEquals
+      case .KeyPathAccessorHash:   return .keyPathAccessorHash
+      default: fatalError()
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -237,6 +323,73 @@ extension TypeProperties {
   public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
     return Conformance(bridged: rawType.bridged.checkConformance(`protocol`.bridged))
   }
+
+  /// The generic signature that the component types are specified in terms of, if any.
+  public var substitutedGenericSignatureOfFunctionType: CanonicalGenericSignature {
+    CanonicalGenericSignature(
+      bridged: rawType.canonical.bridged.SILFunctionType_getSubstGenericSignature())
+  }
+
+  public var containsSILPackExpansionType: Bool {
+    return rawType.bridged.containsSILPackExpansionType()
+  }
+
+  public var isSILPackElementAddress: Bool {
+    return rawType.bridged.isSILPackElementAddress()
+  }
+}
+
+public enum FunctionTypeRepresentation {
+  /// A freestanding thick function.
+  case thick
+
+  /// A thick function that is represented as an Objective-C block.
+  case block
+
+  /// A freestanding thin function that needs no context.
+  case thin
+
+  /// A C function pointer, which is thin and also uses the C calling convention.
+  case cFunctionPointer
+
+  /// A Swift instance method.
+  case method
+
+  /// An Objective-C method.
+  case objCMethod
+
+  /// A Swift protocol witness.
+  case witnessMethod
+
+  /// A closure invocation function that has not been bound to a context.
+  case closure
+
+  /// A C++ method that takes a "this" argument (not a static C++ method or constructor).
+  /// Except for handling the "this" argument, has the same behavior as "CFunctionPointer".
+  case cxxMethod
+
+  /// A KeyPath accessor function, which is thin and also uses the variadic length generic
+  /// components serialization in trailing buffer. Each representation has a different convention
+  /// for which parameters have serialized generic type info.
+  case keyPathAccessorGetter, keyPathAccessorSetter, keyPathAccessorEquals, keyPathAccessorHash
+
+  public var bridged: BridgedASTType.FunctionTypeRepresentation {
+    switch self {
+      case .thick:                 return .Thick
+      case .block:                 return .Block
+      case .thin:                  return .Thin
+      case .cFunctionPointer:      return .CFunctionPointer
+      case .method:                return .Method
+      case .objCMethod:            return .ObjCMethod
+      case .witnessMethod:         return .WitnessMethod
+      case .closure:               return .Closure
+      case .cxxMethod:             return .CXXMethod
+      case .keyPathAccessorGetter: return .KeyPathAccessorGetter
+      case .keyPathAccessorSetter: return .KeyPathAccessorSetter
+      case .keyPathAccessorEquals: return .KeyPathAccessorEquals
+      case .keyPathAccessorHash:   return .KeyPathAccessorHash
+    }
+  }
 }
 
 public struct TypeArray : RandomAccessCollection, CustomReflectable {
@@ -294,3 +447,5 @@ extension CanonicalType: Equatable {
     lhs.rawType == rhs.rawType
   }
 }
+
+public typealias GenericTypeParameterKind = swift.GenericTypeParamKind

@@ -1,0 +1,4 @@
+framework module TestExt {
+  header "MyType.h"
+  export *
+}

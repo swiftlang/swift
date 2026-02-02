@@ -23,6 +23,14 @@
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility-appextlib.h
 // RUN: %check-in-clang %t/accessibility-appextlib.h
 
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -application-extension-library -emit-clang-header-min-access internal -typecheck -verify -emit-objc-header-path %t/accessibility-explicit-internal.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-INTERNAL %s < %t/accessibility-explicit-internal.h
+// RUN: %check-in-clang %t/accessibility-explicit-internal.h
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -application-extension -emit-clang-header-min-access public -typecheck -verify -emit-objc-header-path %t/accessibility-explicit-public.h -disable-objc-attr-requires-foundation-module
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-PUBLIC %s < %t/accessibility-explicit-public.h
+// RUN: %check-in-clang %t/accessibility-explicit-public.h
+
 // REQUIRES: objc_interop
 
 // CHECK: #ifndef ACCESSIBILITY_SWIFT_H

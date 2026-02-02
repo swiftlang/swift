@@ -7,6 +7,9 @@
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fsyntax-only -c %t/test-stdlib.cpp -I %t -Wall -Werror -Werror=ignored-attributes -Wno-error=unused-command-line-argument
 
+// #84574 and #82055 have turned up an availability edge case on Android, disable till fixed.
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 //--- print-string.swift
 
 public func printString(_ s: String) {

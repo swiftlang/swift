@@ -169,6 +169,16 @@ extension ArraySlice {
     }
   }
   
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+  @_alwaysEmitIntoClient
+  @_semantics("array.make_mutable")
+  internal mutating func _makeMutableAndUniqueUnchecked() {
+    if _slowPath(!_buffer.beginCOWMutationUnchecked()) {
+      _buffer = _Buffer(copying: _buffer)
+    }
+  }
+#endif
+
   /// Marks the end of a mutation.
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
@@ -1166,9 +1176,9 @@ extension ArraySlice {
 extension ArraySlice {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
-  @_disfavoredOverload
-  func withUnsafeBufferPointer<R>(
+  internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
@@ -1209,18 +1219,24 @@ extension ArraySlice {
   ) throws(E) -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
+}
 
-  @available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ArraySlice {
+  @available(SwiftCompatibilitySpan 5.0, *)
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
     borrowing get {
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
       let span = unsafe Span(_unsafeStart: pointer, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
+}
 
+extension ArraySlice {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_semantics("array.withUnsafeMutableBufferPointer")
@@ -1299,11 +1315,14 @@ extension ArraySlice {
     // Invoke the body.
     return try unsafe body(&inoutBufferPointer)
   }
+}
 
-  @available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ArraySlice {
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
-    @_alwaysEmitIntoClient
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
@@ -1320,7 +1339,9 @@ extension ArraySlice {
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
+}
 
+extension ArraySlice {
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
@@ -1586,3 +1607,44 @@ extension ArraySlice {
   }
 }
 #endif
+
+extension ArraySlice {
+  /// Returns a boolean value indicating whether this array is identical to
+  /// `other`.
+  ///
+  /// Two array values are identical if there is no way to distinguish between
+  /// them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - If `a` and `b` are `Equatable`, then `a.isTriviallyIdentical(b)` implies
+  /// `a == b`
+  ///   - `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// will compare identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true
+  /// ```
+  ///
+  /// Comparing arrays this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// array storage object. Therefore, identical arrays are guaranteed to
+  /// compare equal with `==`, but not all equal arrays are considered
+  /// identical.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    self._buffer.isTriviallyIdentical(to: other._buffer)
+  }
+}

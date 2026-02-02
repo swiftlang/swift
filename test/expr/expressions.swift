@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -194,7 +194,7 @@ func test5() {
 
 
   let c: (a: Int, b: Int) = (1,2)
-  let _: (b: Int, a: Int) = c  // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  let _: (b: Int, a: Int) = c  // expected-warning {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
 }
 
 
@@ -758,10 +758,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
 
 _ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
 _ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}

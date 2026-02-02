@@ -50,7 +50,8 @@ static bool hasOnlyIncidentalUses(SILInstruction *inst,
 ///
 /// TODO: Handle partial_apply [stack] which has a dealloc_stack user.
 static bool isScopeAffectingInstructionDead(SILInstruction *inst,
-                                            bool fixLifetime) {
+                                            bool fixLifetime,
+                                            bool assumeFixedLifetimes) {
   SILFunction *fun = inst->getFunction();
   assert(fun && "Instruction has no function.");
   // Only support ownership SIL for scoped instructions.
@@ -84,7 +85,7 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
     }
 
     // If result was lexical, lifetime shortening maybe observed, return.
-    if (result->isLexical()) {
+    if (result->isLexical() || assumeFixedLifetimes) {
       auto resultTy = result->getType().getAs<SILFunctionType>();
       // Allow deleted dead lexical values when they are trivial no escape types.
       if (!resultTy || !resultTy->isTrivialNoEscape()) {
@@ -186,10 +187,9 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
 bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
   bool fixLifetime = inst->getFunction()->hasOwnership();
   if (isInstructionTriviallyDead(inst)
-      || isScopeAffectingInstructionDead(inst, fixLifetime)) {
-    assert(!isIncidentalUse(inst) &&
-           (!isa<DestroyValueInst>(inst) ||
-            canTriviallyDeleteOSSAEndScopeInst(inst)) &&
+      || isScopeAffectingInstructionDead(inst, fixLifetime, assumeFixedLifetimes)) {
+    assert(!isIncidentalUse(inst)
+           || canTriviallyDeleteOSSAEndScopeInst(inst) &&
            "Incidental uses cannot be removed in isolation. "
            "They would be removed iff the operand is dead");
     getCallbacks().notifyWillBeDeleted(inst);
@@ -334,7 +334,7 @@ bool InstructionDeleter::deleteIfDead(SILInstruction *inst) {
 
 bool InstructionDeleter::deleteIfDead(SILInstruction *inst, bool fixLifetime) {
   if (isInstructionTriviallyDead(inst)
-      || isScopeAffectingInstructionDead(inst, fixLifetime)) {
+      || isScopeAffectingInstructionDead(inst, fixLifetime, assumeFixedLifetimes)) {
     getCallbacks().notifyWillBeDeleted(inst);
     deleteWithUses(inst, fixLifetime);
     return true;
@@ -350,10 +350,24 @@ namespace swift::test {
 static FunctionTest DeleterDeleteIfDeadTest(
     "deleter_delete_if_dead", [](auto &function, auto &arguments, auto &test) {
       auto *inst = arguments.takeInstruction();
-      InstructionDeleter deleter;
+      InstructionDeleter deleter(/*assumeFixedLifetimes=*/ false);
       llvm::outs() << "Deleting-if-dead " << *inst;
       auto deleted = deleter.deleteIfDead(inst);
       llvm::outs() << "deleteIfDead returned " << deleted << "\n";
+      function.print(llvm::outs());
+    });
+
+// Arguments:
+// - instruction: the instruction to delete
+// Dumps:
+// - the function
+static FunctionTest DeleterTrackIfDeadTest(
+    "deleter_track_if_dead", [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      InstructionDeleter deleter;
+      llvm::outs() << "Tracking " << *inst;
+      deleter.trackIfDead(inst);
+      deleter.cleanupDeadInstructions();
       function.print(llvm::outs());
     });
 } // namespace swift::test

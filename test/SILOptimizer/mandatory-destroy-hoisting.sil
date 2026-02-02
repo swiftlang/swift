@@ -1,0 +1,529 @@
+// RUN: %target-sil-opt -mandatory-destroy-hoisting %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [ossa] @simple :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'simple'
+sil [ossa] @simple : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'multi_block'
+sil [ossa] @multi_block : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
+bb2:
+  br bb3
+bb3:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @two_uses_in_one_user :
+// CHECK:         apply
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'two_uses_in_one_user'
+sil [ossa] @two_uses_in_one_user : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  apply undef(%0, %0) : $(@guaranteed String, @guaranteed String) -> ()
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_destroy :
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'no_destroy'
+sil [ossa] @no_destroy : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  apply undef(%0) : $(@owned String) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_arg_user :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'no_arg_user'
+sil [ossa] @no_arg_user : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @no_inst_user :
+// CHECK:         %1 = move_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'no_inst_user'
+sil [ossa] @no_inst_user : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = move_value %0
+  debug_step
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_already_in_place :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'destroy_already_in_place'
+sil [ossa] @destroy_already_in_place : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  destroy_value %0
+  debug_step
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @two_consecutive_users :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'two_consecutive_users'
+sil [ossa] @two_consecutive_users : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  fix_lifetime %0
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @last_user_is_terminator :
+// CHECK:       bb1(%2 : $()):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       bb2(%5 : @owned $any Error):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'last_user_is_terminator'
+sil [ossa] @last_user_is_terminator : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  try_apply undef(%0) : $(@guaranteed String) -> @error Error, normal bb1, error bb2
+bb1(%2 : $()):
+  br bb3
+bb2(%3 : @owned $Error):
+  apply undef(%3) : $(@owned Error) -> ()
+  br bb3
+bb3:
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @liverange_exit :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'liverange_exit'
+sil [ossa] @liverange_exit : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  cond_br undef, bb1, bb2
+bb1:
+  debug_step
+  destroy_value %0
+  br bb3
+bb2:
+  apply undef(%0) : $(@owned String) -> ()
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @non_overlapping_access_scope :
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    begin_access
+// CHECK:       } // end sil function 'non_overlapping_access_scope'
+sil [ossa] @non_overlapping_access_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  %2 = begin_access [modify] [dynamic] undef : $*Int
+  end_access %2
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @overlapping_access_scope :
+// CHECK:         end_access
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'overlapping_access_scope'
+sil [ossa] @overlapping_access_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_access [modify] [dynamic] undef : $*Int
+  %2 = move_value %0
+  fix_lifetime %2
+  end_access %1
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @interleaved_overlapping_access_scope :
+// CHECK:         end_access %1
+// CHECK-NEXT:    end_access %4
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'interleaved_overlapping_access_scope'
+sil [ossa] @interleaved_overlapping_access_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_access [modify] [dynamic] undef : $*Int
+  %2 = move_value %0
+  fix_lifetime %2
+  %4 = begin_access [modify] [dynamic] undef : $*Int
+  end_access %1
+  end_access %4
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @interleaved_overlapping_access_scope_reverse_order :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_access %4
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'interleaved_overlapping_access_scope_reverse_order'
+sil [ossa] @interleaved_overlapping_access_scope_reverse_order : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_access [modify] [dynamic] undef : $*Int
+  %2 = move_value %0
+  fix_lifetime %2
+  %4 = begin_access [modify] [dynamic] undef : $*Int
+  br bb2
+bb1:
+  end_access %4
+  destroy_value %2
+  %r = tuple ()
+  return %r
+bb2:
+  end_access %1
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_block :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       bb2:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dead_end_block'
+sil [ossa] @dead_end_block : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  cond_br undef, bb1, bb2
+bb1:
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+bb2:
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_block_with_use :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       bb2:
+// CHECK-NEXT:    fix_lifetime %0
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    debug_step
+// CHECK:       } // end sil function 'dead_end_block_with_use'
+sil [ossa] @dead_end_block_with_use : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  cond_br undef, bb1, bb2
+bb1:
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+bb2:
+  fix_lifetime %0
+  debug_step
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_block_with_inner_use :
+// CHECK:         end_borrow %1
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dead_end_block_with_inner_use'
+sil [ossa] @dead_end_block_with_inner_use : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_borrow %0
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %1
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+bb2:
+  fix_lifetime %1
+  end_borrow %1
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @deadend_vs_not_deadend :
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    debug_step
+// CHECK:       } // end sil function 'deadend_vs_not_deadend'
+sil [ossa] @deadend_vs_not_deadend : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  cond_br undef, bb1, bb2
+bb1:
+  fix_lifetime %0
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+bb2:
+  debug_step
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @only_deadend :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    debug_step
+// CHECK:       } // end sil function 'only_deadend'
+sil [ossa] @only_deadend : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  debug_step
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_with_no_destroy :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    fix_lifetime
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dead_end_with_no_destroy'
+sil [ossa] @dead_end_with_no_destroy : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  fix_lifetime %0
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_with_no_use :
+// CHECK:       bb0(%0 : @owned $String):
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dead_end_with_no_use'
+sil [ossa] @dead_end_with_no_use : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_scope :
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'borrow_scope'
+sil [ossa] @borrow_scope : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_borrow %0
+  end_borrow %1
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// TODO: If InteriorLiveness handles `partial_apply [on_stack]`, then the destroy can be hoisted.
+//
+// CHECK-LABEL: sil [ossa] @partial_apply :
+// CHECK:         destroy_value %1
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'partial_apply'
+sil [ossa] @partial_apply : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = partial_apply [on_stack] undef(%0) : $(@guaranteed String) -> ()
+  destroy_value %1
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @mark_dependence :
+// CHECK:         destroy_value %2
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'mark_dependence'
+sil [ossa] @mark_dependence : $@convention(thin) (@owned String, @owned String) -> () {
+bb0(%0 : @owned $String, %1 : @owned $String):
+  %2 = mark_dependence [nonescaping] %1 on %0
+  destroy_value %2
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @reborrow :
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    debug_step
+// CHECK:       } // end sil function 'reborrow'
+sil [ossa] @reborrow : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  cond_br undef, bb1, bb2
+bb1:
+  %1 = begin_borrow %0
+  br bb3(%1)
+bb2:
+  %3 = begin_borrow %0
+  br bb3(%3)
+bb3(%5 : @reborrow $String):
+  %6 = borrowed %5 from (%0)
+  end_borrow %6
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @lexical :
+// CHECK:         debug_step
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'lexical'
+sil [ossa] @lexical : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = move_value [lexical] %0
+  debug_step
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+class C {}
+
+// CHECK-LABEL: sil [ossa] @lexical_in_class_initializer :
+// CHECK:         debug_step
+// CHECK-NEXT:    destroy_value %2
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'lexical_in_class_initializer'
+sil [ossa] @lexical_in_class_initializer : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $C
+  %1 = move_value [lexical] %0
+  %2 = end_init_let_ref %1
+  debug_step
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @copy_of_lexical :
+// CHECK:         %2 = copy_value %1
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'copy_of_lexical'
+sil [ossa] @copy_of_lexical : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = move_value [lexical] %0
+  %2 = copy_value %1
+  destroy_value %1
+  debug_step
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+struct NC: ~Copyable {}
+
+// CHECK-LABEL: sil [ossa] @not_copyable_arg :
+// CHECK:         debug_step
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'not_copyable_arg'
+sil [ossa] @not_copyable_arg : $@convention(thin) (@owned NC) -> () {
+bb0(%0 : @owned $NC):
+  fix_lifetime %0
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @not_copyable_struct :
+// CHECK:         debug_step
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'not_copyable_struct'
+sil [ossa] @not_copyable_struct : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $NC ()
+  fix_lifetime %0
+  debug_step
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+sil @closure1 : $@convention(thin) (@guaranteed C) -> ()
+
+// rdar165850554: InteriorUseDefWalker must consider copies of an on-stack partial apply when computing liveness of the
+// borrowed operand.
+
+// CHECK-LABEL: sil private [ossa] @test_closure_copy :
+// CHECK:         %1 = copy_value %0
+// CHECK:         debug_step
+// CHECK-NEXT:    destroy_value %1
+// CHECK-LABEL: } // end sil function 'test_closure_copy'
+sil private [ossa] @test_closure_copy : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  // create a non-lexical value to trigger mandatory destroy hoisting
+  %1 = copy_value %0
+  %2 = function_ref @closure1 : $@convention(thin) (@guaranteed C) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  %4 = copy_value %3
+  // force a pointer-escape
+  %5 = unchecked_bitwise_cast %4 to $@noescape @callee_guaranteed () -> ()
+  destroy_value %3
+  destroy_value %0
+  destroy_value %4
+  debug_step
+  destroy_value %1
+  %10 = tuple ()
+  return %10
+}

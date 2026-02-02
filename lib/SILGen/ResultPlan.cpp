@@ -225,14 +225,14 @@ public:
 /// reabstracting it.  The value can actually be a tuple if the
 /// abstraction is opaque.
 class ScalarResultPlan final : public ResultPlan {
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   AbstractionPattern origType;
   CanType substType;
   Initialization *init;
   SILFunctionTypeRepresentation rep;
 
 public:
-  ScalarResultPlan(std::unique_ptr<TemporaryInitialization> &&temporary,
+  ScalarResultPlan(TemporaryInitializationPtr &&temporary,
                    AbstractionPattern origType, CanType substType,
                    Initialization *init,
                    SILFunctionTypeRepresentation rep)
@@ -339,13 +339,13 @@ class InitValueFromTemporaryResultPlan final : public ResultPlan {
   Initialization *init;
   CanType substType;
   ResultPlanPtr subPlan;
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
 
 public:
   InitValueFromTemporaryResultPlan(
       Initialization *init, CanType substType,
       ResultPlanPtr &&subPlan,
-      std::unique_ptr<TemporaryInitialization> &&temporary)
+      TemporaryInitializationPtr &&temporary)
       : init(init), substType(substType), subPlan(std::move(subPlan)),
         temporary(std::move(temporary)) {}
 
@@ -524,6 +524,7 @@ public:
     // Loop over the pack, initializing each value with the appropriate
     // element.
     SGF.emitDynamicPackLoop(loc, FormalPackType, ComponentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionIndex,
                                 SILValue packIndex) {
@@ -834,9 +835,9 @@ public:
     SILFunction *impl =
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
-                impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
-            blockStorageTy->mapTypeOutOfContext()->getReducedType(sig),
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
+                impFnTy->mapTypeOutOfEnvironment()->getReducedType(sig)),
+            blockStorageTy->mapTypeOutOfEnvironment()->getReducedType(sig),
+            continuationTy->mapTypeOutOfEnvironment()->getReducedType(sig),
             origFormalType, sig, calleeTypeInfo);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
 
@@ -947,7 +948,7 @@ public:
         }
 
         auto mappedOutContinuationTy =
-            continuationTy->mapTypeOutOfContext()->getCanonicalType();
+            continuationTy->mapTypeOutOfEnvironment()->getCanonicalType();
         auto resumeType =
             cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
@@ -957,7 +958,7 @@ public:
                 : SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
 
         Type replacementTypes[] = {
-            SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
+            SGF.F.mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          LookUpConformanceInModule());
@@ -1249,7 +1250,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
   }
 
   // Create a temporary if the result is indirect.
-  std::unique_ptr<TemporaryInitialization> temporary;
+  TemporaryInitializationPtr temporary;
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
         SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));
@@ -1313,6 +1314,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
   // we can emit a dynamic loop to do that now.
   if (init->canPerformInPlacePackInitialization(openedEnv, eltTy)) {
     SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                            []() -> SILBasicBlock * { return nullptr; },
                             [&](SILValue indexWithinComponent,
                                 SILValue expansionPackIndex,
                                 SILValue packIndex) {
@@ -1334,6 +1336,7 @@ ResultPlanBuilder::buildPackExpansionIntoPack(SILValue packAddr,
                                     SILType::getPrimitiveObjectType(tupleTy));
 
   SGF.emitDynamicPackLoop(loc, formalPackType, componentIndex, openedEnv,
+                          []() -> SILBasicBlock * { return nullptr; },
                           [&](SILValue indexWithinComponent,
                               SILValue expansionPackIndex,
                               SILValue packIndex) {

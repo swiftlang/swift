@@ -21,9 +21,11 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
@@ -70,6 +72,21 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
+enum class MandatoryInlining_t {
+  transparent,
+  inlineAlways
+};
+
+static bool isLexicalPartialApply(PartialApplyInst *pai) {
+  for (Operand *use : pai->getUses()) {
+    if (auto *mv = dyn_cast<MoveValueInst>(use->getUser())) {
+      if (mv->isLexical())
+        return true;
+    }
+  }
+  return false;
+}
+
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -87,6 +104,8 @@ static  bool fixupReferenceCounts(
   // We assume that we were passed a slice of our actual argument array. So we
   // can use this to copy if we need to.
   assert(captureArgConventions.size() == capturedArgs.size());
+
+  bool isLexical = isLexicalPartialApply(pai);
 
   // FIXME: Can we cache this in between inlining invocations?
   DeadEndBlocks deadEndBlocks(pai->getFunction());
@@ -134,7 +153,7 @@ static  bool fixupReferenceCounts(
       auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
       builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
 
-      LinearLifetimeChecker checker(&deadEndBlocks);
+      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -155,6 +174,24 @@ static  bool fixupReferenceCounts(
     }
 
     case ParameterConvention::Direct_Guaranteed: {
+      if (isLexical && v->getOwnershipKind() == OwnershipKind::Owned) {
+        // If the result of the `partial_apply` is lexical we must make sure
+        // to make its captured arguments lexical. Otherwise the argument
+        // lifetimes may be shortened after inlining because the (lexical)
+        //`partial_apply` is not there anymore to keep the arguments alive.
+        auto *mv = SILBuilderWithScope(pai).createMoveValue(loc, v, IsLexical);
+        for (Operand *use : v->getUses()) {
+          if (use->getUser() == pai) {
+            ASSERT(use->isLifetimeEnding() &&
+                   "an escaping partial_apply must consume its arguments");
+            use->set(mv);
+            v = mv;
+            break;
+          }
+        }
+        ASSERT(v == mv && "partial_apply doesn't use its captured argument");
+      }
+
       // If we have a direct_guaranteed value, the value is being taken by the
       // partial_apply at +1, but we are going to invoke the value at +0. So we
       // need to copy/borrow the value before the pai and then
@@ -177,7 +214,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(&deadEndBlocks);
+      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -224,7 +261,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(&deadEndBlocks);
+      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -261,7 +298,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(&deadEndBlocks);
+      LinearLifetimeChecker checker(&deadEndBlocks, /*instIndices=*/ nullptr);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -368,7 +405,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue) {
                                                           calleeValue);
         sri->eraseFromParent();
       } else {
-        auto *dvi = destroy.get<DestroyValueInst *>();
+        auto *dvi = cast<DestroyValueInst *>(destroy);
         SILBuilderWithScope(dvi).emitDestroyValueAndFold(dvi->getLoc(),
                                                          calleeValue);
         dvi->eraseFromParent();
@@ -673,7 +710,8 @@ static SILFunction *
 getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
                   SmallVectorImpl<ParameterConvention> &CapturedArgConventions,
                   SmallVectorImpl<SILValue> &FullArgs,
-                  PartialApplyInst *&PartialApply) {
+                  PartialApplyInst *&PartialApply,
+                  MandatoryInlining_t whatToInline) {
   IsThick = false;
   PartialApply = nullptr;
   CapturedArgConventions.clear();
@@ -744,8 +782,20 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
-  if (CalleeFunction->isTransparent() == IsNotTransparent)
+  if (whatToInline == MandatoryInlining_t::transparent &&
+      CalleeFunction->isTransparent() == IsNotTransparent)
     return nullptr;
+
+  // If the CalleeFunction is not inline(always) definition, we can not process
+  // it.
+  bool calleeThunkIsTransparentAndAThunk =
+    CalleeFunction->isTransparent() == IsTransparent &&
+    CalleeFunction->isThunk();
+  if (whatToInline == MandatoryInlining_t::inlineAlways &&
+      CalleeFunction->getInlineStrategy() != AlwaysInline &&
+      !calleeThunkIsTransparentAndAThunk) {
+    return nullptr;
+  }
 
   // If CalleeFunction is a declaration, see if we can load it.
   if (CalleeFunction->empty())
@@ -801,13 +851,14 @@ static SILInstruction *tryDevirtualizeApplyHelper(SILPassManager *pm, FullApplyS
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation *pi,
                          SILFunction *F,
                          FullApplySite AI, DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
                          ClassHierarchyAnalysis *CHA,
-                         DenseFunctionSet &changedFunctions) {
+                         DenseFunctionSet &changedFunctions,
+                         MandatoryInlining_t whatToInline) {
   // Avoid reprocessing functions needlessly.
   if (FullyInlinedSet.count(F))
     return true;
@@ -818,8 +869,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
     assert(AI && "Cannot have circular inline without apply");
     SILLocation L = AI.getLoc();
     assert(L && "Must have location for transparent inline apply");
+
     diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
-             diag::circular_transparent);
+             whatToInline == MandatoryInlining_t::transparent ?
+               diag::circular_transparent : diag::circular_inlineAlways);
     return false;
   }
 
@@ -830,6 +883,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
   SmallVector<ParameterConvention, 16> CapturedArgConventions;
   SmallVector<SILValue, 32> FullArgs;
   bool invalidatedStackNesting = false;
+
+  SwiftPassInvocation *nestedPi = pi->initializeNestedSwiftPassInvocation(F);
 
   // Visiting blocks in reverse order avoids revisiting instructions after block
   // splitting, which would be quadratic.
@@ -853,7 +908,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
       // *NOTE* If devirtualization succeeds, devirtInst may not be InnerAI,
       // but a casted result of InnerAI or even a block argument due to
       // abstraction changes when calling the witness or class method.
-      auto *devirtInst = tryDevirtualizeApplyHelper(pm, InnerAI, CHA);
+      auto *devirtInst = tryDevirtualizeApplyHelper(pi->getPassManager(), InnerAI, CHA);
       // If devirtualization succeeds, make sure we record that this function
       // changed.
       if (devirtInst != InnerAI.getInstruction())
@@ -870,15 +925,16 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CapturedArgConventions, FullArgs, PAI);
+          F, InnerAI, IsThick, CapturedArgConventions, FullArgs, PAI,
+          whatToInline);
 
       if (!CalleeFunction)
         continue;
 
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(
-              FuncBuilder, pm, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
-              CurrentInliningSet, CHA, changedFunctions)) {
+              FuncBuilder, nestedPi, CalleeFunction, InnerAI, FullyInlinedSet, SetFactory,
+              CurrentInliningSet, CHA, changedFunctions, whatToInline)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
@@ -890,6 +946,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
           diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
                    diag::note_while_inlining);
         }
+        pi->deinitializeNestedSwiftPassInvocation();
         return false;
       }
 
@@ -909,7 +966,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
         }));
 
       SILInliner Inliner(FuncBuilder, deleter,
-                         SILInliner::InlineKind::MandatoryInline, Subs);
+                         whatToInline == MandatoryInlining_t::transparent ?
+                           SILInliner::InlineKind::MandatoryInline :
+                           SILInliner::InlineKind::InlineAlwaysInline,
+                         Subs);
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 
@@ -1006,6 +1066,20 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
     changedFunctions.insert(F);
   }
 
+  if (F->isDefinition()) {
+    removeUnreachableBlocks(*F);
+
+    if (F->needBreakInfiniteLoops())
+      breakInfiniteLoops(pi->getPassManager(), F);
+
+    if (F->needCompleteLifetimes()) {
+      pi->getPassManager()->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+      completeAllLifetimes(pi->getPassManager(), F);
+    }
+
+  }
+  pi->deinitializeNestedSwiftPassInvocation();
+
   // Keep track of full inlined functions so we don't waste time recursively
   // reprocessing them.
   FullyInlinedSet.insert(F);
@@ -1019,6 +1093,9 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILPassManager *pm,
 namespace {
 
 class MandatoryInlining : public SILModuleTransform {
+
+  MandatoryInlining_t whatToInline;
+
   /// The entry point to the transformation.
   void run() override {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
@@ -1050,9 +1127,11 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.wasDeserializedCanonical())
         continue;
 
-      runOnFunctionRecursively(FuncBuilder, getPassManager(), &F, FullApplySite(),
+      runOnFunctionRecursively(FuncBuilder, getPassManager()->getSwiftPassInvocation(),
+                               &F, FullApplySite(),
                                FullyInlinedSet, SetFactory,
-                               SetFactory.getEmptySet(), CHA, changedFunctions);
+                               SetFactory.getEmptySet(), CHA, changedFunctions,
+                               whatToInline);
 
       // The inliner splits blocks at call sites. Re-merge trivial branches
       // to reestablish a canonical CFG.
@@ -1075,9 +1154,15 @@ class MandatoryInlining : public SILModuleTransform {
     }
   }
 
+public:
+  MandatoryInlining(MandatoryInlining_t whatToInline) :
+    whatToInline(whatToInline) {}
 };
 } // end anonymous namespace
 
 SILTransform *swift::createMandatoryInlining() {
-  return new MandatoryInlining();
+  return new MandatoryInlining(MandatoryInlining_t::transparent);
+}
+SILTransform *swift::createInlineAlwaysInlining() {
+  return new MandatoryInlining(MandatoryInlining_t::inlineAlways);
 }

@@ -75,7 +75,7 @@ func reabstractAsConcreteThrowing() throws -> Int {
   try passthroughCall(fiveOrTypedBust)
 }
 
-// CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias{{( nocapture)?}} sret(%TSi){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %4, ptr %5)
+// CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias sret(%TSi) captures(none) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias swifterror captures(none) dereferenceable(8) %4, ptr %5)
 // CHECK: call swiftcc {{i32|i64}} %1
 // CHECK: [[CMP:%.*]] = icmp ne ptr {{%.*}}, null
 // CHECK: br i1 [[CMP]], label %typed.error.load
@@ -107,7 +107,7 @@ func throwsSmallError() throws(SmallError) -> (Float, Int) {
 }
 
 // CHECK: define hidden swiftcc i64 @"$s12typed_throws17catchesSmallErrorSiyF"()
-// CHECK:   [[RES:%.*]] = call swiftcc { float, i64 } @"$s12typed_throws0B10SmallErrorSf_SityAA0cD0VYKF"(ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[RES:%.*]] = call swiftcc { float, i64 } @"$s12typed_throws0B10SmallErrorSf_SityAA0cD0VYKF"(ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[R0:%.*]] = extractvalue { float, i64 } [[RES]], 0
 // CHECK:   [[R1:%.*]] = extractvalue { float, i64 } [[RES]], 1
 // CHECK:   phi i64 [ [[R1]], %typed.error.load ]
@@ -316,7 +316,7 @@ func smallResultLargerError() throws(SmallError) -> Int8? {
 }
 
 // CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
-// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallResultLargerErrors4Int8VSgyAA05SmallF0VYKF"(ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallResultLargerErrors4Int8VSgyAA05SmallF0VYKF"(ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
 // CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds{{.*}} { i16 }, ptr [[COERCED]], i32 0, i32 0
 // CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
@@ -335,7 +335,7 @@ func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
 }
 
 // CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
-// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallErrorLargerResultSiyAA017UInt8OptSingletonD0OYKF"(ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallErrorLargerResultSiyAA017UInt8OptSingletonD0OYKF"(ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
 // CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds{{.*}} { i16 }, ptr [[COERCED]], i32 0, i32 0
 // CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2

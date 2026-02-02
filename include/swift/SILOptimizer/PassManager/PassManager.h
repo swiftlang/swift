@@ -18,7 +18,6 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -52,66 +51,39 @@ void executePassPipelinePlan(SILModule *SM, const SILPassPipelinePlan &plan,
                              irgen::IRGenModule *IRMod = nullptr);
 
 /// Utility class to invoke Swift passes.
-class SwiftPassInvocation {
+class SwiftPassInvocation : public SILContext {
   /// Backlink to the pass manager.
   SILPassManager *passManager;
 
   /// The current transform.
   SILTransform *transform = nullptr;
 
-  /// The currently optimized function.
-  SILFunction *function = nullptr;
-
-  /// Non-null if this is an instruction pass, invoked from SILCombine.
+  /// Non-null if this is an instruction simplification, invoked from SILCombine.
   SILCombiner *silCombiner = nullptr;
-
-  /// Change notifications, collected during a pass run.
-  SILAnalysis::InvalidationKind changeNotifications =
-      SILAnalysis::InvalidationKind::Nothing;
-
-  bool functionTablesChanged = false;
-
-  /// All slabs, allocated by the pass.
-  SILModule::SlabList allocatedSlabs;
-
-  SILSSAUpdater *ssaUpdater = nullptr;
 
   SwiftPassInvocation *nestedSwiftPassInvocation = nullptr;
 
-  static constexpr int BlockSetCapacity = SILBasicBlock::numCustomBits;
-  char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
-  bool aliveBlockSets[BlockSetCapacity];
-  int numBlockSetsAllocated = 0;
-
-  static constexpr int NodeSetCapacity = SILNode::numCustomBits;
-  char nodeSetStorage[sizeof(NodeSet) * NodeSetCapacity];
-  bool aliveNodeSets[NodeSetCapacity];
-  int numNodeSetsAllocated = 0;
-
-  static constexpr int OperandSetCapacity = Operand::numCustomBits;
-  char operandSetStorage[sizeof(OperandSet) * OperandSetCapacity];
-  bool aliveOperandSets[OperandSetCapacity];
-  int numOperandSetsAllocated = 0;
-
-  int numClonersAllocated = 0;
-
   bool needFixStackNesting = false;
+
+  void verifyEverythingIsCleared();
 
   void endPass();
 
 public:
-  SwiftPassInvocation(SILPassManager *passManager, SILFunction *function,
-                         SILCombiner *silCombiner) :
-    passManager(passManager), function(function), silCombiner(silCombiner) {}
-
   SwiftPassInvocation(SILPassManager *passManager, SILTransform *transform,
                       SILFunction *function) :
-    passManager(passManager), transform(transform), function(function) {}
+    SILContext(function), passManager(passManager), transform(transform) {}
 
-  SwiftPassInvocation(SILPassManager *passManager) :
-    passManager(passManager) {}
+  SwiftPassInvocation(SILPassManager *passManager);
 
-  ~SwiftPassInvocation();
+  virtual ~SwiftPassInvocation();
+
+  /// Gets the innermost active pass-invocation.
+  /// Pass-invocations can be nested if a module pass creates an inner context
+  /// for a specific function to modify.
+  SwiftPassInvocation *getCurrent() {
+    return nestedSwiftPassInvocation ? nestedSwiftPassInvocation->getCurrent() : this;
+  }
 
   SILPassManager *getPassManager() const { return passManager; }
   
@@ -121,29 +93,24 @@ public:
 
   irgen::IRGenModule *getIRGenModule();
 
-  FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
-
-  FixedSizeSlab *freeSlab(FixedSizeSlab *slab);
-
-  BasicBlockSet *allocBlockSet();
-
-  void freeBlockSet(BasicBlockSet *set);
-
-  NodeSet *allocNodeSet();
-
-  void freeNodeSet(NodeSet *set);
-
-  OperandSet *allocOperandSet();
-
-  void freeOperandSet(OperandSet *set);
+  void injectSILCombiner(SILCombiner *combiner) {
+    silCombiner = combiner;
+  }
 
   /// The top-level API to erase an instruction, called from the Swift pass.
-  void eraseInstruction(SILInstruction *inst, bool salvageDebugInfo);
+  void eraseInstruction(SILInstruction *inst, bool salvageDebugInfo) override;
 
-  /// Called by the pass when changes are made to the SIL.
-  void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
+  SILFunction *createEmptyFunction(StringRef name, ArrayRef<SILParameterInfo> params,
+                                  bool hasSelfParam, SILFunction *fromFn) override;
 
-  void notifyFunctionTablesChanged();
+  void moveFunctionBody(SILFunction *sourceFn, SILFunction *destFn) override;
+
+  SILFunction *lookupStdlibFunction(StringRef name) override;
+
+  void initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) override;
+  void SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) override;
+  SILValue SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) override;
+  SILValue SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) override;
 
   /// Called by the pass manager before the pass starts running.
   void startModulePassRun(SILModuleTransform *transform);
@@ -162,41 +129,26 @@ public:
 
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
-  
-  void beginTransformFunction(SILFunction *function);
 
-  void endTransformFunction();
+  /// Updates all analysis.
+  /// This is useful if a pass needs an updated analysis after invalidating the SIL of a function.
+  void updateAnalysis();
 
   void beginVerifyFunction(SILFunction *function);
   void endVerifyFunction();
 
-  void notifyNewCloner() { numClonersAllocated++; }
-  void notifyClonerDestroyed() { numClonersAllocated--; }
-
   void setNeedFixStackNesting(bool newValue) { needFixStackNesting = newValue; }
   bool getNeedFixStackNesting() const { return needFixStackNesting; }
 
-  void initializeSSAUpdater(SILFunction *fn, SILType type,
-                            ValueOwnershipKind ownership) {
-    if (!ssaUpdater)
-      ssaUpdater = new SILSSAUpdater;
-    ssaUpdater->initialize(fn, type, ownership);
-  }
-
-  SILSSAUpdater *getSSAUpdater() const {
-    assert(ssaUpdater && "SSAUpdater not initialized");
-    return ssaUpdater;
-  }
-
   SwiftPassInvocation *initializeNestedSwiftPassInvocation(SILFunction *newFunction) {
-    assert(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
+    ASSERT(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
     nestedSwiftPassInvocation = new SwiftPassInvocation(passManager, transform, newFunction);
     return nestedSwiftPassInvocation;
   }
 
   void deinitializeNestedSwiftPassInvocation() {
-    assert(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
-    nestedSwiftPassInvocation->endTransformFunction();
+    ASSERT(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
+    nestedSwiftPassInvocation->finishedFunctionPassRun();
     delete nestedSwiftPassInvocation;
     nestedSwiftPassInvocation = nullptr;
   }
@@ -502,11 +454,11 @@ private:
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F,
-                    int passIdx = -1);
+                    int passIdx = -1, bool skipNewline = false);
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, unsigned TransIdx,
-                    SILFunction *F = nullptr);
+                    SILFunction *F = nullptr, bool skipNewline = false);
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.
@@ -514,14 +466,8 @@ private:
   void viewCallGraph();
 };
 
-inline void SwiftPassInvocation::
-notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
-    changeNotifications = (SILAnalysis::InvalidationKind)
-        (changeNotifications | invalidationKind);
-}
-inline void SwiftPassInvocation::notifyFunctionTablesChanged() {
-  functionTablesChanged = true;
-}
+inline SwiftPassInvocation::SwiftPassInvocation(SILPassManager *passManager) :
+  SILContext(passManager->getModule()), passManager(passManager)  {}
 
 } // end namespace swift
 

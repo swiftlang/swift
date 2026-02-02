@@ -13,12 +13,32 @@ class Klass {}
 sil @getC : $@convention(thin) () -> (@owned C)
 sil @getKlass : $@convention(thin) () -> (@owned Klass)
 
+// CHECK-LABEL: sil [ossa] @alloc_stack_nonnested : $@convention(thin) () -> () {
+// CHECK: alloc_stack [non_nested] $Klass
+// CHECK: } // end sil function 'alloc_stack_nonnested'
+sil [ossa] @alloc_stack_nonnested : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [non_nested] $Klass
+  dealloc_stack %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: ignored_use %0 : $Klass
 // CHECK: } // end sil function 'ignored_use_test'
 sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   ignored_use %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inferred_immutable : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0(%0 : @inferredImmutable @guaranteed $Klass):
+// CHECK: } // end sil function 'inferred_immutable'
+sil [ossa] @inferred_immutable : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @inferredImmutable @guaranteed $Klass):
   %9999 = tuple ()
   return %9999 : $()
 }
@@ -113,6 +133,43 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [serialized] [ossa] @test_dereference_addr_borrow : $@convention(thin) (Builtin.Borrow<Any>) -> @out Any {
+// CHECK:       bb0([[DEST:%.*]] : $*Any, [[BORROW:%.*]] : $Builtin.Borrow<Any>):
+// CHECK:         [[ANY_PTR:%.*]] = dereference_addr_borrow [[BORROW]] : $Builtin.Borrow<Any>
+// CHECK:         copy_addr [[ANY_PTR]] to [init] [[DEST]] : $*Any
+// CHECK-LABEL: } // end sil function 'test_dereference_addr_borrow'
+sil [serialized] [ossa] @test_dereference_addr_borrow : $@convention(thin) (Builtin.Borrow<Any>) -> @out Any {
+bb0(%0 : $*Any, %1 : $Builtin.Borrow<Any>):
+  %any_ptr = dereference_addr_borrow %1 : $Builtin.Borrow<Any>
+  copy_addr %any_ptr to [init] %0 : $*Any
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @test_dereference_borrow : $@convention(thin) (Builtin.Borrow<Int>) -> Int {
+// CHECK:       bb0([[BORROW:%.*]] : $Builtin.Borrow<Int>):
+// CHECK:         [[INT:%.*]] = dereference_borrow [[BORROW]] : $Builtin.Borrow<Int>
+// CHECK:         return [[INT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_dereference_borrow'
+sil [serialized] [ossa] @test_dereference_borrow : $@convention(thin) (Builtin.Borrow<Int>) -> Int {
+bb0(%0 : $Builtin.Borrow<Int>):
+  %int = dereference_borrow %0 : $Builtin.Borrow<Int>
+  return %int : $Int
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @test_dereference_borrow_addr : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> @out T {
+// CHECK:       bb0([[DEST:%.*]] : $*T, [[BORROW:%.*]] : $*Builtin.Borrow<T>):
+// CHECK:         [[T_PTR:%.*]] = dereference_borrow_addr [[BORROW]] : $*Builtin.Borrow<T>
+// CHECK:         copy_addr [[T_PTR]] to [init] [[DEST]] : $*T
+// CHECK-LABEL: } // end sil function 'test_dereference_borrow_addr'
+sil [serialized] [ossa] @test_dereference_borrow_addr : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> @out T {
+bb0(%0 : $*T, %1 : $*Builtin.Borrow<T>):
+  %t_ptr = dereference_borrow_addr %1 : $*Builtin.Borrow<T>
+  copy_addr %t_ptr to [init] %0 : $*T
+  %t = tuple ()
+  return %t
+}
+
 // CHECK-LABEL: sil [ossa] @test_destroy_value : {{.*}} {
 // CHECK:         cond_br undef, [[GOOD:bb[0-9]+]], [[BAD:bb[0-9]+]]
 // CHECK:       [[BAD]]:
@@ -199,17 +256,50 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @test_extend_lifetime : {{.*}} {
 // CHECK:       bb0([[K:%[^,]+]] :
-// CHECK:         br [[LOOP:bb[0-9]+]]
-// CHECK:       [[LOOP]]:
-// CHECK:         extend_lifetime [[K]]
-// CHECK:         br [[LOOP]]
+// CHECK:         br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    extend_lifetime [[K]]
 // CHECK-LABEL: } // end sil function 'test_extend_lifetime'
 sil [ossa] @test_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 entry(%k : @owned $Builtin.NativeObject):
   br bb1
 bb1:
   extend_lifetime %k : $Builtin.NativeObject
-  br bb1
+  br bb2
+bb2:
+  destroy_value [dead_end] %k
+  unreachable
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @test_init_borrow_addr : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+// CHECK:       bb0([[DEST:%.*]] : $*Builtin.Borrow<T>, [[SRC:%.*]] : $*T):
+// CHECK:         init_borrow_addr [[DEST]] : $*Builtin.Borrow<T> with [[SRC]] : $*T
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr'
+sil [serialized] [ossa] @test_init_borrow_addr : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+bb0(%0 : $*Builtin.Borrow<T>, %1 : $*T):
+  init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @test_make_addr_borrow : $@convention(thin) (@in_guaranteed Any) -> Builtin.Borrow<Any> {
+// CHECK:       bb0([[ANY:%.*]] : $*Any):
+// CHECK:         [[BORROW:%.*]] = make_addr_borrow [[ANY]] : $*Any
+// CHECK-LABEL: } // end sil function 'test_make_addr_borrow'
+sil [serialized] [ossa] @test_make_addr_borrow : $@convention(thin) (@in_guaranteed Any) -> Builtin.Borrow<Any> {
+bb0(%0 : $*Any):
+  %borrow = make_addr_borrow %0 : $*Any
+  return %borrow : $Builtin.Borrow<Any>
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @test_make_borrow : $@convention(thin) (Int) -> Builtin.Borrow<Int> {
+// CHECK:       bb0([[INT:%.*]] : $Int):
+// CHECK:         [[BORROW:%.*]] = make_borrow [[INT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_make_borrow'
+sil [serialized] [ossa] @test_make_borrow : $@convention(thin) (Int) -> Builtin.Borrow<Int> {
+bb0(%0 : $Int):
+  %borrow = make_borrow %0 : $Int
+  return %borrow : $Builtin.Borrow<Int>
 }
 
 // CHECK-LABEL: sil [ossa] @test_mark_dependence : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
@@ -389,4 +479,3 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %9999 = tuple ()
   return %9999 : $()
 }
-

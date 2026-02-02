@@ -814,6 +814,11 @@ SILValue. Instead, it constrains the lifetime of an addressable
 variable. Since the constraint is applied to the in-memory
 representation, no additional lexical SILValue is required.
 
+The `self` function argument in a borrow accessor is not lexical.
+`self` is already borrowed for the duration of the borrow accessor and the
+dependency between borrowed return value and `self` will be represented in SIL,
+making lexical lifetime unnecessary.
+
 ### Deinit Barriers
 
 Deinit barriers (see Instruction.isDeinitBarrier(_:)) are instructions

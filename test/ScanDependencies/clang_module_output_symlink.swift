@@ -12,7 +12,7 @@
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
-// CHECK:      "-fmodule-file=C=[[PCM_PATH:.*symlink.*C-.*.pcm]]"
+// CHECK:      "-fmodule-file=C=[[PCM_PATH:C-.*.pcm]]"
 // CHECK:      "-fmodule-file-cache-key"
 // CHECK-NEXT: "-Xcc"
 // CHECK-NEXT: "[[PCM_PATH]]"

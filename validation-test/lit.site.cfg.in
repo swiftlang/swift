@@ -25,6 +25,7 @@ config.swift_src_root = "@SWIFT_SOURCE_DIR@"
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_module_triple = "@VARIANT_MODULE_TRIPLE@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.swift_test_results_dir = \
@@ -136,6 +137,11 @@ config.swift_enable_dispatch = "@SWIFT_ENABLE_DISPATCH@" == "TRUE"
 config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" == "TRUE"
 # Configured in DarwinSDKs.cmake
 config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
+
+if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
+  config.available_features.add('swift_swift_parser')
+
+config.swift_sdks = "@SWIFT_SDKS@".split(";")
 
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

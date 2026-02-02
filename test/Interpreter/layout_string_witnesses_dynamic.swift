@@ -4,7 +4,7 @@
 // RUN: %target-codesign %t/%target-library-name(layout_string_witnesses_types)
 // RUN: %target-swift-frontend -target %target-future-triple -enable-experimental-feature LayoutStringValueWitnesses -enable-experimental-feature LayoutStringValueWitnessesInstantiation -enable-layout-string-value-witnesses -enable-layout-string-value-witnesses-instantiation -enable-library-evolution -enable-autolinking-runtime-compatibility-bytecode-layouts -emit-module -emit-module-path=%t/layout_string_witnesses_types_resilient.swiftmodule %S/Inputs/layout_string_witnesses_types_resilient.swift
 // RUN: %target-build-swift -target %target-future-triple -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -Xfrontend -enable-library-evolution -c -parse-as-library -o %t/layout_string_witnesses_types_resilient.o %S/Inputs/layout_string_witnesses_types_resilient.swift
-// RUN: %target-build-swift -target %target-future-triple -g -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
+// RUN: %target-build-swift -target %target-future-triple -g -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnesses -Xfrontend -enable-experimental-feature -Xfrontend LayoutStringValueWitnessesInstantiation -Xfrontend -enable-layout-string-value-witnesses -Xfrontend -enable-layout-string-value-witnesses-instantiation -parse-stdlib -module-name layout_string_witnesses_dynamic -llayout_string_witnesses_types -L%t %t/layout_string_witnesses_types_resilient.o -I %t -o %t/main %s %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(layout_string_witnesses_types) | %FileCheck %s --check-prefix=CHECK -check-prefix=CHECK-%target-os
 
@@ -15,9 +15,6 @@
 // Requires runtime functions added in Swift 5.9.
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-
-// test disabled until rdar://151476435 is fixed
-// REQUIRES: rdar151476435
 
 import Swift
 import layout_string_witnesses_types
@@ -33,7 +30,7 @@ class TestClass {
 
 func testGeneric() {
     let ptr = allocateInternalGenericPtr(of: TestClass.self)
-    
+
     do {
         let x = TestClass()
         testGenericInit(ptr, to: x)
@@ -1246,7 +1243,7 @@ func testNonCopyableGenericStructSimpleClass() {
     let ptr = UnsafeMutableBufferPointer<NonCopyableGenericStruct<SimpleClass>>.allocate(capacity: 1)
 
     let x = NonCopyableGenericStruct(x: 23, y: SimpleClass(x: 23))
-    ptr[0] = x
+    ptr.initializeElement(at: 0, to: x)
 
     // CHECK-NEXT: Before deinit
     print("Before deinit")
@@ -1264,7 +1261,7 @@ func testNonCopyableGenericEnumSimpleClass() {
     let ptr = UnsafeMutableBufferPointer<NonCopyableGenericEnum<SimpleClass>>.allocate(capacity: 1)
 
     let x = NonCopyableGenericEnum.x(23, SimpleClass(x: 23))
-    ptr[0] = x
+    ptr.initializeElement(at: 0, to: x)
 
     // CHECK-NEXT: Before deinit
     print("Before deinit")
@@ -1277,6 +1274,72 @@ func testNonCopyableGenericEnumSimpleClass() {
 }
 
 testNonCopyableGenericEnumSimpleClass()
+
+public struct NonCopyableResilientWrapper: ~Copyable {
+    let x: SimpleResilient
+    let y: Int
+}
+
+func testNonCopyableResilientStruct() {
+    let ptr = allocateInternalGenericPtr(of: NonCopyableResilientWrapper.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: NonCopyableResilientWrapper(x: SimpleResilient(x: 23, y: x), y: 5))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: NonCopyableResilientWrapper(x: SimpleResilient(x: 23, y: y), y: 7))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: NonCopyableResilientWrapper.self)
+
+    ptr.deallocate()
+}
+
+testNonCopyableResilientStruct()
+
+public enum NonCopyableResilientEnum: ~Copyable {
+    case x(SimpleResilient, Int)
+    case y(Int)
+}
+
+func testNonCopyableResilientEnum() {
+    let ptr = allocateInternalGenericPtr(of: NonCopyableResilientEnum.self)
+
+    do {
+        let x = TestClass()
+        testGenericInit(ptr, to: NonCopyableResilientEnum.x(SimpleResilient(x: 23, y: x), 5))
+    }
+
+    do {
+        let y = TestClass()
+        // CHECK: Before deinit
+        print("Before deinit")
+
+        // CHECK-NEXT: TestClass deinitialized!
+        testGenericAssign(ptr, from: NonCopyableResilientEnum.x(SimpleResilient(x: 23, y: y), 7))
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: TestClass deinitialized!
+    testGenericDestroy(ptr, of: NonCopyableResilientEnum.self)
+
+    ptr.deallocate()
+}
+
+testNonCopyableResilientEnum()
 
 #if os(macOS)
 

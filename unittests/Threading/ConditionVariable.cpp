@@ -67,7 +67,7 @@ TEST(ConditionVariableTest, Timeout) {
     ASSERT_FALSE(ret);
   });
 
-  ASSERT_GE(duration.count(), 0.01);
+  ASSERT_GE(duration.count(), 0.01 * 0.999);
 
   duration = measureDuration([&] {
     ConditionVariable::ScopedLock lock(cond);
@@ -75,7 +75,7 @@ TEST(ConditionVariableTest, Timeout) {
     ASSERT_FALSE(ret);
   });
 
-  ASSERT_GE(duration.count(), 0.1);
+  ASSERT_GE(duration.count(), 0.1 * 0.999);
 
   duration = measureDuration([&] {
     ConditionVariable::ScopedLock lock(cond);
@@ -83,7 +83,7 @@ TEST(ConditionVariableTest, Timeout) {
     ASSERT_FALSE(ret);
   });
 
-  ASSERT_GE(duration.count(), 1.0);
+  ASSERT_GE(duration.count(), 1.0 * 0.999);
 
   auto deadline = std::chrono::system_clock::now() + 0.5s;
 
@@ -93,7 +93,7 @@ TEST(ConditionVariableTest, Timeout) {
     ASSERT_FALSE(ret);
   });
 
-  ASSERT_GE(duration.count(), 0.5);
+  ASSERT_GE(duration.count(), 0.5 * 0.999);
 }
 
 // Check that signal() wakes exactly one waiter

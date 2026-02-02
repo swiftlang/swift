@@ -1524,7 +1524,7 @@ bb0:
 
 // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
 // The semantics attribute is used by the constant folder.
-sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [heuristic_always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 // CHECK-LABEL: sil @string_ptr_to_int_round_trip : $@convention(thin) () -> Builtin.RawPointer {
 // CHECK-NOT: builtin

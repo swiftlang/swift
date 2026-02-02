@@ -23,6 +23,7 @@ internal import BacktracingImpl.OS.Darwin
 #endif
 
 /// Holds a map of the process's address space.
+@available(Backtracing 6.2, *)
 public struct ImageMap: Collection, Sendable, Hashable {
 
   /// A type representing the sequence's elements.
@@ -33,32 +34,42 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   /// Tells us what size of machine words were used when capturing the
   /// image map.
-  enum WordSize: Sendable {
+  @_spi(Testing)
+  public enum WordSize: Sendable {
     case sixteenBit
     case thirtyTwoBit
     case sixtyFourBit
   }
 
   /// We use UInt64s for addresses here.
-  typealias Address = UInt64
+  @_spi(Testing)
+  public typealias Address = UInt64
 
   /// The internal representation of an image.
-  struct Image: Sendable, Hashable {
-    var name: String?
-    var path: String?
-    var uniqueID: [UInt8]?
-    var baseAddress: Address
-    var endOfText: Address
+  @_spi(Formatting)
+  public struct Image: Sendable, Hashable {
+    @_spi(Testing)
+    public var name: String?
+    @_spi(Testing)
+    public var path: String?
+    @_spi(Testing)
+    public var uniqueID: [UInt8]?
+    @_spi(Testing)
+    public var baseAddress: Address
+    @_spi(Testing)
+    public var endOfText: Address
   }
 
   /// The name of the platform that captured this image map.
   public private(set) var platform: String
 
   /// The actual image storage.
-  var images: [Image]
+  @_spi(Formatting)
+  public var images: [Image]
 
   /// The size of words used when capturing.
-  var wordSize: WordSize
+  @_spi(Testing)
+  public var wordSize: WordSize
 
   /// Construct an ImageMap.
   init(platform: String, images: [Image], wordSize: WordSize) {
@@ -126,6 +137,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension ImageMap: CustomStringConvertible {
   /// Generate a description of an ImageMap
   public var description: String {
@@ -156,6 +168,7 @@ extension ImageMap: CustomStringConvertible {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension Backtrace.Image {
   /// Convert an ImageMap.Image to a Backtrace.Image.
   ///
@@ -193,6 +206,7 @@ extension Backtrace.Image {
   }
 }
 
+@available(Backtracing 6.2, *)
 extension ImageMap: Codable {
 
   public func encode(to encoder: any Encoder) throws {

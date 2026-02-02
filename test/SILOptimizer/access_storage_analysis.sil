@@ -103,12 +103,12 @@ bb0(%0 : ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @writeIdentifiedBox
-// CHECK: [read] Box   %1 = alloc_box ${ var Int }
+// CHECK: [modify] Box   %1 = alloc_box ${ var Int }
 sil @writeIdentifiedBox : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   store %0 to %3 : $*Int
   end_access %3 : $*Int
   %6 = tuple ()
@@ -398,7 +398,7 @@ bb0(%0 : $C):
 sil @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   %4 = begin_access [modify] [dynamic] %3 : $*Int
   store %1 to %4 : $*Int
   end_access %4 : $*Int

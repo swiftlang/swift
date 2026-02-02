@@ -43,12 +43,12 @@ __all__ = [
 
 # Options that can be "configured" by command line options
 
-BUILD_VARIANT = 'Debug'
+BUILD_VARIANT = 'RelWithDebInfo'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = Version('6.2')
-CLANG_USER_VISIBLE_VERSION = Version('17.0.0')
+SWIFT_USER_VISIBLE_VERSION = Version('6.3')
+CLANG_USER_VISIBLE_VERSION = Version('21.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
 DARWIN_XCRUN_TOOLCHAIN = 'default'

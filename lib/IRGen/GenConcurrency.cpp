@@ -18,6 +18,7 @@
 #include "GenConcurrency.h"
 
 #include "BitPatternBuilder.h"
+#include "CallEmission.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
 #include "GenPointerAuth.h"
@@ -234,7 +235,8 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   localContextInfo = IGF.Builder.CreateBitCast(localContextInfo,
                                                IGF.IGM.OpaquePtrTy);
   
-  // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
+  // Stack allocate the AsyncLet structure and begin lifetime for it.
+  // This will be balanced in EndAsyncLetLifetime.
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
   auto alet = IGF.Builder.CreateBitCast(address.getAddress(),
@@ -249,7 +251,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
       llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     futureResultTypeMetadata =
-        IGF.emitAbstractTypeMetadataRef(futureResultType);
+        IGF.emitTypeMetadataRef(futureResultType);
   }
 
   // The concurrency runtime for older Apple OSes has a bug in task formation
@@ -298,32 +300,94 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   taskOptions =
     maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, futureResultType);
   
-  llvm::CallInst *call;
-  if (localResultBuffer) {
-    // This is @_silgen_name("swift_asyncLet_begin")
-    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFunctionPointer(),
-                                  {alet, taskOptions, futureResultTypeMetadata,
-                                   taskFunction, localContextInfo,
-                                   localResultBuffer});
-  } else {
-    // This is @_silgen_name("swift_asyncLet_start")
-    call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFunctionPointer(),
-                                  {alet, taskOptions, futureResultTypeMetadata,
-                                   taskFunction, localContextInfo});
-  }
+  // Call swift_asyncLet_begin. We no longer use swift_asyncLet_start.
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(IGF.IGM.getAsyncLetBeginFunctionPointer(),
+                           {alet, taskOptions, futureResultTypeMetadata,
+                            taskFunction, localContextInfo,
+                            localResultBuffer});
+
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
   return alet;
 }
 
-void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
-  auto *call =
-      IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFunctionPointer(), {alet});
+llvm::Value *irgen::emitBuiltinTaskAddHandler(IRGenFunction &IGF,
+                                              BuiltinValueKind kind,
+                                              llvm::Value *func,
+                                              llvm::Value *context) {
+  auto callee = [&]() -> FunctionPointer {
+    if (kind == BuiltinValueKind::TaskAddCancellationHandler) {
+      return IGF.IGM.getTaskAddCancellationHandlerFunctionPointer();
+    }
+    if (kind == BuiltinValueKind::TaskAddPriorityEscalationHandler) {
+      return IGF.IGM.getTaskAddPriorityEscalationHandlerFunctionPointer();
+    }
+    llvm::report_fatal_error("Unhandled builtin");
+  }();
+  auto *call = IGF.Builder.CreateCall(callee, {func, context});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
 
-  IGF.Builder.CreateLifetimeEnd(alet);
+void irgen::emitBuiltinTaskRemoveHandler(IRGenFunction &IGF,
+                                         BuiltinValueKind kind,
+                                         llvm::Value *record) {
+  auto callee = [&]() -> FunctionPointer {
+    if (kind == BuiltinValueKind::TaskRemoveCancellationHandler) {
+      return IGF.IGM.getTaskRemoveCancellationHandlerFunctionPointer();
+    }
+    if (kind == BuiltinValueKind::TaskRemovePriorityEscalationHandler) {
+      return IGF.IGM.getTaskRemovePriorityEscalationHandlerFunctionPointer();
+    }
+    llvm::report_fatal_error("Unhandled builtin");
+  }();
+  auto *call = IGF.Builder.CreateCall(callee, {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+void irgen::emitBuiltinTaskLocalValuePush(IRGenFunction &IGF, llvm::Value *key,
+                                          llvm::Value *value,
+                                          llvm::Value *valueMetatype) {
+  auto callee = IGF.IGM.getTaskLocalValuePushFunctionPointer();
+
+  // We pass in Value at +1, but we are luckily given the value already at +1,
+  // so the end lifetime is performed for us.
+  auto *call = IGF.Builder.CreateCall(callee, {key, value, valueMetatype});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+void irgen::emitBuiltinTaskLocalValuePop(IRGenFunction &IGF) {
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskLocalValuePopFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
+                               llvm::Value *asyncLet,
+                               llvm::Value *resultBuffer) {
+  llvm::Constant *function = IGF.IGM.getAsyncLetFinishFn();
+  auto callee = Callee::forBuiltinRuntimeFunction(IGF.IGM, function,
+                        BuiltinValueKind::FinishAsyncLet, SubstitutionMap(),
+                        FunctionPointerKind::SpecialKind::AsyncLetFinish);
+  auto emission = getCallEmission(IGF, nullptr, std::move(callee));
+
+  emission->begin();
+
+  Explosion args;
+  args.add(asyncLet);
+  args.add(resultBuffer);
+  emission->setArgs(args, /*outlined*/ false, /*witness metadata*/ nullptr);
+
+  Explosion result;
+  emission->emitToExplosion(result, false);
+
+  emission->end();
 }
 
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
@@ -352,7 +416,7 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
     return group;
   }
 
-  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+  auto resultTypeMetadata = IGF.emitTypeMetadataRef(resultType);
 
   llvm::CallInst *call;
   if (groupFlags) {
@@ -416,7 +480,7 @@ void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
   assert(subs.getReplacementTypes().size() == 1 &&
          "taskRunInline should have a type substitution");
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
-  auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
+  auto resultTypeMetadata = IGF.emitTypeMetadataRef(resultType);
 
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskRunInlineFunctionPointer(),
@@ -878,4 +942,140 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
   auto newContext = IGF.Builder.CreateExtractValue(result, { 1 });
   newContext = IGF.Builder.CreateBitCast(newContext, IGF.IGM.Int8PtrTy);
   return { newTask, newContext };
+}
+
+namespace {
+
+/// A TypeInfo implementation for Builtin.ImplicitActor.
+class ImplicitActorTypeInfo final
+    : public ScalarPairTypeInfo<ImplicitActorTypeInfo, LoadableTypeInfo> {
+
+public:
+  ImplicitActorTypeInfo(llvm::StructType *storageType, Size size,
+                        Alignment align, SpareBitVector &&spareBits)
+      : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
+                           IsNotTriviallyDestroyable, IsCopyable, IsFixedSize,
+                           IsABIAccessible) {}
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(
+        *this, T, ScalarKind::NativeStrongReference);
+  }
+
+  static Size getFirstElementSize(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+
+  static StringRef getFirstElementLabel() { return ".actor"; }
+
+  static bool isFirstElementTrivial() { return false; }
+
+  void emitRetainFirstElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {
+    if (!atomicity)
+      atomicity = IGF.getDefaultAtomicity();
+    IGF.emitNativeStrongRetain(data, *atomicity);
+  }
+
+  void emitReleaseFirstElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {
+    if (!atomicity)
+      atomicity = IGF.getDefaultAtomicity();
+    IGF.emitNativeStrongRelease(data, *atomicity);
+  }
+
+  void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *data,
+                              Address address) const {
+    IGF.emitNativeStrongAssign(data, address);
+  }
+
+  static Size getSecondElementOffset(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+  static Size getSecondElementSize(IRGenModule &IGM) {
+    return IGM.getPointerSize();
+  }
+  static StringRef getSecondElementLabel() { return ".witness_table_pointer"; }
+  bool isSecondElementTrivial() const { return true; }
+
+  void emitRetainSecondElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {}
+  void emitReleaseSecondElement(
+      IRGenFunction &IGF, llvm::Value *data,
+      std::optional<Atomicity> atomicity = std::nullopt) const {}
+  void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
+                               Address dataAddr) const {
+    IGF.Builder.CreateStore(context, dataAddr);
+  }
+
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return false;
+  }
+  PointerInfo getPointerInfo(IRGenModule &IGM) const {
+    return PointerInfo::forHeapObject(IGM);
+  }
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return 0;
+  }
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                     unsigned index) const override {
+
+    llvm_unreachable("no extra inhabitants");
+  }
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
+                                       SILType T,
+                                       bool isOutlined) const override {
+    llvm_unreachable("no extra inhabitants");
+  }
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
+    llvm_unreachable("no extra inhabitants");
+  }
+};
+
+} // end anonymous namespace
+
+const LoadableTypeInfo &IRGenModule::getImplicitActorTypeInfo() {
+  return Types.getImplicitActorTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getImplicitActorTypeInfo() {
+  if (ImplicitActorTI)
+    return *ImplicitActorTI;
+
+  auto ty = IGM.SwiftImplicitActorType;
+
+  // No spare bits
+  SpareBitVector spareBits;
+  spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+  spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
+
+  ImplicitActorTI = new ImplicitActorTypeInfo(ty, IGM.getPointerSize() * 2,
+                                              IGM.getPointerAlignment(),
+                                              std::move(spareBits));
+  ImplicitActorTI->NextConverted = FirstType;
+  FirstType = ImplicitActorTI;
+  return *ImplicitActorTI;
+}
+
+llvm::Value *irgen::clearImplicitIsolatedActorBits(IRGenFunction &IGF,
+                                                   llvm::Value *value) {
+  auto *cast = IGF.Builder.CreateBitOrPointerCast(value, IGF.IGM.IntPtrTy);
+  // When TBI is enabled, we use the bottom two bits of the upper nibble of the
+  // TBI bit, implying a mask of 0xCFFFFFFFFFFFFFFF. If TBI is disabled, then we
+  // mask the bottom two tagged pointer bits.
+  auto *bitMask =
+      IGF.getOptions().HasAArch64TBI
+          ? llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0xCFFFFFFFFFFFFFFFull)
+          : llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4);
+  auto *result = IGF.Builder.CreateAnd(cast, bitMask);
+  return IGF.Builder.CreateBitOrPointerCast(result, value->getType());
 }

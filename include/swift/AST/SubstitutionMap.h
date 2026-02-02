@@ -209,7 +209,7 @@ public:
 
   /// Swap archetypes in the substitution map's replacement types with their
   /// interface types.
-  SubstitutionMap mapReplacementTypesOutOfContext() const;
+  SubstitutionMap mapReplacementTypesOutOfEnvironment() const;
 
   /// Verify that the conformances stored in this substitution map match the
   /// replacement types provided.
@@ -217,7 +217,7 @@ public:
 
   /// Whether to dump the full substitution map, or just a minimal useful subset
   /// (on a single line).
-  enum class DumpStyle { Minimal, Full };
+  enum class DumpStyle { Minimal, NoConformances, Full };
   /// Dump the contents of this substitution map for debugging purposes.
   void dump(llvm::raw_ostream &out, DumpStyle style = DumpStyle::Full,
             unsigned indent = 0) const;

@@ -1,16 +1,15 @@
 // RUN: %empty-directory(%t/Frameworks)
-// RUN: INPUT_DIR=%S/Inputs
-// RUN: cp -R $INPUT_DIR/Alpha.framework %t/Frameworks/
+// RUN: cp -R %S/Inputs/Alpha.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/Alpha.framework/Modules/Alpha.swiftmodule)
 // RUN: %empty-directory(%t/Frameworks/Alpha.framework/Headers/)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -parse-as-library -disable-availability-checking -module-name Alpha \
 // RUN:  -emit-module -o %t/Frameworks/Alpha.framework/Modules/Alpha.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:  -enable-objc-interop -disable-objc-attr-requires-foundation-module \
-// RUN:  -emit-objc-header -emit-objc-header-path %t/Frameworks/Alpha.framework/Headers/Alpha-Swift.h $INPUT_DIR/Alpha.swift
-// RUN: cp -R $INPUT_DIR/Beta.framework %t/Frameworks/
+// RUN:  -emit-objc-header -emit-objc-header-path %t/Frameworks/Alpha.framework/Headers/Alpha-Swift.h %S/Inputs/Alpha.swift
+// RUN: cp -R %S/Inputs/Beta.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/Beta.framework/Headers/)
-// RUN: cp $INPUT_DIR/Beta.h %t/Frameworks/Beta.framework/Headers/Beta.h
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -typecheck -verify %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks
+// RUN: cp %S/Inputs/Beta.h %t/Frameworks/Beta.framework/Headers/Beta.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -typecheck -verify -verify-ignore-unrelated %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-string-processing-module-import -disable-availability-checking -parse-as-library -emit-silgen -DSILGEN %s -F %t/Frameworks -F %clang-importer-sdk-path/frameworks | %FileCheck -check-prefix=CHECK-SYMB %s
 
@@ -260,7 +259,7 @@ class ProbeDefault_BaseIsolatedClass: BaseIsolatedClass {
 }
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers @MainActor @preconcurrency class ProbeIsolated_BaseIsolatedClass : BaseIsolatedClass {
-// CHECK: @objc @preconcurrency isolated deinit
+// CHECK: @objc isolated deinit
 // CHECK: }
 // CHECK-SYMB: ProbeIsolated_BaseIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
@@ -320,7 +319,7 @@ class ProbeDefault_DerivedIsolatedClass: DerivedIsolatedClass {
 }
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers @MainActor @preconcurrency class ProbeIsolated_DerivedIsolatedClass : DerivedIsolatedClass {
-// CHECK: @objc @preconcurrency isolated deinit
+// CHECK: @objc isolated deinit
 // CHECK: }
 // CHECK-SYMB: ProbeIsolated_DerivedIsolatedClass.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor

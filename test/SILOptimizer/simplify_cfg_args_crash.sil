@@ -56,25 +56,3 @@ bb1(%2 : $Pair):
   br bb1(%2 : $Pair)
 }
 
-// CHECK-LABEL: sil [ossa] @redundant_phi_unreachable : $@convention(thin) () -> () {
-// CHECK: bb1({{.*}}):
-// CHECK-LABEL: } // end sil function 'redundant_phi_unreachable'
-sil [ossa] @redundant_phi_unreachable : $@convention(thin) () -> () {
-bb0:
-  %1 = integer_literal $Builtin.Int32, 37
-  br bb3
-
-bb1(%3 : $Builtin.Int32):
-  cond_br undef, bb2, bb4
-
-bb2:
-  br bb1(%3 : $Builtin.Int32)
-
-bb4:
-  br bb3
-
-bb3:
-  %r = tuple()
-  return %r : $()
-}
-

@@ -210,6 +210,15 @@ protected:
                                  llvm::SmallVectorImpl<char> &scratch) const;
 };
 
+/// Emits a fallback diagnostic message if no other error has been emitted.
+class FallbackDiagnostic final : public FailureDiagnostic {
+public:
+  FallbackDiagnostic(const Solution &solution, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Base class for all of the diagnostics related to generic requirement
 /// failures, provides common information like failed requirement,
 /// declaration where such requirement comes from, etc.
@@ -681,6 +690,12 @@ public:
 
   bool diagnoseAsNote() override;
 
+  /// If the type of a key path literal is read-only due to setter
+  /// availability constraints but the context requires a writable
+  /// key path, let's produce a tailed availability diagnostic that
+  /// points to the offending setter.
+  bool diagnoseKeyPathLiteralMutabilityMismatch() const;
+
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
 
@@ -726,7 +741,7 @@ protected:
 
   /// Try to add a fix-it to conform the decl context (if it's a type) to the
   /// protocol
-  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+  bool tryProtocolConformanceFixIt() const;
 
 private:
   Type resolve(Type rawType) const {
@@ -1644,6 +1659,27 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference member from the wrong module with a module
+/// selector, e.g.
+///
+/// ```swift
+/// import Foo
+/// import Bar
+///
+/// SomeType.Bar::methodDefinedInFoo()
+/// ```
+class MemberFromWrongModuleFailure final : public FailureDiagnostic {
+  ValueDecl *Member;
+  DeclNameRef Name;
+
+public:
+  MemberFromWrongModuleFailure(const Solution &solution, DeclNameRef name,
+                               ValueDecl *member, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Member(member), Name(name) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference member marked as `mutating`
 /// on immutable base e.g. `let` variable:
 ///
@@ -1707,9 +1743,10 @@ public:
   KeyPathSubscriptIndexHashableFailure(const Solution &solution, Type type,
                                        ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), NonConformingType(type) {
-    assert((locator->isResultOfKeyPathDynamicMemberLookup() ||
-            locator->isKeyPathSubscriptComponent()) ||
-           locator->isKeyPathMemberComponent());
+    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
+           locator->isKeyPathSubscriptComponent() ||
+           locator->isKeyPathMemberComponent() ||
+           locator->isKeyPathApplyComponent());
   }
 
   SourceLoc getLoc() const override;
@@ -1884,6 +1921,27 @@ public:
                                          ConstraintLocator *locator)
       : InvalidMemberRefInKeyPath(solution, member, locator) {
     assert(isa<FuncDecl>(member));
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose an attempt to reference a type as a key path component
+/// e.g.
+///
+/// ```swift
+/// struct S {
+///   enum Q {}
+/// }
+///
+/// _ = \S.Type.Q
+/// ```
+class InvalidTypeRefInKeyPath final : public InvalidMemberRefInKeyPath {
+public:
+  InvalidTypeRefInKeyPath(const Solution &solution, ValueDecl *member,
+                          ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator) {
+    assert(isa<TypeDecl>(member));
   }
 
   bool diagnoseAsError() override;
@@ -2170,7 +2228,7 @@ public:
                           FixBehavior fixBehavior =
                               FixBehavior::Error)
       : ContextualFailure(solution, argType, paramType, locator, fixBehavior),
-        Info(*getFunctionArgApplyInfo(getLocator())) {}
+        Info(getFunctionArgApplyInfo(getLocator()).value()) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -2395,6 +2453,15 @@ public:
 
 private:
   bool diagnoseMissingConformance() const;
+};
+
+class NonMetatypeDynamicTypeFailure final : public ContextualFailure {
+public:
+  NonMetatypeDynamicTypeFailure(const Solution &solution, Type instanceTy,
+                                Type metatypeTy, ConstraintLocator *locator)
+      : ContextualFailure(solution, instanceTy, metatypeTy, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
@@ -2948,7 +3015,8 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Emit a warning for mismatched tuple labels.
+/// Emit a warning for mismatched tuple labels, which is upgraded to an error
+/// for a future language mode.
 class TupleLabelMismatchWarning final : public ContextualFailure {
 public:
   TupleLabelMismatchWarning(const Solution &solution, Type fromType,
@@ -3306,6 +3374,17 @@ public:
                             Type rhsCount, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
         rhsCount(resolveType(rhsCount)) {}
+
+  bool diagnoseAsError() override;
+};
+
+class TooManyDynamicMemberLookupsFailure final : public FailureDiagnostic {
+  DeclNameRef Name;
+
+public:
+  TooManyDynamicMemberLookupsFailure(const Solution &solution, DeclNameRef name,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), Name(name) {}
 
   bool diagnoseAsError() override;
 };

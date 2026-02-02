@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -Xfrontend -default-isolation=MainActor )
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -swift-version 6 -g -import-objc-header %S/Inputs/RunOnMainActor.h %import-libdispatch -Xfrontend -default-isolation=MainActor  -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

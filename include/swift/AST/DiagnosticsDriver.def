@@ -114,9 +114,6 @@ WARNING(warn_opt_remark_disabled, none,
         "requires a single compiler invocation: consider enabling the "
         "-whole-module-optimization flag", ())
 
-WARNING(warn_ignoring_batch_mode,none,
-"ignoring '-enable-batch-mode' because '%0' was also specified", (StringRef))
-
 WARNING(warn_ignoring_wmo, none,
         "ignoring '-wmo' because '-dump-ast' was also specified", ())
 

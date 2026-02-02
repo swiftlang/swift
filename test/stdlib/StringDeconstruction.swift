@@ -94,8 +94,10 @@ func id<T>(_ a: T) -> T { a }
 StringDeconstructTests.test("deconstruct") {
   let smallASCII = "abcd"
 
-#if _pointerBitWidth(_32)
+#if _pointerBitWidth(_32) && os(watchOS)
   let smallUTF8 = "ジッパ"
+#elseif _pointerBitWidth(_32)
+  let smallUTF8 = "ジッ"
 #else
   let smallUTF8 = "ジッパー"
 #endif

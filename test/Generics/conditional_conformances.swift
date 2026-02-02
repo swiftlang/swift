@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 {}

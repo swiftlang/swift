@@ -119,3 +119,21 @@ func parameterizedExistentials() {
   var ppt: any PP4<Int>.Type
   pt = ppt // expected-error {{cannot assign value of type 'any PP4<Int>.Type' to type 'any P4<Int>.Type'}}
 }
+
+// https://github.com/swiftlang/swift/issues/83991
+
+func testNestedMetatype() {
+  struct S: P {}
+
+  func bar<T>(_ x: T) -> T.Type { }
+  func metaBar<T>(_ x: T) -> T.Type.Type { }
+  func foo1(_ x: P.Type) {}
+  func foo2(_ x: P.Type.Type) { }
+
+  foo1(bar(S.self)) // expected-error {{argument type 'S.Type' does not conform to expected type 'P'}}
+
+  // Make sure we don't crash.
+  foo2(bar(S.self))
+  foo2(bar(0)) // expected-error {{cannot convert value of type 'Int' to expected argument type 'any P.Type'}}
+  foo2(metaBar(0)) // expected-error {{argument type 'Int' does not conform to expected type 'P'}}
+}

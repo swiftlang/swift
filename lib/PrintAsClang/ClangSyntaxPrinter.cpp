@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangSyntaxPrinter.h"
+#include "DeclAndTypePrinter.h"
 #include "PrimitiveTypeMapping.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "clang/AST/ASTContext.h"
@@ -82,7 +84,7 @@ void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
 
 bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
     const NominalTypeDecl *typeDecl) {
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return true;
   printGenericSignature(
       typeDecl->getGenericSignature().getCanonicalSignature());
@@ -91,7 +93,7 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclTemplateSpecifiers(
 
 bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
     const NominalTypeDecl *typeDecl) {
-  if (!typeDecl->isGeneric())
+  if (!typeDecl->hasGenericParamList())
     return true;
   printGenericSignatureInnerStaticAsserts(
       typeDecl->getGenericSignature().getCanonicalSignature());
@@ -99,6 +101,12 @@ bool ClangSyntaxPrinter::printNominalTypeOutsideMemberDeclInnerStaticAssert(
 }
 
 void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
+  StringRef osObjectName = DeclAndTypePrinter::maybeGetOSObjectBaseName(
+      dyn_cast<clang::NamedDecl>(cast<clang::NamedDecl>(typeDecl)));
+  if (!osObjectName.empty()) {
+    os << osObjectName << "_t";
+    return;
+  }
   if (cast<clang::NamedDecl>(typeDecl)->getDeclName().isEmpty() &&
       isa<clang::TagDecl>(typeDecl)) {
     if (auto *tnd =
@@ -131,20 +139,25 @@ void ClangSyntaxPrinter::printClangTypeReference(const clang::Decl *typeDecl) {
 bool ClangSyntaxPrinter::printNestedTypeNamespaceQualifiers(const ValueDecl *D,
                                                             bool forC) const {
   bool first = true;
-  while (auto parent = dyn_cast_or_null<NominalTypeDecl>(
-             D->getDeclContext()->getAsDecl())) {
+  while (auto parent = D->getDeclContext()->getAsDecl()) {
+    const auto *parentNTD = dyn_cast<NominalTypeDecl>(parent);
+    if (!parentNTD)
+      if (const auto *ED = dyn_cast<ExtensionDecl>(parent))
+        parentNTD = ED->getExtendedNominal();
+    if (!parentNTD)
+      continue;
     // C++ namespaces are imported as enums.
-    if (parent->hasClangNode() &&
-        isa<clang::NamespaceDecl>(parent->getClangNode().getAsDecl()))
+    if (parentNTD->hasClangNode() &&
+        isa<clang::NamespaceDecl>(parentNTD->getClangNode().getAsDecl()))
       break;
     if (!first)
       os << (forC ? "_" : "::");
     first = false;
     if (!forC)
       os << "__";
-    printBaseName(parent);
+    printBaseName(parentNTD);
     os << "Nested";
-    D = parent;
+    D = parentNTD;
   }
   return first;
 }
@@ -160,7 +173,7 @@ void ClangSyntaxPrinter::printNominalTypeReference(
   if (!printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
   ClangSyntaxPrinter(typeDecl->getASTContext(), os).printBaseName(typeDecl);
-  if (typeDecl->isGeneric())
+  if (typeDecl->hasGenericParamList())
     printGenericSignatureParams(
         typeDecl->getGenericSignature().getCanonicalSignature());
 }
@@ -207,7 +220,8 @@ void ClangSyntaxPrinter::printNamespace(
 void ClangSyntaxPrinter::printParentNamespaceForNestedTypes(
     const ValueDecl *D, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
     NamespaceTrivia trivia) const {
-  if (!isa_and_nonnull<NominalTypeDecl>(D->getDeclContext()->getAsDecl()) ||
+  if ((!isa_and_nonnull<NominalTypeDecl>(D->getDeclContext()->getAsDecl()) &&
+       !isa_and_nonnull<ExtensionDecl>(D->getDeclContext()->getAsDecl())) ||
       importer::isClangNamespace(D->getDeclContext())) {
     bodyPrinter(os);
     return;

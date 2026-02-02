@@ -1051,6 +1051,7 @@ left_success(%lt : @owned $T):
   br exit(%lt : $T)
 
 left_failure(%lerror : @owned $any Error):
+  destroy_value [dead_end] %lerror
   unreachable
 
 right:
@@ -1063,6 +1064,7 @@ exit(%tp : @owned $T):
   return %tp : $T
 
 right_failure(%rerror : @owned $any Error):
+  destroy_value [dead_end] %rerror
   unreachable
 }
 

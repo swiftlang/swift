@@ -46,6 +46,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
+#include <fstream>
 #include <optional>
 
 using namespace swift;
@@ -178,6 +179,14 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
   if (isa<BorrowedFromInst>(inst))
     return false;
+
+  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
+  // non-escapable struct which has only trivial elements. The instruction is not trivially
+  // dead because it ends the lifetime of its operand.
+  if (isa<DestructureStructInst>(inst) &&
+      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+    return false;
+  }
 
   // These invalidate enums so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
@@ -774,7 +783,8 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
 }
 
 namespace {
-  class TypeDependentVisitor : public CanTypeVisitor<TypeDependentVisitor, bool> {
+  class TypeDependentVisitor :
+      public CanTypeVisitor_AnyNominal<TypeDependentVisitor, bool> {
   public:
     // If the type isn't actually dependent, we're okay.
     bool visit(CanType type) {
@@ -783,11 +793,8 @@ namespace {
       return CanTypeVisitor::visit(type);
     }
 
-    bool visitStructType(CanStructType type) {
-      return visitStructDecl(type->getDecl());
-    }
-    bool visitBoundGenericStructType(CanBoundGenericStructType type) {
-      return visitStructDecl(type->getDecl());
+    bool visitAnyStructType(CanType type, StructDecl *decl) {
+      return visitStructDecl(decl);
     }
     bool visitStructDecl(StructDecl *decl) {
       auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
@@ -806,11 +813,8 @@ namespace {
       return false;
     }
 
-    bool visitEnumType(CanEnumType type) {
-      return visitEnumDecl(type->getDecl());
-    }
-    bool visitBoundGenericEnumType(CanBoundGenericEnumType type) {
-      return visitEnumDecl(type->getDecl());
+    bool visitAnyEnumType(CanType type, EnumDecl *decl) {
+      return visitEnumDecl(decl);
     }
     bool visitEnumDecl(EnumDecl *decl) {
       if (decl->isIndirect())
@@ -835,12 +839,9 @@ namespace {
     }
 
     // A class reference does not depend on the layout of the class.
-    bool visitClassType(CanClassType type) {
+    bool visitAnyClassType(CanType type, ClassDecl *decl) {
       return false;
      }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
-      return false;
-    }
 
     // The same for non-strong references.
     bool visitReferenceStorageType(CanReferenceStorageType type) {
@@ -884,55 +885,6 @@ ProjectBoxInst *swift::getOrCreateProjectBox(AllocBoxInst *abi,
 
   SILBuilder builder(nextInst);
   return builder.createProjectBox(abi->getLoc(), abi, index);
-}
-
-// Peek through trivial Enum initialization, typically for pointless
-// Optionals.
-//
-// Given an UncheckedTakeEnumDataAddrInst, check that there are no
-// other uses of the Enum value and return the address used to initialized the
-// enum's payload:
-//
-//   %stack_adr = alloc_stack
-//   %data_adr  = init_enum_data_addr %stk_adr
-//   %enum_adr  = inject_enum_addr %stack_adr
-//   %copy_src  = unchecked_take_enum_data_addr %enum_adr
-//   dealloc_stack %stack_adr
-//   (No other uses of %stack_adr.)
-InitEnumDataAddrInst *
-swift::findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai) {
-  auto *asi = dyn_cast<AllocStackInst>(utedai->getOperand());
-  if (!asi)
-    return nullptr;
-
-  InjectEnumAddrInst *singleInject = nullptr;
-  InitEnumDataAddrInst *singleInit = nullptr;
-  for (auto use : asi->getUses()) {
-    auto *user = use->getUser();
-    if (user == utedai)
-      continue;
-
-    // If there is a single init_enum_data_addr and a single inject_enum_addr,
-    // those instructions must dominate the unchecked_take_enum_data_addr.
-    // Otherwise the enum wouldn't be initialized on all control flow paths.
-    if (auto *inj = dyn_cast<InjectEnumAddrInst>(user)) {
-      if (singleInject)
-        return nullptr;
-      singleInject = inj;
-      continue;
-    }
-
-    if (auto *init = dyn_cast<InitEnumDataAddrInst>(user)) {
-      if (singleInit)
-        return nullptr;
-      singleInit = init;
-      continue;
-    }
-
-    if (isa<DeallocStackInst>(user) || isa<DebugValueInst>(user))
-      continue;
-  }
-  return singleInit;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1029,7 +981,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
       return;
     }
 
-    callbacks.createdNewInst(u.get<StrongReleaseInst *>());
+    callbacks.createdNewInst(cast<StrongReleaseInst *>(u));
     return;
   }
 
@@ -1042,7 +994,7 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
     return;
   }
 
-  callbacks.createdNewInst(u.get<ReleaseValueInst *>());
+  callbacks.createdNewInst(cast<ReleaseValueInst *>(u));
 }
 
 // NOTE: The ownership of the partial_apply argument does not match the
@@ -1600,6 +1552,9 @@ void swift::insertDeallocOfCapturedArguments(
 
     SILValue argValue = getAddressToDealloc(arg.get());
     if (!argValue) {
+      continue;
+    }
+    if (isa<SILUndef>(argValue)) {
       continue;
     }
 
@@ -2617,4 +2572,63 @@ bool swift::isDestructorSideEffectFree(SILInstruction *mayRelease,
   }
 
   return false;
+}
+
+// cond_fail removal based on cond_fail message and containing function name.
+//
+// The standard library uses _precondition calls which have a message argument.
+//
+// Allow disabling the generated cond_fail by these message arguments.
+//
+// For example:
+//
+//  _precondition(source >= (0 as T), "Negative value is not representable")
+// results in a cond_fail "Negative value is not representable".
+//
+// This commit allows for specifying a file that contains these messages on each
+// line.
+//
+// /path/to/disable_cond_fails:
+//
+// ```
+// Negative value is not representable
+// Array index is out of range
+// ```
+//
+// The optimizer will remove these cond_fails if the swift frontend is invoked
+// with -Xllvm -cond-fail-config-file=/path/to/disable_cond_fails.
+//
+// Additionally, also interpret the lines as function names and check whether
+// the current cond_fail is contained in a listed function when considering
+// whether to remove it.
+static llvm::cl::opt<std::string> CondFailConfigFile(
+    "cond-fail-config-file", llvm::cl::init(""),
+    llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
+
+static std::set<std::string> CondFailsToRemove;
+
+bool swift::shouldRemoveCondFail(StringRef withMessage, StringRef functionName) {
+  if (CondFailConfigFile.empty())
+    return false;
+
+  std::fstream fs(CondFailConfigFile);
+  if (!fs) {
+    llvm::errs() << "cannot cond_fail disablement config file\n";
+    exit(1);
+  }
+  if (CondFailsToRemove.empty()) {
+    std::string line;
+    while (std::getline(fs, line)) {
+      CondFailsToRemove.insert(line);
+    }
+    fs.close();
+  }
+  // Check whether the cond_fail's containing function was listed in the config
+  // file.
+  if (CondFailsToRemove.find(functionName.str()) !=
+      CondFailsToRemove.end())
+    return true;
+
+  // Check whether the cond_fail's message was listed in the config file.
+  return CondFailsToRemove.find(withMessage.str()) != CondFailsToRemove.end();
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -182,7 +182,7 @@ static void
 convertToErrorAndJoin(const llvm::SMDiagnostic &diag, void *ctxPtr) {
   ASTContext &ctx = *(ASTContext*)ctxPtr;
 
-  SourceLoc loc{diag.getLoc()};
+  auto loc = SourceLoc::getFromPointer(diag.getLoc().getPointer());
   assert(ctx.SourceMgr.isOwning(loc));
 
   switch (diag.getKind()) {

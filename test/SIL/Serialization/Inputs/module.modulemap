@@ -1,0 +1,7 @@
+module CTakesPtrNullable {
+  header "c_takes_ptr_nullable.h"
+}
+
+module CTakesPtrNonNull {
+  header "c_takes_ptr_nonnull.h"
+}

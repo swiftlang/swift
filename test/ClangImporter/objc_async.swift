@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=targeted -parse-as-library -enable-experimental-feature SendableCompletionHandlers
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=targeted -parse-as-library -enable-experimental-feature SendableCompletionHandlers
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -392,7 +392,7 @@ extension SomeWrapper: Sendable where T: Sendable {}
   func makeCall(slowServer: SlowServer) {
     slowServer.doSomethingSlow("churn butter") { (_ : Int) in
       let _ = self.isolatedThing
-      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
+      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure}}
     }
   }
 }
@@ -403,4 +403,10 @@ extension CoffeeDelegate  {
     @MainActor func test() async -> (NSObject?, NSObject, NSObject) {
         return await self.icedMochaServiceGenerateMocha!(NSObject())
     }
+}
+
+@MainActor
+func testGetSendableClasses() async {
+  let x = ImportObjCAsyncGetter()
+  _ = await x.sendableClasses
 }

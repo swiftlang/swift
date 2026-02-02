@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=none -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=none -enable-sil-verify-all %s -loop-invariant-code-motion | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -21,6 +21,12 @@ struct NonCopyable : ~Copyable {
 struct S {
   var i: Int
   var s: String
+}
+
+struct S2 {
+  var i: Int
+  var s1: String
+  var s2: String
 }
 
 struct Pair  {
@@ -182,13 +188,14 @@ bb4:
 sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
 sil @user : $@convention(thin) (Int) -> ()
 
-// CHECK-LABEL:   sil @dont_hoist_get_count_on_low_level_sil
-// CHECK:         {{^}}bb1:
+// CHECK-LABEL:   sil @hoist_get_count_on_low_level_sil
+// CHECK:         {{^}}bb0(%0 : $Array<Int>):
 // CHECK:           apply
+// CHECK:         {{^}}bb1:
 // CHECK:           apply
 // CHECK:         {{^}}bb2:
 // CHECK:           return
-sil @dont_hoist_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> () {
+sil @hoist_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> () {
 bb0(%0 : $Array<Int>):
   br bb1
 
@@ -585,6 +592,45 @@ bb6:
   return %12 : $()
 }
 
+// CHECK-LABEL: sil @dont_sink_store_with_nonmaterializable_load_projection
+// CHECK:       alloc_stack
+// CHECK-NOT:   store
+// CHECK: bb1(%8 : $Builtin.Int64, %9 : $Builtin.Int64):
+// CHECK:       store
+// CHECK:       [[INDEXADDR:%.*]] = index_addr
+// CHECK:       load [[INDEXADDR]]
+// CHECK: bb3:
+// CHECK-NOT:   store
+// CHECK:       dealloc_stack
+// CHECK: } // end sil function 'dont_sink_store_with_nonmaterializable_load_projection'
+sil @dont_sink_store_with_nonmaterializable_load_projection : $@convention(method) (InlineArray<3, Int>) -> () {
+bb0(%0 : $InlineArray<3, Int>):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %0, #InlineArray._storage
+  %5 = alloc_stack $Builtin.FixedArray<3, Int>
+  %6 = vector_base_addr %5
+  br bb1(%1, %1)
+
+bb1(%8 : $Builtin.Int64, %9 : $Builtin.Int64):
+  %10 = builtin "sadd_with_overflow_Int64"(%8, %2, %3) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10, 0
+  store %4 to %5
+  %13 = builtin "truncOrBitCast_Int64_Word"(%9) : $Builtin.Word
+  %14 = index_addr [stack_protection] %6, %13
+  %15 = load %14
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%1, %1)
+
+bb3:
+  dealloc_stack %5
+  %18 = tuple ()
+  return %18
+}
+
 // CHECK-LABEL: sil @hoist_loads_and_stores_multiple_exits
 // CHECK:   [[V1:%[0-9]+]] = load %0
 // CHECK:   br bb1([[V1]] : $Int32)
@@ -943,11 +989,8 @@ bb5:
   return %99 : $()
 }
 
-// Test load splitting with a loop-invariant stored value. The loop
+// Test load splitting with a loop-invariant. The loop
 // will be empty after combined load/store hoisting/sinking.
-//
-// TODO: sink a struct_extract (or other non-side-effect instructions)
-//        with no uses in the loop.
 //
 // CHECK-LABEL: sil shared @testLoadSplit : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
 // CHECK:         [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
@@ -971,8 +1014,7 @@ bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
 bb1:
   %val1 = load %outerAddr1 : $*Index
   %val2 = load %middleAddr1 : $*Int64
-  %outerAddr2 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
-  %middleAddr2 = struct_element_addr %outerAddr2 : $*Index, #Index.value
+  %middleAddr2 = struct_element_addr %outerAddr1 : $*Index, #Index.value
   store %0 to %middleAddr2 : $*Int64
   %innerAddr1 = struct_element_addr %middleAddr1 : $*Int64, #Int64._value
   %val3 = load %innerAddr1 : $*Builtin.Int64
@@ -984,12 +1026,12 @@ bb2:
 bb3:
   %result = tuple (%val1 : $Index, %val2 : $Int64, %val3 : $Builtin.Int64)
   return %result : $(Index, Int64, Builtin.Int64)
-}
+} // end sil function 'testLoadSplit'
 
 // Test load splitting with a loop-varying stored value.
 // CHECK-LABEL: sil shared @testLoadSplitPhi : $@convention(method) (Int64, Builtin.RawPointer) -> (Index, Int64, Builtin.Int64) {
 // CHECK:        [[PRELOAD:%.*]] = load %{{.*}} : $*Int64
-// CHECK:        br bb1(%4 : $Int64)
+// CHECK:        br bb1(%{{.*}} : $Int64)
 // CHECK:      bb1([[PHI:%.*]] : $Int64):
 // CHECK-NEXT:   [[OUTERVAL:%.*]] = struct $Index ([[PHI]] : $Int64)
 // CHECK-NEXT:   [[EXTRACT:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
@@ -1017,8 +1059,7 @@ bb1:
   %zero = integer_literal $Builtin.Int1, 0
   %add = builtin "uadd_with_overflow_Int32"(%innerVal : $Builtin.Int64, %one : $Builtin.Int64, %zero : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %inc = tuple_extract %add : $(Builtin.Int64, Builtin.Int1), 0
-  %outerAddr2 = pointer_to_address %1 : $Builtin.RawPointer to $*Index
-  %middleAddr2 = struct_element_addr %outerAddr2 : $*Index, #Index.value
+  %middleAddr2 = struct_element_addr %outerAddr1 : $*Index, #Index.value
   %newVal = struct $Int64 (%inc : $Builtin.Int64)
   store %newVal to %middleAddr2 : $*Int64
   %middleVal = load %middleAddr1 : $*Int64
@@ -1030,7 +1071,7 @@ bb2:
 bb3:
   %result = tuple (%outerVal : $Index, %middleVal : $Int64, %innerVal : $Builtin.Int64)
   return %result : $(Index, Int64, Builtin.Int64)
-}
+} // end sil function 'testLoadSplitPhi'
 
 struct State {
   @_hasStorage var valueSet: (Int64, Int64, Int64) { get set }
@@ -1045,11 +1086,14 @@ struct State {
 // CHECK:   bb0(%0 : $Builtin.RawPointer):
 // CHECK:     [[HOISTADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
 // ...Preload stored element #1
+// CHECK:     tuple_element_addr
 // CHECK:     [[PRELOADADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
 // CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
 // ...Split element 0
-// CHECK:     [[SPLIT0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
-// CHECK:     [[ELT0:%.*]] = load [[SPLIT0]] : $*Int64
+// CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
+// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
+// CHECK:     [[HOISTADR2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
+// CHECK:     [[ELT0B:%.*]] = load [[HOISTADR2]] : $*Int64
 // ...Split element 2
 // CHECK:     [[SPLIT2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 2
 // CHECK:     [[ELT2:%.*]] = load [[SPLIT2]] : $*Int64
@@ -1057,12 +1101,10 @@ struct State {
 // CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
 // CHECK:     [[SINGLEVAL:%.*]] = load [[SINGLEADR]] : $*Int64
 // ...Hoisted element 0
-// CHECK:     [[HOISTLOAD:%.*]] = load [[HOISTADR]] : $*Int64
-// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[HOISTLOAD]] : $Int64, #Int64._value
 // CHECK:     br bb1([[PRELOAD]] : $Int64)
 // ...Loop
 // CHECK:   bb1([[PHI:%.*]] : $Int64):
-// CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[ELT0]] : $Int64, [[PHI]] : $Int64, [[ELT2]] : $Int64)
+// CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[ELT0B]] : $Int64, [[PHI]] : $Int64, [[ELT2]] : $Int64)
 // CHECK-NEXT: [[STRUCT:%.*]] = struct $State ([[TUPLE]] : $(Int64, Int64, Int64), [[SINGLEVAL]] : $Int64)
 // CHECK-NEXT: [[ADDEND:%.*]] = struct_extract [[PHI]] : $Int64, #Int64._value
 // CHECK-NEXT: [[UADD:%.*]] = builtin "uadd_with_overflow_Int32"([[HOISTVAL]] : $Builtin.Int64, [[ADDEND]] : $Builtin.Int64, %{{.*}} : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
@@ -1153,6 +1195,41 @@ bb3:
   return %val1 : $(Int64, Int64, Int64)
 }
 
+sil @$foo_read_write : $@convention(method) (Int) -> () {
+[global: read,write]
+}
+
+sil @$foo_read : $@convention(method) (Int) -> () {
+[global: read]
+}
+
+// Read only apply can't be hoisted because of a conflicting write apply in the loop.
+//
+// CHECK-LABEL: sil @test_conflicting_write_apply : $@convention(thin) (Int) -> () {
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   apply
+// CHECK:      bb3:
+// CHECK-LABEL: } // end sil function 'test_conflicting_write_apply'
+sil @test_conflicting_write_apply : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %4 = function_ref @$foo_read_write : $@convention(method) (Int) -> ()
+  %5 = function_ref @$foo_read : $@convention(method) (Int) -> ()
+  br bb2
+
+bb1:
+  br bb2
+
+bb2:
+  %8 = apply %5(%0) : $@convention(method) (Int) -> ()
+  %9 = apply %4(%0) : $@convention(method) (Int) -> ()
+  cond_br undef, bb3, bb1
+
+bb3:
+  %11 = tuple ()
+  return %11
+}
+
 // Two stores, one to the outer tuple and one to the inner tuple. This
 // results in two access paths that are only loaded/stored to.  First
 // split the outer tuple when processing the outer access path, then
@@ -1166,7 +1243,6 @@ bb3:
 // CHECK:   [[ELT_1a:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 1
 // CHECK:   [[ELT_1_0:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64), 0
 // CHECK:   [[V_1_0:%.*]] = load [[ELT_1_0]] : $*Int64
-// CHECK:   [[ELT_1b:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, (Int64, Int64)), 1
 // CHECK:   [[ELT_1_1:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64), 1
 // CHECK:   [[V_1_1:%.*]] = load [[ELT_1_1]] : $*Int64
 // CHECK: br bb1([[V_0:%.*]] : $Int64, [[V_1_0]] : $Int64)
@@ -1241,25 +1317,22 @@ bb3:
   return %val1 : $(Int64, (Int64, Int64))
 }
 
-// Two wide loads. The first can be successfully split and the second
-// half hoisted. The second cannot be split because of a pointer
-// cast. Make sure two remaining loads and the store are still in the loop.
+// Split two wide loads.
 //
 // CHECK-LABEL: sil hidden @testSplitNonStandardProjection : $@convention(method) (Int64, Builtin.RawPointer) -> ((Int64, (Int64, Int64)), (Int64, Int64)) {
 // CHECK: bb0(%0 : $Int64, %1 : $Builtin.RawPointer):
 //
-// The first load was split, so one half is hoisted.
-// CHECK:   [[V1:%.*]] = load %{{.*}} : $*Int64
-// CHECK:   br bb1
-// CHECK: bb1:
-// CHECK:   [[V0:%.*]] = load %{{.*}} : $*Int64
-// CHECK:   [[INNER:%.*]] = tuple ([[V0]] : $Int64, [[V1]] : $Int64)
-// CHECK:   store %0 to %{{.*}} : $*Int64
-// CHECK:   [[OUTER:%.*]] = load %{{.*}} : $*(Int64, (Int64, Int64))
+// CHECK:   [[ADDR1:%.*]] = tuple_element_addr %{{.*}}, 0
+// CHECK:   [[V1:%.*]] = load [[ADDR1]] : $*Int64
+// CHECK:   [[OUTER:%.*]] = tuple (%{{.*}} : $Int64, %{{.*}} : $(Int64, Int64))
+// CHECK:   br bb1([[V1]] : $Int64)
+// CHECK: bb1([[PHI:%.*]] : $Int64):
+// CHECK:   [[INNER:%.*]] = tuple ([[PHI]] : $Int64, {{%[0-9]+}} : $Int64)
 // CHECK:   cond_br undef, bb2, bb3
 // CHECK: bb2:
-// CHECK:   br bb1
+// CHECK:   br bb1(%0 : $Int64)
 // CHECK: bb3:
+// CHECK:   store %0 to [[ADDR1]] : $*Int64
 // CHECK:   [[RESULT:%.*]] = tuple ([[OUTER]] : $(Int64, (Int64, Int64)), [[INNER]] : $(Int64, Int64))
 // CHECK:   return [[RESULT]] : $((Int64, (Int64, Int64)), (Int64, Int64))
 // CHECK-LABEL: } // end sil function 'testSplitNonStandardProjection'
@@ -1291,14 +1364,13 @@ bb3:
 // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
 // CHECK: [[ELT_1:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 1
 // CHECK: [[V1:%.*]] = load %4 : $*(Int64, Int64)
-// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
-// CHECK: [[V0:%.*]] = load %6 : $*Int64
 // CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
-// CHECK: [[ARG0_0:%.*]] = tuple_extract %8 : $(Int64, Int64), 0
 // CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
+// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
+// CHECK: [[ARG0_0:%.*]] = tuple_extract [[ARG0]] : $(Int64, Int64), 0
 // CHECK:   br bb1([[V1]] : $(Int64, Int64))
 // CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):
-// CHECK:   [[LOOPVAL:%.*]] = tuple ([[V0]] : $Int64, [[PHI]] : $(Int64, Int64))
+// CHECK:   [[LOOPVAL:%.*]] = tuple ({{%[0-9]+}} : $Int64, [[PHI]] : $(Int64, Int64))
 // CHECK:   cond_br undef, bb2, bb3
 // CHECK: bb2:
 // CHECK:   br bb1([[ARG1]] : $(Int64, Int64))
@@ -1343,8 +1415,10 @@ class C {}
 
 // This won't be hoisted because we can't find a base to check if it is invariant
 // CHECK-LABEL: sil @testLoopInvariantStoreNoBase1 :
+// CHECK: bb3(%11 : $Builtin.RawPointer):
+// CHECK-NOT:   load
 // CHECK: bb6:
-// CHECK-NOT:   store
+// CHECK:       store
 // CHECK-LABEL: } // end sil function 'testLoopInvariantStoreNoBase1'
 sil @testLoopInvariantStoreNoBase1 : $@convention(thin) (Builtin.BridgeObject, Double) -> () {
 bb0(%0 : $Builtin.BridgeObject, %1 : $Double):
@@ -1380,8 +1454,10 @@ bb6:
 
 // This won't be hoisted because we can't find a base to check if it is invariant
 // CHECK-LABEL: sil @testLoopInvariantStoreNoBase2 :
+// CHECK: bb3(%11 : $Builtin.RawPointer):
+// CHECK-NOT: load
 // CHECK: bb6:
-// CHECK-NOT:   store
+// CHECK:     store
 // CHECK-LABEL: } // end sil function 'testLoopInvariantStoreNoBase2'
 sil @testLoopInvariantStoreNoBase2 : $@convention(thin) (Builtin.BridgeObject, Double) -> () {
 bb0(%0 : $Builtin.BridgeObject, %1 : $Double):
@@ -1515,6 +1591,47 @@ bb2:
   return %r1 : $()
 }
 
+struct Outer {
+    var interactions: Inner
+}
+
+public struct Inner {
+    public let x: Int
+    var storage: ContiguousArray<Double>
+}
+
+sil @$get_array_from_inner : $@convention(method) (Inner) -> (ContiguousArray<Double>)
+
+// Make sure we project load access path to matching store access path.
+// Otherwise the pass could crash.
+//
+// CHECK-LABEL: sil @project_load_path_before_splitting_crash :
+// CHECK:         load
+// CHECK:       bb1({{%[0-9]+}} : $ContiguousArray<Double>):
+// CHECK:       bb3:
+// CHECK:         store
+// CHECK:       } // end sil function 'project_load_path_before_splitting_crash'
+sil @project_load_path_before_splitting_crash : $@convention(thin) (@inout Outer) -> () {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0, #Outer.interactions
+  %2 = struct_element_addr %1, #Inner.storage
+  br bb1
+
+bb1:
+  %4 = load %1
+  %5 = function_ref @$get_array_from_inner : $@convention(method) (Inner) -> ContiguousArray<Double>
+  %6 = apply %5(%4) : $@convention(method) (Inner) -> ContiguousArray<Double>
+  store %6 to %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %10 = tuple ()
+  return %10
+}
+
 // CHECK-LABEL: sil @dont_hoist_builtin_once_memory_conflict :
 // CHECK:         function_ref
 // CHECK:         br bb1
@@ -1540,11 +1657,14 @@ bb2:
   return %r1 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_hoist_non_trivial_load :
+// CHECK-LABEL: sil [ossa] @hoist_load_copy :
+// CHECK:        %1 = load_borrow %0
 // CHECK:       bb1:
-// CHECK-NEXT:   load [copy]
-// CHECK:       } // end sil function 'dont_hoist_non_trivial_load'
-sil [ossa] @dont_hoist_non_trivial_load : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+// CHECK-NEXT:   %3 = copy_value %1
+// CHECK:       bb3:
+// CHECK-NEXT:   end_borrow %1
+// CHECK:       } // end sil function 'hoist_load_copy'
+sil [ossa] @hoist_load_copy : $@convention(thin) (@inout Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):
   br bb1
 bb1:
@@ -1559,9 +1679,59 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @hoist_load_take_store_init :
+// CHECK:        %2 = load [take] %0
+// CHECK:       bb1(%4 : @owned $S):
+// CHECK-NEXT:   fix_lifetime %4
+// CHECK:       bb3:
+// CHECK-NEXT:   store %7 to [init] %0
+// CHECK:       } // end sil function 'hoist_load_take_store_init'
+sil [ossa] @hoist_load_take_store_init : $@convention(thin) (@inout S, @guaranteed S) -> () {
+bb0(%0 : $*S, %new_val : @guaranteed $S):
+  br bb1
+bb1:
+  %2 = load [take] %0
+  fix_lifetime %2
+  destroy_value %2
+  %copied = copy_value %new_val
+  store %copied to [init] %0
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @$foo_yield : $@yield_once @convention(method) (Int) -> @yields Int {
+[global: read]
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_begin_apply : $@convention(thin) (Int) -> () {
+// CHECK:       bb0(%0 : $Int):
+// CHECK:         function_ref
+// CHECK:         begin_apply
+// CHECK:       bb3:
+// CHECK:         end_apply
+// CHECK:       } // end sil function 'hoist_begin_apply'
+sil [ossa] @hoist_begin_apply : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  br bb1
+bb1:
+  %reader = function_ref @$foo_yield : $@yield_once @convention(method) (Int) -> @yields Int
+  (%value, %token) = begin_apply %reader(%0) : $@yield_once @convention(method) (Int) -> @yields Int
+  end_apply %token as $()
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @hoist_trivial_load :
 // CHECK:         load [trivial]
-// CHECK-NEXT:  br bb1  
+// CHECK-NEXT:  br bb1
 // CHECK:       } // end sil function 'hoist_trivial_load'
 sil [ossa] @hoist_trivial_load : $@convention(thin) (@inout Int) -> () {
 bb0(%0 : $*Int):
@@ -1577,11 +1747,13 @@ bb3:
   return %r : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow :
-// CHECK:       bb1:
+// CHECK-LABEL: sil [ossa] @hoist_load_borrow :
+// CHECK:       bb0(%0 : $*Builtin.NativeObject):
 // CHECK-NEXT:    load_borrow
-// CHECK:       } // end sil function 'dont_hoist_load_borrow'
-sil [ossa] @dont_hoist_load_borrow : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow
+// CHECK:       } // end sil function 'hoist_load_borrow'
+sil [ossa] @hoist_load_borrow : $@convention(thin) (@inout Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):
   br bb1
 bb1:
@@ -1596,6 +1768,34 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow :
+// CHECK:       bb1:
+// CHECK-NEXT:    copy_addr
+// CHECK-NEXT:    load_borrow
+// CHECK:       } // end sil function 'dont_hoist_load_borrow'
+sil [ossa] @dont_hoist_load_borrow : $@convention(thin) (@in_guaranteed String) -> () {
+bb0(%0 : $*String):
+  %1 = alloc_stack $String
+  br bb1
+
+bb1:
+  copy_addr %0 to [init] %1
+  %3 = load_borrow %1
+  fix_lifetime %3
+  end_borrow %3
+  %6 = load [take] %1
+  destroy_value %6
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1
+  %r = tuple()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_hoist_struct :
 // CHECK:       bb1:
 // CHECK-NEXT:    struct $NonCopyable
@@ -1607,6 +1807,31 @@ bb1:
   %2 = struct $NonCopyable (%0)
   fix_lifetime %2
   destroy_value %2
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_store_borrow :
+// CHECK:       bb0(%0 : @guaranteed $S):
+// CHECK-NEXT:    alloc_stack
+// CHECK-NEXT:    store_borrow
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'hoist_store_borrow'
+sil [ossa] @hoist_store_borrow : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  br bb1
+bb1:
+  %s = alloc_stack $S
+  %2 = store_borrow %0 to %s
+  fix_lifetime %2
+  end_borrow %2
+  dealloc_stack %s
   cond_br undef, bb2, bb3
 bb2:
   br bb1
@@ -1657,7 +1882,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'store_of_optional_none'
 sil [ossa] @store_of_optional_none : $@convention(thin) () -> () {
 bb0:
-  %0 = enum $Optional<String>, #Optional.none!enumelt 
+  %0 = enum $Optional<String>, #Optional.none!enumelt
   %1 = alloc_stack $Optional<String>
   store %0 to [init] %1
   br bb1
@@ -1734,4 +1959,306 @@ bb3:
   return %13
 }
 
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @uninitialized_at_entry_and_exit :
+// CHECK-LABEL: } // end sil function 'uninitialized_at_entry_and_exit'
+sil [ossa] @uninitialized_at_entry_and_exit : $@convention(thin) (@owned S) -> @out S {
+bb0(%0 : $*S, %1 : @owned $S):
+  br bb1
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %0
+  %7 = load [take] %0
+  destroy_value %7
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  store %1 to [init] %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @uninitialized_at_entry :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C:%.*]] = copy_value %1
+// CHECK-NEXT:    cond_br
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK:       bb3:
+// CHECK-NEXT:    store [[C]] to [init] %0
+// CHECK-LABEL: } // end sil function 'uninitialized_at_entry'
+sil [ossa] @uninitialized_at_entry : $@convention(thin) (@owned S) -> @out S {
+bb0(%0 : $*S, %1 : @owned $S):
+  br bb1
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  %7 = load [take] %0
+  destroy_value %7
+  br bb1
+
+bb3:
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @uninitialized_at_exit :
+// CHECK-LABEL: } // end sil function 'uninitialized_at_exit'
+sil [ossa] @uninitialized_at_exit : $@convention(thin) (@in S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %4 = load [take] %0
+  %5 = move_value %4
+  store %5 to [init] %0
+  %6 = load [take] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  %8 = move_value %6
+  store %8 to [init] %0
+  br bb1
+
+bb3:
+  destroy_value %6
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @projected_load_take :
+// CHECK:       bb1([[V:%.*]] : @owned $(S, Int)):
+// CHECK-NEXT:    ([[E:%.*]], {{%[0-9]+}}) = destructure_tuple [[V]]
+// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[E]]
+// CHECK-NEXT:    = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK-LABEL: } // end sil function 'projected_load_take'
+sil [ossa] @projected_load_take : $@convention(thin) (@inout (S, Int), Int) -> () {
+bb0(%0 : $*(S, Int), %1 : $Int):
+  br bb1
+
+bb1:
+  %2 = tuple_element_addr %0, 0
+  %3 = struct_element_addr %2, #S.s
+  %4 = load [take] %3
+  %5 = struct $S (%1, %4)
+  %6 = tuple (%5, %1)
+  store %6 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @load_copy_followed_by_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[V]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:      = move_value [[V]]
+// CHECK-LABEL: } // end sil function 'load_copy_followed_by_take'
+sil [ossa] @load_copy_followed_by_take : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %4 = load [copy] %0
+  destroy_value %4
+  %6 = load [take] %0
+  %7 = move_value %6
+  store %7 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @projected_load_copy_followed_by_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]]
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[SE]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[V]]
+// CHECK-NEXT:      = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK-LABEL: } // end sil function 'projected_load_copy_followed_by_take'
+sil [ossa] @projected_load_copy_followed_by_take : $@convention(thin) (@inout S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  br bb1
+
+bb1:
+  %43 = struct_element_addr %0, #S.s
+  %4 = load [copy] %43
+  destroy_value %4
+  %48 = load [take] %43
+  %49 = struct $S (%1, %48)
+  store %49 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// Just check that LICM doesn't produce invalid SIL.
+// CHECK-LABEL: sil [ossa] @partial_load_take_is_not_supported :
+// CHECK-LABEL: } // end sil function 'partial_load_take_is_not_supported'
+sil [ossa] @partial_load_take_is_not_supported : $@convention(thin) (@inout S2, Int) -> () {
+bb0(%0 : $*S2, %1 : $Int):
+  br bb1
+
+bb1:
+  %4 = struct_element_addr %0, #S2.s1
+  %5 = load [take] %4
+  %6 = struct_element_addr %0, #S2.s2
+  %7 = load [take] %6
+  %8 = struct $S2 (%1, %5, %7)
+  store %8 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @partial_load_copy :
+// CHECK:       bb1([[V:%.*]] : @owned $S2):
+// CHECK:          [[B1:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:     [[SE1:%.*]] = struct_extract [[B1]] : $S2, #S2.s1
+// CHECK-NEXT:       = copy_value [[SE1]]
+// CHECK:          [[B2:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:     [[SE2:%.*]] = struct_extract [[B2]] : $S2, #S2.s2
+// CHECK-NEXT:       = copy_value [[SE2]]
+// CHECK-LABEL: } // end sil function 'partial_load_copy'
+sil [ossa] @partial_load_copy : $@convention(thin) (@inout S2, Int) -> () {
+bb0(%0 : $*S2, %1 : $Int):
+  br bb1
+
+bb1:
+  %4 = struct_element_addr %0, #S2.s1
+  %5 = load [copy] %4
+  %6 = struct_element_addr %0, #S2.s2
+  %7 = load [copy] %6
+  %8 = struct $S2 (%1, %5, %7)
+  %9 = load [take] %0
+  destroy_value %9
+  store %8 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_load_with_idential_load_in_preheader :
+// CHECK:         store
+// CHECK:         load
+// CHECK:         store
+// CHECK:         [[L:%.*]] = load
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    apply undef([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_with_idential_load_in_preheader'
+sil [ossa] @hoist_load_with_idential_load_in_preheader : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %0 to [trivial] %2
+  %3 = load [trivial] %2
+  store %1 to [trivial] %2
+  br bb1
+
+bb1:
+  %6 = load [trivial] %2
+  %7 = apply undef(%6) : $(Int) -> ()
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_take :
+// CHECK:       bb1:
+// CHECK-NEXT:    load [take]
+// CHECK-LABEL: } // end sil function 'dont_hoist_load_take'
+sil [ossa] @dont_hoist_load_take : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = alloc_stack [dynamic_lifetime] $String
+  store %0 to [init] %1
+  br bb1
+
+bb1:
+  %4 = load [take] %1
+  destroy_value %4
+  cond_br undef, bb3, bb2
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @begin_borrow_with_dead_end_exit :
+// CHECK:         %1 = begin_borrow %0
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       bb5:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-LABEL: } // end sil function 'begin_borrow_with_dead_end_exit'
+sil [ossa] @begin_borrow_with_dead_end_exit : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %2 = begin_borrow %0
+  fix_lifetime %2
+  end_borrow %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_value [dead_end] %0
+  unreachable
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb1
+
+bb5:
+  return %0
+}
 

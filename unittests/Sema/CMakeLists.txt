@@ -13,6 +13,8 @@ add_swift_unittest(swiftSemaTests
 target_link_libraries(swiftSemaTests
   PRIVATE
     swiftAST
+    swiftClangImporter
+    swiftSIL
     swiftSema
     swiftSerialization)
 

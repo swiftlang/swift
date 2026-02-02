@@ -345,8 +345,6 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  AccessNotesFile accessNotes;
-
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
@@ -415,8 +413,9 @@ public:
   /// imports.
   ImplicitImportList getImplicitImports() const;
 
-  AccessNotesFile &getAccessNotes() { return accessNotes; }
-  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
+  /// Retrieve the access notes to apply for the module, or \c nullptr if there
+  /// are no access notes.
+  const AccessNotesFile *getAccessNotes() const;
 
   /// Return whether the module was imported with resilience disabled. The
   /// debugger does this to access private fields.
@@ -433,19 +432,6 @@ public:
   /// Produces the source file that contains the given source location, or
   /// \c nullptr if the source location isn't in this module.
   SourceFile *getSourceFileContainingLocation(SourceLoc loc);
-
-  // Retrieve the buffer ID and source range of the outermost node that
-  // caused the generation of the buffer containing \p range. \p range and its
-  // buffer if it isn't in a generated buffer or has no original range.
-  std::pair<unsigned, SourceRange> getOriginalRange(SourceRange range) const;
-
-  // Retrieve the buffer ID and source location of the outermost location that
-  // caused the generation of the buffer containing \p loc. \p loc and its
-  // buffer if it isn't in a generated buffer or has no original location.
-  std::pair<unsigned, SourceLoc> getOriginalLocation(SourceLoc loc) const {
-    auto [buffer, range] = getOriginalRange(loc);
-    return std::make_pair(buffer, range.Start);
-  }
 
   /// Creates a map from \c #filePath strings to corresponding \c #fileID
   /// strings, diagnosing any conflicts.
@@ -494,6 +480,11 @@ public:
   /// Get the list of all modules this module declares a cross-import with.
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
+
+  /// Returns the name that should be used for this module in a module
+  /// selector. For separately-imported overlays, this will be the declaring
+  /// module's name.
+  Identifier getNameForModuleSelector();
 
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
@@ -831,13 +822,22 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
-  /// Whether this module has enable strict memory safety checking.
+  /// Whether this module has enabled strict memory safety checking.
   bool strictMemorySafety() const {
     return Bits.ModuleDecl.StrictMemorySafety;
   }
 
   void setStrictMemorySafety(bool value = true) {
     Bits.ModuleDecl.StrictMemorySafety = value;
+  }
+
+  /// Whether this module uses deferred code generation.
+  bool deferredCodeGen() const {
+    return Bits.ModuleDecl.DeferredCodeGen;
+  }
+
+  void setDeferredCodeGen(bool value = true) {
+    Bits.ModuleDecl.DeferredCodeGen = value;
   }
 
   bool isObjCNameLookupCachePopulated() const {
@@ -862,6 +862,13 @@ public:
   /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
   /// returns true.
   bool isSubmoduleOf(const ModuleDecl *M) const;
+
+private:
+  std::string CacheKey;
+
+public:
+  void setCacheKey(const std::string &key) { CacheKey = key; }
+  StringRef getCacheKey() const { return CacheKey; }
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
@@ -970,6 +977,10 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  bool isModuleImportedPreconcurrency(const ModuleDecl *importedModule) const;
+
   /// Finds the custom availability domain defined by this module with the
   /// given identifier and if one exists adds it to results.
   void
@@ -1053,11 +1064,15 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Has \p module been imported via an '@_implementationOnly' import
-  /// instead of another kind of import?
+  /// Has \p module been imported via an '@_implementationOnly' import and
+  /// not by anything more visible?
   ///
-  /// This assumes that \p module was imported.
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+  /// If \p assumeImported, assume that \p module was imported and avoid the
+  /// work to confirm it is imported at all. Transitive modules not reexported
+  /// are not considered imported here and may lead to false positive without
+  /// this setting.
+  bool isImportedImplementationOnly(const ModuleDecl *module,
+      bool assumeImported = true) const;
 
   /// Finds all top-level decls of this module.
   ///
@@ -1157,6 +1172,9 @@ public:
 
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
+
+  /// \returns true if this module is the "Cxx" module.
+  bool isCxxModule() const;
 
   /// \returns true if this module is the "_Concurrency" standard library module.
   bool isConcurrencyModule() const;

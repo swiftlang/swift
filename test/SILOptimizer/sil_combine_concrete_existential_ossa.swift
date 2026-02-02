@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -enable-ossa-modules -Xllvm -sil-print-types -emit-sil -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
-// RUN: %target-swift-frontend -O -enable-ossa-modules -Xllvm -sil-print-types -emit-sil -Xllvm -sil-verify-force-analysis-around-pass=devirtualizer -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -Xllvm -sil-verify-force-analysis-around-pass=devirtualizer -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -166,7 +166,7 @@ public struct SomeStruct: ProtoB {
 // CHECK:         [[L:%.*]] = integer_literal $Builtin.Int64, 27
 // CHECK-NEXT:    [[I:%.*]] = struct $Int64 ([[L]] : $Builtin.Int64)
 // CHECK:         [[S:%.*]] = struct $SomeStruct ([[I]] : $Int64)
-// CHECK-NEXT:    [[O:%.*]] = enum $Optional<SomeStruct>, #Optional.some!enumelt, [[S]] : $SomeStruct
+// CHECK:         [[O:%.*]] = enum $Optional<SomeStruct>, #Optional.some!enumelt, [[S]] : $SomeStruct
 // CHECK-NEXT:    return [[O]] : $Optional<SomeStruct>
 // CHECK:       } // end sil function '$s37sil_combine_concrete_existential_ossa16createSomeStructAA0gH0VSgyF'
 public func createSomeStruct() -> SomeStruct? {

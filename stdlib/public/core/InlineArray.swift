@@ -12,34 +12,88 @@
 
 /// A fixed-size array.
 ///
-/// The `InlineArray` type is a specialized array that stores its elements
-/// contiguously inline, rather than allocating an out-of-line region of memory
-/// with copy-on-write optimization.
+/// An `InlineArray` is a specialized container that doesn't use a separate
+/// memory allocation just to store its elements. When a value is copied, all of
+/// its elements are copied eagerly, like those of a tuple. Use an `InlineArray`
+/// when you have a fixed number of elements and need to avoid a separate heap
+/// allocation.
+///
+/// Initializing a Value
+/// --------------------
+///
+/// When initializing a new `InlineArray` value, you must initialize all of its
+/// elements. You can use an array literal just as with `Array`, rely on type
+/// inference for the `count` and `Element` type, and spell the type with the
+/// shorthand `[count of Element]`.
+///
+///     let a: InlineArray<3, Int> = [1, 2, 3]
+///     let b: InlineArray<_, Int> = [1, 2, 3]
+///     let c: InlineArray<3, _>   = [1, 2, 3]
+///     let d: InlineArray         = [1, 2, 3]
+///     
+///     let e: [3 of Int]          = [1, 2, 3]
+///     let f: [_ of Int]          = [1, 2, 3]
+///     let g: [3 of _]            = [1, 2, 3]
+///     let h: [_ of _]            = [1, 2, 3]
+///
+/// You can also use one of the type's initializers to create a new value.
+///
+/// Accessing Elements
+/// ------------------
+///
+/// Just as with `Array`, you can read and modify an element in an `InlineArray`
+/// using a subscript. Unless you use the memory-unsafe `unchecked` subscript,
+/// any index you provide is subject to bounds checking; an invalid index
+/// triggers a runtime error in your program.
+///
+///     var values: [3 of Double] = [1, 1.5, 2]
+///     print(values[0])  // Prints "1.0"
+///     values[1] -= 0.25
+///     print(values[1])  // Prints "1.25"
+///     values[3] = 42.0  // Fatal error: Index out of bounds
+///
+/// You can use the `indices` property to iterate over all elements in order.
+///
+///     for index in values.indices {
+///         print(values[index])
+///     }
+///
+/// Working with Noncopyable Elements
+/// ---------------------------------
+///
+/// An `InlineArray` can store elements of potentially noncopyable type. When
+/// `Element` isn't copyable, the `InlineArray` itself also isn't copyable. You
+/// must then explicitly move or consume the value if you want to transfer
+/// ownership.
 ///
 /// Memory Layout
 /// -------------
 ///
-/// An *empty* array's size is zero. Its stride and alignment are one byte.
+/// An `InlineArray` stores its elements contiguously. If an `InlineArray` is a
+/// stored property of a class, then it's allocated on the heap along with the
+/// other stored properties of the class. Otherwise, in general, an
+/// `InlineArray` is allocated on the stack.
 ///
-/// A *nonempty* array's size and stride are equal to the element's stride
-/// multiplied by the number of elements. Its alignment is equal to the
-/// element's alignment.
+/// A *non-empty* `InlineArray`'s size and stride are both found by multiplying
+/// the `count` of elements by the `Element`'s stride. Its alignment is equal to
+/// the `Element`'s alignment.
 ///
-///     MemoryLayout<InlineArray<3, UInt16>>.size       //-> 6
-///     MemoryLayout<InlineArray<3, UInt16>>.stride     //-> 6
-///     MemoryLayout<InlineArray<3, UInt16>>.alignment  //-> 2
+///     struct Record {
+///         let x: UInt32
+///         let y: Bool
+///     }
+///     MemoryLayout<Record>.size                 // 5
+///     MemoryLayout<Record>.stride               // 8
+///     MemoryLayout<Record>.alignment            // 4
+///     MemoryLayout<[2 of Record]>.size          // 16
+///     MemoryLayout<[2 of Record]>.stride        // 16
+///     MemoryLayout<[2 of Record]>.alignment     // 4
+///     MemoryLayout<(Record, Record)>.size       // 13
+///     MemoryLayout<(Record, Record)>.stride     // 16
+///     MemoryLayout<(Record, Record)>.alignment  // 4
 ///
-/// Literal Initialization
-/// ----------------------
-///
-/// Array literal syntax can be used to initialize an `InlineArray` instance.
-/// A stack-allocated array will do in-place initialization of each element.
-/// The `count` and/or `Element` can be inferred from the array literal.
-///
-///     let a: InlineArray<4, Int> = [1, 2, 4, 8]
-///     let b: InlineArray<_, Int> = [1, 2, 4, 8]
-///     let c: InlineArray<4, _>   = [1, 2, 4, 8]
-///     let d: InlineArray         = [1, 2, 4, 8]
+/// An *empty* `InlineArray`'s size is zero. Its stride and alignment are both
+/// one byte.
 @available(SwiftStdlib 6.2, *)
 @frozen
 @safe
@@ -69,7 +123,11 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafePointer<Element> {
+#if $AddressOfProperty2
     unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(_storage))
+#else
+    unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(self))
+#endif
   }
 
   /// Returns a buffer pointer over the entire array.
@@ -80,13 +138,45 @@ extension InlineArray where Element: ~Copyable {
     unsafe UnsafeBufferPointer<Element>(start: _address, count: count)
   }
 
+  /// Returns a pointer to the first element in the array while performing stack
+  /// checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedAddress: UnsafePointer<Element> {
+#if $AddressOfProperty2
+    unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(_storage))
+#else
+    unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+#endif
+  }
+
+  /// Returns a buffer pointer over the entire array while performing stack
+  /// checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedBuffer: UnsafeBufferPointer<Element> {
+    unsafe UnsafeBufferPointer<Element>(start: _protectedAddress, count: count)
+  }
+
   /// Returns a mutable pointer to the first element in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
+#if $AddressOfProperty2
       unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&_storage))
+#else
+      unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&self))
+#endif
     }
   }
 
@@ -98,6 +188,41 @@ extension InlineArray where Element: ~Copyable {
     mutating get {
       unsafe UnsafeMutableBufferPointer<Element>(
         start: _mutableAddress,
+        count: count
+      )
+    }
+  }
+
+  /// Returns a mutable pointer to the first element in the array while
+  /// performing stack checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
+    mutating get {
+#if $AddressOfProperty2
+      unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&_storage))
+#else
+      unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&self))
+#endif
+    }
+  }
+
+  /// Returns a mutable buffer pointer over the entire array while performing
+  /// stack checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedMutableBuffer: UnsafeMutableBufferPointer<Element> {
+    mutating get {
+      unsafe UnsafeMutableBufferPointer<Element>(
+        start: _protectedMutableAddress,
         count: count
       )
     }
@@ -132,7 +257,7 @@ extension InlineArray where Element: ~Copyable {
   /// count of the array, to initialize every element by passing the closure
   /// the index of the current element being initialized.
   ///
-  ///     InlineArray<4, Int> { 1 << $0 }  //-> [1, 2, 4, 8]
+  ///     InlineArray<4, Int> { $0 * 2 }  // [0, 2, 4, 6]
   ///
   /// The closure is allowed to throw an error at any point during
   /// initialization at which point the array will stop initialization,
@@ -141,12 +266,9 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
   ///   the passed in index.
-  ///
-  /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
-#if $BuiltinEmplaceTypedThrows
     _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
@@ -165,9 +287,6 @@ extension InlineArray where Element: ~Copyable {
         }
       }
     }
-#else
-    fatalError()
-#endif
   }
 
   /// Initializes every element in this array, by calling the given closure
@@ -177,7 +296,7 @@ extension InlineArray where Element: ~Copyable {
   /// count of the array, to initialize every element by passing the closure an
   /// immutable borrow reference to the preceding element.
   ///
-  ///     InlineArray<4, Int>(first: 1) { $0 << 1 }  //-> [1, 2, 4, 8]
+  ///     InlineArray<4, Int>(first: 1) { $0 * 2 }  // [1, 2, 4, 8]
   ///
   /// The closure is allowed to throw an error at any point during
   /// initialization at which point the array will stop initialization,
@@ -189,15 +308,12 @@ extension InlineArray where Element: ~Copyable {
   ///   - next: A closure that takes an immutable borrow reference to the
   ///     preceding element, and returns an owned `Element` instance to emplace
   ///     into the array.
-  ///
-  /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(
     first: consuming Element,
     next: (borrowing Element) throws(E) -> Element
   ) throws(E) {
-#if $BuiltinEmplaceTypedThrows
     // FIXME: We should be able to mark 'Builtin.emplace' as '@once' or something
     //        to give the compiler enough information to know we will only run
     //        it once so it can consume the capture. For now, we use an optional
@@ -231,9 +347,23 @@ extension InlineArray where Element: ~Copyable {
         }
       }
     }
-#else
-    fatalError()
-#endif
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public init<E: Error>(
+    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+  ) throws(E) {
+    _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
+      _internalInvariant(Self.count == buffer.count)
+      var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+      // no need to finalize in a `defer` block, since throwing will cause
+      // changes to be deinitialized when the output span is deinited.
+      try initializer(&output)
+      let initialized = unsafe output.finalize(for: buffer)
+      _precondition(count == initialized, "InlineArray initialization underflow")
+    }
   }
 }
 
@@ -242,20 +372,14 @@ extension InlineArray where Element: Copyable {
   /// Initializes every element in this array to a copy of the given value.
   ///
   /// - Parameter value: The instance to initialize this array with.
-  ///
-  /// - Complexity: O(*n*), where *n* is the number of elements in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
-#if $ValueGenericsNameLookup
     _storage = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
-#else
-    fatalError()
-#endif
   }
 }
 
@@ -407,12 +531,12 @@ extension InlineArray where Element: ~Copyable {
   public subscript(unchecked i: Index) -> Element {
     @_transparent
     unsafeAddress {
-      unsafe _address + i
+      unsafe _protectedAddress + i
     }
 
     @_transparent
     unsafeMutableAddress {
-      unsafe _mutableAddress + i
+      unsafe _protectedMutableAddress + i
     }
   }
 }
@@ -454,58 +578,41 @@ extension InlineArray where Element: ~Copyable {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Span
+// MARK: - Span APIs
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @_transparent
     borrowing get {
-      let pointer = unsafe _address
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      guard count > 0 else {
+        let span = Span<Element>()
+        return unsafe _overrideLifetime(span, borrowing: self)
+      }
+      let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
-    @_alwaysEmitIntoClient
+    @_transparent
     mutating get {
-      let pointer = unsafe _mutableAddress
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      guard count > 0 else {
+        let span = MutableSpan<Element>()
+        return unsafe _overrideLifetime(span, mutating: &self)
+      }
+      let span = unsafe MutableSpan(
+        _unsafeStart: _protectedMutableAddress,
+        count: count
+      )
       return unsafe _overrideLifetime(span, mutating: &self)
     }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: - Unsafe APIs
-//===----------------------------------------------------------------------===//
-
-@available(SwiftStdlib 6.2, *)
-extension InlineArray where Element: ~Copyable {
-  // FIXME: @available(*, deprecated, renamed: "span.withUnsafeBufferPointer(_:)")
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public borrowing func _withUnsafeBufferPointer<Result: ~Copyable, E: Error>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> Result
-  ) throws(E) -> Result {
-    try unsafe body(_buffer)
-  }
-
-  // FIXME: @available(*, deprecated, renamed: "mutableSpan.withUnsafeMutableBufferPointer(_:)")
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public mutating func _withUnsafeMutableBufferPointer<Result: ~Copyable, E: Error>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
-  ) throws(E) -> Result {
-    try unsafe body(_mutableBuffer)
   }
 }

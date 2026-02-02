@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -dump-importer-lookup-table -source-filename %s -import-objc-header %S/Inputs/swift_name_objc.h > %t.ide-test.log 2>&1
 // RUN: %FileCheck %s < %t.ide-test.log
 
-// RUN: %target-typecheck-verify-swift -dump-clang-lookup-tables -import-objc-header %S/Inputs/swift_name_objc.h > %t.frontend.log 2>&1
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -dump-clang-lookup-tables -import-objc-header %S/Inputs/swift_name_objc.h > %t.frontend.log 2>&1
 // RUN: %FileCheck %s < %t.frontend.log
 
 // REQUIRES: objc_interop

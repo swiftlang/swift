@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -enable-experimental-feature SendingArgsAndResults
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-experimental-feature SendingArgsAndResults
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_RegionBasedIsolation
 // REQUIRES: swift_feature_SendingArgsAndResults
 
 // README: This test makes sure that we error when sending is placed in the

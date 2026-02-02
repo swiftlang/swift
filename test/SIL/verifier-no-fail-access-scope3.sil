@@ -1,0 +1,26 @@
+
+// RUN: %target-sil-opt %s -o /dev/null
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+// Don't verify that there are no stores in read-only access scopes if there is a conflicting scope.
+// This is a programming error, but the compiler should not crash. The violation is caught at runtime.
+
+import Builtin
+import Swift
+
+sil_global @g : $Int
+
+sil [ossa] @write_in_read_only_scope : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_addr @g : $*Int
+  %2 = begin_access [read] [dynamic] %1
+  %3 = begin_access [modify] [dynamic] %1
+  store %0 to [trivial] %3
+  end_access %3
+  end_access %2
+  %7 = tuple()
+  return %7
+}

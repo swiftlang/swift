@@ -21,6 +21,6 @@
 // TODO-CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>)
 // TODO-CHECK: func defaultedTemplatePointerPointerTypeParam<T>(_ t: UnsafeMutablePointer<OpaquePointer?>!)
 
-// CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>)
+// CHECK: func defaultedTemplatePointerTypeParam<T>(_ t: UnsafeMutablePointer<T>!)
 // We don't support references to dependent types (rdar://89034440).
 // CHECK-NOT: defaultedTemplatePointerReferenceTypeParam

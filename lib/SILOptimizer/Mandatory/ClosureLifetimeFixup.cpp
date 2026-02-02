@@ -421,27 +421,6 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
   return curr;
 }
 
-/// Returns the (single) "endAsyncLetLifetime" builtin if \p startAsyncLet is a
-/// "startAsyncLetWithLocalBuffer" builtin.
-static BuiltinInst *getEndAsyncLet(BuiltinInst *startAsyncLet) {
-  if (startAsyncLet->getBuiltinKind() != BuiltinValueKind::StartAsyncLetWithLocalBuffer)
-    return nullptr;
-
-  BuiltinInst *endAsyncLet = nullptr;
-  for (Operand *op : startAsyncLet->getUses()) {
-    auto *endBI = dyn_cast<BuiltinInst>(op->getUser());
-    if (endBI && endBI->getBuiltinKind() == BuiltinValueKind::EndAsyncLetLifetime) {
-      // At this stage of the pipeline, it's always the case that a
-      // startAsyncLet has an endAsyncLet: that's how SILGen generates it.
-      // Just to be on the safe side, do this check.
-      if (endAsyncLet)
-        return nullptr;
-      endAsyncLet = endBI;
-    }
-  }
-  return endAsyncLet;
-}
-
 /// Call the \p insertFn with a builder at all insertion points after
 /// a closure is used by \p closureUser.
 static void insertAfterClosureUser(SILInstruction *closureUser,
@@ -467,14 +446,21 @@ static void insertAfterClosureUser(SILInstruction *closureUser,
     }
   }
 
-  if (auto *startAsyncLet = dyn_cast<BuiltinInst>(closureUser)) {
-    BuiltinInst *endAsyncLet = getEndAsyncLet(startAsyncLet);
-    if (!endAsyncLet)
-      return;
-    SILBuilderWithScope builder(std::next(endAsyncLet->getIterator()));
-    insertFn(builder);
+  // If the user is a startAsyncLet builtin, emit the code after all of the
+  // endAsyncLetLifetime builtins.
+  if (auto *startAsyncLet =
+        isBuiltinInst(closureUser, BuiltinValueKind::StartAsyncLetWithLocalBuffer)) {
+    for (Operand *op : startAsyncLet->getUses()) {
+      auto endAsyncLet = isBuiltinInst(op->getUser(),
+                                       BuiltinValueKind::EndAsyncLetLifetime);
+      if (!endAsyncLet) continue;
+
+      SILBuilderWithScope builder(std::next(endAsyncLet->getIterator()));
+      insertFn(builder);
+    }
     return;
   }
+
   FullApplySite fas = FullApplySite::isa(closureUser);
   assert(fas);
   fas.insertAfterApplication(insertFn);
@@ -1009,15 +995,14 @@ static bool tryExtendLifetimeToLastUse(
     return false;
 
   // Handle apply instructions and startAsyncLet.
-  BuiltinInst *endAsyncLet = nullptr;
+  BuiltinInst *startAsyncLet = nullptr;
   if (FullApplySite::isa(singleUser)) {
     // TODO: Enable begin_apply/end_apply. It should work, but is not tested yet.
     if (isa<BeginApplyInst>(singleUser))
       return false;
-  } else if (auto *bi = dyn_cast<BuiltinInst>(singleUser)) {
-    endAsyncLet = getEndAsyncLet(bi);
-    if (!endAsyncLet)
-      return false;
+  } else if ((startAsyncLet = isBuiltinInst(singleUser,
+                            BuiltinValueKind::StartAsyncLetWithLocalBuffer))) {
+    // continue
   } else if (!isa<BeginBorrowInst>(singleUser)) {
     return false;
   }
@@ -1025,16 +1010,28 @@ static bool tryExtendLifetimeToLastUse(
   if (SILValue closureOp = tryRewriteToPartialApplyStack(
           cvt, singleUser, dominanceAnalysis, deleter, memoized,
           reachableBlocks, /*const*/ modifiedCFG)) {
-    if (endAsyncLet) {
+    if (startAsyncLet) {
+      // Collect all of the endAsyncLet calls in one pass so that we can
+      // safely mutate the use-def chain in the second.
+      SmallVector<BuiltinInst*, 4> endAsyncLets;
+      for (auto use: startAsyncLet->getUses()) {
+        if (auto endAsyncLet =
+              isBuiltinInst(use->getUser(), BuiltinValueKind::EndAsyncLetLifetime)) {
+          endAsyncLets.push_back(endAsyncLet);
+        }
+      }
+
       // Add the closure as a second operand to the endAsyncLet builtin.
       // This ensures that the closure arguments are kept alive until the
       // endAsyncLet builtin.
-      assert(endAsyncLet->getNumOperands() == 1);
-      SILBuilderWithScope builder(endAsyncLet);
-      builder.createBuiltin(endAsyncLet->getLoc(), endAsyncLet->getName(),
-        endAsyncLet->getType(), endAsyncLet->getSubstitutions(),
-        {endAsyncLet->getOperand(0), closureOp});
-      deleter.forceDelete(endAsyncLet);
+      for (auto endAsyncLet: endAsyncLets) {
+        assert(endAsyncLet->getNumOperands() == 1);
+        SILBuilderWithScope builder(endAsyncLet);
+        builder.createBuiltin(endAsyncLet->getLoc(), endAsyncLet->getName(),
+          endAsyncLet->getType(), endAsyncLet->getSubstitutions(),
+          {endAsyncLet->getOperand(0), closureOp});
+        deleter.forceDelete(endAsyncLet);
+      }
     }
     return true;
   }
@@ -1526,6 +1523,9 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
           StackNesting::fixNesting(getFunction()) == StackNesting::Changes::CFG;
       }
       invalidateAnalysis(analysisInvalidationKind(modifiedCFG));
+
+      // TODO: it would be more efficient to just complete the closure values.
+      completeAllLifetimes(PM, getFunction());
     }
     LLVM_DEBUG(getFunction()->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache()));
 

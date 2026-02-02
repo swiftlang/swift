@@ -33,7 +33,7 @@ static FuncDecl *synthesizeExit(ASTContext &ctx, ModuleDecl *moduleDecl) {
       DeclName(ctx, DeclBaseName(ctx.getIdentifier("exit")), params), {},
       /*async*/ false, /*throws*/ false, /*thrownType*/ Type(), {}, params,
       ctx.getNeverType(), moduleDecl);
-  exitFuncDecl->getAttrs().add(new (ctx) ExternAttr(
+  exitFuncDecl->addAttribute(new (ctx) ExternAttr(
       std::nullopt, std::nullopt, ExternKind::C, /*implicit*/ true));
   return exitFuncDecl;
 }
@@ -65,26 +65,31 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
 
   auto prologueLoc = RegularLocation::getModuleLocation();
   prologueLoc.markAsPrologue();
-  if (SF->isAsyncContext()) {
-    // emitAsyncMainThreadStart will create argc and argv.
-    // Just set the main actor as the expected executor; we should
-    // already be running on it.
-    SILValue executor = TopLevelSGF.emitMainExecutor(prologueLoc);
-    TopLevelSGF.ExpectedExecutor.set(TopLevelSGF.B.createOptionalSome(
-        prologueLoc, executor, SILType::getOptionalType(executor->getType())));
-  } else {
-    // Create the argc and argv arguments.
-    auto entry = TopLevelSGF.B.getInsertionBB();
-    auto context = TopLevelSGF.getTypeExpansionContext();
-    auto paramTypeIter =
-        TopLevelSGF.F.getConventions().getParameterSILTypes(context).begin();
-
-    entry->createFunctionArgument(*paramTypeIter);
-    entry->createFunctionArgument(*std::next(paramTypeIter));
-  }
 
   {
     Scope S(TopLevelSGF.Cleanups, moduleCleanupLoc);
+
+    if (SF->isAsyncContext()) {
+      // emitAsyncMainThreadStart will create argc and argv.
+      // Just set the main actor as the expected executor; we should
+      // already be running on it.
+      auto mainActorType =
+          getASTContext().getMainActorType()->getCanonicalType();
+      TopLevelSGF.ExpectedExecutor.set(
+          TopLevelSGF.emitGlobalActorIsolation(prologueLoc, mainActorType)
+              .borrow(TopLevelSGF, prologueLoc)
+              .getValue());
+    } else {
+      // Create the argc and argv arguments.
+      auto entry = TopLevelSGF.B.getInsertionBB();
+      auto context = TopLevelSGF.getTypeExpansionContext();
+      auto paramTypeIter =
+          TopLevelSGF.F.getConventions().getParameterSILTypes(context).begin();
+
+      entry->createFunctionArgument(*paramTypeIter);
+      entry->createFunctionArgument(*std::next(paramTypeIter));
+    }
+
     SILGenTopLevel(TopLevelSGF).visitSourceFile(SF);
   }
 
@@ -453,7 +458,7 @@ void SILGenTopLevel::visitTopLevelCodeDecl(TopLevelCodeDecl *TD) {
     } else if (auto *E = ESD.dyn_cast<Expr *>()) {
       SGF.emitIgnoredExpr(E);
     } else {
-      SGF.visit(ESD.get<Decl *>());
+      SGF.visit(cast<Decl *>(ESD));
     }
   }
 }

@@ -1,4 +1,7 @@
-# Property Wrapper Implementation Requirements
+# Property wrapper implementation requirements (PropertyWrappers)
+
+## Overview
+
 If a type is marked with the `@propertyWrapper` attribute, it must meet certain requirements to be a valid property wrapper.
 
 First, all property wrapper types must have a property named `wrappedValue`. This property cannot be static and must have the same access level as the property wrapper type. If the property wrapper provides a `projectedValue` property, it is subject to the same requirements.

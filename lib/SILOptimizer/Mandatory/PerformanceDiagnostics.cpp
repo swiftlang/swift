@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -207,7 +208,7 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
             if (auto *fri = dyn_cast<FunctionRefInst>(bi->getArguments()[1])) {
               if (visitCallee(bi, fri->getReferencedFunction(), perfConstr, parentLoc))
                 return true;
-            } else {
+            } else if (perfConstr != PerformanceConstraints::ManualOwnership) {
               LocWithParent loc(inst.getLoc().getSourceLoc(), parentLoc);
               diagnose(loc, diag::performance_unknown_callees);
               return true;
@@ -249,6 +250,12 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
                                             SILInstruction *callInst,
                                             PerformanceConstraints perfConstr,
                                             LocWithParent *parentLoc) {
+  // Closures within a function are pre-annotated with [manual_ownership]
+  // within SILGen, if they're visible to users for annotation at all.
+  // So no recursive closure checking is needed here.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   // Walk through the definition of the closure until we find the "underlying"
   // function_ref instruction.
   while (!isa<FunctionRefInst>(closure)) {
@@ -293,6 +300,11 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
                                          CalleeList callees,
                                          PerformanceConstraints perfConstr,
                                          LocWithParent *parentLoc) {
+  // Manual Ownership is not checked recursively within callees of the function,
+  // it's a local, non-viral performance annotation.
+  if (perfConstr == PerformanceConstraints::ManualOwnership)
+    return false;
+
   LocWithParent asLoc(callInst->getLoc().getSourceLoc(), parentLoc);
   LocWithParent *loc = &asLoc;
   if (parentLoc && asLoc.loc == callInst->getFunction()->getLocation().getSourceLoc())
@@ -369,6 +381,159 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   SILType impactType;
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
+
+  if (perfConstr == PerformanceConstraints::ManualOwnership) {
+    if (impact & RuntimeEffect::RefCounting) {
+      bool shouldDiagnose = false;
+      switch (inst->getKind()) {
+      case SILInstructionKind::PartialApplyInst:
+      case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::DestroyValueInst:
+      case SILInstructionKind::StoreInst:
+        break; // These modify reference counts, but aren't copies.
+      case SILInstructionKind::ExplicitCopyAddrInst:
+      case SILInstructionKind::ExplicitCopyValueInst:
+        break; // Explicitly acknowledged copies are OK.
+      case SILInstructionKind::CopyAddrInst: {
+        if (!cast<CopyAddrInst>(inst)->isTakeOfSrc())
+          shouldDiagnose = true; // If it isn't a [take], it's a copy.
+        break;
+      }
+      case SILInstructionKind::LoadInst: {
+        // FIXME: we don't have an `explicit_load` and transparent functions can
+        //   end up bringing in a `load [copy]`. A better approach is needed to
+        //   handle transparent functions, in general, as rewriting them during
+        //   inlining of transparent functions is also not so great, as it
+        //   may hide a copy that semantically is there, but we happened to
+        //   tuck away in a transparent synthesized function, like those
+        //   synthesized getters!
+        //
+        // For now look to see if the load copy's only non-destroying users are
+        // explicit_copy's, as that would indicate the user has acknowledged it:
+        //
+        //  %y = load [copy] %x
+        //  %z = explicit_copy_value %y
+        //  destroy_value %y
+        //
+        // In all other cases, it's safer to diagnose.
+        //
+        auto load = cast<LoadInst>(inst);
+        if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
+          break;
+
+        for (auto *use : load->getUsers()) {
+          if (!isa<ExplicitCopyAddrInst, ExplicitCopyValueInst,
+                   DestroyAddrInst, DestroyValueInst>(use)) {
+            shouldDiagnose = true;
+            break;
+          }
+        }
+        break;
+      }
+      default:
+        shouldDiagnose = true;
+        break;
+      }
+      if (shouldDiagnose) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "function " << inst->getFunction()->getName()
+                   << "\n has unexpected copying instruction: " << *inst);
+
+        // Try to come up with a useful diagnostic.
+
+        // First, identify what is being copied.
+        SILValue copied;
+        if (auto svi = dyn_cast<SingleValueInstruction>(inst)) {
+          copied = svi;
+        } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+          copied = cai->getSrc();
+        }
+
+        // Find a name for that copied thing.
+        std::optional<Identifier> name;
+        if (copied)
+          name = VariableNameInferrer::inferName(copied);
+
+        if (!name) {
+          // Emit a rudimentary diagnostic.
+          diagnose(loc, diag::manualownership_copy);
+          return false;
+        }
+
+        // Try to tailor the diagnostic based on usages.
+
+        // Simplistic check for whether this is a closure capture.
+        for (auto user : copied->getUsers()) {
+          if (isa<PartialApplyInst>(user)) {
+            LLVM_DEBUG(llvm::dbgs() << "captured by "<< *user);
+            diagnose(loc, diag::manualownership_copy_captured, name->get());
+            return false;
+          }
+        }
+
+        // There's no hope of borrowing access if there's a consuming use.
+        for (auto op : copied->getUses()) {
+          auto useKind = op->getOperandOwnership();
+
+          // Only some DestroyingConsume's, like 'store', are interesting.
+          if (useKind == OperandOwnership::ForwardingConsume
+              || isa<StoreInst>(op->getUser())) {
+            LLVM_DEBUG(llvm::dbgs() << "demanded by "<< *(op->getUser()));
+            diagnose(loc, diag::manualownership_copy_demanded, *name);
+            return false;
+          }
+        }
+
+        // Catch-all diagnostic for when we at least have the name.
+        diagnose(loc, diag::manualownership_copy_happened, *name);
+        return false;
+      }
+    }
+    if (impact & RuntimeEffect::ExclusivityChecking) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::BeginUnpairedAccessInst:
+      case SILInstructionKind::EndUnpairedAccessInst:
+        // These instructions are quite unusual; they seem to only ever created
+        // explicitly by calling functions from the Builtin module, see:
+        //   - emitBuiltinPerformInstantaneousReadAccess
+        //   - emitBuiltinEndUnpairedAccess
+        break;
+      case SILInstructionKind::EndAccessInst:
+        break; // We'll already diagnose the begin access.
+      case SILInstructionKind::BeginAccessInst: {
+        auto bai = cast<BeginAccessInst>(inst);
+        auto info = VariableNameInferrer::inferNameAndRoot(bai->getSource());
+
+        if (!info) {
+          LLVM_DEBUG(llvm::dbgs() << "exclusivity (no name?): " << *inst);
+          diagnose(loc, diag::manualownership_exclusivity);
+          return false;
+        }
+        Identifier name = info->first;
+        SILValue root = info->second;
+        StringRef advice = "";
+
+        // Try to classify the root to give advice.
+        if (isa<GlobalAddrInst>(root)) {
+          advice = ", because it involves a global variable";
+        } else if (root->getType().isAnyClassReferenceType()) {
+          advice = ", because it's a member of a reference type";
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "exclusivity: " << *inst);
+        LLVM_DEBUG(llvm::dbgs() << "with root: " << root);
+
+        diagnose(loc, diag::manualownership_exclusivity_named, name, advice);
+        break;
+      }
+      default:
+        LLVM_DEBUG(llvm::dbgs() << "UNKNOWN EXCLUSIVITY INST: " << *inst);
+        diagnose(loc, diag::manualownership_exclusivity);
+        return false;
+      }
+    }
+    return false;
+  }
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
       ((impact & RuntimeEffect::Existential) ||
@@ -601,17 +766,17 @@ private:
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
-    // Check that @_section, @_silgen_name is only on constant globals
+    // Check that @section, @_silgen_name is only on constant globals
     for (SILGlobalVariable &g : module->getSILGlobals()) {
       if (!g.getStaticInitializerValue() && g.mustBeInitializedStatically()) {
         PrettyStackTraceSILGlobal stackTrace(
             "global inst", &g);
 
         auto *decl = g.getDecl();
-        if (g.getSectionAttr()) {
+        if (!g.section().empty()) {
           module->getASTContext().Diags.diagnose(
             g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
-            "@_section");
+            "@section");
         } else if (decl && g.isDefinition() &&
                    decl->getAttrs().hasAttribute<SILGenNameAttr>()) {
           module->getASTContext().Diags.diagnose(

@@ -29,6 +29,10 @@ inline LoadableIntWrapper operator^(LoadableIntWrapper lhs, LoadableIntWrapper r
   return LoadableIntWrapper{.value = lhs.value ^ rhs.value};
 }
 
+inline LoadableIntWrapper operator~(LoadableIntWrapper lhs) {
+  return LoadableIntWrapper{.value = ~lhs.value};
+}
+
 inline LoadableIntWrapper operator&(LoadableIntWrapper lhs, LoadableIntWrapper rhs) {
   return LoadableIntWrapper{.value = lhs.value & rhs.value};
 }

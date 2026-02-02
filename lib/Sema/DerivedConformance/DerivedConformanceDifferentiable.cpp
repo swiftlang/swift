@@ -83,7 +83,7 @@ getStoredPropertiesForDifferentiation(
       continue;
     if (vd->getInterfaceType()->hasError())
       continue;
-    auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
+    auto varType = DC->mapTypeIntoEnvironment(vd->getValueInterfaceType());
     auto conformance = checkConformance(varType, diffableProto);
     if (!conformance)
       continue;
@@ -121,7 +121,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   if (!conf)
     return nullptr;
   auto tanType = conf.getTypeWitnessByName(C.Id_TangentVector);
-  return tanType->hasArchetype() ? tanType->mapTypeOutOfContext() : tanType;
+  return tanType->hasArchetype() ? tanType->mapTypeOutOfEnvironment() : tanType;
 }
 
 /// Returns true iff the given nominal type declaration can derive
@@ -133,7 +133,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
     return false;
 
   auto nominalTypeInContext =
-      DC->mapTypeIntoContext(nominal->getDeclaredInterfaceType());
+      DC->mapTypeIntoEnvironment(nominal->getDeclaredInterfaceType());
   auto &C = nominal->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
@@ -145,7 +145,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
     if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
       return false;
     // `Self` must have all stored properties satisfy `Self == TangentVector`.
-    auto fieldType = DC->mapTypeIntoContext(field->getValueInterfaceType());
+    auto fieldType = DC->mapTypeIntoEnvironment(field->getValueInterfaceType());
     auto conf = checkConformance(fieldType, diffableProto);
     if (!conf)
       return false;
@@ -208,7 +208,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
     if (v->getInterfaceType()->hasError())
       return false;
-    auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
+    auto varType = DC->mapTypeIntoEnvironment(v->getValueInterfaceType());
     return (bool) checkConformance(varType, diffableProto);
   });
 }
@@ -239,7 +239,7 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   // parameter member: `self.<member>.move(by: offset.<member>)`.
   auto createMemberMethodCallExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+        parentDC->mapTypeIntoEnvironment(member->getValueInterfaceType());
     auto confRef = lookupConformance(memberType, diffProto);
     assert(confRef && "Member does not conform to `Differentiable`");
 
@@ -410,12 +410,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // because that incorrectly affects memberwise initializer synthesis and
     // causes the type checker to not guarantee the order of these members.
     auto memberContextualType =
-        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+        parentDC->mapTypeIntoEnvironment(member->getValueInterfaceType());
     auto memberTanInterfaceType =
         getTangentVectorInterfaceType(memberContextualType, parentDC);
     tangentProperty->setInterfaceType(memberTanInterfaceType);
     auto memberTanContextType =
-        parentDC->mapTypeIntoContext(memberTanInterfaceType);
+        parentDC->mapTypeIntoEnvironment(memberTanInterfaceType);
     Pattern *memberPattern =
         NamedPattern::createImplicit(C, tangentProperty, memberTanContextType);
     memberPattern =
@@ -467,8 +467,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
   // If nominal type is `@frozen`, also mark `TangentVector` struct.
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
-    structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
-  
+    structDecl->addAttribute(new (C) FrozenAttr(/*implicit*/ true));
+
   // Add `typealias TangentVector = Self` so that the `TangentVector` itself
   // won't need its own conformance derivation.
   auto *tangentEqualsSelfAlias = new (C) TypeAliasDecl(
@@ -537,8 +537,8 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
                 nominalCanDeriveAdditiveArithmetic)
             .fixItInsert(loc, "@noDerivative ");
         // Add an implicit `@noDerivative` attribute.
-        originalProperty->getAttrs().add(
-            new (Context) NoDerivativeAttr(/*Implicit*/ true));
+        originalProperty->addAttribute(new (Context)
+                                           NoDerivativeAttr(/*Implicit*/ true));
         continue;
       }
       // Use the original wrapped property.
@@ -550,14 +550,14 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
     // Check whether to diagnose stored property.
-    auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
+    auto varType = DC->mapTypeIntoEnvironment(vd->getValueInterfaceType());
     auto diffableConformance = checkConformance(varType, diffableProto);
     // If stored property should not be diagnosed, continue.
     if (diffableConformance && 
         canInvokeMoveByOnProperty(vd, diffableConformance))
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
-    vd->getAttrs().add(new (Context) NoDerivativeAttr(/*Implicit*/ true));
+    vd->addAttribute(new (Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
     // Diagnose properties that do not conform to `Differentiable`.
@@ -598,7 +598,7 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
 
   // Return the `TangentVector` struct type.
   return std::make_pair(
-    parentDC->mapTypeIntoContext(
+    parentDC->mapTypeIntoEnvironment(
       tangentStruct->getDeclaredInterfaceType()),
     tangentStruct);
 }

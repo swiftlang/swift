@@ -15,18 +15,16 @@
 
 import Oceans // re-exports Rivers
 
-// CHECK:      #if compiler(>=5.3) && $CustomAvailability
-// CHECK-NEXT: @available(Colorado)
+// CHECK-NOT:  $CustomAvailability
+
+// CHECK:      @available(Colorado)
 // CHECK-NEXT: public func availableInColorado()
-// CHECK-NEXT: #endif
 @available(Colorado)
 public func availableInColorado() { }
 
-// CHECK:      #if compiler(>=5.3) && $CustomAvailability
-// CHECK-NEXT: @available(Arctic, unavailable)
+// CHECK:      @available(Arctic, unavailable)
 // CHECK-NEXT: @available(Pacific)
 // CHECK-NEXT: public func unavailableInArcticButAvailableInPacific()
-// CHECK-NEXT: #endif
 @available(Arctic, unavailable)
 @available(Pacific)
 public func unavailableInArcticButAvailableInPacific() { }

@@ -99,16 +99,6 @@ static bool shouldYieldThread() {
 
 namespace {
 
-/// An extremely silly class which exists to make pointer
-/// default-initialization constexpr.
-template <class T> struct Pointer {
-  T *Value;
-  constexpr Pointer() : Value(nullptr) {}
-  constexpr Pointer(T *value) : Value(value) {}
-  operator T *() const { return Value; }
-  T *operator->() const { return Value; }
-};
-
 /// A class which encapsulates the information we track about
 /// the current thread and active executor.
 class ExecutorTrackingInfo {
@@ -123,7 +113,7 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                                  tls_key::concurrency_executor_tracking_info)
       ActiveInfoInThread;
 
@@ -200,7 +190,7 @@ public:
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
                                  tls_key::concurrency_task) Value;
 
 public:
@@ -212,10 +202,10 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
 ActiveTask::Value;
 
-SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
@@ -237,11 +227,16 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // current thread.  If the task suspends somewhere, it should
     // update the task status appropriately; we don't need to update
     // it afterwards.
-    task->flagAsRunning();
+    [[maybe_unused]]
+    uint32_t dispatchOpaquePriority = task->flagAsRunning();
 
     auto traceHandle = concurrency::trace::job_run_begin(job);
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+#endif
 
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");
@@ -256,8 +251,6 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 #if SWIFT_OBJC_INTEROP
   objc_autoreleasePoolPop(pool);
 #endif
-
-  _swift_tsan_release(job);
 }
 
 void swift::adoptTaskVoucher(AsyncTask *task) {
@@ -487,9 +480,15 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnTaskExecutor(
 // Implemented in Swift to avoid some annoying hard-coding about
 // SerialExecutor's protocol witness table.  We could inline this
 // with effort, though.
+#if SWIFT_CONCURRENCY_EMBEDDED
+extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
+    Job *job, HeapObject *executor,
+    const SerialExecutorWitnessTable *wtable);
+#else
 extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
+#endif // #if SWIFT_CONCURRENCY_EMBEDDED
 
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorWithFlagsImpl(
@@ -2393,13 +2392,15 @@ static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
   }
 
   // else, we may have to switch if the preferred task executor is different
-  auto differentTaskExecutor =
-      currentTaskExecutor.getIdentity() != newTaskExecutor.getIdentity();
-  if (differentTaskExecutor) {
-    return true;
-  }
+  if (currentTaskExecutor.getIdentity() == newTaskExecutor.getIdentity())
+    return false;
 
-  return false;
+  if (currentTaskExecutor.isUndefined())
+    currentTaskExecutor = swift_getDefaultExecutor();
+  if (newTaskExecutor.isUndefined())
+    newTaskExecutor = swift_getDefaultExecutor();
+
+  return currentTaskExecutor.getIdentity() != newTaskExecutor.getIdentity();
 }
 
 /// Given that we've assumed control of an executor on this thread,
@@ -2489,14 +2490,31 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   SWIFT_TASK_DEBUG_LOG("Task %p can give up thread?", task);
   if (currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
-      !shouldYieldThread() &&
-      tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG(
-        "switch succeeded, task %p assumed thread for executor %p", task,
-        newExecutor.getIdentity());
+      !shouldYieldThread()) {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+    // With actors-as-locks, tryAssumeThreadForSwitch always succeeds. We must
+    // give up the thread first, or else we may deadlock due to holding the old
+    // actor while trying to acquire the new one.
     giveUpThreadForSwitch(currentExecutor);
+    bool success = tryAssumeThreadForSwitch(newExecutor, newTaskExecutor);
+    assert(success);
+    SWIFT_TASK_DEBUG_LOG(
+        "switched to new actor, task %p assumed thread for executor %p", task,
+        newExecutor.getIdentity());
     // 'return' forces tail call
     return runOnAssumedThread(task, newExecutor, trackingInfo);
+#else
+    // Without actors-as-locks, tryAssumeThreadForSwitch can fail. Try it first,
+    // and give up the thread only if it succeeds.
+    if (tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
+      SWIFT_TASK_DEBUG_LOG(
+          "switch succeeded, task %p assumed thread for executor %p", task,
+          newExecutor.getIdentity());
+      giveUpThreadForSwitch(currentExecutor);
+      // 'return' forces tail call
+      return runOnAssumedThread(task, newExecutor, trackingInfo);
+    }
+#endif
   }
 
   // Otherwise, just asynchronously enqueue the task on the given
@@ -2576,7 +2594,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
                                             SerialExecutorRef newExecutor,
                                             size_t rawFlags) {
   // Sign the function pointer
-  work = swift_auth_code_function(
+  work = swift_auth_code(
       work, SpecialPointerAuthDiscriminators::DeinitWorkFunction);
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
@@ -2704,7 +2722,11 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
     return swift_defaultActor_enqueue(job, serialExecutorRef.getDefaultActor());
   }
 
-#if SWIFT_CONCURRENCY_EMBEDDED
+#if SWIFT_CONCURRENCY_EMBEDDED && defined(__wasi__)
+  auto serialExecutorIdentity = serialExecutorRef.getIdentity();
+  auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
+  _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorWtable);
+#elif SWIFT_CONCURRENCY_EMBEDDED
   swift_unreachable("custom executors not supported in embedded Swift");
 #else
   // For main actor or actors with custom executors
@@ -2764,7 +2786,8 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
 
   // TODO: remove this memset eventually, today we only do this to not have
   //       to modify the destructor logic, as releasing zeroes is no-op
-  memset(alloc + 1, 0, metadata->getInstanceSize() - sizeof(HeapObject));
+  memset((void *)(alloc + 1), 0,
+         metadata->getInstanceSize() - sizeof(HeapObject));
 
   // TODO(distributed): a remote one does not have to have the "real"
   //  default actor body, e.g. we don't need an executor at all; so

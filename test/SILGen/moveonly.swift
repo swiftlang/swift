@@ -982,9 +982,13 @@ public struct LoadableSubscriptGetOnlyTester : ~Copyable {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJECT]]
 // CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[LOAD:%.*]] = load_borrow [unchecked] [[MARK]]
-// CHECK: apply {{%.*}}([[M2_PROJECT]], {{%.*}}, [[LOAD]])
+// CHECK: [[STACK_ALLOC:%.*]] = alloc_stack $AddressOnlyProtocol
+// CHECK: [[M_STACK_ALLOC:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK_ALLOC]]
+// CHECK: apply {{%.*}}([[M_STACK_ALLOC]], {{%.*}}, [[LOAD]])
 // CHECK: end_borrow [[LOAD]]
 // CHECK: end_access [[ACCESS]]
+// CHECK: copy_addr [take] [[M_STACK_ALLOC]] to [init] [[M2_PROJECT]]
+// CHECK: dealloc_stack [[STACK_ALLOC]]
 // CHECK: [[M2_MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[M2_PROJECT]]
 // CHECK: end_borrow [[M2_BORROW]]
 // CHECK: destroy_value [[M2_BOX]]

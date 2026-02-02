@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
@@ -20,406 +21,653 @@
 
 using namespace swift;
 
-void StackNesting::setup() {
-  SmallVector<SILBasicBlock *, 8> WorkList;
+/// Run the given function exactly once on each of the reachable blocks in
+/// a SIL function. Blocks will be visited in a post-order consistent with
+/// dominance, which is to say, after all dominating blocks but otherwise
+/// in an unspecified order.
+///
+/// The function is passed a state value, which it can freely mutate. The
+/// initial value of the state will be the same as the value left in the
+/// state for an unspecified predecessor. For the entry block of the
+/// function, this is the initial state passed to runInDominanceOrder.
+///
+/// Essentially, runInDominanceOrder finds an arbitrary simple path to
+/// the block and runs the callback function for each block in that path
+/// in order. As long as the callback:
+/// - only looks at instructions in the current block and the blocks
+///   it dominates,
+/// - has no dependencies outside of the state (which must have "value
+///   semantics"), and
+/// - can handle the arbitrariness of the choice of path,
+/// then the callback can act as if only the work done along the current
+/// path has happened and ignore the impact of arbitrary visitation order.
+///
+/// This function assumes you don't change the CFG during its operation.
+template <class Fn, class State>
+void runInDominanceOrder(SILFunction &F, State &&state, const Fn &fn) {
+  // The set of blocks that have ever been enqueued onto the worklist.
+  // (We actually skip the worklist a lot, but *abstractly* they're
+  // enqueued, and everything but the entry block does get added to this
+  // set.)
+  BasicBlockSet visitedBlocks(&F);
 
-  // Start with the function entry block and add blocks while walking down along
-  // the successor edges.
-  // This ensures a correct ordering of stack locations: an inner location has
-  // a higher bit-number than it's outer parent location.
-  // This ordering is only important for inserting multiple deallocation
-  // instructions (see below).
-  auto Entry = BlockInfos.entry();
-  WorkList.push_back(&Entry.block);
-  Entry.data.visited = true;
+  // The next basic block to operate on. We always operate on `state`.
+  SILBasicBlock *curBB = F.getEntryBlock();
 
-  while (!WorkList.empty()) {
-    SILBasicBlock *Block = WorkList.pop_back_val();
-    BlockInfo &BI = BlockInfos[Block];
-    for (SILInstruction &I : *Block) {
-      if (I.isAllocatingStack()) {
-        auto Alloc = &I;
-        // Register this stack location.
-        unsigned CurrentBitNumber = StackLocs.size();
-        StackLoc2BitNumbers[Alloc] = CurrentBitNumber;
-        StackLocs.push_back(StackLoc(Alloc));
+  // We need to copy `state` whenever we enqueue a block onto the worklist.
+  // We'll move-assign it back to `state` when we dequeue it.
+  using StateValue = std::remove_reference_t<State>;
+  SmallVector<std::pair<SILBasicBlock *, StateValue>> worklist;
 
-        BI.StackInsts.push_back(Alloc);
-      } else if (I.isDeallocatingStack()) {
-        auto *AllocInst = getAllocForDealloc(&I);
-        if (!BI.StackInsts.empty() && BI.StackInsts.back() == AllocInst) {
-          // As an optimization, we ignore perfectly nested alloc-dealloc pairs
-          // inside a basic block.
-          // Actually, this catches most of the cases and keeps our bitsets
-          // small.
-          assert(StackLocs.back().Alloc == AllocInst);
-          StackLocs.pop_back();
-          BI.StackInsts.pop_back();
-        } else {
-          // Register the stack deallocation.
-          BI.StackInsts.push_back(&I);
-        }
-      }
-    }
-    for (SILBasicBlock *SuccBB : Block->getSuccessorBlocks()) {
-      BlockInfo &SuccBI = BlockInfos[SuccBB];
-      if (!SuccBI.visited) {
-        // Push the next reachable block onto the WorkList.
-        WorkList.push_back(SuccBB);
-        SuccBI.visited = true;
-      }
-    }
-  }
+  // Count the remaining edges to each dead-end region, and keep track
+  // of a current merged state for each.
+  DeadEndEdges deadEndEdges(&F);
+  SmallVector<std::optional<StateValue>> deadEndRegionStates;
+  deadEndRegionStates.resize(deadEndEdges.getNumDeadEndRegions());
+  auto visitedDeadEndEdges = deadEndEdges.createVisitingSet();
 
-  unsigned NumLocs = StackLocs.size();
-  for (unsigned Idx = 0; Idx < NumLocs; ++Idx) {
-    StackLocs[Idx].AliveLocs.resize(NumLocs);
-    // Initially each location gets it's own alive-bit.
-    StackLocs[Idx].AliveLocs.set(Idx);
-  }
-}
+  while (true) {
+    // Run the function on the current block, updating the current state.
+    fn(curBB, state);
 
-bool StackNesting::solve() {
-  bool changed = false;
-  bool isNested = false;
-  BitVector Bits(StackLocs.size());
+    // Enqueue the successors.
+    SILBasicBlock *nextBB = nullptr;
+    for (SILBasicBlock *succBB : curBB->getSuccessorBlocks()) {
+      // If this edge visits a dead-end region, we may need to conservatively
+      // merge the input state before visiting the region.
+      if (auto deadEndRegionIndex =
+            deadEndEdges.entersDeadEndRegion(curBB, succBB)) {
+        auto &existingRegionState = deadEndRegionStates[*deadEndRegionIndex];
 
-  StackList<SILBasicBlock *> deadEndWorklist(BlockInfos.getFunction());
+        bool isLastEdgeToRegion = visitedDeadEndEdges.visitEdgeTo(succBB);
 
-  // Initialize all bit fields to 1s, expect 0s for the entry block.
-  bool initVal = false;
-  for (auto bd : BlockInfos) {
-    bd.data.AliveStackLocsAtEntry.resize(StackLocs.size(), initVal);
-    initVal = true;
-
-    bd.data.isDeadEnd = !bd.block.getTerminator()->isFunctionExiting();
-    if (!bd.data.isDeadEnd)
-      deadEndWorklist.push_back(&bd.block);
-  }
-
-  // Calculate the isDeadEnd block flags.
-  while (!deadEndWorklist.empty()) {
-    SILBasicBlock *b = deadEndWorklist.pop_back_val();
-    for (SILBasicBlock *pred : b->getPredecessorBlocks()) {
-      BlockInfo &bi = BlockInfos[pred];
-      if (bi.isDeadEnd) {
-        bi.isDeadEnd = false;
-        deadEndWorklist.push_back(pred);
-      }
-    }
-  }
-
-  // First step: do a forward dataflow analysis to get the live stack locations
-  // at the block exits.
-  // This is necessary to get the live locations at dead-end blocks (otherwise
-  // the backward data flow would be sufficient).
-  // The special thing about dead-end blocks is that it's okay to have alive
-  // locations at that point (e.g. at an `unreachable`) i.e. locations which are
-  // never dealloced. We cannot get such locations with a purely backward
-  // dataflow.
-  do {
-    changed = false;
-
-    for (auto bd : BlockInfos) {
-      Bits = bd.data.AliveStackLocsAtEntry;
-      for (SILInstruction *StackInst : bd.data.StackInsts) {
-        if (StackInst->isAllocatingStack()) {
-          Bits.set(bitNumberForAlloc(StackInst));
-        } else if (StackInst->isDeallocatingStack()) {
-          Bits.reset(bitNumberForDealloc(StackInst));
-        }
-      }
-      if (Bits != bd.data.AliveStackLocsAtExit) {
-        bd.data.AliveStackLocsAtExit = Bits;
-        changed = true;
-      }
-      // Merge the bits into the successors.
-      for (SILBasicBlock *SuccBB : bd.block.getSuccessorBlocks()) {
-        BlockInfos[SuccBB].AliveStackLocsAtEntry &= Bits;
-      }
-    }
-  } while (changed);
-
-  // Second step: do a backward dataflow analysis to extend the lifetimes of
-  // not properly nested allocations.
-  do {
-    changed = false;
-
-    for (auto bd : llvm::reverse(BlockInfos)) {
-      // Collect the alive-bits (at the block exit) from the successor blocks.
-      for (SILBasicBlock *SuccBB : bd.block.getSuccessorBlocks()) {
-        bd.data.AliveStackLocsAtExit |= BlockInfos[SuccBB].AliveStackLocsAtEntry;
-      }
-      Bits = bd.data.AliveStackLocsAtExit;
-      assert(!(bd.data.visited && bd.block.getTerminator()->isFunctionExiting()
-               && Bits.any())
-             && "stack location is missing dealloc");
-
-      if (bd.data.isDeadEnd) {
-        // We treat `unreachable` as an implicit deallocation for all locations
-        // which are still alive at this point. The same is true for dead-end
-        // CFG regions due to an infinite loop.
-        for (int BitNr = Bits.find_first(); BitNr >= 0;
-             BitNr = Bits.find_next(BitNr)) {
-          // For each alive location extend the lifetime of all locations which
-          // are alive at the allocation point. This is the same as we do for
-          // a "real" deallocation instruction (see below).
-          // In dead-end CFG regions we have to do that for all blocks (because
-          // of potential infinite loops), whereas in "normal" CFG regions it's
-          // sufficient to do it at deallocation instructions.
-          Bits |= StackLocs[BitNr].AliveLocs;
-        }
-        bd.data.AliveStackLocsAtExit = Bits;
-      }
-      for (SILInstruction *StackInst : llvm::reverse(bd.data.StackInsts)) {
-        if (StackInst->isAllocatingStack()) {
-          int BitNr = bitNumberForAlloc(StackInst);
-          if (Bits != StackLocs[BitNr].AliveLocs) {
-            // More locations are alive around the StackInst's location.
-            // Update the AliveLocs bitset, which contains all those alive
-            // locations.
-            assert(Bits.test(BitNr) && "no dealloc found for alloc stack");
-            StackLocs[BitNr].AliveLocs = Bits;
-            changed = true;
-            isNested = true;
+        // If this is not the last edge to the dead-end region, we can't
+        // enqueue yet. Merge the current state into the existing state we're
+        // tracking for the region.
+        if (!isLastEdgeToRegion) {
+          if (!existingRegionState) {
+            existingRegionState.emplace(/*copied*/ state);
+          } else {
+            existingRegionState->merge(state);
           }
-          // The allocation ends the lifetime of it's stack location (in reverse
-          // order)
-          Bits.reset(BitNr);
-        } else if (StackInst->isDeallocatingStack()) {
-          // A stack deallocation begins the lifetime of its location (in
-          // reverse order). And it also begins the lifetime of all other
-          // locations which are alive at the allocation point.
-          Bits |= StackLocs[bitNumberForDealloc(StackInst)].AliveLocs;
+          continue;
         }
+
+        // Otherwise, this is the last edge to the dead-end region.
+
+        // The dead-end-edges counting means we know we haven't visited the
+        // successor block yet (or anything else in its region), so we're
+        // going to end up enqueuing it. But we do need to add it to
+        // visitedBlocks so we don't re-enter it if its region is cyclic.
+        auto inserted = visitedBlocks.insert(succBB);
+        assert(inserted); (void) inserted;
+
+        // If we have an existing state for the region, merge the current
+        // state into it, then enqueue that state.
+        if (existingRegionState) {
+          // In theory we could merge into state and then just continue if
+          // this is the current block's only reasonable successor, but
+          // avoiding a few move-assignments wouldn't really justify the
+          // more complicated bookkeeping that would require.
+          existingRegionState->merge(state);
+          worklist.emplace_back(succBB, std::move(*existingRegionState));
+          continue;
+        }
+
+        // Otherwise there was just a single edge into the dead-end region,
+        // so there's no conservative state merge required, and we can just
+        // fall into the code below.
+
+      // If this edge doesn't visit a dead-end region, just check whether
+      // we've already enqueued the successor block. If so, we can just
+      // skip it.
+      } else {
+        // Insertion returns false if it the block was already in the set.
+        // We could avoid this set operation by checking whether the block
+        // has a unique predecessor edge, but BasicBlockSet is fast enough
+        // that that's not worthwhile.
+        if (!visitedBlocks.insert(succBB))
+          continue;
       }
-      if (Bits != bd.data.AliveStackLocsAtEntry) {
-        bd.data.AliveStackLocsAtEntry = Bits;
-        changed = true;
+
+      // If we haven't found a successor to visit yet, pick this one.
+      if (!nextBB) {
+        nextBB = succBB;
+
+      // Otherwise, add it to the worklist, copying the current state.
+      } else {
+        worklist.emplace_back(succBB, /*copied*/ state);
       }
     }
-  } while (changed);
-  
-  return isNested;
+
+    // If there's a viable direct successor, just continue along this
+    // path, editing the current state in-place.
+    if (nextBB) {
+      curBB = nextBB;
+      continue;
+    }
+
+    // Otherwise, if the worklist is empty, we're done.
+    if (worklist.empty()) {
+      return;
+    }
+
+    // Otherwise, pull the next item off the worklist and overwrite the
+    // current state with the state we saved for it before.
+    auto &nextItem = worklist.back();
+    curBB = nextItem.first;
+    state = std::move(nextItem.second);
+    worklist.pop_back();
+  }
 }
 
-static SILInstruction *createDealloc(SILInstruction *Alloc,
-                                     SILInstruction *InsertionPoint,
-                                     SILLocation Location) {
-  SILBuilderWithScope B(InsertionPoint);
-  switch (Alloc->getKind()) {
-    case SILInstructionKind::PartialApplyInst:
-    case SILInstructionKind::AllocStackInst:
-      assert((isa<AllocStackInst>(Alloc) ||
-              cast<PartialApplyInst>(Alloc)->isOnStack()) &&
-             "wrong instruction");
-      return B.createDeallocStack(Location,
-                                  cast<SingleValueInstruction>(Alloc));
-    case SILInstructionKind::BeginApplyInst: {
-      auto *bai = cast<BeginApplyInst>(Alloc);
-      assert(bai->isCalleeAllocated());
-      return B.createDeallocStack(Location, bai->getCalleeAllocationResult());
-    }
-    case SILInstructionKind::AllocRefDynamicInst:
-    case SILInstructionKind::AllocRefInst:
-      assert(cast<AllocRefInstBase>(Alloc)->canAllocOnStack());
-      return B.createDeallocStackRef(Location, cast<AllocRefInstBase>(Alloc));
-    case SILInstructionKind::AllocPackInst:
-      return B.createDeallocPack(Location, cast<AllocPackInst>(Alloc));
-    case SILInstructionKind::BuiltinInst: {
-      auto *bi = cast<BuiltinInst>(Alloc);
-      assert(bi->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
-             bi->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc);
-      auto &context = Alloc->getFunction()->getModule().getASTContext();
+/// Returns the stack allocation instruction for a stack deallocation
+/// instruction.
+static SILInstruction *getAllocForDealloc(SILInstruction *dealloc) {
+  SILValue op = dealloc->getOperand(0);
+  while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
+    op = mvi->getOperand();
+  }
+  return op->getDefiningInstruction();
+}
+
+/// Create a dealloc for a particular allocation.
+///
+/// This is expected to work for all allocations that don't have
+/// properly-nested deallocations. It's fine to have a kind of allocation
+/// that you can't do this for, as long as as it's always explicitly
+/// deallocated on all paths. This pass doesn't change any allocations
+/// or deallocations that are properly nested already.
+///
+/// Only allocations whose deallocations return true from canMoveDealloc
+/// need to support this.
+static void createDealloc(SILBuilder &B, SILLocation loc, SILInstruction *alloc) {
+  switch (alloc->getKind()) {
+  case SILInstructionKind::PartialApplyInst:
+  case SILInstructionKind::AllocStackInst:
+    assert((isa<AllocStackInst>(alloc) ||
+            cast<PartialApplyInst>(alloc)->isOnStack()) &&
+           "wrong instruction");
+    B.createDeallocStack(loc, cast<SingleValueInstruction>(alloc));
+    return;
+  case SILInstructionKind::BeginApplyInst: {
+    auto *bai = cast<BeginApplyInst>(alloc);
+    assert(bai->isCalleeAllocated());
+    B.createDeallocStack(loc, bai->getCalleeAllocationResult());
+    return;
+  }
+  case SILInstructionKind::AllocRefDynamicInst:
+  case SILInstructionKind::AllocRefInst:
+    assert(cast<AllocRefInstBase>(alloc)->canAllocOnStack());
+    B.createDeallocStackRef(loc, cast<AllocRefInstBase>(alloc));
+    return;
+  case SILInstructionKind::AllocPackInst:
+    B.createDeallocPack(loc, cast<AllocPackInst>(alloc));
+    return;
+  case SILInstructionKind::BuiltinInst: {
+    auto *bi = cast<BuiltinInst>(alloc);
+    auto &ctx = alloc->getFunction()->getModule().getASTContext();
+
+    switch (*bi->getBuiltinKind()) {
+    case BuiltinValueKind::StackAlloc:
+    case BuiltinValueKind::UnprotectedStackAlloc: {
       auto identifier =
-          context.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
-      return B.createBuiltin(Location, identifier,
-                             SILType::getEmptyTupleType(context),
-                             SubstitutionMap(), {bi});
+        ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StackDealloc));
+      B.createBuiltin(loc, identifier,
+                      SILType::getEmptyTupleType(ctx),
+                      SubstitutionMap(), {bi});
+      return;
     }
-    case SILInstructionKind::AllocPackMetadataInst:
-      return B.createDeallocPackMetadata(Location,
-                                         cast<AllocPackMetadataInst>(Alloc));
     default:
-      llvm_unreachable("unknown stack allocation");
-  }
-}
-
-bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
-                                  const BitVector &AliveAfter,
-                                  SILInstruction *InsertionPoint,
-                                  std::optional<SILLocation> Location) {
-  if (!AliveBefore.test(AliveAfter))
-    return false;
-
-  // The order matters here if we have to insert more than one
-  // deallocation. We already ensured in setup() that the bit numbers
-  // are allocated in the right order.
-  bool changesMade = false;
-  for (int LocNr = AliveBefore.find_first(); LocNr >= 0;
-       LocNr = AliveBefore.find_next(LocNr)) {
-    if (!AliveAfter.test(LocNr)) {
-      auto *Alloc = StackLocs[LocNr].Alloc;
-      InsertionPoint = createDealloc(Alloc, InsertionPoint,
-                   Location.has_value() ? Location.value() : Alloc->getLoc());
-      changesMade = true;
+      llvm_unreachable("unknown stack allocation builtin");
     }
   }
-  return changesMade;
+  case SILInstructionKind::AllocPackMetadataInst:
+    B.createDeallocPackMetadata(loc, cast<AllocPackMetadataInst>(alloc));
+    return;
+  default:
+    llvm_unreachable("unknown stack allocation");
+  }
 }
 
-// Insert deallocations at block boundaries.
-// This can be necessary for unreachable blocks. Example:
-//
-//   %1 = alloc_stack
-//   %2 = alloc_stack
-//   cond_br %c, bb2, bb3
-// bb2: <--- need to insert a dealloc_stack %2 at the begin of bb2
-//   dealloc_stack %1
-//   unreachable
-// bb3:
-//   dealloc_stack %2
-//   dealloc_stack %1
-StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
-  Changes changes = Changes::None;
-   for (auto bd : llvm::reverse(BlockInfos)) {
-    // Collect the alive-bits (at the block exit) from the successor blocks.
-    for (auto succAndIdx : llvm::enumerate(bd.block.getSuccessorBlocks())) {
-      BlockInfo &SuccBI = BlockInfos[succAndIdx.value()];
-      if (SuccBI.AliveStackLocsAtEntry == bd.data.AliveStackLocsAtExit)
+namespace {
+enum class AllocationStatus {
+  Allocated, Pending, Undeallocatable
+};
+
+class ActiveAllocation {
+  llvm::PointerIntPair<SILInstruction*, 2, AllocationStatus> valueAndStatus;
+
+public:
+  ActiveAllocation(SILInstruction *value)
+    : valueAndStatus(value, AllocationStatus::Allocated) {}
+
+  SILInstruction *getValue() const {
+    return valueAndStatus.getPointer();
+  }
+
+  AllocationStatus getStatus() const {
+    return valueAndStatus.getInt();
+  }
+
+  void setPending() {
+    assert(getStatus() == AllocationStatus::Allocated);
+    valueAndStatus.setInt(AllocationStatus::Pending);
+  }
+
+  void setUndeallocatable() {
+    valueAndStatus.setInt(AllocationStatus::Undeallocatable);
+  }
+
+  bool operator==(const ActiveAllocation &other) const {
+    return valueAndStatus == other.valueAndStatus;
+  }
+  bool operator!=(const ActiveAllocation &other) const {
+    return valueAndStatus != other.valueAndStatus;
+  }
+};
+
+using IndexForAllocationMap = llvm::DenseMap<SILInstruction*, size_t>;
+
+struct State {
+  /// The stack of active allocations and their statuses.
+  SmallVector<ActiveAllocation, 4> allocations;
+
+  ActiveAllocation &getEntryForNonTop(SILInstruction *alloc,
+                                      SILInstruction *dealloc,
+                                      IndexForAllocationMap &indexForAllocation);
+
+  /// Given that these are the end states of two blocks with edges into
+  /// a dead-end region R, merge them.
+  ///
+  /// In the formal presentation of the algorithm, we decide whether PSS(R)
+  /// is non-singleton and, if so, apply STATE_MERGE. We can do this
+  /// iteratively by checking for pairwise equality and doing a pairwise
+  /// CONSERVATIVE_MERGE if they're not.
+  void merge(const State &other) {
+    // If the states match exactly, there's nothing to do.
+    if (ArrayRef(allocations) == ArrayRef(other.allocations)) {
+      return;
+    }
+
+    // Otherwise, find the longest common prefix of allocations. We can start
+    // from the end and stop as soon as we find a match because all states
+    // that contain A have a common prefix of allocations; see
+    // [allocation-index] in the proof.
+    auto commonPrefixLength =
+      std::min(allocations.size(), other.allocations.size());
+    while (commonPrefixLength > 0 &&
+           allocations[commonPrefixLength - 1].getValue()
+             != other.allocations[commonPrefixLength - 1].getValue()) {
+      commonPrefixLength--;
+    }
+
+    // Truncate to the common prefix length and set all entries to
+    // undeallocatable.
+    allocations.truncate(commonPrefixLength);
+    for (auto &entry : allocations) {
+      entry.setUndeallocatable();
+    }
+  } 
+
+#ifndef NDEBUG
+  SWIFT_ATTRIBUTE_NORETURN
+  void abortForUnknownAllocation(SILInstruction *alloc,
+                                 SILInstruction *dealloc) {
+    llvm::errs() << "fatal error: StackNesting could not find record of "
+                    "allocation for deallocation:\n  "
+                 << *dealloc
+                 << "Allocation might not be jointly post-dominated. "
+                    "Current stack:\n";
+    for (auto i : indices(allocations)) {
+      auto status = allocations[i].getStatus();
+      llvm::errs() << "[" << i << "] "
+                   << (status == AllocationStatus::Allocated ? "" :
+                       status == AllocationStatus::Pending ? "(pending) " :
+                       "(undeallocatable) ")
+                   << *allocations[i].getValue();
+    }
+    llvm::errs() << "Complete function:\n";
+    alloc->getFunction()->dump();
+    abort();
+  }
+#endif
+};
+
+} // end anonymous namespace
+
+ActiveAllocation &
+State::getEntryForNonTop(SILInstruction *alloc,
+                         SILInstruction *dealloc,
+                         IndexForAllocationMap &indexForAllocation) {
+  auto stack = MutableArrayRef(allocations);
+  assert(!stack.empty());
+
+  // By precondition, we know the top entry doesn't match the allocation,
+  // so we can drop it.
+  assert(stack.back().getValue() != alloc);
+  stack = stack.drop_back();
+
+  // This is really just searching for the allocation in the stack.
+  // All the complexity has to do with trying to avoid super-linear
+  // behavior while also trying very hard to avoid actually filling
+  // in indexForAllocation for simple cases.
+
+  // It's very common for allocations to never be improperly nested,
+  // so we don't want to eagerly add allocations to indexForAllocation
+  // when we encounter them. This means we can't rely on it having
+  // an entry for `alloc` now.
+
+  // `alloc` is very likely to be close to the top of the stack. Just do
+  // a short linear scan there first. This is quick, and it means we
+  // can probably avoid ever filling in indexForAllocation.
+  const size_t linearScanLimit = 8;
+  auto linearScanEntries = stack.take_back(linearScanLimit);
+  for (auto &entry : linearScanEntries) {
+    if (entry.getValue() == alloc) {
+      return entry;
+    }
+  }
+
+  // Okay, so much for that, time for the hashtable.
+
+#ifndef NDEBUG
+  if (stack.size() <= linearScanLimit) {
+    abortForUnknownAllocation(alloc, dealloc);
+  }
+#endif
+
+  // We don't need to consider entries that we've already linearly scanned.
+  stack = stack.drop_back(linearScanLimit);
+
+  // Check if the entry's already in the hashtable.
+  if (auto it = indexForAllocation.find(alloc); it != indexForAllocation.end()) {
+    auto index = it->second;
+    assert(stack[index].getValue() == alloc);
+    return stack[index];
+  }
+
+  // Fill in any missing entries in indexForAllocations.
+  //
+  // The invariant we maintain is that there may be allocations at the
+  // top of the stack that aren't hashed, but once we reach a hashed
+  // entry, everything beneath it is hashed. The first half of this
+  // is necessary because we don't eagerly add allocations to the table,
+  // but it's also what makes it okay that we skip the entries we
+  // linearly scanned. The second half of this means that, if we start
+  // adding entries from the top down, we can stop hashing once we find
+  // that the entries we're adding are redundant. That's what keeps this
+  // O(N).
+  //
+  // This caching works because allocations have a constant index as long
+  // as they're in the stack; see [allocation-index] in the proof.
+
+  // Look for the target allocation index in this loop rather than doing
+  // a hash lookup at the end.
+  std::optional<size_t> foundIndexForAlloc;
+
+  for (size_t onePast = stack.size(); onePast != 0; --onePast) {
+    size_t entryIndex = onePast - 1;
+    auto entryAlloc = stack[entryIndex].getValue();
+
+    // Remember this if it's the allocation we're looking for.
+    if (entryAlloc == alloc) {
+      foundIndexForAlloc = entryIndex;
+    }
+
+    // Add this entry to the hashtable. We can stop adding entries as soon as
+    // we find something that already has an entry.
+    auto insertResult = indexForAllocation.insert({entryAlloc, entryIndex});
+    if (!insertResult.second) {
+      continue;
+    }
+  }
+
+#ifndef NDEBUG
+  if (!foundIndexForAlloc) {
+    abortForUnknownAllocation(alloc, dealloc);
+  }
+#endif
+
+  return stack[*foundIndexForAlloc];
+}
+
+/// Pop and emit deallocations for any allocations on top of the
+/// active allocations stack that are pending deallocation.
+///
+/// This operation is called whenever we pop an allocation; it
+/// restores the invariant that the top of the stack is never in a
+/// pending state.
+static void emitPendingDeallocations(State &state,
+                                     SILInstruction *insertAfterDealloc,
+                                     bool &madeChanges) {
+  // The builder we use for inserting deallocations. Initialized lazily
+  // to insert after the initial dealloc. We have to reuse the same
+  // builder so that, if we pop multiple deallocations, we order them
+  // correctly w.r.t each other.
+  std::optional<SILBuilderWithScope> builder;
+
+  while (!state.allocations.empty() &&
+         state.allocations.back().getStatus() == AllocationStatus::Pending) {
+    auto entry = state.allocations.pop_back_val();
+    SILInstruction *alloc = entry.getValue();
+
+    // Create a builder if necessary.
+    if (!builder) {
+      // We want to use the location of (and inherit debug scopes from)
+      // the initial dealloc that we're inserting after.
+      builder.emplace(/*insertion point*/
+                        std::next(insertAfterDealloc->getIterator()),
+                      /*inherit scope from*/insertAfterDealloc);
+    }
+
+    createDealloc(*builder, insertAfterDealloc->getLoc(), alloc);
+    madeChanges = true;
+  }
+}
+
+/// The main entrypoint for clients.
+///
+/// We use a straightforward, single-pass algorithm:
+///
+///   enum AllocationStatus {
+///     case allocated
+///     case pendingDeallocation
+///     case undeallocatable
+///   }
+///   struct State {
+///     var stack = [(StackAllocationInst, AllocationStatus)]()
+///   }
+///   F.searchBlocksForJointPostDominance(initialState: State()) {
+///     (block, state) in
+///     for inst in block.instructions {
+///       if inst.isStackAllocation {
+///         state.stack.push((inst, .allocated))
+///       } else if inst.isStackDeallocation {
+///         let allocation = inst.stackAllocation
+///         if state.stack.top == (A, .allocated) {
+///           _ = state.stack.pop()
+///           let builder = SILBuilder(insertAfter: I)
+///           while !state.stack.isEmpty &&
+///                 state.stack.top!.1 == .pendingDeallocation {
+///             builder.createStackDeallocation(for: state.stack.pop().0)
+///           }
+///         } else {
+///           I.remove()
+///           let curStatus = state.findStatus(A)
+///           assert(curStatus != .pendingDeallocation)
+///           if curStatus == .allocated) {
+///             state.setStatus(A, .pendingDeallocation)
+///           }
+///         }
+///       }
+///     }
+///   }
+///
+/// The expectation is that searchBlocksForJointPostDominance performs
+/// a depth-first search, passing a state that reflects the current
+/// simple path from the entry block that is being explored. However,
+/// there's a twist to this from a standard DFS; see below.
+///
+/// For the most part, the value in `state` at the end of processing
+/// a block is the initial value of `state` at the start of processing
+/// its successor as visited by the DFS, but this also has a twist;
+/// see below.
+///
+/// The state consists of (1) an active stack of allocations which
+/// haven't yet been deallocated on this path and (2) an active
+/// status for each allocation.
+///
+/// It has five invariants:
+///
+/// 1. Allocations on the stack dominate all allocations above them.
+/// 2. Every allocation on the stack dominates the current point
+///    being considered.
+/// 3. The top of the stack never has pending status.
+/// 4. If a stack item has undeallocatable status, every item
+///    below it also has undeallocatable status.
+/// 5. If an allocation has pending status, there is an allocation
+///    above it on the stack which has allocated status.
+///
+/// The twist about the search order and state relates to the
+/// non-coherence of SIL's joint post-dominance requirement for stack
+/// allocations. Specifically, SIL permits the current state of the
+/// stack to vary on different edges into a dead-end region; this just
+/// means it is not permitted to pop any of those deallocations from
+/// the stack. (More allocations can be pushed and popped, but the
+/// existing ones become untouchable.) StackNesting therefore permits
+/// its input to be non-coherent: whether an allocation has been
+/// deallocated is allowed to vary across the entries to a dead-end
+/// region.
+///
+/// To handle this, the search delays considering edges into a dead-end
+/// region until it has seen the last such edge. Furthermore, the
+/// initial state of the destination block is set to a conservative
+/// merger of the final states of all of the predecessors: if two
+/// states differ in any way, the contents of the stack are pared
+/// back to the common prefix, and all allocations are placed in the
+/// undeallocatable state.
+///
+/// A proof of correctness can be found in StackNestingProof.txt.
+StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
+  bool madeChanges = false;
+
+  // The index in the allocation stack for each allocation.
+  // This function never uses this directly; it's just a cache for
+  // setAllocationAsPending.
+  IndexForAllocationMap indexForAllocation;
+
+  // Visit each block of the function in an order consistent with dominance.
+  // The state represents the stack of active allocations; it starts
+  // with an empty stack because so does the function.
+  runInDominanceOrder(*F, State(), [&](SILBasicBlock *B, State &state) {
+
+    // We can't use a foreach loop because we sometimes remove the
+    // current instruction or add instructions (that we don't want to
+    // visit) after it. Advancing the iterator immediately within the
+    // loop is sufficient to protect against both.
+    for (auto II = B->begin(), IE = B->end(); II != IE; ) {
+      SILInstruction *I = &*II;
+      ++II;
+
+      // Invariant: the top of the stack is never pending.
+      assert(state.allocations.empty() ||
+             state.allocations.back().getStatus() != AllocationStatus::Pending);
+
+      // Push allocations onto the current stack in the non-pending state.
+      //
+      // In the formal presentation, the state change is
+      //   state = STATE_PUSH(state, alloc)
+      if (I->isAllocatingStack()) {
+        // Only handle nested stack allocations.
+        if (I->isStackAllocationNested() == StackAllocationIsNested)
+          state.allocations.push_back(I);
+        continue;
+      }
+
+      // Ignore instructions other than allocations and deallocations.
+      if (!I->isDeallocatingStack()) {
+        continue;
+      }
+
+      // Get the allocation for the deallocation. The allocation should be
+      // in the state, and it should not have pending status; see
+      // [deallocation-preconditions] in the proof.
+      SILInstruction *dealloc = I;
+      SILInstruction *alloc = getAllocForDealloc(dealloc);
+
+      // Since we only processed nested allocations above, ignore deallocations
+      // from non-nested allocations.
+      if (alloc->isStackAllocationNested() == StackAllocationIsNotNested)
         continue;
 
-      // Insert deallocations for all locations which are alive at the end of
-      // the current block, but not at the begin of the successor block.
-      SILBasicBlock *InsertionBlock = succAndIdx.value();
-      if (!InsertionBlock->getSinglePredecessorBlock()) {
-        // If the current block is not the only predecessor of the successor
-        // block, we have to insert a new block where we can add the
-        // deallocations.
-        InsertionBlock = splitEdge(bd.block.getTerminator(), succAndIdx.index());
-        changes = Changes::CFG;
+#ifndef NDEBUG
+      if (state.allocations.empty()) {
+        state.abortForUnknownAllocation(alloc, dealloc);
       }
-      if (insertDeallocs(bd.data.AliveStackLocsAtExit,
-                         SuccBI.AliveStackLocsAtEntry, &InsertionBlock->front(),
-                         std::nullopt)) {
-        if (changes == Changes::None)
-          changes = Changes::Instructions;
-      }
-    }
-  }
-  return changes;
-}
+#endif
 
-StackNesting::Changes StackNesting::adaptDeallocs() {
-  bool InstChanged = false;
-  BitVector Bits(StackLocs.size());
+      // If the allocation is the top of the allocations stack:
+      if (alloc == state.allocations.back().getValue()) {
+        auto status = state.allocations.back().getStatus();
+        assert(status == AllocationStatus::Allocated ||
+               status == AllocationStatus::Undeallocatable);
 
-  // Visit all blocks. Actually the order doesn't matter, but let's to it in
-  // the same order as in solve().
-   for (auto bd : llvm::reverse(BlockInfos)) {
-    Bits = bd.data.AliveStackLocsAtExit;
+        // If the allocation has allocated status, leave the deallocation
+        // alone, pop the record of it off the stack, and pop and emit any
+        // pending allocations beneath it.
+        //
+        // In the formal presentation, the state change is
+        //   state = STATE_POP(state, alloc)
+        if (status == AllocationStatus::Allocated) {
+          state.allocations.pop_back();
+          emitPendingDeallocations(state, /*after*/ dealloc, madeChanges);
 
-    // Insert/remove deallocations inside blocks.
-    for (SILInstruction *StackInst : llvm::reverse(bd.data.StackInsts)) {
-      if (StackInst->isAllocatingStack()) {
-        // For allocations we just update the bit-set.
-        int BitNr = bitNumberForAlloc(StackInst);
-        assert(Bits == StackLocs[BitNr].AliveLocs &&
-               "dataflow didn't converge");
-        Bits.reset(BitNr);
-      } else if (StackInst->isDeallocatingStack()) {
-        // Handle deallocations.
-        SILLocation Loc = StackInst->getLoc();
-        int BitNr = bitNumberForDealloc(StackInst);
-        SILInstruction *InsertionPoint = &*std::next(StackInst->getIterator());
-        if (Bits.test(BitNr)) {
-          // The location of StackInst is alive after StackInst. So we have to
-          // remove this deallocation.
-          StackInst->eraseFromParent();
-          InstChanged = true;
+        // Otherwise, it must have undeallocatable status; remove the
+        // deallocation, but make no changes to the state.
         } else {
-          // Avoid inserting another deallocation for BitNr (which is already
-          // StackInst).
-          Bits.set(BitNr);
+          dealloc->eraseFromParent();
+          madeChanges = true;
         }
 
-        // Insert deallocations for all locations which are not alive after
-        // StackInst but _are_ alive at the StackInst.
-        InstChanged |= insertDeallocs(StackLocs[BitNr].AliveLocs, Bits,
-                                      InsertionPoint, Loc);
-        Bits |= StackLocs[BitNr].AliveLocs;
+      // If the allocation is not the top of the allocations stack:
+      } else {
+        // Find its entry.
+        auto &entry = state.getEntryForNonTop(alloc, dealloc,
+                                              indexForAllocation);
+
+        auto status = entry.getStatus();
+        assert(status == AllocationStatus::Allocated ||
+               status == AllocationStatus::Undeallocatable);
+
+        // If the allocation has allocated status, remove the deallocation
+        // and update the allocation status to pending.
+        //
+        // In the formal presentation, the state change is
+        //   state = STATE_PEND(state, alloc)
+        if (status == AllocationStatus::Allocated) {
+          entry.setPending();
+
+        // Otherwise, it has undeallocatable status; just remove the
+        // deallocation but make no changes to the state.
+        }
+
+        // In any case, remove the deallocation.
+        dealloc->eraseFromParent();
+        madeChanges = true;
       }
     }
-    assert(Bits == bd.data.AliveStackLocsAtEntry && "dataflow didn't converge");
-  }
-  return InstChanged ? Changes::Instructions : Changes::None;
-}
+  });
 
-StackNesting::Changes StackNesting::fixNesting(SILFunction *F) {
-  Changes changes = Changes::None;
-  {
-    StackNesting SN(F);
-    if (!SN.analyze())
-      return Changes::None;
-
-    // Insert deallocs at block boundaries. This might be necessary in CFG sub
-    // graphs which don't reach a function exit, but only an unreachable.
-    changes = SN.insertDeallocsAtBlockBoundaries();
-    if (changes == Changes::None) {
-      // Do the real work: extend lifetimes by moving deallocs.
-      return SN.adaptDeallocs();
-    }
-  }
-  {
-    // Those inserted deallocs make it necessary to re-compute the analysis.
-    StackNesting SN(F);
-    SN.analyze();
-    // Do the real work: extend lifetimes by moving deallocs.
-    return std::max(SN.adaptDeallocs(), changes);
-  }
-}
-
-void StackNesting::dump() const {
-  for (auto bd : BlockInfos) {
-    llvm::dbgs() << "Block " << bd.block.getDebugID();
-    if (bd.data.isDeadEnd)
-      llvm::dbgs() << "(deadend)";
-    llvm::dbgs() << ": entry-bits=";
-    dumpBits(bd.data.AliveStackLocsAtEntry);
-    llvm::dbgs() << ": exit-bits=";
-    dumpBits(bd.data.AliveStackLocsAtExit);
-    llvm::dbgs() << '\n';
-    for (SILInstruction *StackInst : bd.data.StackInsts) {
-      if (StackInst->isAllocatingStack()) {
-        auto AllocInst = StackInst;
-        int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
-        llvm::dbgs() << "  alloc #" << BitNr << ": alive=";
-        dumpBits(StackLocs[BitNr].AliveLocs);
-        llvm::dbgs() << ",     " << *StackInst;
-      } else if (StackInst->isDeallocatingStack()) {
-        auto *AllocInst = getAllocForDealloc(StackInst);
-        int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
-        llvm::dbgs() << "  dealloc for #" << BitNr << "\n"
-                        "    " << *StackInst;
-      }
-    }
-  }
-}
-
-void StackNesting::dumpBits(const BitVector &Bits) {
-  llvm::dbgs() << '<';
-  const char *separator = "";
-  for (int Bit = Bits.find_first(); Bit >= 0; Bit = Bits.find_next(Bit)) {
-    llvm::dbgs() << separator << Bit;
-    separator = ",";
-  }
-  llvm::dbgs() << '>';
+  // We never make changes to the CFG.
+  return (madeChanges ? Changes::Instructions : Changes::None);
 }
 
 namespace swift::test {
-static FunctionTest MyNewTest("stack_nesting_fixup",
-                              [](auto &function, auto &arguments, auto &test) {
-                                StackNesting::fixNesting(&function);
-                                function.print(llvm::outs());
-                              });
+static FunctionTest StackNestingTests("stack_nesting_fixup",
+                                      [](auto &function, auto &arguments,
+                                         auto &test) {
+                                        StackNesting::fixNesting(&function);
+                                        function.print(llvm::outs());
+                                      });
 } // end namespace swift::test

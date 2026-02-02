@@ -48,6 +48,7 @@ void SILInstruction::verifyDebugInfo() const {
     require(
         instKind == SILInstructionKind::BranchInst ||
             instKind == SILInstructionKind::ReturnInst ||
+            instKind == SILInstructionKind::ReturnBorrowInst ||
             instKind == SILInstructionKind::UnreachableInst,
         "return locations are only allowed on branch and return instructions");
 

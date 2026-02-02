@@ -112,6 +112,7 @@ private:
   const LoadableTypeInfo *JobTI = nullptr;
   const LoadableTypeInfo *ExecutorTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
+  const LoadableTypeInfo *ImplicitActorTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
   const TypeInfo *TaskContinuationFunctionPtrTI = nullptr;
@@ -184,7 +185,7 @@ private:
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
   const TypeInfo *convertBuiltinFixedArrayType(BuiltinFixedArrayType *T);
-
+  const TypeInfo *convertBuiltinBorrowType(BuiltinBorrowType *T);
 
 public:
   TypeConverter(IRGenModule &IGM);
@@ -202,6 +203,7 @@ public:
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
   const LoadableTypeInfo &getJobTypeInfo();

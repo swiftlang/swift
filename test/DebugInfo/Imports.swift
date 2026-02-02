@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/basic.swiftmodule %S/basic.swift
+// RUN: %target-swift-frontend -emit-module-path %t/advanced.swiftmodule %S/advanced.swift
 
 // RUN: %target-swift-frontend -emit-ir -module-name Foo %s -I %t -g -o - | %FileCheck %s
 // RUN: %target-swift-frontend -c -module-name Foo %s -I %t -g -o %t.o
@@ -10,13 +10,13 @@
 // CHECK-DAG: ![[THISFILE]] = !DIFile(filename: "{{.*}}test{{/|\\\\}}DebugInfo{{/|\\\\}}Imports.swift",
 // CHECK-DAG: ![[SWIFTMODULE:[0-9]+]] = !DIModule({{.*}}, name: "Swift"
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE]], entity: ![[SWIFTMODULE]]
-// CHECK-DAG: ![[BASICMODULE:[0-9]+]] = !DIModule({{.*}}, name: "basic"
+// CHECK-DAG: ![[BASICMODULE:[0-9]+]] = !DIModule({{.*}}, name: "advanced"
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[THISFILE]], entity: ![[BASICMODULE]]
-import basic
+import advanced
 import typealias Swift.Optional
 
 func markUsed<T>(_ t: T) {}
-markUsed(basic.foo(1, 2))
+markUsed(advanced.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module
@@ -26,7 +26,7 @@ markUsed(basic.foo(1, 2))
 // DWARF:   DW_AT_name ("Swift")
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name ("basic")
+// DWARF:   DW_AT_name ("advanced")
 
 // DWARF-NOT: "Swift.Optional"
 

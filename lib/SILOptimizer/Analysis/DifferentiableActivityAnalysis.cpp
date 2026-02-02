@@ -16,6 +16,7 @@
 #include "swift/SILOptimizer/Differentiation/Common.h"
 
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -435,67 +436,75 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
     auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
     if (!dti)
       continue;
-    // The second tuple field of the return value is the `RawPointer`.
-    for (auto use : dti->getResult(1)->getUses()) {
-      // The `RawPointer` passes through a `mark_dependence(pointer_to_address`.
-      // That instruction's first use is a `store` whose source is useful; its
-      // subsequent uses are `index_addr`s whose only use is a useful `store`.
-      auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
-      assert(
-          mdi &&
-          "Expected a mark_dependence user for uninitialized array intrinsic.");
-      auto *ptai = dyn_cast<PointerToAddressInst>(getSingleNonDebugUser(mdi));
-      assert(ptai && "Expected a pointer_to_address.");
-      setUseful(ptai, dependentVariableIndex);
-      // Propagate usefulness through array element addresses:
-      // `pointer_to_address` and `index_addr` instructions.
-      //
-      // - Set all array element addresses as useful.
-      // - Find instructions with array element addresses as "result":
-      //   - `store` and `copy_addr` with array element address as destination.
-      //   - `apply` with array element address as an indirect result.
-      // - For each instruction, propagate usefulness through "arguments":
-      //   - `store` and `copy_addr`: propagate to source.
-      //   - `apply`: propagate to arguments.
-      //
-      // NOTE: `propagateUseful(use->getUser(), ...)` is intentionally not used
-      // because it marks more values than necessary as useful, including:
-      // - The `RawPointer` result of the intrinsic.
-      // - `integer_literal` operands to `index_addr` for indexing the
-      //   `RawPointer`.
-      // It is also blocked by TF-1032: control flow differentiation crash for
-      // active values with no tangent space.
-      for (auto use : ptai->getUses()) {
-        auto *user = use->getUser();
-        if (auto *si = dyn_cast<StoreInst>(user)) {
-          setUseful(si->getDest(), dependentVariableIndex);
-          setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
-        } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-          setUseful(cai->getDest(), dependentVariableIndex);
-          setUsefulAndPropagateToOperands(cai->getSrc(),
-                                          dependentVariableIndex);
-        } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
-          if (FullApplySite(ai).isIndirectResultOperand(*use))
-            for (auto arg : ai->getArgumentsWithoutIndirectResults())
-              setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
-        } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
-          setUseful(iai, dependentVariableIndex);
-          for (auto use : iai->getUses()) {
-            auto *user = use->getUser();
-            if (auto si = dyn_cast<StoreInst>(user)) {
-              setUseful(si->getDest(), dependentVariableIndex);
-              setUsefulAndPropagateToOperands(si->getSrc(),
-                                              dependentVariableIndex);
-            } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-              setUseful(cai->getDest(), dependentVariableIndex);
-              setUsefulAndPropagateToOperands(cai->getSrc(),
-                                              dependentVariableIndex);
-            } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
-              if (FullApplySite(ai).isIndirectResultOperand(*use))
-                for (auto arg : ai->getArgumentsWithoutIndirectResults())
-                  setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
+
+    ValueWorklist worklist(dti->getResult(0));
+
+    while (SILValue v = worklist.pop()) {
+      for (auto use : v->getUses()) {
+        switch (use->getUser()->getKind()) {
+          case SILInstructionKind::UncheckedRefCastInst:
+          case SILInstructionKind::StructExtractInst:
+          case SILInstructionKind::BeginBorrowInst:
+            worklist.pushIfNotVisited(cast<SingleValueInstruction>(use->getUser()));
+            break;
+          case SILInstructionKind::RefTailAddrInst: {
+            auto *rta = cast<RefTailAddrInst>(use->getUser());
+            setUseful(rta, dependentVariableIndex);
+            // Propagate usefulness through array element addresses:
+            // `pointer_to_address` and `index_addr` instructions.
+            //
+            // - Set all array element addresses as useful.
+            // - Find instructions with array element addresses as "result":
+            //   - `store` and `copy_addr` with array element address as destination.
+            //   - `apply` with array element address as an indirect result.
+            // - For each instruction, propagate usefulness through "arguments":
+            //   - `store` and `copy_addr`: propagate to source.
+            //   - `apply`: propagate to arguments.
+            //
+            // NOTE: `propagateUseful(use->getUser(), ...)` is intentionally not used
+            // because it marks more values than necessary as useful, including:
+            // - The `RawPointer` result of the intrinsic.
+            // - `integer_literal` operands to `index_addr` for indexing the
+            //   `RawPointer`.
+            // It is also blocked by TF-1032: control flow differentiation crash for
+            // active values with no tangent space.
+            for (auto use : rta->getUses()) {
+              auto *user = use->getUser();
+              if (auto *si = dyn_cast<StoreInst>(user)) {
+                setUseful(si->getDest(), dependentVariableIndex);
+                setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
+              } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+                setUseful(cai->getDest(), dependentVariableIndex);
+                setUsefulAndPropagateToOperands(cai->getSrc(),
+                                                dependentVariableIndex);
+              } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
+                if (FullApplySite(ai).isIndirectResultOperand(*use))
+                  for (auto arg : ai->getArgumentsWithoutIndirectResults())
+                    setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
+              } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+                setUseful(iai, dependentVariableIndex);
+                for (auto use : iai->getUses()) {
+                  auto *user = use->getUser();
+                  if (auto si = dyn_cast<StoreInst>(user)) {
+                    setUseful(si->getDest(), dependentVariableIndex);
+                    setUsefulAndPropagateToOperands(si->getSrc(),
+                                                    dependentVariableIndex);
+                  } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+                    setUseful(cai->getDest(), dependentVariableIndex);
+                    setUsefulAndPropagateToOperands(cai->getSrc(),
+                                                    dependentVariableIndex);
+                  } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
+                    if (FullApplySite(ai).isIndirectResultOperand(*use))
+                      for (auto arg : ai->getArgumentsWithoutIndirectResults())
+                        setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
+                  }
+                }
+              }
             }
+            break;
           }
+          default:
+            break;
         }
       }
     }

@@ -7,7 +7,7 @@
 void simple(int len, int * __counted_by(len) __noescape p);
 
 void swiftAttr(int len, int *p) __attribute__((
-    swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"), .nonescaping(pointer: .param(2)), spanAvailability: \"visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4\")")));
+    swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"), .nonescaping(pointer: .param(2)), spanAvailability: \"visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4\")")));
 
 void shared(int len, int * __counted_by(len) __noescape p1, int * __counted_by(len) __noescape p2);
 
@@ -44,7 +44,7 @@ void lenName(int lenName, int size, int * __counted_by(lenName * size) _Nullable
 void func(int len, int * __counted_by(len) _Nullable func __noescape);
 
 void *funcRenameKeyword(int len, int * __counted_by(len) _Nullable func __noescape,
-    int extension __lifetimebound,
+    int extension,
     int init,
     int open,
     int var,
@@ -55,7 +55,7 @@ void *funcRenameKeyword(int len, int * __counted_by(len) _Nullable func __noesca
     int where) __attribute__((swift_name("funcRenamed(len:func:extension:init:open:var:is:as:in:guard:where:)")));
 
 void *funcRenameKeywordAnonymous(int len, int * __counted_by(len) _Nullable __noescape,
-    int __lifetimebound,
+    int,
     int,
     int,
     int,

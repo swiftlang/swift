@@ -36,17 +36,6 @@ SyntacticElementTarget::SyntacticElementTarget(
   assert((!contextualInfo.getType() || contextualPurpose != CTP_Unused) &&
          "Purpose for conversion type was not specified");
 
-  // Take a look at the conversion type to check to make sure it is sensible.
-  if (auto type = contextualInfo.getType()) {
-    // If we're asked to convert to an UnresolvedType, then ignore the request.
-    // This happens when CSDiags nukes a type.
-    if (type->is<UnresolvedType>() ||
-        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
-      contextualInfo.typeLoc = TypeLoc();
-      contextualPurpose = CTP_Unused;
-    }
-  }
-
   kind = Kind::expression;
   expression.expression = expr;
   expression.dc = dc;
@@ -141,7 +130,7 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
-      patternType && !patternType->is<UnresolvedType>()) {
+      patternType && !patternType->is<PlaceholderType>()) {
     contextualType = TypeLoc::withoutLoc(patternType);
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
@@ -181,13 +170,14 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
   return result;
 }
 
-SyntacticElementTarget
-SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
-                                  DeclContext *dc) {
+SyntacticElementTarget SyntacticElementTarget::forReturn(ReturnStmt *returnStmt,
+                                                         Expr *returnExpr,
+                                                         Type contextTy,
+                                                         DeclContext *dc) {
   assert(contextTy);
   assert(returnStmt->hasResult() && "Must have result to be type-checked");
   ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
-  SyntacticElementTarget target(returnStmt->getResult(), dc, contextInfo,
+  SyntacticElementTarget target(returnExpr, dc, contextInfo,
                                 /*isDiscarded*/ false);
   target.expression.parentReturnStmt = returnStmt;
   return target;
@@ -261,7 +251,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   switch (getExprContextualTypePurpose()) {
   case CTP_Initialization:
     return !infersOpaqueReturnType() && !isOptionalSomePatternInit();
-  case CTP_ForEachStmt:
   case CTP_ForEachSequence:
     return true;
   case CTP_Unused:
@@ -274,7 +263,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_EnumCaseRawValue:
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
-  case CTP_CalleeResult:
   case CTP_CallArgument:
   case CTP_ClosureResult:
   case CTP_ArrayElement:
@@ -285,8 +273,6 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_SubscriptAssignSource:
   case CTP_Condition:
   case CTP_WrappedProperty:
-  case CTP_ComposedPropertyWrapper:
-  case CTP_CannotFail:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     return false;
@@ -302,20 +288,46 @@ void SyntacticElementTarget::markInvalid() const {
     InvalidationWalker(ASTContext &ctx) : Ctx(ctx) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (!E->getType())
-        E->setType(ErrorType::get(Ctx));
-
+      E->setType(ErrorType::get(Ctx));
       return Action::Continue(E);
+    }
+
+    PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+      P->setType(ErrorType::get(Ctx));
+
+      // For a named pattern, set it on the variable. This stops us from
+      // attempting to double-type-check variables we've already type-checked.
+      if (auto *NP = dyn_cast<NamedPattern>(P))
+        NP->getDecl()->setNamingPattern(NP);
+
+      return Action::Continue(P);
+    }
+
+    void invalidateVarDecl(VarDecl *VD) {
+      // Only set invalid if we don't already have an interface type computed.
+      if (!VD->hasInterfaceType())
+        VD->setInvalid();
+
+      // Also do the same for any auxiliary vars.
+      VD->visitAuxiliaryVars(/*forNameLookup*/ false, [&](VarDecl *VD) {
+        invalidateVarDecl(VD);
+      });
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       // Mark any VarDecls and PatternBindingDecls as invalid.
       if (auto *VD = dyn_cast<VarDecl>(D)) {
-        // Only set invalid if we don't already have an interface type computed.
-        if (!VD->hasInterfaceType())
-          D->setInvalid();
-      } else if (isa<PatternBindingDecl>(D)) {
-        D->setInvalid();
+        invalidateVarDecl(VD);
+      } else if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+        PBD->setInvalid();
+        // Make sure we mark the patterns and initializers as having been
+        // checked, otherwise `typeCheckPatternBinding` might try to check them
+        // again.
+        for (auto i : range(0, PBD->getNumPatternEntries())) {
+          PBD->setPattern(i, PBD->getPattern(i), /*fullyValidated*/ true);
+          if (PBD->isInitialized(i))
+            PBD->setInitializerChecked(i);
+        }
       }
       return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }

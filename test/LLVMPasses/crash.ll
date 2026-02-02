@@ -8,7 +8,7 @@ target triple = "x86_64-apple-macosx10.9"
 
 declare { ptr, i64, ptr } @_Tsop1pFT3lhsNs6String3rhsS__S_(ptr, i64, ptr, ptr, i64, ptr)
 declare { ptr, i64, ptr } @_TNs6String24convertFromStringLiteralFT3valp_S_(ptr)
-declare void @swift_release(ptr nocapture)
+declare void @swift_release(ptr captures(none))
 
 
 @0 = private unnamed_addr constant [3 x i8] c"So\00"

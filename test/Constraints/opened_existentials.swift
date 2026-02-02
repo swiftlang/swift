@@ -591,3 +591,18 @@ protocol PP3 {
     associatedtype A
 }
 
+protocol PP4 {
+}
+
+do {
+  func test<T>(env: T) where T: PP4 {}
+
+  func test(env: PP4? = nil) {
+    guard let env else {
+      return
+    }
+
+    // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
+    test(env: env)
+  }
+}

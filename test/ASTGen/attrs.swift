@@ -2,9 +2,8 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
@@ -12,9 +11,8 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
@@ -25,20 +23,17 @@
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
 // REQUIRES: concurrency
-// REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_Extern
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_RawLayout
-// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -95,7 +90,9 @@ func fn(_: Int) {}
 
 @_disallowFeatureSuppression(NoncopyableGenerics) public struct LoudlyNC<T: ~Copyable> {}
 
-@_cdecl("c_function_name") func foo(x: Int) {}
+@_cdecl("c_function_name") func cdeclUnderscore(x: Int) {}
+@c(c_function_name_official) func cdecl(x: Int) {}
+@c func cdeclDefault() {}
 
 struct StaticProperties {
   dynamic var property: Int { return 1 }
@@ -138,7 +135,7 @@ class ExclusivityAttrClass {
 @_extern(c) func externCFn()
 
 struct SectionStruct {
-	@_section("__TEXT,__mysection") @_used func foo() {}
+	@section("__TEXT,__mysection") @used func foo() {}
 }
 
 protocol ImplementsProto {
@@ -214,13 +211,13 @@ struct OpTest {
 
 struct E {}
 struct NE : ~Escapable {}
-@lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
-@lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+@_lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
+@_lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
   if (Int.random(in: 1..<100) < 50) { return ne1 }
   return ne2
 }
-@lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
-@lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+@_lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
+@_lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
 
 actor MyActor {
   nonisolated let constFlag: Bool = false

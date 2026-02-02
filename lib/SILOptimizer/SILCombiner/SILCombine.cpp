@@ -33,11 +33,13 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -45,7 +47,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include <fstream>
 #include <set>
 
 using namespace swift;
@@ -77,7 +78,7 @@ static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   BasicBlockWorklist Worklist(BB);
-  llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
+  llvm::SmallVector<SILInstruction *, 16> InstrsForSILCombineWorklist;
 
   while (SILBasicBlock *BB = Worklist.pop()) {
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
@@ -217,9 +218,9 @@ SILCombiner::SILCombiner(SILFunctionTransform *trans,
       /* EraseAction */
       [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
   deBlocks(trans->getFunction()),
-  ownershipFixupContext(getInstModCallbacks(), deBlocks),
-  swiftPassInvocation(trans->getPassManager(),
-                      trans->getFunction(), this) {}
+  ownershipFixupContext(getInstModCallbacks(), deBlocks) {
+  trans->getPassManager()->getSwiftPassInvocation()->getCurrent()->injectSILCombiner(this);
+}
 
 bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
   if (auto *consumingUse = svi->getSingleConsumingUse()) {
@@ -311,7 +312,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   // copyInst was either optimized by a SILCombine visitor or is a copy_value
   // produced by the visitor. Find the canonical def.
   auto recordCopiedDef = [&defsToCanonicalize](CopyValueInst *copyInst) {
-    SILValue def = CanonicalizeOSSALifetime::getCanonicalCopiedDef(copyInst);
+    SILValue def = OSSACanonicalizeOwned::getCanonicalCopiedDef(copyInst);
 
     // getCanonicalCopiedDef returns a copy whenever that the copy's source is
     // guaranteed. In that case, find the root of the borrowed lifetime. If it
@@ -325,8 +326,9 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
     // fast convergence, rewriting borrow scopes should not be combined with
     // other unrelated transformations.
     if (auto *copyDef = dyn_cast<CopyValueInst>(def)) {
-      if (SILValue borrowDef = CanonicalizeBorrowScope::getCanonicalBorrowedDef(
-              copyDef->getOperand())) {
+      if (SILValue borrowDef =
+              OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(
+                  copyDef->getOperand())) {
         if (isa<SILFunctionArgument>(borrowDef)) {
           def = borrowDef;
         }
@@ -348,7 +350,7 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
     return;
 
   // Remove instructions deleted during canonicalization from SILCombine's
-  // worklist. CanonicalizeOSSALifetime invalidates operands before invoking
+  // worklist. OSSACanonicalizeOwned invalidates operands before invoking
   // the deletion callback.
   auto canonicalizeCallbacks =
       InstModCallbacks().onDelete([this](SILInstruction *instToDelete) {
@@ -358,12 +360,12 @@ void SILCombiner::canonicalizeOSSALifetimes(SILInstruction *currentInst) {
   InstructionDeleter deleter(std::move(canonicalizeCallbacks));
 
   DominanceInfo *domTree = DA->get(&Builder.getFunction());
-  CanonicalizeOSSALifetime canonicalizer(
+  OSSACanonicalizeOwned canonicalizer(
       DontPruneDebugInsts,
       MaximizeLifetime_t(!parentTransform->getFunction()->shouldOptimize()),
       parentTransform->getFunction(), NLABA, DEBA, domTree, CA, deleter);
-  CanonicalizeBorrowScope borrowCanonicalizer(parentTransform->getFunction(),
-                                              deleter);
+  OSSACanonicalizeGuaranteed borrowCanonicalizer(parentTransform->getFunction(),
+                                                 deleter);
 
   while (!defsToCanonicalize.empty()) {
     SILValue def = defsToCanonicalize.pop_back_val();
@@ -428,6 +430,14 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   return MadeChange;
 }
 
+static bool hasAddressOperands(SILInstruction *inst) {
+  for (Operand *op : inst->getRealOperands()) {
+    if (op->get()->getType().isAddress())
+      return true;
+  }
+  return false;
+}
+
 void SILCombiner::processInstruction(SILInstruction *I,
                                      SILCombineCanonicalize &scCanonicalize,
                                      bool &MadeChange) {
@@ -466,6 +476,15 @@ void SILCombiner::processInstruction(SILInstruction *I,
     if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
       if (auto fwdOp = ForwardingOperation(svi)) {
         if (fwdOp.getSingleForwardingOperand() &&
+
+            // Don't risk sinking instructions with address operands out of the
+            // addressed memory's lifetime. E.g:
+            // ```
+            //   %3 = mark_dependence %2 on %1 : $*T  // must not be moved after the destroy_addr
+            //   destroy_addr %1
+            // ```
+            !hasAddressOperands(svi) &&
+
             SILValue(svi)->getOwnershipKind() == OwnershipKind::Owned) {
           // Try to sink the value. If we sank the value and deleted it,
           // return. If we didn't optimize or sank but we are still able to
@@ -597,9 +616,10 @@ void SILCombiner::eraseInstIncludingUsers(SILInstruction *inst) {
 /// Runs a Swift instruction pass.
 void SILCombiner::runSwiftInstructionPass(SILInstruction *inst,
                               void (*runFunction)(BridgedInstructionPassCtxt)) {
-  swiftPassInvocation.startInstructionPassRun(inst);
-  runFunction({ {inst->asSILNode()}, {&swiftPassInvocation} });
-  swiftPassInvocation.finishedInstructionPassRun();
+  auto invocation = parentTransform->getPassManager()->getSwiftPassInvocation()->getCurrent();
+  invocation->startInstructionPassRun(inst);
+  runFunction({ {inst->asSILNode()}, {invocation} });
+  invocation->finishedInstructionPassRun();
 }
 
 /// Registered briged instruction pass run functions.
@@ -667,11 +687,9 @@ class SILCombine : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     bool enableCopyPropagation =
-        getOptions().CopyPropagation == CopyPropagationOption::On;
-    if (getOptions().EnableOSSAModules) {
-      enableCopyPropagation =
-          getOptions().CopyPropagation != CopyPropagationOption::Off;
-    }
+        getOptions().CopyPropagation >= CopyPropagationOption::Optimizing;
+    enableCopyPropagation =
+        getOptions().CopyPropagation != CopyPropagationOption::Off;
 
     SILCombiner Combiner(this, getOptions().RemoveRuntimeAsserts,
                          enableCopyPropagation);
@@ -681,6 +699,14 @@ class SILCombine : public SILFunctionTransform {
       updateAllGuaranteedPhis(getPassManager(), getFunction());
       // Invalidate everything.
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    }
+    if (Changed ||
+        (getPassManager()->getSwiftPassInvocation()->getChangeNotifications() & SILContext::Branches) != 0) {
+      removeUnreachableBlocks(*getFunction());
+      if (getFunction()->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), getFunction());
+      if (getFunction()->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), getFunction());
     }
   }
 };
@@ -708,64 +734,4 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst, bool salvageDeb
       inst->eraseFromParent();
     }
   }
-}
-
-// cond_fail removal based on cond_fail message and containing function name.
-//
-// The standard library uses _precondition calls which have a message argument.
-//
-// Allow disabling the generated cond_fail by these message arguments.
-//
-// For example:
-//
-//  _precondition(source >= (0 as T), "Negative value is not representable")
-// results in a cond_fail "Negative value is not representable".
-//
-// This commit allows for specifying a file that contains these messages on each
-// line.
-//
-// /path/to/disable_cond_fails:
-//
-// ```
-// Negative value is not representable
-// Array index is out of range
-// ```
-//
-// The optimizer will remove these cond_fails if the swift frontend is invoked
-// with -Xllvm -cond-fail-config-file=/path/to/disable_cond_fails.
-//
-// Additionally, also interpret the lines as function names and check whether
-// the current cond_fail is contained in a listed function when considering
-// whether to remove it.
-static llvm::cl::opt<std::string> CondFailConfigFile(
-    "cond-fail-config-file", llvm::cl::init(""),
-    llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
-
-static std::set<std::string> CondFailsToRemove;
-
-bool SILCombiner::shouldRemoveCondFail(CondFailInst &CFI) {
-  if (CondFailConfigFile.empty())
-    return false;
-
-  std::fstream fs(CondFailConfigFile);
-  if (!fs) {
-    llvm::errs() << "cannot cond_fail disablement config file\n";
-    exit(1);
-  }
-  if (CondFailsToRemove.empty()) {
-    std::string line;
-    while (std::getline(fs, line)) {
-      CondFailsToRemove.insert(line);
-    }
-    fs.close();
-  }
-  // Check whether the cond_fail's containing function was listed in the config
-  // file.
-  if (CondFailsToRemove.find(CFI.getFunction()->getName().str()) !=
-      CondFailsToRemove.end())
-    return true;
-
-  // Check whether the cond_fail's message was listed in the config file.
-  auto message = CFI.getMessage();
-  return CondFailsToRemove.find(message.str()) != CondFailsToRemove.end();
 }

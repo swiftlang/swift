@@ -6,7 +6,7 @@ file(CONFIGURE
 ---
 version: 0
 case-sensitive: false
-use-external-names: false
+use-external-names: true
 roots:
   - name: "@CMAKE_ANDROID_NDK@/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include"
     type: directory
@@ -28,13 +28,14 @@ target_compile_options(SwiftAndroid INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc --sysroot=\"${CMAKE_ANDROID_NDK_TOOLCHAIN_UNIFIED}/sysroot\">"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${CMAKE_CURRENT_BINARY_DIR}/android-ndk-overlay.yaml>")
 
+install(TARGETS SwiftAndroid
+  EXPORT SwiftOverlayTargets)
 install(FILES
   android.modulemap
   SwiftAndroidNDK.h
   SwiftBionic.h
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR})
-
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR})
 install(FILES
   posix_filesystem.apinotes
   spawn.apinotes
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>/apinotes)
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)

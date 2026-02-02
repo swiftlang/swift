@@ -283,9 +283,9 @@ bb0(%0 : $*X3, %1 : @guaranteed $Builtin.NativeObject):
 //
 // CHECK-LABEL: sil [ossa] @testDestructureTupleNoCrash : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.NativeObject)) -> () {
 // CHECKOPT: bb0(
-// CHECKOPT-NEXT: destroy_value
-// CHECKOPT-NEXT: tuple
-// CHECKOPT-NEXT: return
+// CHECKOPT-NEXT: (%1, %2) = destructure_tuple
+// CHECKOPT:      destroy_value %2
+// CHECKOPT-NEXT: destroy_value %1
 // CHECK: } // end sil function 'testDestructureTupleNoCrash'
 sil [ossa] @testDestructureTupleNoCrash : $@convention(thin) (@owned (Builtin.NativeObject, Builtin.NativeObject)) -> () {
 bb0(%0 : @owned $(Builtin.NativeObject, Builtin.NativeObject)):
@@ -339,28 +339,6 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   debug_value %2 : $Builtin.NativeObject, let, name "var"
   destroy_value %2 : $Builtin.NativeObject
   return %1 : $Builtin.NativeObject
-}
-
-// Test SemanticARCOpts eliminateSimpleCopies. At -O, remove the
-// debug_value with the copy to avoid a lifetime violation. -Onone, do nothing.
-//
-// CHECK-LABEL: sil [ossa] @testSimpleCopyWithDebug : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
-// CHECKOPT-NOT: copy_value
-// CHECKOPT-NOT: debug_value
-// CHECKDEB: copy_value
-// CHECKDEB: debug_value
-// CHECK-LABEL: } // end sil function 'testSimpleCopyWithDebug'
-sil [ossa] @testSimpleCopyWithDebug : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
-bb9(%0 : @owned $Klass):
-  %borrow = begin_borrow %0 : $Klass
-  %p = ref_element_addr %borrow : $Klass, #Klass.property
-  %v = load [trivial] %p : $*Builtin.Int64
-  %copy = copy_value %borrow : $Klass
-  end_borrow %borrow : $Klass
-  debug_value %copy : $Klass, let, name "c"
-  destroy_value %copy : $Klass
-  destroy_value %0 : $Klass
-  return %v : $Builtin.Int64
 }
 
 struct Outer {

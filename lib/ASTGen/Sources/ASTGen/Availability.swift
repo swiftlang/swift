@@ -21,8 +21,8 @@ import SwiftIfConfig
 extension ASTGenVisitor {
   /// Implementation detail for `generateAvailableAttr(attribute:)` and `generateSpecializeAttr(attribute:)`.
   func generateAvailableAttr(
-    atLoc: BridgedSourceLoc,
-    range: BridgedSourceRange,
+    atLoc: SourceLoc,
+    range: SourceRange,
     attrName: SyntaxText,
     args: AvailabilityArgumentListSyntax
   ) -> [BridgedAvailableAttr] {
@@ -66,8 +66,8 @@ extension ASTGenVisitor {
   }
 
   func generateAvailableAttrShorthand(
-    atLoc: BridgedSourceLoc,
-    range: BridgedSourceRange,
+    atLoc: SourceLoc,
+    range: SourceRange,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> [BridgedAvailableAttr] {
@@ -101,9 +101,9 @@ extension ASTGenVisitor {
         introduced: spec.rawVersion,
         introducedRange: spec.versionRange,
         deprecated: BridgedVersionTuple(),
-        deprecatedRange: BridgedSourceRange(),
+        deprecatedRange: SourceRange(),
         obsoleted: BridgedVersionTuple(),
-        obsoletedRange: BridgedSourceRange(),
+        obsoletedRange: SourceRange(),
         isSPI: isSPI
       )
       attr.setIsGroupMember()
@@ -121,8 +121,8 @@ extension ASTGenVisitor {
   }
 
   func generateAvailableAttrExtended(
-    atLoc: BridgedSourceLoc,
-    range: BridgedSourceRange,
+    atLoc: SourceLoc,
+    range: SourceRange,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> BridgedAvailableAttr? {
@@ -155,7 +155,7 @@ extension ASTGenVisitor {
 
     struct VersionAndRange {
       let version: VersionTuple
-      let range: BridgedSourceRange
+      let range: SourceRange
     }
 
     var introduced: VersionAndRange? = nil
@@ -263,11 +263,11 @@ extension ASTGenVisitor {
       message: message ?? BridgedStringRef(),
       renamed: renamed ?? BridgedStringRef(),
       introduced: introduced?.version.bridged ?? BridgedVersionTuple(),
-      introducedRange: introduced?.range ?? BridgedSourceRange(),
+      introducedRange: introduced?.range ?? SourceRange(),
       deprecated: deprecated?.version.bridged ?? BridgedVersionTuple(),
-      deprecatedRange: deprecated?.range ?? BridgedSourceRange(),
+      deprecatedRange: deprecated?.range ?? SourceRange(),
       obsoleted: obsoleted?.version.bridged ?? BridgedVersionTuple(),
-      obsoletedRange: obsoleted?.range ?? BridgedSourceRange(),
+      obsoletedRange: obsoleted?.range ?? SourceRange(),
       isSPI: isSPI
     )
   }
@@ -369,7 +369,7 @@ extension ASTGenVisitor {
     return result
   }
 
-  typealias GeneratedPlatformVersion = (platform: BridgedPlatformKind, version: BridgedVersionTuple)
+  typealias GeneratedPlatformVersion = (platform: swift.PlatformKind, version: BridgedVersionTuple)
 
   func generate(platformVersionList node: PlatformVersionItemListSyntax) -> [GeneratedPlatformVersion] {
     var result: [GeneratedPlatformVersion] = []
@@ -380,9 +380,9 @@ extension ASTGenVisitor {
       let version = self.generate(versionTuple: platformVersionNode.version)?.bridged ?? BridgedVersionTuple()
 
       // If the name is a platform name, use it.
-      let platform = BridgedPlatformKind(from: platformName.bridged)
-      if platform != .none {
-        result.append((platform: platform, version: version))
+      let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
+      guard !platform.hasValue else {
+        result.append((platform: platform.value, version: version))
         continue
       }
 
@@ -397,11 +397,12 @@ extension ASTGenVisitor {
             let spec = BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr))
             let domainOrIdentifier = spec.domainOrIdentifier
             precondition(!domainOrIdentifier.isDomain)
-            let platform = BridgedPlatformKind(from: domainOrIdentifier.asIdentifier)
-            guard platform != .none else {
+            let platform = BridgedOptionalPlatformKind(from: domainOrIdentifier.asIdentifier)
+            guard platform.hasValue else {
+              // TODO: Diagnose?
               continue
             }
-            result.append((platform: platform, version: spec.rawVersion))
+            result.append((platform: platform.value, version: spec.rawVersion))
           }
         }
         continue

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
@@ -8,31 +8,57 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 
-class MyClass {
+public class MyClass {
   init() { print("MyClass.init") }
   deinit { print("MyClass.deinit") }
   func foo() { print("MyClass.foo") }
 }
 
-class MySubClass: MyClass {
-  var x = 27
+public class MySubClass: MyClass {
+  var x: Int
 
-  override init() { print("MySubClass.init") }
+  override init() {
+    self.x = 27
+    print("MySubClass.init")
+  }
+
+  public init(p: some P) {
+    self.x = p.get()
+    super.init()
+    print("MySubClass.init")
+  }
+
   deinit { print("MySubClass.deinit") }
-  override func foo() { print("MySubClass.foo") }
+
+  override func foo() { print("MySubClass.foo: \(x)") }
 
   func printX() {
     print(x)
   }
 }
 
-class MySubSubClass: MySubClass {
-  override init() { print("MySubSubClass.init") }
+public protocol P {
+  func get() -> Int
+}
+
+struct S: P {
+  let i: Int
+
+  func get() -> Int { i }
+}
+
+public class MySubSubClass: MySubClass {
+  override init() {
+    print("MySubSubClass.init")
+    super.init()
+  }
+
   deinit { print("MySubSubClass.deinit") }
+
   override func foo() { print("MySubSubClass.foo") }
 }
 
-class OtherSubClass: MyClass {}
+public class OtherSubClass: MyClass {}
 
 func testCasting(_ title: StaticString, _ c: MyClass) {
   print(title, terminator: "")
@@ -81,10 +107,15 @@ struct Main {
     o.1!.foo()
     o.2!.foo()
     // CHECK: MyClass.foo
-    // CHECK: MySubClass.foo
+    // CHECK: MySubClass.foo: 27
     // CHECK: MySubSubClass.foo
     print("")
-    
+
+    print("4b") // CHECK: 4b
+    o.1 = MySubClass(p: S(i: 42))
+    o.1!.foo()
+    // CHECK: MySubClass.foo: 42
+
     print("5") // CHECK: 5
     o.0 = nil
     // CHECK: MyClass.deinit

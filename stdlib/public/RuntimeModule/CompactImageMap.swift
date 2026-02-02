@@ -20,6 +20,7 @@ private let slash = UInt8(ascii: "/")
 private let backslash = UInt8(ascii: "\\")
 
 @_spi(Internal)
+@available(Backtracing 6.2, *)
 public enum CompactImageMapFormat {
 
   /// The list of fixed prefixes used to encode paths.

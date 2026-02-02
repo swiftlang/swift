@@ -48,7 +48,15 @@ module MemoryLayout {
   requires cplusplus
 }
 
-module MemberVariables {
+// This header is shared between 3 test cases. It's built with -verify in
+// test/Interop/Cxx/class/member-variables-typechecker.swift, which is defeated
+// if the test just picks up a cached module. We could set the module cache path
+// explicitly, but that would rebuild CxxStdlib which is really slow.
+module MemberVariablesNoDiagnostics {
+  header "member-variables.h"
+  requires cplusplus
+}
+module MemberVariablesDiagnostics {
   header "member-variables.h"
   requires cplusplus
 }
@@ -155,6 +163,12 @@ module PIMPL {
 
 module SimpleStructs {
   header "simple-structs.h"
+  requires cplusplus
+  export *
+}
+
+module Mirror {
+  header "mirror.h"
   requires cplusplus
   export *
 }

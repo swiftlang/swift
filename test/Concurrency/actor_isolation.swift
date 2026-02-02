@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/GlobalVariables.swiftmodule -module-name GlobalVariables %S/Inputs/GlobalVariables.swift -target %target-swift-5.1-abi-triple -parse-as-library
 
-// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -verify-ignore-unrelated -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -275,7 +275,7 @@ extension MyActor {
     // expected-note@-1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can not be used 'inout' on a nonisolated actor instance}}
     // expected-error@+3{{actor-isolated property 'mutable' can not be mutated on a nonisolated actor instance}}
-    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}
+    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}{{5-11=}}
     // expected-note@+1{{consider declaring an isolated method on 'MyActor' to perform the mutation}}
     await otherActor.mutable = 0
 
@@ -616,7 +616,7 @@ func testGlobalRestrictions(actor: MyActor) async {
 
   // stored and computed properties can be accessed. Only immutable stored properties can be accessed without 'await'
   _ = actor.immutable
-  _ = await actor.immutable // expected-warning {{no 'async' operations occur within 'await' expression}}
+  _ = await actor.immutable // expected-warning {{no 'async' operations occur within 'await' expression}}{{7-13=}}
   _ = actor.mutable  // expected-error{{actor-isolated property 'mutable' cannot be accessed from outside of the actor}}{{7-7=await }}
   _ = await actor.mutable
   _ = actor.text[0] // expected-error{{actor-isolated property 'text' cannot be accessed from outside of the actor}}{{7-7=await }}
@@ -813,31 +813,29 @@ actor LazyActor {
     lazy var l25: Int = { [unowned self] in self.l }()
 
     nonisolated lazy var l31: Int = { v }()
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l32: Int = v
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
-    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l33: Int = { self.v }()
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l34: Int = self.v
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
-    // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     // expected-warning@-2 {{actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
 
     nonisolated lazy var l41: Int = { l }()
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l42: Int = l
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l43: Int = { self.l }()
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l44: Int = self.l
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
     nonisolated lazy var l45: Int = { [unowned self] in self.l }()
-    // expected-warning@-1 {{'nonisolated' is not supported on lazy properties; this is an error in the Swift 6 language mode}}
+    // expected-warning@-1 {{'nonisolated' cannot be applied to mutable stored properties; this is an error in the Swift 6 language mode}}
 }
 
 // Infer global actors from context only for instance members.
@@ -1207,7 +1205,7 @@ extension MyActor {
     }
 
     acceptAsyncSendableClosureInheriting {
-      _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
+      _ = await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}{{11-17=}}
       counter += 1 // okay
     }
 
@@ -1750,5 +1748,31 @@ actor UserDefinedActorSelfDotMethod {
     let functionRef = Self.actorAffinedFunc // expected-error {{call to actor-isolated instance method 'actorAffinedFunc()' in a synchronous nonisolated context}}
     // error message changes with InferSendabaleFromCaptures - see actor_isolation_swift6.swift
     return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
+  }
+}
+
+func requireSendableInheritContext(@_inheritActorContext _: @Sendable () -> ()) {}
+// expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+
+actor InvalidInheritedActorIsolation {
+  func actorFunction() {} // expected-note {{calls to instance method 'actorFunction()' from outside of its actor context are implicitly asynchronous}}
+
+  func test() {
+    requireSendableInheritContext {
+      self.actorFunction()
+      // expected-error@-1 {{call to actor-isolated instance method 'actorFunction()' in a synchronous nonisolated context}}
+    }
+  }
+}
+
+@MainActor
+class InvalidInheritedGlobalActorIsolation {
+  func mainActorFunction() {} // expected-note {{calls to instance method 'mainActorFunction()' from outside of its actor context are implicitly asynchronous}}
+
+  func test() {
+    requireSendableInheritContext {
+      self.mainActorFunction()
+      // expected-error@-1 {{call to main actor-isolated instance method 'mainActorFunction()' in a synchronous nonisolated context}}
+    }
   }
 }

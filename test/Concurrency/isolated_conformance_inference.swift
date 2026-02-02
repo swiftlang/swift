@@ -92,3 +92,7 @@ class InferMeDefaults {
   var someGlobalActorState: any P2.Type = DifferingConformances.self // expected-error{{global actor 'SomeGlobalActor'-isolated default value in a main actor-isolated context}}
   var bothState: any (P & P2).Type = DifferingConformances.self // expected-error{{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
 }
+
+protocol PDerived: P {}
+
+@MainActor struct ImpliedConformanceInference: PDerived { func f() {} }

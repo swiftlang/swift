@@ -16,7 +16,7 @@ void releaseCxxRefType(CxxRefType *_Nonnull b) {}
 
 @interface Bridge : NSObject
 
-+ (struct CxxRefType *)objCMethodReturningFRTUnannotated;
++ (struct CxxRefType *)objCMethodReturningFRTUnannotated; // expected-note {{annotate 'objCMethodReturningFRTUnannotated()' with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED}}
 + (struct CxxRefType *)objCMethodReturningFRTUnowned
     __attribute__((swift_attr("returns_unretained")));
 + (struct CxxRefType *)objCMethodReturningFRTOwned
@@ -24,7 +24,7 @@ void releaseCxxRefType(CxxRefType *_Nonnull b) {}
 + (struct CxxRefType *)objCMethodReturningFRTBothAnnotations // expected-error {{'objCMethodReturningFRTBothAnnotations' cannot be annotated with both SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED}}
     __attribute__((swift_attr("returns_unretained")))
     __attribute__((swift_attr("returns_retained")));
-+ (struct CxxValType *)objCMethodReturningNonCxxFrtAnannotated // expected-error {{'objCMethodReturningNonCxxFrtAnannotated' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
++ (struct CxxValType *)objCMethodReturningNonCxxFrtAnannotated // expected-warning {{'objCMethodReturningNonCxxFrtAnannotated' should not be annotated with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
     __attribute__((swift_attr("returns_retained")));
 
 @end

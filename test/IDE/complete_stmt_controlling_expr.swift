@@ -413,7 +413,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 
 // WITH_I_INT_LOCAL: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
 
-// WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#_#]{{; name=.+$}}
 
 // WITH_J_INT: Decl[LocalVar]/Local: j[#Int#]{{; name=.+$}}
 
@@ -486,7 +486,7 @@ func testIfLetBinding2(x: FooStruct?) {
 func testIfLetBinding3(x: FooStruct?) {
   if let y = x, let z = y.#^IF_LET_BIND_3?check=FOOSTRUCT_DOT^# {}
 }
-func testIfLetBinding3(x: FooStruct?) {
+func testIfLetBinding4(x: FooStruct?) {
   if let y = x, let z = y#^IF_LET_BIND_4?check=FOOSTRUCT_NODOT^# {}
 }
 func testGuardLetBinding1(x: FooStruct?) {
@@ -504,7 +504,7 @@ func testGuardLetBinding4(x: FooStruct?) {
 func testGuardLetBinding5(x: FooStruct?) {
   guard let y = x, let z = y.#^GUARD_LET_BIND_5?check=FOOSTRUCT_DOT^# else {}
 }
-func testGuardLetBinding5(x: FooStruct?) {
+func testGuardLetBinding6(x: FooStruct?) {
   guard let y = x, z = y#^GUARD_LET_BIND_6?check=FOOSTRUCT_NODOT^# else {}
 }
 func testGuardLetBinding7(x: FooStruct?) {
@@ -513,10 +513,10 @@ func testGuardLetBinding7(x: FooStruct?) {
 func testGuardLetBinding8(_ x: FooStruct?) {
   guard let boundVal = x, let other = testGuardLetBinding8(#^GUARD_LET_BIND_8?check=FOOSTRUCT_LOCALVAL^#) else {}
 }
-func testGuardCase(x:FooStruct?) {
+func testGuardCase1(x:FooStruct?) {
   guard case .#^GUARD_CASE_PATTERN_1?check=OPTIONAL_FOOSTRUCT^# = x {}
 }
-func testGuardCase(x:FooStruct?) {
+func testGuardCase2(x:FooStruct?) {
   guard case .#^GUARD_CASE_PATTERN_2?check=OPTIONAL_FOOSTRUCT^#some() = x {}
 }
 

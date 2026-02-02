@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "sil-cse"
 #include "swift/Basic/Assertions.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeBits.h"
@@ -34,6 +33,8 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
@@ -51,6 +52,11 @@ STATISTIC(NumOpenExtRemoved,
 
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
+
+llvm::cl::opt<bool>
+PrintCSEInternals("print-cse-internals", llvm::cl::init(false),
+                  llvm::cl::desc("Print internal CSE log messages"));
+
 
 using namespace swift;
 
@@ -520,10 +526,7 @@ public:
   }
 
   hash_code visitTypeValueInst(TypeValueInst *X) {
-    OperandValueArrayRef Operands(X->getAllOperands());
-    return llvm::hash_combine(
-        X->getKind(), X->getType(),
-        llvm::hash_combine_range(Operands.begin(), Operands.end()));
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getParamType());
   }
 };
 } // end anonymous namespace
@@ -568,6 +571,13 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
 
     return true;
   }
+  auto *ltvi = dyn_cast<TypeValueInst>(LHSI);
+  auto *rtvi = dyn_cast<TypeValueInst>(RHSI);
+  if (ltvi && rtvi) {
+    if (ltvi->getType() != rtvi->getType())
+      return false;
+    return ltvi->getParamType() == rtvi->getParamType();
+  }
   auto opCmp = [&](const Operand *op1, const Operand *op2) -> bool {
     if (op1 == op2)
       return true;
@@ -577,7 +587,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   };
   bool isEqual =
       LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
-#ifndef NDEBUG
+
   if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
     llvm::dbgs() << "LHS: ";
     LHSI->dump();
@@ -585,9 +595,9 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
     RHSI->dump();
     llvm::dbgs() << "In function:\n";
     LHSI->getFunction()->dump();
-    llvm_unreachable("Mismatched isEqual and getHashValue() function in CSE\n");
+    ABORT("Mismatched isEqual and getHashValue() function in CSE\n");
   }
-#endif
+
   return isEqual;
 }
 
@@ -1059,6 +1069,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
                               << *AvailInst << '\n');
 
+      if (PrintCSEInternals) {
+        llvm::dbgs() << "CSE " << *Inst << "with " << *AvailInst;
+      }
+
       auto *AI = dyn_cast<ApplyInst>(Inst);
       if (AI && isLazyPropertyGetter(AI)) {
         // We do the actual transformation for lazy property getters later. It
@@ -1496,6 +1510,10 @@ class SILCSE : public SILFunctionTransform {
       // Cleanup the dead blocks from the inlined lazy property getters.
       removeUnreachableBlocks(*Fn);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      if (Fn->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), Fn);
+      if (Fn->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), Fn);
     } else if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }

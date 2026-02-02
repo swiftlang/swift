@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Debug -Onone
-// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Release -O
-// RUN: %target-build-swift %s -Xfrontend -disable-access-control -o %t/Assert_Unchecked -Ounchecked
+//
+// With -disable-access-control on, `_StringProcessing._internalInvariant` would shadow `Swift._internalInvariant`
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -disable-implicit-string-processing-module-import -o %t/Assert_Debug -Onone
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -disable-implicit-string-processing-module-import -o %t/Assert_Release -O
+// RUN: %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -disable-implicit-string-processing-module-import -o %t/Assert_Unchecked -Ounchecked
+//
 // RUN: %target-codesign %t/Assert_Debug
 // RUN: %target-codesign %t/Assert_Release
 // RUN: %target-codesign %t/Assert_Unchecked

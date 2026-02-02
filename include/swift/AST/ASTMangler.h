@@ -45,7 +45,7 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
-  const ASTContext &Context;
+  ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -105,6 +105,12 @@ protected:
   /// because lldb wants to find declarations in the modules they're currently
   /// defined in.
   bool RespectOriginallyDefinedIn = true;
+
+  /// Whether to always mangle using the declaration's API, ignoring e.g
+  /// attached `@abi` attributes. This is necessary for USR mangling since for
+  /// semantic functionality we're only concerned about the API entity, and need
+  /// to be able to do name lookups to find the original decl based on the USR.
+  bool UseAPIMangling = false;
 
 public:
   class SymbolicReferent {
@@ -187,18 +193,27 @@ public:
     HasSymbolQuery,
   };
 
-  /// lldb overrides the defaulted argument to 'true'.
-  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
+  /// lldb overrides \p DWARFMangling to 'true'.
+  ASTMangler(ASTContext &Ctx, bool DWARFMangling = false,
+             bool UseAPIMangling = false)
+      : Context(Ctx) {
     if (DWARFMangling) {
-      DWARFMangling = true;
+      this->DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    this->UseAPIMangling = UseAPIMangling;
     Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
                  ? ManglingFlavor::Embedded
                  : ManglingFlavor::Default;
   }
 
-  const ASTContext &getASTContext() { return Context; }
+  /// Create an ASTMangler suitable for mangling a USR for use in semantic
+  /// functionality.
+  static ASTMangler forUSR(ASTContext &Ctx) {
+    return ASTMangler(Ctx, /*DWARFMangling*/ true, /*UseAPIMangling*/ true);
+  }
+
+  ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -246,6 +261,8 @@ public:
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
                                              SymbolKind SKind = SymbolKind::Default);
+  std::string manglePropertyWrappedFieldInitAccessorEntity(
+      const VarDecl *var, SymbolKind SKind = SymbolKind::Default);
   std::string mangleInitFromProjectedValueEntity(const VarDecl *var,
                                                  SymbolKind SKind = SymbolKind::Default);
 
@@ -390,9 +407,8 @@ public:
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
   void appendAnyDecl(const ValueDecl *Decl);
-  std::string mangleAnyDecl(const ValueDecl *Decl, bool prefix,
-                            bool respectOriginallyDefinedIn = false);
-  std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
+  std::string mangleAnyDecl(const ValueDecl *decl, bool addPrefix);
+  std::string mangleDeclWithPrefix(const ValueDecl *decl, StringRef prefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
@@ -722,6 +738,7 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
   void appendBackingInitializerEntity(const VarDecl *var);
+  void appendPropertyWrappedFieldInitAccessorEntity(const VarDecl *var);
   void appendInitFromProjectedValueEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
@@ -788,6 +805,29 @@ protected:
                                     const ValueDecl *forDecl);
 
   void appendLifetimeDependence(LifetimeDependenceInfo info);
+
+  void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
+                                     SmallVectorImpl<InverseRequirement> &inverses,
+                                     Type base) const;
+
+  /// Extracts a list of inverse requirements from a PCT serving as the
+  /// constraint type of an existential.
+  void extractExistentialInverseRequirements(
+      SmallVectorImpl<InverseRequirement> &inverses,
+      ProtocolCompositionType *PCT) const;
+
+  template <typename DeclType>
+  DeclType *getABIDecl(DeclType *D) const {
+    if (!D || UseAPIMangling)
+      return nullptr;
+
+    auto abiRole = ABIRoleInfo(D);
+    if (!abiRole.providesABI())
+      return abiRole.getCounterpart();
+    return nullptr;
+  }
+
+  std::optional<SymbolicReferent> getABIDecl(SymbolicReferent ref) const;
 };
 
 } // end namespace Mangle

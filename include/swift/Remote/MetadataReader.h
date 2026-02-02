@@ -58,19 +58,17 @@ enum class MangledNameKind {
 template <typename T>
 class RemoteRef {
 private:
-  uint64_t Address;
+  RemoteAddress Address;
   const T *LocalBuffer;
 
 public:
-  RemoteRef()
-    : Address(0), LocalBuffer(nullptr) {}
+  RemoteRef() : Address(), LocalBuffer(nullptr) {}
 
   /*implicit*/
   RemoteRef(std::nullptr_t _) : RemoteRef() {}
 
-  template<typename StoredPointer>
-  explicit RemoteRef(StoredPointer address, const T *localBuffer)
-    : Address((uint64_t)address), LocalBuffer(localBuffer) {}
+  explicit RemoteRef(RemoteAddress address, const T *localBuffer)
+      : Address(address), LocalBuffer(localBuffer) {}
 
   // <rdar://99715218> Some versions of clang++ sometimes fail to generate the
   // copy constructor for this type correctly - add a workaround
@@ -83,9 +81,7 @@ public:
     return *this;
   }
 
-  uint64_t getAddressData() const {
-    return Address;
-  }
+  RemoteAddress getRemoteAddress() const { return Address; }
 
   const T *getLocalBuffer() const {
     return LocalBuffer;
@@ -113,23 +109,23 @@ public:
   template<typename U>
   RemoteRef<U> getField(U &field) const {
     auto offset = (intptr_t)&field - (intptr_t)LocalBuffer;
-    return RemoteRef<U>((uint64_t)(Address + (int64_t)offset), &field);
+    return RemoteRef<U>((Address + (int64_t)offset), &field);
   }
   
   /// Resolve the remote address of a relative offset stored at the remote address.
-  uint64_t resolveRelativeAddressData() const {
+  RemoteAddress resolveRelativeAddressData() const {
     int32_t offset;
     memcpy(&offset, LocalBuffer, sizeof(int32_t));
     if (offset == 0)
-      return 0;
+      return RemoteAddress();
     return Address + (int64_t)offset;
   }
-  
-  template<typename U>
-  uint64_t resolveRelativeFieldData(U &field) const {
+
+  template <typename U>
+  RemoteAddress resolveRelativeFieldData(U &field) const {
     return getField(field).resolveRelativeAddressData();
   }
-  
+
   RemoteRef atByteOffset(int64_t Offset) const {
     return RemoteRef(Address + Offset,
                      (const T *)((intptr_t)LocalBuffer + Offset));
@@ -195,10 +191,10 @@ private:
   /// amounts of data when we encounter corrupt values for sizes/counts.
   static const uint64_t MaxMetadataSize = 1048576; // 1MB
 
-  /// The dense map info for a std::pair<StoredPointer, bool>.
+  /// The dense map info for a std::pair<RemoteAddress, bool>.
   struct DenseMapInfoTypeCacheKey {
-    using Pair = std::pair<StoredPointer, bool>;
-    using StoredPointerInfo = llvm::DenseMapInfo<StoredPointer>;
+    using Pair = std::pair<RemoteAddress, bool>;
+    using StoredPointerInfo = llvm::DenseMapInfo<RemoteAddress>;
 
     static inline Pair getEmptyKey() {
       // Since bool doesn't have an empty key implementation, we only use the
@@ -223,7 +219,7 @@ private:
 
   /// A cache of built types, keyed by the address of the type and whether the
   /// request ignored articial superclasses or not.
-  llvm::DenseMap<std::pair<StoredPointer, bool>, BuiltType,
+  llvm::DenseMap<std::pair<RemoteAddress, bool>, BuiltType,
                  DenseMapInfoTypeCacheKey>
       TypeCache;
 
@@ -231,7 +227,7 @@ private:
   using OwnedMetadataRef = MemoryReader::ReadBytesResult;
 
   /// A cache of read type metadata, keyed by the address of the metadata.
-  llvm::DenseMap<StoredPointer, OwnedMetadataRef> MetadataCache;
+  llvm::DenseMap<RemoteAddress, OwnedMetadataRef> MetadataCache;
 
   using ContextDescriptorRef =
       RemoteRef<const TargetContextDescriptor<Runtime>>;
@@ -313,14 +309,14 @@ private:
 
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
-  llvm::DenseMap<StoredPointer, OwnedContextDescriptorRef>
+  llvm::DenseMap<RemoteAddress, OwnedContextDescriptorRef>
       ContextDescriptorCache;
 
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
   /// A cache of read extended existential shape metadata, keyed by the
   /// address of the shape metadata.
-  llvm::DenseMap<StoredPointer, OwnedShapeRef> ShapeCache;
+  llvm::DenseMap<RemoteAddress, OwnedShapeRef> ShapeCache;
 
   enum class IsaEncodingKind {
     /// We haven't checked yet.
@@ -359,8 +355,8 @@ private:
   StoredPointer IsaIndexShift;
   StoredPointer IsaMagicMask;
   StoredPointer IsaMagicValue;
-  StoredPointer IndexedClassesPointer;
-  StoredPointer IndexedClassesCountPointer;
+  RemoteAddress IndexedClassesPointer;
+  RemoteAddress IndexedClassesCountPointer;
   StoredPointer LastIndexedClassesCount = 0;
 
   enum class TaggedPointerEncodingKind {
@@ -389,11 +385,11 @@ private:
   StoredPointer TaggedPointerMask;
   StoredPointer TaggedPointerSlotShift;
   StoredPointer TaggedPointerSlotMask;
-  StoredPointer TaggedPointerClasses;
+  RemoteAddress TaggedPointerClasses;
   StoredPointer TaggedPointerExtendedMask;
   StoredPointer TaggedPointerExtendedSlotShift;
   StoredPointer TaggedPointerExtendedSlotMask;
-  StoredPointer TaggedPointerExtendedClasses;
+  RemoteAddress TaggedPointerExtendedClasses;
   StoredPointer TaggedPointerObfuscator;
 
   Demangle::NodeFactory Factory;
@@ -411,33 +407,32 @@ public:
 
   StoredPointer PtrAuthMask;
 
-  StoredPointer stripSignedPointer(StoredSignedPointer P) {
-    return P.SignedValue & PtrAuthMask;
-  }
-
-  RemoteAbsolutePointer stripSignedPointer(const RemoteAbsolutePointer &P) {
-    if (P.isResolved()) {
-      return RemoteAbsolutePointer("", 
-        P.getResolvedAddress().getAddressData() & PtrAuthMask);
-    }
+  RemoteAddress stripSignedPointer(RemoteAddress P) {
+    // Only pointers in the default address space are signed.
+    if (P.getAddressSpace() == RemoteAddress::DefaultAddressSpace)
+      return P & PtrAuthMask;
     return P;
   }
 
+  RemoteAddress stripSignedPointer(StoredSignedPointer P) {
+    return RemoteAddress(P.SignedValue & PtrAuthMask,
+                         RemoteAddress::DefaultAddressSpace);
+  }
+
+  RemoteAbsolutePointer stripSignedPointer(const RemoteAbsolutePointer &P) {
+    auto Stripped = stripSignedPointer(P.getResolvedAddress());
+    return RemoteAbsolutePointer(P.getSymbol(), P.getOffset(), Stripped);
+  }
+
   StoredPointer queryPtrAuthMask() {
-    StoredPointer QueryResult;
-    if (Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask,
-                                nullptr, &QueryResult)) {
-      return QueryResult;
-    }
-    return ~StoredPointer(0);
+    auto QueryResult = Reader->getPtrAuthMask();
+    return QueryResult.value_or(~StoredPointer(0));
   }
 
   template <class... T>
-  MetadataReader(std::shared_ptr<MemoryReader> reader, T &&... args)
-    : Builder(std::forward<T>(args)...),
-      Reader(std::move(reader)),
-      PtrAuthMask(queryPtrAuthMask()) {
-  }
+  MetadataReader(std::shared_ptr<MemoryReader> reader, T &&...args)
+      : Builder(std::forward<T>(args)...), Reader(std::move(reader)),
+        PtrAuthMask(queryPtrAuthMask()) {}
 
   MetadataReader(const MetadataReader &other) = delete;
   MetadataReader &operator=(const MetadataReader &other) = delete;
@@ -462,19 +457,21 @@ public:
         swift::Demangle::NodePointer {
       // Resolve the reference to a remote address.
       auto offsetInMangledName =
-            (const char *)base - mangledName.getLocalBuffer();
-      auto remoteAddress =
-        mangledName.getAddressData() + offsetInMangledName + offset;
+          (const char *)base - mangledName.getLocalBuffer();
+      auto offsetAddress = mangledName.getRemoteAddress() + offsetInMangledName;
 
       RemoteAbsolutePointer resolved;
       if (directness == Directness::Indirect) {
+        auto remoteAddress = Reader->resolveIndirectAddressAtOffset(
+            offsetAddress, offset, /*directnessEncodedInOffset=*/false);
         if (auto indirectAddress = readPointer(remoteAddress)) {
           resolved = stripSignedPointer(*indirectAddress);
         } else {
           return nullptr;
         }
       } else {
-        resolved = Reader->getSymbol(RemoteAddress(remoteAddress));
+        auto remoteAddress = offsetAddress + offset;
+        resolved = Reader->getSymbol(remoteAddress);
       }
 
       switch (kind) {
@@ -485,12 +482,13 @@ public:
         // Try to preserve a reference to an OpaqueTypeDescriptor
         // symbolically, since we'd like to read out and resolve the type ref
         // to the underlying type if available.
-        if (useOpaqueTypeSymbolicReferences
-           && context.isResolved()
-           && context.getResolved()->getKind() == ContextDescriptorKind::OpaqueType){
+        if (useOpaqueTypeSymbolicReferences && context.isResolved() &&
+            context.getResolved()->getKind() ==
+                ContextDescriptorKind::OpaqueType) {
           return dem.createNode(
-                            Node::Kind::OpaqueTypeDescriptorSymbolicReference,
-                            context.getResolved().getAddressData());
+              Node::Kind::OpaqueTypeDescriptorSymbolicReference,
+              context.getResolved().getRemoteAddress().getRawAddress(),
+              context.getResolved().getRemoteAddress().getAddressSpace());
         }
 
         return buildContextMangling(context, dem);
@@ -504,43 +502,28 @@ public:
         // The symbolic reference points at a unique extended
         // existential type shape.
         return dem.createNode(
-                          Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference,
-                          resolved.getResolvedAddress().getAddressData());
+            Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference,
+            resolved.getResolvedAddress().getRawAddress(),
+            resolved.getResolvedAddress().getAddressSpace());
       }
       case Demangle::SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape: {
         // The symbolic reference points at a non-unique extended
         // existential type shape.
         return dem.createNode(
-                          Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
-                          resolved.getResolvedAddress().getAddressData());
+            Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
+            resolved.getResolvedAddress().getRawAddress(),
+            resolved.getResolvedAddress().getAddressSpace());
       }
       case Demangle::SymbolicReferenceKind::ObjectiveCProtocol: {
         // 'resolved' points to a struct of two relative addresses.
         // The second entry is a relative address to the mangled protocol
         // without symbolic references.
 
-        // lldb might return an unresolved remote absolute pointer from its
-        // resolvePointerAsSymbol implementation -- workaround this.
-        if (!resolved.isResolved()) {
-          auto remoteAddr = RemoteAddress(remoteAddress);
-          resolved =
-            RemoteAbsolutePointer("", remoteAddr.getAddressData());
-        }
-
-        auto addr =
-            resolved.getResolvedAddress().getAddressData() + sizeof(int32_t);
+        auto addr = resolved.getResolvedAddress() + sizeof(int32_t);
         int32_t offset;
-        Reader->readInteger(RemoteAddress(addr), &offset);
+        Reader->readInteger(addr, &offset);
         auto addrOfTypeRef = addr + offset;
-        resolved = Reader->getSymbol(RemoteAddress(addrOfTypeRef));
-
-        // lldb might return an unresolved remote absolute pointer from its
-        // resolvePointerAsSymbol implementation -- workaround this.
-        if (!resolved.isResolved()) {
-          auto remoteAddr = RemoteAddress(addrOfTypeRef);
-          resolved =
-            RemoteAbsolutePointer("", remoteAddr.getAddressData());
-        }
+        resolved = Reader->getSymbol(addrOfTypeRef);
 
         // Dig out the protocol from the protocol list.
         auto protocolList = readMangledName(resolved.getResolvedAddress(),
@@ -594,10 +577,9 @@ public:
   /// Demangle a mangled name from a potentially temporary std::string. The
   /// demangler may produce pointers into the string data, so this copies the
   /// string into the demangler's allocation first.
-  Demangle::NodePointer demangle(uint64_t remoteAddress,
+  Demangle::NodePointer demangle(RemoteAddress remoteAddress,
                                  const std::string &mangledName,
-                                 MangledNameKind kind,
-                                 Demangler &dem) {
+                                 MangledNameKind kind, Demangler &dem) {
     StringRef mangledNameCopy = dem.copyString(mangledName);
     return demangle(RemoteRef<char>(remoteAddress, mangledNameCopy.data()),
                     kind, dem);
@@ -625,7 +607,7 @@ public:
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
   std::optional<MetadataKind>
-  readKindFromMetadata(StoredPointer MetadataAddress) {
+  readKindFromMetadata(RemoteAddress MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta)
       return std::nullopt;
@@ -634,11 +616,10 @@ public:
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  StoredPointer
-  readSuperClassFromClassMetadata(StoredPointer MetadataAddress) {
+  RemoteAddress readSuperClassFromClassMetadata(RemoteAddress MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
-      return StoredPointer();
+      return RemoteAddress();
 
     auto classMeta = cast<TargetClassMetadata>(meta);
     return stripSignedPointer(classMeta->Superclass);
@@ -647,7 +628,7 @@ public:
   /// Given a remote pointer to class metadata, attempt to discover its class
   /// instance size and whether fields should use the resilient layout strategy.
   std::optional<unsigned>
-  readInstanceStartFromClassMetadata(StoredPointer MetadataAddress) {
+  readInstanceStartFromClassMetadata(RemoteAddress MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::Class)
       return std::nullopt;
@@ -656,7 +637,7 @@ public:
       // The following algorithm only works on the non-fragile Apple runtime.
 
       // Grab the RO-data pointer.  This part is not ABI.
-      StoredPointer roDataPtr = readObjCRODataPtr(MetadataAddress);
+      RemoteAddress roDataPtr = readObjCRODataPtr(MetadataAddress);
       if (!roDataPtr)
         return std::nullopt;
 
@@ -664,7 +645,7 @@ public:
       auto address = roDataPtr + sizeof(uint32_t) * 1;
 
       unsigned start;
-      if (!Reader->readInteger(RemoteAddress(address), &start))
+      if (!Reader->readInteger(address, &start))
         return std::nullopt;
 
       return start;
@@ -694,19 +675,19 @@ public:
   /// witness table. Note that it's not safe to access any non-mandatory
   /// members of the value witness table, like extra inhabitants or enum members.
   std::optional<TargetValueWitnessTable<Runtime>>
-  readValueWitnessTable(StoredPointer MetadataAddress) {
+  readValueWitnessTable(RemoteAddress MetadataAddress) {
     // The value witness table pointer is at offset -1 from the metadata
     // pointer, that is, the pointer-sized word immediately before the
     // pointer's referenced address.
     TargetValueWitnessTable<Runtime> VWT;
     auto ValueWitnessTableAddrAddr = MetadataAddress - sizeof(StoredPointer);
     StoredSignedPointer SignedValueWitnessTableAddr;
-    if (!Reader->readInteger(RemoteAddress(ValueWitnessTableAddrAddr),
+    if (!Reader->readInteger(ValueWitnessTableAddrAddr,
                              &SignedValueWitnessTableAddr))
       return std::nullopt;
-    auto ValueWitnessTableAddr = stripSignedPointer(SignedValueWitnessTableAddr);
-    if (!Reader->readBytes(RemoteAddress(ValueWitnessTableAddr),
-                           (uint8_t *)&VWT, sizeof(VWT)))
+    auto ValueWitnessTableAddr =
+        stripSignedPointer(SignedValueWitnessTableAddr);
+    if (!Reader->readBytes(ValueWitnessTableAddr, (uint8_t *)&VWT, sizeof(VWT)))
       return std::nullopt;
     return VWT;
   }
@@ -718,8 +699,7 @@ public:
   std::optional<RemoteExistential>
   readMetadataAndValueErrorExistential(RemoteAddress ExistentialAddress) {
     // An pointer to an error existential is always an heap object.
-    auto MetadataAddress =
-        readMetadataFromInstance(ExistentialAddress.getAddressData());
+    auto MetadataAddress = readMetadataFromInstance(ExistentialAddress);
     if (!MetadataAddress)
       return std::nullopt;
 
@@ -748,18 +728,15 @@ public:
 
     if (isBridged) {
       // NSError instances don't need to be unwrapped.
-      return RemoteExistential(RemoteAddress(*MetadataAddress),
-                               ExistentialAddress,
-                               isBridged);
+      return RemoteExistential(*MetadataAddress, ExistentialAddress, isBridged);
     }
 
     // In addition to the isa pointer and two 32-bit reference counts, if the
     // error existential is layout-compatible with NSError, we also need to
     // skip over its three word-sized fields: the error code, the domain,
     // and userInfo.
-    StoredPointer InstanceMetadataAddressAddress =
-        ExistentialAddress.getAddressData() +
-        (isObjC ? 5 : 2) * sizeof(StoredPointer);
+    RemoteAddress InstanceMetadataAddressAddress =
+        ExistentialAddress + (isObjC ? 5 : 2) * sizeof(StoredPointer);
 
     // We need to get the instance's alignment info so we can get the exact
     // offset of the start of its data in the class.
@@ -775,7 +752,7 @@ public:
 
     // Now we need to skip over the instance metadata pointer and instance's
     // conformance pointer for Swift.Error.
-    StoredPointer InstanceAddress =
+    RemoteAddress InstanceAddress =
         InstanceMetadataAddressAddress + 2 * sizeof(StoredPointer);
 
     // When built with Objective-C interop, the runtime also stores a conformance
@@ -788,10 +765,8 @@ public:
     auto AlignmentMask = VWT->getAlignmentMask();
     InstanceAddress = (InstanceAddress + AlignmentMask) & ~AlignmentMask;
 
-    return RemoteExistential(
-        RemoteAddress(*InstanceMetadataAddress),
-        RemoteAddress(InstanceAddress),
-        isBridged);
+    return RemoteExistential(*InstanceMetadataAddress, InstanceAddress,
+                             isBridged);
   }
 
   /// Given a known-opaque existential, attempt to discover the pointer to its
@@ -801,10 +776,11 @@ public:
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
     TargetOpaqueExistentialContainer<Runtime> Container;
-    if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
-                           (uint8_t *)&Container, sizeof(Container)))
+    if (!Reader->readBytes(ExistentialAddress, (uint8_t *)&Container,
+                           sizeof(Container)))
       return std::nullopt;
-    auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
+    auto MetadataAddress =
+        RemoteAddress(Container.Type, ExistentialAddress.getAddressSpace());
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
       return std::nullopt;
@@ -816,20 +792,19 @@ public:
     // Inline representation (the value fits in the existential container).
     // So, the value starts at the first word of the container.
     if (VWT->isValueInline())
-      return RemoteExistential(RemoteAddress(MetadataAddress),
-                               ExistentialAddress);
+      return RemoteExistential(MetadataAddress, ExistentialAddress);
 
     // Non-inline (box'ed) representation.
     // The first word of the container stores the address to the box.
-    StoredPointer BoxAddress;
-    if (!Reader->readInteger(ExistentialAddress, &BoxAddress))
+    RemoteAddress BoxAddress;
+    if (!Reader->template readRemoteAddress<StoredPointer>(ExistentialAddress,
+                                                           BoxAddress))
       return std::nullopt;
 
     auto AlignmentMask = VWT->getAlignmentMask();
     auto Offset = (sizeof(HeapObject) + AlignmentMask) & ~AlignmentMask;
     auto StartOfValue = BoxAddress + Offset;
-    return RemoteExistential(RemoteAddress(MetadataAddress),
-                             RemoteAddress(StartOfValue));
+    return RemoteExistential(MetadataAddress, StartOfValue);
   }
 
   /// Given a known-opaque existential, discover if its value is inlined in
@@ -839,10 +814,12 @@ public:
     // OpaqueExistentialContainer is the layout of an opaque existential.
     // `Type` is the pointer to the metadata.
     TargetOpaqueExistentialContainer<Runtime> Container;
-    if (!Reader->readBytes(RemoteAddress(ExistentialAddress),
-                           (uint8_t *)&Container, sizeof(Container)))
+    if (!Reader->readBytes(ExistentialAddress, (uint8_t *)&Container,
+                           sizeof(Container)))
       return std::nullopt;
-    auto MetadataAddress = static_cast<StoredPointer>(Container.Type);
+    auto MetadataAddress =
+        RemoteAddress(Container.Type, ExistentialAddress.getAddressSpace());
+
     auto Metadata = readMetadata(MetadataAddress);
     if (!Metadata)
       return std::nullopt;
@@ -855,11 +832,10 @@ public:
   }
 
   /// Read a protocol from a reference to said protocol.
-  template<typename Resolver>
+  template <typename Resolver>
   typename Resolver::Result readProtocol(
-      const TargetProtocolDescriptorRef<Runtime> &ProtocolAddress,
-      Demangler &dem,
-      Resolver resolver) {
+      const RemoteTargetProtocolDescriptorRef<Runtime> &ProtocolAddress,
+      Demangler &dem, Resolver resolver) {
 #if SWIFT_OBJC_INTEROP
     if (Runtime::ObjCInterop) {
       // Check whether we have an Objective-C protocol.
@@ -895,8 +871,7 @@ public:
 #endif
 
     // Swift-native protocol.
-    auto Demangled =
-      readDemanglingForContextDescriptor(
+    auto Demangled = readDemanglingForContextDescriptor(
         stripSignedPointer({ProtocolAddress.getSwiftProtocol()}), dem);
     if (!Demangled)
       return resolver.failure();
@@ -904,12 +879,79 @@ public:
     return resolver.swiftProtocol(Demangled);
   }
 
+  BuiltType readTypeFromShape(
+      RemoteAbsolutePointer shapeAddress,
+      std::function<std::optional<std::vector<BuiltType>>(unsigned)> getArgs) {
+    RemoteAddress addr = shapeAddress.getResolvedAddress();
+    ShapeRef Shape = readShape(addr);
+    if (!Shape)
+      return BuiltType();
+
+    assert(Shape->hasGeneralizationSignature());
+
+    // Pull out the existential type from the mangled type name.
+    Demangler dem;
+    auto mangledExistentialAddr =
+        resolveRelativeField(Shape, Shape->ExistentialType);
+    auto node =
+        readMangledName(mangledExistentialAddr, MangledNameKind::Type, dem);
+    if (!node)
+      return BuiltType();
+
+    BuiltType builtProto = decodeMangledType(node).getType();
+    if (!builtProto)
+      return BuiltType();
+
+    if (auto builtArgs = getArgs(Shape->getGenSigArgumentLayoutSizeInWords())) {
+      // Build up a substitution map for the generalized signature.
+      BuiltGenericSignature sig =
+          decodeRuntimeGenericSignature(Shape,
+                                        Shape->getGeneralizationSignature())
+              .getType();
+      if (!sig)
+        return BuiltType();
+
+      BuiltSubstitutionMap subst =
+          Builder.createSubstitutionMap(sig, *builtArgs);
+      if (subst.empty())
+        return BuiltType();
+
+      builtProto = Builder.subst(builtProto, subst);
+      if (!builtProto)
+        return BuiltType();
+    }
+
+    // Read the type expression to build up any remaining layers of
+    // existential metatype.
+    if (Shape->Flags.hasTypeExpression()) {
+      Demangler dem;
+
+      // Read the mangled name.
+      auto mangledContextName = Shape->getTypeExpression();
+      auto mangledNameAddress =
+          resolveRelativeField(Shape, mangledContextName->name);
+      auto node =
+          readMangledName(mangledNameAddress, MangledNameKind::Type, dem);
+      if (!node)
+        return BuiltType();
+
+      while (node->getKind() == Demangle::Node::Kind::Type &&
+             node->hasChildren() &&
+             node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
+             node->getChild(0)->getNumChildren()) {
+        builtProto = Builder.createExistentialMetatypeType(builtProto);
+        node = node->getChild(0)->getChild(0);
+      }
+    }
+    return builtProto;
+  }
+
   /// Given a remote pointer to metadata, attempt to turn it into a type.
   BuiltType
-  readTypeFromMetadata(StoredPointer MetadataAddress,
+  readTypeFromMetadata(RemoteAddress MetadataAddress,
                        bool skipArtificialSubclasses = false,
                        int recursion_limit = defaultTypeRecursionLimit) {
-    std::pair<StoredPointer, bool> TypeCacheKey(MetadataAddress,
+    std::pair<RemoteAddress, bool> TypeCacheKey(MetadataAddress,
                                                 skipArtificialSubclasses);
     auto Cached = TypeCache.find(TypeCacheKey);
     if (Cached != TypeCache.end())
@@ -952,17 +994,20 @@ public:
 
       for (unsigned i = 0, n = tupleMeta->NumElements; i != n; ++i) {
         auto &element = tupleMeta->getElement(i);
-        if (auto elementType =
-                readTypeFromMetadata(element.Type, false, recursion_limit))
+        auto elementTypeAddress =
+            RemoteAddress(element.Type, MetadataAddress.getAddressSpace());
+        if (auto elementType = readTypeFromMetadata(elementTypeAddress, false,
+                                                    recursion_limit))
           elementTypes.push_back(elementType);
         else
           return BuiltType();
       }
 
       // Read the labels string.
+      auto labelAddress =
+          RemoteAddress(tupleMeta->Labels, MetadataAddress.getAddressSpace());
       std::string labelStr;
-      if (tupleMeta->Labels &&
-          !Reader->readString(RemoteAddress(tupleMeta->Labels), labelStr))
+      if (labelAddress && !Reader->readString(labelAddress, labelStr))
         return BuiltType();
 
       std::vector<llvm::StringRef> labels;
@@ -988,8 +1033,10 @@ public:
 
       std::vector<FunctionParam<BuiltType>> Parameters;
       for (unsigned i = 0, n = Function->getNumParameters(); i != n; ++i) {
-        auto ParamTypeRef = readTypeFromMetadata(Function->getParameter(i),
-                                                 false, recursion_limit);
+        auto paramAddress = RemoteAddress(Function->getParameter(i),
+                                          MetadataAddress.getAddressSpace());
+        auto ParamTypeRef =
+            readTypeFromMetadata(paramAddress, false, recursion_limit);
         if (!ParamTypeRef)
           return BuiltType();
 
@@ -999,8 +1046,10 @@ public:
         Parameters.push_back(std::move(Param));
       }
 
+      auto resultTypeAddress = RemoteAddress(Function->ResultType,
+                                             MetadataAddress.getAddressSpace());
       auto Result =
-          readTypeFromMetadata(Function->ResultType, false, recursion_limit);
+          readTypeFromMetadata(resultTypeAddress, false, recursion_limit);
       if (!Result)
         return BuiltType();
 
@@ -1012,8 +1061,10 @@ public:
 
       BuiltType globalActor = BuiltType();
       if (Function->hasGlobalActor()) {
-        globalActor = readTypeFromMetadata(Function->getGlobalActor(), false,
-                                           recursion_limit);
+        auto globalActorAddress = RemoteAddress(
+            Function->getGlobalActor(), MetadataAddress.getAddressSpace());
+        globalActor =
+            readTypeFromMetadata(globalActorAddress, false, recursion_limit);
         if (!globalActor)
           return BuiltType();
       }
@@ -1035,8 +1086,10 @@ public:
 
       BuiltType thrownError = BuiltType();
       if (Function->hasThrownError()) {
-        thrownError = readTypeFromMetadata(Function->getThrownError(), false,
-                                           recursion_limit);
+        auto thrownErrorAddress = RemoteAddress(
+            Function->getThrownError(), MetadataAddress.getAddressSpace());
+        thrownError =
+            readTypeFromMetadata(thrownErrorAddress, false, recursion_limit);
         if (!thrownError)
           return BuiltType();
       }
@@ -1055,9 +1108,12 @@ public:
 
       BuiltType SuperclassType = BuiltType();
       if (Exist->Flags.hasSuperclassConstraint()) {
+        auto superclassContraintAddress =
+            RemoteAddress(Exist->getSuperclassConstraint(),
+                          MetadataAddress.getAddressSpace());
         // The superclass is stored after the list of protocols.
-        SuperclassType = readTypeFromMetadata(Exist->getSuperclassConstraint(),
-                                              false, recursion_limit);
+        SuperclassType = readTypeFromMetadata(superclassContraintAddress, false,
+                                              recursion_limit);
         if (!SuperclassType) return BuiltType();
 
         HasExplicitAnyObject = true;
@@ -1087,7 +1143,10 @@ public:
       Demangler dem;
       std::vector<BuiltProtocolDecl> Protocols;
       for (auto ProtocolAddress : Exist->getProtocols()) {
-        if (auto Protocol = readProtocol(ProtocolAddress, dem, resolver))
+        auto ProtocolRef = RemoteTargetProtocolDescriptorRef<Runtime>(
+            RemoteAddress(ProtocolAddress.getRawData(),
+                          MetadataAddress.getAddressSpace()));
+        if (auto Protocol = readProtocol(ProtocolRef, dem, resolver))
           Protocols.push_back(Protocol);
         else
           return BuiltType();
@@ -1099,87 +1158,37 @@ public:
     }
     case MetadataKind::ExtendedExistential: {
       auto Exist = cast<TargetExtendedExistentialTypeMetadata<Runtime>>(Meta);
-
       // Read the shape for this existential.
-      StoredPointer shapeAddress = stripSignedPointer(Exist->Shape);
-      ShapeRef Shape = readShape(shapeAddress);
-      if (!Shape)
-        return BuiltType();
 
-      const unsigned shapeArgumentCount
-          = Shape->getGenSigArgumentLayoutSizeInWords();
-      // Pull out the arguments to the generalization signature.
-      assert(Shape->hasGeneralizationSignature());
-      std::vector<BuiltType> builtArgs;
-      for (unsigned i = 0; i < shapeArgumentCount; ++i) {
-        auto remoteArg = Exist->getGeneralizationArguments()[i];
-        auto builtArg = readTypeFromMetadata(remoteArg, false, recursion_limit);
-        if (!builtArg)
-          return BuiltType();
-        builtArgs.push_back(builtArg);
-      }
-
-      // Pull out the existential type from the mangled type name.
-      Demangler dem;
-      auto mangledExistentialAddr =
-          resolveRelativeField(Shape, Shape->ExistentialType);
-      auto node = readMangledName(RemoteAddress(mangledExistentialAddr),
-                                  MangledNameKind::Type, dem);
-      if (!node)
-        return BuiltType();
-
-      BuiltType builtProto = decodeMangledType(node).getType();
-      if (!builtProto)
-        return BuiltType();
-
-      // Build up a substitution map for the generalized signature.
-      BuiltGenericSignature sig =
-          decodeRuntimeGenericSignature(Shape,
-                                        Shape->getGeneralizationSignature())
-              .getType();
-      if (!sig)
-        return BuiltType();
-
-      BuiltSubstitutionMap subst =
-          Builder.createSubstitutionMap(sig, builtArgs);
-      if (subst.empty())
-        return BuiltType();
-
-      builtProto = Builder.subst(builtProto, subst);
-      if (!builtProto)
-        return BuiltType();
-
-      // Read the type expression to build up any remaining layers of
-      // existential metatype.
-      if (Shape->Flags.hasTypeExpression()) {
-        Demangler dem;
-
-        // Read the mangled name.
-        auto mangledContextName = Shape->getTypeExpression();
-        auto mangledNameAddress =
-            resolveRelativeField(Shape, mangledContextName->name);
-        auto node = readMangledName(RemoteAddress(mangledNameAddress),
-                                    MangledNameKind::Type, dem);
-        if (!node)
-          return BuiltType();
-
-        while (node->getKind() == Demangle::Node::Kind::Type &&
-               node->getNumChildren() &&
-               node->getChild(0)->getKind() == Demangle::Node::Kind::Metatype &&
-               node->getChild(0)->getNumChildren()) {
-          builtProto = Builder.createExistentialMetatypeType(builtProto);
-          node = node->getChild(0)->getChild(0);
-        }
-      }
-
+      RemoteAddress shapeAddress = stripSignedPointer(Exist->Shape);
+      auto builtProto = readTypeFromShape(
+          RemoteAddress(shapeAddress),
+          [&](unsigned shapeArgumentCount)
+              -> std::optional<std::vector<BuiltType>> {
+            // Pull out the arguments to the generalization signature.
+            std::vector<BuiltType> builtArgs;
+            for (unsigned i = 0; i < shapeArgumentCount; ++i) {
+              auto remoteArg = Exist->getGeneralizationArguments()[i];
+              auto builtArg = readTypeFromMetadata(
+                  remote::RemoteAddress(remoteArg,
+                                        shapeAddress.getAddressSpace()),
+                  false, recursion_limit);
+              if (!builtArg)
+                return std::nullopt;
+              builtArgs.push_back(builtArg);
+            }
+            return builtArgs;
+          });
       TypeCache[TypeCacheKey] = builtProto;
       return builtProto;
     }
 
     case MetadataKind::Metatype: {
       auto Metatype = cast<TargetMetatypeMetadata<Runtime>>(Meta);
+      auto InstanceTypeAddress = RemoteAddress(
+          Metatype->InstanceType, MetadataAddress.getAddressSpace());
       auto Instance =
-          readTypeFromMetadata(Metatype->InstanceType, false, recursion_limit);
+          readTypeFromMetadata(InstanceTypeAddress, false, recursion_limit);
       if (!Instance) return BuiltType();
       auto BuiltMetatype = Builder.createMetatypeType(Instance);
       TypeCache[TypeCacheKey] = BuiltMetatype;
@@ -1187,7 +1196,8 @@ public:
     }
     case MetadataKind::ObjCClassWrapper: {
       auto objcWrapper = cast<TargetObjCClassWrapperMetadata<Runtime>>(Meta);
-      auto classAddress = objcWrapper->Class;
+      auto classAddress =
+          RemoteAddress(objcWrapper->Class, MetadataAddress.getAddressSpace());
 
       std::string className;
       if (!readObjCClassName(classAddress, className))
@@ -1199,8 +1209,10 @@ public:
     }
     case MetadataKind::ExistentialMetatype: {
       auto Exist = cast<TargetExistentialMetatypeMetadata<Runtime>>(Meta);
+      auto classAddress =
+          RemoteAddress(Exist->InstanceType, MetadataAddress.getAddressSpace());
       auto Instance =
-          readTypeFromMetadata(Exist->InstanceType, false, recursion_limit);
+          readTypeFromMetadata(classAddress, false, recursion_limit);
       if (!Instance) return BuiltType();
       auto BuiltExist = Builder.createExistentialMetatypeType(Instance);
       TypeCache[TypeCacheKey] = BuiltExist;
@@ -1281,8 +1293,13 @@ public:
       switch (req.Flags.getKind()) {
       case GenericRequirementKind::SameType: {
         Demangler rdem;
+        // FIXME: This should not work since the mangled name pointer is on the
+        // local process.
+        auto mangledNameAddress =
+            RemoteAddress((uint64_t)req.getMangledTypeName().data(),
+                          RemoteAddress::DefaultAddressSpace);
         auto demangledConstraint =
-            demangle(RemoteRef<char>(req.getMangledTypeName().data(),
+            demangle(RemoteRef<char>(mangledNameAddress,
                                      req.getMangledTypeName().data()),
                      MangledNameKind::Type, rdem);
         auto constraintType = decodeMangledType(demangledConstraint);
@@ -1323,7 +1340,9 @@ public:
         Demangler dem;
         auto protocolAddress =
             resolveRelativeIndirectProtocol(contextRef, req.Protocol);
-        auto protocol = readProtocol(protocolAddress, dem, resolver);
+        auto protocolRef =
+            RemoteTargetProtocolDescriptorRef<Runtime>(protocolAddress);
+        auto protocol = readProtocol(protocolRef, dem, resolver);
         if (!protocol) {
           return TypeLookupError("Failed to read protocol type in conformance "
                                  "requirement of runtime generic signature.");
@@ -1335,8 +1354,13 @@ public:
       }
       case GenericRequirementKind::BaseClass: {
         Demangler rdem;
+        // FIXME: This should not work since the mangled name pointer is on the
+        // local process.
+        auto mangledNameAddress =
+            RemoteAddress((uint64_t)req.getMangledTypeName().data(),
+                          RemoteAddress::DefaultAddressSpace);
         auto demangledConstraint =
-            demangle(RemoteRef<char>(req.getMangledTypeName().data(),
+            demangle(RemoteRef<char>(mangledNameAddress,
                                      req.getMangledTypeName().data()),
                      MangledNameKind::Type, rdem);
         auto constraintType = decodeMangledType(demangledConstraint);
@@ -1379,90 +1403,84 @@ public:
   ParentContextDescriptorRef
   readContextDescriptor(const RemoteAbsolutePointer &address) {
     // Map an unresolved pointer to an unresolved context ref.
-    if (!address.isResolved()) {
+    if (!address.getSymbol().empty()) {
       // We can only handle references to a symbol without an offset currently.
-      if (address.getOffset() != 0) {
-        return ParentContextDescriptorRef();
-      }
-      return ParentContextDescriptorRef(address.getSymbol());
+      if (address.getOffset() == 0)
+        return ParentContextDescriptorRef(address.getSymbol());
     }
-    
+
     return ParentContextDescriptorRef(
-          readContextDescriptor(address.getResolvedAddress().getAddressData()));
+        readContextDescriptor(address.getResolvedAddress()));
   }
 
-  ShapeRef
-  readShape(StoredPointer address) {
-    if (address == 0)
+  ShapeRef readShape(RemoteAddress address) {
+    if (!address)
       return nullptr;
 
+    using ShapeHeader = TargetExtendedExistentialTypeShape<Runtime>;
     auto cached = ShapeCache.find(address);
     if (cached != ShapeCache.end())
-      return ShapeRef(address,
-        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
-            cached->second.get()));
+      return ShapeRef(
+          address, reinterpret_cast<const ShapeHeader *>(cached->second.get()));
 
     ExtendedExistentialTypeShapeFlags flags;
-    if (!Reader->readBytes(RemoteAddress(address), (uint8_t*)&flags,
-                           sizeof(flags)))
+    if (!Reader->readBytes(address, (uint8_t *)&flags, sizeof(flags)))
       return nullptr;
 
     // Read the size of the requirement signature.
-    uint64_t reqSigGenericSize = 0;
-    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    uint64_t descriptorSize;
     {
-      GenericContextDescriptorHeader header;
-      auto headerAddr = address + sizeof(flags);
-
-      if (!Reader->readBytes(RemoteAddress(headerAddr),
-                             (uint8_t*)&header, sizeof(header)))
+      auto readResult =
+          Reader->readBytes(RemoteAddress(address), sizeof(ShapeHeader));
+      if (!readResult)
         return nullptr;
+      auto shapeHeader =
+          reinterpret_cast<const ShapeHeader *>(readResult.get());
 
-      reqSigGenericSize = reqSigGenericSize
-        + (header.NumParams + 3u & ~3u)
-        + header.NumRequirements
-          * sizeof(TargetGenericRequirementDescriptor<Runtime>);
+      // Read the size of the requirement signature.
+      uint64_t reqSigGenericSize = 0;
+      auto flags = shapeHeader->Flags;
+      auto &reqSigHeader = shapeHeader->ReqSigHeader;
+      reqSigGenericSize =
+          reqSigGenericSize + (reqSigHeader.NumParams + 3u & ~3u) +
+          reqSigHeader.NumRequirements *
+              sizeof(TargetGenericRequirementDescriptor<Runtime>);
+      uint64_t typeExprSize =
+          flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
+      uint64_t suggestedVWSize =
+          flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
+
+      descriptorSize = sizeof(shapeHeader) + typeExprSize + suggestedVWSize +
+                       reqSigGenericSize;
     }
-    uint64_t typeExprSize = flags.hasTypeExpression() ? sizeof(StoredPointer) : 0;
-    uint64_t suggestedVWSize = flags.hasSuggestedValueWitnesses() ? sizeof(StoredPointer) : 0;
-
-    uint64_t size = sizeof(ExtendedExistentialTypeShapeFlags) +
-                    sizeof(TargetRelativeDirectPointer<Runtime, const char,
-                                                       /*nullable*/ false>) +
-                    genericHeaderSize + typeExprSize + suggestedVWSize +
-                    reqSigGenericSize;
-    if (size > MaxMetadataSize)
+    if (descriptorSize > MaxMetadataSize)
       return nullptr;
-    auto readResult = Reader->readBytes(RemoteAddress(address), size);
+    auto readResult = Reader->readBytes(RemoteAddress(address), descriptorSize);
     if (!readResult)
       return nullptr;
 
-    auto descriptor =
-        reinterpret_cast<const TargetExtendedExistentialTypeShape<Runtime> *>(
-            readResult.get());
+    auto descriptor = reinterpret_cast<const ShapeHeader *>(readResult.get());
 
-    ShapeCache.insert(
-        std::make_pair(address, std::move(readResult)));
+    ShapeCache.insert(std::make_pair(address, std::move(readResult)));
     return ShapeRef(address, descriptor);
   }
 
   /// Given the address of a context descriptor, attempt to read it.
-  ContextDescriptorRef
-  readContextDescriptor(StoredPointer address) {
-    if (address == 0)
+  ContextDescriptorRef readContextDescriptor(RemoteAddress remoteAddress) {
+    if (!remoteAddress)
       return nullptr;
 
-    auto remoteAddress = RemoteAddress(address);
     auto ptr = Reader->readBytes(remoteAddress,
                                  sizeof(TargetContextDescriptor<Runtime>));
     if (!ptr)
       return nullptr;
 
-    auto cached = ContextDescriptorCache.find(address);
+    auto cached = ContextDescriptorCache.find(remoteAddress);
     if (cached != ContextDescriptorCache.end())
       return ContextDescriptorRef(
-          address, reinterpret_cast<const TargetContextDescriptor<Runtime> *>(
-                       cached->second.get()));
+          remoteAddress,
+          reinterpret_cast<const TargetContextDescriptor<Runtime> *>(
+              cached->second.get()));
 
     bool success = false;
     switch (
@@ -1475,33 +1493,33 @@ public:
       break;
     case ContextDescriptorKind::Extension:
       success =
-          readFullContextDescriptor<TargetExtensionContextDescriptor<Runtime>>(
-              remoteAddress, ptr);
+          readFullTrailingObjects<TargetExtensionContextDescriptor<Runtime>>(
+              remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Anonymous:
       success =
-          readFullContextDescriptor<TargetAnonymousContextDescriptor<Runtime>>(
-              remoteAddress, ptr);
+          readFullTrailingObjects<TargetAnonymousContextDescriptor<Runtime>>(
+              remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Class:
-      success = readFullContextDescriptor<TargetClassDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetClassDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Enum:
-      success = readFullContextDescriptor<TargetEnumDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetEnumDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Struct:
-      success = readFullContextDescriptor<TargetStructDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetStructDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::Protocol:
-      success = readFullContextDescriptor<TargetProtocolDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetProtocolDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     case ContextDescriptorKind::OpaqueType:
-      success = readFullContextDescriptor<TargetOpaqueTypeDescriptor<Runtime>>(
-          remoteAddress, ptr);
+      success = readFullTrailingObjects<TargetOpaqueTypeDescriptor<Runtime>>(
+          remoteAddress, ptr, sizeof(TargetContextDescriptor<Runtime>));
       break;
     default:
       // We don't know about this kind of context.
@@ -1512,16 +1530,23 @@ public:
 
     auto *descriptor =
         reinterpret_cast<const TargetContextDescriptor<Runtime> *>(ptr.get());
-    ContextDescriptorCache.insert(std::make_pair(address, std::move(ptr)));
-    return ContextDescriptorRef(address, descriptor);
+    ContextDescriptorCache.insert(
+        std::make_pair(remoteAddress, std::move(ptr)));
+    return ContextDescriptorRef(remoteAddress, descriptor);
   }
 
-  template <typename DescriptorTy>
-  bool readFullContextDescriptor(RemoteAddress address,
-                                 MemoryReader::ReadBytesResult &ptr) {
+  /// Read all memory occupied by a value with TrailingObjects. This will
+  /// incrementally read pieces of the object to figure out the full size of it.
+  ///   - address: The address of the value.
+  ///   - ptr: The bytes that have been read so far. On return, the full object.
+  ///   - existingByteCount: The number of bytes in ptr.
+  template <typename BaseTy>
+  bool readFullTrailingObjects(RemoteAddress address,
+                               MemoryReader::ReadBytesResult &ptr,
+                               size_t existingByteCount) {
     // Read the full base descriptor if it's bigger than what we have so far.
-    if (sizeof(DescriptorTy) > sizeof(TargetContextDescriptor<Runtime>)) {
-      ptr = Reader->template readObj<DescriptorTy>(address);
+    if (sizeof(BaseTy) > existingByteCount) {
+      ptr = Reader->template readObj<BaseTy>(address);
       if (!ptr)
         return false;
     }
@@ -1537,13 +1562,17 @@ public:
     // size. Once we've walked through all the trailing objects, we've read
     // everything.
 
-    size_t sizeSoFar = sizeof(DescriptorTy);
+    size_t sizeSoFar = sizeof(BaseTy);
 
-    for (size_t i = 0; i < DescriptorTy::trailingTypeCount(); i++) {
-      const DescriptorTy *descriptorSoFar =
-          reinterpret_cast<const DescriptorTy *>(ptr.get());
+    for (size_t i = 0; i < BaseTy::trailingTypeCount(); i++) {
+      const BaseTy *descriptorSoFar =
+          reinterpret_cast<const BaseTy *>(ptr.get());
       size_t thisSize = descriptorSoFar->sizeWithTrailingTypeCount(i);
       if (thisSize > sizeSoFar) {
+        // Make sure we haven't ended up with a ridiculous size.
+        if (thisSize > MaxMetadataSize)
+          return false;
+
         ptr = Reader->readBytes(address, thisSize);
         if (!ptr)
           return false;
@@ -1626,19 +1655,17 @@ public:
   /// Read a context descriptor from the given address and build a mangling
   /// tree representing it.
   Demangle::NodePointer
-  readDemanglingForContextDescriptor(StoredPointer contextAddress,
+  readDemanglingForContextDescriptor(RemoteAddress contextAddress,
                                      Demangler &Dem) {
     auto context = readContextDescriptor(contextAddress);
     if (!context)
       return nullptr;
     return buildContextMangling(context, Dem);
   }
-  
+
   /// Read the mangled underlying type from an opaque type descriptor.
-  Demangle::NodePointer
-  readUnderlyingTypeManglingForOpaqueTypeDescriptor(StoredPointer contextAddr,
-                                                    unsigned ordinal,
-                                                    Demangler &Dem) {
+  Demangle::NodePointer readUnderlyingTypeManglingForOpaqueTypeDescriptor(
+      RemoteAddress contextAddr, unsigned ordinal, Demangler &Dem) {
     auto context = readContextDescriptor(contextAddr);
     if (!context)
       return nullptr;
@@ -1654,13 +1681,12 @@ public:
     
     auto nameAddr = resolveRelativeField(context,
                      opaqueType->getUnderlyingTypeArgumentMangledName(ordinal));
-    
-    return readMangledName(RemoteAddress(nameAddr),
-                                MangledNameKind::Type, Dem);
+
+    return readMangledName(nameAddr, MangledNameKind::Type, Dem);
   }
 
   TypeLookupErrorOr<typename BuilderType::BuiltType>
-  readUnderlyingTypeForOpaqueTypeDescriptor(StoredPointer contextAddr,
+  readUnderlyingTypeForOpaqueTypeDescriptor(RemoteAddress contextAddr,
                                             unsigned ordinal) {
     Demangle::Demangler Dem;
     auto node = readUnderlyingTypeManglingForOpaqueTypeDescriptor(contextAddr,
@@ -1670,31 +1696,33 @@ public:
     return decodeMangledType(node);
   }
 
-  bool isTaggedPointer(StoredPointer objectAddress) {
+  bool isTaggedPointer(RemoteAddress objectAddress) {
     if (getTaggedPointerEncoding() != TaggedPointerEncodingKind::Extended)
       return false;
-  
-    return (objectAddress ^ TaggedPointerObfuscator) & TaggedPointerMask;
+
+    return (bool)((objectAddress ^ TaggedPointerObfuscator) &
+                  TaggedPointerMask);
   }
 
   /// Read the isa pointer of an Object-C tagged pointer value.
-  std::optional<StoredPointer>
-  readMetadataFromTaggedPointer(StoredPointer objectAddress) {
+  std::optional<RemoteAddress>
+  readMetadataFromTaggedPointer(RemoteAddress objectAddress) {
     auto readArrayElement =
-        [&](StoredPointer base,
-            StoredPointer tag) -> std::optional<StoredPointer> {
-      StoredPointer addr = base + tag * sizeof(StoredPointer);
-      StoredPointer isa;
-      if (!Reader->readInteger(RemoteAddress(addr), &isa))
+        [&](RemoteAddress base,
+            StoredPointer tag) -> std::optional<RemoteAddress> {
+      RemoteAddress addr = base + tag * sizeof(StoredPointer);
+      RemoteAddress isa;
+      if (!Reader->template readRemoteAddress<StoredPointer>(addr, isa))
         return std::nullopt;
       return isa;
     };
 
     // Extended pointers have a tag of 0b111, using 8 additional bits
     // to specify the class.
-    if (TaggedPointerExtendedMask != 0 &&
-        (((objectAddress ^ TaggedPointerObfuscator) & TaggedPointerExtendedMask)
-           == TaggedPointerExtendedMask)) {
+    if (TaggedPointerExtendedMask &&
+        ((((StoredPointer)objectAddress.getRawAddress() ^
+           TaggedPointerObfuscator) &
+          TaggedPointerExtendedMask) == TaggedPointerExtendedMask)) {
       auto tag = ((objectAddress >> TaggedPointerExtendedSlotShift) &
                   TaggedPointerExtendedSlotMask);
       return readArrayElement(TaggedPointerExtendedClasses, tag);
@@ -1708,13 +1736,13 @@ public:
 
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
-  std::optional<StoredPointer>
-  readMetadataFromInstance(StoredPointer objectAddress) {
+  std::optional<RemoteAddress>
+  readMetadataFromInstance(RemoteAddress objectAddress) {
     if (isTaggedPointer(objectAddress))
       return readMetadataFromTaggedPointer(objectAddress);
 
-    StoredPointer isa;
-    if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
+    RemoteAddress isa;
+    if (!Reader->template readRemoteAddress<StoredPointer>(objectAddress, isa))
       return std::nullopt;
 
     switch (getIsaEncoding()) {
@@ -1731,11 +1759,12 @@ public:
     case IsaEncodingKind::Indexed: {
       // If applying the magic mask doesn't give us the magic value,
       // it's not an indexed isa.
-      if ((isa & IsaMagicMask) != IsaMagicValue)
+      if (((StoredPointer)(isa & IsaMagicMask).getRawAddress()) !=
+          IsaMagicValue)
         return isa;
 
       // Extract the index.
-      auto classIndex = (isa & IsaIndexMask) >> IsaIndexShift;
+      StoredPointer classIndex = (isa & IsaIndexMask) >> IsaIndexShift;
 
       // 0 is never a valid index.
       if (classIndex == 0) {
@@ -1761,10 +1790,10 @@ public:
       RemoteAddress eltPointer =
         RemoteAddress(IndexedClassesPointer
                         + classIndex * sizeof(StoredPointer));
-      StoredPointer metadataPointer;
-      if (!Reader->readInteger(eltPointer, &metadataPointer)) {
+      RemoteAddress metadataPointer;
+      if (!Reader->template readRemoteAddress<StoredPointer>(eltPointer,
+                                                             metadataPointer))
         return std::nullopt;
-      }
 
       return metadataPointer;
     }
@@ -1865,7 +1894,7 @@ public:
 
             return cls->getClassBoundsAsSwiftSuperclass();
           },
-          [](StoredPointer objcClassName)
+          [](RemoteAddress objcClassName)
               -> std::optional<ClassMetadataBounds> {
             // We have no ability to look up an ObjC class by name.
             // FIXME: add a query for this; clients may have a way to do it.
@@ -1883,14 +1912,14 @@ public:
   template <class Result, class DescriptorFn, class MetadataFn,
             class ClassNameFn>
   std::optional<Result> forTypeReference(TypeReferenceKind refKind,
-                                         StoredPointer ref,
+                                         RemoteAddress ref,
                                          const DescriptorFn &descriptorFn,
                                          const MetadataFn &metadataFn,
                                          const ClassNameFn &classNameFn) {
     switch (refKind) {
     case TypeReferenceKind::IndirectTypeDescriptor: {
       StoredSignedPointer descriptorAddress;
-      if (!Reader->readInteger(RemoteAddress(ref), &descriptorAddress)) {
+      if (!Reader->readInteger(ref, &descriptorAddress)) {
         return std::nullopt;
       }
 
@@ -1910,8 +1939,8 @@ public:
       return classNameFn(ref);
 
     case TypeReferenceKind::IndirectObjCClass: {
-      StoredPointer classRef = 0;
-      if (!Reader->readInteger(RemoteAddress(ref), &classRef))
+      RemoteAddress classRef;
+      if (!Reader->template readRemoteAddress<StoredPointer>(ref, classRef))
         return std::nullopt;
 
       auto metadata = readMetadata(classRef);
@@ -1927,8 +1956,8 @@ public:
 
   /// Read a single generic type argument from a bound generic type
   /// metadata.
-  std::optional<StoredPointer>
-  readGenericArgFromMetadata(StoredPointer metadata, unsigned index) {
+  std::optional<RemoteAddress>
+  readGenericArgFromMetadata(RemoteAddress metadata, unsigned index) {
     auto Meta = readMetadata(metadata);
     if (!Meta)
       return std::nullopt;
@@ -1958,9 +1987,9 @@ public:
     if (index >= generics->getGenericContextHeader().getNumArguments())
       return std::nullopt;
 
-    StoredPointer genericArgAddress;
-    if (!Reader->readInteger(RemoteAddress(addressOfGenericArgAddress),
-                             &genericArgAddress))
+    RemoteAddress genericArgAddress;
+    if (!Reader->template readRemoteAddress<StoredPointer>(
+            addressOfGenericArgAddress, genericArgAddress))
       return std::nullopt;
 
     return genericArgAddress;
@@ -1968,7 +1997,7 @@ public:
 
   /// Given the address of a nominal type descriptor, attempt to resolve
   /// its nominal type declaration.
-  BuiltTypeDecl readNominalTypeFromDescriptor(StoredPointer address) {
+  BuiltTypeDecl readNominalTypeFromDescriptor(RemoteAddress address) {
     auto descriptor = readContextDescriptor(address);
     if (!descriptor)
       return BuiltTypeDecl();
@@ -1977,7 +2006,7 @@ public:
   }
 
   /// Try to read the offset of a tuple element from a tuple metadata.
-  bool readTupleElementOffset(StoredPointer metadataAddress, unsigned eltIndex,
+  bool readTupleElementOffset(RemoteAddress metadataAddress, unsigned eltIndex,
                               StoredSize *offset) {
     // Read the metadata.
     auto metadata = readMetadata(metadataAddress);
@@ -2001,7 +2030,7 @@ public:
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
   std::optional<StoredPointer>
-  readOffsetToFirstCaptureFromMetadata(StoredPointer MetadataAddress) {
+  readOffsetToFirstCaptureFromMetadata(RemoteAddress MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
       return std::nullopt;
@@ -2010,15 +2039,15 @@ public:
     return heapMeta->OffsetToFirstCapture;
   }
 
-  std::optional<RemoteAbsolutePointer> readPointer(StoredPointer address) {
-    return Reader->readPointer(RemoteAddress(address), sizeof(StoredPointer));
+  std::optional<RemoteAbsolutePointer> readPointer(RemoteAddress address) {
+    return Reader->readPointer(address, sizeof(StoredPointer));
   }
 
-  std::optional<StoredPointer> readResolvedPointerValue(StoredPointer address) {
+  std::optional<RemoteAddress> readResolvedPointerValue(RemoteAddress address) {
     if (auto pointer = readPointer(address)) {
-      if (!pointer->isResolved())
+      if (!pointer->getResolvedAddress())
         return std::nullopt;
-      return (StoredPointer)pointer->getResolvedAddress().getAddressData();
+      return pointer->getResolvedAddress();
     }
     return std::nullopt;
   }
@@ -2027,13 +2056,13 @@ public:
   RemoteAbsolutePointer resolvePointerField(RemoteRef<T> base,
                                             const U &field) {
     auto pointerRef = base.getField(field);
-    return Reader->resolvePointer(RemoteAddress(getAddress(pointerRef)),
+    return Reader->resolvePointer(getAddress(pointerRef),
                                   *pointerRef.getLocalBuffer());
   }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
   std::optional<RemoteAbsolutePointer>
-  readCaptureDescriptorFromMetadata(StoredPointer MetadataAddress) {
+  readCaptureDescriptorFromMetadata(RemoteAddress MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
       return std::nullopt;
@@ -2043,15 +2072,14 @@ public:
   }
 
 protected:
-  template<typename Base>
-  StoredPointer getAddress(RemoteRef<Base> base) {
-    return (StoredPointer)base.getAddressData();
+  template <typename Base>
+  RemoteAddress getAddress(RemoteRef<Base> base) {
+    return base.getRemoteAddress();
   }
-  
-  template<typename Base, typename Field>
-  StoredPointer resolveRelativeField(
-                            RemoteRef<Base> base, const Field &field) {
-    return (StoredPointer)base.resolveRelativeFieldData(field);
+
+  template <typename Base, typename Field>
+  RemoteAddress resolveRelativeField(RemoteRef<Base> base, const Field &field) {
+    return base.resolveRelativeFieldData(field);
   }
 
   template <typename Base, typename Field>
@@ -2067,27 +2095,29 @@ protected:
     offset &= ~1u;
     
     using SignedPointer = typename std::make_signed<StoredPointer>::type;
-    
-    StoredPointer resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
-    
+
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
+      RemoteAddress resultAddress = Reader->resolveIndirectAddressAtOffset(
+          getAddress(fieldRef), (SignedPointer)offset,
+          /*directnessEncodedInOffset=*/true);
       if (auto ptr = readPointer(resultAddress)) {
         return stripSignedPointer(*ptr);
       }
       return std::nullopt;
     }
-    
-    return RemoteAbsolutePointer("", resultAddress);
+
+    RemoteAddress resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
+    return RemoteAbsolutePointer(resultAddress);
   }
 
   /// Given a pointer to an Objective-C class, try to read its class name.
-  bool readObjCClassName(StoredPointer classAddress, std::string &className) {
+  bool readObjCClassName(RemoteAddress classAddress, std::string &className) {
     // The following algorithm only works on the non-fragile Apple runtime.
 
     // Grab the RO-data pointer.  This part is not ABI.
-    StoredPointer roDataPtr = readObjCRODataPtr(classAddress);
+    RemoteAddress roDataPtr = readObjCRODataPtr(classAddress);
     if (!roDataPtr) return false;
 
     // This is ABI.
@@ -2096,18 +2126,19 @@ protected:
       + sizeof(StoredPointer);
 
     // Read the name pointer.
-    StoredPointer namePtr;
-    if (!Reader->readInteger(RemoteAddress(roDataPtr + OffsetToName), &namePtr))
+    RemoteAddress namePtr;
+    if (!Reader->template readRemoteAddress<StoredPointer>(
+            roDataPtr + OffsetToName, namePtr))
       return false;
 
     // If the name pointer is null, treat that as an error.
     if (!namePtr)
       return false;
 
-    return Reader->readString(RemoteAddress(namePtr), className);
+    return Reader->readString(namePtr, className);
   }
 
-  MetadataRef readMetadata(StoredPointer address) {
+  MetadataRef readMetadata(RemoteAddress address) {
     auto cached = MetadataCache.find(address);
     if (cached != MetadataCache.end())
       return MetadataRef(address,
@@ -2115,56 +2146,31 @@ protected:
                              cached->second.get()));
 
     StoredPointer KindValue = 0;
-    if (!Reader->readInteger(RemoteAddress(address), &KindValue))
+    if (!Reader->readInteger(address, &KindValue))
       return nullptr;
 
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
-
-        return _readMetadata<TargetClassMetadataType>(address);
-
+        return _readMetadataFixedSize<TargetClassMetadataType>(address);
       case MetadataKind::Enum:
-        return _readMetadata<TargetEnumMetadata>(address);
+        return _readMetadataFixedSize<TargetEnumMetadata>(address);
       case MetadataKind::ErrorObject:
-        return _readMetadata<TargetEnumMetadata>(address);
-      case MetadataKind::Existential: {
-        StoredPointer flagsAddress = address +
-          sizeof(StoredPointer);
-
-        ExistentialTypeFlags::int_type flagsData;
-        if (!Reader->readInteger(RemoteAddress(flagsAddress),
-                                 &flagsData))
-          return nullptr;
-
-        ExistentialTypeFlags flags(flagsData);
-
-        StoredPointer numProtocolsAddress = flagsAddress + sizeof(flagsData);
-        uint32_t numProtocols;
-        if (!Reader->readInteger(RemoteAddress(numProtocolsAddress),
-                                 &numProtocols))
-          return nullptr;
-
-        // Make sure the number of protocols is reasonable
-        if (numProtocols >= 256)
-          return nullptr;
-
-        auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
-          + numProtocols *
-          sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
-
-        if (flags.hasSuperclassConstraint())
-          totalSize += sizeof(StoredPointer);
-
-        return _readMetadata(address, totalSize);
-      }
+        return _readMetadataFixedSize<TargetMetadata>(address);
+      case MetadataKind::Existential:
+        return _readMetadataVariableSize<TargetExistentialTypeMetadata>(
+            address);
       case MetadataKind::ExistentialMetatype:
-        return _readMetadata<TargetExistentialMetatypeMetadata>(address);
+        return _readMetadataFixedSize<TargetExistentialMetatypeMetadata>(
+            address);
       case MetadataKind::ExtendedExistential: {
         // We need to read the shape in order to figure out how large
-        // the generalization arguments are.
-        StoredPointer shapeAddress = address + sizeof(StoredPointer);
-        StoredSignedPointer signedShapePtr;
-        if (!Reader->readInteger(RemoteAddress(shapeAddress), &signedShapePtr))
+        // the generalization arguments are. This prevents us from using
+        // _readMetadataVariableSize, which requires the Shape field to be
+        // dereferenceable here.
+        RemoteAddress shapeAddress = address + sizeof(StoredPointer);
+        RemoteAddress signedShapePtr;
+        if (!Reader->template readRemoteAddress<StoredPointer>(shapeAddress,
+                                                               signedShapePtr))
           return nullptr;
         auto shapePtr = stripSignedPointer(signedShapePtr);
 
@@ -2179,52 +2185,29 @@ protected:
         return _readMetadata(address, totalSize);
       }
       case MetadataKind::ForeignClass:
-        return _readMetadata<TargetForeignClassMetadata>(address);
+        return _readMetadataFixedSize<TargetForeignClassMetadata>(address);
       case MetadataKind::ForeignReferenceType:
-        return _readMetadata<TargetForeignReferenceTypeMetadata>(address);
-      case MetadataKind::Function: {
-        StoredSize flagsValue;
-        auto flagsAddr =
-            address + TargetFunctionTypeMetadata<Runtime>::OffsetToFlags;
-        if (!Reader->readInteger(RemoteAddress(flagsAddr), &flagsValue))
-          return nullptr;
-
-        auto flags =
-            TargetFunctionTypeFlags<StoredSize>::fromIntValue(flagsValue);
-
-        auto totalSize =
-            sizeof(TargetFunctionTypeMetadata<Runtime>) +
-            flags.getNumParameters() * sizeof(FunctionTypeMetadata::Parameter);
-
-        if (flags.hasParameterFlags())
-          totalSize += flags.getNumParameters() * sizeof(uint32_t);
-
-        if (flags.isDifferentiable())
-          totalSize = roundUpToAlignment(totalSize, sizeof(StoredPointer)) +
-              sizeof(TargetFunctionMetadataDifferentiabilityKind<
-                  typename Runtime::StoredSize>);
-
-        return _readMetadata(address,
-                             roundUpToAlignment(totalSize, sizeof(StoredPointer)));
-      }
+        return _readMetadataFixedSize<TargetForeignReferenceTypeMetadata>(
+            address);
+      case MetadataKind::Function:
+        return _readMetadataVariableSize<TargetFunctionTypeMetadata>(address);
       case MetadataKind::HeapGenericLocalVariable:
-        return _readMetadata<TargetGenericBoxHeapMetadata>(address);
+        return _readMetadataFixedSize<TargetGenericBoxHeapMetadata>(address);
       case MetadataKind::HeapLocalVariable:
-        return _readMetadata<TargetHeapLocalVariableMetadata>(address);
+        return _readMetadataFixedSize<TargetHeapLocalVariableMetadata>(address);
       case MetadataKind::Metatype:
-        return _readMetadata<TargetMetatypeMetadata>(address);
+        return _readMetadataFixedSize<TargetMetatypeMetadata>(address);
       case MetadataKind::ObjCClassWrapper:
-        return _readMetadata<TargetObjCClassWrapperMetadata>(address);
+        return _readMetadataFixedSize<TargetObjCClassWrapperMetadata>(address);
       case MetadataKind::Optional:
-        return _readMetadata<TargetEnumMetadata>(address);
+        return _readMetadataFixedSize<TargetEnumMetadata>(address);
       case MetadataKind::Struct:
-        return _readMetadata<TargetStructMetadata>(address);
+        return _readMetadataFixedSize<TargetStructMetadata>(address);
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
           TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
         StoredSize numElements;
-        if (!Reader->readInteger(RemoteAddress(numElementsAddress),
-                                 &numElements))
+        if (!Reader->readInteger(numElementsAddress, &numElements))
           return nullptr;
         auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
                          numElements * sizeof(TupleTypeMetadata::Element);
@@ -2237,7 +2220,7 @@ protected:
       }
       case MetadataKind::Opaque:
       default:
-        return _readMetadata<TargetOpaqueMetadata>(address);
+        return _readMetadataFixedSize<TargetOpaqueMetadata>(address);
     }
 
     // We can fall out here if the value wasn't actually a valid
@@ -2245,7 +2228,7 @@ protected:
     return nullptr;
   }
 
-  StoredPointer
+  RemoteAddress
   readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
                                      bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
@@ -2253,28 +2236,29 @@ protected:
       auto classMeta = cast<TargetClassMetadata>(metadata);
       while (true) {
         if (!classMeta->isTypeMetadata())
-          return 0;
+          return RemoteAddress();
 
         StoredSignedPointer descriptorAddressSigned = classMeta->getDescriptionAsSignedPointer();
-        StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+        RemoteAddress descriptorAddress =
+            stripSignedPointer(descriptorAddressSigned);
 
         // If this class has a null descriptor, it's artificial,
         // and we need to skip it upon request.  Otherwise, we're done.
         if (descriptorAddress || !skipArtificialSubclasses)
-          return static_cast<StoredPointer>(descriptorAddress);
+          return descriptorAddress;
 
         auto superclassMetadataAddress =
             stripSignedPointer(classMeta->Superclass);
         if (!superclassMetadataAddress)
-          return 0;
+          return RemoteAddress();
 
         auto superMeta = readMetadata(superclassMetadataAddress);
         if (!superMeta)
-          return 0;
+          return RemoteAddress();
 
         auto superclassMeta = dyn_cast<TargetClassMetadata>(superMeta);
         if (!superclassMeta)
-          return 0;
+          return RemoteAddress();
 
         classMeta = superclassMeta;
         metadata = superMeta;
@@ -2286,45 +2270,67 @@ protected:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = valueMeta->getDescriptionAsSignedPointer();
-      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      RemoteAddress descriptorAddress =
+          stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;
     }
         
     case MetadataKind::ForeignClass: {
       auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
-      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      RemoteAddress descriptorAddress =
+          stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;
     }
 
     case MetadataKind::ForeignReferenceType: {
       auto foreignMeta = cast<TargetForeignReferenceTypeMetadata<Runtime>>(metadata);
       StoredSignedPointer descriptorAddressSigned = foreignMeta->getDescriptionAsSignedPointer();
-      StoredPointer descriptorAddress = stripSignedPointer(descriptorAddressSigned);
+      RemoteAddress descriptorAddress =
+          stripSignedPointer(descriptorAddressSigned);
       return descriptorAddress;
     }
 
     default:
-      return 0;
+      return RemoteAddress();
     }
   }
 
 private:
   template <template <class R> class M>
-  MetadataRef _readMetadata(StoredPointer address) {
+  MetadataRef _readMetadataFixedSize(RemoteAddress address) {
+    static_assert(!ABI::typeHasTrailingObjects<M<Runtime>>(),
+                  "Type must not have trailing objects. Use "
+                  "_readMetadataVariableSize for types that have them.");
+
     return _readMetadata(address, sizeof(M<Runtime>));
   }
 
-  MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
-    if (sizeAfter > MaxMetadataSize)
-      return nullptr;
-    auto readResult = Reader->readBytes(RemoteAddress(address), sizeAfter);
+  template <template <class R> class M>
+  MetadataRef _readMetadataVariableSize(RemoteAddress address) {
+    static_assert(ABI::typeHasTrailingObjects<M<Runtime>>(),
+                  "Type must have trailing objects. Use _readMetadataFixedSize "
+                  "for types that don't.");
+
+    MemoryReader::ReadBytesResult bytes;
+    auto readResult = readFullTrailingObjects<M<Runtime>>(address, bytes, 0);
     if (!readResult)
       return nullptr;
+    return _cacheMetadata(address, bytes);
+  }
 
+  MetadataRef _readMetadata(RemoteAddress address, size_t sizeAfter) {
+    if (sizeAfter > MaxMetadataSize)
+      return nullptr;
+    auto readResult = Reader->readBytes(address, sizeAfter);
+    return _cacheMetadata(address, readResult);
+  }
+
+  MetadataRef _cacheMetadata(RemoteAddress address,
+                             MemoryReader::ReadBytesResult &bytes) {
     auto metadata =
-        reinterpret_cast<const TargetMetadata<Runtime> *>(readResult.get());
-    MetadataCache.insert(std::make_pair(address, std::move(readResult)));
+        reinterpret_cast<const TargetMetadata<Runtime> *>(bytes.get());
+    MetadataCache.insert(std::make_pair(address, std::move(bytes)));
     return MetadataRef(address, metadata);
   }
 
@@ -2335,18 +2341,16 @@ private:
     auto parentAddress = resolveRelativeIndirectableField(base, base->Parent);
     if (!parentAddress)
       return std::nullopt;
-    if (!parentAddress->isResolved()) {
+    if (!parentAddress->getSymbol().empty()) {
       // Currently we can only handle references directly to a symbol without
       // an offset.
-      if (parentAddress->getOffset() != 0) {
-        return std::nullopt;
-      }
-      return ParentContextDescriptorRef(parentAddress->getSymbol());
+      if (parentAddress->getOffset() == 0)
+        return ParentContextDescriptorRef(parentAddress->getSymbol());
     }
     auto addr = parentAddress->getResolvedAddress();
     if (!addr)
       return ParentContextDescriptorRef();
-    if (auto parentDescriptor = readContextDescriptor(addr.getAddressData()))
+    if (auto parentDescriptor = readContextDescriptor(addr))
       return ParentContextDescriptorRef(parentDescriptor);
     return std::nullopt;
   }
@@ -2374,7 +2378,7 @@ private:
     if (auto protoBuffer =
             dyn_cast<TargetProtocolDescriptor<Runtime>>(context)) {
       auto nameAddress = resolveRelativeField(descriptor, protoBuffer->Name);
-      if (Reader->readString(RemoteAddress(nameAddress), name))
+      if (Reader->readString(nameAddress, name))
         return name;
 
       return std::nullopt;
@@ -2384,7 +2388,7 @@ private:
     if (auto moduleBuffer =
             dyn_cast<TargetModuleContextDescriptor<Runtime>>(context)) {
       auto nameAddress = resolveRelativeField(descriptor, moduleBuffer->Name);
-      if (Reader->readString(RemoteAddress(nameAddress), name))
+      if (Reader->readString(nameAddress, name))
         return name;
 
       return std::nullopt;
@@ -2396,7 +2400,7 @@ private:
       return std::nullopt;
 
     auto nameAddress = resolveRelativeField(descriptor, typeBuffer->Name);
-    if (!Reader->readString(RemoteAddress(nameAddress), name))
+    if (!Reader->readString(nameAddress, name))
       return std::nullopt;
 
     // Read the TypeImportInfo if present.
@@ -2407,7 +2411,7 @@ private:
       while (true) {
         // Read the next string.
         std::string temp;
-        if (!Reader->readString(RemoteAddress(nameAddress), temp))
+        if (!Reader->readString(nameAddress, temp))
           return std::nullopt;
 
         // If we read an empty string, we're done.
@@ -2467,8 +2471,7 @@ private:
         return nullptr;
 
       // Move the address forward and add the next chunk.
-      currentAddress =
-        RemoteAddress(currentAddress.getAddressData() + chunk.size() + 1);
+      currentAddress = currentAddress + chunk.size() + 1;
       mangledName += std::move(chunk);
 
       // Scan through the mangled name to skip over symbolic references.
@@ -2502,7 +2505,7 @@ private:
       // We're done.
       break;
     }
-    return demangle(address.getAddressData(), mangledName, kind, dem);
+    return demangle(address, mangledName, kind, dem);
   }
 
   /// Read and demangle the name of an anonymous context.
@@ -2519,9 +2522,7 @@ private:
     auto mangledContextName = anonymousBuffer->getMangledContextName();
     auto mangledNameAddress = resolveRelativeField(contextRef,
                                                    mangledContextName->name);
-    return readMangledName(RemoteAddress(mangledNameAddress),
-                           MangledNameKind::Symbol,
-                           dem);
+    return readMangledName(mangledNameAddress, MangledNameKind::Symbol, dem);
   }
 
   /// If we have a context whose parent context is an anonymous context
@@ -2603,18 +2604,18 @@ private:
   /// Resolve a relative target protocol descriptor pointer, which uses
   /// the lowest bit to indicate an indirect vs. direct relative reference and
   /// the second lowest bit to indicate whether it is an Objective-C protocol.
-  template<typename Base>
-  StoredPointer resolveRelativeIndirectProtocol(
+  template <typename Base>
+  RemoteAddress resolveRelativeIndirectProtocol(
       RemoteRef<Base> descriptor,
       const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
     // Map the offset from within our local buffer to the remote address.
     auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();
-    StoredPointer targetAddress(getAddress(descriptor) + distance);
+    RemoteAddress targetAddress(getAddress(descriptor) + distance);
 
     // Read the relative offset.
     int32_t relative;
-    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
-      return StoredPointer();
+    if (!Reader->readInteger(targetAddress, &relative))
+      return RemoteAddress();
 
     // Collect and mask off the 'indirect' and 'isObjC' bits.
     bool indirect = relative & 1;
@@ -2625,15 +2626,14 @@ private:
     using SignedPointer = typename std::make_signed<StoredPointer>::type;
     auto signext = (SignedPointer)(int32_t)relative;
 
-    StoredPointer resultAddress = targetAddress + signext;
+    RemoteAddress resultAddress = targetAddress + signext;
 
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
-      if (!Reader->readBytes(RemoteAddress(resultAddress),
-                             (uint8_t *)&resultAddress,
-                             sizeof(StoredPointer)))
-        return StoredPointer();
+      if (!Reader->template readRemoteAddress<StoredPointer>(resultAddress,
+                                                             resultAddress))
+        return RemoteAddress();
     }
 
     // Add back the Objective-C bit.
@@ -2641,6 +2641,26 @@ private:
       resultAddress |= 0x1;
 
     return resultAddress;
+  }
+
+  Demangle::NodePointer
+  buildContextDescriptorManglingForSymbol(llvm::StringRef symbol,
+                                          Demangler &dem) {
+    if (auto demangledSymbol = buildContextManglingForSymbol(symbol, dem)) {
+      // Look through Type nodes since we're building up a mangling here.
+      if (demangledSymbol->getKind() == Demangle::Node::Kind::Type) {
+        demangledSymbol = demangledSymbol->getChild(0);
+      }
+      return demangledSymbol;
+    }
+
+    return nullptr;
+  }
+
+  Demangle::NodePointer
+  buildContextDescriptorManglingForSymbol(const std::string &symbol,
+                                          Demangler &dem) {
+    return buildContextDescriptorManglingForSymbol(dem.copyString(symbol), dem);
   }
 
   Demangle::NodePointer
@@ -2656,15 +2676,7 @@ private:
     
     // Try to demangle the symbol name to figure out what context it would
     // point to.
-    auto demangledSymbol = buildContextManglingForSymbol(descriptor.getSymbol(),
-                                                         dem);
-    if (!demangledSymbol)
-      return nullptr;
-    // Look through Type notes since we're building up a mangling here.
-    if (demangledSymbol->getKind() == Demangle::Node::Kind::Type){
-      demangledSymbol = demangledSymbol->getChild(0);
-    }
-    return demangledSymbol;
+    return buildContextDescriptorManglingForSymbol(descriptor.getSymbol(), dem);
   }
 
   Demangle::NodePointer
@@ -2672,6 +2684,18 @@ private:
                                  Demangler &dem, int recursion_limit) {
     if (recursion_limit <= 0) {
       return nullptr;
+    }
+
+    // Check if the Reader can provide a symbol for this descriptor, and if it 
+    // can, use that instead.
+    if (auto remoteAbsolutePointer =
+            Reader->resolvePointerAsSymbol(descriptor.getRemoteAddress())) {
+      auto symbol = remoteAbsolutePointer->getSymbol();
+      if (!symbol.empty()) {
+        if (auto demangledSymbol = buildContextDescriptorManglingForSymbol(symbol, dem)) {
+          return demangledSymbol;
+        }
+      }
     }
 
     // Read the parent descriptor.
@@ -2756,9 +2780,7 @@ private:
         resolveRelativeField(descriptor, extensionBuffer->ExtendedContext);
 
       auto demangledExtendedContext =
-        readMangledName(RemoteAddress(extendedContextAddress),
-                        MangledNameKind::Type,
-                        dem);
+          readMangledName(extendedContextAddress, MangledNameKind::Type, dem);
       if (!demangledExtendedContext)
         return nullptr;
 
@@ -2807,8 +2829,7 @@ private:
           // Demangle the subject.
           auto subjectAddress = resolveRelativeField(descriptor, req.Param);
           swift::Demangle::NodePointer subject =
-              readMangledName(RemoteAddress(subjectAddress),
-                              MangledNameKind::Type, dem);
+              readMangledName(subjectAddress, MangledNameKind::Type, dem);
           if (!subject) {
             failed = true;
             break;
@@ -2818,8 +2839,9 @@ private:
           case GenericRequirementKind::Protocol: {
             auto protocolAddress =
               resolveRelativeIndirectProtocol(descriptor, req.Protocol);
-            auto protocol = readProtocol(protocolAddress, dem,
-                                         protocolResolver);
+            auto protocolRef =
+                RemoteTargetProtocolDescriptorRef<Runtime>(protocolAddress);
+            auto protocol = readProtocol(protocolRef, dem, protocolResolver);
             if (!protocol) {
               failed = true;
               break;
@@ -2839,8 +2861,7 @@ private:
             // Demangle the right-hand type.
             auto typeAddress = resolveRelativeField(descriptor, req.Type);
             swift::Demangle::NodePointer type =
-                readMangledName(RemoteAddress(typeAddress),
-                                MangledNameKind::Type, dem);
+                readMangledName(typeAddress, MangledNameKind::Type, dem);
             if (!type) {
               failed = true;
               break;
@@ -2868,11 +2889,11 @@ private:
             // address.
             auto distance =
               (intptr_t)&req.Layout - (intptr_t)descriptor.getLocalBuffer();
-            StoredPointer targetAddress(getAddress(descriptor) + distance);
+            RemoteAddress targetAddress(getAddress(descriptor) + distance);
 
             GenericRequirementLayoutKind kind;
-            if (!Reader->readBytes(RemoteAddress(targetAddress),
-                                   (uint8_t *)&kind, sizeof(kind))) {
+            if (!Reader->readBytes(targetAddress, (uint8_t *)&kind,
+                                   sizeof(kind))) {
               failed = true;
               break;
             }
@@ -2907,8 +2928,10 @@ private:
     case ContextDescriptorKind::Anonymous: {
       // Use the remote address to identify the anonymous context.
       char addressBuf[18];
+      RemoteAddress address(descriptor.getRemoteAddress());
+      address = Reader->resolveRemoteAddress(address).value_or(address);
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
-               (uint64_t)descriptor.getAddressData());
+               (uint64_t)address.getRawAddress());
       auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
       addressStr.append(addressBuf, dem);
@@ -2933,7 +2956,7 @@ private:
       auto nameAddress
         = resolveRelativeField(descriptor, moduleBuffer->Name);
       std::string moduleName;
-      if (!Reader->readString(RemoteAddress(nameAddress), moduleName))
+      if (!Reader->readString(nameAddress, moduleName))
         return nullptr;
 
       // The form of module contexts is a little different from other
@@ -3091,7 +3114,7 @@ private:
   }
 
 #if SWIFT_OBJC_INTEROP
-  std::string readObjCProtocolName(StoredPointer Address) {
+  std::string readObjCProtocolName(RemoteAddress Address) {
     auto Size = sizeof(TargetObjCProtocolPrefix<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
     if (!Buffer)
@@ -3100,13 +3123,15 @@ private:
       free(Buffer);
     };
 
-    if (!Reader->readBytes(RemoteAddress(Address), Buffer, Size))
+    if (!Reader->readBytes(Address, Buffer, Size))
       return std::string();
 
     auto ProtocolDescriptor
       = reinterpret_cast<TargetObjCProtocolPrefix<Runtime> *>(Buffer);
+    auto NameAddress =
+        RemoteAddress(ProtocolDescriptor->Name, Address.getAddressSpace());
     std::string Name;
-    if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name), Name))
+    if (!Reader->readString(NameAddress, Name))
       return std::string();
 
     return Name;
@@ -3143,10 +3168,10 @@ private:
           if (numGenericArgs == 0)
             return {};
           --numGenericArgs;
-          
-          StoredPointer arg;
-          if (!Reader->readBytes(RemoteAddress(genericArgsAddr),
-                                 (uint8_t*)&arg, sizeof(arg))) {
+
+          RemoteAddress arg;
+          if (!Reader->template readRemoteAddress<StoredPointer>(
+                  genericArgsAddr, arg)) {
             return {};
           }
           genericArgsAddr += sizeof(StoredPointer);
@@ -3200,6 +3225,23 @@ private:
     // Read the nominal type descriptor.
     ContextDescriptorRef descriptor = readContextDescriptor(descriptorAddress);
     if (!descriptor)
+      return BuiltType();
+
+    // Make sure the kinds match, to catch bad data from not reading an actual
+    // metadata.
+    auto metadataKind = metadata.getLocalBuffer()->getKind();
+    auto descriptorKind = descriptor.getLocalBuffer()->getKind();
+    if (metadataKind == MetadataKind::Class &&
+        descriptorKind != ContextDescriptorKind::Class)
+      return BuiltType();
+    if (metadataKind == MetadataKind::Struct &&
+        descriptorKind != ContextDescriptorKind::Struct)
+      return BuiltType();
+    if (metadataKind == MetadataKind::Enum &&
+        descriptorKind != ContextDescriptorKind::Enum)
+      return BuiltType();
+    if (metadataKind == MetadataKind::Optional &&
+        descriptorKind != ContextDescriptorKind::Enum)
       return BuiltType();
 
     // From that, attempt to resolve a nominal type.
@@ -3269,17 +3311,16 @@ private:
 
   /// Given that the remote process is running the non-fragile Apple runtime,
   /// grab the ro-data from a class pointer.
-  StoredPointer readObjCRODataPtr(StoredPointer classAddress) {
+  RemoteAddress readObjCRODataPtr(RemoteAddress classAddress) {
     // WARNING: the following algorithm works on current modern Apple
     // runtimes but is not actually ABI.  But it is pretty reliable.
 
 #if SWIFT_OBJC_INTEROP
-    StoredPointer dataPtr;
-    if (!Reader->readInteger(
-            RemoteAddress(classAddress +
-                          TargetClassMetadataObjCInterop::offsetToData()),
-            &dataPtr))
-      return StoredPointer();
+    RemoteAddress dataPtr;
+    if (!Reader->template readRemoteAddress<StoredPointer>(
+            classAddress + TargetClassMetadataObjCInterop::offsetToData(),
+            dataPtr))
+      return RemoteAddress();
 
     // Apply the data-pointer mask.
     // These values have been stolen from the runtime source.
@@ -3287,12 +3328,12 @@ private:
       (Runtime::PointerSize == 8 ? 0x00007ffffffffff8ULL : 0xfffffffcULL);
     dataPtr &= StoredPointer(DataPtrMask);
     if (!dataPtr)
-      return StoredPointer();
+      return RemoteAddress();
 
     // Read the flags, which is a 32-bit header on both formats.
     uint32_t flags;
-    if (!Reader->readInteger(RemoteAddress(dataPtr), &flags))
-      return StoredPointer();
+    if (!Reader->readInteger(dataPtr, &flags))
+      return RemoteAddress();
 
     // If the type is not realized, this is the RO-data.
     static constexpr uint32_t RO_REALIZED = 0x80000000U;
@@ -3303,22 +3344,22 @@ private:
     // well-known position within the RW-data.
     StoredSignedPointer signedDataPtr;
     static constexpr uint32_t OffsetToROPtr = 8;
-    if (!Reader->readInteger(RemoteAddress(dataPtr + OffsetToROPtr), &signedDataPtr))
-      return StoredPointer();
+    if (!Reader->readInteger(dataPtr + OffsetToROPtr, &signedDataPtr))
+      return RemoteAddress();
     dataPtr = stripSignedPointer(signedDataPtr);
 
     // Newer Objective-C runtimes implement a size optimization where the RO
     // field is a tagged union. If the low-bit is set, then the pointer needs
     // to be dereferenced once more to yield the real class_ro_t pointer.
     if (dataPtr & 1) {
-      if (!Reader->readInteger(RemoteAddress(dataPtr^1), &signedDataPtr))
-        return StoredPointer();
+      if (!Reader->readInteger(dataPtr ^ 1, &signedDataPtr))
+        return RemoteAddress();
       dataPtr = stripSignedPointer(signedDataPtr);
     }
 
     return dataPtr;
 #else
-    return StoredPointer();
+    return RemoteAddress();
 #endif
   }
 
@@ -3361,9 +3402,9 @@ private:
         tryFindAndReadSymbol(IsaIndexShift,
                              "objc_debug_indexed_isa_index_shift");
         tryFindSymbol(indexedClasses, "objc_indexed_classes");
-        IndexedClassesPointer = indexedClasses.getAddressData();
+        IndexedClassesPointer = indexedClasses;
         tryFindSymbol(indexedClassesCount, "objc_indexed_classes_count");
-        IndexedClassesCountPointer = indexedClassesCount.getAddressData();
+        IndexedClassesCountPointer = indexedClassesCount;
 
         return finish(IsaEncodingKind::Indexed);
       }
@@ -3429,8 +3470,8 @@ private:
                   "objc_debug_taggedpointer_classes");
     if (!TaggedPointerClassesAddr)
       finish(TaggedPointerEncodingKind::Error);
-    TaggedPointerClasses = TaggedPointerClassesAddr.getAddressData();
-    
+    TaggedPointerClasses = TaggedPointerClassesAddr;
+
     // Extended tagged pointers don't exist on older OSes. Handle those
     // by setting the variables to zero.
     tryFindAndReadSymbolWithDefault(TaggedPointerExtendedMask,
@@ -3445,15 +3486,12 @@ private:
     auto TaggedPointerExtendedClassesAddr =
       Reader->getSymbolAddress("objc_debug_taggedpointer_ext_classes");
     if (TaggedPointerExtendedClassesAddr)
-      TaggedPointerExtendedClasses =
-          TaggedPointerExtendedClassesAddr.getAddressData();
+      TaggedPointerExtendedClasses = TaggedPointerExtendedClassesAddr;
 
     // The tagged pointer obfuscator is not present on older OSes, in
     // which case we can treat it as zero.
     tryFindAndReadSymbolWithDefault(TaggedPointerObfuscator,
-                                    "objc_debug_taggedpointer_obfuscator",
-                                    0);
-    
+                                    "objc_debug_taggedpointer_obfuscator", 0);
 #   undef tryFindSymbol
 #   undef tryReadSymbol
 #   undef tryFindAndReadSymbol

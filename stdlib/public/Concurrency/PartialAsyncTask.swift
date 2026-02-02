@@ -88,7 +88,7 @@ public struct UnownedJob: Sendable {
   @available(StdlibDeploymentTarget 5.9, *)
   public var priority: JobPriority {
     let raw: UInt8
-    if #available(StdlibDeploymentTarget 6.2, *) {
+    if #available(StdlibDeploymentTarget 6.3, *) {
       raw = _jobGetPriority(context)
     } else {
       fatalError("we shouldn't get here; if we have, availability is broken")
@@ -227,7 +227,7 @@ public struct Job: Sendable, ~Copyable {
 
   public var priority: JobPriority {
     let raw: UInt8
-    if #available(StdlibDeploymentTarget 6.2, *) {
+    if #available(StdlibDeploymentTarget 6.3, *) {
       raw = _jobGetPriority(self.context)
     } else {
       fatalError("we shouldn't get here; if we have, availability is broken")
@@ -298,34 +298,47 @@ public struct ExecutorJob: Sendable, ~Copyable {
     self.context = job.context
   }
 
-  public var priority: JobPriority {
-    let raw: UInt8
-    if #available(StdlibDeploymentTarget 6.2, *) {
-      raw = _jobGetPriority(self.context)
-    } else {
-      fatalError("we shouldn't get here; if we have, availability is broken")
+  internal(set) public var priority: JobPriority {
+    get {
+      let raw: UInt8
+      if #available(StdlibDeploymentTarget 6.3, *) {
+        raw = _jobGetPriority(self.context)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+      return JobPriority(rawValue: raw)
     }
-    return JobPriority(rawValue: raw)
+    set {
+      if #available(StdlibDeploymentTarget 6.3, *) {
+        _jobSetPriority(self.context, newValue.rawValue)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+    }
   }
 
   /// Execute a closure, passing it the bounds of the executor private data
-  /// for the job.
+  /// for the job.  The executor is responsible for ensuring that any resources
+  /// referenced from the private data area are cleared up prior to running the
+  /// job.
   ///
   /// Parameters:
   ///
   /// - body: The closure to execute.
   ///
   /// Returns the result of executing the closure.
-  @available(StdlibDeploymentTarget 6.2, *)
+  @_spi(ExperimentalCustomExecutors)
+  @available(StdlibDeploymentTarget 6.3, *)
   public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
-    let base = _jobGetExecutorPrivateData(self.context)
+    let base = unsafe _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
                                                          count: size))
   }
 
   /// Kinds of schedulable jobs
-  @available(StdlibDeploymentTarget 6.2, *)
+  @_spi(ExperimentalCustomExecutors)
+  @available(StdlibDeploymentTarget 6.3, *)
   @frozen
   public struct Kind: Sendable, RawRepresentable {
     public typealias RawValue = UInt8
@@ -346,7 +359,8 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// What kind of job this is.
-  @available(StdlibDeploymentTarget 6.2, *)
+  @_spi(ExperimentalCustomExecutors)
+  @available(StdlibDeploymentTarget 6.3, *)
   public var kind: Kind {
     return Kind(rawValue: _jobGetKind(self.context))!
   }
@@ -441,8 +455,54 @@ extension ExecutorJob {
   }
 }
 
+// Helper to create a trampoline job to execute a job on a specified
+// executor.
+@_spi(ExperimentalCustomExecutors)
+@available(StdlibDeploymentTarget 6.3, *)
+extension ExecutorJob {
+
+  /// Create a trampoline to enqueue the specified job on the specified
+  /// executor.
+  ///
+  /// This is useful in conjunction with the `Clock.run()` API, which
+  /// runs a job on an unspecified executor.
+  ///
+  /// Parameters:
+  ///
+  /// - to executor:   The `Executor` on which it should be enqueued.
+  ///
+  /// Returns:
+  ///
+  /// A new ExecutorJob that will enqueue the specified job on the specified
+  /// executor.
+  @_spi(ExperimentalCustomExecutors)
+  @available(StdlibDeploymentTarget 6.3, *)
+  public func createTrampoline(to executor: some Executor) -> ExecutorJob {
+    let flags = taskCreateFlags(
+      priority: TaskPriority(priority),
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false
+    )
+
+    let unownedJob = UnownedJob(context: self.context)
+    let (trampolineTask, _) = Builtin.createAsyncTask(flags) {
+      executor.enqueue(unownedJob)
+    }
+    let trampoline = Builtin.convertTaskToJob(trampolineTask)
+
+    return ExecutorJob(context: trampoline)
+  }
+
+}
+
 // Stack-disciplined job-local allocator support
-@available(StdlibDeploymentTarget 6.2, *)
+@_spi(ExperimentalCustomExecutors)
+@available(StdlibDeploymentTarget 6.3, *)
 extension ExecutorJob {
 
   /// Obtain a stack-disciplined job-local allocator.
@@ -459,9 +519,8 @@ extension ExecutorJob {
   /// A job-local stack-disciplined allocator.
   ///
   /// This can be used to allocate additional data required by an
-  /// executor implementation; memory allocated in this manner will
-  /// be released automatically when the job is disposed of by the
-  /// runtime.
+  /// executor implementation; memory allocated in this manner must
+  /// be released by the executor before the job is executed.
   ///
   /// N.B. Because this allocator is stack disciplined, explicitly
   /// deallocating memory out-of-order will cause your program to abort.
@@ -470,13 +529,13 @@ extension ExecutorJob {
 
     /// Allocate a specified number of bytes of uninitialized memory.
     public func allocate(capacity: Int) -> UnsafeMutableRawBufferPointer {
-      let base = _jobAllocate(context, capacity)
+      let base = unsafe _jobAllocate(context, capacity)
       return unsafe UnsafeMutableRawBufferPointer(start: base, count: capacity)
     }
 
     /// Allocate uninitialized memory for a single instance of type `T`.
     public func allocate<T>(as type: T.Type) -> UnsafeMutablePointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.size)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.size)
       return unsafe base.bindMemory(to: type, capacity: 1)
     }
 
@@ -484,28 +543,25 @@ extension ExecutorJob {
     /// instances of type `T`.
     public func allocate<T>(capacity: Int, as type: T.Type)
       -> UnsafeMutableBufferPointer<T> {
-      let base = _jobAllocate(context, MemoryLayout<T>.stride * capacity)
+      let base = unsafe _jobAllocate(context, MemoryLayout<T>.stride * capacity)
       let typedBase = unsafe base.bindMemory(to: T.self, capacity: capacity)
       return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate(_ buffer: UnsafeMutableRawBufferPointer) {
       unsafe _jobDeallocate(context, buffer.baseAddress!)
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate<T>(_ pointer: UnsafeMutablePointer<T>) {
       unsafe _jobDeallocate(context, UnsafeMutableRawPointer(pointer))
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.    You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
       unsafe _jobDeallocate(context, UnsafeMutableRawPointer(buffer.baseAddress!))
     }
@@ -540,14 +596,24 @@ public struct JobPriority: Sendable {
 
   /// The raw priority value.
   public var rawValue: RawValue
+
+  /// Construct from a raw value
+  public init(rawValue: RawValue) {
+    self.rawValue = rawValue
+  }
+
+  /// Construct from a TaskPriority
+  public init(_ p: TaskPriority) {
+    self.rawValue = p.rawValue
+  }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(StdlibDeploymentTarget 5.9, *)
 extension TaskPriority {
   /// Convert this ``UnownedJob/Priority`` to a ``TaskPriority``.
   ///
   /// Most values are directly interchangeable, but this initializer reserves the right to fail for certain values.
-  @available(SwiftStdlib 5.9, *)
+  @available(StdlibDeploymentTarget 5.9, *)
   public init?(_ p: JobPriority) {
     guard p.rawValue != 0 else {
       // 0 is "undefined"
@@ -909,3 +975,19 @@ public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
 public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
 }
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("_swift_createJobForTestingOnly")
+public func _swift_createJobForTestingOnly(
+  priority: TaskPriority = TaskPriority.medium,
+  _ body: @escaping () -> ()
+) -> ExecutorJob {
+  let flags: Int = Int(priority.rawValue)
+  let (task, _) = Builtin.createAsyncTask(flags, body)
+  var job = ExecutorJob(unsafe unsafeBitCast(Builtin.convertTaskToJob(task),
+      to: UnownedJob.self))
+  job.priority = JobPriority(priority)
+  return job
+}
+#endif

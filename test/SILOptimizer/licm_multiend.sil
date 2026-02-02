@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -loop-invariant-code-motion | %FileCheck %s
 // REQUIRES: PTRSIZE=64
 // REQUIRES: OS=macosx
 
@@ -115,14 +115,16 @@ bb12:
 } // end sil function 'multi_end_licm'
 
 // CHECK-LABEL: sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
-// CHECK: br [[LOOPH:bb[0-9]+]]({{.*}} : $Builtin.Int64)
-// CHECK: [[LOOPH]]({{.*}} : $Builtin.Int64)
-// CHECK: begin_access [modify] [dynamic] [no_nested_conflict]
-// CHECK: cond_br {{.*}}, [[LOOPCOND1:bb[0-9]+]], [[LOOPCOND2:bb[0-9]+]]
-// CHECK: [[LOOPCOND1]]
-// CHECK-NEXT: store
-// CHECK-NEXT: end_access
-// CHECK: return
+// CHECK:       bb2:
+// CHECK:         begin_access [modify] [dynamic] [no_nested_conflict]
+// CHECK:         br bb3
+// CHECK:       bb5:
+// CHECK:         end_access
+// CHECK:       bb6:
+// CHECK:       bb7:
+// CHECK:         end_access
+// CHECK:       bb8:
+// CHECK:       } // end sil function 'multi_end_licm_loop_exit'
 sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
@@ -185,10 +187,10 @@ bbend1:
 bbend2:
   %otherInt = struct $Int (%27 : $Builtin.Int64)
   store %otherInt to %global : $*Int
+  end_access %global : $*Int
   cond_br %47, bbOut, bb5
 
 bbOut:
-  end_access %global : $*Int
   br bb6
 
 bb5:

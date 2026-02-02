@@ -11,10 +11,10 @@
 // RUN:   -enable-private-imports
 
 /// Typecheck a @_private client.
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/PrivateClient.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t %t/PrivateClient.swift
 
 /// Typecheck a regular client building against the same Lib with private imports enabled.
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/RegularClient.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t %t/RegularClient.swift
 
 //--- Lib_FileA.swift
 @_spi(S) public func spiFuncA() {}

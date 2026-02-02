@@ -39,7 +39,7 @@ import SIL
 /// ```
 
 /// The optimization can be done if:
-/// * In caseof a `load`: during the (forward-extended) lifetime of the loaded value the
+/// * In case of a `load`: during the (forward-extended) lifetime of the loaded value the
 ///                       memory location is not changed.
 /// * In case of a `copy_value`: the (guaranteed) lifetime of the source operand extends
 ///                       the lifetime of the copied value.
@@ -53,61 +53,68 @@ let copyToBorrowOptimization = FunctionPass(name: "copy-to-borrow-optimization")
     return
   }
 
+  var changed = false
+
   for inst in function.instructions {
     switch inst {
     case let load as LoadInst:
-      optimize(load: load, context)
+      if optimize(load: load, context) {
+        changed = true
+      }
     case let copy as CopyValueInst:
-      optimize(copy: copy, context)
+      if optimize(copy: copy, context) {
+        changed = true
+      }
     default:
       break
     }
   }
+
+  if changed {
+    updateBorrowedFrom(in: function, context)
+  }
 }
 
-private func optimize(load: LoadInst, _ context: FunctionPassContext) {
+private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
   if load.loadOwnership != .copy {
-    return
+    return false
   }
 
   var collectedUses = Uses(context)
   defer { collectedUses.deinitialize() }
   if !collectedUses.collectUses(of: load) {
-    return
+    return false
   }
 
-  if mayWrite(toAddressOf: load,
-              within: collectedUses.destroys,
-              usersInDeadEndBlocks: collectedUses.usersInDeadEndBlocks,
-              context)
-  {
-    return
+  if mayWrite(toAddressOf: load, within: collectedUses.destroys, context) {
+    return false
   }
 
   load.replaceWithLoadBorrow(collectedUses: collectedUses)
+  return true
 }
 
-private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) {
+private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bool {
   if copy.fromValue.ownership != .guaranteed {
-    return
+    return false
   }
 
   var collectedUses = Uses(context)
   defer { collectedUses.deinitialize() }
   if !collectedUses.collectUses(of: copy) {
-    return
+    return false
   }
 
   var liverange = InstructionRange(begin: copy, context)
   defer { liverange.deinitialize() }
   liverange.insert(contentsOf: collectedUses.destroys)
-  liverange.insert(contentsOf: collectedUses.usersInDeadEndBlocks)
 
   if !liverange.isFullyContainedIn(borrowScopeOf: copy.fromValue.lookThroughForwardingInstructions) {
-    return
+    return false
   }
 
   remove(copy: copy, collectedUses: collectedUses, liverange: liverange)
+  return true
 }
 
 private struct Uses {
@@ -124,14 +131,11 @@ private struct Uses {
   // E.g. the none-case of a switch_enum of an Optional.
   private(set) var nonDestroyingLiverangeExits: Stack<Instruction>
 
-  private(set) var usersInDeadEndBlocks: Stack<Instruction>
-
   init(_ context: FunctionPassContext) {
     self.context = context
     self.forwardingUses = Stack(context)
     self.destroys = Stack(context)
     self.nonDestroyingLiverangeExits = Stack(context)
-    self.usersInDeadEndBlocks = Stack(context)
   }
 
   mutating func collectUses(of initialValue: SingleValueInstruction) -> Bool {
@@ -156,20 +160,6 @@ private struct Uses {
           return false
         }
       }
-      // Get potential additional uses in dead-end blocks for which a final destroy is missing.
-      // In such a case the dataflow would _not_ visit potential writes to the load's memory location.
-      // In the following example, the `load [copy]` must not be converted to a `load_borrow`:
-      //
-      //   %1 = load [copy] %0
-      //     ...
-      //   store %2 to %0
-      //     ...
-      //   use of %1      // additional use: the lifetime of %1 ends here
-      //     ...          // no destroy of %1!
-      //   unreachable
-      //
-      // TODO: we can remove this once with have completed OSSA lifetimes throughout the SIL pipeline.
-      findAdditionalUsesInDeadEndBlocks(of: value)
     }
     return true
   }
@@ -189,36 +179,16 @@ private struct Uses {
     }
   }
 
-  private mutating func findAdditionalUsesInDeadEndBlocks(of value: Value) {
-    var users = Stack<Instruction>(context)
-    defer { users.deinitialize() }
-
-    // Finds all uses except destroy_value.
-    var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: true, context) {
-      let user = $0.instruction
-      if !(user is DestroyValueInst) {
-        users.append(user)
-      }
-      return .continueWalk
-    }
-    defer { visitor.deinitialize() }
-
-    _ = visitor.visitUses()
-    usersInDeadEndBlocks.append(contentsOf: users)
-  }
-
   mutating func deinitialize() {
     forwardingUses.deinitialize()
     destroys.deinitialize()
     nonDestroyingLiverangeExits.deinitialize()
-    usersInDeadEndBlocks.deinitialize()
   }
 }
 
 private func mayWrite(
   toAddressOf load: LoadInst,
   within destroys: Stack<DestroyValueInst>,
-  usersInDeadEndBlocks: Stack<Instruction>,
   _ context: FunctionPassContext
 ) -> Bool {
   let aliasAnalysis = context.aliasAnalysis
@@ -228,7 +198,6 @@ private func mayWrite(
   for destroy in destroys {
     worklist.pushPredecessors(of: destroy, ignoring: load)
   }
-  worklist.pushIfNotVisited(contentsOf: usersInDeadEndBlocks)
 
   // Visit all instructions starting from the destroys in backward order.
   while let inst = worklist.pop() {

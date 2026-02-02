@@ -248,6 +248,17 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
+// Define the calling convention for refcounting functions for targets where it
+// differs from the standard calling convention. Currently this is only used for
+// swift_retain, swift_release, and some internal helper functions that they
+// call.
+#if defined(__aarch64__) && !SWIFT_RUNTIME_EMBEDDED
+#define SWIFT_REFCOUNT_CC SWIFT_CC_PreserveMost
+#define SWIFT_REFCOUNT_CC_PRESERVEMOST 1
+#else
+#define SWIFT_REFCOUNT_CC
+#endif
+
 /// Should we use absolute function pointers instead of relative ones?
 /// WebAssembly target uses it by default.
 #ifndef SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
@@ -549,17 +560,6 @@ swift_auth_code(T value, unsigned extra) {
 #if SWIFT_PTRAUTH
   return (T)ptrauth_auth_function((void *)value,
                                   ptrauth_key_process_independent_code, extra);
-#else
-  return value;
-#endif
-}
-
-template <typename T>
-SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
-swift_auth_code_function(T value, unsigned extra) {
-#if SWIFT_PTRAUTH
-  return (T)ptrauth_auth_function((void *)value,
-                                  ptrauth_key_function_pointer, extra);
 #else
   return value;
 #endif

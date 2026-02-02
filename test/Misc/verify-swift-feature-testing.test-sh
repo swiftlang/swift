@@ -20,11 +20,17 @@ EXCEPTIONAL_FILES = [
     # Tests for ModuleInterfaceExportAs being ignored
     pathlib.Path("test/ModuleInterface/swift-export-as.swift"),
     # Uses the pseudo-feature AvailabilityMacro=
-    pathlib.Path("test/Sema/availability_define.swift"),
+    pathlib.Path("test/Availability/availability_define.swift"),
+    # Uses the pseudo-feature RequiresObjC=
+    pathlib.Path("test/Interop/SwiftToCxx/stdlib/foundation-type-not-exposed-by-default-to-cxx.swift"),
     # Tests behavior when you try to use a feature without enabling it
     pathlib.Path("test/attr/feature_requirement.swift"),
     # Tests completion with features both enabled and disabled
     pathlib.Path("test/IDE/complete_decl_attribute_feature_requirement.swift"),
+    # Uses the pseudo-feature ApproachableConcurrency
+    pathlib.Path("test/Concurrency/approachable_concurrency.swift"),
+    # Uses a script that hides usage of the CoroutineAccessor feature.
+    pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
 ]
 
 ENABLE_FEATURE_RE = re.compile(
@@ -112,6 +118,7 @@ def find_matches(swift_src_root):
             # Be careful to not use RUN with a colon after it or Lit will pick
             # it up.
             "RUN[:].*-enable-(experimental|upcoming)-feature",
+            "--",
             "test",
             "validation-test",
         ],

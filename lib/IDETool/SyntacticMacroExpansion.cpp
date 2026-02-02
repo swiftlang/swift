@@ -67,7 +67,7 @@ bool SyntacticMacroExpansionInstance::setup(
       invocation.getSILOptions(), invocation.getSearchPathOptions(),
       invocation.getClangImporterOptions(), invocation.getSymbolGraphOptions(),
       invocation.getCASOptions(), invocation.getSerializationOptions(),
-      SourceMgr, Diags));
+      SourceMgr, Diags, invocation.getSDKInfo()));
   registerParseRequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
 
@@ -150,7 +150,7 @@ MacroDecl *SyntacticMacroExpansionInstance::getSynthesizedMacroDecl(
                                        /*lParenLoc=*/{}, role, /*names=*/{},
                                        /*conformances=*/{},
                                        /*rParenLoc=*/{}, /*implicit=*/true);
-    macro->getAttrs().add(attr);
+    macro->addAttribute(attr);
   }
 
   // Set the macro definition.
@@ -425,7 +425,7 @@ void SyntacticMacroExpansionInstance::expand(
     // Attached macros.
     MacroDecl *macro = getSynthesizedMacroDecl(
         getCustomAttrName(getASTContext(), attr), expansion);
-    auto *attachedTo = expansionNode->node.get<Decl *>();
+    auto *attachedTo = cast<Decl *>(expansionNode->node);
     bufferIDs = expandAttachedMacro(macro, attr, attachedTo);
 
     // For an attached macro, remove the custom attribute; it's been fully
@@ -437,10 +437,10 @@ void SyntacticMacroExpansionInstance::expand(
     // Freestanding macros.
     FreestandingMacroExpansion *freestanding;
     auto node = expansionNode->node;
-    if (node.is<Expr *>()) {
-      freestanding = cast<MacroExpansionExpr>(node.get<Expr *>());
+    if (isa<Expr *>(node)) {
+      freestanding = cast<MacroExpansionExpr>(cast<Expr *>(node));
     } else {
-      freestanding = cast<MacroExpansionDecl>(node.get<Decl *>());
+      freestanding = cast<MacroExpansionDecl>(cast<Decl *>(node));
     }
 
     MacroDecl *macro = getSynthesizedMacroDecl(

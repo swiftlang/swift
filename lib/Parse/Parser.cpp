@@ -31,6 +31,7 @@
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
@@ -116,7 +117,7 @@ bool IDEInspectionSecondPassRequest::evaluate(
     IDEInspectionCallbacksFactory *Factory) const {
   // If we didn't find the code completion token, bail.
   auto *parserState = SF->getDelayedParserState();
-  if (!parserState->hasIDEInspectionDelayedDeclState())
+  if (!parserState || !parserState->hasIDEInspectionDelayedDeclState())
     return true;
 
   // Decrement the closure discriminator index by one so a top-level closure
@@ -162,6 +163,7 @@ void Parser::performIDEInspectionSecondPassImpl(
   // Clear any ASTScopes that were expanded.
   SF.clearScope();
 
+  // FIXME: We shouldn't be mutating the AST after-the-fact like this.
   switch (info.Kind) {
   case IDEInspectionDelayedDeclKind::TopLevelCodeDecl: {
     // Re-enter the top-level code decl context.
@@ -340,21 +342,15 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState)
     : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
 
-Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,
-               SILParserStateBase *SIL,
-               PersistentParserState *PersistentState)
-    : Parser(
-          std::unique_ptr<Lexer>(new Lexer(
-              SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
-              BufferID, LexerDiags,
-              sourceFileKindToLexerMode(SF.Kind),
-              SF.Kind == SourceFileKind::Main
-                  ? HashbangMode::Allowed
-                  : HashbangMode::Disallowed,
-              SF.getASTContext().LangOpts.AttachCommentsToDecls
-                  ? CommentRetentionMode::AttachToNextToken
-                  : CommentRetentionMode::None)),
-          SF, SIL, PersistentState) {}
+Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
+               SILParserStateBase *SIL, PersistentParserState *PersistentState)
+    : Parser(std::unique_ptr<Lexer>(new Lexer(
+                 SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+                 BufferID, LexerDiags, sourceFileKindToLexerMode(SF.Kind),
+                 SF.Kind == SourceFileKind::Main ? HashbangMode::Allowed
+                                                 : HashbangMode::Disallowed,
+                 CommentRetentionMode::AttachToNextToken)),
+             SF, SIL, PersistentState) {}
 
 namespace {
 
@@ -606,17 +602,52 @@ SourceLoc Parser::consumeAttributeLParen() {
   SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
   if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
     diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
-        .warnUntilSwiftVersion(6);
+        .warnUntilLanguageMode(6);
   }
   return consumeToken(tok::l_paren);
 }
 
-bool Parser::consumeIfAttributeLParen() {
-  if (!Tok.isFollowingLParen()) {
+bool Parser::consumeIfAttributeLParen(bool isCustomAttr) {
+  if (!isAtAttributeLParen(isCustomAttr))
     return false;
-  }
-  consumeAttributeLParen();
+  (void)consumeAttributeLParen();
   return true;
+}
+
+bool Parser::isAtAttributeLParen(bool isCustomAttr) {
+  if (!Tok.isFollowingLParen())
+    return false;
+
+  if (Context.isLanguageModeAtLeast(6)) {
+    // No-space '(' are always arguments.
+    if (getEndOfPreviousLoc() == Tok.getLoc())
+      return true;
+
+    // Otherwise it's an error, but for recovery, parse it as an argument list
+    // if it's obvious.
+    BacktrackingScope backtrack(*this);
+    skipSingle();
+    return Tok.is(tok::at_sign) || isStartOfSwiftDecl();
+  } else {
+    // In <=5, builtin attributes only checks 'isFollowingLParen()'.
+    if (!isCustomAttr)
+      return true;
+
+    BacktrackingScope backtrack(*this);
+    if (skipSingle().hasCodeCompletion())
+      return true;
+
+    // If we have any keyword, identifier, or token that follows a function
+    // type's parameter list, this is a parameter list and not an attribute.
+    // Alternatively, we might have a token that illustrates we're not going to
+    // get anything following the attribute, which means the parentheses
+    // describe what follows the attribute.
+    return (!Tok.isAny(tok::arrow, tok::kw_throw, tok::kw_throws,
+                       tok::kw_rethrows, tok::r_paren, tok::r_brace,
+                       tok::r_square, tok::r_angle) &&
+            !Tok.isContextualKeyword("async") &&
+            !Tok.isContextualKeyword("reasync"));
+  }
 }
 
 SourceLoc Parser::consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len) {
@@ -1162,7 +1193,10 @@ struct ParserUnit::Implementation {
   CASOptions CASOpts;
   SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   ASTContext &Ctx;
+  SourceManager &SM;
+  unsigned BufferID;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
@@ -1172,7 +1206,8 @@ struct ParserUnit::Implementation {
         SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, CASOpts,
-                             SerializationOpts, SM, Diags)) {
+                             SerializationOpts, SM, Diags, SDKInfo)),
+        SM(SM), BufferID(BufferID) {
     registerParseRequestFunctions(Ctx.evaluator);
 
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
@@ -1186,6 +1221,7 @@ struct ParserUnit::Implementation {
 
   ~Implementation() {
     TheParser.reset();
+    SM.deleteSourceFile(BufferID);
     delete &Ctx;
   }
 };
@@ -1207,12 +1243,10 @@ ParserUnit::ParserUnit(SourceManager &SM, SourceFileKind SFKind,
     : Impl(*new Implementation(SM, SFKind, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
-  Lex.reset(new Lexer(Impl.LangOpts, SM,
-                      BufferID, &Impl.Diags,
-                      LexerMode::Swift,
-                      HashbangMode::Allowed,
-                      CommentRetentionMode::None,
-                      Offset, EndOffset));
+  Lex.reset(new Lexer(Impl.LangOpts, SM, BufferID, &Impl.Diags,
+                      LexerMode::Swift, HashbangMode::Allowed,
+                      CommentRetentionMode::AttachToNextToken, Offset,
+                      EndOffset));
   Impl.TheParser.reset(new Parser(std::move(Lex), *Impl.SF, /*SIL=*/nullptr,
                                   /*PersistentState=*/nullptr));
 }

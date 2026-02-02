@@ -240,6 +240,15 @@ public class TupleMacro: ExpressionMacro {
   }
 }
 
+public class VoidExpressionMacro: ExpressionMacro {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return "()"
+  }
+}
+
 enum CustomError: Error, CustomStringConvertible {
   case message(String)
 
@@ -2042,7 +2051,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
 
       results += ["""
 
-      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expect error: need 'any'
+      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expected-warning{{must be written 'any Hashable'}}
         #introduceTypeCheckingErrors // make sure we get nested errors
       }
       """]
@@ -2061,7 +2070,7 @@ public struct IntroduceTypeCheckingErrorsMacro: DeclarationMacro {
       """
 
       struct \(context.makeUniqueName("name")) {
-        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expect error: need 'any'
+        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expected-warning{{must be written 'any Hashable'}}
         }
       }
       """
@@ -2716,6 +2725,24 @@ struct ThrowCancellationMacro: BodyMacro {
   }
 }
 
+struct EmptyBodyMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor closure: ClosureExprSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+}
+
 @_spi(ExperimentalLanguageFeature)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
@@ -2970,4 +2997,22 @@ public struct BigEndianAccessorMacro: AccessorMacro {
             """
         ]
     }
+}
+
+public struct CustomConditionCheckMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    guard let firstElement = node.arguments.first,
+          let stringLiteral = firstElement.expression
+      .as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(conditionName)? = stringLiteral.segments.first else {
+      throw CustomError.message("macro requires a string literal containing the name of a custom condition")
+    }
+
+    let isSet = try context.buildConfiguration?.isCustomConditionSet(name: conditionName.content.text) ?? false
+    return "\(literal: isSet)"
+  }
 }

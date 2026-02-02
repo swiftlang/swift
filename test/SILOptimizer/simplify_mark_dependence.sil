@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt %s -onone-simplification -simplify-instruction=mark_dependence -enable-experimental-feature LifetimeDependence | %FileCheck %s
+// RUN: %target-sil-opt %s -onone-simplification -simplify-instruction=mark_dependence -enable-experimental-feature Lifetimes | %FileCheck %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 import Swift
 import Builtin
@@ -14,9 +14,19 @@ struct S {
 
 struct NE: ~Escapable {}
 
+struct NEHolder : ~Escapable {
+  var ne: NE {
+    @_lifetime(borrow self)
+    get
+  }
+}
+
 struct S2: ~Escapable {
   var a: NE
 }
+
+sil @read_ne : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+sil @use_ne : $@convention(thin) (@guaranteed NE) -> ()
 
 // CHECK-LABEL: sil [ossa] @mark_dependence_trivial_base :
 // CHECK:         %2 = copy_value %0
@@ -155,3 +165,26 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %5
 }
 
+// CHECK-LABEL: sil hidden [ossa] @testChainedDependence : $@convention(thin) (@guaranteed NEHolder) -> () {
+// CHECK: bb0(%0 : @noImplicitCopy @guaranteed $NEHolder):
+// CHECK:   ([[YIELD:%[0-9]+]], [[TOKEN:%[0-9]+]]) = begin_apply %{{.*}}(%{{.*}}) : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+// CHECK:   [[MD1:%[0-9]+]] = mark_dependence [nonescaping] [[YIELD]] on [[TOKEN]]
+// CHECK:   mark_dependence [nonescaping] [[MD1]] on
+// CHECK-LABEL: } // end sil function 'testChainedDependence'
+sil hidden [ossa] @testChainedDependence : $@convention(thin) (@guaranteed NEHolder) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $NEHolder):
+  %2 = begin_borrow %0
+  %3 = function_ref @read_ne : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+  (%4, %5) = begin_apply %3(%2) : $@yield_once @convention(method) (@guaranteed NEHolder) -> @lifetime(borrow 0) @yields @guaranteed NE
+  %6 = mark_dependence [nonescaping] %4 on %5
+  %7 = mark_dependence [nonescaping] %6 on %2
+  %8 = copy_value %7
+  %9 = move_value [var_decl] %8
+  %11 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %12 = apply %11(%9) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %9
+  %14 = end_apply %5 as $()
+  end_borrow %2
+  %16 = tuple ()
+  return %16
+}

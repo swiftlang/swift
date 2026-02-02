@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -38,8 +38,8 @@ BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern) {
 }
 
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
-                                                 BridgedSourceLoc cLoc) {
-  return new (cContext.unbridged()) AnyPattern(cLoc.unbridged());
+                                                 SourceLoc loc) {
+  return new (cContext.unbridged()) AnyPattern(loc);
 }
 
 BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext) {
@@ -48,20 +48,18 @@ BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext) {
 
 BridgedBindingPattern
 BridgedBindingPattern_createParsed(BridgedASTContext cContext,
-                                   BridgedSourceLoc cKeywordLoc, bool isLet,
+                                   SourceLoc keywordLoc, bool isLet,
                                    BridgedPattern cSubPattern) {
   VarDecl::Introducer introducer =
       isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
-  return BindingPattern::createParsed(cContext.unbridged(),
-                                      cKeywordLoc.unbridged(), introducer,
-                                      cSubPattern.unbridged());
+  return BindingPattern::createParsed(cContext.unbridged(), keywordLoc,
+                                      introducer, cSubPattern.unbridged());
 }
 
 BridgedBindingPattern
 BridgedBindingPattern_createImplicitCatch(BridgedDeclContext cDeclContext,
-                                          BridgedSourceLoc cLoc) {
-  return BindingPattern::createImplicitCatch(cDeclContext.unbridged(),
-                                             cLoc.unbridged());
+                                          SourceLoc loc) {
+  return BindingPattern::createImplicitCatch(cDeclContext.unbridged(), loc);
 }
 
 BridgedExprPattern
@@ -73,52 +71,51 @@ BridgedExprPattern_createParsed(BridgedDeclContext cDeclContext,
 }
 
 BridgedIsPattern BridgedIsPattern_createParsed(BridgedASTContext cContext,
-                                               BridgedSourceLoc cIsLoc,
+                                               SourceLoc isLoc,
                                                BridgedTypeExpr cTypeExpr) {
   return new (cContext.unbridged())
-      IsPattern(cIsLoc.unbridged(), cTypeExpr.unbridged(),
+      IsPattern(isLoc, cTypeExpr.unbridged(),
                 /*subPattern=*/nullptr, CheckedCastKind::Unresolved);
 }
 
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext cContext,
                                  BridgedDeclContext cDeclContext,
-                                 BridgedIdentifier name, BridgedSourceLoc loc) {
+                                 Identifier name, SourceLoc loc) {
   auto &context = cContext.unbridged();
   auto *dc = cDeclContext.unbridged();
 
   // Note 'isStatic' and the introducer value are temporary.
   // The outer context should set the correct values.
   auto *varDecl = new (context) VarDecl(
-      /*isStatic=*/false, VarDecl::Introducer::Let, loc.unbridged(),
-      name.unbridged(), dc);
+      /*isStatic=*/false, VarDecl::Introducer::Let, loc, name, dc);
   auto *pattern = new (context) NamedPattern(varDecl);
   return pattern;
 }
 
-BridgedParenPattern BridgedParenPattern_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
-    BridgedPattern cSubPattern, BridgedSourceLoc cRParenLoc) {
-  return new (cContext.unbridged()) ParenPattern(
-      cLParenLoc.unbridged(), cSubPattern.unbridged(), cRParenLoc.unbridged());
+BridgedParenPattern BridgedParenPattern_createParsed(BridgedASTContext cContext,
+                                                     SourceLoc lParenLoc,
+                                                     BridgedPattern cSubPattern,
+                                                     SourceLoc rParenLoc) {
+  return new (cContext.unbridged())
+      ParenPattern(lParenLoc, cSubPattern.unbridged(), rParenLoc);
 }
 
-BridgedTuplePattern BridgedTuplePattern_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cLParenLoc,
-    BridgedArrayRef cElements, BridgedSourceLoc cRParenLoc) {
+BridgedTuplePattern BridgedTuplePattern_createParsed(BridgedASTContext cContext,
+                                                     SourceLoc lParenLoc,
+                                                     BridgedArrayRef cElements,
+                                                     SourceLoc rParenLoc) {
   ASTContext &context = cContext.unbridged();
   llvm::SmallVector<TuplePatternElt, 4> elements;
   elements.reserve(cElements.Length);
   llvm::transform(cElements.unbridged<BridgedTuplePatternElt>(),
                   std::back_inserter(elements),
                   [](const BridgedTuplePatternElt &elt) {
-                    return TuplePatternElt(elt.Label.unbridged(),
-                                           elt.LabelLoc.unbridged(),
+                    return TuplePatternElt(elt.Label, elt.LabelLoc,
                                            elt.ThePattern.unbridged());
                   });
 
-  return TuplePattern::create(context, cLParenLoc.unbridged(), elements,
-                              cRParenLoc.unbridged());
+  return TuplePattern::create(context, lParenLoc, elements, rParenLoc);
 }
 
 BridgedTypedPattern BridgedTypedPattern_createParsed(BridgedASTContext cContext,
@@ -140,6 +137,6 @@ void BridgedPattern_setImplicit(BridgedPattern cPattern) {
   cPattern.unbridged()->setImplicit();
 }
 
-BridgedIdentifier BridgedPattern_getBoundName(BridgedPattern cPattern) {
+Identifier BridgedPattern_getBoundName(BridgedPattern cPattern) {
   return cPattern.unbridged()->getBoundName();
 }

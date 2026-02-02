@@ -68,6 +68,8 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-strict-memory-safety")
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowUnsafeAttribute")
 
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
+
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
   "-D__STDC_WANT_LIB_EXT1__=1")
 
@@ -76,13 +78,12 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   Actor.cpp
   AsyncLet.cpp
   Clock.cpp
-  GlobalExecutor.cpp
   ConcurrencyHooks.cpp
+  GlobalExecutor.cpp
   EmbeddedSupport.cpp
   Error.cpp
   ExecutorBridge.cpp
   ExecutorChecks.cpp
-  Setup.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskStatus.cpp
@@ -158,7 +159,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
-  DummyExecutor.swift
+  UnimplementedExecutor.swift
   CooperativeExecutor.swift
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
@@ -183,6 +184,9 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "dispatch")
     CFExecutor.swift
     ExecutorImpl.swift
   )
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES CFExecutor.cpp)
+  endif()
 elseif("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded")
   set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
     ExecutorImpl.swift
@@ -195,14 +199,11 @@ else()
   )
 endif()
 
-set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-  PlatformExecutorNone.swift
-  )
-
 set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
   CooperativeGlobalExecutor.cpp
   DispatchGlobalExecutor.cpp
+  CFExecutor.cpp
 )
 
 set(SWIFT_CONCURRENCY_DEPENDENCIES)
@@ -284,7 +285,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
-  set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
+  set(SWIFT_STDLIB_TRACING FALSE)
   set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
   set(SWIFT_STDLIB_HAS_ASL FALSE)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
@@ -314,12 +315,30 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       endif()
     endif()
 
+    if("${arch}" MATCHES "wasm32")
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        ExecutorImpl.swift
+        PlatformExecutorCooperative.swift
+      )
+      list(APPEND SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
+        ExecutorImpl.cpp
+      )
+    else()
+      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        PlatformExecutorNone.swift
+      )
+    endif()
+
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+      set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
 
     # lib/swift/embedded/_Concurrency.swiftmodule
     # lib/swift/embedded/<triple>/libswift_Concurrency.a

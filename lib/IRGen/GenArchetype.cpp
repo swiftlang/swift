@@ -101,7 +101,7 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   auto *member = archetype->getInterfaceType()->castTo<DependentMemberType>();
 
   auto parent = cast<ArchetypeType>(
-    archetype->getGenericEnvironment()->mapTypeIntoContext(
+    archetype->getGenericEnvironment()->mapTypeIntoEnvironment(
       member->getBase())->getCanonicalType());
   auto *assocType = member->getAssocType();
 
@@ -235,7 +235,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // The first entry in the path is a direct requirement of the signature,
   // for which we should always have local type data available.
   CanType rootArchetype =
-    environment->mapTypeIntoContext(i->first)->getCanonicalType();
+    environment->mapTypeIntoEnvironment(i->first)->getCanonicalType();
   ProtocolDecl *rootProtocol = i->second;
 
   // Turn the rest of the path into a MetadataPath.

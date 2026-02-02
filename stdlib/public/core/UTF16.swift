@@ -260,7 +260,7 @@ extension Unicode.UTF16 {
   }
 }
 
-extension Unicode.UTF16: Unicode.Encoding {
+extension Unicode.UTF16: _UnicodeEncoding {
   public typealias CodeUnit = UInt16
   public typealias EncodedScalar = _UIntBuffer<UInt16>
 

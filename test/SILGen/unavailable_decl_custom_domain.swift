@@ -1,25 +1,19 @@
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
-// RUN:   | %FileCheck %s --check-prefixes=CHECK
+// RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-NOOPT
 
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
-// RUN:   -define-disabled-availability-domain DisabledDomain \
-// RUN:   -define-dynamic-availability-domain DynamicDomain \
-// RUN:   -unavailable-decl-optimization=stub \
-// RUN:   | %FileCheck %s --check-prefixes=CHECK
-
-// RUN: %target-swift-emit-silgen -module-name Test %s -verify \
-// RUN:   -enable-experimental-feature CustomAvailability \
-// RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
 // RUN:   -unavailable-decl-optimization=complete \
-// RUN:   | %FileCheck %s --check-prefixes=CHECK
+// RUN:   | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
 
 // REQUIRES: swift_feature_CustomAvailability
 
@@ -33,6 +27,14 @@ public func availableInEnabledDomain() { }
 // CHECK-NOT: s4Test26unavailableInEnabledDomainyyF
 @available(EnabledDomain, unavailable)
 public func unavailableInEnabledDomain() { }
+
+// CHECK: s4Test30availableInAlwaysEnabledDomainyyF
+@available(AlwaysEnabledDomain)
+public func availableInAlwaysEnabledDomain() { }
+
+// CHECK-NOT: s4Test32unavailableInAlwaysEnabledDomainyyF
+@available(AlwaysEnabledDomain, unavailable)
+public func unavailableInAlwaysEnabledDomain() { }
 
 // CHECK-NOT: s4Test25availableInDisabledDomainyyF
 @available(DisabledDomain)
@@ -85,41 +87,24 @@ public func availableInEnabledAndDisabledDomain() { }
 @available(EnabledDomain)
 public func availableInDisabledAndEnabledDomain() { }
 
-// CHECK-LABEL: sil{{.*}}$s4Test28testIfAvailableEnabledDomainyyF : $@convention(thin) () -> ()
-public func testIfAvailableEnabledDomain() {
-  // CHECK: bb0:
-  // CHECK:   [[PRED:%.*]] = integer_literal $Builtin.Int1, -1
-  // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+// CHECK-NOOPT: s4Test49availableInEnabledDomainAndUnavailableUniversallyyyF
+// CHECK-OPT-NOT: s4Test49availableInEnabledDomainAndUnavailableUniversallyyyF
+@available(*, unavailable)
+@available(EnabledDomain)
+public func availableInEnabledDomainAndUnavailableUniversally() { }
 
-  // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @$s4Test24availableInEnabledDomainyyF
+// CHECK-NOT: s4Test40unavailableInEnabledDomainAndUniversallyyyF
+@available(*, unavailable)
+@available(EnabledDomain, unavailable)
+public func unavailableInEnabledDomainAndUniversally() { }
 
-  // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @$s4Test26unavailableInEnabledDomainyyF
-  if #available(EnabledDomain) {
-    availableInEnabledDomain()
-  } else {
-    unavailableInEnabledDomain()
-  }
-}
-// CHECK: end sil function '$s4Test28testIfAvailableEnabledDomainyyF'
+// CHECK-NOT: s4Test50availableInDisabledDomainAndUnavailableUniversallyyyF
+@available(*, unavailable)
+@available(DisabledDomain)
+public func availableInDisabledDomainAndUnavailableUniversally() { }
 
-// CHECK-LABEL: sil{{.*}}$s4Test29testIfAvailableDisabledDomainyyF : $@convention(thin) () -> ()
-public func testIfAvailableDisabledDomain() {
-  // CHECK: bb0:
-  // CHECK:   [[PRED:%.*]] = integer_literal $Builtin.Int1, 0
-  // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
-
-  // CHECK: [[TRUE_BB]]:
-  // CHECK:   function_ref @$s4Test25availableInDisabledDomainyyF
-
-  // CHECK: [[FALSE_BB]]:
-  // CHECK:   function_ref @$s4Test27unavailableInDisabledDomainyyF
-  if #available(DisabledDomain) {
-    availableInDisabledDomain()
-  } else {
-    unavailableInDisabledDomain()
-  }
-}
-// CHECK: end sil function '$s4Test29testIfAvailableDisabledDomainyyF'
-
+// CHECK-NOOPT: s4Test41unavailableInDisabledDomainAndUniversallyyyF
+// CHECK-OPT-NOT: s4Test41unavailableInDisabledDomainAndUniversallyyyF
+@available(*, unavailable)
+@available(DisabledDomain, unavailable)
+public func unavailableInDisabledDomainAndUniversally() { }

@@ -10,7 +10,7 @@
 
 // RUN: %target-swift-frontend                           \
 // RUN:     %t/DownstreamDiagnostics.swift               \
-// RUN:     -typecheck -verify                           \
+// RUN:     -typecheck -verify -verify-ignore-unrelated                           \
 // RUN:     -debug-diagnostic-names                      \
 // RUN:     -I %t
 

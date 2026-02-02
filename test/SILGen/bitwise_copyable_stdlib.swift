@@ -7,11 +7,11 @@
 // RUN:     -module-name Swift                               \
 // RUN:     -disable-availability-checking                   \
 // RUN:     -enable-experimental-feature BuiltinModule       \
-// RUN:     -enable-experimental-feature LifetimeDependence  \
+// RUN:     -enable-experimental-feature Lifetimes  \
 // RUN:     -enable-builtin-module
 
 // REQUIRES: swift_feature_BuiltinModule
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 // Force verification of TypeLowering's isTrivial.
 

@@ -23,8 +23,8 @@ enum Platform: String, EnumerableFlag {
     case .osx:
       return "pkg"
     case .ubuntu1404,
-      .ubuntu1604,
-      .ubuntu1804:
+         .ubuntu1604,
+         .ubuntu1804:
       return "tar.gz"
     }
   }
@@ -34,8 +34,8 @@ enum Platform: String, EnumerableFlag {
     case .osx:
       return "xcode"
     case .ubuntu1404,
-      .ubuntu1604,
-      .ubuntu1804:
+         .ubuntu1604,
+         .ubuntu1804:
       return self.rawValue
     }
   }
@@ -50,9 +50,18 @@ enum Branch: String, EnumerableFlag {
   var tagPrefix: String {
     switch self {
     case .development:
-       "swift-\(rawValue.uppercased())"
+      "swift-\(rawValue.uppercased())"
     default:
-       "swift-\(rawValue.uppercased())-DEVELOPMENT"
+      "swift-\(rawValue.uppercased())-DEVELOPMENT"
+    }
+  }
+
+  var urlBranchName: String {
+    switch self {
+    case .development:
+      return self.rawValue
+    default:
+      return "swift-\(self.rawValue)-branch"
     }
   }
 }

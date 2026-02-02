@@ -37,6 +37,8 @@ constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProc
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the CxxShim module, which contains a cxx casting utility.
 constexpr static const StringLiteral CXX_SHIM_NAME = "CxxShim";
+/// The name of the CxxStdlibShim module, which contains utilities for the C++ stdlib overlay.
+constexpr static const StringLiteral CXX_STDLIB_SHIM_NAME = "CxxStdlibShim";
 /// The name of the Cxx module, which contains C++ interop helper protocols.
 constexpr static const StringLiteral CXX_MODULE_NAME = "Cxx";
 /// The name of the Builtin module, which contains Builtin functions.
@@ -144,6 +146,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_NATIVEOBJECT = {
 /// The name of the Builtin type for BridgeObject
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BRIDGEOBJECT = {
     "Builtin.BridgeObject"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_IMPLICITACTOR = {
+    "Builtin.ImplicitActor"};
 /// The name of the Builtin type for RawPointer
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_RAWPOINTER = {
     "Builtin.RawPointer"};
@@ -176,6 +180,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_VEC = {
     "Builtin.Vec"};
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_FIXEDARRAY = {
     "Builtin.FixedArray"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_BORROW = {
+    "Builtin.Borrow"};
 /// The name of the Builtin type for SILToken
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
     "Builtin.SILToken"};

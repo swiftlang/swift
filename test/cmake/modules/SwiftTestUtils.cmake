@@ -30,7 +30,7 @@ function(get_swift_test_versioned_target_triple variant_triple_out_var sdk arch 
     # Use the macCatalyst target triple and compiler resources for the iOS-like build flavor.
     set(variant_triple "${arch}-apple-ios13.1-macabi")
   else()
-    get_versioned_target_triple(variant_triple ${sdk} ${arch} "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
+    get_versioned_target_triple(variant_triple ${sdk} ${arch} "${SWIFT_SDK_${sdk}_TEST_DEPLOYMENT_VERSION}")
   endif()
 
   set(${variant_triple_out_var} "${variant_triple}" PARENT_SCOPE)

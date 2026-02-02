@@ -16,14 +16,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "libsil"
-#include "swift/SIL/SILType.h"
-#include "swift/SIL/SILModule.h"
+
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILType.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -91,6 +94,20 @@ CanType TypeConverter::getBridgedResultType(SILFunctionTypeRepresentation rep,
   return loweredType->getCanonicalType();
 }
 
+clang::CXXRecordDecl *Lowering::getBridgedSmartPtr(AbstractionPattern pattern) {
+  if (!pattern.isClangType())
+    return nullptr;
+
+  auto ty = pattern.getClangType();
+  if (auto rd = ty->getAsCXXRecordDecl())
+    for (auto attr : rd->getAttrs())
+      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
+        if (swiftAttr->getAttribute().starts_with("@_refCountedPtr"))
+          return rd;
+
+  return nullptr;
+}
+
 Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
                                           Type t,
                                           Bridgeability bridging,
@@ -119,7 +136,7 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
       pattern = pattern.getOptionalObjectType();
       auto ty = getLoweredCBridgedType(pattern, valueTy, bridging, rep,
                                       BridgedTypePurpose::ForNonOptionalResult);
-      return ty ? OptionalType::get(ty) : ty;
+      return ty && !getBridgedSmartPtr(pattern) ? OptionalType::get(ty) : ty;
     }
     return getLoweredCBridgedType(pattern, t, bridging, rep, purpose);
   }
@@ -157,6 +174,14 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
       return getObjCBoolType();
 
     return t;
+  }
+
+  if (t->isForeignReferenceType()) {
+    if (auto rd = getBridgedSmartPtr(pattern)) {
+      return cast<TypeDecl>(
+                 Context.getClangModuleLoader()->lookupImportedDecl(rd))
+          ->getDeclaredInterfaceType();
+    }
   }
 
   // Class metatypes bridge to ObjC metatypes.

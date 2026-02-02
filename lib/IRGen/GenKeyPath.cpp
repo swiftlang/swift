@@ -204,7 +204,7 @@ getLayoutFunctionForComputedComponent(IRGenModule &IGM,
 
     for (auto &index : component.getArguments()) {
       auto ty = genericEnv
-        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), index.LoweredType)
+        ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(), index.LoweredType)
         : index.LoweredType;
       auto &ti = IGM.getTypeInfo(ty);
       auto indexSize = ti.getSize(IGF, ty);
@@ -259,7 +259,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
   bool isTrivial = true;
   for (auto &component : component.getArguments()) {
     auto ty = genericEnv
-      ? genericEnv->mapTypeIntoContext(IGM.getSILModule(), component.LoweredType)
+      ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(), component.LoweredType)
       : component.LoweredType;
     auto &ti = IGM.getTypeInfo(ty);
     isTrivial &= ti.isTriviallyDestroyable(ResilienceExpansion::Minimal);
@@ -297,7 +297,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       llvm::Value *offset = nullptr;
       for (auto &component : component.getArguments()) {
         auto ty = genericEnv
-          ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+          ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                            component.LoweredType)
           : component.LoweredType;
         auto &ti = IGM.getTypeInfo(ty);
@@ -311,8 +311,8 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         }
         auto elt =
             IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, componentArgsBuf, offset);
-        auto eltAddr = ti.getAddressForPointer(
-          IGF.Builder.CreateBitCast(elt, ti.getStorageType()->getPointerTo()));
+        auto eltAddr =
+            ti.getAddressForPointer(IGF.Builder.CreateBitCast(elt, IGM.PtrTy));
         ti.destroy(IGF, eltAddr, ty,
                    true /*witness table: need it to be fast*/);
         auto size = ti.getSize(IGF, ty);
@@ -348,7 +348,7 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
       llvm::Value *offset = nullptr;
       for (auto &component : component.getArguments()) {
         auto ty = genericEnv
-          ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+          ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                            component.LoweredType)
           : component.LoweredType;
         auto &ti = IGM.getTypeInfo(ty);
@@ -365,11 +365,9 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
         auto destElt =
             IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, destArgsBuf, offset);
         auto sourceEltAddr = ti.getAddressForPointer(
-          IGF.Builder.CreateBitCast(sourceElt,
-                                    ti.getStorageType()->getPointerTo()));
+            IGF.Builder.CreateBitCast(sourceElt, IGM.PtrTy));
         auto destEltAddr = ti.getAddressForPointer(
-          IGF.Builder.CreateBitCast(destElt,
-                                    ti.getStorageType()->getPointerTo()));
+            IGF.Builder.CreateBitCast(destElt, IGM.PtrTy));
 
         ti.initializeWithCopy(IGF, destEltAddr, sourceEltAddr, ty, false);
         auto size = ti.getSize(IGF, ty);
@@ -481,7 +479,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
     // Figure out the offsets of the operands in the source buffer.
     for (int i = 0; i <= lastOperandNeeded; ++i) {
       auto ty = genericEnv
-        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+        ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                          operands[i].LoweredType)
         : operands[i].LoweredType;
       
@@ -495,8 +493,8 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       }
 
       auto ptr = IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, src, offset);
-      auto addr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
-        ptr, ti.getStorageType()->getPointerTo()));
+      auto addr =
+          ti.getAddressForPointer(IGF.Builder.CreateBitCast(ptr, IGM.PtrTy));
       srcAddresses.push_back(addr);
       
       auto size = ti.getSize(IGF, ty);
@@ -510,7 +508,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       auto &index = component.getArguments()[i];
 
       auto ty = genericEnv
-        ? genericEnv->mapTypeIntoContext(IGM.getSILModule(),
+        ? genericEnv->mapTypeIntoEnvironment(IGM.getSILModule(),
                                          index.LoweredType)
         : index.LoweredType;
       
@@ -524,9 +522,9 @@ getInitializerForComputedComponent(IRGenModule &IGM,
       }
 
       auto ptr = IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, dest, offset);
-      auto destAddr = ti.getAddressForPointer(IGF.Builder.CreateBitCast(
-        ptr, ti.getStorageType()->getPointerTo()));
-      
+      auto destAddr =
+          ti.getAddressForPointer(IGF.Builder.CreateBitCast(ptr, IGM.PtrTy));
+
       // The last component using an operand can move the value out of the
       // buffer.
       if (&component == operands[index.Operand].LastUser) {
@@ -675,7 +673,7 @@ emitKeyPathComponent(IRGenModule &IGM,
 
     // Recover class decl from superclass constraint
     if (!classDecl && genericEnv) {
-      auto ty = genericEnv->mapTypeIntoContext(baseTy)->getCanonicalType();
+      auto ty = genericEnv->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
       auto archetype = dyn_cast<ArchetypeType>(ty);
       if (archetype && archetype->requiresClass()) {
         auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
@@ -704,7 +702,7 @@ emitKeyPathComponent(IRGenModule &IGM,
           SILType::getPrimitiveObjectType(loweredClassTy.getASTType());
       if (!loweredClassTy.getASTType()->hasArchetype())
         loweredBaseContextTy = SILType::getPrimitiveObjectType(
-            GenericEnvironment::mapTypeIntoContext(genericEnv,
+            GenericEnvironment::mapTypeIntoEnvironment(genericEnv,
                                                    loweredClassTy.getASTType())
                 ->getCanonicalType());
 
@@ -930,7 +928,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       auto loweredClassTy = loweredBaseTy;
       // Recover class decl from superclass constraint
       if (!classDecl && genericEnv) {
-        auto ty = genericEnv->mapTypeIntoContext(baseTy)->getCanonicalType();
+        auto ty = genericEnv->mapTypeIntoEnvironment(baseTy)->getCanonicalType();
         auto archetype = dyn_cast<ArchetypeType>(ty);
         if (archetype && archetype->requiresClass()) {
           auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
@@ -963,7 +961,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         // and start counting at the Swift native root.
         if (loweredClassTy.getASTType()->hasTypeParameter())
           loweredClassTy = SILType::getPrimitiveObjectType(
-              GenericEnvironment::mapTypeIntoContext(
+              GenericEnvironment::mapTypeIntoEnvironment(
                   genericEnv, loweredClassTy.getASTType())
                   ->getCanonicalType());
         switch (getClassFieldAccess(IGM, loweredClassTy, property)) {
@@ -1145,6 +1143,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // null otherwise.
   if (!pattern->getObjCString().empty()) {
     auto objcString = getAddrOfGlobalString(pattern->getObjCString(),
+                                            CStringSectionType::Default,
                                             /*relatively addressed*/ true);
     fields.addRelativeAddress(objcString);
   } else {
@@ -1360,8 +1359,8 @@ std::pair<llvm::Value *, llvm::Value *> irgen::emitKeyPathArgument(
     auto &ti = IGF.getTypeInfo(operandTy);
     auto ptr = IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, argsBuf.getAddress(),
                                              operandOffsets[i]);
-    auto addr = ti.getAddressForPointer(
-        IGF.Builder.CreateBitCast(ptr, ti.getStorageType()->getPointerTo()));
+    auto addr =
+        ti.getAddressForPointer(IGF.Builder.CreateBitCast(ptr, IGM.PtrTy));
     if (operandTy.isAddress()) {
       ti.initializeWithTake(IGF, addr, ti.getAddressForPointer(indiceValues.claimNext()),
                             operandTy, false, /*zeroizeIfSensitive=*/ true);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O  -enable-ossa-modules -sil-verify-all %s
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s
 // REQUIRES: OS=macosx
 
 import Foundation

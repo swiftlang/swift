@@ -49,7 +49,7 @@ InheritedTypeResult InheritedTypeRequest::evaluate(
       }
     }
   } else {
-    dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+    dc = (DeclContext *)cast<const ExtensionDecl *>(decl);
     context = TypeResolverContext::Inherited;
   }
 
@@ -172,27 +172,23 @@ bool SuppressesConformanceRequest::evaluate(Evaluator &evaluator,
     if (other == kp)
       return true;
   }
+
+  for (auto *attr :
+       nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(kp) && attr->isSuppressed())
+      return true;
+  }
+
   return false;
 }
 
-CustomAttr *
-AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *decl) const {
-  ASTContext &ctx = decl->getASTContext();
-  auto dc = decl->getDeclContext();
+CustomAttr *AttachedResultBuilderRequest::evaluate(Evaluator &evaluator,
+                                                   ValueDecl *decl) const {
   for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
-    // Figure out which nominal declaration this custom attribute refers to.
-    auto *nominal = evaluateOrDefault(ctx.evaluator,
-                                      CustomAttrNominalRequest{mutableAttr, dc},
-                                      nullptr);
-
-    if (!nominal)
-      continue;
-
     // Return the first custom attribute that is a result builder type.
-    if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>())
-      return mutableAttr;
+    auto *nominal = attr->getNominalDecl();
+    if (nominal && nominal->getAttrs().hasAttribute<ResultBuilderAttr>())
+      return attr;
   }
 
   return nullptr;
@@ -483,15 +479,15 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  return type->mapTypeOutOfContext();
+  return type->mapTypeOutOfEnvironment();
 }
 
-Type GenericTypeParamDeclGetValueTypeRequest::evaluate(Evaluator &evaluator,
-                                             GenericTypeParamDecl *decl) const {
-  if (!decl->isValue())
-    return Type();
+Type GenericTypeParamDeclGetValueTypeRequest::evaluate(
+    Evaluator &evaluator, const GenericTypeParamDecl *decl) const {
+  ASSERT(decl->isValue());
 
-  if (decl->getInherited().size() == 0) {
+  auto inherited = decl->getInherited();
+  if (inherited.empty()) {
     decl->diagnose(diag::missing_value_generic_type, decl->getName());
     return Type();
   }
@@ -502,12 +498,11 @@ Type GenericTypeParamDeclGetValueTypeRequest::evaluate(Evaluator &evaluator,
   //
   // We should have 1 inherited type for 'N', 'Int', and have a 2nd generic
   // parameter called 'Bool'.
-  ASSERT(decl->getInherited().size() == 1);
+  ASSERT(inherited.size() == 1);
 
   // The value type of a generic parameter should never rely on the generic
   // signature of the generic parameter itself or any of the outside context.
-  return decl->getInherited().getResolvedType(0,
-                                              TypeResolutionStage::Structural);
+  return inherited.getResolvedType(0, TypeResolutionStage::Structural);
 }
 
 // Define request evaluation functions for each of the type checker requests.

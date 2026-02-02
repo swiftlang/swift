@@ -48,6 +48,7 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class ParamDecl;
   class GenericSignature;
   enum class AccessorKind;
 
@@ -435,7 +436,8 @@ public:
   static std::optional<UIdent>
   getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
-  static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
+  static SourceKit::UIdent
+  getUIDForAccessLevel(const clang::index::SymbolProperty Scope);
 
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
@@ -755,6 +757,12 @@ public:
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
                                std::optional<VFSOptions> vfsOptions) override;
+
+  void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                        ArrayRef<const char *> Args,
+                        SourceKitCancellationToken CancellationToken,
+                        SignatureHelpConsumer &Consumer,
+                        std::optional<VFSOptions> vfsOptions) override;
 
   void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
                                 ArrayRef<const char *> args,

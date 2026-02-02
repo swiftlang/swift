@@ -970,8 +970,17 @@ bb0:
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   return %3 : $Int
 }
-// CHECK-LABEL: [always_inline] @always_inline_callee
-sil [transparent] [serialized] [always_inline] @always_inline_callee : $@convention(thin) () -> Int {
+// CHECK-LABEL: [heuristic_always_inline] @always_inline_callee
+sil [transparent] [serialized] [heuristic_always_inline] @always_inline_callee : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %1 = metatype $@thin Int.Type
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  return %3 : $Int
+}
+// CHECK-LABEL: [always_inline] @always_inline_callee2
+sil [transparent] [serialized] [always_inline] @always_inline_callee2 : $@convention(thin) () -> Int {
 bb0:
   %0 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBI_cSimF : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
@@ -1593,6 +1602,7 @@ bb0:
   %110 = function_ref @test_thunk : $@convention(thin) () -> ()
   %130 = function_ref @noinline_callee : $@convention(thin) () -> Int
   %132 = function_ref @always_inline_callee : $@convention(thin) () -> Int
+  %161 = function_ref @always_inline_callee2 : $@convention(thin) () -> Int
   %131 = function_ref @test_semantics : $@convention(thin) () -> ()
   %136 = function_ref @test_onone : $@convention(thin) () -> ()
   %137 = function_ref @test_ospeed : $@convention(thin) () -> ()

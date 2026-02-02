@@ -267,6 +267,14 @@ SWIFT_RUNTIME_STDLIB_SPI
 const void * const _swift_debug_allocationPoolPointer;
 
 SWIFT_RUNTIME_STDLIB_SPI
+const size_t _swift_debug_allocationPoolSize;
+
+// The size of the pages the metadata allocator allocates on the heap. May be
+// used to filter out possible metadata pages when examining the heap.
+SWIFT_RUNTIME_STDLIB_SPI
+const size_t _swift_debug_metadataAllocatorPageSize;
+
+SWIFT_RUNTIME_STDLIB_SPI
 std::atomic<const void *> _swift_debug_metadataAllocationBacktraceList;
 
 SWIFT_RUNTIME_STDLIB_SPI

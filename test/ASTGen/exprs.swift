@@ -83,7 +83,7 @@ func asyncFunc(_ arg: String) async throws -> Int {
   return 1
 }
 func testUnaryExprs() async throws {
-  let str = String()
+  var str = String()
   let foo = try await asyncFunc(_borrow str)
   let bar = copy foo
   let baz = consume foo

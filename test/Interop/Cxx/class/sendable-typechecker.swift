@@ -1,8 +1,10 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -swift-version 6 -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs -swift-version 6 -cxx-interoperability-mode=upcoming-swift
 
 import Sendable // expected-warning {{add '@preconcurrency' to treat 'Sendable'-related errors from module 'Sendable' as warnings}}
 
 func takesSendable<T: Sendable>(_ x: T.Type) {}
+func takesSendable<T>(_: T.Type) where T: Sendable, T: ~Copyable {}
+func takesSendable(_: @Sendable () -> Void) {}
 
 takesSendable(HasPrivatePointerField.self) // expected-error {{type 'HasPrivatePointerField' does not conform to the 'Sendable' protocol}}
 takesSendable(HasProtectedPointerField.self) // expected-error {{type 'HasProtectedPointerField' does not conform to the 'Sendable' protocol}}
@@ -23,3 +25,8 @@ takesSendable(DerivedPrivatelyFromHasPrivatePointerField.self) // expected-error
 takesSendable(DerivedProtectedFromHasPublicPointerField.self) // expected-error {{type 'DerivedProtectedFromHasPublicPointerField' does not conform to the 'Sendable' protocol}}
 takesSendable(DerivedProtectedFromHasPublicNonSendableField.self) // expected-error {{type 'DerivedProtectedFromHasPublicNonSendableField' does not conform to the 'Sendable' protocol}}
 takesSendable(DerivedProtectedFromHasPrivatePointerField.self) // expected-error {{type 'DerivedProtectedFromHasPrivatePointerField' does not conform to the 'Sendable' protocol}}
+
+func checkSendableRef(k: borrowing SendableKlass) {
+  takesSendable(SendableKlass.self) // Ok
+  takesSendable(k.test) // Ok
+}

@@ -175,7 +175,7 @@ bb7(%26 : $()):                                   // Preds: bb4
 }
 
 // main.(speak in _9ACC0692747077F216D14C36CD927671) (main.(Foo in _9ACC0692747077F216D14C36CD927671)) -> ()
-sil private [always_inline] @_TF4mainP33_9ACC0692747077F216D14C36CD9276715speakFCS_P33_9ACC0692747077F216D14C36CD9276713FooT_ : $@convention(thin) (@owned Foo) -> () {
+sil private [heuristic_always_inline] @_TF4mainP33_9ACC0692747077F216D14C36CD9276715speakFCS_P33_9ACC0692747077F216D14C36CD9276713FooT_ : $@convention(thin) (@owned Foo) -> () {
 bb0(%0 : $Foo):
   debug_value %0 : $Foo                           // id: %1
   strong_retain %0 : $Foo                         // id: %2

@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// REQUIRES: swift_feature_RegionBasedIsolation
 
 @MainActor
 class MyActor {

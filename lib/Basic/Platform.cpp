@@ -117,23 +117,32 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
     // macOS versions before 10.14.4 don't have Swift in the OS
     // (the linker still uses an rpath-based install name until 10.15).
     // macOS versions before 12.0 don't have _Concurrency in the OS.
-    return triple.isMacOSXVersionLT(12, 0);
+    // macOS versions before 26.0 don't have Span in stdlib.
+    return triple.isMacOSXVersionLT(26, 0);
   }
 
   if (triple.isiOS()) {
     // iOS versions before 12.2 don't have Swift in the OS.
     // iOS versions before 15.0 don't have _Concurrency in the OS.
-    return triple.isOSVersionLT(15, 0);
+    // iOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   if (triple.isWatchOS()) {
     // watchOS versions before 5.2 don't have Swift in the OS.
     // watchOS versions before 8.0 don't have _Concurrency in the OS.
-    return triple.isOSVersionLT(8, 0);
+    // watchOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
+  }
+
+  if (triple.isTvOS()) {
+    // tvOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   if (triple.isXROS()) {
-    return triple.isOSVersionLT(1, 0);
+    // visionOS versions before 26.0 don't have Span in stdlib.
+    return triple.isOSVersionLT(26, 0);
   }
 
   // Other platforms don't have Swift installed as part of the OS by default.
@@ -141,7 +150,10 @@ bool swift::tripleRequiresRPathForSwiftLibrariesInOS(
 }
 
 bool swift::tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple) {
-  return triple.isOSOpenBSD() && triple.getArch() == llvm::Triple::aarch64;
+  return triple.isOSOpenBSD() && (
+     triple.getArch() == llvm::Triple::aarch64 ||
+     triple.getArch() == llvm::Triple::x86_64);
+
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
@@ -273,9 +285,29 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "none";
   case llvm::Triple::UEFI:
   case llvm::Triple::LiteOS:
+  case llvm::Triple::Managarm:
     llvm_unreachable("unsupported OS");
   }
   llvm_unreachable("unsupported OS");
+}
+
+llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
+  if (triple.isMacOSX()) {
+    llvm::VersionTuple OSVersion;
+    triple.getMacOSXVersion(OSVersion);
+    return OSVersion;
+  } else if (triple.isiOS()) {
+    return triple.getiOSVersion();
+  } else if (triple.isWatchOS()) {
+    return triple.getOSVersion();
+  } else if (triple.isXROS()) {
+    return triple.getOSVersion();
+  } else if (triple.isOSWindows()) {
+    return triple.getOSVersion();
+  } else if (triple.isAndroid()) {
+    return triple.getEnvironmentVersion();
+  }
+  return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
 }
 
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
@@ -335,18 +367,18 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleArchName = triple.getArchName();
 
   return llvm::StringSwitch<StringRef>(tripleArchName)
-              .Cases("arm64", "aarch64", "arm64")
-              .Cases("arm64_32", "aarch64_32", "arm64_32")
-              .Cases("x86_64", "amd64", "x86_64")
-              .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
-                     "i386")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("armv7s", "armv7s")
-  //          .Case ("armv7k", "armv7k")
-  //          .Case ("armv7", "armv7")
-  //          .Case ("arm64e", "arm64e")
-              .Default(tripleArchName);
+      .Cases({"arm64", "aarch64"}, "arm64")
+      .Cases({"arm64_32", "aarch64_32"}, "arm64_32")
+      .Cases({"x86_64", "amd64"}, "x86_64")
+      .Cases({"i386", "i486", "i586", "i686", "i786", "i886", "i986"}, "i386")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("armv7s", "armv7s")
+      //          .Case ("armv7k", "armv7k")
+      //          .Case ("armv7", "armv7")
+      //          .Case ("arm64e", "arm64e")
+      .Default(tripleArchName);
 }
 
 static StringRef
@@ -373,20 +405,21 @@ getOSForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleOSNameNoVersion = tripleOSName.take_until(llvm::isDigit);
 
   return llvm::StringSwitch<StringRef>(tripleOSNameNoVersion)
-              .Cases("macos", "macosx", "darwin", "macos")
-              .Cases("unknown", "", "unknown")
-  // These values are also supported, but are handled by the default case below:
-  //          .Case ("ios", "ios")
-  //          .Case ("tvos", "tvos")
-  //          .Case ("watchos", "watchos")
-              .Default(tripleOSNameNoVersion);
+      .Cases({"macos", "macosx", "darwin"}, "macos")
+      .Cases({"unknown", ""}, "unknown")
+      // These values are also supported, but are handled by the default case
+      // below:
+      //          .Case ("ios", "ios")
+      //          .Case ("tvos", "tvos")
+      //          .Case ("watchos", "watchos")
+      .Default(tripleOSNameNoVersion);
 }
 
 static std::optional<StringRef>
 getEnvironmentForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   auto tripleEnvironment = triple.getEnvironmentName();
   return llvm::StringSwitch<std::optional<StringRef>>(tripleEnvironment)
-      .Cases("unknown", "", std::nullopt)
+      .Cases({"unknown", ""}, std::nullopt)
       // These values are also supported, but are handled by the default case
       // below:
       //          .Case ("simulator", StringRef("simulator"))
@@ -846,6 +879,37 @@ llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
   }
 
   return SDKVersion;
+}
+
+std::optional<llvm::Triple>
+swift::getCanonicalTriple(const llvm::Triple &triple) {
+  llvm::Triple Result = triple;
+  // Non-darwin targets do not require canonicalization.
+  if (!triple.isOSDarwin())
+    return Result;
+
+  // If the OS versions stay the same, return back the same triple.
+  const llvm::VersionTuple inputOSVersion = triple.getOSVersion();
+  const bool isOSVersionInValidRange =
+      llvm::Triple::isValidVersionForOS(triple.getOS(), inputOSVersion);
+  const llvm::VersionTuple canonicalVersion =
+      llvm::Triple::getCanonicalVersionForOS(
+          triple.getOS(), triple.getOSVersion(), isOSVersionInValidRange);
+  if (canonicalVersion == triple.getOSVersion())
+    return Result;
+
+  const std::string inputOSName = triple.getOSName().str();
+  const std::string inputOSVersionAsStr = inputOSVersion.getAsString();
+  const int platformNameLength =
+      inputOSName.size() - inputOSVersionAsStr.size();
+  if (!StringRef(inputOSName).ends_with(inputOSVersionAsStr) ||
+      (platformNameLength <= 0))
+    return std::nullopt;
+
+  llvm::SmallString<64> buffer(inputOSName.substr(0, platformNameLength));
+  buffer.append(canonicalVersion.getAsString());
+  Result.setOSName(buffer.str());
+  return Result;
 }
 
 static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {

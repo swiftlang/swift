@@ -58,7 +58,7 @@ swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
   // headers. Iterate over all AST modules.
   while (!buf.empty()) {
     auto info = serialization::validateSerializedAST(
-        buf, Loader.isRequiredOSSAModules(),
+        buf,
         /*requiredSDK*/StringRef());
 
     assert(info.name.size() < (2 << 10) && "name failed sanity check");
@@ -103,18 +103,4 @@ swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
   }
 
   return foundModules;
-}
-
-bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
-                            StringRef buf,
-                            const llvm::Triple &filter,
-                            SmallVectorImpl<std::string> &foundModules) {
-  auto Result = parseASTSection(Loader, buf, filter);
-  if (auto E = Result.takeError()) {
-    llvm::dbgs() << toString(std::move(E));
-    return false;
-  }
-  for (auto m : *Result)
-    foundModules.push_back(m);
-  return true;
 }

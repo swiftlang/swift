@@ -487,9 +487,8 @@ public:
   /// \returns the value returned by \c f
   /// \note When calling, you may need to specify the \c Val type
   ///       explicitly as a type parameter.
-  template <typename Val>
-  Val lookahead(unsigned char K,
-                llvm::function_ref<Val(CancellableBacktrackingScope &)> f) {
+  template <typename Fn>
+  decltype(auto) lookahead(unsigned char K, Fn f) {
     CancellableBacktrackingScope backtrackScope(*this);
 
     for (unsigned char i = 0; i < K; ++i)
@@ -574,7 +573,11 @@ public:
   /// the '(' by a space.
   ///
   /// If the next token is not '(' or it's on a new line, return false.
-  bool consumeIfAttributeLParen();
+  bool consumeIfAttributeLParen(bool isCustomAttr = false);
+
+  /// Check if the current token is '(' and it looks like a start of an
+  /// attribute argument list.
+  bool isAtAttributeLParen(bool isCustomAttr = false);
 
   bool consumeIfNotAtStartOfLine(tok K) {
     if (Tok.isAtStartOfLine()) return false;
@@ -690,6 +693,18 @@ public:
     return Context.LangOpts.EnableExperimentalConcurrency;
   }
 
+  bool shouldAttachCommentToDecl() {
+    return Context.LangOpts.AttachCommentsToDecls;
+  }
+
+  /// Returns true if a Swift declaration starts after the current token,
+  /// otherwise returns false.
+  bool isNextStartOfSwiftDecl() {
+    BacktrackingScope backtrack(*this);
+    consumeToken();
+    return isStartOfSwiftDecl();
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, DiagRef Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -763,6 +778,17 @@ public:
   SourceLoc
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
                                          size_t Len = 1);
+
+  /// If the next token is \c tok::colon, consume it; if the next token is
+  /// \c tok::colon_colon, split it into two \c tok::colons and consume the
+  /// first; otherwise, do nothing and return false.
+  bool consumeIfColonSplittingDoubles() {
+    if (!Tok.isAny(tok::colon, tok::colon_colon))
+      return false;
+
+    consumeStartingCharacterOfCurrentToken(tok::colon);
+    return true;
+  }
 
   //===--------------------------------------------------------------------===//
   // Primitive Parsing
@@ -1055,7 +1081,7 @@ public:
       std::optional<bool> &Exported,
       std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
-      AvailabilityRange *SILAvailability,
+      DeclNameLoc &targetFunctionLoc, AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
@@ -1127,8 +1153,8 @@ public:
   );
 
   /// Parse the @lifetime attribute.
-  ParserResult<LifetimeAttr> parseLifetimeAttribute(SourceLoc AtLoc,
-                                                    SourceLoc Loc);
+  ParserResult<LifetimeAttr>
+  parseLifetimeAttribute(StringRef attrName, SourceLoc atLoc, SourceLoc loc);
 
   /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
   /// type modifier.
@@ -1139,7 +1165,6 @@ public:
                                   SourceLoc AtEndLoc,
                                   bool isFromClangAttribute = false);
 
-  bool isCustomAttributeArgument();
   bool canParseCustomAttribute();
 
   /// Parse a custom attribute after the initial '@'.
@@ -1158,7 +1183,8 @@ public:
 
   bool isParameterSpecifier() {
     if (Tok.is(tok::kw_inout)) return true;
-    if (Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+    if ((Context.LangOpts.hasFeature(Feature::LifetimeDependence) ||
+         Context.LangOpts.hasFeature(Feature::Lifetimes)) &&
         isSILLifetimeDependenceToken())
       return true;
     if (!canHaveParameterSpecifierContextualKeyword()) return false;
@@ -1171,8 +1197,7 @@ public:
       return true;
     if (isCallerIsolatedSpecifier())
       return true;
-    if (Context.LangOpts.hasFeature(Feature::SendingArgsAndResults) &&
-        Tok.isContextualKeyword("sending"))
+    if (Tok.isContextualKeyword("sending"))
       return true;
     return false;
   }
@@ -1796,8 +1821,28 @@ public:
   /// \param loc The location of the label (empty if it doesn't exist)
   /// \param isAttr True if this is an argument label for an attribute (allows, but deprecates, use of
   ///               \c '=' instead of \c ':').
+  /// \param splittingColonColon True if \c :: tokens should be treated as two
+  ///                           adjacent colons.
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
-                                  bool isAttr = false);
+                                  bool isAttr = false,
+                                  bool splittingColonColon = false);
+
+  /// If a \c module-selector is present, returns a true value (specifically,
+  /// 1 or 2 depending on how many tokens should be consumed to skip it).
+  unsigned isAtModuleSelector();
+
+  /// Attempts to parse a \c module-selector if one is present.
+  ///
+  /// \verbatim
+  ///   module-selector: identifier '::'
+  /// \endverbatim
+  ///
+  /// \return \c None if no selector is present or a selector is present but
+  ///         is not allowed; an instance with an empty \c Identifier if a
+  ///         selector is present but has no valid identifier; an instance with
+  ///         a valid \c Identifier if a selector is present and includes a
+  ///         module name.
+  std::optional<Located<Identifier>> parseModuleSelector();
 
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
@@ -1810,6 +1855,9 @@ public:
     /// If passed, 'deinit' and 'subscript' should be parsed as special names,
     /// not ordinary identifiers.
     AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
+
+    /// If passed, module selectors are not permitted on this declaration name.
+    ModuleSelectorUnsupported = 1 << 3,
 
     /// If passed, compound names with argument lists are allowed, unless they
     /// have empty argument lists.
@@ -1829,6 +1877,9 @@ public:
     return DeclNameOptions(flag1) | flag2;
   }
 
+  /// Parse a declaration name that results in a `DeclNameRef` in the syntax
+  /// tree.
+  /// 
   /// Without \c DeclNameFlag::AllowCompoundNames, parse an
   /// unqualified-decl-base-name.
   ///
@@ -1852,7 +1903,8 @@ public:
       SourceLoc &rightAngleLoc, ArgumentList *&argList, bool isExprBasic,
       DiagRef diag);
 
-  ParserResult<Expr> parseExprIdentifier(bool allowKeyword);
+  ParserResult<Expr> parseExprIdentifier(bool allowKeyword,
+                                         bool allowModuleSelector = true);
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 

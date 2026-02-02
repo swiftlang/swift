@@ -230,7 +230,7 @@ static bool isAtStartOfSwitchCase(Parser &parser,
 
     parser.consumeToken(tok::at_sign);
     parser.consumeToken(tok::identifier);
-    if (parser.Tok.is(tok::l_paren))
+    if (parser.isAtAttributeLParen())
       parser.skipSingle();
   }
 
@@ -404,7 +404,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserStatus Status = parseLineDirective(false);
       BraceItemsStatus |= Status;
       NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
-    } else if (isStartOfSwiftDecl()) {
+    } else if (isStartOfSwiftDecl() ||
+               // Force parsing '@<identifier>' as a declaration, as there's no
+               // valid expression or statement starting with an attribute.
+               (Tok.is(tok::at_sign) && peekToken().is(tok::identifier))) {
       SmallVector<Decl*, 8> TmpDecls;
       ParserStatus DeclResult =
           parseDecl(IsAtStartOfLineOrPreviousHadSemi,
@@ -462,9 +465,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (Status.isErrorOrHasCompletion())
         NeedParseErrorRecovery = true;
       else if (!allowTopLevelCode()) {
-        diagnose(StartLoc,
-                 Result.is<Stmt*>() ? diag::illegal_top_level_stmt
-                                    : diag::illegal_top_level_expr);
+        diagnose(StartLoc, isa<Stmt *>(Result) ? diag::illegal_top_level_stmt
+                                               : diag::illegal_top_level_expr);
       }
 
       if (!Result.isNull()) {
@@ -472,7 +474,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         //       explicit '{' or '}', so the start and end locations should be
         //       the same as those of the result node, plus any junk consumed
         //       afterwards
-        auto Brace = BraceStmt::create(Context, Result.getStartLoc(),
+        auto Brace = BraceStmt::create(Context, StartLoc,
                                        Result, PreviousLoc, /*Implicit=*/true);
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
@@ -2500,11 +2502,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
         Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
-      Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
-                                pattern.get(), InLoc,
-                                Container.get(), WhereLoc, Where.getPtrOrNull(),
-                                Body.get()));
+      Status, new (Context) ForEachStmt(
+                  LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc, pattern.get(),
+                  InLoc, Container.get(), WhereLoc, Where.getPtrOrNull(),
+                  Body.get(), CurDeclContext));
 }
 
 ///
@@ -2712,7 +2713,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       }
       consumeToken(tok::identifier);
 
-      if (Tok.is(tok::l_paren)) {
+      if (isAtAttributeLParen()) {
         diagnose(Tok, diag::unexpected_lparen_in_attribute, "unknown");
         skipSingle();
       }
@@ -2723,7 +2724,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       diagnose(Tok, diag::unknown_attr_name, Tok.getText());
       consumeToken(tok::identifier);
 
-      if (Tok.is(tok::l_paren))
+      if (isAtAttributeLParen())
         skipSingle();
     }
   }

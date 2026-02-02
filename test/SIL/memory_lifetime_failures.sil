@@ -29,9 +29,24 @@ struct Mixed {
   var i: Int
 }
 
+public struct InnerWrapper<T> {
+  @_hasStorage var _prop: T { get set }
+  public var prop: T
+}
+
+public struct GenWrapper<T> {
+  @_hasStorage var _prop: T { get set }
+  public var prop: T
+
+  @_hasStorage var _nestedProp: InnerWrapper<T> { get set }
+  public var nestedProp: InnerWrapper<T>
+}
+
 sil @use_owned : $@convention(thin) (@owned T) -> ()
 sil @use_guaranteed : $@convention(thin) (@guaranteed T) -> ()
 sil @get_owned : $@convention(thin) () -> @owned T
+sil @use_T : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @mutate_T : $@convention(thin) <T> (@inout T) -> ()
 
 // CHECK: SIL memory lifetime failure in @test_simple: indirect argument is not alive at function return
 sil [ossa] @test_simple : $@convention(thin) (@inout T) -> @owned T {
@@ -276,14 +291,40 @@ bb0(%0 :  $*T):
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: store-borrow location cannot be written 
-sil [ossa] @test_store_borrow_destroy : $@convention(thin) (@guaranteed T) -> () {
+// CHECK: SIL memory lifetime failure in @test_non_escaping_closure_with_mark_dependence: memory is not initialized, but should be
+sil [ossa] @test_non_escaping_closure_with_mark_dependence : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa1 = mark_dependence %pa on %0
+  destroy_value %pa1 : $@noescape @callee_guaranteed () -> () 
+  dealloc_stack %0
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy1: store-borrow location cannot be written 
+sil [ossa] @test_store_borrow_destroy1 : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
   %sb = store_borrow %0 to %s : $*T
   destroy_addr %sb : $*T
   end_borrow %sb : $*T
   dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy2: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_destroy2 : $@convention(thin) (@guaranteed Inner) -> () {
+bb0(%0 :  @guaranteed $Inner):
+  %s = alloc_stack $Inner
+  %sb = store_borrow %0 to %s
+  %elem = struct_element_addr %sb, #Inner.a
+  destroy_addr %elem
+  end_borrow %sb
+  dealloc_stack %s
   %res = tuple ()
   return %res : $()
 }
@@ -842,3 +883,81 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
   dealloc_stack %2
   return %8
 }
+
+sil [ossa] @borrow_addressonly_prop : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
+bb0(%0 : $*GenWrapper<T>):
+  %2 = struct_element_addr %0, #GenWrapper._prop
+  return %2
+}
+
+sil [ossa] @mutate_addressonly_prop : $@convention(method) <T> (@inout GenWrapper<T>) -> @inout T {
+bb0(%0 : $*GenWrapper<T>):
+  %2 = struct_element_addr %0, #GenWrapper._prop
+  return %2
+}
+
+sil [ossa] @borrow_addressonly_nested_prop : $@convention(method) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address InnerWrapper<T> {
+bb0(%0 : $*GenWrapper<T>):
+  %2 = struct_element_addr %0, #GenWrapper._nestedProp
+  return %2
+}
+
+sil [ossa] @mutate_addressonly_nested_prop : $@convention(method) <T> (@inout GenWrapper<T>) -> @inout InnerWrapper<T> {
+bb0(%0 : $*GenWrapper<T>):
+  %2 = struct_element_addr %0, #GenWrapper._nestedProp
+  return %2
+}
+
+// CHECK: SIL memory lifetime failure in @test_use_after_free_address_only1: memory is not initialized, but should be
+// CHECK: memory location:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK: at instruction:   %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil [ossa] @test_use_after_free_address_only1 : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  %3 = function_ref @use_T : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0
+  %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK: SIL memory lifetime failure in @test_use_after_free_address_only2: memory is not initialized, but should be
+// CHECK: memory location:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0
+// CHECK: at instruction:   %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
+sil [ossa] @test_use_after_free_address_only2 : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @mutate_addressonly_prop : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0
+  %3 = function_ref @mutate_T : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
+  destroy_addr %0
+  %5 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@inout τ_0_0) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// TODO-CHECK: SIL memory lifetime failure in @test_guaranteed_address_consume: store-borrow location cannot be written
+// TODO-CHECK: memory location:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+// TODO-CHECK: at instruction:   destroy_addr %2 : $*T
+sil [ossa] @test_guaranteed_address_consume : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  destroy_addr %2
+  %4 = tuple ()
+  return %4
+}
+
+// TODO-CHECK: SIL memory lifetime failure in @test_guaranteed_nested_address_consume: store-borrow location cannot be written
+// TODO-CHECK: memory location:   %3 = struct_element_addr %2 : $*InnerWrapper<T>, #InnerWrapper._prop
+// TODO-CHECK: at instruction:   destroy_addr %3 : $*T
+sil [ossa] @test_guaranteed_nested_address_consume : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = function_ref @borrow_addressonly_nested_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address InnerWrapper<τ_0_0>
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address InnerWrapper<τ_0_0>
+  %3 = struct_element_addr %2, #InnerWrapper._prop
+  destroy_addr %3
+  %4 = tuple ()
+  return %4
+}
+

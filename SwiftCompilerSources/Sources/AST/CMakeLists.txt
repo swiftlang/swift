@@ -11,6 +11,7 @@ add_swift_compiler_module(AST
     Basic
   SOURCES
     Declarations.swift
+    DeclContext.swift
     Conformance.swift
     DiagnosticEngine.swift
     GenericSignature.swift

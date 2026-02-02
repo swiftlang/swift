@@ -52,3 +52,15 @@ void floatCastToInt(float meters, int * __counted_by((int) meters) p);
 void pointerCastToInt(int *square, int * __counted_by((int) square) p);
 
 void nanAsInt(int * __counted_by((int) (0 / 0)) p);
+
+void unsignedLiteral(int * __counted_by(2u) p);
+
+void longLiteral(int * __counted_by(2l) p);
+
+void hexLiteral(int * __counted_by(0xfa) p);
+
+void binaryLiteral(int * __counted_by(0b10) p);
+
+void octalLiteral(int * __counted_by(0777) p);
+
+void variadic(int len, int * __counted_by(len) p, ...);

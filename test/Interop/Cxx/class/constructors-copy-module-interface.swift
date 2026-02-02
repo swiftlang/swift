@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=Constructors -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// XFAIL: OS=linux-androideabi
 
 // CHECK: struct TemplatedCopyConstructor
 // CHECK: struct TemplatedCopyConstructorWithExtraArg

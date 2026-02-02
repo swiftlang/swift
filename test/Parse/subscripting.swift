@@ -142,7 +142,7 @@ struct A2 {
   subscript (i : Int) -> // expected-error{{expected subscripting element type}}
      {
     get {
-      return stored
+      return stored // expected-error {{cannot find 'stored' in scope}}
     }
     set {
       stored = newValue // expected-error{{cannot find 'stored' in scope}}
@@ -179,7 +179,6 @@ struct A6 {
                                      // expected-note@-2 {{did you mean}}
     get {
       return i + j // expected-error {{cannot find 'j' in scope}}
-                   // expected-error@-1 {{cannot convert return expression of type 'Int' to return type '(Int) -> Int'}}
     }
   }
 }

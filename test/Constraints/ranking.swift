@@ -450,3 +450,43 @@ struct HasIntInit {
 func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
   return .init(Int(x / numericCast(y)))
 }
+
+// This should pick UnicodeScalar.init(Int) and not one of the other
+// random overloads
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking19unicode_scalar_init1sys7UnicodeO6ScalarV_tF : $@convention(thin) (Unicode.Scalar) -> () {
+// CHECK: function_ref @$ss7UnicodeO6ScalarVyADSgSicfC : $@convention(method) (Int, @thin Unicode.Scalar.Type) -> Optional<Unicode.Scalar>
+// CHECK: return
+
+func unicode_scalar_init(s: UnicodeScalar) {
+  if s == UnicodeScalar(0xfe0e) {}
+}
+
+//--------------------------------------------------------------------
+// For loops
+//--------------------------------------------------------------------
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking12testForLoopsyyF : $@convention(thin) () -> ()
+func testForLoops() {
+  func foo() -> any Sequence<Int> { [0] }
+  func foo() -> some Sequence<Int> { [0] }
+  func foo() -> [Int] { [0] }
+
+  // CHECK: function_ref @$s7ranking12testForLoopsyyF3fooL1_SaySiGyF : $@convention(thin) () -> @owned Array<Int>
+  for _ in foo() {}
+}
+
+extension Collection {
+  // CHECK-LABEL: sil hidden [ossa] @$sSl7rankingE13testDropFirstyySiF
+  func testDropFirst(_ i: Int) {
+    // These should refer to the default Collection implementation of 'dropFirst'.
+    for _ in self.dropFirst(i) {}
+    // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
+
+    // CHECK-LABEL: sil private [ossa] @$sSl7rankingE13testDropFirstyySiFyycfU_
+    _ = {
+      for _ in self.dropFirst(i) {}
+      // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
+    }
+  }
+}

@@ -58,3 +58,27 @@ do {
   generic(Int.self)
   // CHECK: D<Int>
 }
+
+protocol Q {
+  func update(_: [Self])
+}
+
+extension Q {
+  func update(_ arr: [Self]) { print(Self.self) }
+}
+
+do {
+  class Parent : Q {}
+  class Subclass: Parent {}
+
+  func test(_ v: Parent & Sendable) {
+    v.update([])
+  }
+
+  test(Subclass())
+  // CHECK: Subclass
+
+  let sendableV: any Subclass & Sendable = Subclass()
+  test(sendableV)
+  // CHECK: Subclass
+}

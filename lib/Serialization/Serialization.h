@@ -116,6 +116,11 @@ class Serializer : public SerializerBase {
   /// an error in the AST.
   bool hadError = false;
 
+  bool hadImplementationOnlyImport = false;
+
+  /// Current decl being serialized.
+  const Decl* crossReferencedDecl = nullptr;
+
   /// Helper for serializing entities in the AST block object graph.
   ///
   /// Keeps track of assigning IDs to newly-seen entities, and collecting
@@ -431,8 +436,7 @@ private:
                     const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M, bool serializeAllSIL,
-                bool serializeDebugInfo);
+  void writeSIL(const SILModule *M);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
@@ -469,7 +473,7 @@ public:
   /// The type will be scheduled for serialization if necessary.,
   ///
   /// \returns The ID for the given type in this module.
-  ClangTypeID addClangTypeRef(const clang::Type *ty);
+  ClangTypeID addClangTypeRef(const clang::Type *ty, bool forFunction = false);
 
   /// Records the use of the given DeclBaseName.
   ///

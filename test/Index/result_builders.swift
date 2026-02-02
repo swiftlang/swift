@@ -36,7 +36,7 @@ enum Color {
 }
 
 func acceptColorTagged<Result>(@TaggedBuilder<Color> body: () -> Result) {
-// CHECK: [[@LINE-1]]:6 | function/Swift | acceptColorTagged(body:) | s:14swift_ide_test17acceptColorTagged4bodyyxyXE_tlF | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | acceptColorTagged(body:) | s:14swift_ide_test17acceptColorTagged4bodyyxyXE_tlF | Def | rel: 0
 // CHECK: [[@LINE-2]]:33 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref,RelCont | rel: 1
 // CHECK: [[@LINE-3]]:47 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref,RelCont | rel: 1
   print(body())
@@ -47,5 +47,5 @@ struct Context {
     // CHECK: [[@LINE-1]]:6 | struct/Swift | TaggedBuilder | s:14swift_ide_test13TaggedBuilderV | Ref,RelCont | rel: 1
     // CHECK: [[@LINE-2]]:20 | enum/Swift | Color | s:14swift_ide_test5ColorO | Ref,RelCont | rel: 1
     func foo() -> () {}
-    // CHECK: [[@LINE-1]]:10 | instance-method/Swift | foo() | s:14swift_ide_test7ContextV3fooyyF | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:10 | instance-method(internal)/Swift | foo() | s:14swift_ide_test7ContextV3fooyyF | Def,RelChild | rel: 1
 }

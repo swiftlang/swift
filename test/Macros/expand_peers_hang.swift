@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library -disable-availability-checking
 
 @attached(peer, names: named(BadThing))
 macro HangingMacro() = #externalMacro(module: "MacroDefinition", type: "HangingMacro")
@@ -11,6 +11,10 @@ macro HangingMacro() = #externalMacro(module: "MacroDefinition", type: "HangingM
 class Foo {
   init() {}
 
+  // expected-expansion@+5:32{{
+  //   expected-error@1{{unexpected token '}' in expanded member list}}
+  //   expected-error@2{{expected declaration}}
+  // }}
   // expected-note@+1 2{{in expansion of macro 'HangingMacro' on property 'result' here}}
   @HangingMacro var result: Int // This comment makes it hang.
 }

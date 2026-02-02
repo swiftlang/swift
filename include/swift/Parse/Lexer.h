@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,7 +39,6 @@ namespace swift {
   template<typename ...T> struct Diag;
 
 enum class CommentRetentionMode {
-  None,
   AttachToNextToken,
   ReturnAsTokens,
 };
@@ -185,7 +184,7 @@ public:
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, LexerMode LexMode,
       HashbangMode HashbangAllowed = HashbangMode::Disallowed,
-      CommentRetentionMode RetainComments = CommentRetentionMode::None);
+      CommentRetentionMode RetainComments = CommentRetentionMode::AttachToNextToken);
 
   /// Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
@@ -414,7 +413,7 @@ public:
   static bool isOperator(StringRef string);
 
   SourceLoc getLocForStartOfBuffer() const {
-    return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
+    return SourceLoc::getFromPointer(BufferStart);
   }
   
   /// StringSegment - A segment of a (potentially interpolated) string.
@@ -516,7 +515,7 @@ public:
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
-    return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    return SourceLoc::getFromPointer(Loc);
   }
 
   /// Get the token that starts at the given location.

@@ -38,6 +38,7 @@ benefit of all Swift developers.
         - [Reducing SIL test cases using bug_reducer](#reducing-sil-test-cases-using-bug_reducer)
     - [Disabling PCH Verification](#disabling-pch-verification)
     - [Diagnosing LSAN Failures in the Compiler](#diagnosing-lsan-failures-in-the-compiler)
+    - [Diagnosing the modules and swiftinterface files that the Compiler is loading](#diagnosing-the-modules-and-swiftinterface-files-that-the-compiler-is-loading)
 - [Debugging the Compiler Build](#debugging-the-compiler-build)
     - [Build Dry Run](#build-dry-run)
 - [Debugging the Compiler Driver](#debugging-the-compiler-driver-build)
@@ -47,11 +48,13 @@ benefit of all Swift developers.
     - [Reproducing the Compiler Driver build steps](#reproducing-the-compiler-driver-build-steps)
     - [Installing the Compiler Driver](#installing-the-compiler-driver)
 - [Debugging Swift Executables](#debugging-swift-executables)
+    - [Debugging Swift Testing Executables with LLDB](#debugging-swift-testing-executables-with-lldb)
     - [Determining the mangled name of a function in LLDB](#determining-the-mangled-name-of-a-function-in-lldb)
     - [Manually symbolication using LLDB](#manually-symbolication-using-lldb)
     - [Viewing allocation history, references, and page-level info](#viewing-allocation-history-references-and-page-level-info)
     - [Printing memory contents](#printing-memory-contents)
     - [Windows Error Codes](#windows-error-codes)
+    - [Debugging Simulator Apps](#working-simulator-apps)
 - [Debugging LLDB failures](#debugging-lldb-failures)
     - ["Types" Log](#types-log)
     - ["Expression" Log](#expression-log)
@@ -113,7 +116,7 @@ swiftc -g -emit-sil -O file.swift
 * **IRGen** To print the LLVM IR after IR generation:
 
 ```sh
-swiftc -emit-ir -Xfrontend -disable-llvm-optzns -O file.swift
+swiftc -emit-irgen -O file.swift
 ```
 
 * **LLVM passes** To print the LLVM IR after LLVM passes:
@@ -128,10 +131,15 @@ swiftc -emit-ir -O file.swift
 swiftc -S -O file.swift
 ```
 
-Compilation stops at the phase where you print the output. So if you want to
-print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except `-dump-ast`) can be redirected
 with an additional `-o <file>` option.
+Compilation stops at the phase where you print the output.
+
+If you want to print the SIL or IR in addition to producing the regular output
+file (e.g an object file), use the `-save-sil`, `save-irgen` or `save-ir`
+options.
+Those options take a file argument and save the SIL or LLVM-IR before or after
+LLVM optimization, respectively.
 
 ## Debugging Diagnostic Emission
 
@@ -936,6 +944,34 @@ $ apt update
 $ apt install vim
 ```
 
+## Diagnosing the modules and swiftinterface files that the Compiler is loading
+
+In order to determine which swiftinterface files or modules a compiler is
+loading, one can pass in the `-Rmodule-loading` flag to the compiler. This will
+cause the compiler to emit diagnostics that show where it is loading modules
+from. E.x.:
+
+```
+<unknown>:0: remark: 'Swift' has a required transitive dependency on 'SwiftShims'
+<unknown>:0: remark: loaded module 'SwiftShims'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/shims/module.modulemap', loaded: '2HUHAYXMA6V6X/SwiftShims-2VJU34GCOR4TK.pcm'
+<unknown>:0: remark: loaded module 'Swift'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/Swift.swiftmodule/arm64e-apple-macos.swiftinterface', loaded: '$MODULE_CACHE_PATH/Swift-145L0LE2COJMJ.swiftmodule'
+<unknown>:0: remark: '_StringProcessing' has a required transitive dependency on 'Swift'
+<unknown>:0: remark: loaded module '_StringProcessing'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/_StringProcessing.swiftmodule/arm64e-apple-macos.swiftinterface', loaded: '$MODULE_CACHE_PATH/_StringProcessing-GDUC793JZ4FG.swiftmodule'
+<unknown>:0: remark: loaded module '_SwiftConcurrencyShims'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/shims/module.modulemap', loaded: '$MODULE_CACHE_PATH/2HUHAYXMA6V6X/_SwiftConcurrencyShims-2VJU34GCOR4TK.pcm'
+<unknown>:0: remark: '_Concurrency' has a required transitive dependency on 'Swift'
+<unknown>:0: remark: '_Concurrency' has a required transitive dependency on 'SwiftShims'
+<unknown>:0: remark: loaded module '_Concurrency'; source: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX14.5.sdk/usr/lib/swift/_Concurrency.swiftmodule/arm64e-apple-macos.swiftinterface', loaded: '$MODULE_CACHE_PATH/_Concurrency-2F0RT3BEWY3IN.swiftmodule'
+```
+
+One can also control whether or not the compiler prefers the interface or
+serialized version of a module by using the environment variable
+`SWIFT_FORCE_MODULE_LOADING`. The supported options are:
+
+* prefer-interface
+* prefer-serialized
+* only-interface
+* only-serialized
+
 # Debugging the Compiler Build
 
 ## Build Dry Run
@@ -1066,6 +1102,12 @@ individual build actions (`clean`, `build`, `install`), the product build path
 One can use the previous tips for debugging the Swift compiler with Swift
 executables as well. Here are some additional useful techniques that one can use
 in Swift executables.
+
+## Debugging Swift Testing Executables with LLDB
+
+When debugging executables that use Swift Testing with LLDB, refer to the Swift
+Testing documentation for LLDB command-line debugging techniques:
+https://github.com/swiftlang/swift-testing/blob/main/Documentation/CommandlineDebugging.md
 
 ## Determining the mangled name of a function in LLDB
 
@@ -1200,6 +1242,15 @@ Some relevant Microsoft documentation:
 * https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
 * https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/0642cb2f-2075-4469-918c-4441e69c548a
 * https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+
+## Debugging Simulator Apps
+
+Sometimes one has to debug apps compiled for one of the simulators (e.x.: iOS
+simulator). To manipulate the simulator from the command line, one uses the tool
+called `simctl`. This lets one perform actions such as installing apps,
+uninstalling apps, and of course launching apps. To pass through environment
+variables to launched apps, one sets them in the calling environment using the
+environment variable prefix `SIMCTL_CHILD_$ACTUAL_ENV_VAR_NAME`.
 
 # Debugging LLDB failures
 

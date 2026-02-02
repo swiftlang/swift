@@ -1,12 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o -enforce-exclusivity=checked
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+
+func f() -> Bool? { return nil }
 
 public class MyClass {
   var handler: (()->())? = nil
@@ -32,5 +34,22 @@ struct Main {
     o!.foo() // CHECK: capture local
     print(local == 43 ? "43" : "???") // CHECK: 43
     o = nil // CHECK: deinit
+
+    let closure = {
+         guard var b = f() else { print("success"); return }
+         let c = { b = true }
+         _ = (b, c)
+    }
+    closure()   // CHECK: success
   }
+}
+
+/// Exclusivity checking stubs
+
+@c
+public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
+}
+
+@c
+public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
 }

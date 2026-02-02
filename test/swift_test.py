@@ -19,7 +19,10 @@ import os
 import lit
 import lit.formats
 import lit.util
+import lit.Test
 
+# Like FLAKYPASS, but this one is a failure.
+FLAKYFAIL = lit.Test.ResultCode("FLAKYFAIL", "Flaky", True)
 
 class SwiftTest(lit.formats.ShTest, object):
     def __init__(self, coverage_mode=None, execute_external=True):
@@ -53,7 +56,29 @@ class SwiftTest(lit.formats.ShTest, object):
                     os.path.join(test.config.swift_test_results_dir,
                                  "swift-%4m.profraw")
 
+        # If long tests are not run, and this is not a test known to be quite
+        # slow, tell Lit to re-run it at most 5 times upon failure to increase
+        # our odds detecting non-determinism early. If a test turns out to
+        # be flaky, it will fail and be reported as a FLAKYFAIL.
+        #
+        # NB: Unfortunately, we cannot base this condition on whether a
+        # particular test is a long test without hacks because the test is not
+        # parsed until it is executed.
+        if (
+            "long_test" not in test.config.available_features
+            # Some of these tests are notoriously slow.
+            and not ("Interop" in test.path_in_suite and "Cxx" in test.path_in_suite)
+            and not ("swift-dev-utils.test" in test.path_in_suite)
+        ):
+            test.allowed_retries = 5
+
     def after_test(self, test, litConfig, result):
+        # Intercept FLAKYPASS results and rewrite them into flaky failures. The
+        # goal here is to catch non-determinism and complain about it rather
+        # than to give a test more chances to succeed.
+        if result.code == lit.Test.FLAKYPASS:
+            result.code = FLAKYFAIL
+
         if test.getSourcePath() in self.skipped_tests:
             self.skipped_tests.remove(test.getSourcePath())
         return result

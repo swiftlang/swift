@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 1 --end 20 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-expression-time-threshold=1
+// RUN: %scale-test --begin 1 --end 20 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-scope-threshold=1000
 // REQUIRES: asserts,no_asan
 
 // UNSUPPORTED: OS=linux-gnu

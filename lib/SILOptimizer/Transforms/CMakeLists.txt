@@ -9,7 +9,6 @@ target_sources(swiftSILOptimizer PRIVATE
   COWOpts.cpp
   CSE.cpp
   ConditionForwarding.cpp
-  CopyForwarding.cpp
   CopyPropagation.cpp
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
@@ -31,7 +30,5 @@ target_sources(swiftSILOptimizer PRIVATE
   DestroyAddrHoisting.cpp
   SimplifyCFG.cpp
   Sink.cpp
-  SpeculativeDevirtualizer.cpp
-  StringOptimization.cpp
-  TempLValueOpt.cpp)
+  StringOptimization.cpp)
 

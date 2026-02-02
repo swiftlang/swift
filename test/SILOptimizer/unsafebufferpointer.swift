@@ -5,6 +5,9 @@
 // This is an end-to-end test to ensure that the optimizer generates
 // optimal code for UnsafeBufferPointer.
 
+// TODO: for some reason code generation for armv7 is not optimal in some cases
+// REQUIRES: PTRSIZE=64
+
 // CHECK-LABEL: define {{.*}}testIteration
 
 // Check if the code contains no traps at all.

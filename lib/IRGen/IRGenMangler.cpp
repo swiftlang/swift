@@ -13,7 +13,9 @@
 #include "IRGenMangler.h"
 #include "ExtendedExistential.h"
 #include "GenClass.h"
+#include "IRGenModule.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -414,15 +416,44 @@ std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
 std::string IRGenMangler::mangleSymbolNameForMangledMetadataAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
-                                           CanType type) {
+                                           CanType type,
+                                           MangledTypeRefRole role) {
   beginManglingWithoutPrefix();
   Buffer << kind << " ";
 
-  if (genericSig)
+  if (genericSig) {
     appendGenericSignature(genericSig);
+  }
 
-  if (type)
+  if (type) {
     appendType(type, genericSig);
+  }
+
+  // Noncopyable types get additional runtime capability checks before we reveal
+  // their metadata to reflection APIs, while core metadata queries always provide
+  // the metadata. So we need a separate symbol mangling for the two variants in
+  // this case.
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+  case MangledTypeRefRole::FlatUnique:
+  case MangledTypeRefRole::Metadata:
+    // Core metadata, never conditionalized.
+    break;
+
+  case MangledTypeRefRole::Reflection:
+  case MangledTypeRefRole::FieldMetadata: {
+    // Reflection metadata is conditionalized for noncopyable types.
+    CanType contextType = type;
+    if (genericSig) {
+      contextType = genericSig.getGenericEnvironment()->mapTypeIntoEnvironment(contextType)
+        ->getReducedType(genericSig);
+    }
+    if (contextType->isNoncopyable()) {
+      Buffer << " noncopyable";
+    }
+  }
+  }
+  
   return finalize();
 }
 

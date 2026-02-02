@@ -1,6 +1,6 @@
 // REQUIRES: objc_interop
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/nested_protocol_name.h -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/nested_protocol_name.h -typecheck -verify -verify-ignore-unrelated %s
 
 // RUN: echo '#include "nested_protocol_name.h"' > %t.m
 // RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/nested_protocol_name.h -import-objc-header %S/Inputs/nested_protocol_name.h --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt

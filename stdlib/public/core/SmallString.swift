@@ -79,14 +79,26 @@ internal struct _SmallString {
 extension _SmallString {
   @inlinable @inline(__always)
   internal static var capacity: Int {
-#if _pointerBitWidth(_32) || _pointerBitWidth(_16)
+#if os(watchOS) && _pointerBitWidth(_32)
     return 10
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
+    // Note: changed from 10 for contiguous storage.
+    return 8
 #elseif os(Android) && arch(arm64)
     return 14
 #elseif _pointerBitWidth(_64)
     return 15
 #else
 #error("Unknown platform")
+#endif
+  }
+
+  @_alwaysEmitIntoClient @inline(__always)
+  internal static func contiguousCapacity() -> Int {
+#if os(watchOS) && _pointerBitWidth(_32)
+    return capacity &- 2
+#else
+    return capacity
 #endif
   }
 

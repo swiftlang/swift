@@ -1,8 +1,8 @@
 // REQUIRES: objc_interop, OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
-// RUN: %target-swift-frontend %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5
-// RUN: %target-swift-frontend %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json
+// RUN: %target-swift-frontend %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -library-level api
+// RUN: %target-swift-frontend %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json -library-level api
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 // Struct has no objc data.
@@ -28,7 +28,8 @@ public struct TestStruct {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVACycfC",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/struct.swift",
-// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "10.13"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVMa",

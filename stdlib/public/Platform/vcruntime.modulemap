@@ -757,6 +757,11 @@ module std [system] {
       export *
     }
 
+    explicit module xsmf_control {
+      header "xsmf_control.h"
+      export *
+    }
+
     explicit module xstring {
       header "xstring"
       export *

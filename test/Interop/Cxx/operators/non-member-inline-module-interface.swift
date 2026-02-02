@@ -6,6 +6,7 @@
 // CHECK-NEXT: func / (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func % (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func ^ (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK-NEXT: func ~ (lhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func & (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func | (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK-NEXT: func << (lhs: LoadableIntWrapper, rhs: LoadableIntWrapper) -> LoadableIntWrapper

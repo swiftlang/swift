@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=destroy_value | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits %s -onone-simplification -simplify-instruction=destroy_value | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits %s -simplification -simplify-instruction=destroy_value | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 sil_stage canonical
 
@@ -8,20 +9,467 @@ import Builtin
 import Swift
 import SwiftShims
 
-sil @cl : $@convention(thin) () -> Int
-
-// CHECK-LABEL: sil [ossa] @remove_copy :
-// CHECK-NOT:     destroy_value
-// CHECK:       } // end sil function 'remove_copy'
-sil [ossa] @remove_copy : $@convention(thin) () -> () {
-bb0:
-  %0 = function_ref @cl : $@convention(thin) () -> Int
-  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
-  destroy_value %1 : $@callee_guaranteed () -> Int
-  %4 = tuple ()
-  return %4 : $()
+struct S {
+  var a: C
+  var b: C
+  var c: Int
 }
 
+struct S2 {
+  var a: C
+}
 
+struct NCS: ~Copyable {
+  var a: C
+  deinit
+}
 
+enum E {
+  case A(Int)
+  case B(C)
+}
+
+enum NCE: ~Copyable {
+  case A(Int)
+  case B(C)
+  deinit
+}
+
+protocol P: C {}
+class C: P {}
+class D: C {}
+
+sil @cl : $@convention(thin) () -> Int
+
+// CHECK-LABEL: sil [ossa] @remove_destroy :
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_destroy'
+sil [ossa] @remove_destroy : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @cl : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> Int
+  destroy_value %1
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @remove_struct :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'remove_struct'
+sil [ossa] @remove_struct : $@convention(thin) (@owned C, @owned C, Int) -> Int {
+bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+  %3 = struct $S (%0, %1, %2)
+  destroy_value %3
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @remove_tuple :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'remove_tuple'
+sil [ossa] @remove_tuple : $@convention(thin) (@owned C, @owned C, Int) -> Int {
+bb0(%0 : @owned $C, %1 : @owned $C, %2 : $Int):
+  %3 = tuple (%0, %1, %2)
+  destroy_value %3
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @remove_enum_a :
+// CHECK:       bb0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_enum_a'
+sil [ossa] @remove_enum_a : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $E, #E.A!enumelt, %0, forwarding: @owned
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_enum_b :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_enum_b'
+sil [ossa] @remove_enum_b : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = enum $E, #E.B!enumelt, %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_ref_to_bridged :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_ref_to_bridged'
+sil [ossa] @remove_ref_to_bridged : $@convention(thin) (@owned C, Builtin.Word) -> () {
+bb0(%0 : @owned $C, %1 : $Builtin.Word):
+  %2 = ref_to_bridge_object %0, %1
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_bridged_to_ref :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_bridged_to_ref'
+sil [ossa] @remove_bridged_to_ref : $@convention(thin) (@owned Builtin.BridgeObject) -> () {
+bb0(%0 : @owned $Builtin.BridgeObject):
+  %1 = bridge_object_to_ref %0 to $C
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_convert_function :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_convert_function'
+sil [ossa] @remove_convert_function : $@convention(thin) (@owned @convention(thick) (C) -> ()) -> () {
+bb0(%0 : @owned $@convention(thick) (C) -> ()):
+  %1 = convert_function %0 to $@convention(thick) (D) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_thin_to_thick_function :
+// CHECK:       bb0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_thin_to_thick_function'
+sil [ossa] @remove_thin_to_thick_function : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @cl : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 to $@callee_guaranteed () -> Int, forwarding: @owned
+  destroy_value %1
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @remove_upcast :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_upcast'
+sil [ossa] @remove_upcast : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = upcast %0 to $C
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unchecked_ref_cast :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_unchecked_ref_cast'
+sil [ossa] @remove_unchecked_ref_cast : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = unchecked_ref_cast %0 to $D
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_unconditional_checked_cast :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_unconditional_checked_cast'
+sil [ossa] @remove_unconditional_checked_cast : $@convention(thin) (@owned any P) -> () {
+bb0(%0 : @owned $any P):
+  %1 = unconditional_checked_cast %0 to C
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_init_existential_ref :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_init_existential_ref'
+sil [ossa] @remove_init_existential_ref : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = init_existential_ref %0 : $C : $C, $P
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @remove_open_existential_ref :
+// CHECK:       bb0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_open_existential_ref'
+sil [ossa] @remove_open_existential_ref : $@convention(thin) (@owned any P) -> () {
+bb0(%0 : @owned $any P):
+  %1 = open_existential_ref %0 to $@opened("01234567-89ab-cdef-0123-111111111111", P) Self
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Doing this wouldn't be a simplification
+// CHECK-LABEL: sil [ossa] @dont_remove_unchecked_enum_data :
+// CHECK:       bb0
+// CHECK-NEXT:    %1 = unchecked_enum_data
+// CHECK:         destroy_value %1
+// CHECK:       } // end sil function 'dont_remove_unchecked_enum_data'
+sil [ossa] @dont_remove_unchecked_enum_data : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = unchecked_enum_data %0, #E.B!enumelt
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Doing this might undo an opposite simplification
+// CHECK-LABEL: sil [ossa] @dont_remove_destructure_struct :
+// CHECK:       bb0
+// CHECK-NEXT:    %1 = destructure_struct
+// CHECK:         destroy_value %1
+// CHECK:       } // end sil function 'dont_remove_destructure_struct'
+sil [ossa] @dont_remove_destructure_struct : $@convention(thin) (@owned S2) -> () {
+bb0(%0 : @owned $S2):
+  %1 = destructure_struct %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Doing this might undo an opposite simplification
+// CHECK-LABEL: sil [ossa] @dont_remove_destructure_tuple :
+// CHECK:       bb0
+// CHECK:         %2 = destructure_tuple
+// CHECK:         destroy_value %2
+// CHECK:       } // end sil function 'dont_remove_destructure_tuple'
+sil [ossa] @dont_remove_destructure_tuple : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = tuple (%0)
+  %2 = destructure_tuple %1
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_struct_with_deinit :
+// CHECK:       bb0
+// CHECK-NEXT:    %1 = struct $NCS
+// CHECK-NEXT:    destroy_value %1
+// CHECK:       } // end sil function 'dont_remove_struct_with_deinit'
+sil [ossa] @dont_remove_struct_with_deinit : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = struct $NCS (%0)
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_enum_with_deinit :
+// CHECK:       bb0
+// CHECK-NEXT:    %1 = enum $NCE
+// CHECK-NEXT:    destroy_value %1
+// CHECK:       } // end sil function 'dont_remove_enum_with_deinit'
+sil [ossa] @dont_remove_enum_with_deinit : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = enum $NCE, #NCE.B!enumelt, %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_with_additional_user :
+// CHECK:       bb0
+// CHECK-NEXT:    %1 = upcast
+// CHECK:         destroy_value %1
+// CHECK:       } // end sil function 'dont_remove_with_additional_user'
+sil [ossa] @dont_remove_with_additional_user : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = upcast %0 to $C
+  %2 = begin_borrow %1
+  fix_lifetime %2
+  end_borrow %2
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL:      sil [ossa] @dont_remove_with_debug_user :
+// CHECK:            bb0
+// CHECK-O-NEXT:       destroy_value %0
+// CHECK-O-NEXT:       tuple
+// CHECK-ONONE-NEXT:   %1 = upcast
+// CHECK-ONONE-NEXT:   debug_value %1
+// CHECK-ONONE-NEXT:   destroy_value %1
+// CHECK:            } // end sil function 'dont_remove_with_debug_user'
+sil [ossa] @dont_remove_with_debug_user : $@convention(thin) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = upcast %0 to $C
+  debug_value %1, let, name "x"
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_phi :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'hoist_over_phi'
+sil [ossa] @hoist_over_phi : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%4 : @owned $C):
+  destroy_value %4
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_over_phi_with_additional_args :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3(%1, %2)
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3(%1, %2)
+// CHECK:       bb3({{%[0-9]+}} : $Int, {{%[0-9]+}} : $Int):
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'hoist_over_phi_with_additional_args'
+sil [ossa] @hoist_over_phi_with_additional_args : $@convention(thin) (@owned C, Int, Int) -> () {
+bb0(%0 : @owned $C, %1 : $Int, %2 : $Int):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%1, %0, %2)
+
+bb2:
+  br bb3(%1, %0, %2)
+
+bb3(%6 : $Int, %7 : @owned $C, %8 : $Int):
+  debug_step           // not a deinit barrier
+  destroy_value %7
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_non_phi_arg :
+// CHECK:       bb2([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    destroy_value [[A]]
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'dont_hoist_over_non_phi_arg'
+sil [ossa] @dont_hoist_over_non_phi_arg : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  switch_enum %0, case #E.A!enumelt: bb1, case #E.B!enumelt: bb2
+
+bb1(%2 : $Int):
+  br bb3
+
+bb2(%4 : @owned $C):
+  destroy_value %4
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_over_deinit_barrier :
+// CHECK-NOT:     destroy_value
+// CHECK:       bb3([[A:%.*]] : @owned $C):
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy_value [[A]]
+// CHECK:       } // end sil function 'dont_hoist_over_deinit_barrier'
+sil [ossa] @dont_hoist_over_deinit_barrier : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%4 : @owned $C):
+  apply undef() : $() -> ()
+  destroy_value %4
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_dead_end :
+// CHECK:       bb3([[PHI:%.*]] : @owned $C):
+// CHECK-NEXT:    destroy_value [dead_end] [[PHI]]
+// CHECK:       } // end sil function 'dont_hoist_dead_end'
+sil [ossa] @dont_hoist_dead_end : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%4 : @owned $C):
+  destroy_value [dead_end] %4
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_in_different_block :
+// CHECK-NOT:     destroy_value
+// CHECK:       bb4:
+// CHECK-NEXT:    destroy_value
+// CHECK:       bb5:
+// CHECK-NEXT:    destroy_value
+// CHECK:       } // end sil function 'dont_hoist_destroy_in_different_block'
+sil [ossa] @dont_hoist_destroy_in_different_block : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0)
+
+bb2:
+  br bb3(%0)
+
+bb3(%4 : @owned $C):
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_value %4
+  br bb6
+
+bb5:
+  destroy_value %4
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r
+}
 

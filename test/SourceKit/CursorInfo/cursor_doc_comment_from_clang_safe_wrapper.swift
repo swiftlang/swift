@@ -28,7 +28,7 @@ func test(_ s: Span<CInt>) {
 // CHECK: This comment contains `markup`.
 // CHECK: - And a list
 // CHECK-LABEL: DOC COMMENT XML
-// CHECK: <Function file="@__swiftmacro_So9testCDecl15_SwiftifyImportfMp_.swift" line="6" column="134"><Name>testCDecl(_:)</Name><USR>s:SC9testCDeclyys4SpanVys5Int32VGF</USR><Declaration>@available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK: <Function file="@__swiftmacro_So9testCDecl15_SwiftifyImportfMp_.swift" line="6" column="134"><Name>testCDecl(_:)</Name><USR>s:SC9testCDeclyys4SpanVys5Int32VGF</USR><Declaration>@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: public func testCDecl(_ p: Span&lt;Int32&gt;)</Declaration><CommentParts><Abstract><Para>This comment contains <codeVoice>markup</codeVoice>. *</Para></Abstract><Discussion><List-Bullet><Item><List-Bullet><Item><Para>And a list</Para></Item></List-Bullet></Item></List-Bullet><Para>This is an auto-generated wrapper for safer interop</Para></Discussion></CommentParts></Function>
 
 // CHECK-LABEL: SYMBOL GRAPH BEGIN

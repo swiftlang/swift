@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -parse-as-library -o %t -module-name=ModuleA %S/Inputs/diag_non_ephemeral_module1.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -parse-as-library -o %t -module-name=ModuleB %S/Inputs/diag_non_ephemeral_module2.swift
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %t %t/main.swift %S/Inputs/diag_non_ephemeral_globals.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t %t/main.swift %S/Inputs/diag_non_ephemeral_globals.swift
 
 import ModuleA
 import ModuleB

@@ -31,7 +31,9 @@ add_library(swift_RegexParser
   Utility/Errors.swift
   Utility/MissingUnicode.swift)
 
-target_link_libraries(swift_RegexParser PRIVATE swiftCore)
+target_link_libraries(swift_RegexParser PRIVATE
+  swiftCore
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 set_target_properties(swift_RegexParser PROPERTIES
   Swift_MODULE_NAME _RegexParser)
@@ -43,4 +45,5 @@ install(TARGETS swift_RegexParser
 emit_swift_interface(swift_RegexParser)
 install_swift_interface(swift_RegexParser)
 
+generate_plist(swiftRegexParser "${CMAKE_PROJECT_VERSION}" swift_RegexParser)
 embed_manifest(swift_RegexParser)

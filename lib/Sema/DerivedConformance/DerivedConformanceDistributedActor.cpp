@@ -29,19 +29,6 @@
 
 using namespace swift;
 
-bool DerivedConformance::canDeriveIdentifiable(
-    NominalTypeDecl *nominal, DeclContext *dc) {
-  // we only synthesize for concrete 'distributed actor' decls (which are class)
-  if (!isa<ClassDecl>(nominal))
-    return false;
-
-  auto &C = nominal->getASTContext();
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return false;
-
-  return nominal->isDistributedActor();
-}
-
 bool DerivedConformance::canDeriveDistributedActor(
     NominalTypeDecl *nominal, DeclContext *dc) {
   auto &C = nominal->getASTContext();
@@ -89,9 +76,6 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
 
   auto idType = getDistributedActorIDType(decl);
   auto actorSystemType = getDistributedActorSystemType(decl);
-
-  if (!idType || !actorSystemType)
-    return nullptr;
 
   // (id: Self.ID, using system: Self.ActorSystem)
   auto *params = ParameterList::create(
@@ -332,17 +316,24 @@ deriveBodyDistributed_invokeHandlerOnReturn(AbstractFunctionDecl *afd,
     metatypeVar->setImplicit();
     metatypeVar->setSynthesized();
 
+    // If the SerializationRequirement requires it, we need to emit a cast:
     // metatype as! <<concrete SerializationRequirement.Type>>
+    bool serializationRequirementIsAny =
+      serializationRequirementMetaTypeTy->getMetatypeInstanceType()->isEqual(
+            C.getAnyExistentialType());
+
     auto metatypeRef =
         new (C) DeclRefExpr(ConcreteDeclRef(metatypeParam), dloc, implicit);
-    auto metatypeSRCastExpr = ForcedCheckedCastExpr::createImplicit(
-        C, metatypeRef, serializationRequirementMetaTypeTy);
-
     auto metatypePattern = NamedPattern::createImplicit(C, metatypeVar);
-    auto metatypePB = PatternBindingDecl::createImplicit(
-        C, swift::StaticSpellingKind::None, metatypePattern,
-        /*expr=*/metatypeSRCastExpr, func);
 
+    PatternBindingDecl *metatypePB = serializationRequirementIsAny ?
+      PatternBindingDecl::createImplicit(
+          C, swift::StaticSpellingKind::None, metatypePattern,
+          /*expr=*/metatypeRef, func) :
+      PatternBindingDecl::createImplicit(
+          C, swift::StaticSpellingKind::None, metatypePattern,
+          /*expr=*/ForcedCheckedCastExpr::createImplicit(
+          C, metatypeRef, serializationRequirementMetaTypeTy), func);
     stmts.push_back(metatypePB);
     stmts.push_back(metatypeVar);
   }
@@ -399,7 +390,6 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
   auto system = derived.Nominal;
   auto &C = system->getASTContext();
 
-  // auto serializationRequirementType = getDistributedActorSystemType(decl);
   auto resultHandlerType = getDistributedActorSystemResultHandlerType(system);
   auto unsafeRawPointerType = C.getUnsafeRawPointerType();
   auto anyTypeType = ExistentialMetatypeType::get(C.TheAnyType); // Any.Type
@@ -415,7 +405,7 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
       {
           ParamDecl::createImplicit(
               C, C.Id_handler, C.Id_handler,
-              system->mapTypeIntoContext(resultHandlerType), system),
+              system->mapTypeIntoEnvironment(resultHandlerType), system),
           ParamDecl::createImplicit(
               C, C.Id_resultBuffer, C.Id_resultBuffer,
               unsafeRawPointerType, system),
@@ -436,84 +426,13 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
                                /*throws=*/true,
                                /*ThrownType=*/Type(),
                                /*genericParams=*/nullptr, params,
-                               /*returnType*/ TupleType::getEmpty(C), system);
+                               /*returnType=*/TupleType::getEmpty(C), system);
   funcDecl->setSynthesized(true);
   funcDecl->copyFormalAccessFrom(system, /*sourceIsParentContext=*/true);
   funcDecl->setBodySynthesizer(deriveBodyDistributed_invokeHandlerOnReturn);
 
   derived.addMembersToConformanceContext({funcDecl});
   return funcDecl;
-}
-
-/******************************************************************************/
-/******************************* PROPERTIES ***********************************/
-/******************************************************************************/
-
-static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
-  assert(derived.Nominal->isDistributedActor());
-  auto &C = derived.Context;
-
-  // ```
-  // nonisolated let id: Self.ID // Self.ActorSystem.ActorID
-  // ```
-  auto propertyType = getDistributedActorIDType(derived.Nominal);
-
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-      /*isStatic=*/false, /*isFinal=*/true);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
-
-  derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
-  derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-  return propDecl;
-}
-
-static ValueDecl *deriveDistributedActor_actorSystem(
-    DerivedConformance &derived) {
-  auto &C = derived.Context;
-
-  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
-  assert(classDecl && derived.Nominal->isDistributedActor());
-
-  if (!C.getLoadedModule(C.Id_Distributed))
-    return nullptr;
-
-  // ```
-  // nonisolated let actorSystem: ActorSystem
-  // ```
-  // (no need for @actorIndependent because it is an immutable let)
-  auto propertyType = getDistributedActorSystemType(classDecl);
-
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
-      DerivedConformance::SynthesizedIntroducer::Let, C.Id_actorSystem,
-      propertyType, /*isStatic=*/false, /*isFinal=*/true);
-
-  // mark as nonisolated, allowing access to it from everywhere
-  propDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
-
-  // IMPORTANT: `id` MUST be the first field of a distributed actor, and
-  // `actorSystem` MUST be the second field, because for a remote instance
-  // we don't allocate memory after those two fields, so their order is very
-  // important. The `hint` below makes sure the system is inserted right after.
-  if (auto id = derived.Nominal->getDistributedActorIDProperty()) {
-    derived.addMemberToConformanceContext(propDecl, /*hint=*/id);
-    derived.addMemberToConformanceContext(pbDecl, /*hint=*/id);
-  } else {
-    // `id` will be synthesized next, and will insert at head,
-    // so in order for system to be SECOND (as it must be),
-    // we'll insert at head right now and as id gets synthesized we'll get
-    // the correct order: id, actorSystem.
-    derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
-    derived.addMemberToConformanceContext(pbDecl, /*insertAtHead==*/true);
-  }
-
-  return propDecl;
 }
 
 /******************************************************************************/
@@ -550,26 +469,6 @@ deriveDistributedActorType_ActorSystem(
 
   // Return the default system type.
   return defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
-}
-
-static Type
-deriveDistributedActorType_ID(
-    DerivedConformance &derived) {
-  if (!derived.Nominal->isDistributedActor())
-    return nullptr;
-
-  // Look for a type DefaultDistributedActorSystem within the parent context.
-  auto systemTy = getDistributedActorSystemType(derived.Nominal);
-
-  // There is no known actor system type, so fail to synthesize.
-  if (!systemTy || systemTy->hasError())
-    return nullptr;
-
-  if (auto systemNominal = systemTy->getAnyNominal()) {
-    return getDistributedActorSystemActorIDType(systemNominal);
-  }
-
-  return nullptr;
 }
 
 static Type
@@ -790,13 +689,13 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
       executorType, /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
-  property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
-                                                   SourceLoc(), SourceRange(),
-                                                   /*implicit*/ true));
-  property->getAttrs().add(NonisolatedAttr::createImplicit(ctx));
+  property->addAttribute(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
+                                                 SourceLoc(), SourceRange(),
+                                                 /*implicit*/ true));
+  property->addAttribute(NonisolatedAttr::createImplicit(ctx));
 
   // Make the property implicitly final.
-  property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
+  property->addAttribute(new (ctx) FinalAttr(/*IsImplicit=*/true));
   if (property->getFormalAccess() == AccessLevel::Open)
     property->overwriteAccess(AccessLevel::Public);
 
@@ -843,13 +742,8 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
   if (auto var = dyn_cast<VarDecl>(requirement)) {
     ValueDecl *derivedValue = nullptr;
-    if (var->getName() == Context.Id_id) {
-      derivedValue = deriveDistributedActor_id(*this);
-    } else if (var->getName() == Context.Id_actorSystem) {
-      derivedValue = deriveDistributedActor_actorSystem(*this);
-    } else if (var->getName() == Context.Id_unownedExecutor) {
+    if (var->getName() == Context.Id_unownedExecutor)
       derivedValue = deriveDistributedActor_unownedExecutor(*this);
-    }
 
     if (derivedValue) {
       assertRequiredSynthesizedPropertyOrder(Context, Nominal);
@@ -881,10 +775,6 @@ std::pair<Type, TypeDecl *> DerivedConformance::deriveDistributedActor(
   if (assocType->getName() == Context.Id_SerializationRequirement) {
     return std::make_pair(
         deriveDistributedActorType_SerializationRequirement(*this), nullptr);
-  }
-
-  if (assocType->getName() == Context.Id_ID) {
-    return std::make_pair(deriveDistributedActorType_ID(*this), nullptr);
   }
 
   Context.Diags.diagnose(assocType->getLoc(),

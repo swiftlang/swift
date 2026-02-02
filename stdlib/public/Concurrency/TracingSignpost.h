@@ -28,6 +28,10 @@
 #include <os/log.h>
 #include <os/signpost.h>
 
+#if defined(__arm64__) && __has_include(<os/apt_private.h>)
+#include <os/apt_private.h>
+#endif
+
 // Compatibility notes:
 //
 // These signposts can be read by external software that isn't synced with the
@@ -210,7 +214,24 @@ inline void task_destroy(AsyncTask *task) {
 
 inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
                                 bool isCancelled, bool isEscalated,
-                                bool isStarting, bool isRunning, bool isEnqueued) {
+                                bool isStarting, bool isRunning,
+                                bool isEnqueued, bool wasRunning) {
+#if !TARGET_OS_SIMULATOR
+#if OS_APT_SPI_VERSION >= 20241023
+  uint64_t taskId = task->getTaskId();
+  if (isRunning) {
+    if (SWIFT_RUNTIME_WEAK_CHECK(os_apt_msg_async_task_running_4swift)) {
+      SWIFT_RUNTIME_WEAK_USE(os_apt_msg_async_task_running_4swift(taskId));
+    }
+  } else if (!isRunning && wasRunning) {
+#if OS_APT_SPI_VERSION >= 20250710
+    if (SWIFT_RUNTIME_WEAK_CHECK(os_apt_msg_async_task_stopped_4swift)) {
+      SWIFT_RUNTIME_WEAK_USE(os_apt_msg_async_task_stopped_4swift(taskId));
+    }
+#endif // OS_APT_SPI_VERSION >= 20250710
+  }
+#endif // OS_APT_SPI_VERSION >= 20241023
+#endif // !TARGET_OS_SIMULATOR
   ENSURE_LOGS();
   auto id = os_signpost_id_make_with_pointer(TaskLog, task);
   os_signpost_event_emit(

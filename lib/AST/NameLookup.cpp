@@ -361,6 +361,51 @@ enum class ConstructorComparison {
   Better,
 };
 
+bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
+                                   Identifier moduleSelector,
+                                   const DeclContext *dc) {
+  if (moduleSelector.empty())
+    return false;
+
+  ASTContext &ctx = dc->getASTContext();
+
+  // FIXME: Should we look this up relative to dc?
+  // We'd need a new ResolutionKind.
+  // FIXME: How can we diagnose this?
+  ModuleDecl *visibleFromRoot = ctx.getLoadedModule(moduleSelector);
+  if (!visibleFromRoot && moduleSelector == ctx.TheBuiltinModule->getName())
+    visibleFromRoot = ctx.TheBuiltinModule;
+  if (!visibleFromRoot) {
+    LLVM_DEBUG(llvm::dbgs() << "no module " << moduleSelector << "\n");
+    bool clearedAny = !decls.empty();
+    decls.clear();
+    return clearedAny;
+  }
+
+  SmallVector<ModuleDecl *, 4> visibleFrom;
+  dc->getSeparatelyImportedOverlays(visibleFromRoot, visibleFrom);
+  if (visibleFrom.empty())
+    visibleFrom.push_back(visibleFromRoot);
+
+  size_t initialCount = decls.size();
+  decls.erase(
+    std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) -> bool {
+      bool inScope = llvm::any_of(visibleFrom, [&](ModuleDecl *visibleFromMod) {
+        return ctx.getImportCache().isImportedBy(decl->getModuleContext(),
+                                                 visibleFromMod);
+      });
+
+      LLVM_DEBUG(decl->dumpRef(llvm::dbgs()));
+      LLVM_DEBUG(llvm::dbgs() << ": " << decl->getModuleContext()->getName()
+                              << (inScope ? " is " : " is NOT ")
+                              << "selected by " << moduleSelector << "\n");
+
+      return !inScope;
+    }),
+    decls.end());
+  return initialCount != decls.size();
+}
+
 /// Determines whether \p ctor1 is a "better" initializer than \p ctor2.
 static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
                                                  ConstructorDecl *ctor2,
@@ -482,11 +527,27 @@ static void recordShadowedDeclsAfterTypeMatch(
           }
         }
 
+        auto *firstProto = firstDecl->getDeclContext()->getSelfProtocolDecl();
+        auto *secondProto = secondDecl->getDeclContext()->getSelfProtocolDecl();
+
         // If one declaration is in a protocol or extension thereof and the
         // other is not, prefer the one that is not.
-        if ((bool)firstDecl->getDeclContext()->getSelfProtocolDecl() !=
-              (bool)secondDecl->getDeclContext()->getSelfProtocolDecl()) {
-          if (firstDecl->getDeclContext()->getSelfProtocolDecl()) {
+        if ((bool)firstProto != (bool)secondProto) {
+          if (firstProto) {
+            shadowed.insert(firstDecl);
+            break;
+          } else {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
+        // If one declaration is an associated type and the other is a type alias
+        // in a protocol or protocol extension, prefer the associated type.
+        if ((bool)firstProto && (bool)secondProto &&
+            (isa<AssociatedTypeDecl>(firstDecl) !=
+             isa<AssociatedTypeDecl>(secondDecl))) {
+          if (isa<AssociatedTypeDecl>(secondDecl)) {
             shadowed.insert(firstDecl);
             break;
           } else {
@@ -565,7 +626,7 @@ static void recordShadowedDeclsAfterTypeMatch(
       // This is due to the fact that in Swift 4, we only gave custom overload
       // types to properties in extensions of generic types, otherwise we
       // used the null type.
-      if (!ctx.isSwiftVersionAtLeast(5) && isa<ValueDecl>(firstDecl)) {
+      if (!ctx.isLanguageModeAtLeast(5) && isa<ValueDecl>(firstDecl)) {
         auto secondSig = cast<ValueDecl>(secondDecl)->getOverloadSignature();
         auto firstSig = cast<ValueDecl>(firstDecl)->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
@@ -1125,6 +1186,9 @@ enum class DirectlyReferencedTypeLookupFlags {
   /// Include members that would normally be excluded because they come from
   /// modules that have not been imported directly.
   IgnoreMissingImports = 1 << 3,
+
+  /// Whenther we should exclude macro expansions.
+  ExcludeMacroExpansions = 1 << 4,
 };
 
 using DirectlyReferencedTypeLookupOptions =
@@ -2468,14 +2532,27 @@ bool namelookup::isInABIAttr(SourceFile *sourceFile, SourceLoc loc) {
 }
 
 void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                                      Identifier moduleSelector,
                                       SmallVectorImpl<ValueDecl *> &decls) {
+  // If we're supposed to remove associated type declarations, do so now.
+  if (options & NL_RemoveAssociatedTypes) {
+    decls.erase(
+      std::remove_if(decls.begin(), decls.end(),
+                     [&](ValueDecl *decl) {
+                       return isa<AssociatedTypeDecl>(decl);
+                     }),
+      decls.end());
+  }
+
   // If we're supposed to remove overridden declarations, do so now.
   if (options & NL_RemoveOverridden)
     removeOverriddenDecls(decls);
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
-  if (options & NL_RemoveNonVisible)
+  if (options & NL_RemoveNonVisible) {
+    removeOutOfModuleDecls(decls, moduleSelector, dc);
     removeShadowedDecls(decls, dc);
+  }
 
   ModuleDecl *M = dc->getParentModule();
   filterForDiscriminator(decls, M->getDebugClient());
@@ -2787,7 +2864,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     }
   }
 
-  pruneLookupResultSet(DC, options, decls);
+  pruneLookupResultSet(DC, options, member.getModuleSelector(), decls);
   if (auto *debugClient = DC->getParentModule()->getDebugClient()) {
     debugClient->finishLookupInNominals(DC, typeDecls, member.getFullName(),
                                         options, decls);
@@ -2817,8 +2894,9 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
-    lookupInModule(module, member.getFullName(), decls, NLKind::QualifiedLookup,
-                   kind, topLevelScope, SourceLoc(), options);
+    lookupInModule(module, member.getFullName(), member.hasModuleSelector(),
+                   decls, NLKind::QualifiedLookup, kind, topLevelScope,
+                   SourceLoc(), options);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -2833,13 +2911,13 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                      [&](ImportPath::Access accessPath) {
                        return accessPath.matches(member.getFullName());
                      })) {
-      lookupInModule(module, member.getFullName(), decls,
-                     NLKind::QualifiedLookup, kind, topLevelScope,
+      lookupInModule(module, member.getFullName(), member.hasModuleSelector(),
+                     decls, NLKind::QualifiedLookup, kind, topLevelScope,
                      SourceLoc(), options);
     }
   }
 
-  pruneLookupResultSet(DC, options, decls);
+  pruneLookupResultSet(DC, options, member.getModuleSelector(), decls);
 
   if (auto *debugClient = DC->getParentModule()->getDebugClient()) {
     debugClient->finishLookupInModule(DC, module, member.getFullName(),
@@ -2907,7 +2985,7 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
       decls.push_back(decl);
   }
 
-  pruneLookupResultSet(dc, options, decls);
+  pruneLookupResultSet(dc, options, member.getModuleSelector(), decls);
   if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
     debugClient->finishLookupInAnyObject(dc, member.getFullName(), options,
                                          decls);
@@ -3065,6 +3143,10 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
           DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
     options |= UnqualifiedLookupFlags::IgnoreMissingImports;
 
+  if (typeLookupOptions.contains(
+          DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+    options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
   // Manually exclude macro expansions here since the source location
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
@@ -3147,6 +3229,10 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
       options |= NL_IgnoreMissingImports;
 
+    if (typeLookupOptions.contains(
+            DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+      options |= NL_ExcludeMacroExpansions;
+
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
     SmallVector<ModuleDecl *, 2> moduleDecls;
@@ -3178,6 +3264,11 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
 static DirectlyReferencedTypeDecls directReferencesForDeclRefTypeRepr(
     Evaluator &evaluator, ASTContext &ctx, DeclRefTypeRepr *repr,
     DeclContext *dc, DirectlyReferencedTypeLookupOptions options) {
+  // If we've already bound this TypeRepr, don't repeat the work.
+  if (repr->isBound()) {
+    return DirectlyReferencedTypeDecls({ repr->getBoundDecl() }, {});
+  }
+
   if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(repr)) {
     auto result = directReferencesForTypeRepr(
         evaluator, ctx, qualIdentTR->getBase(), dc, options);
@@ -3395,7 +3486,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
       dc = typeDecl->getInnermostDeclContext();
     else
-      dc = (DeclContext *)decl.get<const ExtensionDecl *>();
+      dc = (DeclContext *)cast<const ExtensionDecl *>(decl);
 
     // If looking at a protocol's inheritance list,
     // do not look at protocol members to avoid circularity.
@@ -3572,22 +3663,28 @@ ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(requirements);
 }
 
-NominalTypeDecl *
-ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                 ExtensionDecl *ext) const {
-  auto typeRepr = ext->getExtendedTypeRepr();
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
+    bool excludeMacroExpansions) const {
+  auto typeRepr = getExtendedTypeRepr();
   if (!typeRepr) {
     // We must've seen 'extension { ... }' during parsing.
     return nullptr;
   }
 
-  ASTContext &ctx = ext->getASTContext();
+  ASTContext &ctx = getASTContext();
+  auto &evaluator = ctx.evaluator;
   auto options = defaultDirectlyReferencedTypeLookupOptions;
-  if (ext->isInSpecializeExtensionContext()) {
+
+  if (isInSpecializeExtensionContext()) {
     options |= DirectlyReferencedTypeLookupFlags::AllowUsableFromInline;
   }
+
+  if (excludeMacroExpansions) {
+    options |= DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions;
+  }
+
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
-      evaluator, ctx, typeRepr, ext->getParent(), options);
+      evaluator, ctx, typeRepr, getParent(), options);
 
   // If there were no results, expand the lookup to include members that are
   // inaccessible due to missing imports. The missing imports will be diagnosed
@@ -3597,7 +3694,7 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                               /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
-                                             ext->getParent(), options);
+                                             getParent(), options);
   }
 
   // Resolve those type declarations to nominal type declarations.
@@ -3613,7 +3710,24 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   if (nominalTypes.empty())
     return nullptr;
 
-  return nominalTypes[0];
+  auto *result = nominalTypes[0];
+
+  // Tuple extensions are experimental, if the feature isn't enabled let's not
+  // bind this extension at all. This fixes a bunch of crashers that we don't
+  // yet properly handle with the feature enabled.
+  if (isa<BuiltinTupleDecl>(result) &&
+      !ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+    return nullptr;
+  }
+
+  return result;
+}
+
+NominalTypeDecl *
+ExtendedNominalRequest::evaluate(Evaluator &evaluator,
+                                 const ExtensionDecl *ext) const {
+  ASSERT(ext->canNeverBeBound() && "Should have been bound by bindExtensions");
+  return ext->computeExtendedNominal();
 }
 
 /// Whether there are only associated types in the set of declarations.
@@ -3685,7 +3799,7 @@ createTupleExtensionGenericParams(ASTContext &ctx,
     return nullptr;
 
   auto *typeAlias = cast<TypeAliasDecl>(referenced.first[0]);
-  if (!typeAlias->isGeneric())
+  if (!typeAlias->hasGenericParamList())
     return nullptr;
 
   return createExtensionGenericParams(ctx, ext, typeAlias);
@@ -3937,18 +4051,22 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
       parsedGenericParams->getRAngleLoc());
 }
 
-NominalTypeDecl *
-CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
-                                   CustomAttr *attr, DeclContext *dc) const {
+NominalTypeDecl *CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
+                                                    CustomAttr *attr) const {
+  auto owner = attr->getOwner();
+  auto *dc = owner.getDeclContext();
+
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
-  // any suitable macros.
+  // any suitable macros. If we're preferring property wrappers we wait to see
+  // if any property wrappers are in scope before returning.
   auto [module, macro] = attr->destructureMacroRef();
   auto moduleName = (module) ? module->getNameRef() : DeclNameRef();
   auto macroName = (macro) ? macro->getNameRef() : DeclNameRef();
   auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
                                          getAttachedMacroRoles());
-  if (!macros.empty())
+  auto shouldPreferPropWrapper = attr->shouldPreferPropertyWrapperOverMacro();
+  if (!macros.empty() && !shouldPreferPropWrapper)
     return nullptr;
 
   // Find the types referenced by the custom attribute.
@@ -3968,6 +4086,15 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   auto nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls.first,
                                             ResolveToNominalOptions(),
                                             modulesFound, anyObject);
+  // If we're preferring property wrappers and found a suitable match, continue.
+  // Otherwise we can bail and resolve as a macro.
+  if (shouldPreferPropWrapper) {
+    auto hasPropWrapper = llvm::any_of(nominals, [](NominalTypeDecl *NTD) {
+      return NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
+    });
+    if (!macros.empty() && !hasPropWrapper)
+      return nullptr;
+  }
   if (nominals.size() == 1 && !isa<ProtocolDecl>(nominals.front()))
     return nominals.front();
 
@@ -4072,7 +4199,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc, attributes, isSuppressed});
+    result.push_back({nominal, loc, inheritedTypes.getTypeRepr(i), attributes,
+                      isSuppressed});
   }
 }
 
@@ -4105,8 +4233,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
     ConformanceAttributes attributes;
     if (attr->isUnchecked())
       attributes.uncheckedLoc = loc;
-    result.push_back(
-        {attr->getProtocol(), loc, attributes, /*isSuppressed=*/false});
+    result.push_back({attr->getProtocol(), loc, /*inheritedTypeRepr=*/nullptr,
+                      attributes, attr->isSuppressed()});
   }
 
   // Else we have access to this information on the where clause.
@@ -4117,7 +4245,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), ConformanceAttributes(),
+    result.emplace_back(inheritedNominal, SourceLoc(),
+                        /*inheritedTypeRepr=*/nullptr, ConformanceAttributes(),
                         /*isSuppressed=*/false);
 
   return result;

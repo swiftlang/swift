@@ -265,6 +265,7 @@ bb1(%3 : $()):
   return %4 : $()
 bb2(%5: @owned $Error):
   %6 = builtin "unexpectedError"(%5 : $Error) : $()
+  destroy_value [dead_end] %5
   unreachable
 }
 
@@ -532,8 +533,6 @@ bb0(%0 : $*Builtin.Int64, %1: $*Builtin.Int64):
   return %4 : $()
 }
 
-sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
-
 // CHECK-LABEL: @partial_apply_asynclet
 sil [ossa] @partial_apply_asynclet : $@convention(thin) @async (@inout_aliasable Builtin.Int64) -> () {
 bb0(%0 : $*Builtin.Int64):
@@ -546,8 +545,7 @@ bb0(%0 : $*Builtin.Int64):
   %a = convert_function %e : $@async @callee_guaranteed () -> (@out Builtin.Int64, @error any Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>
   %n = convert_escape_to_noescape [not_guaranteed] %a : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>
   %sl = builtin "startAsyncLetWithLocalBuffer"<Builtin.Int64>(%o : $Optional<Builtin.RawPointer>, %n : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>, %p : $Builtin.RawPointer) : $Builtin.RawPointer
-  %fn = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
-  %ap = apply %fn(%sl, %p) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %ap = builtin "finishAsyncLet"(%sl, %p) : $()
   hop_to_executor %x : $Optional<Builtin.Executor>
   %el = builtin "endAsyncLetLifetime"(%sl : $Builtin.RawPointer) : $()
   destroy_value %n : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>

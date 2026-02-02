@@ -8,7 +8,7 @@
 // RUN:   -enable-experimental-feature CustomAvailability
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/client.swift \
-// RUN:   -typecheck -verify \
+// RUN:   -typecheck -verify -verify-ignore-unrelated \
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -I %t/modules -enable-experimental-feature CustomAvailability
 
@@ -31,7 +31,8 @@ public func unavailableInColorado() { }
 
 import lib
 
-func test() {
+func test() { // expected-note {{add '@available' attribute to enclosing global function}}
   availableInPacific() // expected-error {{'availableInPacific()' is only available in Pacific}}
+  // expected-note@-1 {{add 'if #available' version check}}
   unavailableInColorado() // expected-error {{'unavailableInColorado()' is unavailable}}
 }

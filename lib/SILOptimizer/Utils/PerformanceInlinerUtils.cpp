@@ -135,6 +135,9 @@ SILValue swift::stripFunctionConversions(SILValue val) {
       val = cvt->getOperand();
       result = val;
       continue;
+    } else if (auto md = dyn_cast<MarkDependenceInst>(val)) {
+      val = md->getValue();
+      result = val;
     } else {
       break;
     }
@@ -713,7 +716,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 
   for (auto Param : SubstParams) {
     // Map the parameter into context
-    auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
+    auto ContextTy = Callee->mapTypeIntoEnvironment(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();
     if (!Archetype)
       continue;
@@ -758,6 +761,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // If our inline selection is only always inline, do a quick check if we have
   // an always inline function and bail otherwise.
   if (WhatToInline == InlineSelection::OnlyInlineAlways &&
+      Callee->getInlineStrategy() != HeuristicAlwaysInline &&
       Callee->getInlineStrategy() != AlwaysInline) {
     return nullptr;
   }
@@ -870,7 +874,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     if (!isCallerAndCalleeLayoutConstraintsCompatible(AI) &&
         // TODO: revisit why we can make an exception for inline-always
         // functions. Some tests depend on it.
-        Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
+        Callee->getInlineStrategy() != HeuristicAlwaysInline && !Callee->isTransparent())
       return nullptr;
   }
 

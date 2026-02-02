@@ -120,6 +120,9 @@ suite.test("Initialize with ordinary element")
     let pointer: UnsafeMutablePointer = $0.baseAddress!
     span = Span(_unsafeStart: pointer, count: $0.count)
     expectEqual(span.count, capacity)
+
+    span = Span()
+    expectEqual(span.count, 0)
   }
 }
 
@@ -254,10 +257,10 @@ suite.test("_elementsEqual(_: Span)")
   a.withUnsafeBufferPointer {
     let span = Span(_unsafeElements: $0)
 
-    expectEqual(span._elementsEqual(span._extracting(first: 1)), false)
-    expectEqual(span._extracting(0..<0)._elementsEqual(span._extracting(last: 0)), true)
+    expectEqual(span._elementsEqual(span.extracting(first: 1)), false)
+    expectEqual(span.extracting(0..<0)._elementsEqual(span.extracting(last: 0)), true)
     expectEqual(span._elementsEqual(span), true)
-    expectEqual(span._extracting(0..<3)._elementsEqual(span._extracting(last: 3)), false)
+    expectEqual(span.extracting(0..<3)._elementsEqual(span.extracting(last: 3)), false)
 
     let copy = span.withUnsafeBufferPointer(Array.init)
     copy.withUnsafeBufferPointer {
@@ -281,7 +284,7 @@ suite.test("_elementsEqual(_: some Collection)")
     let span = Span(_unsafeElements: $0)
 
     expectEqual(span._elementsEqual(a), true)
-    expectEqual(span._extracting(0..<0)._elementsEqual([]), true)
+    expectEqual(span.extracting(0..<0)._elementsEqual([]), true)
     expectEqual(span._elementsEqual(a.dropLast()), false)
   }
 }
@@ -301,7 +304,7 @@ suite.test("_elementsEqual(_: some Sequence")
 
     let s = AnySequence(a)
     expectEqual(span._elementsEqual(s), true)
-    expectEqual(span._extracting(0..<(capacity-1))._elementsEqual(s), false)
+    expectEqual(span.extracting(0..<(capacity-1))._elementsEqual(s), false)
     expectEqual(span._elementsEqual(s.dropFirst()), false)
   }
 }
@@ -338,7 +341,7 @@ suite.test("subscript with BitwiseCopyable element")
   }
 }
 
-suite.test("_extracting() functions")
+suite.test("extracting() functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -350,17 +353,17 @@ suite.test("_extracting() functions")
   let b = (0..<capacity).map(String.init)
   b.withUnsafeBufferPointer {
     let span = Span(_unsafeElements: $0)
-    let sub1 = span._extracting(0..<2)
-    let sub2 = span._extracting(..<2)
-    let sub3 = span._extracting(...)
-    let sub4 = span._extracting(2...)
+    let sub1 = span.extracting(0..<2)
+    let sub2 = span.extracting(..<2)
+    let sub3 = span.extracting(...)
+    let sub4 = span.extracting(2...)
     expectTrue(sub1._elementsEqual(sub2))
     expectTrue(sub3._elementsEqual(span))
     expectFalse(sub4._elementsEqual(sub3))
   }
 }
 
-suite.test("_extracting(unchecked:) functions")
+suite.test("extracting(unchecked:) functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -372,14 +375,14 @@ suite.test("_extracting(unchecked:) functions")
   let b = (0..<capacity).map(String.init)
   b.withUnsafeBufferPointer {
     let span = Span(_unsafeElements: $0)
-    let prefix = span._extracting(0..<8)
-    let beyond = prefix._extracting(unchecked: 16...23)
+    let prefix = span.extracting(0..<8)
+    let beyond = prefix.extracting(unchecked: 16...23)
     expectEqual(beyond.count, 8)
     expectEqual(beyond[0], "16")
   }
 }
 
-suite.test("prefix _extracting() functions")
+suite.test("prefix extracting() functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -392,22 +395,22 @@ suite.test("prefix _extracting() functions")
   a.withUnsafeBufferPointer {
     let span = Span(_unsafeElements: $0)
     expectEqual(span.count, capacity)
-    expectEqual(span._extracting(first: 1)[0], 0)
-    expectEqual(span._extracting(first: capacity)[capacity-1], capacity-1)
-    expectEqual(span._extracting(droppingLast: capacity).count, 0)
-    expectEqual(span._extracting(droppingLast: 1)[capacity-2], capacity-2)
+    expectEqual(span.extracting(first: 1)[0], 0)
+    expectEqual(span.extracting(first: capacity)[capacity-1], capacity-1)
+    expectEqual(span.extracting(droppingLast: capacity).count, 0)
+    expectEqual(span.extracting(droppingLast: 1)[capacity-2], capacity-2)
   }
 
   do {
     let b = UnsafeBufferPointer<Int>(start: nil, count: 0)
     let span = Span(_unsafeElements: b)
     expectEqual(span.count, b.count)
-    expectEqual(span._extracting(first: 1).count, b.count)
-    expectEqual(span._extracting(droppingLast: 1).count, b.count)
+    expectEqual(span.extracting(first: 1).count, b.count)
+    expectEqual(span.extracting(droppingLast: 1).count, b.count)
   }
 }
 
-suite.test("suffix _extracting() functions")
+suite.test("suffix extracting() functions")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -420,46 +423,41 @@ suite.test("suffix _extracting() functions")
   a.withUnsafeBufferPointer {
     let span = Span<Int>(_unsafeElements: $0)
     expectEqual(span.count, capacity)
-    expectEqual(span._extracting(last: capacity)[0], 0)
-    expectEqual(span._extracting(last: capacity-1)[0], 1)
-    expectEqual(span._extracting(last: 1)[0], capacity-1)
-    expectEqual(span._extracting(droppingFirst: capacity).count, 0)
-    expectEqual(span._extracting(droppingFirst: 1)[0], 1)
+    expectEqual(span.extracting(last: capacity)[0], 0)
+    expectEqual(span.extracting(last: capacity-1)[0], 1)
+    expectEqual(span.extracting(last: 1)[0], capacity-1)
+    expectEqual(span.extracting(droppingFirst: capacity).count, 0)
+    expectEqual(span.extracting(droppingFirst: 1)[0], 1)
   }
 
   do {
     let b = UnsafeBufferPointer<Int>(start: nil, count: 0)
     let span = Span(_unsafeElements: b)
     expectEqual(span.count, b.count)
-    expectEqual(span._extracting(last: 1).count, b.count)
-    expectEqual(span._extracting(droppingFirst: 1).count, b.count)
+    expectEqual(span.extracting(last: 1).count, b.count)
+    expectEqual(span.extracting(droppingFirst: 1).count, b.count)
   }
 }
 
 suite.test("withUnsafeBufferPointer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity: UInt8 = 64
-  let a = Array(0..<capacity)
-  a.withUnsafeBufferPointer {
-    ub in
-    let span = Span(_unsafeElements: ub)
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  var a = ContiguousArray(0..<10)
+  a.withUnsafeMutableBufferPointer {
+    let span = Span(_unsafeElements: $0)
     span.withUnsafeBufferPointer {
-      let i = Int.random(in: 0..<$0.count)
-      expectEqual($0[i], ub[i])
+      expectEqual($0.count, capacity)
+      for i in $0.indices {
+        expectEqual($0[i], i)
+      }
     }
 
-    let emptyBuffer = UnsafeBufferPointer(rebasing: ub[0..<0])
-    expectEqual(emptyBuffer.baseAddress, ub.baseAddress)
-
+    let emptyBuffer = UnsafeBufferPointer(rebasing: $0[0..<0])
+    expectEqual(emptyBuffer.baseAddress, $0.baseAddress)
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBufferPointer {
-      expectNil($0.baseAddress)
+      expectEqual($0.count, 0)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -488,12 +486,13 @@ suite.test("withUnsafeBytes()")
 
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBytes {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }
 
-suite.test("isIdentical(to:)")
+suite.test("isTriviallyIdentical(to:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -501,23 +500,70 @@ suite.test("isIdentical(to:)")
 .code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
+  func checkTriviallyIdentical<T: BitwiseCopyable>(
+    _ x: UnsafeMutableBufferPointer<T>,
+    _ y: UnsafeMutableBufferPointer<T>,
+    _ expected: Bool,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    showFrame: Bool = true,
+    file: String = #file,
+    line: UInt = #line
+  ) {
+    let stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+    do {
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeBufferPointer<T>(x)
+      let y = UnsafeBufferPointer<T>(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeRawBufferPointer(x)
+      let y = UnsafeRawBufferPointer(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeMutableRawBufferPointer(x)
+      let y = UnsafeMutableRawBufferPointer(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x: Span<T> = unsafe x.span
+      let y: Span<T> = unsafe y.span
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      expectEqual(expected, x.isIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x: RawSpan = unsafe x.span.bytes
+      let y: RawSpan = unsafe y.span.bytes
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      expectEqual(expected, x.isIdentical(to: y), stackTrace: stackTrace)
+    }
+  }
+
+  let a = UnsafeMutableBufferPointer<Int>(start: nil, count: 0)
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
+  let c = b.extracting(..<6) // FIXME: (first: 6)
+  let d = b.extracting(2...) // FIXME: (last: 6)
+  let e = c.extracting(2...) // FIXME: (last: 4)
+  let f = d.extracting(..<4) // FIXME: (first: 4)
+
   _ = b.initialize(fromContentsOf: 0..<8)
   defer { b.deallocate() }
 
-  let span = Span(_unsafeElements: b)
-  let pre = span._extracting(first: 6)
-  let suf = span._extracting(last: 6)
+  checkTriviallyIdentical(a, a, true)
+  checkTriviallyIdentical(b, b, true)
+  checkTriviallyIdentical(c, c, true)
+  checkTriviallyIdentical(d, d, true)
+  checkTriviallyIdentical(e, e, true)
+  checkTriviallyIdentical(f, f, true)
 
-  expectFalse(
-    pre.isIdentical(to: suf)
-  )
-  expectFalse(
-    pre.isIdentical(to: span)
-  )
-  expectTrue(
-    pre._extracting(last: 4).isIdentical(to: suf._extracting(first: 4))
-  )
+  checkTriviallyIdentical(a, b, false)
+  checkTriviallyIdentical(b, c, false)
+  checkTriviallyIdentical(c, d, false)
+  checkTriviallyIdentical(d, e, false)
+  checkTriviallyIdentical(e, f, true)
 }
 
 suite.test("indices(of:)")
@@ -533,13 +579,13 @@ suite.test("indices(of:)")
   defer { b.deallocate() }
 
   let span = Span(_unsafeElements: b)
-  let subSpan1 = span._extracting(first: 6)
-  let subSpan2 = span._extracting(last: 6)
-  let emptySpan = span._extracting(first: 0)
+  let subSpan1 = span.extracting(first: 6)
+  let subSpan2 = span.extracting(last: 6)
+  let emptySpan = span.extracting(first: 0)
 /*  This isn't relevant until we can support unaligned spans
   let unalignedSpan = RawSpan(_unsafeSpan: span)
-                        ._extracting(droppingFirst: 6)
-                        ._extracting(droppingLast: 2)
+                        .extracting(droppingFirst: 6)
+                        .extracting(droppingLast: 2)
                         .unsafeView(as: Int.self)
 */
   let nilBuffer = UnsafeBufferPointer<Int>(start: nil, count: 0)
@@ -596,8 +642,6 @@ private struct NCSendable: ~Copyable, Sendable {}
 
 suite.test("Span Sendability")
 .require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
   defer { buffer.deallocate() }
   buffer.initializeElement(at: 0, to: NCSendable())

@@ -9,6 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// This defines the public APIs for parsing floating point numbers.
+//
+// The backing implementation is in `FloatingPointFromString.swift`
+//
+//===----------------------------------------------------------------------===//
+
 
 import SwiftShims
 
@@ -122,6 +129,10 @@ extension ${Self}: LosslessStringConvertible {
   ///       // p?.isNaN == true
   ///       // String(p!) == "nan(0x10)"
   ///
+  /// - An input string of `"snan"` (case insensitive) is converted
+  ///   into a *signaling NaN* value.  This form permits an optional
+  ///   payload in the same format as for a non-signaling NaN.
+  ///
   /// A string in any other format than those described above
   /// or containing additional characters
   /// results in a `nil` value. For example, the following conversions
@@ -134,7 +145,7 @@ extension ${Self}: LosslessStringConvertible {
   /// A decimal or hexadecimal string is converted to a `${Self}`
   /// instance using the IEEE 754 roundTiesToEven (default) rounding
   /// attribute.
-  /// Values with absolute value smaller than `${Self}.leastNonzeroMagnitude`
+  /// Values with absolute value smaller than one-half of `${Self}.leastNonzeroMagnitude`
   /// are rounded to plus or minus zero.
   /// Values with absolute value larger than `${Self}.greatestFiniteMagnitude`
   /// are rounded to plus or minus infinity.
@@ -161,13 +172,26 @@ extension ${Self}: LosslessStringConvertible {
   /// - Parameter text: An input string to convert to a `${Self}?` instance.
   ///
   @inlinable
+  // This is inlinable because the unspecialized generic takes a protocol
+  // argument; inlining might be able to specialize away the existential.
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
+    // Float16 has only been supported since Swift 5.3, so it can
+    // unconditionally delegate to init(_:Substring)
     self.init(Substring(text))
   %else:
-    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) { //SwiftStdlib 5.3
+    if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+      // On SwiftStdlib 5.3 and later, we can just delegate to the
+      // init(_:Substring) initializer:
       self.init(Substring(text))
     } else {
+      // When running on SwiftStdlib <5.3, we can't just delegate to
+      // the init(_:Substring) initializer, so we have to inline the whole thing...
+
+      // This means we must preserve the _swift_stdlib_strto{f,d,ld}_clocale
+      // ABI for as long as we support code compiled for Swift < 5.3, which
+      // includes macOS < 11.0, iOS/tvOS < 14.0, or watchOS < 7.0
+
       self = 0.0
       let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
         unsafe text.withCString { chars -> Bool in
@@ -191,14 +215,76 @@ extension ${Self}: LosslessStringConvertible {
   %end
   }
 
-  // Caveat:  This implementation used to be inlineable.
-  // In particular, we still have to export
-  // _swift_stdlib_strtoXYZ_clocale()
-  // as ABI to support old compiled code that still requires it.
+  % if bits in [16, 32, 64]:
+
+  // Various entry points that take concrete types.  Note that these
+  // are deliberately NOT inlinable:
+  // * There is no performance advantage to inlining
+  // * There is a code size disadvantage to inlining
+  // * We don't want to use the `StringProtocol` API for these common cases as
+  //   that pessimizes either performance or code size depending on whether it
+  //   gets inlined.
+
+  // TODO: Expose a concrete `String` API to optimize the common case
+  /*
+  @available(SwiftStdlib 6.4, *)
+  public init?(_ text: String) {
+    if let d = parse_float(text.utf8.span) {
+      self = d
+    } else {
+      return nil
+    }
+  }
+  */
+
+  // TODO: Expose Span-taking API publicly
+  // TODO: Some applications would like to restrict the patterns supported
+  // here. We could do that by adding an option set here that indicates
+  // the supported patterns, or we could expose additional entry points to
+  // support common use cases (e.g., JSON).
+  /*
+  @available(SwiftStdlib 6.4, *)
+  public init?(_ text: Span<UInt8>) {
+    if let d = parse_float(text) {
+      self = d
+    } else {
+      return nil
+    }
+  }
+  */
+
+  // Use the all-Swift `parse_float${bits}()` implementation for Float16/32/64
+  @available(SwiftStdlib 5.3, *)
+  public init?(_ text: Substring) {
+  #if _pointerBitWidth(_16)
+    // Always fail on 16-bit targets
+    return nil
+  #else
+    var mutableText = text
+    let parsed: ${Self}?
+    parsed = mutableText.withUTF8 { chars -> ${Self}? in
+      unsafe parse_float${bits}(chars.span)
+    }
+
+    if let parsed {
+      self = parsed
+    } else {
+      return nil
+    }
+  #endif
+  }
+
+  % elif bits in [80]:
+
+  // For now, continue relying on libc-based implementation for Float80 support
+  // TODO: Implement `parse_float80(_:Span)` so this can
+  // be implemented the same as above.
   @available(SwiftStdlib 5.3, *)
   public init?(_ text: Substring) {
     self = 0.0
     let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
+      // Make a copy of `text` to ensure we have a null-terminated C string
+      // to pass to the libc API:
       unsafe text.withCString { chars -> Bool in
         switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
@@ -217,7 +303,9 @@ extension ${Self}: LosslessStringConvertible {
       return nil
     }
   }
+  % end
 }
+
 
 % if bits in [16,80]:
 #endif

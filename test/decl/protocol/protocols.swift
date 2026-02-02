@@ -113,8 +113,8 @@ struct DoesNotConform : Up {
 
 protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
 protocol CircleMiddle : CircleStart { func circle_middle() }
-// expected-note@-1 2 {{protocol 'CircleMiddle' declared here}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
+// expected-note@-1 2 {{through protocol 'CircleMiddle' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{through protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}

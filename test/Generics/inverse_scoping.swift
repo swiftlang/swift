@@ -1,22 +1,13 @@
-// RUN: %target-typecheck-verify-swift  -enable-experimental-feature SuppressedAssociatedTypes
-
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
-
-
+// RUN: %target-typecheck-verify-swift
 
 protocol NoCopyReq: ~Copyable {}
 
 protocol P {
   func f() where Self: ~Copyable // expected-error {{cannot suppress '~Copyable' on generic parameter 'Self' defined in outer scope}}
+                                 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
   func g<T>(_: T) where Self: ~Copyable // expected-error {{cannot suppress '~Copyable' on generic parameter 'Self' defined in outer scope}}
-
-  associatedtype AT where Self: ~Copyable // expected-error {{constraint with subject type of 'Self' is not supported; consider adding requirement to protocol inheritance clause instead}}
-
-  // expected-error@+1 {{cannot suppress '~Copyable' on generic parameter 'Self.Alice' defined in outer scope}}
-  associatedtype Bob where Alice: NoCopyReq & ~Copyable
-  associatedtype Alice where Bob: ~Copyable
-  // expected-error@-1 {{cannot suppress '~Copyable' on generic parameter 'Self.Bob' defined in outer scope}}
+                                        // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 }
 
 protocol U {}
@@ -24,14 +15,16 @@ protocol U {}
 extension U where Self: ~Copyable {}
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
-extension P where Self: ~Copyable {
+extension P where Self: ~Copyable { // expected-error {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
+
   func g() where Self: ~Copyable, // expected-error {{cannot suppress '~Copyable' on generic parameter 'Self' defined in outer scope}}
-                                  // FIXME: why no similar 2nd error as Escapable here on Self?
+                                  // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
                  Self: ~Escapable {}  // expected-error {{cannot suppress '~Escapable' on generic parameter 'Self' defined in outer scope}}
                                       // expected-error@-1 {{'Self' required to be 'Escapable' but is marked with '~Escapable'}}
 
   typealias Me = Self where Self: ~Copyable // expected-error {{cannot suppress '~Copyable' on generic parameter 'Self' defined in outer scope}}
+                                            // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
   typealias MeAndU = Self where Self: U
 }

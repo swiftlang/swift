@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/Compiler.h"
 #include "swift/Demangling/Demangler.h"
 #include "DemanglerAssert.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -601,6 +600,11 @@ NodePointer NodeFactory::createNode(Node::Kind K) {
 NodePointer NodeFactory::createNode(Node::Kind K, Node::IndexType Index) {
   return new (Allocate<Node>()) Node(K, Index);
 }
+NodePointer NodeFactory::createNode(Node::Kind K, uint64_t RemoteAddress,
+                                    uint8_t AddressSpace) {
+  return new (Allocate<Node>()) Node(K, RemoteAddress, AddressSpace);
+}
+
 NodePointer NodeFactory::createNodeWithAllocatedText(Node::Kind K,
                                                      llvm::StringRef Text) {
   return new (Allocate<Node>()) Node(K, Text);
@@ -1120,7 +1124,8 @@ recur:
       // outlined copy functions. We treat such a suffix as "unmangled suffix".
       pushBack();
       return createNode(Node::Kind::Suffix, consumeAll());
-    case '$': return demangleIntegerType();
+    case '$':
+      return demangleIntegerType();
     default:
       pushBack();
       return demangleIdentifier();
@@ -1435,6 +1440,10 @@ NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
   const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
+    case 'A':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_IMPLICITACTOR);
+      break;
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
                                BUILTIN_TYPE_NAME_BRIDGEOBJECT);
@@ -1498,6 +1507,14 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinFixedArray);
       Ty->addChild(size, *this);
       Ty->addChild(element, *this);
+      break;
+    }
+    case 'W': {
+      NodePointer referent = popNode(Node::Kind::Type);
+      if (!referent)
+        return nullptr;
+      Ty = createNode(Node::Kind::BuiltinBorrow);
+      Ty->addChild(referent, *this);
       break;
     }
     case 'O':
@@ -2135,6 +2152,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrappedFieldInitAccessor:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::Static:
       return false;
@@ -2285,6 +2303,15 @@ NodePointer Demangler::demangleImplResultConvention(Node::Kind ConvKind) {
     case 'u': attr = "@unowned_inner_pointer"; break;
     case 'a': attr = "@autoreleased"; break;
     case 'k': attr = "@pack_out"; break;
+    case 'l':
+      attr = "@guaranteed_address";
+      break;
+    case 'g':
+      attr = "@guaranteed";
+      break;
+    case 'm':
+      attr = "@inout";
+      break;
     default:
       pushBack();
       return nullptr;
@@ -2299,6 +2326,22 @@ NodePointer Demangler::demangleImplParameterSending() {
     return nullptr;
   const char *attr = "sending";
   return createNode(Node::Kind::ImplParameterSending, attr);
+}
+
+NodePointer Demangler::demangleImplParameterIsolated() {
+  // Empty string represents default differentiability.
+  if (!nextIf('I'))
+    return nullptr;
+  const char *attr = "isolated";
+  return createNode(Node::Kind::ImplParameterIsolated, attr);
+}
+
+NodePointer Demangler::demangleImplParameterImplicitLeading() {
+  // Empty string represents default differentiability.
+  if (!nextIf('L'))
+    return nullptr;
+  const char *attr = "sil_implicit_leading_param";
+  return createNode(Node::Kind::ImplParameterImplicitLeading, attr);
 }
 
 NodePointer Demangler::demangleImplParameterResultDifferentiability() {
@@ -2451,6 +2494,10 @@ NodePointer Demangler::demangleImplFunctionType() {
     if (NodePointer Diff = demangleImplParameterResultDifferentiability())
       Param = addChild(Param, Diff);
     if (auto Sending = demangleImplParameterSending())
+      Param = addChild(Param, Sending);
+    if (auto Sending = demangleImplParameterIsolated())
+      Param = addChild(Param, Sending);
+    if (auto Sending = demangleImplParameterImplicitLeading())
       Param = addChild(Param, Sending);
     ++NumTypesToAdd;
   }
@@ -3337,6 +3384,8 @@ NodePointer Demangler::demangleGenericSpecializationWithDroppedArguments() {
 NodePointer Demangler::demangleFunctionSpecialization() {
   NodePointer Spec = demangleSpecAttributes(
         Node::Kind::FunctionSignatureSpecialization);
+  if (Spec && Spec->getFirstChild()->getKind() == Node::Kind::RepresentationChanged)
+    return Spec;
   while (Spec && !nextIf('_')) {
     Spec = addChild(Spec, demangleFuncSpecParam(Node::Kind::FunctionSignatureSpecializationParam));
   }
@@ -3352,43 +3401,40 @@ NodePointer Demangler::demangleFunctionSpecialization() {
     if (Param->getKind() != Node::Kind::FunctionSignatureSpecializationParam)
       continue;
 
-    if (Param->getNumChildren() == 0)
-      continue;
-    NodePointer KindNd = Param->getFirstChild();
-    assert(KindNd->getKind() ==
-             Node::Kind::FunctionSignatureSpecializationParamKind);
-    auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
-    switch (ParamKind) {
-      case FunctionSigSpecializationParamKind::ConstantPropFunction:
-      case FunctionSigSpecializationParamKind::ConstantPropGlobal:
-      case FunctionSigSpecializationParamKind::ConstantPropString:
-      case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
-      case FunctionSigSpecializationParamKind::ClosureProp: {
-        size_t FixedChildren = Param->getNumChildren();
-        while (NodePointer Ty = popNode(Node::Kind::Type)) {
-          if (ParamKind != FunctionSigSpecializationParamKind::ClosureProp &&
-              ParamKind != FunctionSigSpecializationParamKind::ConstantPropKeyPath)
-            return nullptr;
-          Param = addChild(Param, Ty);
+    size_t fixedChildren = Param->getNumChildren();
+    NodePointer paramToAdd = Param;
+    for (size_t childIdx = 0; childIdx < fixedChildren; ++childIdx) {
+      NodePointer KindNd = Param->getChild(fixedChildren - childIdx - 1);
+      if (KindNd->getKind() != Node::Kind::FunctionSignatureSpecializationParamKind)
+        continue;
+
+      auto ParamKind = (FunctionSigSpecializationParamKind)KindNd->getIndex();
+      switch (ParamKind) {
+        case FunctionSigSpecializationParamKind::ClosureProp: {
+          while (NodePointer Ty = popNode(Node::Kind::Type)) {
+            paramToAdd = addChild(paramToAdd, Ty);
+          }
+          break;
         }
-        NodePointer Name = popNode(Node::Kind::Identifier);
-        if (!Name)
-          return nullptr;
-        StringRef Text = Name->getText();
-        if (ParamKind ==
-                FunctionSigSpecializationParamKind::ConstantPropString &&
-            !Text.empty() && Text[0] == '_') {
-          // A '_' escapes a leading digit or '_' of a string constant.
-          Text = Text.drop_front(1);
-        }
-        addChild(Param, createNodeWithAllocatedText(
-          Node::Kind::FunctionSignatureSpecializationParamPayload, Text));
-        Param->reverseChildren(FixedChildren);
-        break;
+        case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
+          paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+          paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+          break;
+        case FunctionSigSpecializationParamKind::ConstantPropStruct:
+          paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+          continue;
+        case FunctionSigSpecializationParamKind::ConstantPropFunction:
+        case FunctionSigSpecializationParamKind::ConstantPropGlobal:
+        case FunctionSigSpecializationParamKind::ConstantPropString:
+          break;
+        default:
+          continue;
       }
-      default:
-        break;
+      paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Identifier));
     }
+    if (!paramToAdd)
+      return nullptr;
+    Param->reverseChildren(fixedChildren);
   }
   return Spec;
 }
@@ -3406,59 +3452,92 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::ClosureProp)));
+    case 'C': {
+      // Consumes an identifier and multiple type parameters.
+      // The parameters will be added later.
+      addChild(Param, createNode(
+        Node::Kind::FunctionSignatureSpecializationParamKind,
+        uint64_t(FunctionSigSpecializationParamKind::ClosurePropPreviousArg)));
+      int prevArgIdx = demangleNatural();
+      if (prevArgIdx < 0)
+        return nullptr;
+      return addChild(Param, createNode(
+         Node::Kind::FunctionSignatureSpecializationParamPayload, (Node::IndexType)prevArgIdx));
+    }
     case 'p': {
-      switch (nextChar()) {
-        case 'f':
-          // Consumes an identifier parameter, which will be added later.
-          return addChild(
-              Param,
-              createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
-                         Node::IndexType(FunctionSigSpecializationParamKind::
-                                             ConstantPropFunction)));
-        case 'g':
-          // Consumes an identifier parameter, which will be added later.
-          return addChild(
-              Param,
-              createNode(
-                  Node::Kind::FunctionSignatureSpecializationParamKind,
-                  Node::IndexType(
-                      FunctionSigSpecializationParamKind::ConstantPropGlobal)));
-        case 'i':
-          return addFuncSpecParamNumber(Param,
-                    FunctionSigSpecializationParamKind::ConstantPropInteger);
-        case 'd':
-          return addFuncSpecParamNumber(Param,
-                      FunctionSigSpecializationParamKind::ConstantPropFloat);
-        case 's': {
-          // Consumes an identifier parameter (the string constant),
-          // which will be added later.
-          const char *Encoding = nullptr;
-          switch (nextChar()) {
-            case 'b': Encoding = "u8"; break;
-            case 'w': Encoding = "u16"; break;
-            case 'c': Encoding = "objc"; break;
-            default: return nullptr;
+      for (;;) {
+        switch (nextChar()) {
+          case 'S':
+            // Consumes an identifier parameter, which will be added later.
+            addChild(
+                Param,
+                createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                           Node::IndexType(FunctionSigSpecializationParamKind::
+                                               ConstantPropStruct)));
+            break;
+          case 'f':
+            // Consumes an identifier parameter, which will be added later.
+            addChild(
+                Param,
+                createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                           Node::IndexType(FunctionSigSpecializationParamKind::
+                                               ConstantPropFunction)));
+            break;
+          case 'g':
+            // Consumes an identifier parameter, which will be added later.
+            addChild(
+                Param,
+                createNode(
+                    Node::Kind::FunctionSignatureSpecializationParamKind,
+                    Node::IndexType(
+                        FunctionSigSpecializationParamKind::ConstantPropGlobal)));
+            break;
+          case 'i':
+            if (!addFuncSpecParamNumber(Param,
+                      FunctionSigSpecializationParamKind::ConstantPropInteger)) {
+              return nullptr;
+            }
+            break;
+          case 'd':
+            if (!addFuncSpecParamNumber(Param,
+                        FunctionSigSpecializationParamKind::ConstantPropFloat)) {
+              return nullptr;
+            }
+            break;
+          case 's': {
+            // Consumes an identifier parameter (the string constant),
+            // which will be added later.
+            const char *Encoding = nullptr;
+            switch (nextChar()) {
+              case 'b': Encoding = "u8"; break;
+              case 'w': Encoding = "u16"; break;
+              case 'c': Encoding = "objc"; break;
+              default: return nullptr;
+            }
+            addChild(Param,
+                     createNode(
+                         Node::Kind::FunctionSignatureSpecializationParamKind,
+                         Node::IndexType(
+                             swift::Demangle::FunctionSigSpecializationParamKind::
+                                 ConstantPropString)));
+            addChild(Param, createNode(
+                    Node::Kind::FunctionSignatureSpecializationParamPayload,
+                    Encoding));
+            break;
           }
-          addChild(Param,
-                   createNode(
-                       Node::Kind::FunctionSignatureSpecializationParamKind,
-                       Node::IndexType(
-                           swift::Demangle::FunctionSigSpecializationParamKind::
-                               ConstantPropString)));
-          return addChild(Param, createNode(
-                  Node::Kind::FunctionSignatureSpecializationParamPayload,
-                  Encoding));
+          case 'k': {
+            // Consumes two types and a SHA1 identifier.
+            addChild(
+                Param,
+                createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                           Node::IndexType(FunctionSigSpecializationParamKind::
+                                               ConstantPropKeyPath)));
+            break;
+          }
+          default:
+            pushBack();
+            return Param;
         }
-        case 'k': {
-          // Consumes two types and a SHA1 identifier.
-          return addChild(
-              Param,
-              createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
-                         Node::IndexType(FunctionSigSpecializationParamKind::
-                                             ConstantPropKeyPath)));
-        }
-        default:
-          return nullptr;
       }
     }
     case 'e': {
@@ -3549,6 +3628,7 @@ NodePointer Demangler::addFuncSpecParamNumber(NodePointer Param,
 NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
   bool isSerialized = nextIf('q');
   bool asyncRemoved = nextIf('a');
+  bool representationChanged = nextIf('r');
 
   int PassID = (int)nextChar() - '0';
   if (PassID < 0 || PassID >= MAX_SPECIALIZATION_PASS) {
@@ -3563,6 +3643,10 @@ NodePointer Demangler::demangleSpecAttributes(Node::Kind SpecKind) {
 
   if (asyncRemoved)
     SpecNd->addChild(createNode(Node::Kind::AsyncRemoved),
+                     *this);
+
+  if (representationChanged)
+    SpecNd->addChild(createNode(Node::Kind::RepresentationChanged),
                      *this);
 
   SpecNd->addChild(createNode(Node::Kind::SpecializationPassID, PassID),
@@ -3646,6 +3730,15 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'O': {
       switch (nextChar()) {
+      case 'B': {
+        if (auto sig = popNode(Node::Kind::DependentGenericSignature))
+          return createWithChildren(
+              Node::Kind::OutlinedInitializeWithTakeNoValueWitness,
+              popNode(Node::Kind::Type), sig);
+        return createWithChild(
+            Node::Kind::OutlinedInitializeWithTakeNoValueWitness,
+            popNode(Node::Kind::Type));
+      }
       case 'C': {
         if (auto sig = popNode(Node::Kind::DependentGenericSignature))
           return createWithChildren(Node::Kind::OutlinedInitializeWithCopyNoValueWitness,
@@ -4037,10 +4130,16 @@ NodePointer Demangler::demangleAccessor(NodePointer ChildNode) {
     case 'w': Kind = Node::Kind::WillSet; break;
     case 'W': Kind = Node::Kind::DidSet; break;
     case 'r': Kind = Node::Kind::ReadAccessor; break;
-    case 'y': Kind = Node::Kind::Read2Accessor; break;
+    case 'y': Kind = Node::Kind::YieldingBorrowAccessor; break;
     case 'M': Kind = Node::Kind::ModifyAccessor; break;
-    case 'x': Kind = Node::Kind::Modify2Accessor; break;
+    case 'x': Kind = Node::Kind::YieldingMutateAccessor; break;
     case 'i': Kind = Node::Kind::InitAccessor; break;
+    case 'b':
+      Kind = Node::Kind::BorrowAccessor;
+      break;
+    case 'z':
+      Kind = Node::Kind::MutateAccessor;
+      break;
     case 'a':
       switch (nextChar()) {
         case 'O': Kind = Node::Kind::OwningMutableAddressor; break;
@@ -4100,6 +4199,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'P':
       Args = None;
       Kind = Node::Kind::PropertyWrapperBackingInitializer;
+      break;
+    case 'F':
+      Args = None;
+      Kind = Node::Kind::PropertyWrappedFieldInitAccessor;
       break;
     case 'W':
       Args = None;

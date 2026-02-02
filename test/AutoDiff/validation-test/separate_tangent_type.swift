@@ -10,6 +10,8 @@ import StdlibUnittest
   import Android
 #elseif os(Windows)
   import CRT
+#elseif canImport(WASILibc)
+  import WASILibc
 #else
 #error("Unsupported platform")
 #endif

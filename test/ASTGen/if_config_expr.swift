@@ -46,7 +46,7 @@ func testInvalidContent(baseExpr: MyStruct, otherExpr: Int) {
 
   baseExpr      // expected-warning {{expression of type 'MyStruct' is unused}}
 #if CONDITION_1
-    + otherExpr // expected-error {{unexpected code '+ otherExpr' in conditional compilation block}}
+    + otherExpr // expected-error {{unexpected code '+ otherExpr' in conditional compilation clause}}
 #endif
 
   baseExpr

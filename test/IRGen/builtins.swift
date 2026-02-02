@@ -204,6 +204,26 @@ func vector_select_test(
   return Builtin.select_Vec8xInt1_Vec8xInt32(p, trueValue, falseValue)
 }
 
+func interleave_test(
+  _ evens: Builtin.Vec8xInt16,
+  _ odds: Builtin.Vec8xInt16
+) -> (Builtin.Vec8xInt16, Builtin.Vec8xInt16) {
+  // CHECK: interleave_test
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 0, i32 8, i32 1, i32 9, i32 2, i32 10, i32 3, i32 11>
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 4, i32 12, i32 5, i32 13, i32 6, i32 14, i32 7, i32 15>
+  return Builtin.interleave_Vec8xInt16(evens, odds)
+}
+
+func deinterleave_test(
+  _ low: Builtin.Vec8xInt16,
+  _ high: Builtin.Vec8xInt16
+) -> (Builtin.Vec8xInt16, Builtin.Vec8xInt16) {
+  // CHECK: deinterleave_test
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
+  return Builtin.deinterleave_Vec8xInt16(low, high)
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
@@ -626,6 +646,13 @@ func assumeNonNegative_test2(_ x: Builtin.Word) -> Builtin.Word {
   return Builtin.assumeNonNegative_Word(return_word(x))
 }
 
+// CHECK-LABEL: define hidden {{.*}}@"$s8builtins23assumeNonNegative_test3yBwBwF"
+func assumeNonNegative_test3(_ x: Builtin.Word) -> Builtin.Word {
+  // CHECK: [[C:%.*]] = icmp sge i{{[0-9]+}} %0, 0
+  // CHECK: call void @llvm.assume(i1 [[C]])
+  return Builtin.assumeNonNegative_Word(x)
+}
+
 struct Empty {}
 struct Pair { var i: Int, b: Bool }
 
@@ -669,11 +696,11 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
-// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsBuiltinNativeObject(_ ref: inout Builtin.NativeObject?) {}
 
 // native
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr %[[LD_RC]])
@@ -683,7 +710,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // native nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD_RC]])
@@ -692,11 +719,11 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load ptr, ptr [[ADDR]]
@@ -709,7 +736,7 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 
 // ObjC nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
-// CHECK-SAME:    (ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-SAME:    (ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} %AnyObject, ptr %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load ptr, ptr [[ADDR]]
@@ -721,7 +748,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(ptr %[[LD]])
@@ -737,7 +764,7 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD]])
@@ -747,7 +774,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: call zeroext i1 @swift_isUniquelyReferenced_native(ptr
 // CHECK: ret i1
@@ -900,5 +927,64 @@ func injectEnumTag<T>(_ x: inout T, tag: UInt32) {
 func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) -> Builtin.RawPointer {
   return Builtin.allocVector(elementType, capacity)
 }
+
+// CHECK-LABEL: define{{.*}} void @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU_{{(.ptrauth)?}}", ptr null)
+// CHECK: [[CONTEXT:%.*]] = call{{.*}} @swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata, i32 0, i32 2), i64 32, i64 7)
+// CHECK: [[RESULT_2:%.*]] = call {{.*}} @swift_task_addCancellationHandler(ptr @"$s8builtins30testTaskAddCancellationHandlerSV_SVtyYaFyyXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
+// CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{.*}}, ptr [[RESULT]], ptr [[RESULT_2]])
+nonisolated(nonsending) func testTaskAddCancellationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
+  let result = Builtin.taskAddCancellationHandler {}
+  let x = "123" 
+  let result2 = Builtin.taskAddCancellationHandler {
+    print(x)
+  }
+  return (result, result2)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins33testTaskRemoveCancellationHandleryySVYaF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3)
+// CHECK: call{{.*}} @swift_task_removeCancellationHandler(ptr %3)
+nonisolated(nonsending) func testTaskRemoveCancellationHandler(_ x: UnsafeRawPointer) async {
+  Builtin.taskRemoveCancellationHandler(record: x)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU_{{(.ptrauth)?}}", ptr null)
+// CHECK: [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.3, i32 0, i32 2), i64 32, i64 7)
+// CHECK: [[RESULT_2:%.*]] = call{{.*}} @swift_task_addPriorityEscalationHandler(ptr @"$s8builtins36testTaskAddPriorityEscalationHandlerSV_SVtyYaFys5UInt8V_ADtXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
+// CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{%.*}}, ptr [[RESULT]], ptr [[RESULT_2]])
+nonisolated(nonsending) func testTaskAddPriorityEscalationHandler() async -> (UnsafeRawPointer, UnsafeRawPointer) {
+  let result = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
+    _ = x
+    _ = y
+  }
+  let str = "123"
+  let result2 = Builtin.taskAddPriorityEscalationHandler { (x: UInt8, y: UInt8) in
+    print(str)
+    _ = x
+    _ = y
+  }
+  return (result, result2)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins39testTaskRemovePriorityEscalationHandleryySVYaF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3)
+// CHECK: call{{.*}} @swift_task_removePriorityEscalationHandler(ptr %3)
+nonisolated(nonsending) func testTaskRemovePriorityEscalationHandler(_ x: UnsafeRawPointer) async {
+  Builtin.taskRemovePriorityEscalationHandler(record: x)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins22testTaskLocalValuePushyyBp_xntYalF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3, ptr noalias %4, ptr %Value)
+// CHECK: [[TASK_VAR:%.*]] = call swiftcc ptr @swift_task_alloc({{.*}}
+// CHECK: call ptr %InitializeWithTake(ptr noalias [[TASK_VAR]], ptr noalias {{%.*}}, ptr %Value)
+// CHECK: call swiftcc {} @swift_task_localValuePush(ptr %3, ptr [[TASK_VAR]], ptr %Value)
+nonisolated(nonsending) func testTaskLocalValuePush<Value>(_ key: Builtin.RawPointer, _ value: consuming Value) async {
+  Builtin.taskLocalValuePush(key, value)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins21testTaskLocalValuePopyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: call swiftcc {} @swift_task_localValuePop()
+nonisolated(nonsending) func testTaskLocalValuePop() async {
+  Builtin.taskLocalValuePop()
+}  
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

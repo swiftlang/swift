@@ -36,6 +36,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string toolchains::Windows::sanitizerRuntimeLibName(StringRef Sanitizer,
                                                          bool shared) const {
@@ -75,8 +76,8 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   auto requiresLLD = [&]{
     if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
       return llvm::StringSwitch<bool>(A->getValue())
-        .Cases("lld", "lld.exe", "lld-link", "lld-link.exe", true)
-        .Default(false);
+          .Cases({"lld", "lld.exe", "lld-link", "lld-link.exe"}, true)
+          .Default(false);
     }
     // Force to use lld for LTO on Windows because we don't support link LTO or
     // something else except for lld LTO at this time.
@@ -89,7 +90,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     // for now, which supports the behavior via a flag.
     // TODO: Once we've changed coverage to no longer rely on emitting
     // duplicate weak symbols (rdar://131295678), we can remove this.
-    if (context.Args.getLastArg(options::OPT_profile_generate)) {
+    if (swift::driver::toolchains::needsInstrProfileRuntime(context.Args)) {
       return true;
     }
     return false;
@@ -186,7 +187,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                         sanitizerRuntimeLibName("ubsan"));
   }
 
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     Arguments.push_back(context.Args.MakeArgString("-Xlinker"));
     Arguments.push_back(context.Args.MakeArgString(
         Twine({"-include:", llvm::getInstrProfRuntimeHookVarName()})));

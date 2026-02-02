@@ -52,13 +52,14 @@ enum SingletonTypeSynthesizer {
   _rawUnsafeContinuation,
   _void,
   _word,
-  _swiftInt,       // Swift.Int
-  _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
-  _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
-  _actor,          // the '_Concurrency.Actor' protocol
-  _distributedActor,  // the 'Distributed.DistributedActor' protocol
+  _swiftInt,               // Swift.Int
+  _serialExecutor,         // the '_Concurrency.SerialExecutor' protocol
+  _taskExecutor,           // the '_Concurrency.TaskExecutor' protocol
+  _actor,                  // the '_Concurrency.Actor' protocol
+  _distributedActor,       // the 'Distributed.DistributedActor' protocol
   _unsafeRawBufferPointer, // UnsafeRawBufferPointer
-  _unconstrainedAny, // any ~Copyable & ~Escapable
+  _unconstrainedAny,       // any ~Copyable & ~Escapable
+  _unsafeRawPointer,       // UnsafeRawPointer
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -93,6 +94,8 @@ inline Type synthesizeType(SynthesisContext &SC,
       ->getDeclaredInterfaceType();
   case _unsafeRawBufferPointer:
     return SC.Context.getUnsafeRawBufferPointerType();
+  case _unsafeRawPointer:
+    return SC.Context.getUnsafeRawPointerType();
   case _copyable:
     return SC.Context.getProtocol(KnownProtocolKind::Copyable)
         ->getDeclaredInterfaceType();

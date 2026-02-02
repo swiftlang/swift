@@ -1,0 +1,4 @@
+module SAL [system] {
+  header "sal.h"
+  export *
+}

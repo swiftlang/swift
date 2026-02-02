@@ -1,18 +1,10 @@
-# TODO: clean this up so it's less Apple-specific.
-# Detect B&I builds.
-set(SWIFT_BNI_OS_BUILD FALSE)
-set(SWIFT_BNI_XCODE_BUILD FALSE)
-if(DEFINED ENV{RC_XBS})
-  if((NOT DEFINED ENV{RC_XCODE} OR NOT "$ENV{RC_XCODE}") AND (NOT DEFINED ENV{RC_PLAYGROUNDS} OR NOT "$ENV{RC_PLAYGROUNDS}"))
-    set(SWIFT_BNI_OS_BUILD TRUE)
-  else()
-    set(SWIFT_BNI_XCODE_BUILD TRUE)
-  endif()
-endif()
-
 configure_file("CMakeConfig.h.in"
   "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
   ESCAPE_QUOTES @ONLY)
+
+add_library(swiftRuntimeCMakeConfig INTERFACE)
+target_include_directories(swiftRuntimeCMakeConfig INTERFACE
+  $<$<COMPILE_LANGUAGE:C,CXX,Swift>:$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>>)
 
 add_library(swiftRuntime OBJECT
     "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
@@ -20,6 +12,7 @@ add_library(swiftRuntime OBJECT
     Array.cpp
     AutoDiffSupport.cpp
     Bincompat.cpp
+    Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
     CrashReporter.cpp
@@ -60,7 +53,6 @@ add_library(swiftRuntime OBJECT
     RefCount.cpp
     ReflectionMirror.cpp
     RuntimeInvocationsTracking.cpp
-    SwiftDtoa.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
     Tracing.cpp
@@ -79,6 +71,14 @@ endif()
 # `libexec/swift` and drop the platform/architecture specific subdirectories
 if(SwiftCore_ENABLE_FILESYSTEM_SUPPORT AND (NOT SwiftCore_ARCH_SUBDIR OR NOT SwiftCore_PLATFORM_SUBDIR))
   message(SEND_ERROR "Filesystem support requires setting `SwiftCore_ARCH_SUBDIR` and `SwiftCore_PLATFORM_SUBDIR`")
+endif()
+
+if(SwiftCore_ENABLE_STDLIB_TRACING)
+  check_symbol_exists("os_signpost_interval_begin" "os/signpost.h" SwiftCore_HAS_OS_SIGNPOST)
+  check_symbol_exists("os_log" "os/log.h" SwiftCore_HAS_OS_LOG)
+  if(NOT SwiftCore_HAS_OS_LOG OR NOT SwiftCore_HAS_OS_SIGNPOST)
+    message(SEND_ERROR "Tracing requires 'os_signpost' and 'os_log' APIs")
+  endif()
 endif()
 
 # TODO: Probably worth considering putting half of these in a RuntimeConfig.h.in
@@ -143,6 +143,14 @@ if(SwiftCore_ENABLE_OBJC_INTEROP)
     ReflectionMirrorObjC.mm
     ObjCRuntimeGetImageNameFromClass.mm)
 endif()
+
+install(FILES
+  "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/swift/Runtime"
+  COMPONENT SwiftCore_development)
+install(TARGETS swiftRuntimeCMakeConfig
+  EXPORT SwiftCoreTargets
+  COMPONENT SwiftCore_development)
 
 if(NOT BUILD_SHARED_LIBS)
   install(TARGETS swiftRuntime

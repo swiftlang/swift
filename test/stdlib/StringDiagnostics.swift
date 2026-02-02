@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 
@@ -34,14 +34,18 @@ func testAmbiguousStringComparisons(s: String) {
   let nsString = s as NSString
   let a1 = s as NSString == nsString
   let a2 = s as NSString != nsString
-  let a3 = s < nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
+  let a3 = s < nsString 
+  // expected-error@-1{{binary operator '<' cannot be applied to operands of type 'String' and 'NSString'}}
+  // expected-note@-2{{overloads for '<' exist with these partially matching parameter lists: (String, String)}}
   let a4 = s <= nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
   let a5 = s >= nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{25-25= as String}}
   let a6 = s > nsString // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{24-24= as String}}
   // now the other way
   let a7 = nsString == s as NSString
   let a8 = nsString != s as NSString
-  let a9 = nsString < s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{20-20= as String}}
+  let a9 = nsString < s 
+  // expected-error@-1{{binary operator '<' cannot be applied to operands of type 'NSString' and 'String'}}
+  // expected-note@-2{{overloads for '<' exist with these partially matching parameter lists: (String, String)}}
   let a10 = nsString <= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
   let a11 = nsString >= s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}
   let a12 = nsString > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{21-21= as String}}

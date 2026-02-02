@@ -26,7 +26,7 @@ public let benchmarks = [
 @inline(never)
 public func run_CountAlgoArray(_ N: Int) {
   for _ in 1...10*N {
-    CheckResults(numbers.count(where: { $0 & 4095 == 0 }) == 25)
+    check(numbers.count(where: { $0 & 4095 == 0 }) == 25)
   }
 }
 
@@ -34,7 +34,7 @@ public func run_CountAlgoArray(_ N: Int) {
 public func run_CountAlgoString(_ N: Int) {
   let vowels = Set("aeiou")
   for _ in 1...N {
-    CheckResults(text.count(where: vowels.contains) == 2014)
+    check(text.count(where: vowels.contains) == 2014)
   }
 }
 

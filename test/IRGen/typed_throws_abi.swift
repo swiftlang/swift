@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-irgen -enable-library-evolution | %FileCheck %s
 
-// XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64
 
 struct Empty: Error {}
@@ -20,8 +19,27 @@ struct ThreeWords: Error {
     let z = 0
 }
 
+struct ManyBytes {
+    let x0: UInt8 = 0
+    let x1: UInt8 = 1
+    let x2: UInt8 = 2
+    let x3: UInt8 = 3
+    let x4: UInt8 = 4
+    let x5: UInt8 = 5
+    let x6: UInt8 = 6
+    let x7: UInt8 = 7
+    let x8: UInt8 = 8
+    let x9: UInt8 = 9
+    let x10: UInt8 = 10
+    let x11: UInt8 = 11
+    let x12: UInt8 = 12
+    let x13: UInt8 = 13
+    let x14: UInt8 = 14
+    let x15: UInt8 = 15
+}
+
 struct Impl: P {
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2f0yySbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2f0yySbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
     // CHECK:   ret void
@@ -38,7 +56,7 @@ struct Impl: P {
         }
     }
 
-    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2f1ySiSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2f1ySiSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
     // CHECK:   ret i64 1
@@ -56,7 +74,7 @@ struct Impl: P {
         return 1
     }
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2f2ySi_SitSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2f2ySi_SitSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
     // CHECK:   ret { i64, i64 } { i64 1, i64 2 }
@@ -74,7 +92,7 @@ struct Impl: P {
         return (1, 2)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f3ySi_S2itSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f3ySi_S2itSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
     // CHECK:   ret { i64, i64, i64 } { i64 1, i64 2, i64 3 }
@@ -92,7 +110,7 @@ struct Impl: P {
         return (1, 2, 3)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f4ySi_S3itSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f4ySi_S3itSbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
     // CHECK:   ret { i64, i64, i64, i64 } { i64 1, i64 2, i64 3, i64 4 }
@@ -110,7 +128,7 @@ struct Impl: P {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2f5ySi_S4itSbAA5EmptyVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2f5ySi_S4itSbAA5EmptyVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4)
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
     // CHECK:   store i64 1, ptr %.elt._value, align 8
@@ -133,7 +151,14 @@ struct Impl: P {
         return (1, 2, 3, 4, 5)
     }
 
-    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2g0yySbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    func fManyBytes(_ b: Bool) throws(Empty) -> ManyBytes {
+        guard b else {
+            throw Empty()
+        }
+        return ManyBytes()
+    }
+
+    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2g0yySbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -151,7 +176,7 @@ struct Impl: P {
         }
     }
 
-    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2g1ySiSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2g1ySiSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -170,7 +195,7 @@ struct Impl: P {
         return 1
     }
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2g2ySi_SitSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2g2ySi_SitSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -189,7 +214,7 @@ struct Impl: P {
         return (1, 2)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g3ySi_S2itSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g3ySi_S2itSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -208,7 +233,7 @@ struct Impl: P {
         return (1, 2, 3)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g4ySi_S3itSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g4ySi_S3itSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -227,7 +252,7 @@ struct Impl: P {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2g5ySi_S4itSbAA7OneWordVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2g5ySi_S4itSbAA7OneWordVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4)
     // CHECK: entry:
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV, align 8
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -252,7 +277,14 @@ struct Impl: P {
         return (1, 2, 3, 4, 5)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h0yySbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    func gManyBytes(_ b: Bool) throws(OneWord) -> ManyBytes {
+        guard b else {
+            throw OneWord()
+        }
+        return ManyBytes()
+    }
+
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h0yySbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -270,7 +302,7 @@ struct Impl: P {
         }
     }
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h1ySiSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h1ySiSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -289,7 +321,7 @@ struct Impl: P {
         return 1
     }
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h2ySi_SitSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h2ySi_SitSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -308,7 +340,7 @@ struct Impl: P {
         return (1, 2)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h3ySi_S2itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h3ySi_S2itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -327,7 +359,7 @@ struct Impl: P {
         return (1, 2, 3)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h4ySi_S3itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h4ySi_S3itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -346,7 +378,7 @@ struct Impl: P {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2h5ySi_S4itSbAA8TwoWordsVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2h5ySi_S4itSbAA8TwoWordsVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4)
     // CHECK: entry:
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV, align 8
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -371,7 +403,14 @@ struct Impl: P {
         return (1, 2, 3, 4, 5)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i0yySbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    func hManyBytes(_ b: Bool) throws(TwoWords) -> ManyBytes {
+        guard b else {
+            throw TwoWords()
+        }
+        return ManyBytes()
+    }
+
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i0yySbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -389,7 +428,7 @@ struct Impl: P {
         }
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i1ySiSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i1ySiSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -408,7 +447,7 @@ struct Impl: P {
         return 1
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i2ySi_SitSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i2ySi_SitSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -427,7 +466,7 @@ struct Impl: P {
         return (1, 2)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i3ySi_S2itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i3ySi_S2itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -446,7 +485,7 @@ struct Impl: P {
         return (1, 2, 3)
     }
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i4ySi_S3itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i4ySi_S3itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -465,7 +504,7 @@ struct Impl: P {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2i5ySi_S4itSbAA10ThreeWordsVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2i5ySi_S4itSbAA10ThreeWordsVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4)
     // CHECK: entry:
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV, align 8
     // CHECK:   br i1 %1, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -489,12 +528,19 @@ struct Impl: P {
         }
         return (1, 2, 3, 4, 5)
     }
+
+    func iManyBytes(_ b: Bool) throws(ThreeWords) -> ManyBytes {
+        guard b else {
+            throw ThreeWords()
+        }
+        return ManyBytes()
+    }
 }
 
 // CHECK: define hidden swiftcc i1 @"$s16typed_throws_abi11callImpl_f0ySbAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2f0yySbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2f0yySbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
@@ -521,7 +567,7 @@ func callImpl_f0(_ impl: Impl, _ b: Bool) -> Bool {
 // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi11callImpl_f1ySiAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc i64 @"$s16typed_throws_abi4ImplV2f1ySiSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc i64 @"$s16typed_throws_abi4ImplV2f1ySiSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
@@ -548,7 +594,7 @@ func callImpl_f1(_ impl: Impl, _ b: Bool) -> Int {
 // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi11callImpl_f2ySi_SitAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2f2ySi_SitSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2f2ySi_SitSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
@@ -581,7 +627,7 @@ func callImpl_f2(_ impl: Impl, _ b: Bool) -> (Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_f3ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f3ySi_S2itSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f3ySi_S2itSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -618,7 +664,7 @@ func callImpl_f3(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi11callImpl_f4ySi_S3itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f4ySi_S3itSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2f4ySi_S3itSbAA5EmptyVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 2
@@ -656,12 +702,12 @@ func callImpl_f4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
     }
 }
 
-// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_f5ySi_S4itAA0E0V_SbtF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1)
+// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_f5ySi_S4itAA0E0V_SbtF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
 // CHECK:   %swifterror1 = alloca ptr, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
-// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2f5ySi_S4itSbAA5EmptyVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror, ptr %swifterror1)
+// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2f5ySi_S4itSbAA5EmptyVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror, ptr %swifterror1)
 // CHECK:   [[CALL_RES0:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES1:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES2:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
@@ -703,10 +749,18 @@ func callImpl_f5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
     }
 }
 
+func callImpl_fManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.fManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
+
 // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi11callImpl_g0ySiAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc i64 @"$s16typed_throws_abi4ImplV2g0yySbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc i64 @"$s16typed_throws_abi4ImplV2g0yySbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
@@ -734,7 +788,7 @@ func callImpl_g0(_ impl: Impl, _ b: Bool) -> Int {
 // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi11callImpl_g1ySiAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc i64 @"$s16typed_throws_abi4ImplV2g1ySiSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc i64 @"$s16typed_throws_abi4ImplV2g1ySiSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
 // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
 // CHECK:   br i1 [[ISERROR]], label %typed.error.load, label %[[SUCCESS:.*]]
@@ -762,7 +816,7 @@ func callImpl_g1(_ impl: Impl, _ b: Bool) -> Int {
 // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi11callImpl_g2ySi_SitAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2g2ySi_SitSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2g2ySi_SitSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
@@ -796,7 +850,7 @@ func callImpl_g2(_ impl: Impl, _ b: Bool) -> (Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_g3ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g3ySi_S2itSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g3ySi_S2itSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -834,7 +888,7 @@ func callImpl_g3(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi11callImpl_g4ySi_S3itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g4ySi_S3itSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2g4ySi_S3itSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 2
@@ -873,12 +927,12 @@ func callImpl_g4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
     }
 }
 
-// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_g5ySi_S4itAA0E0V_SbtF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1)
+// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_g5ySi_S4itAA0E0V_SbtF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
 // CHECK:   %swifterror1 = alloca %T16typed_throws_abi7OneWordV, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
-// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2g5ySi_S4itSbAA7OneWordVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror, ptr %swifterror1)
+// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2g5ySi_S4itSbAA7OneWordVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror, ptr %swifterror1)
 // CHECK:   [[CALL_RES0:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES1:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES2:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
@@ -924,10 +978,18 @@ func callImpl_g5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
     }
 }
 
+func callImpl_gManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.gManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
+
 // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi11callImpl_h0ySi_SitAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h0yySbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h0yySbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
@@ -961,7 +1023,7 @@ func callImpl_h0(_ impl: Impl, _ b: Bool) -> (Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi11callImpl_h1ySi_SitAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h1ySiSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h1ySiSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
@@ -995,7 +1057,7 @@ func callImpl_h1(_ impl: Impl, _ b: Bool) -> (Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi11callImpl_h2ySi_SitAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h2ySi_SitSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h2ySi_SitSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[ERROR:%.*]] = load ptr, ptr %swifterror, align 8
@@ -1030,7 +1092,7 @@ func callImpl_h2(_ impl: Impl, _ b: Bool) -> (Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_h3ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h3ySi_S2itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h3ySi_S2itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -1069,7 +1131,7 @@ func callImpl_h3(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi11callImpl_h4ySi_S3itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h4ySi_S3itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2h4ySi_S3itSbAA8TwoWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 2
@@ -1109,12 +1171,12 @@ func callImpl_h4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
     }
 }
 
-// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_h5ySi_S4itAA0E0V_SbtF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1)
+// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_h5ySi_S4itAA0E0V_SbtF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
 // CHECK:   %swifterror1 = alloca %T16typed_throws_abi8TwoWordsV, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
-// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2h5ySi_S4itSbAA8TwoWordsVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror, ptr %swifterror1)
+// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2h5ySi_S4itSbAA8TwoWordsVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror, ptr %swifterror1)
 // CHECK:   [[CALL_RES0:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES1:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES2:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
@@ -1162,10 +1224,18 @@ func callImpl_h5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
     }
 }
 
+func callImpl_hManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.hManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
+
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_i0ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i0yySbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i0yySbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -1203,7 +1273,7 @@ func callImpl_i0(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_i1ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i1ySiSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i1ySiSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -1241,7 +1311,7 @@ func callImpl_i1(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_i2ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i2ySi_SitSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i2ySi_SitSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -1281,7 +1351,7 @@ func callImpl_i2(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi11callImpl_i3ySi_S2itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i3ySi_S2itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i3ySi_S2itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64 } [[CALL_RES]], 2
@@ -1321,7 +1391,7 @@ func callImpl_i3(_ impl: Impl, _ b: Bool) -> (Int, Int, Int) {
 // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi11callImpl_i4ySi_S3itAA0E0V_SbtF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i4ySi_S3itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i4ySi_S3itSbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { i64, i64, i64, i64 } [[CALL_RES]], 2
@@ -1362,12 +1432,12 @@ func callImpl_i4(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int) {
     }
 }
 
-// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_i5ySi_S4itAA0E0V_SbtF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1)
+// CHECK: define hidden swiftcc void @"$s16typed_throws_abi11callImpl_i5ySi_S4itAA0E0V_SbtF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
 // CHECK:   %swifterror1 = alloca %T16typed_throws_abi10ThreeWordsV, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
-// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2i5ySi_S4itSbAA10ThreeWordsVYKF"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror, ptr %swifterror1)
+// CHECK:   call swiftcc void @"$s16typed_throws_abi4ImplV2i5ySi_S4itSbAA10ThreeWordsVYKF"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %call.aggresult, i1 %1, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror, ptr %swifterror1)
 // CHECK:   [[CALL_RES0:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES1:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
 // CHECK:   [[CALL_RES2:%.*]] = load i64, ptr {{%call.aggresult.*}}, align 8
@@ -1414,6 +1484,14 @@ func callImpl_i5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
         return try impl.i5(b)
     } catch {
         return (error.x, error.y, error.z, 0, 0)
+    }
+}
+
+func callImpl_iManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.iManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -1519,7 +1597,7 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2f5ySi_S4itSbYaAA5EmptyVYKF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr %3)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2f5ySi_S4itSbYaAA5EmptyVYKF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3)
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %2, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
     // CHECK: [[SUCCESS]]:
@@ -1542,6 +1620,13 @@ struct ImplAsync: PAsync {
             throw Empty()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func fManyBytes(_ b: Bool) async throws(Empty) -> ManyBytes {
+        guard b else {
+            throw Empty()
+        }
+        return ManyBytes()
     }
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2g0yySbYaAA7OneWordVYKF"(ptr swiftasync %0, i1 %1)
@@ -1648,7 +1733,7 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2g5ySi_S4itSbYaAA7OneWordVYKF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr %3)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2g5ySi_S4itSbYaAA7OneWordVYKF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi7OneWordV, align 8
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %2, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -1672,6 +1757,13 @@ struct ImplAsync: PAsync {
             throw OneWord()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func gManyBytes(_ b: Bool) async throws(OneWord) -> ManyBytes {
+        guard b else {
+            throw OneWord()
+        }
+        return ManyBytes()
     }
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2h0yySbYaAA8TwoWordsVYKF"(ptr swiftasync %0, i1 %1)
@@ -1778,7 +1870,7 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2h5ySi_S4itSbYaAA8TwoWordsVYKF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr %3)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2h5ySi_S4itSbYaAA8TwoWordsVYKF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV, align 8
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %2, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -1802,6 +1894,13 @@ struct ImplAsync: PAsync {
             throw TwoWords()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func hManyBytes(_ b: Bool) async throws(TwoWords) -> ManyBytes {
+        guard b else {
+            throw TwoWords()
+        }
+        return ManyBytes()
     }
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2i0yySbYaAA10ThreeWordsVYKF"(ptr swiftasync %0, i1 %1)
@@ -1908,7 +2007,7 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4)
     }
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2i5ySi_S4itSbYaAA10ThreeWordsVYKF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr %3)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2i5ySi_S4itSbYaAA10ThreeWordsVYKF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr %3)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV, align 8
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   br i1 %2, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -1932,6 +2031,13 @@ struct ImplAsync: PAsync {
             throw ThreeWords()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func iManyBytes(_ b: Bool) async throws(ThreeWords) -> ManyBytes {
+        guard b else {
+            throw ThreeWords()
+        }
+        return ManyBytes()
     }
 }
 
@@ -2127,7 +2233,7 @@ func callImplAsync_f4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
     }
 }
 
-// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_f5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2)
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_f5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2)
 // CHECK:   %swifterror = alloca ptr, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
 // CHECK:   %swifterror1 = alloca swifterror ptr, align 8
@@ -2181,8 +2287,16 @@ func callImplAsync_f5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
     }
 }
 
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_fManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.fManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
 
-// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK-LABEL: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaFTu")
 // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
@@ -2381,7 +2495,7 @@ func callImplAsync_g4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 }
 
 
-// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2)
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2)
 // CHECK:   %swifterror = alloca %T16typed_throws_abi7OneWordV, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
 // CHECK:   %swifterror1 = alloca swifterror ptr, align 8
@@ -2436,6 +2550,15 @@ func callImplAsync_g5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
         return try await impl.g5(b)
     } catch {
         return (error.x, 0, 0, 0, 0)
+    }
+}
+
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_gManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.gManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -2647,7 +2770,7 @@ func callImplAsync_h4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 }
 
 
-// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_h5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2)
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_h5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2)
 // CHECK:   %swifterror = alloca %T16typed_throws_abi8TwoWordsV, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
 // CHECK:   %swifterror1 = alloca swifterror ptr, align 8
@@ -2704,6 +2827,15 @@ func callImplAsync_h5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
         return try await impl.h5(b)
     } catch {
         return (error.x, error.y, 0, 0, 0)
+    }
+}
+
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_hManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.hManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -2927,7 +3059,7 @@ func callImplAsync_i4(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
 }
 
 
-// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_i5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2)
+// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_i5ySi_S4itAA0eF0V_SbtYaF"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2)
 // CHECK:   %swifterror = alloca %T16typed_throws_abi10ThreeWordsV, align 8
 // CHECK:   %call.aggresult = alloca <{ %TSi, %TSi, %TSi, %TSi, %TSi }>, align 8
 // CHECK:   %swifterror1 = alloca swifterror ptr, align 8
@@ -2989,7 +3121,16 @@ func callImplAsync_i5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
     }
 }
 
-// CHECK: define hidden swiftcc { float, float, i64 } @"$s16typed_throws_abi14nonMatching_f0ySf_SftSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_iManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.iManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
+
+// CHECK: define hidden swiftcc { float, float, i64 } @"$s16typed_throws_abi14nonMatching_f0ySf_SftSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
 // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
 // CHECK: [[SUCCESS]]:
 // CHECK:   ret { float, float, i64 } { float 1.000000e+00, float 2.000000e+00, i64 undef }
@@ -3009,7 +3150,7 @@ func nonMatching_f0(_ b: Bool) throws(OneWord) -> (Float, Float) {
 // CHECK: define hidden swiftcc { i64, float, float } @"$s16typed_throws_abi18callNonMatching_f0ySi_S2ftSbF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   store ptr null, ptr %swifterror, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { float, float, i64 } @"$s16typed_throws_abi14nonMatching_f0ySf_SftSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { float, float, i64 } @"$s16typed_throws_abi14nonMatching_f0ySf_SftSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { float, float, i64 } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { float, float, i64 } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { float, float, i64 } [[CALL_RES]], 2
@@ -3044,7 +3185,7 @@ func callNonMatching_f0(_ b: Bool) -> (Int, Float, Float) {
     }
 }
 
-// define hidden swiftcc { float, i64, float } @"$s16typed_throws_abi14nonMatching_f1ySf_SbSftSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2)
+// define hidden swiftcc { float, i64, float } @"$s16typed_throws_abi14nonMatching_f1ySf_SbSftSbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
 // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
 // CHECK: [[SUCCESS]]:
 // CHECK:   ret { float, i64, float } { float 1.000000e+00, i64 1, float 2.000000e+00 }
@@ -3063,7 +3204,7 @@ func nonMatching_f1(_ b: Bool) throws(OneWord) -> (Float, Bool, Float) {
 
 // CHECK: define hidden swiftcc { i64, float, i1, float } @"$s16typed_throws_abi18callNonMatching_f1ySi_SfSbSftSbF"(i1 %0)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
-// CHECK:   [[CALL_RES:%.*]] = call swiftcc { float, i64, float } @"$s16typed_throws_abi14nonMatching_f1ySf_SbSftSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
+// CHECK:   [[CALL_RES:%.*]] = call swiftcc { float, i64, float } @"$s16typed_throws_abi14nonMatching_f1ySf_SbSftSbAA7OneWordVYKF"(i1 %0, ptr swiftself undef, ptr noalias swifterror captures(none) dereferenceable(8) %swifterror)
 // CHECK:   [[CALL_RES0:%.*]] = extractvalue { float, i64, float } [[CALL_RES]], 0
 // CHECK:   [[CALL_RES1:%.*]] = extractvalue { float, i64, float } [[CALL_RES]], 1
 // CHECK:   [[CALL_RES2:%.*]] = extractvalue { float, i64, float } [[CALL_RES]], 2
@@ -3107,7 +3248,7 @@ func callNonMatching_f1(_ b: Bool) -> (Int, Float, Bool, Float) {
 // CHECK: [[SUCCESS]]:
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%.*}}, i1 false, ptr @"$s16typed_throws_abi20nonMatching_f0_asyncySf_SftSbYaAA7OneWordVYKF{{.*}}", ptr {{%.*}}, ptr {{%.*}}, float 1.000000e+00, float 2.000000e+00, i64 undef, ptr null)
 // CHECK:   unreachable
-// CHECK: 18:
+// CHECK: [[ERROR]]:
 // CHECK:   [[ERROR_X:%.*]] = call swiftcc i64 @"$s16typed_throws_abi7OneWordVACycfC"()
 // CHECK:   [[ERROR_RET:%.*]] = insertvalue { float, float, i64 } undef, i64 [[ERROR_X]], 2
 // CHECK:   [[ERROR_RET0:%.*]] = extractvalue { float, float, i64 } [[ERROR_RET]], 0
@@ -3225,7 +3366,7 @@ func callNonMatching_f1_async(_ b: Bool) async -> (Int, Float, Bool, Float) {
 }
 
 protocol P {
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f0yySbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f0yySbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3236,7 +3377,7 @@ protocol P {
     // CHECK: }
     func f0(_ b: Bool) throws(Empty)
 
-    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2f1ySiSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2f1ySiSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3247,7 +3388,7 @@ protocol P {
     // CHECK: }
     func f1(_ b: Bool) throws(Empty) -> Int
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2f2ySi_SitSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2f2ySi_SitSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3258,7 +3399,7 @@ protocol P {
     // CHECK: }
     func f2(_ b: Bool) throws(Empty) -> (Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2f3ySi_S2itSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2f3ySi_S2itSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3269,7 +3410,7 @@ protocol P {
     // CHECK: }
     func f3(_ b: Bool) throws(Empty) -> (Int, Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2f4ySi_S3itSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2f4ySi_S3itSbAA5EmptyVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3280,13 +3421,15 @@ protocol P {
     // CHECK: }
     func f4(_ b: Bool) throws(Empty) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f5ySi_S4itSbAA5EmptyVYKFTj"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
-    // CHECK:   call swiftcc void {{%.*}}(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2f5ySi_S4itSbAA5EmptyVYKFTj"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK:   call swiftcc void {{%.*}}(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   ret void
     // CHECK: }
     func f5(_ b: Bool) throws(Empty) -> (Int, Int, Int, Int, Int)
 
-    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2g0yySbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    func fManyBytes(_ b: Bool) throws(Empty) -> ManyBytes
+
+    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2g0yySbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3297,7 +3440,7 @@ protocol P {
     // CHECK: }
     func g0(_ b: Bool) throws(OneWord)
 
-    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2g1ySiSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2g1ySiSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3308,7 +3451,7 @@ protocol P {
     // CHECK: }
     func g1(_ b: Bool) throws(OneWord) -> Int
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2g2ySi_SitSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2g2ySi_SitSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3319,7 +3462,7 @@ protocol P {
     // CHECK: }
     func g2(_ b: Bool) throws(OneWord) -> (Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2g3ySi_S2itSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2g3ySi_S2itSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3330,7 +3473,7 @@ protocol P {
     // CHECK: }
     func g3(_ b: Bool) throws(OneWord) -> (Int, Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2g4ySi_S3itSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2g4ySi_S3itSbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3341,13 +3484,15 @@ protocol P {
     // CHECK: }
     func g4(_ b: Bool) throws(OneWord) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2g5ySi_S4itSbAA7OneWordVYKFTj"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
-    // CHECK:   call swiftcc void {{%.*}}(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2g5ySi_S4itSbAA7OneWordVYKFTj"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK:   call swiftcc void {{%.*}}(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   ret void
     // CHECK: }
     func g5(_ b: Bool) throws(OneWord) -> (Int, Int, Int, Int, Int)
 
-    // CHECK:  define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h0yySbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    func gManyBytes(_ b: Bool) throws(OneWord) -> ManyBytes
+
+    // CHECK:  define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h0yySbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3358,7 +3503,7 @@ protocol P {
     // CHECK: }
     func h0(_ b: Bool) throws(TwoWords)
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h1ySiSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h1ySiSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3369,7 +3514,7 @@ protocol P {
     // CHECK: }
     func h1(_ b: Bool) throws(TwoWords) -> Int
 
-    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h2ySi_SitSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h2ySi_SitSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3380,7 +3525,7 @@ protocol P {
     // CHECK: }
     func h2(_ b: Bool) throws(TwoWords) -> (Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2h3ySi_S2itSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2h3ySi_S2itSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3391,7 +3536,7 @@ protocol P {
     // CHECK: }
     func h3(_ b: Bool) throws(TwoWords) -> (Int, Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2h4ySi_S3itSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2h4ySi_S3itSbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3402,13 +3547,15 @@ protocol P {
     // CHECK: }
     func h4(_ b: Bool) throws(TwoWords) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2h5ySi_S4itSbAA8TwoWordsVYKFTj"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
-    // CHECK:   call swiftcc void {{%.*}}(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2h5ySi_S4itSbAA8TwoWordsVYKFTj"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK:   call swiftcc void {{%.*}}(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   ret void
     // CHECK: }
     func h5(_ b: Bool) throws(TwoWords) -> (Int, Int, Int, Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i0yySbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    func hManyBytes(_ b: Bool) throws(TwoWords) -> ManyBytes
+
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i0yySbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3419,7 +3566,7 @@ protocol P {
     // CHECK: }
     func i0(_ b: Bool) throws(ThreeWords)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i1ySiSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i1ySiSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3430,7 +3577,7 @@ protocol P {
     // CHECK: }
     func i1(_ b: Bool) throws(ThreeWords) -> Int
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i2ySi_SitSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i2ySi_SitSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3441,7 +3588,7 @@ protocol P {
     // CHECK: }
     func i2(_ b: Bool) throws(ThreeWords) -> (Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i3ySi_S2itSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i3ySi_S2itSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3452,7 +3599,7 @@ protocol P {
     // CHECK: }
     func i3(_ b: Bool) throws(ThreeWords) -> (Int, Int, Int)
 
-    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2i4ySi_S3itSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %2, ptr %3, ptr %4)
+    // CHECK: define hidden swiftcc { i64, i64, i64, i64 } @"$s16typed_throws_abi1PP2i4ySi_S3itSbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
     // CHECK:   br i1 [[ISERROR]], label %failure, label %success
@@ -3463,11 +3610,13 @@ protocol P {
     // CHECK: }
     func i4(_ b: Bool) throws(ThreeWords) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2i5ySi_S4itSbAA10ThreeWordsVYKFTj"(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
-    // CHECK:   call swiftcc void {{%.*}}(ptr noalias{{( nocapture)?}} sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>){{( captures\(none\))?}} %0, i1 %1, ptr noalias swiftself %2, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swiftcc void @"$s16typed_throws_abi1PP2i5ySi_S4itSbAA10ThreeWordsVYKFTj"(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
+    // CHECK:   call swiftcc void {{%.*}}(ptr noalias sret(<{ %TSi, %TSi, %TSi, %TSi, %TSi }>) captures(none) %0, i1 %1, ptr noalias swiftself %2, ptr noalias swifterror captures(none) dereferenceable(8) %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   ret void
     // CHECK: }
     func i5(_ b: Bool) throws(ThreeWords) -> (Int, Int, Int, Int, Int)
+
+    func iManyBytes(_ b: Bool) throws(ThreeWords) -> ManyBytes
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -3542,7 +3691,7 @@ protocol PAsync {
     // CHECK: }
     func f4(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2f5ySi_S4itSbYaAA5EmptyVYKFTj"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2f5ySi_S4itSbYaAA5EmptyVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3550,6 +3699,8 @@ protocol PAsync {
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr [[ERROR]])
     // CHECK: }
     func f5(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int, Int)
+
+    func fManyBytes(_ b: Bool) async throws(Empty) -> ManyBytes
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2g0yySbYaAA7OneWordVYKFTj"(ptr swiftasync %0, i1 %1, ptr noalias swiftself %2, ptr %3, ptr %4)
     // CHECK:   %swifterror = alloca swifterror ptr
@@ -3621,7 +3772,7 @@ protocol PAsync {
     // CHECK: }
     func g4(_ b: Bool) async throws(OneWord) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2g5ySi_S4itSbYaAA7OneWordVYKFTj"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2g5ySi_S4itSbYaAA7OneWordVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3629,6 +3780,8 @@ protocol PAsync {
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr [[ERROR]])
     // CHECK: }
     func g5(_ b: Bool) async throws(OneWord) -> (Int, Int, Int, Int, Int)
+
+    func gManyBytes(_ b: Bool) async throws(OneWord) -> ManyBytes
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2h0yySbYaAA8TwoWordsVYKFTj"(ptr swiftasync %0, i1 %1, ptr noalias swiftself %2, ptr %3, ptr %4)
     // CHECK:   %swifterror = alloca swifterror ptr
@@ -3700,7 +3853,7 @@ protocol PAsync {
     // CHECK: }
     func h4(_ b: Bool) async throws(TwoWords) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2h5ySi_S4itSbYaAA8TwoWordsVYKFTj"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2h5ySi_S4itSbYaAA8TwoWordsVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3708,6 +3861,8 @@ protocol PAsync {
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr [[ERROR]])
     // CHECK: }
     func h5(_ b: Bool) async throws(TwoWords) -> (Int, Int, Int, Int, Int)
+
+    func hManyBytes(_ b: Bool) async throws(TwoWords) -> ManyBytes
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2i0yySbYaAA10ThreeWordsVYKFTj"(ptr swiftasync %0, i1 %1, ptr noalias swiftself %2, ptr %3, ptr %4)
     // CHECK:   %swifterror = alloca swifterror ptr
@@ -3779,7 +3934,7 @@ protocol PAsync {
     // CHECK: }
     func i4(_ b: Bool) async throws(ThreeWords) -> (Int, Int, Int, Int)
 
-    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2i5ySi_S4itSbYaAA10ThreeWordsVYKFTj"(ptr noalias {{(nocapture|captures\(none\))}} %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+    // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2i5ySi_S4itSbYaAA10ThreeWordsVYKFTj"(ptr noalias captures(none) %0, ptr swiftasync %1, i1 %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
     // CHECK:   store ptr null, ptr %swifterror
@@ -3787,4 +3942,6 @@ protocol PAsync {
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr [[ERROR]])
     // CHECK: }
     func i5(_ b: Bool) async throws(ThreeWords) -> (Int, Int, Int, Int, Int)
+
+    func iManyBytes(_ b: Bool) async throws(ThreeWords) -> ManyBytes
 }

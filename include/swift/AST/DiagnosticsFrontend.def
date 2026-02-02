@@ -24,6 +24,9 @@
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
 
+WARNING(warning_darwin_sdk_invalid_settings, none,
+        "SDK settings were ignored as 'SDKSettings.json' could not be parsed", ())
+
 ERROR(error_no_frontend_args, none,
       "no arguments provided to '-frontend'", ())
 
@@ -40,12 +43,12 @@ WARNING(warning_upcoming_feature_on_by_default, none,
         "upcoming feature '%0' is already enabled as of Swift version %1",
         (StringRef, unsigned))
 
-GROUPED_WARNING(unrecognized_feature, StrictLanguageFeatures, DefaultIgnore,
+GROUPED_WARNING(unrecognized_feature, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not a recognized "
                 "%select{experimental|upcoming}1 feature",
                 (StringRef, bool))
 
-GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
+GROUPED_WARNING(feature_not_experimental, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not an experimental feature, "
                 "use -%select{disable|enable}1-upcoming-feature instead",
                 (StringRef, bool))
@@ -67,11 +70,6 @@ GROUPED_WARNING(feature_does_not_support_migration_mode, StrictLanguageFeatures,
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
-
-ERROR(error_old_spi_only_import_unsupported, none,
-      "'-experimental-spi-imports' is unsupported in Swift 6, "
-      "use '@_spiOnly' instead",
-      ())
 
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
@@ -126,8 +124,6 @@ WARNING(warning_locale_path_not_found,none,
       "translation is disabled", (StringRef))
 WARNING(warning_cannot_find_locale_file,none,
       "cannot find translations for '%0' at '%1': no such file", (StringRef, StringRef))
-WARNING(warning_cannot_multithread_batch_mode,none,
-      "ignoring -num-threads argument; cannot multithread batch mode", ())
 ERROR(error_cannot_explicit_interface_build_in_mode,none,
       "'-explicit-interface-module-build' only supported when building a module from interface ('-compile-module-from-interface' or '-typecheck-module-from-interface')'", ())
 ERROR(error_unsupported_option_argument,none,
@@ -157,6 +153,9 @@ ERROR(error_load_resolved_plugin,none,
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
+
+ERROR(error_module_interface_requires_language_mode,none,
+      "emitting module interface files requires '-language-mode'", ())
 
 ERROR(error_mode_cannot_emit_dependencies,none,
       "this mode does not support emitting dependency files", ())
@@ -197,8 +196,8 @@ WARNING(ignoring_option_obsolete,none,
         "ignoring '%0'; this option is obsolete", (StringRef))
 WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
-WARNING(warn_ignore_option_overriden_by,none,
-        "ignoring %0 (overriden by %1)", (StringRef, StringRef))
+WARNING(warn_ignore_option_overridden_by,none,
+        "ignoring %0 (overridden by %1)", (StringRef, StringRef))
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
@@ -213,6 +212,9 @@ ERROR(error_stdlib_module_name,none,
       "module name \"%0\" is reserved for the standard library"
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
+WARNING(warn_multiple_module_inputs_same_name,none,
+        "multiple Swift module file inputs with identifier \"%0\": replacing '%1' with '%2'",
+        (StringRef, StringRef, StringRef))
 
 ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",
@@ -301,26 +303,9 @@ REMARK(remark_indexing_system_module,none,
        "%select{|; skipping because of a broken swiftinterface}1",
        (StringRef, bool))
 
-ERROR(error_create_symbolic_interfaces_dir,none,
-      "creating symbolic interfaces directory: %0", (StringRef))
-ERROR(error_symbolic_interfaces_failed_status_check,none,
-      "failed file status check: %0", (StringRef))
-ERROR(error_write_symbolic_interface,none,
-      "writing symbolic interface file: %0", (StringRef))
-REMARK(remark_emitting_symbolic_interface_module,none,
-       "emitting symbolic interface at %0"
-       "%select{|; skipping because it's up to date}1",
-       (StringRef, bool))
-
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",
       (StringRef, int, int))
-
-ERROR(error_formatting_multiple_file_ranges,none,
-      "file ranges don't support multiple input files", ())
-
-ERROR(error_formatting_invalid_range,none,
-      "file range is invalid", ())
 
 WARNING(stats_disabled,none,
         "compiler was not built with support for collecting statistics", ())
@@ -359,16 +344,8 @@ ERROR(explicit_swift_module_map_missing,none,
       (StringRef))
 
 ERROR(explicit_swift_module_map_corrupted,none,
-      "explicit Swift module map from %0 is malformed",
-      (StringRef))
-
-ERROR(placeholder_dependency_module_map_missing,none,
-      "cannot open Swift placeholder dependency module map from %0",
-      (StringRef))
-
-ERROR(placeholder_dependency_module_map_corrupted,none,
-      "Swift placeholder dependency module map from %0 is malformed",
-      (StringRef))
+      "explicit Swift module map from %0 is malformed: %1",
+      (StringRef, StringRef))
 
 ERROR(const_extract_protocol_list_input_file_missing,none,
       "cannot open constant extraction protocol list input file from %0",
@@ -519,30 +496,34 @@ REMARK(matching_output_produced,none,
       "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
 
 // Caching related diagnostics
-ERROR(error_caching_no_cas_fs, none,
+GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
     "caching is enabled without CAS file-system options, input is not immutable", ())
-ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
-ERROR(error_invalid_cas_id, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))
-ERROR(error_cas, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
-ERROR(error_cas_fs_creation, none, "cannot create CAS filesystem: %0", (StringRef))
-ERROR(error_cache_key_creation, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
-ERROR(error_cas_file_ref, none, "cannot load file %0 from CAS filesystem", (StringRef))
-ERROR(error_cas_conflict_options, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
-ERROR(error_cas_initialization, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
-ERROR(error_cas_malformed_input, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
-WARNING(cache_replay_failed, none, "cache replay failed: %0", (StringRef))
+GROUPED_ERROR(error_invalid_cas_id, CompilationCaching, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas, CompilationCaching, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas_fs_creation, CompilationCaching, none, "cannot create CAS filesystem: %0", (StringRef))
+GROUPED_ERROR(error_cache_key_creation, CompilationCaching, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas_file_ref, CompilationCaching, none, "cannot load file %0 from CAS filesystem: %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas_conflict_options, CompilationCaching, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
+GROUPED_ERROR(error_cas_initialization, CompilationCaching, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
+GROUPED_ERROR(error_cas_malformed_input, CompilationCaching, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
+GROUPED_WARNING(cache_replay_failed, CompilationCaching, none, "cache replay failed: %0", (StringRef))
 
-ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
-ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))
+GROUPED_ERROR(error_failed_cached_diag, CompilationCaching, none, "failed to serialize cached diagnostics: %0", (StringRef))
+GROUPED_ERROR(error_replay_cached_diag, CompilationCaching, none, "failed to replay cached diagnostics: %0", (StringRef))
 
-ERROR(error_load_input_from_cas, none, "failed to load input '%0' from CAS", (StringRef))
+GROUPED_ERROR(error_load_input_from_cas, CompilationCaching, none, "failed to load input '%0' from CAS", (StringRef))
 
-ERROR(error_wrong_input_num_for_input_file_key, none, "-input-file-key only support one input file", ())
+GROUPED_ERROR(error_wrong_input_num_for_input_file_key, CompilationCaching, none, "-input-file-key only support one input file", ())
+
+ERROR(error_gen_reproducer_not_caching, none, "-gen-reproducer only supports swift caching (-cache-compile-job)", ())
+ERROR(error_cannot_create_reproducer_dir, none, "failed to create reproducer director '%0': %1", (StringRef, StringRef))
+
+NOTE(note_reproducer, none, "reproducer is available at: %0", (StringRef))
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
@@ -567,9 +548,6 @@ WARNING(module_incompatible_with_skip_function_bodies,none,
         "-experimental-skip-*-function-bodies* flags; they have "
         "been automatically disabled", (StringRef))
 
-WARNING(access_notes_file_io_error,none,
-        "ignored access notes file at '%0' because it cannot be read: %1",
-        (StringRef, StringRef))
 WARNING(error_in_access_notes_file,none,
         "ignored access notes file because it cannot be parsed: %0",
         (StringRef))
@@ -597,6 +575,8 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
 
 ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
+ERROR(embedded_existentials_without_embedded,none,
+      "EmbeddedExistentials requires enabling embedded Swift.", ())
 ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,
@@ -607,9 +587,15 @@ ERROR(min_ptr_value_without_embedded,none,
       "-min-valid-pointer-value is only applicable with embedded Swift.", ())
 ERROR(no_swift_sources_with_embedded,none,
       "embedded swift cannot be enabled in a compiler built without Swift sources", ())
-
+WARNING(embedded_dynamic_exclusivity_staging,none,
+        "'-enforce-exclusivity=checked' is ignored in Embedded Swift unless also enabled by '-enable-experimental-feature EmbeddedDynamicExclusivity'", ())
 ERROR(package_cmo_requires_library_evolution, none,
         "Library evolution must be enabled for Package CMO", ())
+
+ERROR(error_invalid_clang_header_access_level, none,
+      "invalid minimum clang header access level '%0'; chose from "
+      "'public'|'package'|'internal'",
+      (StringRef))
 
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
@@ -638,6 +624,8 @@ NOTE(dependency_scan_unexpected_variant_module_map_note, none,
 NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
      "%select{first|second}0 module command-line has extra argument: '%1'", (bool, StringRef))
 
+ERROR(bridging_header_and_pch_internal_mismatch,none,
+      "bridging header and precompiled header options mismatch on internal vs. public import", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

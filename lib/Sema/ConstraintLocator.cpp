@@ -95,7 +95,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
-  case ConstraintLocator::ImplicitConversion:
   case ConstraintLocator::ImplicitDynamicMemberSubscript:
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
@@ -110,8 +109,10 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::PackExpansionType:
   case ConstraintLocator::ThrownErrorType:
+  case ConstraintLocator::FunctionSendability:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
+  case ConstraintLocator::ImplicitForEachCompatMember:
   case ConstraintLocator::ExistentialMemberAccessConversion:
     return 0;
 
@@ -129,8 +130,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
 }
 
 void LocatorPathElt::dump(raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
@@ -462,12 +462,6 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "implicit dynamic member subscript";
     break;
 
-  case ConstraintLocator::ConstraintLocator::ImplicitConversion: {
-    auto convElt = elt.castTo<LocatorPathElt::ImplicitConversion>();
-    out << "implicit conversion " << getName(convElt.getConversionKind());
-    break;
-  }
-
   case ConstraintLocator::ConstraintLocator::PackType: {
     auto packElt = elt.castTo<LocatorPathElt::PackType>();
     out << "pack type '" << packElt.getType()->getString(PO) << "'";
@@ -527,8 +521,16 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "thrown error type";
     break;
   }
+  case ConstraintLocator::FunctionSendability: {
+    out << "function sendability";
+    break;
+  }
   case ConstraintLocator::FallbackType: {
     out << "fallback type";
+    break;
+
+  case ConstraintLocator::ImplicitForEachCompatMember:
+    out << "implicit 'for' loop 'makeIterator'/'next' compatibility member";
     break;
 
   case ConstraintLocator::KeyPathSubscriptIndex:
@@ -545,9 +547,17 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 /// e.g. `foo[0]` or `\Foo.[0]`
 bool ConstraintLocator::isSubscriptMemberRef() const {
   auto anchor = getAnchor();
-  auto path = getPath();
+  if (!anchor)
+    return false;
 
-  if (!anchor || path.empty())
+  // Look through dynamic member lookup since for a subscript reference the
+  // dynamic member lookup is also a subscript reference.
+  auto path = getPath();
+  using KPDynamicMemberElt = LocatorPathElt::KeyPathDynamicMember;
+  while (!path.empty() && path.back().is<KPDynamicMemberElt>())
+    path = path.drop_back();
+
+  if (path.empty())
     return false;
 
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
@@ -588,41 +598,41 @@ bool ConstraintLocator::isResultOfKeyPathDynamicMemberLookup() const {
   });
 }
 
-bool ConstraintLocator::isKeyPathSubscriptComponent() const {
-  auto *anchor = getAsExpr(getAnchor());
-  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
+static bool hasKeyPathComponent(
+    const ConstraintLocator *loc,
+    llvm::function_ref<bool(KeyPathExpr::Component::Kind)> predicate) {
+  auto *KPE = getAsExpr<KeyPathExpr>(loc->getAnchor());
   if (!KPE)
     return false;
 
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
+  return llvm::any_of(loc->getPath(), [&](const LocatorPathElt &elt) {
     auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
     if (!keyPathElt)
       return false;
 
-    auto index = keyPathElt->getIndex();
-    auto &component = KPE->getComponents()[index];
-    return component.getKind() == ComponentKind::Subscript ||
-           component.getKind() == ComponentKind::UnresolvedSubscript;
+    auto &component = KPE->getComponents()[keyPathElt->getIndex()];
+    return predicate(component.getKind());
+  });
+}
+
+bool ConstraintLocator::isKeyPathSubscriptComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Subscript ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedSubscript;
   });
 }
 
 bool ConstraintLocator::isKeyPathMemberComponent() const {
-  auto *anchor = getAsExpr(getAnchor());
-  auto *KPE = dyn_cast_or_null<KeyPathExpr>(anchor);
-  if (!KPE)
-    return false;
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Member ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedMember;
+  });
+}
 
-  using ComponentKind = KeyPathExpr::Component::Kind;
-  return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
-    auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
-    if (!keyPathElt)
-      return false;
-
-    auto index = keyPathElt->getIndex();
-    auto &component = KPE->getComponents()[index];
-    return component.getKind() == ComponentKind::Member ||
-           component.getKind() == ComponentKind::UnresolvedMember;
+bool ConstraintLocator::isKeyPathApplyComponent() const {
+  return hasKeyPathComponent(this, [](auto kind) {
+    return kind == KeyPathExpr::Component::Kind::Apply ||
+           kind == KeyPathExpr::Component::Kind::UnresolvedApply;
   });
 }
 
@@ -803,9 +813,6 @@ void ConstraintLocator::dump(ConstraintSystem *CS) const {
 
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  
   out << "locator@" << (void*) this << " [";
 
   constraints::dumpAnchor(anchor, sm, out);

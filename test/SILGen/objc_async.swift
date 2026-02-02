@@ -255,7 +255,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // rdar://91502776
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}21checkCostcoMembershipSbyYaF : $@convention(thin) @async () -> Bool {
 // CHECK:    bb0:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[FINAL_BUF:%.*]] = alloc_stack $Bool
 // CHECK:        [[RESULT_BUF:%.*]] = alloc_stack $NSObject
 // CHECK:        [[METH:%.*]] = objc_method {{%.*}} : $@objc_metatype Person.Type, #Person.asCustomer!foreign
@@ -264,7 +264,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:        dealloc_stack {{%.*}} : $*@block_storage
 // CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb1
 // CHECK:    bb1:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[RESULT:%.*]] = load [take] [[RESULT_BUF]] : $*NSObject
 // CHECK:        objc_method {{%.*}} : $CostcoManager, #CostcoManager.isCustomerEnrolled!foreign
 // CHECK:        get_async_continuation_addr Bool, [[FINAL_BUF]] : $*Bool
@@ -275,7 +275,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:        dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage
 // CHECK:        await_async_continuation {{%.*}} : $Builtin.RawUnsafeContinuation, resume bb2
 // CHECK:    bb2:
-// CHECK:        hop_to_executor {{%.*}} : $Optional<Builtin.Executor>
+// CHECK:        hop_to_executor {{%.*}} : $Optional<any Actor>
 // CHECK:        [[ANSWER:%.*]] = load [trivial] [[FINAL_BUF]] : $*Bool
 // CHECK:        fix_lifetime [[EXTEND2]] : $CostcoManager
 // CHECK:        destroy_value [[EXTEND2]] : $CostcoManager
@@ -325,7 +325,7 @@ extension OptionalMemberLookups {
 // CHECK: destroy_value {{.*}} : $MainActor
 // CHECK: dealloc_stack {{.*}} : $*AutoreleasingUnsafeMutablePointer<Optional<NSError>>
 // CHECK: dealloc_stack {{.*}} : $*@sil_unmanaged Optional<NSError>
-// CHECK: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
+// CHECK: hop_to_executor {{.*}} : $Optional<any Actor>
 // CHECK: switch_enum
 func checkHotdogs(_ v: some HotdogCompetitor, _ timeLimit: NSObject) async throws -> String? {
     return try await v.pileOfHotdogsToEat(withLimit: timeLimit)
@@ -360,3 +360,31 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK-NEXT:    [[ZERO_FLOAT:%.*]] = builtin "zeroInitializer"() : $Float
 // CHECK-NEXT:    [[BORROWED_SOME_NSERROR:%.*]] = begin_borrow [[SOME_NSERROR]] :
 // CHECK-NEXT:    apply [[BORROWED_BLOCK]]([[ZERO_FLOAT]], [[BORROWED_SOME_NSERROR]])
+
+// CHECK-LABEL: sil hidden [ossa] @$s10objc_async13testAnyObjectyySo10SlowServerCYaF : $@convention(thin) @async (@guaranteed SlowServer) -> () {
+// CHECK: bb0([[SLOWSERVER:%.*]] : @guaranteed $SlowServer):
+// CHECK: [[SLOWSERVER_C:%.*]] = copy_value [[SLOWSERVER]]
+// CHECK: [[SLOWSERVER_ANYOBJECT:%.*]] = init_existential_ref [[SLOWSERVER_C]]
+// CHECK: [[SLOWSERVER_ANYOBJECT_M:%.*]] = move_value [lexical] [var_decl] [[SLOWSERVER_ANYOBJECT]]
+// CHECK: debug_value [[SLOWSERVER_ANYOBJECT_M]] : $AnyObject, let, name "anyObjectSlowServer"
+// CHECK: [[SLOWSERVER_ANYOBJECT_M_B:%.*]] = begin_borrow [[SLOWSERVER_ANYOBJECT_M]]
+// CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O:%.*]] = open_existential_ref [[SLOWSERVER_ANYOBJECT_M_B]]
+// CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O_C:%.*]] = copy_value [[SLOWSERVER_ANYOBJECT_M_B_O]]
+// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) @Sendable () -> (), @opened("{{.*}}", AnyObject) Self) -> ()
+// CHECK: [[CONT:%.*]] = get_async_continuation_addr ()
+// CHECK: [[UNSAFE_CONT:%.*]] = struct $UnsafeContinuation<(), Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
+// CHECK: [[BLOCK:%.*]] = alloc_stack $@block_storage Any
+// CHECK: [[BLOCK_PROJECT:%.*]] = project_block_storage [[BLOCK]]
+// CHECK: [[BLOCK_PROJECT_EX:%.*]] = init_existential_addr [[BLOCK_PROJECT]]
+// CHECK: store [[UNSAFE_CONT]] to [trivial] [[BLOCK_PROJECT_EX]]
+// CHECK: merge_isolation_region [[BLOCK]] : $*@block_storage Any,
+// CHECK: [[CONT_HANDLER:%.*]] = function_ref @$sIeyBh_ytTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
+// CHECK: [[INIT_BLOCK_STORAGE_HEADER:%.*]] = init_block_storage_header [[BLOCK]] : $*@block_storage Any, invoke [[CONT_HANDLER]]
+// CHECK: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, [[BLOCK]]
+// CHECK: apply [[METHOD]]({{%.*}}, [[INIT_BLOCK_STORAGE_HEADER]], [[SLOWSERVER_ANYOBJECT_M_B_O_C]])
+// CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume bb1
+// CHECK: } // end sil function '$s10objc_async13testAnyObjectyySo10SlowServerCYaF'
+func testAnyObject(_ slowServer: SlowServer) async {
+  let anyObjectSlowServer: AnyObject = slowServer
+  await anyObjectSlowServer.start(at: nil)
+}

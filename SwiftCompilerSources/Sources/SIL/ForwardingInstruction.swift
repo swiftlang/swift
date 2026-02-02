@@ -53,7 +53,12 @@ extension ForwardingInstruction {
   public var forwardingOwnership: Ownership {
     Ownership(bridged: bridged.ForwardingInst_forwardingOwnership())
   }
-  
+
+  public func setForwardingOwnership(to ownership: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.ForwardingInst_setForwardingOwnership(ownership._bridged)
+  }
+
   /// A forwarding instruction preserves reference counts if it has a dynamically non-trivial result in which all references are forwarded from the operand.
   ///
   /// A cast can only forward guaranteed values if it preserves reference counts. Such casts cannot release any references within their operand's value and cannot retain any references owned by their result.
@@ -457,6 +462,12 @@ extension LinearFunctionExtractInst: ForwardingInstruction {
 extension BorrowedFromInst: ForwardingInstruction {
   public var singleForwardedOperand: Operand? { operands[0] }
   public var preservesIdentity: Bool { true }
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { false }
+}
+
+extension ImplicitActorToOpaqueIsolationCastInst: ConversionInstruction {
   public var preservesRepresentation: Bool { true }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }

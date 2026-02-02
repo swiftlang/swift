@@ -66,7 +66,8 @@ protected:
                 SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
       : TypeInfo(type, align, pod, bt, copy, alwaysFixedSize, isABIAccessible, stik),
         SpareBits(std::move(spareBits)) {
-    assert(SpareBits.size() == size.getValueInBits());
+    // SpareBits implementation is limited to 32bits.
+    assert(SpareBits.size() == (size.getValueInBits() & 0xFFFFFFFF));
     assert(isFixedSize());
     Bits.FixedTypeInfo.Size = size.getValue();
     assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
@@ -82,8 +83,12 @@ public:
   }
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override;
-  void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
+                             const llvm::Twine &name,
+                             StackAllocationIsNested_t isNested =
+                                 StackAllocationIsNested) const override;
+  void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                       StackAllocationIsNested_t isNested =
+                           StackAllocationIsNested) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
                     bool isOutlined) const override;
 
@@ -98,6 +103,7 @@ public:
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
 

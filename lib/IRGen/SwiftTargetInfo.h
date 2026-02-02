@@ -114,6 +114,9 @@ public:
   /// "negative" pointer values.
   bool SwiftRetainIgnoresNegativeValues = false;
 
+  /// True if the swiftSwiftDirectRuntime static library is available.
+  bool HasSwiftSwiftDirectRuntimeLibrary = false;
+
   bool UsableSwiftAsyncContextAddrIntrinsic = false;
 };
 

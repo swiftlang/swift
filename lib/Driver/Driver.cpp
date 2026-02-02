@@ -97,9 +97,9 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   std::optional<DriverKind> Kind =
       llvm::StringSwitch<std::optional<DriverKind>>(DriverName)
           .Case("swift", DriverKind::Interactive)
-          .Case("swiftc", DriverKind::Batch)
+          .Case("swiftc", DriverKind::Standard)
           .Case("swift-legacy-driver", DriverKind::Interactive)
-          .Case("swiftc-legacy-driver", DriverKind::Batch)
+          .Case("swiftc-legacy-driver", DriverKind::Standard)
           .Case("sil-opt", DriverKind::SILOpt)
           .Case("sil-func-extractor", DriverKind::SILFuncExtractor)
           .Case("sil-nm", DriverKind::SILNM)
@@ -144,7 +144,8 @@ static void validateLegacyUnsupportedArgs(DiagnosticEngine &diags,
 
 static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+  if (!args.hasArgNoClaim(options::OPT_import_bridging_header,
+                          options::OPT_internal_import_bridging_header))
     return;
 
   if (args.hasArgNoClaim(options::OPT_import_underlying_module))
@@ -175,26 +176,97 @@ static void validateWarningControlArgs(DiagnosticEngine &diags,
   }
 }
 
+/// Validates only *generate* profiling flags and their mutual conflicts.
+static void validateProfilingGenerateArgs(DiagnosticEngine &diags,
+                                          const ArgList &args) {
+  const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *CSProfileGenerate =
+      args.getLastArg(options::OPT_cs_profile_generate);
+  const Arg *CSProfileGenerateEQ =
+      args.getLastArg(options::OPT_cs_profile_generate_EQ);
+  const Arg *IRProfileGenerateEQ =
+      args.getLastArg(options::OPT_ir_profile_generate_EQ);
+
+  // If both CS Profile forms were specified, report a clear conflict.
+  if (CSProfileGenerate && CSProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-cs-profile-generate", "-cs-profile-generate=");
+    CSProfileGenerateEQ = nullptr;
+  }
+  // If both IR Profile forms were specified, report a clear conflict.
+  if (IRProfileGenerate && IRProfileGenerateEQ) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-generate=");
+    IRProfileGenerateEQ = nullptr;
+  }
+
+  llvm::SmallVector<std::pair<const Arg *, const char *>, 3> gens;
+  if (ProfileGenerate)
+    gens.push_back({ProfileGenerate, "-profile-generate"});
+  if (IRProfileGenerate)
+    gens.push_back({IRProfileGenerate, "-ir-profile-generate"});
+  if (IRProfileGenerateEQ)
+    gens.push_back({IRProfileGenerateEQ, "-ir-profile-generate="});
+  if (CSProfileGenerate)
+    gens.push_back({CSProfileGenerate, "-cs-profile-generate"});
+  else if (CSProfileGenerateEQ)
+    gens.push_back({CSProfileGenerateEQ, "-cs-profile-generate="});
+
+  // Emit pairwise conflicts if more than one generate-mode was selected
+  for (size_t i = 0; i + 1 < gens.size(); ++i) {
+    for (size_t j = i + 1; j < gens.size(); ++j) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     gens[i].second, gens[j].second);
+    }
+  }
+}
+
 static void validateProfilingArgs(DiagnosticEngine &diags,
                                   const ArgList &args) {
+  validateProfilingGenerateArgs(diags, args);
   const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
   const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
+  const Arg *IRProfileGenerate =
+      args.getLastArg(options::OPT_ir_profile_generate);
+  const Arg *IRProfileGenerateEQ =
+      args.getLastArg(options::OPT_ir_profile_generate_EQ);
+  const Arg *IRProfileUse = args.getLastArg(options::OPT_ir_profile_use);
   if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
   }
-
+  if (ProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-profile-generate", "-ir-profile-use");
+  }
+  if (IRProfileGenerate && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-profile-use");
+  }
+  if (IRProfileGenerate && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate", "-ir-profile-use");
+  }
+  if (IRProfileGenerateEQ && ProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate=", "-profile-use");
+  }
+  if (IRProfileGenerateEQ && IRProfileUse) {
+    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                   "-ir-profile-generate=", "-ir-profile-use");
+  }
   // Check if the profdata is missing
-  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue())) {
-    diags.diagnose(SourceLoc(), diag::error_profile_missing,
-                   ProfileUse->getValue());
+  for (const Arg *use : {ProfileUse, IRProfileUse}) {
+    if (use && !llvm::sys::fs::exists(use->getValue())) {
+      diags.diagnose(SourceLoc(), diag::error_profile_missing, use->getValue());
+    }
   }
 }
 
 static void validateDependencyScanningArgs(DiagnosticEngine &diags,
                                            const ArgList &args) {
-  const Arg *ExternalDependencyMap =
-      args.getLastArg(options::OPT_placeholder_dependency_module_map);
   const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
   const Arg *Prescan = args.getLastArg(options::OPT_import_prescan);
 
@@ -207,11 +279,6 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
   const Arg *ValidatePriorCache =
       args.getLastArg(options::OPT_validate_prior_dependency_scan_cache);
 
-  if (ExternalDependencyMap && !ScanDependencies) {
-    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
-                   "-placeholder-dependency-module-map-file",
-                   "-scan-dependencies");
-  }
   if (Prescan && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-import-prescan", "-scan-dependencies");
@@ -462,33 +529,6 @@ static bool getFilelistThreshold(DerivedArgList &Args, size_t &FilelistThreshold
   return false;
 }
 
-static unsigned
-getDriverBatchSeed(llvm::opt::InputArgList &ArgList,
-                   DiagnosticEngine &Diags) {
-  unsigned DriverBatchSeed = 0;
-  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_seed)) {
-    if (StringRef(A->getValue()).getAsInteger(10, DriverBatchSeed)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(ArgList), A->getValue());
-    }
-  }
-  return DriverBatchSeed;
-}
-
-static std::optional<unsigned>
-getDriverBatchCount(llvm::opt::InputArgList &ArgList, DiagnosticEngine &Diags) {
-  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_count)) {
-    unsigned Count = 0;
-    if (StringRef(A->getValue()).getAsInteger(10, Count)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(ArgList), A->getValue());
-    } else {
-      return Count;
-    }
-  }
-  return std::nullopt;
-}
-
 static std::string
 computeWorkingDirectory(const llvm::opt::InputArgList *ArgList) {
   if (auto *A = ArgList->getLastArg(options::OPT_working_directory)) {
@@ -535,38 +575,13 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
 }
 
 static bool
-computeContinueBuildingAfterErrors(const bool BatchMode,
-                                   const llvm::opt::InputArgList *ArgList) {
-  // Note: Batch mode handling of serialized diagnostics requires that all
-  // batches get to run, in order to make sure that all diagnostics emitted
-  // during the compilation end up in at least one serialized diagnostic file.
-  // Therefore, treat batch mode as implying -continue-building-after-errors.
-  // (This behavior could be limited to only when serialized diagnostics are
-  // being emitted, but this seems more consistent and less surprising for
-  // users.)
+computeContinueBuildingAfterErrors(const llvm::opt::InputArgList *ArgList) {
   // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
   // If we fail to precompile a bridging header, for example, there's no need
   // to go on to compilation of source files, and if compilation of source files
   // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
   // but not schedule any new ones.
-  return BatchMode ||
-         ArgList->hasArg(options::OPT_continue_building_after_errors);
-
-}
-
-static std::optional<unsigned>
-getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
-                        DiagnosticEngine &Diags) {
-  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_size_limit)) {
-    unsigned Limit = 0;
-    if (StringRef(A->getValue()).getAsInteger(10, Limit)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(ArgList), A->getValue());
-    } else {
-      return Limit;
-    }
-  }
-  return std::nullopt;
+  return ArgList->hasArg(options::OPT_continue_building_after_errors);
 }
 
 std::unique_ptr<Compilation>
@@ -606,9 +621,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  bool BatchMode = false;
-  OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
-  buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
+  OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs);
+  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
 
   if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
@@ -668,7 +682,7 @@ Driver::buildCompilation(const ToolChain &TC,
   const bool DriverPrintDerivedOutputFileMap =
       ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   const bool ContinueBuildingAfterErrors =
-      computeContinueBuildingAfterErrors(BatchMode, ArgList.get());
+      computeContinueBuildingAfterErrors(ArgList.get());
   const bool ShowJobLifecycle =
       ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
 
@@ -677,11 +691,6 @@ Driver::buildCompilation(const ToolChain &TC,
   // constructor in a block:
   std::unique_ptr<Compilation> C;
   {
-    const unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
-    const std::optional<unsigned> DriverBatchCount =
-        getDriverBatchCount(*ArgList, Diags);
-    const std::optional<unsigned> DriverBatchSizeLimit =
-        getDriverBatchSizeLimit(*ArgList, Diags);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
     const bool ShowDriverTimeCompilation =
         ArgList->hasArg(options::OPT_driver_time_compilation);
@@ -699,10 +708,6 @@ Driver::buildCompilation(const ToolChain &TC,
         std::move(TranslatedArgList),
         std::move(Inputs),
         DriverFilelistThreshold,
-        BatchMode,
-        DriverBatchSeed,
-        DriverBatchCount,
-        DriverBatchSizeLimit,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
@@ -870,7 +875,7 @@ Driver::parseArgStrings(ArrayRef<const char *> Args) {
   unsigned UnsupportedFlag = 0;
   if (driverKind == DriverKind::Interactive)
     UnsupportedFlag = options::NoInteractiveOption;
-  else if (driverKind == DriverKind::Batch)
+  else if (driverKind == DriverKind::Standard)
     UnsupportedFlag = options::NoBatchOption;
 
   if (UnsupportedFlag)
@@ -1076,7 +1081,7 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 }
 
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
-                             const bool BatchMode, const InputFileList &Inputs,
+                             const InputFileList &Inputs,
                              OutputInfo &OI) const {
 
   if (const Arg *A = Args.getLastArg(options::OPT_lto)) {
@@ -1109,9 +1114,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                               : CompilerOutputType;
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
-    if (BatchMode) {
-      Diags.diagnose(SourceLoc(), diag::warning_cannot_multithread_batch_mode);
-    } else if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
+    if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
@@ -1484,13 +1487,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.RuntimeVariant =
           llvm::StringSwitch<std::optional<OutputInfo::MSVCRuntime>>(
               A->getValue())
-              .Cases("MD", "MultiThreadedDLL", "shared-ucrt",
+              .Cases({"MD", "MultiThreadedDLL", "shared-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDLL)
-              .Cases("MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt",
+              .Cases({"MDd", "MultiThreadedDebugDLL", "shared-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebugDLL)
-              .Cases("MT", "MultiThreaded", "static-ucrt",
+              .Cases({"MT", "MultiThreaded", "static-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreaded)
-              .Cases("MTd", "MultiThreadedDebug", "static-debug-ucrt",
+              .Cases({"MTd", "MultiThreadedDebug", "static-debug-ucrt"},
                      OutputInfo::MSVCRuntime::MultiThreadedDebug)
               .Default(std::nullopt);
       if (!OI.RuntimeVariant)
@@ -1509,8 +1512,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
 OutputInfo::Mode
 Driver::computeCompilerMode(const DerivedArgList &Args,
-                            const InputFileList &Inputs,
-                            bool &BatchModeOut) const {
+                            const InputFileList &Inputs) const {
 
   if (driverKind == Driver::DriverKind::Interactive)
     return Inputs.empty() ? OutputInfo::Mode::REPL
@@ -1524,10 +1526,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
       options::OPT_index_file,
       UseWMO ? options::OPT_whole_module_optimization : llvm::opt::OptSpecifier());
 
-  BatchModeOut = Args.hasFlag(options::OPT_enable_batch_mode,
-                              options::OPT_disable_batch_mode,
-                              false);
-
   // AST dump doesn't work with `-wmo`. Since it's not common to want to dump
   // the AST, we assume that's the priority and ignore `-wmo`, but we warn the
   // user about this decision.
@@ -1538,18 +1536,8 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
     return OutputInfo::Mode::StandardCompile;
   }
 
-  // Override batch mode if given -wmo or -index-file.
-  if (ArgRequiringSingleCompile) {
-    if (BatchModeOut) {
-      BatchModeOut = false;
-      // Emit a warning about such overriding (FIXME: we might conditionalize
-      // this based on the user or xcode passing -disable-batch-mode).
-      Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
-                     ArgRequiringSingleCompile->getOption().getPrefixedName());
-    }
+  if (ArgRequiringSingleCompile)
     return OutputInfo::Mode::SingleCompile;
-  }
-
   return OutputInfo::Mode::StandardCompile;
 }
 
@@ -1607,7 +1595,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (Args.hasFlag(options::OPT_enable_bridging_pch,
                      options::OPT_disable_bridging_pch,
                      true)) {
-      if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
+      if (Arg *A = Args.getLastArg(
+              options::OPT_import_bridging_header,
+              options::OPT_internal_import_bridging_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
         if (Ty == file_types::TY_ClangHeader) {
@@ -1791,9 +1781,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     AllModuleInputs.addInput(CA);
     AllLinkerInputs.push_back(CA);
     break;
-  }
-  case OutputInfo::Mode::BatchModeCompile: {
-    llvm_unreachable("Batch mode should not be used to build actions");
   }
   case OutputInfo::Mode::Immediate: {
     if (Inputs.empty())
@@ -2071,6 +2058,27 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     return false;
   }
 
+  if (Args.hasArg(options::OPT_print_static_build_config)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-static-build-config");
+
+    std::string executable = getSwiftProgramPath();
+
+    // FIXME(https://github.com/apple/swift/issues/54554): This bypasses
+    // mechanisms like -v and -###.
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode, StringRef output,
+                     StringRef errors, sys::TaskProcessInformation ProcInfo,
+                     void *unused) -> sys::TaskFinishedResponse {
+                    llvm::outs() << output;
+                    llvm::errs() << errors;
+                    return sys::TaskFinishedResponse::ContinueExecution;
+                  });
+    return false;
+  }
   return true;
 }
 
@@ -2709,15 +2717,6 @@ void Driver::computeMainOutput(
       file_types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
     // output file: one for each input files.
-
-    // In batch mode, the driver will try to reserve multiple differing main
-    // outputs to a bridging header. Another assertion will trip, but the cause
-    // will be harder to track down. Since the driver now ignores -num-threads
-    // in batch mode, the user should never be able to falsify this assertion.
-    assert(!C.getBatchModeEnabled() && "Batch mode produces only one main "
-                                       "output per input action, cannot have "
-                                       "batch mode & num-threads");
-
     auto OutputFunc = [&](StringRef Base, StringRef Primary) {
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)
@@ -2914,7 +2913,6 @@ void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                        CommandOutput *output) const {
   switch (C.getOutputInfo().CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::BatchModeCompile:
     if (!isa<MergeModuleJobAction>(JA))
       return;
     break;
@@ -3146,7 +3144,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::Interactive:
     ExcludedFlagsBitmask |= options::NoInteractiveOption;
     break;
-  case DriverKind::Batch:
+  case DriverKind::Standard:
   case DriverKind::SILOpt:
   case DriverKind::SILFuncExtractor:
   case DriverKind::SILNM:
@@ -3190,7 +3188,6 @@ bool OutputInfo::mightHaveExplicitPrimaryInputs(
     const CommandOutput &Output) const {
   switch (CompilerMode) {
   case Mode::StandardCompile:
-  case Mode::BatchModeCompile:
     return true;
   case Mode::SingleCompile:
     return false;

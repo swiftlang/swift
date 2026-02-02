@@ -182,7 +182,8 @@ namespace swift {
 }
 
 // FIXME: HACK: copied from HeapObject.cpp
-extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED void
+extern "C" SWIFT_LIBRARY_VISIBILITY SWIFT_NOINLINE SWIFT_USED SWIFT_REFCOUNT_CC
+void
 _swift_release_dealloc(swift::HeapObject *object);
 
 namespace swift {
@@ -714,6 +715,7 @@ class RefCounts {
   // Out-of-line slow paths.
 
   SWIFT_NOINLINE
+  SWIFT_REFCOUNT_CC
   HeapObject *incrementSlow(RefCountBits oldbits, uint32_t inc);
 
   SWIFT_NOINLINE
@@ -815,7 +817,7 @@ class RefCounts {
   // can be directly returned from swift_retain. This makes the call to
   // incrementSlow() a tail call.
   SWIFT_ALWAYS_INLINE
-  HeapObject *increment(uint32_t inc = 1) {
+  HeapObject *increment(HeapObject *returning, uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
     // Constant propagation will remove this in swift_retain, it should only
@@ -835,7 +837,7 @@ class RefCounts {
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
-    return getHeapObject();
+    return returning;
   }
 
   SWIFT_ALWAYS_INLINE
@@ -1010,6 +1012,7 @@ class RefCounts {
   // First slow path of doDecrement, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementSideTable().
   template <PerformDeinit performDeinit>
+  SWIFT_REFCOUNT_CC
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     
@@ -1379,7 +1382,7 @@ class HeapObjectSideTableEntry {
   // STRONG
   
   void incrementStrong(uint32_t inc) {
-    refCounts.increment(inc);
+    refCounts.increment(nullptr, inc);
   }
 
   template <PerformDeinit performDeinit>

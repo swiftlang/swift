@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -update-borrowed-from -dce %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -dce %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -91,15 +91,16 @@ bb0(%0 : $*Klass):
 // CHECK-LABEL: } // end sil function 'dce_dontoptendborrow1'
 sil [ossa] @dce_dontoptendborrow1 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %1 = begin_borrow %0 : $Klass
-  br bb1(%1 : $Klass)
+  %1 = begin_borrow %0
+  br bb1(%1)
 
-bb1(%2 : @guaranteed $Klass):
-  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %2 : $Klass
-  %res = tuple ()
-  return %res : $()
+bb1(%3 : @reborrow $Klass):
+  %4 = borrowed %3 from (%0)
+  %5 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %4
+  %8 = tuple ()
+  return %8
 }
 
 // Cannot optimize dead non phi args
@@ -121,8 +122,9 @@ bb2(%4 : $Error):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy1 :
-// CHECK-NOT: copy_value
-// CHECK: destroy_value %0
+// CHECK:         copy_value
+// CHECK:         destroy_value %1
+// CHECK:         destroy_value %0
 // CHECK-LABEL: } // end sil function 'dce_deadcopy1'
 sil [ossa] @dce_deadcopy1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -134,8 +136,8 @@ bb0(%0 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy2 :
-// CHECK-NOT: copy_value
-// CHECK-NOT: destroy_value
+// CHECK:         copy_value
+// CHECK:         destroy_value
 // CHECK-LABEL: } // end sil function 'dce_deadcopy2'
 sil [ossa] @dce_deadcopy2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -146,11 +148,10 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy3 :
-// CHECK: bb0([[ARG:%.*]])
-// CHECK-NEXT: br bb1
-// CHECK: bb1:
-// CHECK-NEXT: [[RES:%.*]] = tuple ()
-// CHECK-NEXT: return [[RES]]
+// CHECK:       bb0([[ARG:%.*]])
+// CHECK-NEXT:    copy_value
+// CHECK:       bb1({{.*}}):
+// CHECK-NEXT:    destroy_value
 // CHECK-LABEL: } // end sil function 'dce_deadcopy3'
 sil [ossa] @dce_deadcopy3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -164,8 +165,8 @@ bb1(%2 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy4 :
-// CHECK-NOT: copy_value
-// CHECK-NOT: destroy_value
+// CHECK:        copy_value
+// CHECK:        destroy_value
 // CHECK-LABEL: } // end sil function 'dce_deadcopy4'
 sil [ossa] @dce_deadcopy4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -185,11 +186,10 @@ bb3(%2 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy5 :
-// CHECK: bb0([[ARG:%.*]])
-// CHECK-NEXT: br bb1
-// CHECK: bb1:
-// CHECK-NEXT: [[RES:%.*]] = tuple ()
-// CHECK-NEXT: return [[RES]]
+// CHECK:       bb0([[ARG:%.*]])
+// CHECK-NEXT:    copy_value 
+// CHECK:       bb1({{.*}}):
+// CHECK-NEXT:    destroy_value
 // CHECK-LABEL: } // end sil function 'dce_deadcopy5'
 sil [ossa] @dce_deadcopy5 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -209,11 +209,10 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy6 :
-// CHECK: bb0([[ARG:%.*]])
-// CHECK-NEXT: br bb1
-// CHECK: bb1:
-// CHECK-NEXT: [[RES:%.*]] = tuple ()
-// CHECK-NEXT: return [[RES]]
+// CHECK:       bb0([[ARG:%.*]])
+// CHECK-NEXT:    copy_value
+// CHECK:       bb5({{.*}}):
+// CHECK-NEXT:    destroy_value
 // CHECK-LABEL: } // end sil function 'dce_deadcopy6'
 sil [ossa] @dce_deadcopy6 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -239,7 +238,7 @@ bb3(%2 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadcopy7 :
-// CHECK-NOT: load [copy]
+// CHECK:         load [copy]
 // CHECK-LABEL: } // end sil function 'dce_deadcopy7'
 sil [ossa] @dce_deadcopy7 : $@convention(thin) (@in Klass) -> () {
 bb0(%0 : $*Klass):
@@ -254,10 +253,9 @@ bb1(%2 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_destructure1 :
-// CHECK: bb0(%0 : {{.*}})
-// CHECK-NEXT: destroy_value %0
-// CHECK-NEXT: [[RES:%.*]] = tuple ()
-// CHECK-NEXT: return [[RES]]
+// CHECK:       bb0(%0 : {{.*}})
+// CHECK-NEXT:    %1 = destructure_struct
+// CHECK-NEXT:    destroy_value %1
 // CHECK-LABEL: } // end sil function 'dce_destructure1'
 sil [ossa] @dce_destructure1 : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
@@ -280,8 +278,8 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_destructure3 :
-// CHECK: bb0(%0 : {{.*}})
-// CHECK-NOT: destructure_struct
+// CHECK:       bb0(%0 : {{.*}})
+// CHECK:         destructure_struct
 // CHECK-LABEL: } // end sil function 'dce_destructure3'
 sil [ossa] @dce_destructure3 : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
@@ -297,7 +295,7 @@ bb0(%0 : @guaranteed $NonTrivialStruct):
 // This test shows that when we delete a dead instruction which has lifetime ending ops,
 // we need to insert destroys of ops to end their lifetime correctly
 // CHECK-LABEL: sil [ossa] @dce_insertdestroy1 :
-// CHECK-NOT: struct
+// CHECK:         struct
 // CHECK-LABEL: } // end sil function 'dce_insertdestroy1'
 sil [ossa] @dce_insertdestroy1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -314,9 +312,8 @@ bb0(%0 : @owned $Klass):
 // This test shows that when we delete a dead phi arg and its incoming values are live,
 // we need to insert destroys of the incoming values in its pred blocks.
 // CHECK-LABEL: sil [ossa] @dce_insertdestroy2 :
-// CHECK: bb1(%3 : {{.*}})
-// CHECK-NEXT: destroy_value %3
-// CHECK-NEXT: br bb3
+// CHECK:       bb3({{.*}}):
+// CHECK-NEXT:    destroy_value
 // CHECK-LABEL: } // end sil function 'dce_insertdestroy2'
 sil [ossa] @dce_insertdestroy2 : $@convention(thin) (@guaranteed Klass) -> @error any Error {
 bb0(%0 : @guaranteed $Klass):
@@ -336,7 +333,7 @@ bb3(%5 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_multiplerevdepdests :
-// CHECK-NOT: destroy_value
+// CHECK:         destroy_value
 // CHECK-LABEL: } // end sil function 'dce_multiplerevdepdests'
 sil [ossa] @dce_multiplerevdepdests : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -384,53 +381,56 @@ bb0(%0 : @owned $TestStruct):
 // CHECK-LABEL: } // end sil function 'dce_borrowlifetime1'
 sil [ossa] @dce_borrowlifetime1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
 bb0(%0 : @guaranteed $NonTrivialStruct):
-  %copy = copy_value %0 : $NonTrivialStruct
-  %borrow = begin_borrow %copy : $NonTrivialStruct
-  br bb1(%copy : $NonTrivialStruct, %borrow : $NonTrivialStruct)
+  %1 = copy_value %0
+  %2 = begin_borrow %1
+  br bb1(%1, %2)
 
-bb1(%copy2 : @owned $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct):
-  %newcopy = copy_value %borrow2 : $NonTrivialStruct
-  end_borrow %borrow2 : $NonTrivialStruct
-  destroy_value %copy2 : $NonTrivialStruct
-  return %newcopy : $NonTrivialStruct
+bb1(%4 : @owned $NonTrivialStruct, %5 : @reborrow $NonTrivialStruct):
+  %6 = borrowed %5 from (%4)
+  %7 = copy_value %6
+  end_borrow %6
+  destroy_value %4
+  return %7
 }
 
 // CHECK-LABEL: sil [ossa] @dce_borrowlifetime2 :
-// CHECK: bb1:
+// CHECK:       bb1({{.*}}):
 // CHECK-LABEL: } // end sil function 'dce_borrowlifetime2'
 sil [ossa] @dce_borrowlifetime2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %copy = copy_value %0 : $Klass
-  %borrow = begin_borrow %copy : $Klass
-  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%copy : $Klass, %borrow : $Klass)
+  %1 = copy_value %0
+  %2 = begin_borrow %1
+  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1, %2)
 
-bb1(%copy2 : @owned $Klass, %borrow2 : @guaranteed $Klass):
-  end_borrow %borrow2 : $Klass
-  destroy_value %copy2 : $Klass
-  %res = tuple ()
-  return %res : $()
+bb1(%7 : @owned $Klass, %8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%7)
+  end_borrow %9
+  destroy_value %7
+  %12 = tuple ()
+  return %12
 }
 
 // CHECK-LABEL: sil [ossa] @dce_borrowlifetime3 :
-// CHECK: bb1:
+// CHECK:       bb1({{.*}}):
 // CHECK-LABEL: } // end sil function 'dce_borrowlifetime3'
 sil [ossa] @dce_borrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %copy = copy_value %0 : $Klass
-  %borrow = begin_borrow %copy : $Klass
-  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%borrow : $Klass, %copy : $Klass)
+  %1 = copy_value %0
+  %2 = begin_borrow %1
+  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%2, %1)
 
-bb1(%borrow2 : @guaranteed $Klass, %copy2 : @owned $Klass):
-  end_borrow %borrow2 : $Klass
-  destroy_value %copy2 : $Klass
-  %res = tuple ()
-  return %res : $()
+bb1(%7 : @reborrow $Klass, %8 : @owned $Klass):
+  %9 = borrowed %7 from (%8)
+  end_borrow %9
+  destroy_value %8
+  %12 = tuple ()
+  return %12
 }
 
 // CHECK-LABEL: sil [ossa] @dce_borrowlifetime4 :
@@ -438,97 +438,107 @@ bb1(%borrow2 : @guaranteed $Klass, %copy2 : @owned $Klass):
 // CHECK-LABEL: } // end sil function 'dce_borrowlifetime4'
 sil [ossa] @dce_borrowlifetime4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %copy = copy_value %0 : $Klass
-  %borrow = begin_borrow %copy : $Klass
-  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%borrow : $Klass)
+  %1 = copy_value %0
+  %2 = begin_borrow %1
+  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%2)
 
-bb1(%borrow2 : @guaranteed $Klass):
-  end_borrow %borrow2 : $Klass
-  br bb2(%copy : $Klass)
+bb1(%7 : @reborrow $Klass):
+  %8 = borrowed %7 from (%1)
+  end_borrow %8
+  br bb2(%1)
 
-bb2(%copy2 : @owned $Klass):
-  destroy_value %copy2 : $Klass
-  %res = tuple ()
-  return %res : $()
+bb2(%11 : @owned $Klass):
+  destroy_value %11
+  %13 = tuple ()
+  return %13
 }
 
 // CHECK-LABEL: sil [ossa] @dce_borrowlifetime5 :
-// CHECK: bb1:
+// CHECK:         bb1({{.*}}):
 // CHECK-LABEL: } // end sil function 'dce_borrowlifetime5'
 sil [ossa] @dce_borrowlifetime5 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %copy1 = copy_value %0 : $Klass
-  %copy2 = copy_value %0 : $Klass
-  %borrow1 = begin_borrow %copy1 : $Klass
-  %borrow2 = begin_borrow %copy2 : $Klass
-  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %3 = apply %2(%borrow1) : $@convention(thin) (@guaranteed Klass) -> ()
-  %4 = apply %2(%borrow2) : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %2(%copy1) : $@convention(thin) (@guaranteed Klass) -> ()
-  %6 = apply %2(%copy2) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%copy1 : $Klass, %borrow1 : $Klass, %borrow2 : $Klass)
+  %1 = copy_value %0
+  %2 = copy_value %0
+  %3 = begin_borrow %1
+  %4 = begin_borrow %2
+  %5 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  %8 = apply %5(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %9 = apply %5(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1, %3, %4)
 
-bb1(%newcopy : @owned $Klass, %newborrow1 : @guaranteed $Klass, %newborrow2 : @guaranteed $Klass):
-  end_borrow %newborrow1 : $Klass
-  end_borrow %newborrow2 : $Klass
-  destroy_value %newcopy : $Klass
-  destroy_value %copy2 : $Klass
-   %res = tuple ()
-  return %res : $()
+bb1(%11 : @owned $Klass, %12 : @reborrow $Klass, %13 : @reborrow $Klass):
+  %14 = borrowed %13 from (%2)
+  %15 = borrowed %12 from (%11)
+  end_borrow %15
+  end_borrow %14
+  destroy_value %11
+  destroy_value %2
+  %20 = tuple ()
+  return %20
 }
 
 // Nested borrows are currently not optimized in DCE
 sil [ossa] @dce_nestedborrowlifetime1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
 bb0(%0 : @guaranteed $NonTrivialStruct):
-  %borrowo = begin_borrow %0 : $NonTrivialStruct
-  %borrow = begin_borrow %borrowo : $NonTrivialStruct
-  br bb1(%borrowo : $NonTrivialStruct, %borrow : $NonTrivialStruct)
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
+  br bb1(%1, %2)
 
-bb1(%newborrowo : @guaranteed $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct):
-  %newcopy = copy_value %borrow2 : $NonTrivialStruct
-  end_borrow %borrow2 : $NonTrivialStruct
-  end_borrow %newborrowo : $NonTrivialStruct
-  return %newcopy : $NonTrivialStruct
+bb1(%4 : @reborrow $NonTrivialStruct, %5 : @reborrow $NonTrivialStruct):
+  %6 = borrowed %5 from (%4)
+  %7 = borrowed %4 from (%0)
+  %8 = copy_value %6
+  end_borrow %6
+  end_borrow %7
+  return %8
 }
 
 sil [ossa] @dce_nestedborrowlifetime2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %borrowo = begin_borrow %0 : $Klass
-  %borrow = begin_borrow %borrowo : $Klass
-  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %2(%borrowo) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%borrowo : $Klass, %borrow : $Klass)
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
 
-bb1(%newborrow : @guaranteed $Klass, %borrow2 : @guaranteed $Klass):
-  end_borrow %borrow2 : $Klass
-  end_borrow %newborrow : $Klass
-  %res = tuple ()
-  return %res : $()
+  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1, %2)
+
+bb1(%7 : @reborrow $Klass, %8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%7)
+  %10 = borrowed %7 from (%0)
+  end_borrow %9
+  end_borrow %10
+  %13 = tuple ()
+  return %13
 }
 
 // This test shows it is non trivial to find the insert point of an outer reborrow.
 // Here %newborrowo and %newborrowi are both dead phis.
 // First end_borrow for the incoming value of %newborrowi is added
 // It is non straight forward to find the insert pt for the end_borrow of the incoming value of %newborrowo
-// This may not be important once CanonicalizeOSSALifetime supports rewrite of multi-block borrows.
+// This may not be important once OSSACanonicalizeOwned supports rewrite of multi-block borrows.
 sil [ossa] @dce_nestedborrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  %borrowo = begin_borrow %0 : $Klass
-  %borrow = begin_borrow %borrowo : $Klass
-  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
-  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
-  %5 = apply %2(%borrowo) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%borrow : $Klass, %borrowo : $Klass)
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
+  %3 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %3(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%2, %1)
 
-bb1(%newborrowi : @guaranteed $Klass, %newborrowo : @guaranteed $Klass):
-  end_borrow %newborrowi : $Klass
-  end_borrow %newborrowo : $Klass
-  %res = tuple ()
-  return %res : $()
+bb1(%7 : @reborrow $Klass, %8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%0)
+  %10 = borrowed %7 from (%8)
+  end_borrow %10
+  end_borrow %9
+  %13 = tuple ()
+  return %13
 }
 
 
@@ -537,60 +547,72 @@ bb0(%0 : @guaranteed $Wrapper1, %1 : @guaranteed $Wrapper1):
   cond_br undef, bb1, bb2
 
 bb1:
-  %outer1 = begin_borrow %0 : $Wrapper1
-  %ex1 = struct_extract %outer1 : $Wrapper1, #Wrapper1.val1
-  %ex11 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
-  br bb3(%ex11 : $Klass, %outer1 : $Wrapper1)
+  %3 = begin_borrow %0
+  %4 = struct_extract %3, #Wrapper1.val1
+  %5 = struct_extract %4, #Wrapper2.val2
+  br bb3(%5, %3)
 
 bb2:
-  %outer2 = begin_borrow %1 : $Wrapper1
-  %ex2 = struct_extract %outer2 : $Wrapper1, #Wrapper1.val1
-  %ex21 = struct_extract %ex2 : $Wrapper2, #Wrapper2.val2
-  br bb3(%ex21 : $Klass, %outer2 : $Wrapper1)
+  %7 = begin_borrow %1
+  %8 = struct_extract %7, #Wrapper1.val1
+  %9 = struct_extract %8, #Wrapper2.val2
+  br bb3(%9, %7)
 
-bb3(%phi1 : @guaranteed $Klass, %phi2 : @guaranteed $Wrapper1):
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%phi1) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %phi2 : $Wrapper1
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%11 : @guaranteed $Klass, %12 : @reborrow $Wrapper1):
+  %13 = borrowed %12 from (%1, %0)
+  %14 = borrowed %11 from (%12)
+  %15 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %13
+  %18 = tuple ()
+  return %18
 }
 
 sil [ossa] @dce_nestedborrowlifetime5 : $@convention(thin) (@guaranteed Wrapper1) -> () {
 bb0(%0 : @guaranteed $Wrapper1):
-  %outer1 = begin_borrow %0 : $Wrapper1
-  %inner1 = begin_borrow %outer1 : $Wrapper1
-  %ex1 = struct_extract %inner1 : $Wrapper1, #Wrapper1.val1
-  %ex11 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
-  br bb2(%ex11 : $Klass, %inner1 : $Wrapper1)
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
+  %3 = struct_extract %2, #Wrapper1.val1
+  %4 = struct_extract %3, #Wrapper2.val2
+  br bb1(%4, %2)
 
-bb2(%phi1 : @guaranteed $Klass, %phi2 : @guaranteed $Wrapper1):
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%phi1) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %phi2 : $Wrapper1
-  end_borrow %outer1 : $Wrapper1
-  %9999 = tuple()
-  return %9999 : $()
+bb1(%6 : @guaranteed $Klass, %7 : @reborrow $Wrapper1):
+  %8 = borrowed %7 from (%1)
+  %9 = borrowed %6 from (%7)
+  %10 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %8
+  end_borrow %1
+  %14 = tuple ()
+  return %14
 }
 
 // CHECK-LABEL: sil [ossa] @infinite_loop :
-// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'infinite_loop'
 sil [ossa] @infinite_loop : $@convention(thin) (@guaranteed NonTrivialStruct, @guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct, %1 : @guaranteed $NonTrivialStruct):
-  cond_br undef, bb1, bb4
+  cond_br undef, bb1, bb5
 
 bb1:
-  %copy0 = copy_value %0 : $NonTrivialStruct
-  %borrow0 = begin_borrow %copy0 : $NonTrivialStruct
-  br bb3(%borrow0 : $NonTrivialStruct, %copy0 : $NonTrivialStruct)
+  %3 = copy_value %0
+  %4 = begin_borrow %3
+  br bb2(%4, %3)
 
-bb3(%newborrow : @guaranteed $NonTrivialStruct, %newowned : @owned $NonTrivialStruct):
-  br bb3(%newborrow : $NonTrivialStruct, %newowned : $NonTrivialStruct)
+bb2(%6 : @guaranteed $NonTrivialStruct, %7 : @owned $NonTrivialStruct):
+  %8 = borrowed %6 from (%7)
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb2(%8, %7)
 
 bb4:
-  %ret = tuple ()
-  return %ret : $()
+  end_borrow %8
+  destroy_value [dead_end] %7
+  unreachable
+
+bb5:
+  %10 = tuple ()
+  return %10
 }
 
 // CHECK-LABEL: sil [ossa] @dce_reborrow_with_different_basevalues :
@@ -601,27 +623,28 @@ bb0(%0 : @guaranteed $NonTrivialStruct, %1 : @guaranteed $NonTrivialStruct):
   cond_br undef, bb1, bb2
 
 bb1:
-  %copy0a = copy_value %0 : $NonTrivialStruct
-  %borrow0a = begin_borrow %copy0a : $NonTrivialStruct
-  %copy1a = copy_value %1 : $NonTrivialStruct
-  br bb3(%borrow0a : $NonTrivialStruct, %copy0a : $NonTrivialStruct, %copy1a : $NonTrivialStruct)
+  %3 = copy_value %0
+  %4 = begin_borrow %3
+  %5 = copy_value %1
+  br bb3(%4, %3, %5)
 
 bb2:
-  %copy1b = copy_value %1 : $NonTrivialStruct
-  %borrow0b = begin_borrow %copy1b : $NonTrivialStruct
-  %copy0b = copy_value %0 : $NonTrivialStruct
-  br bb3(%borrow0b : $NonTrivialStruct, %copy0b : $NonTrivialStruct, %copy1b : $NonTrivialStruct)
+  %7 = copy_value %1
+  %8 = begin_borrow %7
+  %9 = copy_value %0
+  br bb3(%8, %9, %7)
 
-bb3(%newborrow : @guaranteed $NonTrivialStruct, %newowned1 : @owned $NonTrivialStruct, %newowned2 : @owned $NonTrivialStruct):
-  %res = copy_value %newborrow : $NonTrivialStruct
-  end_borrow %newborrow : $NonTrivialStruct
-  destroy_value %newowned1 : $NonTrivialStruct
-  destroy_value %newowned2 : $NonTrivialStruct
-  return %res : $NonTrivialStruct
+bb3(%11 : @reborrow $NonTrivialStruct, %12 : @owned $NonTrivialStruct, %13 : @owned $NonTrivialStruct):
+  %14 = borrowed %11 from (%13, %12)
+  %15 = copy_value %14
+  end_borrow %14
+  destroy_value %12
+  destroy_value %13
+  return %15
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadterm1 :
-// CHECK-NOT: switch_enum
+// CHECK:         switch_enum
 // CHECK-LABEL: } // end sil function 'dce_deadterm1'
 sil [ossa] @dce_deadterm1 : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
@@ -644,8 +667,8 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadterm2 :
-// CHECK-NOT: load [copy]
-// CHECK-NOT: switch_enum
+// CHECK:         load [copy]
+// CHECK:         switch_enum
 // CHECK-LABEL: } // end sil function 'dce_deadterm2'
 sil [ossa] @dce_deadterm2 : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
@@ -669,7 +692,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadendlifetime1 :
-// CHECK-NOT: end_lifetime
+// CHECK: end_lifetime
 // CHECK-LABEL: } // end sil function 'dce_deadendlifetime1'
 sil [ossa] @dce_deadendlifetime1 : $@convention(thin) () -> () {
 bb0:
@@ -688,7 +711,7 @@ bb3(%2 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadendlifetime2 :
-// CHECK-NOT: end_lifetime
+// CHECK: end_lifetime
 // CHECK-LABEL: } // end sil function 'dce_deadendlifetime2'
 sil [ossa] @dce_deadendlifetime2 : $@convention(thin) () -> () {
 bb0:
@@ -710,31 +733,32 @@ bb4(%3 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @looping_borrow : $@convention(thin) () -> () {
-// CHECK-NOT:     destroy_value
+// CHECK:         destroy_value
 // CHECK-LABEL: } // end sil function 'looping_borrow'
 sil [ossa] @looping_borrow : $@convention(thin) () -> () {
-entry:
-  %instance_1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
-  %lifetime_1 = begin_borrow %instance_1 : $FakeOptional<Klass>
-  br loop_entry(%instance_1 : $FakeOptional<Klass>, %lifetime_1 : $FakeOptional<Klass>)
+bb0:
+  %0 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %1 = begin_borrow %0
+  br bb1(%0, %1)
 
-loop_entry(%18 : @owned $FakeOptional<Klass>, %19 : @guaranteed $FakeOptional<Klass>):
-  br loop_body
+bb1(%3 : @owned $FakeOptional<Klass>, %4 : @reborrow $FakeOptional<Klass>):
+  %5 = borrowed %4 from ()
+  br bb2
 
-loop_body:
-  cond_br undef, loop_back, loop_exit
+bb2:
+  cond_br undef, bb3, bb4
 
-loop_back:
-  br loop_entry(%18 : $FakeOptional<Klass>, %19 : $FakeOptional<Klass>)
+bb3:
+  br bb1(%3, %5)
 
-loop_exit:
-  end_borrow %19 : $FakeOptional<Klass>
-  destroy_value %18 : $FakeOptional<Klass>
-  br exit
+bb4:
+  end_borrow %5
+  destroy_value %3
+  br bb5
 
-exit:
-  %retval = tuple ()
-  return %retval : $()
+bb5:
+  %12 = tuple ()
+  return %12
 }
 
 // CHECK-LABEL: sil hidden [ossa] @add_end_borrow_after_destroy_value : {{.*}} {
@@ -750,32 +774,31 @@ exit:
 // CHECK:         destroy_value [[INSTANCE_1]]
 // CHECK-LABEL: } // end sil function 'add_end_borrow_after_destroy_value'
 sil hidden [ossa] @add_end_borrow_after_destroy_value : $@convention(thin) (Builtin.Int1, @owned Klass, @owned Klass) -> () {
-bb0(%condition : $Builtin.Int1, %instance_1 : @owned $Klass, %instance_2 : @owned $Klass):
-  %lifetime_1 = begin_borrow %instance_1 : $Klass
-
-  %copy_1 = copy_value %lifetime_1 : $Klass
-  %stack_addr = alloc_stack $Klass
-  store %copy_1 to [init] %stack_addr : $*Klass
-  destroy_addr %stack_addr : $*Klass
-  dealloc_stack %stack_addr : $*Klass
-
-  cond_br %condition, bb1, bb2
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass, %2 : @owned $Klass):
+  %3 = begin_borrow %1
+  %4 = copy_value %3
+  %5 = alloc_stack $Klass
+  store %4 to [init] %5
+  destroy_addr %5
+  dealloc_stack %5
+  cond_br %0, bb1, bb2
 
 bb1:
-  end_borrow %lifetime_1 : $Klass
-  destroy_value %instance_1 : $Klass
-  %lifetime_2 = begin_borrow %instance_2 : $Klass
-  br bb3(%instance_2 : $Klass, %lifetime_2 : $Klass)
+  end_borrow %3
+  destroy_value %1
+  %12 = begin_borrow %2
+  br bb3(%2, %12)
 
 bb2:
-  destroy_value %instance_2 : $Klass
-  br bb3(%instance_1 : $Klass, %lifetime_1 : $Klass)
+  destroy_value %2
+  br bb3(%1, %3)
 
-bb3(%original : @owned $Klass, %lifetime : @guaranteed $Klass):
-  end_borrow %lifetime : $Klass
-  destroy_value %original : $Klass
-  %result = tuple ()
-  return %result : $()
+bb3(%16 : @owned $Klass, %17 : @reborrow $Klass):
+  %18 = borrowed %17 from (%16)
+  end_borrow %18
+  destroy_value %16
+  %21 = tuple ()
+  return %21
 }
 
 // CHECK-LABEL: sil [ossa] @borrow_none : {{.*}} {
@@ -812,16 +835,19 @@ exit:
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'reborrowed_begin_borrow'
 sil [ossa] @reborrowed_begin_borrow : $@convention(thin) (@owned Klass) -> () {
-entry(%instance : @owned $Klass):
-  %outer_lifetime_1 = begin_borrow %instance : $Klass
-  %inner_lifetime_1 = begin_borrow %outer_lifetime_1 : $Klass
-  br exit(%outer_lifetime_1 : $Klass, %inner_lifetime_1 : $Klass)
-exit(%outer_lifetime_2 : @guaranteed $Klass, %inner_lifetime_2 : @guaranteed $Klass):
-  end_borrow %inner_lifetime_2 : $Klass
-  end_borrow %outer_lifetime_2 : $Klass
-  destroy_value %instance : $Klass
-  %retval = tuple ()
-  return %retval : $()
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
+  br bb1(%1, %2)
+
+bb1(%4 : @reborrow $Klass, %5 : @reborrow $Klass):
+  %6 = borrowed %5 from (%4)
+  %7 = borrowed %4 from (%0)
+  end_borrow %6
+  end_borrow %7
+  destroy_value %0
+  %11 = tuple ()
+  return %11
 }
 
 // CHECK-LABEL: sil [ossa] @reborrowed_guaranteed_phi : {{.*}} {
@@ -839,22 +865,27 @@ exit(%outer_lifetime_2 : @guaranteed $Klass, %inner_lifetime_2 : @guaranteed $Kl
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'reborrowed_guaranteed_phi'
 sil [ossa] @reborrowed_guaranteed_phi : $@convention(thin) (@owned Klass) -> () {
-entry(%instance : @owned $Klass):
-  %outer_lifetime_1 = begin_borrow %instance : $Klass
-  br work(%outer_lifetime_1 : $Klass)
-work(%outer_lifetime_2 : @guaranteed $Klass):
-  %inner_lifetime_1 = begin_borrow %outer_lifetime_2 : $Klass
-  br exit(%outer_lifetime_2 : $Klass, %inner_lifetime_1 : $Klass)
-exit(%outer_lifetime_3 : @guaranteed $Klass, %inner_lifetime_2 : @guaranteed $Klass):
-  end_borrow %inner_lifetime_2 : $Klass
-  end_borrow %outer_lifetime_3 : $Klass
-  destroy_value %instance : $Klass
-  %retval = tuple ()
-  return %retval : $()
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  br bb1(%1)
+
+bb1(%3 : @reborrow $Klass):
+  %4 = borrowed %3 from (%0)
+  %5 = begin_borrow %4
+  br bb2(%4, %5)
+
+bb2(%7 : @reborrow $Klass, %8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%7)
+  %10 = borrowed %7 from (%0)
+  end_borrow %9
+  end_borrow %10
+  destroy_value %0
+  %14 = tuple ()
+  return %14
 }
 
 // CHECK-LABEL: sil [ossa] @reborrow_guaranteed_phi2 : {{.*}} {
-// CHECK-NOT: switch_enum
+// CHECK:         switch_enum
 // CHECK-LABEL: } // end sil function 'reborrow_guaranteed_phi2'
 sil [ossa] @reborrow_guaranteed_phi2 : $@convention(thin) (@owned EitherNoneOrAnyObject) -> () {
 entry(%0 : @owned $EitherNoneOrAnyObject):
@@ -883,16 +914,18 @@ exit:
 // CHECK-NOT: begin_borrow
 // CHECK-LABEL: } // end sil function 'reborrowed_guaranteed_phi3'
 sil [ossa] @reborrowed_guaranteed_phi3 : $@convention(thin) (@owned Klass) -> () {
-entry(%instance : @owned $Klass):
-  %outer_lifetime_1 = begin_borrow %instance : $Klass
-  %inner_lifetime_1 = begin_borrow %outer_lifetime_1 : $Klass
-  br exit(%inner_lifetime_1 : $Klass)
-exit(%inner_lifetime_2 : @guaranteed $Klass):
-  end_borrow %inner_lifetime_2 : $Klass
-  end_borrow %outer_lifetime_1 : $Klass
-  destroy_value %instance : $Klass
-  %retval = tuple ()
-  return %retval : $()
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = begin_borrow %1
+  br bb1(%2)
+
+bb1(%4 : @reborrow $Klass):
+  %5 = borrowed %4 from (%1)
+  end_borrow %5
+  end_borrow %1
+  destroy_value %0
+  %9 = tuple ()
+  return %9
 }
 
 // CHECK-LABEL: sil [ossa] @reborrow_load_borrow : {{.*}} {
@@ -907,14 +940,17 @@ exit(%inner_lifetime_2 : @guaranteed $Klass):
 // CHECK-LABEL: } // end sil function 'reborrow_load_borrow'
 sil [ossa] @reborrow_load_borrow : $@convention(method) (@in Klass) -> () {
 bb0(%0 : $*Klass):
-  %1 = load_borrow %0 : $*Klass
-  %2 = begin_borrow %1 : $Klass
-  br bb1(%1 : $Klass, %2 : $Klass)
-bb1(%4 : @guaranteed $Klass, %5 : @guaranteed $Klass):
-  end_borrow %5 : $Klass
-  end_borrow %4 : $Klass
-  %8 = tuple ()
-  return %8 : $()
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  br bb1(%1, %2)
+
+bb1(%4 : @reborrow $Klass, %5 : @reborrow $Klass):
+  %6 = borrowed %5 from (%4)
+  %7 = borrowed %4 from ()
+  end_borrow %6
+  end_borrow %7
+  %10 = tuple ()
+  return %10
 }
 
 // CHECK-LABEL: sil [ossa] @reborrow_load_borrow2 : {{.*}} {
@@ -929,14 +965,17 @@ bb1(%4 : @guaranteed $Klass, %5 : @guaranteed $Klass):
 // CHECK-LABEL: } // end sil function 'reborrow_load_borrow2'
 sil [ossa] @reborrow_load_borrow2 : $@convention(method) (@in Klass) -> () {
 bb0(%0 : $*Klass):
-  %1 = load_borrow %0 : $*Klass
-  %2 = begin_borrow %1 : $Klass
-  br bb1(%2 : $Klass, %1 : $Klass)
-bb1(%4 : @guaranteed $Klass, %5 : @guaranteed $Klass):
-  end_borrow %4 : $Klass
-  end_borrow %5 : $Klass
-  %8 = tuple ()
-  return %8 : $()
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  br bb1(%2, %1)
+
+bb1(%4 : @reborrow $Klass, %5 : @reborrow $Klass):
+  %6 = borrowed %5 from ()
+  %7 = borrowed %4 from (%5)
+  end_borrow %7
+  end_borrow %6
+  %10 = tuple ()
+  return %10
 }
 
 class Wrapper {
@@ -958,19 +997,21 @@ struct StructWrapper {
 // CHECK-LABEL: } // end sil function 'reborrow_load_borrow3'
 sil [ossa] @reborrow_load_borrow3 : $@convention(method) (@owned Wrapper) -> () {
 bb0(%0 : @owned $Wrapper):
-  %1 = begin_borrow %0 : $Wrapper
-  %2 = ref_element_addr %1 : $Wrapper, #Wrapper.val
-  %3 = load_borrow %2 : $*Klass
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%1 : $Wrapper, %3 : $Klass)
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #Wrapper.val
+  %3 = load_borrow %2
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1, %3)
 
-bb1(%4 :  @guaranteed $Wrapper, %5 :  @guaranteed $Klass):
-  end_borrow %5 : $Klass
-  end_borrow %4 : $Wrapper
-  destroy_value %0 : $Wrapper
-  %8 = tuple ()
-  return %8 : $()
+bb1(%7 : @reborrow $Wrapper, %8 : @reborrow $Klass):
+  %9 = borrowed %8 from ()
+  %10 = borrowed %7 from (%0)
+  end_borrow %9
+  end_borrow %10
+  destroy_value %0
+  %14 = tuple ()
+  return %14
 }
 
 // CHECK-LABEL: sil [ossa] @reborrow_load_borrow4 : $@convention(method) (@owned DoubleWrapper) -> () {
@@ -980,20 +1021,22 @@ bb1(%4 :  @guaranteed $Wrapper, %5 :  @guaranteed $Klass):
 // CHECK-LABEL: } // end sil function 'reborrow_load_borrow4'
 sil [ossa] @reborrow_load_borrow4 : $@convention(method) (@owned DoubleWrapper) -> () {
 bb0(%0 : @owned $DoubleWrapper):
-  %1 = begin_borrow %0 : $DoubleWrapper
-  %2 = ref_element_addr %1 : $DoubleWrapper, #DoubleWrapper.s
-  %4 = struct_element_addr %2 : $*StructWrapper, #StructWrapper.val
-  %5 = load_borrow %4 : $*Klass
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%5) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb1(%1 : $DoubleWrapper, %5 : $Klass)
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #DoubleWrapper.s
+  %3 = struct_element_addr %2, #StructWrapper.val
+  %4 = load_borrow %3
+  %5 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%1, %4)
 
-bb1(%6 : @guaranteed $DoubleWrapper, %7 : @guaranteed $Klass):
-  end_borrow %7 : $Klass
-  end_borrow %6 : $DoubleWrapper
-  destroy_value %0 : $DoubleWrapper
-  %8 = tuple ()
-  return %8 : $()
+bb1(%8 : @reborrow $DoubleWrapper, %9 : @reborrow $Klass):
+  %10 = borrowed %9 from ()
+  %11 = borrowed %8 from (%0)
+  end_borrow %10
+  end_borrow %11
+  destroy_value %0
+  %15 = tuple ()
+  return %15
 }
 
 // CHECK-LABEL: sil [ossa] @borrow_guaranteed_tuple : {{.*}} {
@@ -1004,18 +1047,22 @@ bb1(%6 : @guaranteed $DoubleWrapper, %7 : @guaranteed $Klass):
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'borrow_guaranteed_tuple'
 sil [ossa] @borrow_guaranteed_tuple : $@convention(thin) (@owned Klass, @owned Klass) -> () {
-entry(%instance_1 : @owned $Klass, %instance_2 : @owned $Klass):
-  %lifetime_1_1 = begin_borrow %instance_1 : $Klass
-  %lifetime_2_1 = begin_borrow %instance_2 : $Klass
-  %tuple = tuple $(Klass, Klass) (%lifetime_1_1, %lifetime_2_1)
-  br exit(%lifetime_1_1 : $Klass, %lifetime_2_1 : $Klass, %tuple : $(Klass, Klass))
-exit(%lifetime_1_2 : @guaranteed $Klass, %lifetime_2_2 : @guaranteed $Klass, %tuple_2 : @guaranteed $(Klass, Klass)):
-  end_borrow %lifetime_2_2 : $Klass
-  destroy_value %instance_2 : $Klass
-  end_borrow %lifetime_1_2 : $Klass
-  destroy_value %instance_1 : $Klass
-  %retval = tuple ()
-  return %retval : $()
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = begin_borrow %0
+  %3 = begin_borrow %1
+  %4 = tuple (%2, %3)
+  br bb1(%2, %3, %4)
+
+bb1(%6 : @reborrow $Klass, %7 : @reborrow $Klass, %8 : @guaranteed $(Klass, Klass)):
+  %9 = borrowed %8 from (%7, %6)
+  %10 = borrowed %7 from (%1)
+  %11 = borrowed %6 from (%0)
+  end_borrow %10
+  destroy_value %1
+  end_borrow %11
+  destroy_value %0
+  %16 = tuple ()
+  return %16
 }
 
 // CHECK-LABEL: sil [ossa] @borrow_guaranteed_struct : {{.*}} {
@@ -1025,15 +1072,18 @@ exit(%lifetime_1_2 : @guaranteed $Klass, %lifetime_2_2 : @guaranteed $Klass, %tu
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'borrow_guaranteed_struct'
 sil [ossa] @borrow_guaranteed_struct : $@convention(thin) (@owned Klass) -> () {
-entry(%instance_1 : @owned $Klass):
-  %lifetime_1 = begin_borrow %instance_1 : $Klass
-  %struct = struct $NonTrivialStruct (%lifetime_1 : $Klass)
-  br exit(%lifetime_1 : $Klass, %struct : $NonTrivialStruct)
-exit(%lifetime_2 : @guaranteed $Klass, %struct_2 : @guaranteed $NonTrivialStruct):
-  end_borrow %lifetime_2 : $Klass
-  destroy_value %instance_1 : $Klass
-  %retval = tuple ()
-  return %retval : $()
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0
+  %2 = struct $NonTrivialStruct (%1)
+  br bb1(%1, %2)
+
+bb1(%4 : @reborrow $Klass, %5 : @guaranteed $NonTrivialStruct):
+  %6 = borrowed %5 from (%4)
+  %7 = borrowed %4 from (%0)
+  end_borrow %7
+  destroy_value %0
+  %10 = tuple ()
+  return %10
 }
 
 sil [ossa] @testBorrowedSwitch : $@convention(thin) (Optional<@sil_unmanaged AnyObject>) -> () {
@@ -1078,20 +1128,21 @@ sil @foo : $@convention(thin) () -> ()
 // CHECK-LABEL: } // end sil function 'test_escape1'
 sil [ossa] @test_escape1 : $@convention(thin) () -> () {
 bb0:
-  %13 = function_ref @foo : $@convention(thin) () -> ()
-  %14 = partial_apply [callee_guaranteed] %13() : $@convention(thin) () -> ()
-  %15 = convert_escape_to_noescape %14 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  %17 = begin_borrow %14 : $@callee_guaranteed () -> ()
-  %18 = mark_dependence %15 : $@noescape @callee_guaranteed () -> () on %17 : $@callee_guaranteed () -> ()
-  br bb1(%18 : $@noescape @callee_guaranteed () -> (), %17 : $@callee_guaranteed () -> (), %14 : $@callee_guaranteed () -> ())
+  %0 = function_ref @foo : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
+  %2 = convert_escape_to_noescape %1 to $@noescape @callee_guaranteed () -> ()
+  %3 = begin_borrow %1
+  %4 = mark_dependence %2 on %3
+  br bb1(%4, %3, %1)
 
-bb1(%21 : @owned $@noescape @callee_guaranteed () -> (), %22 : @guaranteed $@callee_guaranteed () -> (), %23 : @owned $@callee_guaranteed () -> ()):
-  %27 = apply %21() : $@noescape @callee_guaranteed () -> ()
-  destroy_value %21 : $@noescape @callee_guaranteed () -> ()
-  end_borrow %22 : $@callee_guaranteed () -> ()
-  destroy_value %23 : $@callee_guaranteed () -> ()
-  %28 = tuple ()
-  return %28: $()
+bb1(%6 : @owned $@noescape @callee_guaranteed () -> (), %7 : @reborrow $@callee_guaranteed () -> (), %8 : @owned $@callee_guaranteed () -> ()):
+  %9 = borrowed %7 from (%8)
+  %10 = apply %6() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %6
+  end_borrow %9
+  destroy_value %8
+  %14 = tuple ()
+  return %14
 }
 
 // CHECK-LABEL: sil [ossa] @test_escape2 : {{.*}} {
@@ -1123,24 +1174,28 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK-LABEL: } // end sil function 'test_forwarded_phi1'
 sil [ossa] @test_forwarded_phi1 : $@convention(thin) (@owned Wrapper1) -> () {
 bb0(%0 : @owned $Wrapper1):
-  %outer = begin_borrow %0 : $Wrapper1
+  %1 = begin_borrow %0
   br bb1
 
 bb1:
-  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
-  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1)
+  %3 = struct_extract %1, #Wrapper1.val1
+  br bb2(%3, %1)
 
-bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
-  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
-  br bb3(%ex2 : $Klass, %phi2 : $Wrapper1)
+bb2(%5 : @guaranteed $Wrapper2, %6 : @reborrow $Wrapper1):
+  %7 = borrowed %6 from (%0)
+  %8 = borrowed %5 from (%6)
+  %9 = struct_extract %8, #Wrapper2.val2
+  br bb3(%9, %7)
 
-bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %phi4 : $Wrapper1
-  destroy_value %0 : $Wrapper1
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%11 : @guaranteed $Klass, %12 : @reborrow $Wrapper1):
+  %13 = borrowed %12 from (%0)
+  %14 = borrowed %11 from (%12)
+  %15 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %13
+  destroy_value %0
+  %19 = tuple ()
+  return %19
 }
 
 // CHECK-LABEL: sil [ossa] @test_forwarded_phi2 :
@@ -1149,24 +1204,27 @@ bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
 // CHECK-LABEL: } // end sil function 'test_forwarded_phi2'
 sil [ossa] @test_forwarded_phi2 : $@convention(thin) (@owned Wrapper1) -> () {
 bb0(%0 : @owned $Wrapper1):
-  %outer = begin_borrow %0 : $Wrapper1
+  %1 = begin_borrow %0
   br bb1
 
 bb1:
-  br bb2(%outer : $Wrapper1)
+  br bb2(%1)
 
-bb2(%phi1 : @guaranteed $Wrapper1):
-  %ex1 = struct_extract %phi1 : $Wrapper1, #Wrapper1.val1 // user: %4
-  %ex2 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
-  br bb3(%ex2 : $Klass, %phi1 : $Wrapper1)
+bb2(%4 : @reborrow $Wrapper1):
+  %5 = borrowed %4 from (%0)
+  %6 = struct_extract %5, #Wrapper1.val1
+  %7 = struct_extract %6, #Wrapper2.val2
+  br bb3(%7, %5)
 
-bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%phi2) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %phi3 : $Wrapper1
-  destroy_value %0 : $Wrapper1
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%9 : @guaranteed $Klass, %10 : @reborrow $Wrapper1):
+  %11 = borrowed %10 from (%0)
+  %12 = borrowed %9 from (%10)
+  %13 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %11
+  destroy_value %0
+  %17 = tuple ()
+  return %17
 }
 
 // CHECK-LABEL: sil [ossa] @test_forwarded_phi3 :
@@ -1175,24 +1233,27 @@ bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
 // CHECK-LABEL: } // end sil function 'test_forwarded_phi3'
 sil [ossa] @test_forwarded_phi3 : $@convention(thin) (@owned Wrapper1) -> () {
 bb0(%0 : @owned $Wrapper1):
-  %outer = begin_borrow %0 : $Wrapper1
+  %1 = begin_borrow %0
   br bb1
 
 bb1:
-  br bb2(%outer : $Wrapper1)
+  br bb2(%1)
 
-bb2(%phi1 : @guaranteed $Wrapper1):
-  %ex1 = struct_extract %phi1 : $Wrapper1, #Wrapper1.val1 // user: %4
-  %ex2 = struct_extract %ex1 : $Wrapper2, #Wrapper2.val2
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%ex2) : $@convention(thin) (@guaranteed Klass) -> ()
-  br bb3(%ex2 : $Klass, %phi1 : $Wrapper1)
+bb2(%4 : @reborrow $Wrapper1):
+  %5 = borrowed %4 from (%0)
+  %6 = struct_extract %5, #Wrapper1.val1
+  %7 = struct_extract %6, #Wrapper2.val2
+  %8 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb3(%7, %5)
 
-bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
-  end_borrow %phi3 : $Wrapper1
-  destroy_value %0 : $Wrapper1
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%11 : @guaranteed $Klass, %12 : @reborrow $Wrapper1):
+  %13 = borrowed %12 from (%0)
+  %14 = borrowed %11 from (%12)
+  end_borrow %13
+  destroy_value %0
+  %17 = tuple ()
+  return %17
 }
 
 // CHECK-LABEL: sil [ossa] @test_loadborrow_dep :
@@ -1201,24 +1262,28 @@ bb3(%phi2 : @guaranteed $Klass, %phi3 : @guaranteed $Wrapper1):
 // CHECK-LABEL: } // end sil function 'test_loadborrow_dep'
 sil [ossa] @test_loadborrow_dep : $@convention(thin) (@in Wrapper1) -> () {
 bb0(%0 : $*Wrapper1):
-  %outer = load_borrow %0 : $*Wrapper1
+  %1 = load_borrow %0
   br bb1
 
 bb1:
-  %ex1 = struct_extract %outer : $Wrapper1, #Wrapper1.val1
-  br bb2(%ex1 : $Wrapper2, %outer : $Wrapper1)
+  %3 = struct_extract %1, #Wrapper1.val1
+  br bb2(%3, %1)
 
-bb2(%phi1 : @guaranteed $Wrapper2, %phi2 : @guaranteed $Wrapper1):
-  %ex2 = struct_extract %phi1 : $Wrapper2, #Wrapper2.val2
-  br bb3(%ex2 : $Klass, %phi2 : $Wrapper1)
+bb2(%5 : @guaranteed $Wrapper2, %6 : @reborrow $Wrapper1):
+  %7 = borrowed %6 from ()
+  %8 = borrowed %5 from (%6)
+  %9 = struct_extract %8, #Wrapper2.val2
+  br bb3(%9, %7)
 
-bb3(%phi3 : @guaranteed $Klass, %phi4 : @guaranteed $Wrapper1):
-  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-  apply %f(%phi3) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %phi4 : $Wrapper1
-  destroy_addr %0 : $*Wrapper1
-  %9999 = tuple()
-  return %9999 : $()
+bb3(%11 : @guaranteed $Klass, %12 : @reborrow $Wrapper1):
+  %13 = borrowed %12 from ()
+  %14 = borrowed %11 from (%12)
+  %15 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %13
+  destroy_addr %0
+  %19 = tuple ()
+  return %19
 }
 
 
@@ -1268,20 +1333,22 @@ bb0:
 // CHECK-LABEL: } // end sil function 'dce_dead_guaranteedphi'
 sil [ossa] @dce_dead_guaranteedphi : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
-  %b = begin_borrow %0 : $NonTrivialStruct
-  %func = function_ref @$use_nontrivialstruct2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
-  %funcres = apply %func(%b) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
-  br bb2(%b : $NonTrivialStruct, %b : $NonTrivialStruct)
+  %1 = begin_borrow %0
+  %2 = function_ref @$use_nontrivialstruct2 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
+  br bb1(%1, %1)
 
-bb2(%phi1 : @guaranteed $NonTrivialStruct, %phi2 : @guaranteed $NonTrivialStruct):
-  end_borrow %phi1 : $NonTrivialStruct
-  destroy_value %0 : $NonTrivialStruct
-  %9999 = tuple()
-  return %9999 : $()
+bb1(%5 : @reborrow $NonTrivialStruct, %6 : @guaranteed $NonTrivialStruct):
+  %7 = borrowed %6 from (%0)
+  %8 = borrowed %5 from (%0)
+  end_borrow %8
+  destroy_value %0
+  %11 = tuple ()
+  return %11
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadterm4 :
-// CHECK-NOT: switch_enum
+// CHECK:         switch_enum
 // CHECK-LABEL: } // end sil function 'dce_deadterm4'
 sil [ossa] @dce_deadterm4 : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
@@ -1316,8 +1383,8 @@ bb6:
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadterm5 :
-// CHECK: switch_enum
-// CHECK-NOT: switch_enum
+// CHECK:         switch_enum
+// CHECK:         switch_enum
 // CHECK-LABEL: } // end sil function 'dce_deadterm5'
 sil [ossa] @dce_deadterm5 : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
@@ -1353,7 +1420,7 @@ bb6:
 }
 
 // CHECK-LABEL: sil [ossa] @dce_deadforwarding :
-// CHECK-NOT: cond_br
+// CHECK:         cond_br
 // CHECK-LABEL: } // end sil function 'dce_deadforwarding'
 sil [ossa] @dce_deadforwarding : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -1411,34 +1478,3 @@ bb5(%16 : @reborrow $FakeOptional<Klass>, %17 : @reborrow $FakeOptional<Klass>):
   return %23
 }
 
-struct String {
-  var guts: Builtin.AnyObject
-}
-
-sil [_semantics "string.makeUTF8"] [ossa] @makeString : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-
-// CHECK-LABEL: sil [ossa] @uncompletedDeadStrings
-// CHECK-NOT:     apply
-// CHECK-LABEL: } // end sil function 'uncompletedDeadStrings'
-sil [ossa] @uncompletedDeadStrings : $@convention(thin) () -> () {
-  %first_ptr = string_literal utf8 "first"
-  %first_len = integer_literal $Builtin.Word, 5
-  %makeString = function_ref @makeString : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  %first = apply %makeString(%first_ptr, %first_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  cond_br undef, nope, yep
-
-nope:
-  destroy_value %first
-  %second_ptr = string_literal utf8 "second"
-  %second_len = integer_literal $Builtin.Word, 6
-  %second = apply %makeString(%second_ptr, %second_len) : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> @owned String
-  br this(%second)
-
-yep:
-  br this(%first)
-
-this(%string : @owned $String):
-  destroy_value %string
-  %retval = tuple ()
-  return %retval
-}

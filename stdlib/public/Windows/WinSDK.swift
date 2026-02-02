@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import ucrt
+@_exported import _GUIDDef
 @_exported import WinSDK // Clang module
 
 // WinBase.h
@@ -56,7 +57,7 @@ public var STD_ERROR_HANDLE: DWORD {
 // handleapi.h
 @inlinable
 public var INVALID_HANDLE_VALUE: HANDLE {
-  HANDLE(bitPattern: -1)!
+  unsafe HANDLE(bitPattern: -1)!
 }
 
 // shellapi.h
@@ -163,78 +164,78 @@ public var PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: DWORD_PTR {
 // windef.h
 @inlinable
 public var DPI_AWARENESS_CONTEXT_UNAWARE: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -1)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -1)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_SYSTEM_AWARE: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -2)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -2)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -3)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -3)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -4)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -4)!
 }
 
 @inlinable
 public var DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED: DPI_AWARENESS_CONTEXT {
-  DPI_AWARENESS_CONTEXT(bitPattern: -5)!
+  unsafe DPI_AWARENESS_CONTEXT(bitPattern: -5)!
 }
 
 // winreg.h
 @inlinable
 public var HKEY_CLASSES_ROOT: HKEY {
-  HKEY(bitPattern: UInt(0x80000000))!
+  unsafe HKEY(bitPattern: UInt(0x80000000))!
 }
 
 @inlinable
 public var HKEY_CURRENT_USER: HKEY {
-  HKEY(bitPattern: UInt(0x80000001))!
+  unsafe HKEY(bitPattern: UInt(0x80000001))!
 }
 
 @inlinable
 public var HKEY_LOCAL_MACHINE: HKEY {
-  HKEY(bitPattern: UInt(0x80000002))!
+  unsafe HKEY(bitPattern: UInt(0x80000002))!
 }
 
 @inlinable
 public var HKEY_USERS: HKEY {
-  HKEY(bitPattern: UInt(0x80000003))!
+  unsafe HKEY(bitPattern: UInt(0x80000003))!
 }
 
 @inlinable
 public var HKEY_PERFORMANCE_DATA: HKEY {
-  HKEY(bitPattern: UInt(0x80000004))!
+  unsafe HKEY(bitPattern: UInt(0x80000004))!
 }
 
 @inlinable
 public var HKEY_PERFORMANCE_TEXT: HKEY {
-  HKEY(bitPattern: UInt(0x80000050))!
+  unsafe HKEY(bitPattern: UInt(0x80000050))!
 }
 
 @inlinable
 public var HKEY_PERFORMANCE_NLSTEXT: HKEY {
-  HKEY(bitPattern: UInt(0x80000060))!
+  unsafe HKEY(bitPattern: UInt(0x80000060))!
 }
 
 @inlinable
 public var HKEY_CURRENT_CONFIG: HKEY {
-  HKEY(bitPattern: UInt(0x80000005))!
+  unsafe HKEY(bitPattern: UInt(0x80000005))!
 }
 
 @inlinable
 public var HKEY_DYN_DATA: HKEY {
-  HKEY(bitPattern: UInt(0x80000006))!
+  unsafe HKEY(bitPattern: UInt(0x80000006))!
 }
 
 @inlinable
 public var HKEY_CURRENT_USER_LOCAL_SETTINGS: HKEY {
-  HKEY(bitPattern: UInt(0x80000007))!
+  unsafe HKEY(bitPattern: UInt(0x80000007))!
 }
 
 // Richedit.h
@@ -318,3 +319,35 @@ func _convertWindowsBoolToBool(_ b: WindowsBool) -> Bool {
   return b.boolValue
 }
 
+// GUID
+
+extension GUID {
+  @usableFromInline @_transparent
+  internal var uint128Value: UInt128 {
+    unsafe withUnsafeBytes(of: self) { buffer in
+      // GUID is 32-bit-aligned only, so use loadUnaligned().
+      unsafe buffer.baseAddress!.loadUnaligned(as: UInt128.self)
+    }
+  }
+}
+
+// These conformances are marked @retroactive because the GUID type nominally
+// comes from the _GUIDDef clang module rather than the WinSDK clang module.
+
+extension GUID: @retroactive Equatable {
+  // When C++ interop is enabled, Swift imports a == operator from guiddef.h
+  // that conflicts with the definition of == here, so we've renamed it to
+  // __equals to avoid the conflict.
+  @_transparent
+  @_implements(Equatable, ==(_:_:))
+  public static func __equals(lhs: Self, rhs: Self) -> Bool {
+    lhs.uint128Value == rhs.uint128Value
+  }
+}
+
+extension GUID: @retroactive Hashable {
+  @_transparent
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(uint128Value)
+  }
+}

@@ -42,7 +42,7 @@ entry:
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[TEMP]])
   %temp = alloc_stack $Indirect<C>
 
-  // CHECK-NEXT:    call swiftcc void @make_indirect(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[TEMP]], ptr %C)
+  // CHECK-NEXT:    call swiftcc void @make_indirect(ptr noalias sret({{.*}}) captures(none) [[TEMP]], ptr %C)
   %make = function_ref @make_indirect : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
   apply %make<C>(%temp) : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
 

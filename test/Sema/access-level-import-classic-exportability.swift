@@ -1,13 +1,33 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
-/// Build the libraries.
+/// Non-library-evolution.
+// RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/InternalLib.swift -o %t \
+// RUN:   -package-name pkg
+// RUN: %target-swift-frontend -emit-module %t/FileprivateLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t
+
+/// Check diagnostics.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -verify -verify-ignore-unrelated
+
+/// CheckImplementationOnly doesn't change the results.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -enable-experimental-feature CheckImplementationOnly \
+// RUN:   -verify -verify-ignore-unrelated
+
+
+/// Library-evolution.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t \
 // RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t \
 // RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/InternalLib.swift -o %t \
-// RUN:   -enable-library-evolution
+// RUN:   -enable-library-evolution -package-name pkg
 // RUN: %target-swift-frontend -emit-module %t/FileprivateLib.swift -o %t \
 // RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t \
@@ -15,16 +35,18 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
-
-/// Check diagnostics with library-evolution.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 \
+// RUN:   -package-name pkg -swift-version 5 \
 // RUN:   -enable-library-evolution \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -verify -verify-ignore-unrelated
 
-// REQUIRES: swift_feature_AccessLevelOnImport
+/// CheckImplementationOnly doesn't change the results.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -enable-library-evolution \
+// RUN:   -enable-experimental-feature CheckImplementationOnly \
+// RUN:   -verify -verify-ignore-unrelated
+
+// REQUIRES: swift_feature_CheckImplementationOnly
 
 //--- PublicLib.swift
 public struct PublicImportType {
@@ -40,6 +62,8 @@ public struct PackageImportType {
 public struct InternalImportType {
     public init() {}
 }
+
+package struct InternalImportPackageType {}
 
 //--- FileprivateLib.swift
 public struct FileprivateImportType {
@@ -140,6 +164,9 @@ fileprivate protocol InternalConstrainedExtensionProtoInFileprivate {}
 extension Array: InternalConstrainedExtensionProtoInFileprivate where Element == InternalImportType {}
 extension InternalImportType {
     fileprivate func fileprivateMethod() {}
+}
+extension InternalImportPackageType { // No error
+    public func foo() {}
 }
 
 private protocol InternalConstrainedExtensionProtoInPrivate {}

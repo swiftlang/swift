@@ -455,7 +455,7 @@ struct AggregateSymbolicValue final
     auto *aggregate =
         ::new (rawMem) AggregateSymbolicValue(aggregateType, members.size());
     std::uninitialized_copy(members.begin(), members.end(),
-                            aggregate->getTrailingObjects<SymbolicValue>());
+                            aggregate->getTrailingObjects());
     return aggregate;
   }
 
@@ -464,7 +464,7 @@ struct AggregateSymbolicValue final
 
   /// Return the symbolic values of members.
   ArrayRef<SymbolicValue> getMemberValues() const {
-    return {getTrailingObjects<SymbolicValue>(), numElements};
+    return getTrailingObjects(numElements);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -531,12 +531,12 @@ struct alignas(SourceLoc) UnknownSymbolicValue final
     auto value = ::new (rawMem) UnknownSymbolicValue(
         node, reason, static_cast<unsigned>(elements.size()));
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            value->getTrailingObjects<SourceLoc>());
+                            value->getTrailingObjects());
     return value;
   }
 
   ArrayRef<SourceLoc> getCallStack() const {
-    return {getTrailingObjects<SourceLoc>(), callStackSize};
+    return getTrailingObjects(callStackSize);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -657,14 +657,14 @@ struct DerivedAddressValue final
     auto dav =
         ::new (rawMem) DerivedAddressValue(memoryObject, elements.size());
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            dav->getTrailingObjects<unsigned>());
+                            dav->getTrailingObjects());
     return dav;
   }
 
   /// Return the access path for this derived address, which is an array of
   /// indices drilling into the memory object.
   ArrayRef<unsigned> getElements() const {
-    return {getTrailingObjects<unsigned>(), numElements};
+    return getTrailingObjects(numElements);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -749,13 +749,13 @@ struct SymbolicArrayStorage final
     auto *storage =
         ::new (rawMem) SymbolicArrayStorage(elementType, elements.size());
     std::uninitialized_copy(elements.begin(), elements.end(),
-                            storage->getTrailingObjects<SymbolicValue>());
+                            storage->getTrailingObjects());
     return storage;
   }
 
   /// Return the stored elements.
   ArrayRef<SymbolicValue> getElements() const {
-    return {getTrailingObjects<SymbolicValue>(), numElements};
+    return getTrailingObjects(numElements);
   }
 
   // This is used by the llvm::TrailingObjects base class.
@@ -872,9 +872,8 @@ SymbolicClosure *SymbolicClosure::create(SILFunction *target,
   //  Placement initialize the object.
   auto closure = ::new (rawMem) SymbolicClosure(
       target, args.size(), substMap, closureInst, hasNonConstantCapture);
-  std::uninitialized_copy(
-      args.begin(), args.end(),
-      closure->getTrailingObjects<SymbolicClosureArgument>());
+  std::uninitialized_copy(args.begin(), args.end(),
+                          closure->getTrailingObjects());
   return closure;
 }
 

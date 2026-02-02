@@ -55,3 +55,10 @@ open class SyntaxVisitor {
 open class SyntaxAnyVisitor: SyntaxVisitor {
   override open func visit(_ token: TokenSyntax) { }
 }
+
+@available(SwiftStdlib 5.1, *)
+func testMemorySafetyWithForLoop() async {
+  let (stream, continuation) = AsyncStream<Int>.makeStream()
+  for await _ in stream {}
+  _ = continuation
+}

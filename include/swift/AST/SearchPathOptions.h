@@ -45,7 +45,7 @@ enum class ModuleLoadingMode {
   PreferInterface,
   PreferSerialized,
   OnlyInterface,
-  OnlySerialized
+  OnlySerialized,
 };
 
 /// A single module search path that can come from different sources, e.g.
@@ -499,7 +499,7 @@ public:
   bool SkipSDKImportPaths = false;
 
   /// Scanner Prefix Mapper.
-  std::vector<std::string> ScannerPrefixMapper;
+  std::vector<std::pair<std::string, std::string>> ScannerPrefixMapper;
 
   /// Verify resolved plugin is not changed.
   bool ResolvedPluginVerification = false;
@@ -518,18 +518,11 @@ public:
   std::string ExplicitSwiftModuleMapPath;
 
   /// Module inputs specified with -swift-module-input,
-  /// <ModuleName, Path to .swiftmodule file>
-  std::vector<std::pair<std::string, std::string>> ExplicitSwiftModuleInputs;
-
-  /// A map of placeholder Swift module dependency information.
-  std::string PlaceholderDependencyModuleMap;
+  /// ModuleName: Path to .swiftmodule file
+  llvm::StringMap<std::string> ExplicitSwiftModuleInputs;
 
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
-
-  /// Path to the file that defines platform mapping for availability
-  /// version inheritance.
-  std::optional<std::string> PlatformAvailabilityInheritanceMapPath;
 
   /// Cross import module information. Map from module name to the list of cross
   /// import overlay files that associate with that module.

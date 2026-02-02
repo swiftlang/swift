@@ -423,12 +423,11 @@ void irgen::emitDeallocatePartialClassInstance(IRGenFunction &IGF,
 
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
-static llvm::Function *createDtorFn(IRGenModule &IGM,
-                                    const HeapLayout &layout) {
-  llvm::Function *fn =
-    llvm::Function::Create(IGM.DeallocatingDtorTy,
-                           llvm::Function::PrivateLinkage,
-                           "objectdestroy", &IGM.Module);
+static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
+                                    const llvm::Twine &layoutName) {
+  llvm::Function *fn = llvm::Function::Create(
+      IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
+      "__swift_" + layoutName + "_destructor", &IGM.Module);
   auto attrs = IGM.constructInitialAttributes();
   IGM.addSwiftSelfAttributes(attrs, 0);
   fn->setAttributes(attrs);
@@ -556,11 +555,12 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
 
 llvm::Constant *
 HeapLayout::getPrivateMetadata(IRGenModule &IGM,
-                               llvm::Constant *captureDescriptor) const {
+                               llvm::Constant *captureDescriptor,
+                               const llvm::Twine &name) const {
   if (!privateMetadata)
-    privateMetadata = buildPrivateMetadata(IGM, *this, createDtorFn(IGM, *this),
-                                           captureDescriptor,
-                                           MetadataKind::HeapLocalVariable);
+    privateMetadata = buildPrivateMetadata(
+        IGM, *this, createDtorFn(IGM, *this, name), captureDescriptor,
+        MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
 
@@ -573,7 +573,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
     return IGM.RefCountedNull;
   }
 
-  llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
+  llvm::Value *metadata =
+      layout.getPrivateMetadata(IGM, captureDescriptor, name);
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -877,7 +878,7 @@ static void emitUnaryRefCountCall(IRGenFunction &IGF,
                         ? IGF.IGM.VoidTy
                         : value->getType();
     fnType = llvm::FunctionType::get(resultTy, value->getType(), false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -909,7 +910,7 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
     auto resultTy = fnType->getReturnType() == IGF.IGM.VoidTy ? IGF.IGM.VoidTy
                                                               : dest->getType();
     fnType = llvm::FunctionType::get(resultTy, paramTypes, false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -941,7 +942,7 @@ static llvm::Value *emitLoadWeakLikeCall(IRGenFunction &IGF,
   if (resultType != fnType->getReturnType()) {
     llvm::Type *paramTypes[] = { addr->getType() };
     fnType = llvm::FunctionType::get(resultType, paramTypes, false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -974,7 +975,7 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
     auto resultTy = fnType->getReturnType() == IGF.IGM.VoidTy ? IGF.IGM.VoidTy
                                                               : addr->getType();
     fnType = llvm::FunctionType::get(resultTy, paramTypes, false);
-    fn = llvm::ConstantExpr::getBitCast(fn, fnType->getPointerTo());
+    fn = llvm::ConstantExpr::getBitCast(fn, IGF.IGM.PtrTy);
   }
 
   // Emit the call.
@@ -997,11 +998,16 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
     value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
 
   // Emit the call.
-  llvm::CallInst *call = Builder.CreateCall(
-      (atomicity == Atomicity::Atomic)
-          ? IGM.getNativeStrongRetainFunctionPointer()
-          : IGM.getNativeNonAtomicStrongRetainFunctionPointer(),
-      value);
+  FunctionPointer function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
+      getOptions().EnableSwiftDirectRetainRelease)
+    function = IGM.getNativeStrongRetainDirectFunctionPointer();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getNativeStrongRetainFunctionPointer();
+  else
+    function = IGM.getNativeNonAtomicStrongRetainFunctionPointer();
+  llvm::CallInst *call = Builder.CreateCall(function, value);
   call->setDoesNotThrow();
   call->addParamAttr(0, llvm::Attribute::Returned);
 }
@@ -1257,10 +1263,22 @@ void IRGenFunction::emitNativeStrongRelease(llvm::Value *value,
                                             Atomicity atomicity) {
   if (doesNotRequireRefCounting(value))
     return;
-  emitUnaryRefCountCall(*this, (atomicity == Atomicity::Atomic)
-                                   ? IGM.getNativeStrongReleaseFn()
-                                   : IGM.getNativeNonAtomicStrongReleaseFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
+      getOptions().EnableSwiftDirectRetainRelease)
+    function = IGM.getNativeStrongReleaseDirectFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getNativeStrongReleaseFn();
+  else
+    function = IGM.getNativeNonAtomicStrongReleaseFn();
+  emitUnaryRefCountCall(*this, function, value);
+}
+
+void IRGenFunction::emitReleaseBox(llvm::Value *value) {
+  if (doesNotRequireRefCounting(value))
+    return;
+  emitUnaryRefCountCall(*this, IGM.getReleaseBoxFn(), value);
 }
 
 void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
@@ -1353,20 +1371,30 @@ void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value,
 
 void IRGenFunction::emitBridgeStrongRetain(llvm::Value *value,
                                            Atomicity atomicity) {
-  emitUnaryRefCountCall(*this,
-                        (atomicity == Atomicity::Atomic)
-                            ? IGM.getBridgeObjectStrongRetainFn()
-                            : IGM.getNonAtomicBridgeObjectStrongRetainFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
+      getOptions().EnableSwiftDirectRetainRelease)
+    function = IGM.getBridgeObjectStrongRetainDirectFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getBridgeObjectStrongRetainFn();
+  else
+    function = IGM.getNonAtomicBridgeObjectStrongRetainFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitBridgeStrongRelease(llvm::Value *value,
                                             Atomicity atomicity) {
-  emitUnaryRefCountCall(*this,
-                        (atomicity == Atomicity::Atomic)
-                            ? IGM.getBridgeObjectStrongReleaseFn()
-                            : IGM.getNonAtomicBridgeObjectStrongReleaseFn(),
-                        value);
+  llvm::Constant *function;
+  if (atomicity == Atomicity::Atomic &&
+      IGM.TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
+      getOptions().EnableSwiftDirectRetainRelease)
+    function = IGM.getBridgeObjectStrongReleaseDirectFn();
+  else if (atomicity == Atomicity::Atomic)
+    function = IGM.getBridgeObjectStrongReleaseFn();
+  else
+    function = IGM.getNonAtomicBridgeObjectStrongReleaseFn();
+  emitUnaryRefCountCall(*this, function, value);
 }
 
 void IRGenFunction::emitErrorStrongRetain(llvm::Value *value) {
@@ -1528,8 +1556,7 @@ public:
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *box, *address;
     IGF.emitAllocBoxCall(metadata, box, address);
-    address = IGF.Builder.CreateBitCast(address,
-                                        ti.getStorageType()->getPointerTo());
+    address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return {ti.getAddressForPointer(address), box};
   }
 
@@ -1546,8 +1573,7 @@ public:
     auto &ti = IGF.getTypeInfo(boxedType);
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *address = IGF.emitProjectBoxCall(box, metadata);
-    address = IGF.Builder.CreateBitCast(address,
-                                        ti.getStorageType()->getPointerTo());
+    address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return ti.getAddressForPointer(address);
   }
 };
@@ -1575,27 +1601,9 @@ public:
     // Allocate a new object using the layout.
     auto boxedInterfaceType = boxedType;
     if (env) {
-      boxedInterfaceType = boxedType.mapTypeOutOfContext();
+      boxedInterfaceType = boxedType.mapTypeOutOfEnvironment();
     }
 
-    {
-      // FIXME: This seems wrong. We used to just mangle opened archetypes as
-      // their interface type. Let's make that explicit now.
-      auto astType = boxedInterfaceType.getASTType();
-      astType =
-          astType
-              .transformRec([](Type t) -> std::optional<Type> {
-                if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
-                  auto &ctx = openedExistential->getASTContext();
-                  return ctx.TheSelfType;
-                }
-                return std::nullopt;
-              })
-              ->getCanonicalType();
-      boxedInterfaceType = SILType::getPrimitiveType(
-          astType, boxedInterfaceType.getCategory());
-    }
-    
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType,
         env ? env->getGenericSignature().getCanonicalSignature()
@@ -1839,13 +1847,11 @@ Address irgen::emitAllocateExistentialBoxInBuffer(
   OwnedAddress owned = boxTI.allocate(IGF, env, boxType, name);
   Explosion box;
   box.add(owned.getOwner());
-  boxTI.initialize(IGF, box,
-                   Address(IGF.Builder.CreateBitCast(
-                               destBuffer.getAddress(),
-                               owned.getOwner()->getType()->getPointerTo()),
-                           owned.getOwner()->getType(),
-                           destBuffer.getAlignment()),
-                   isOutlined);
+  boxTI.initialize(
+      IGF, box,
+      Address(IGF.Builder.CreateBitCast(destBuffer.getAddress(), IGF.IGM.PtrTy),
+              owned.getOwner()->getType(), destBuffer.getAlignment()),
+      isOutlined);
   return owned.getAddress();
 }
 
@@ -1958,8 +1964,7 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
 llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object) {
   if (IGF.IGM.TargetInfo.hasISAMasking()) {
-    object = IGF.Builder.CreateBitCast(object,
-                                       IGF.IGM.IntPtrTy->getPointerTo());
+    object = IGF.Builder.CreateBitCast(object, IGF.IGM.PtrTy);
     llvm::Value *metadata = IGF.Builder.CreateLoad(
         Address(object, IGF.IGM.IntPtrTy, IGF.IGM.getPointerAlignment()));
     llvm::Value *mask = IGF.Builder.CreateLoad(IGF.IGM.getAddrOfObjCISAMask());
@@ -1969,8 +1974,7 @@ llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
   } else if (IGF.IGM.TargetInfo.hasOpaqueISAs()) {
     return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
   } else {
-    object = IGF.Builder.CreateBitCast(object,
-                                  IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+    object = IGF.Builder.CreateBitCast(object, IGF.IGM.PtrTy);
     llvm::Value *metadata = IGF.Builder.CreateLoad(Address(
         object, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
     return metadata;

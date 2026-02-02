@@ -190,13 +190,17 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   return dc->getParentModule();
 }
 
-void swift::bindExtensions(ModuleDecl &mod) {
+evaluator::SideEffect
+BindExtensionsRequest::evaluate(Evaluator &evaluator, ModuleDecl *M) const {
+  bool excludeMacroExpansions = true;
+
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
-    if (auto nominal = ext->computeExtendedNominal()) {
+    if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
+      ext->setExtendedNominal(nominal);
       nominal->addExtension(ext);
       return true;
     }
@@ -208,7 +212,7 @@ void swift::bindExtensions(ModuleDecl &mod) {
   // resolved to a worklist.
   SmallVector<ExtensionDecl *, 8> worklist;
 
-  for (auto file : mod.getFiles()) {
+  for (auto file : M->getFiles()) {
     auto *SF = dyn_cast<SourceFile>(file);
     if (!SF)
       continue;
@@ -228,22 +232,39 @@ void swift::bindExtensions(ModuleDecl &mod) {
       visitTopLevelDecl(D);
   }
 
-  // Phase 2 - repeatedly go through the worklist and attempt to bind each
-  // extension there, removing it from the worklist if we succeed.
-  bool changed;
-  do {
-    changed = false;
+  auto tryBindExtensions = [&]() {
+    // Phase 2 - repeatedly go through the worklist and attempt to bind each
+    // extension there, removing it from the worklist if we succeed.
+    bool changed;
+    do {
+      changed = false;
 
-    auto last = std::remove_if(worklist.begin(), worklist.end(),
-                               tryBindExtension);
-    if (last != worklist.end()) {
-      worklist.erase(last, worklist.end());
-      changed = true;
-    }
-  } while(changed);
+      auto last = std::remove_if(worklist.begin(), worklist.end(),
+                                 tryBindExtension);
+      if (last != worklist.end()) {
+        worklist.erase(last, worklist.end());
+        changed = true;
+      }
+    } while(changed);
+  };
 
+  tryBindExtensions();
+
+  // If that fails, try again, but this time expand macros.
+  excludeMacroExpansions = false;
+  tryBindExtensions();
+  
   // Any remaining extensions are invalid. They will be diagnosed later by
   // typeCheckDecl().
+  for (auto *ext : worklist)
+    ext->setExtendedNominal(nullptr);
+
+  return {};
+}
+
+void swift::bindExtensions(ModuleDecl &mod) {
+  auto &eval = mod.getASTContext().evaluator;
+  (void)evaluateOrDefault(eval, BindExtensionsRequest{&mod}, {});
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
@@ -316,6 +337,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
     SF->typeCheckDelayedFunctions();
+
+    for (auto *opaqueDecl : SF->getOpaqueReturnTypeDecls()) {
+      TypeChecker::checkCircularOpaqueReturnTypeDecl(opaqueDecl);
+    }
   }
 
   // If region-based isolation is enabled, we diagnose unnecessary
@@ -358,6 +383,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
   evaluateOrDefault(
       Ctx.evaluator,
       CheckInconsistentWeakLinkedImportsRequest{SF->getParentModule()}, {});
+
+  // Opt-in performance hint diagnostics for performance-critical code.
+  if (performanceHintDiagnosticsEnabled(Ctx, SF))
+    evaluateOrDefault(Ctx.evaluator, EmitPerformanceHints{SF}, {});
 
   // Perform various AST transforms we've been asked to perform.
   if (!Ctx.hadError() && Ctx.LangOpts.DebuggerTestingTransform)
@@ -546,13 +575,6 @@ bool swift::typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
       true);
 }
 
-bool swift::typeCheckForCodeCompletion(
-    constraints::SyntacticElementTarget &target, bool needsPrecheck,
-    llvm::function_ref<void(const constraints::Solution &)> callback) {
-  return TypeChecker::typeCheckForCodeCompletion(target, needsPrecheck,
-                                                 callback);
-}
-
 Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                 DeclContext *Context) {
   return TypeChecker::resolveDeclRefExpr(UDRE, Context);
@@ -592,7 +614,7 @@ bool TypeChecker::isDifferentiable(Type type, bool tangentVectorEqualsSelf,
                                    DeclContext *dc,
                                    std::optional<TypeResolutionStage> stage) {
   if (stage)
-    type = dc->mapTypeIntoContext(type);
+    type = dc->mapTypeIntoEnvironment(type);
   auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule());
   if (!tanSpace)

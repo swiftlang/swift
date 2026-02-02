@@ -926,7 +926,9 @@ static bool hasMaxNumberOfBasicBlocks(SILFunction *f, int limit) {
 static bool isInlineAlwaysCallSite(SILFunction *Callee, int numCallerBlocks) {
   if (Callee->isTransparent())
     return true;
-  if (Callee->getInlineStrategy() == AlwaysInline &&
+  if (Callee->getInlineStrategy() == AlwaysInline)
+    return true;
+  if (Callee->getInlineStrategy() == HeuristicAlwaysInline &&
       !Callee->getModule().getOptions().IgnoreAlwaysInline &&
 
       // Protect against misuse of @inline(__always).
@@ -1479,6 +1481,13 @@ public:
     if (Inliner.inlineCallsIntoFunction(getFunction())) {
       removeUnreachableBlocks(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+      // We know that this pass does not create infinite loops even if it
+      // deletes basic blocks.
+      getFunction()->setNeedBreakInfiniteLoops(false);
+      if (getFunction()->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), getFunction());
+
       restartPassPipeline();
     }
   }

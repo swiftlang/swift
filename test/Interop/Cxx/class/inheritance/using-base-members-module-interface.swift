@@ -48,8 +48,6 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct UsingBaseConstructorWithParam {
-// CHECK-NEXT:   public init(consuming _: consuming IntBox)
-// CHECK-NEXT:   public init(_: IntBox)
 // CHECK-NEXT:   public init(_: UInt32)
 // CHECK-NEXT:   public init(_: Int32)
 // CHECK-NEXT:   public var value: Int32
@@ -57,8 +55,6 @@
 
 // CHECK:      public struct UsingBaseConstructorEmpty {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   public init(consuming _: consuming Empty)
-// CHECK-NEXT:   public init(_: Empty)
 // CHECK-NEXT:   public var value: Int32
 // CHECK-NEXT: }
 
@@ -74,11 +70,14 @@
 
 // CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   public var pointee: Int32 { get }
+// CHECK-NEXT:   public subscript(x: Int32) -> Int32 { get }
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> Int32
 // CHECK-NEXT:   prefix public static func ! (lhs: OperatorBasePrivateInheritance) -> OperatorBase
 // CHECK-NEXT:   @available(*, unavailable, message: "use ! instead")
 // CHECK-NEXT:   public func __operatorExclaim() -> OperatorBase
+// CHECK-NEXT:   @available(*, unavailable, message: "use subscript")
+// CHECK-NEXT:   public func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK-NEXT:   public var pointee: Int32 { get }
 // CHECK-NEXT: }

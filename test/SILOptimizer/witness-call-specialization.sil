@@ -1,0 +1,98 @@
+// RUN: %target-sil-opt -enable-experimental-feature Embedded %s -embedded-witness-call-specialization | %FileCheck %s
+// RUN: %target-sil-opt %s -embedded-witness-call-specialization | %FileCheck --check-prefix=CHECKNE %s
+
+// REQUIRES: swift_feature_Embedded
+
+sil_stage canonical
+
+import Builtin
+
+protocol P {}
+
+class C: P {}
+
+// CHECK-LABEL: sil [ossa] @test_simple :
+// CHECK:         [[F:%.*]] = function_ref @$e6calleeTfr9 : $@convention(method) (@guaranteed C) -> ()
+// CHECK:         apply [[F]](%0) : $@convention(method) (@guaranteed C) -> ()
+// CHECK:       } // end sil function 'test_simple'
+// CHECKNE-LABEL: sil [ossa] @test_simple :
+// CHECKNE:         [[F:%.*]] = function_ref @callee : $@convention(witness_method: P) (@guaranteed C) -> ()
+// CHECKNE:         apply [[F]](%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+// CHECKNE:       } // end sil function 'test_simple'
+sil [ossa] @test_simple : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = function_ref @callee : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %2 = apply %1(%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @second_use :
+// CHECK:         [[F:%.*]] = function_ref @$e6calleeTfr9 : $@convention(method) (@guaranteed C) -> ()
+// CHECK:         apply [[F]](%0) : $@convention(method) (@guaranteed C) -> ()
+// CHECK:       } // end sil function 'second_use'
+sil [ossa] @second_use : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = function_ref @callee : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %2 = apply %1(%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @dont_handle_generic_functions :
+// CHECK:         [[F:%.*]] = function_ref @callee : $@convention(witness_method: P) (@guaranteed C) -> ()
+// CHECK:         apply [[F]](%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+// CHECK:       } // end sil function 'dont_handle_generic_functions'
+sil [ossa] @dont_handle_generic_functions : $@convention(thin) <T> (@guaranteed C, @in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $C, %1 : $*T):
+  %2 = function_ref @callee : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %3 = apply %2(%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @only_specialize_witness_methods :
+// CHECK:         [[F:%.*]] = function_ref @thin_function : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:         apply [[F]](%0) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:       } // end sil function 'only_specialize_witness_methods'
+sil [ossa] @only_specialize_witness_methods : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = function_ref @thin_function : $@convention(thin) (@guaranteed C) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @callee_must_have_body :
+// CHECK:         [[F:%.*]] = function_ref @no_body : $@convention(witness_method: P) (@guaranteed C) -> ()
+// CHECK:         apply [[F]](%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+// CHECK:       } // end sil function 'callee_must_have_body'
+sil [ossa] @callee_must_have_body : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = function_ref @no_body : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %2 = apply %1(%0) : $@convention(witness_method: P) (@guaranteed C) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+
+// CHECK-LABEL: sil shared [ossa] @$e6calleeTfr9 : $@convention(method) (@guaranteed C) -> () {
+// CHECK:         fix_lifetime %0
+// CHECK-NEXT:    %2 = tuple ()
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function '$e6calleeTfr9'
+sil [ossa] @callee : $@convention(witness_method: P) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  fix_lifetime %0
+  %2 = tuple ()
+  return %2
+}
+
+sil [ossa] @thin_function : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  fix_lifetime %0
+  %2 = tuple ()
+  return %2
+}
+
+sil [ossa] @no_body : $@convention(witness_method: P) (@guaranteed C) -> ()

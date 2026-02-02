@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/ambiguous.swift
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/DeclsUsedWrongly.swift
 
-// RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t.dia %s -verify
+// RUN: %target-swift-frontend -typecheck -I %t -serialize-diagnostics-path %t.dia %s -verify -verify-ignore-unrelated
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: %FileCheck --input-file=%t.deserialized_diagnostics.txt %s
 

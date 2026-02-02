@@ -599,6 +599,17 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
+    // Borrow/mutate accessor
+    if (searchValue->isBorrowAccessorResult()) {
+      if (auto fas =
+              FullApplySite::isa(searchValue->getDefiningInstruction())) {
+        if (auto selfParam = getNamePathComponentFromCallee(fas)) {
+          searchValue = selfParam;
+          continue;
+        }
+      }
+    }
+
     // Addressor accessor.
     if (auto ptrToAddr =
             dyn_cast<PointerToAddressInst>(stripAccessMarkers(searchValue))) {
@@ -640,6 +651,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<LoadBorrowInst>(searchValue) || isa<BeginAccessInst>(searchValue) ||
         isa<MarkUnresolvedNonCopyableValueInst>(searchValue) ||
         isa<ProjectBoxInst>(searchValue) || isa<CopyValueInst>(searchValue) ||
+        isa<ExplicitCopyValueInst>(searchValue) ||
         isa<ConvertFunctionInst>(searchValue) ||
         isa<MarkUninitializedInst>(searchValue) ||
         isa<MarkDependenceInst>(searchValue) ||

@@ -116,10 +116,6 @@ https://medium.com/kinandcartacreated/contributing-to-swift-part-2-efebcf7b6c93
   efficiency and correctness challenges with automatic reference counting and
   how including ownership semantics in the compiler's intermediate representation
   helps tackles those challenges.
-- [How to talk to your kids about SIL type use][] by Slava Pestov (blog post,
-  Jul 2016): This blog post describes several important SIL concepts: object
-  vs address types, AST -> SIL type lowering, trivial vs loadable vs
-  address-only SIL types, abstraction patterns and more.
 - [Swift's High-Level IR][] by Joe Groff and Chris Lattner (talk, Oct 2015):
   This talk describes the goals and design of SIL. It covers the following:
   - Some commonly used SIL instructions and how they are motivated by language

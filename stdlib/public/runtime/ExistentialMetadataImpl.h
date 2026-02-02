@@ -25,7 +25,20 @@ namespace swift {
 namespace metadataimpl {
 
 /// A common base class for opaque-existential and class-existential boxes.
-template <typename Impl> struct SWIFT_LIBRARY_VISIBILITY ExistentialBoxBase {};
+template <typename Impl>
+struct SWIFT_LIBRARY_VISIBILITY ExistentialBoxBase {
+  template <class Container, class... A>
+  static void copyBytes(Container *dest, Container *src, A... args) {
+    memcpy(dest, src, src->getContainerStride(args...));
+  }
+
+  template <class Container, class... A>
+  static void copyTypeBytes(Container *dest, Container *src, A...args) {
+    auto valueBytes = src->getValueSize();
+    auto toCopy = src->getContainerStride(args...) - valueBytes;
+    memcpy((char *)dest + valueBytes, (char *)src + valueBytes, toCopy);
+  }
+};
 
 /// A common base class for fixed and non-fixed opaque-existential box
 /// implementations.
@@ -83,7 +96,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
-    src->copyTypeInto(dest, args...);
+    copyTypeBytes(dest, src, args...);
     auto *type = src->getType();
     auto *vwt = type->getValueWitnesses();
 
@@ -104,10 +117,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
-    src->copyTypeInto(dest, args...);
-    auto from = src->getBuffer(args...);
-    auto to = dest->getBuffer(args...);
-    memcpy(to, from, sizeof(ValueBuffer));
+    copyBytes(dest, src, args...);
     return dest;
   }
 
@@ -151,7 +161,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         // Move dest value aside so we can destroy it later.
         destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
 
-        src->copyTypeInto(dest, args...);
+        copyTypeBytes(dest, src, args...);
         if (srcVwt->isValueInline()) {
           // Inline src value.
 
@@ -172,7 +182,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         auto *destRef =
             *reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
 
-        src->copyTypeInto(dest, args...);
+        copyTypeBytes(dest, src, args...);
         if (srcVwt->isValueInline()) {
 
           // initWithCopy.
@@ -239,7 +249,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         // Move dest value aside.
         destType->vw_initializeWithTake(opaqueTmpBuffer, destValue);
 
-        src->copyTypeInto(dest, args...);
+        copyTypeBytes(dest, src, args...);
         if (srcVwt->isValueInline()) {
           // Inline src value.
 
@@ -260,7 +270,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
         auto *destRef =
             *reinterpret_cast<HeapObject **>(dest->getBuffer(args...));
 
-        src->copyTypeInto(dest, args...);
+        copyTypeBytes(dest, src, args...);
         if (srcVwt->isValueInline()) {
           // initWithCopy.
 
@@ -291,12 +301,20 @@ template <unsigned NumWitnessTables>
 struct SWIFT_LIBRARY_VISIBILITY FixedOpaqueExistentialContainer {
   OpaqueExistentialContainer Header;
   const void *WitnessTables[NumWitnessTables];
+
+  static size_t getValueSize() {
+    return sizeof(Header.Buffer);
+  }
 };
 // We need to be able to instantiate for NumWitnessTables==0, which
 // requires an explicit specialization.
 template <>
 struct FixedOpaqueExistentialContainer<0> {
   OpaqueExistentialContainer Header;
+
+  static size_t getValueSize() {
+    return sizeof(Header.Buffer);
+  }
 };
 
 /// A box implementation class for an opaque existential type with
@@ -311,10 +329,7 @@ struct SWIFT_LIBRARY_VISIBILITY OpaqueExistentialBox
     ValueBuffer *getBuffer() {
       return &this->Header.Buffer;
     }
-    void copyTypeInto(Container *dest) const {
-      this->Header.copyTypeInto(&dest->Header, NumWitnessTables);
-    }
-    
+
     static size_t getContainerStride() {
       return sizeof(Container);
     }
@@ -355,9 +370,6 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     ValueBuffer *getBuffer(const Metadata *self) {
       return &Header.Buffer;
     }
-    void copyTypeInto(Container *dest, const Metadata *self) {
-      Header.copyTypeInto(&dest->Header, getNumWitnessTables(self));
-    }
 
     static unsigned getNumWitnessTables(const Metadata *self) {
       auto castSelf = static_cast<const ExistentialTypeMetadata*>(self);
@@ -377,7 +389,11 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
     }
     
     static size_t getContainerStride(const Metadata *self) {
-      return getStride(getNumWitnessTables(self));
+      return self->vw_stride();
+    }
+
+    static size_t getValueSize() {
+      return sizeof(Header.Buffer);
     }
   };
 
@@ -411,9 +427,8 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
-    src->copyTypeInto(dest, args...);
     auto newValue = *src->getValueSlot();
-    *dest->getValueSlot() = newValue;
+    copyBytes(dest, src, args...);
     swift_unknownObjectRetain(newValue);
     return dest;  
   }
@@ -421,18 +436,16 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
-    src->copyTypeInto(dest, args...);
-    *dest->getValueSlot() = *src->getValueSlot();
+    copyBytes(dest, src, args...);
     return dest;
   }
 
   template <class Container, class... A>
   static Container *assignWithCopy(Container *dest, Container *src,
                                    A... args) {
-    src->copyTypeInto(dest, args...);
     auto newValue = *src->getValueSlot();
     auto oldValue = *dest->getValueSlot();
-    *dest->getValueSlot() = newValue;
+    copyBytes(dest, src, args...);
     swift_unknownObjectRetain(newValue);
     swift_unknownObjectRelease(oldValue);
     return dest;
@@ -441,10 +454,8 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBoxBase
   template <class Container, class... A>
   static Container *assignWithTake(Container *dest, Container *src,
                                    A... args) {
-    src->copyTypeInto(dest, args...);
-    auto newValue = *src->getValueSlot();
     auto oldValue = *dest->getValueSlot();
-    *dest->getValueSlot() = newValue;
+    copyBytes(dest, src, args...);
     swift_unknownObjectRelease(oldValue);
     return dest;
   }
@@ -470,10 +481,6 @@ struct SWIFT_LIBRARY_VISIBILITY ClassExistentialBox : ClassExistentialBoxBase {
     ClassExistentialContainer Header;
     const void *TypeInfo[NumWitnessTables];
 
-    void copyTypeInto(Container *dest) const {
-      for (unsigned i = 0; i != NumWitnessTables; ++i)
-        dest->TypeInfo[i] = TypeInfo[i];
-    }
     void **getValueSlot() { return &Header.Value; }
     void * const *getValueSlot() const { return &Header.Value; }
     
@@ -501,10 +508,6 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedClassExistentialBox
       return castSelf->Flags.getNumWitnessTables();
     }
 
-    void copyTypeInto(Container *dest, const Metadata *self) {
-      Header.copyTypeInto(&dest->Header, getNumWitnessTables(self));
-    }
-
     void **getValueSlot() { return &Header.Value; }
     void * const *getValueSlot() const { return &Header.Value; }
 
@@ -520,7 +523,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedClassExistentialBox
       return getSize(numWitnessTables);
     }
     static size_t getContainerStride(const Metadata *self) {
-      return getStride(getNumWitnessTables(self));
+      return self->vw_stride();
     }
   };
   using type = Container;
@@ -540,32 +543,28 @@ struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBoxBase
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
-    src->copyTypeInto(dest, args...);
-    *dest->getValueSlot() = *src->getValueSlot();
-    return dest;  
+    copyBytes(dest, src, args...);
+    return dest;
   }
 
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
-    src->copyTypeInto(dest, args...);
-    *dest->getValueSlot() = *src->getValueSlot();
+    copyBytes(dest, src, args...);
     return dest;
   }
 
   template <class Container, class... A>
   static Container *assignWithCopy(Container *dest, Container *src,
                                    A... args) {
-    src->copyTypeInto(dest, args...);
-    *dest->getValueSlot() = *src->getValueSlot();
+    copyBytes(dest, src, args...);
     return dest;
   }
 
   template <class Container, class... A>
   static Container *assignWithTake(Container *dest, Container *src,
                                    A... args) {
-    src->copyTypeInto(dest, args...);
-    *dest->getValueSlot() = *src->getValueSlot();
+    copyBytes(dest, src, args...);
     return dest;
   }
 
@@ -593,10 +592,6 @@ struct SWIFT_LIBRARY_VISIBILITY ExistentialMetatypeBox
     ExistentialMetatypeContainer Header;
     const void *TypeInfo[NumWitnessTables];
 
-    void copyTypeInto(Container *dest) const {
-      for (unsigned i = 0; i != NumWitnessTables; ++i)
-        dest->TypeInfo[i] = TypeInfo[i];
-    }
     const Metadata **getValueSlot() { return &Header.Value; }
     const Metadata * const *getValueSlot() const { return &Header.Value; }
     
@@ -624,10 +619,6 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
       return castSelf->Flags.getNumWitnessTables();
     }
 
-    void copyTypeInto(Container *dest, const Metadata *self) {
-      Header.copyTypeInto(&dest->Header, getNumWitnessTables(self));
-    }
-
     const Metadata **getValueSlot() { return &Header.Value; }
     const Metadata * const *getValueSlot() const { return &Header.Value; }
 
@@ -643,7 +634,7 @@ struct SWIFT_LIBRARY_VISIBILITY NonFixedExistentialMetatypeBox
       return getSize(numWitnessTables);
     }
     static size_t getContainerStride(const Metadata *self) {
-      return getStride(getNumWitnessTables(self));
+      return self->vw_stride();
     }
   };
   using type = Container;

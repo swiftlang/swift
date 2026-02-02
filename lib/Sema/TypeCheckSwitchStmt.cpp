@@ -1160,21 +1160,27 @@ namespace {
           auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
               enumModule->isSystemModule() ||
-              theEnum->getAttrs().hasAttribute<ExtensibleAttr>();
+              theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
 
         auto diag =
             DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                         subjectType, shouldIncludeFutureVersionComment);
 
-        // Presence of `@preEnumExtensibility` pushed the warning farther
-        // into the future.
-        if (theEnum &&
-            theEnum->getAttrs().hasAttribute<PreEnumExtensibilityAttr>()) {
-          diag.warnUntilFutureSwiftVersion();
-        } else {
-          diag.warnUntilSwiftVersion(6);
-        }
+        auto shouldWarnUntilVersion = [&theEnum]() -> unsigned {
+          if (theEnum) {
+            // Presence of `@nonexhaustive(warn)` pushes the warning farther,
+            // into the future.
+            if (auto *nonexhaustive =
+                    theEnum->getAttrs().getAttribute<NonexhaustiveAttr>()) {
+              if (nonexhaustive->getMode() == NonexhaustiveMode::Warning)
+                return swift::version::Version::getFutureMajorLanguageVersion();
+            }
+          }
+          return 6;
+        };
+
+        diag.warnUntilLanguageMode(shouldWarnUntilVersion());
 
         mainDiagType = std::nullopt;
       }
@@ -1476,6 +1482,10 @@ namespace {
         auto *PP = cast<ParenPattern>(item);
         return projectPattern(PP->getSubPattern());
       }
+      case PatternKind::Opaque: {
+        auto *opaque = cast<OpaquePattern>(item);
+        return projectPattern(opaque->getSubPattern());
+      }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         const Identifier name = OSP->getElementDecl()->getBaseIdentifier();
@@ -1497,8 +1507,9 @@ namespace {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
           // FIXME: Compound names.
-          return Space::forConstructor(
-              item->getType(), VP->getName().getBaseIdentifier(), std::nullopt);
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
+                                       ArrayRef<Space>());
         }
 
         SmallVector<Space, 4> conArgSpace;

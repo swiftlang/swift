@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DADDRESS_ONLY -emit-sil -verify %s
-// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DLOADABLE -emit-sil -verify %s
-// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DTRIVIAL -emit-sil -verify %s
-// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableParameters -parse-stdlib -module-name Swift -DADDRESS_ONLY -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableParameters -parse-stdlib -module-name Swift -DLOADABLE -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableParameters -parse-stdlib -module-name Swift -DTRIVIAL -emit-sil -verify %s
+// RUN: %target-swift-frontend  -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableParameters -parse-stdlib -module-name Swift -DEMPTY -emit-sil -verify %s
 
 // REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_AddressableParameters
 
 // TODO: Use the real stdlib types once `UnsafePointer` supports noncopyable
 // types.
@@ -53,6 +54,13 @@ struct S {
   var mutableData: NC {
     unsafeAddress { return makeUpAPointer() }
     unsafeMutableAddress { return makeUpAPointer() }
+  }
+
+  var pointer: Builtin.RawPointer {
+    @_addressableSelf
+    get {
+      Builtin.addressOfBorrow(self)
+    }
   }
 }
 
@@ -121,4 +129,11 @@ func test(mut_snc snc: inout SNC) {
   borrow(snc.mutableData)
   mod(&snc.mutableData)
   take(snc.mutableData) // expected-error{{missing reinitialization of inout parameter 'snc.mutableData' after consume}} expected-note{{consumed here}}
+}
+
+// Test calling passing a no-implicit-copy value as an indirect funtion argument. This requires the
+// MoveOnlyWrappedTypeEliminator to handle a store_borrow with multiple move-only operands without crashing in the
+// verifier with invalid operand ownership.
+func testAddressableNoImplicitCopy(s: consuming S) -> Builtin.RawPointer {
+  s.pointer
 }

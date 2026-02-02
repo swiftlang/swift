@@ -69,6 +69,8 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
     return bridged.canBeInitializedStatically()
   }
 
+  /// True if the global has an attribute, like `@const` or `@section` which requires the global to be
+  /// initialized statically.
   public var mustBeInitializedStatically: Bool {
     return bridged.mustBeInitializedStatically()
   }

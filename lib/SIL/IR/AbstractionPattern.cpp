@@ -15,8 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "llvm/ADT/SmallVector.h"
 #define DEBUG_TYPE "libsil"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
@@ -95,7 +98,22 @@ TypeConverter::getAbstractionPattern(VarDecl *var, bool isNonObjC) {
 
   if (auto clangDecl = var->getClangDecl()) {
     auto clangType = getClangType(clangDecl);
-    auto contextType = var->getDeclContext()->mapTypeIntoContext(swiftType);
+    auto contextType = var->getDeclContext()->mapTypeIntoEnvironment(swiftType);
+
+    // If this is a Swift closure that is being deconstructed into an instance
+    // of __swift_interop_closure, which stores a pair of two pointers, extract
+    // the Clang type from the C++ functional type. This is used to support
+    // interop between std::function and Swift closures. This kind of assignment
+    // will only exist in compiler-generated code.
+    auto clangImporter = var->getASTContext().getClangModuleLoader();
+    if (clangImporter->isDeconstructedSwiftClosure(clangType)) {
+      auto functionWrapperDecl = cast<clang::CXXRecordDecl>(
+          var->getDeclContext()->getAsDecl()->getClangDecl());
+      auto clangFunctionType =
+          clangImporter->extractCXXFunctionType(functionWrapperDecl);
+      return AbstractionPattern(sig, swiftType, clangFunctionType);
+    }
+
     swiftType =
         getLoweredBridgedType(AbstractionPattern(sig, swiftType, clangType),
                               contextType, getClangDeclBridgeability(clangDecl),
@@ -178,6 +196,25 @@ AbstractionPattern::getCurriedCXXMethod(CanType origType,
   return getCurriedCXXMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
+AbstractionPattern AbstractionPattern::getCXXFunctionalConstructor(
+    CanType origType, const clang::CXXRecordDecl *functionalTypeDecl) {
+  auto &ctx = origType->getASTContext();
+  auto &clangCtx = functionalTypeDecl->getASTContext();
+  auto clangImporter = ctx.getClangModuleLoader();
+  auto clangFunctionType =
+      clangImporter->extractCXXFunctionType(functionalTypeDecl);
+  auto ctorClangType =
+      clangCtx
+          .getFunctionType(clangCtx.getRecordType(functionalTypeDecl),
+                           {clang::QualType(clangFunctionType, 0)},
+                           clang::FunctionProtoType::ExtProtoInfo())
+          .getTypePtr();
+  AbstractionPattern pattern;
+  pattern.initClangType(SubstitutionMap(), CanGenericSignature(), origType,
+                        ctorClangType, Kind::CXXFunctionalConstructorType);
+  return pattern;
+}
+
 AbstractionPattern
 AbstractionPattern::getOptional(AbstractionPattern object) {
   switch (object.getKind()) {
@@ -193,6 +230,7 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ObjCCompletionHandlerArgumentsType:
@@ -322,7 +360,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
     // that ensures the type conforms.
     auto type = getType();
     if (hasGenericSignature() && getType()->hasTypeParameter()) {
-      type = GenericEnvironment::mapTypeIntoContext(
+      type = GenericEnvironment::mapTypeIntoEnvironment(
         getGenericSignature().getGenericEnvironment(), getType())
         ->getReducedType(getGenericSignature());
     }
@@ -356,6 +394,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     return true;
@@ -386,6 +425,7 @@ bool AbstractionPattern::matchesTuple(CanType substType) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     return false;
@@ -488,6 +528,7 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types are not tuples");
@@ -547,6 +588,7 @@ bool AbstractionPattern::doesTupleContainPackExpansionType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("pattern is not a tuple");
@@ -727,6 +769,7 @@ AbstractionPattern::getPackElementPackType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ClangType:
@@ -776,6 +819,7 @@ AbstractionPattern::getPackElementType(unsigned index) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::ClangType:
@@ -809,6 +853,7 @@ bool AbstractionPattern::matchesPack(CanPackType substType) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::Tuple:
@@ -924,6 +969,7 @@ AbstractionPattern AbstractionPattern::getPackExpansionPatternType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -967,6 +1013,7 @@ AbstractionPattern AbstractionPattern::getPackExpansionCountType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -1051,6 +1098,7 @@ AbstractionPattern AbstractionPattern::removingMoveOnlyWrapper() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types can not be move only");
@@ -1089,6 +1137,7 @@ AbstractionPattern AbstractionPattern::addingMoveOnlyWrapper() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
     llvm_unreachable("function types can not be move only");
@@ -1193,6 +1242,7 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   case Kind::Discard:
     llvm_unreachable("don't need to discard function abstractions yet");
   case Kind::ClangType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::CFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType: {
     auto clangFunctionType = getClangFunctionType(getClangType());
@@ -1340,6 +1390,7 @@ AbstractionPattern::getFunctionThrownErrorType() const {
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::CurriedObjCMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::CurriedCXXMethodType:
@@ -1366,7 +1417,14 @@ AbstractionPattern::getFunctionThrownErrorType(
     if (!substErrorType)
       return std::nullopt;
 
-    return std::make_pair(AbstractionPattern(*substErrorType),
+    // FIXME: This is actually unsound. The most opaque form of
+    // `(T) throws(U) -> V` should actually be
+    // `(T) throws(any Error) -> V`.
+    auto pattern = ((*substErrorType)->isErrorExistentialType()
+                    ? AbstractionPattern(*substErrorType)
+                    : AbstractionPattern::getOpaque());
+
+    return std::make_pair(pattern,
                           (*substErrorType)->getCanonicalType());
   }
 
@@ -1423,6 +1481,7 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::CurriedObjCMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::CurriedCXXMethodType:
@@ -1627,6 +1686,18 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
                               paramType,
                       method->parameters()[paramIndex]->getType().getTypePtr());
   }
+  case Kind::CXXFunctionalConstructorType:
+    // If this is the last parameter of the Swift function type, it represents
+    // Self. The Clang type will not have this parameter.
+    if (index == getClangFunctionType(getClangType())
+                     ->castAs<clang::FunctionProtoType>()
+                     ->getNumParams()) {
+      auto params = cast<AnyFunctionType>(getType()).getParams();
+      return AbstractionPattern(getGenericSubstitutions(),
+                                getGenericSignatureForFunctionComponent(),
+                                params[index].getParameterType());
+    }
+    LLVM_FALLTHROUGH;
   case Kind::ClangType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     return AbstractionPattern(getGenericSubstitutions(),
@@ -1673,6 +1744,7 @@ AbstractionPattern::isFunctionParamAddressable(unsigned index) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Type:
   case Kind::Discard: {
     auto type = getType();
@@ -1714,6 +1786,7 @@ AbstractionPattern::getLifetimeDependencies() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Type:
   case Kind::Discard: {
     auto type = getType();
@@ -1784,6 +1857,7 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -1829,6 +1903,7 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -1873,6 +1948,7 @@ AbstractionPattern AbstractionPattern::getExistentialConstraintType() const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
@@ -1963,12 +2039,15 @@ void AbstractionPattern::print(raw_ostream &out) const {
     out << ")";
     return;
   case Kind::ClangType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
   case Kind::ObjCCompletionHandlerArgumentsType:
     out << (getKind() == Kind::ClangType
               ? "AP::ClangType(" :
+            getKind() == Kind::CXXFunctionalConstructorType
+              ? "AP::CXXFunctionalConstructorType(" :
             getKind() == Kind::CurriedCFunctionAsMethodType
               ? "AP::CurriedCFunctionAsMethodType(" :
             getKind() == Kind::PartialCurriedCFunctionAsMethodType
@@ -2153,6 +2232,7 @@ const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
@@ -2213,6 +2293,7 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
     // Function types are always passed directly
     return Direct;
       
@@ -2254,6 +2335,7 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
+  case Kind::CXXFunctionalConstructorType:
     // Function types are always passed directly
     return Direct;
 
@@ -2281,6 +2363,7 @@ AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
     return Indirect;
 
   case Kind::ClangType:
+  case Kind::CXXFunctionalConstructorType:
   case Kind::Type:
   case Kind::Discard:
     // Pass according to the formal type.
@@ -2353,6 +2436,7 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && GenericSig == other.GenericSig;
       
   case Kind::ClangType:
+  case Kind::CXXFunctionalConstructorType:
     return OrigType == other.OrigType
       && GenericSig == other.GenericSig
       && ClangType == other.ClangType;
@@ -2666,32 +2750,38 @@ public:
     // Otherwise, there are no structural type parameters to visit.
     return nom;
   }
-  
-  CanType visitBuiltinFixedArrayType(CanBuiltinFixedArrayType bfa,
-                                     AbstractionPattern pattern) {
-    auto orig = pattern.getAs<BuiltinFixedArrayType>();
+
+  CanType visitBuiltinGenericType(CanBuiltinGenericType bga,
+                                  AbstractionPattern pattern) {
+    auto orig = pattern.getAs<BuiltinGenericType>();
 
     // If there are no loose type parameters in the pattern here, we don't need
     // to do a recursive visit at all.
     if (!orig->hasTypeParameter()
         && !orig->hasArchetype()
         && !orig->hasOpaqueArchetype()) {
-      return bfa;
+      return bga;
     }
-    
-    CanType newSize = visit(bfa->getSize(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getSize()));
-    CanType newElement = visit(bfa->getElementType(),
-                         AbstractionPattern(pattern.getGenericSubstitutions(),
-                                            pattern.getGenericSignatureOrNull(),
-                                            orig->getElementType()));
-                                
-    return BuiltinFixedArrayType::get(newSize, newElement)
-      ->getCanonicalType();
+
+    SmallVector<Type, 2> newReplacements;
+
+    for (unsigned i : indices(bga->getSubstitutions().getReplacementTypes())) {
+      CanType newReplacement
+        = visit(CanType(bga->getSubstitutions().getReplacementTypes()[i]),
+                AbstractionPattern(pattern.getGenericSubstitutions(),
+                 pattern.getGenericSignatureOrNull(),
+                 CanType(orig->getSubstitutions().getReplacementTypes()[i])));
+      newReplacements.push_back(newReplacement);
+    }
+
+    // TODO: handle conformances. no generic builtins currently have protocol
+    // requirements.
+    auto newSubs = SubstitutionMap::get(bga->getGenericSignature(),
+                                        newReplacements,
+                                        ArrayRef<ProtocolConformanceRef>{});
+    return bga->getWithSubstitutions(newSubs);
   }
-  
+
   CanType visitBoundGenericType(CanBoundGenericType bgt,
                                 AbstractionPattern pattern) {
     return handleGenericNominalType(pattern, bgt);

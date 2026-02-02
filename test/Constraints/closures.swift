@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
@@ -1362,7 +1362,70 @@ do {
     }
   }
 
-  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> _' to non-throwing function type '(Int) -> Void'}}
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
+}
+
+// Generic requirement failures associated with closure parameters should be diagnosed.
+protocol Input {
+  associatedtype Value
+  var value: Value { get }
+}
+
+protocol Idable {
+  associatedtype ID
+}
+
+struct TestInput<ItemID: Hashable, Value: Collection<ItemID>> : Input { // expected-note {{where 'Value' = 'Item.ID'}}
+  var value: Value
+}
+
+struct Container<I: Input> {
+  var data: (I) -> Void
+}
+
+func test_generic_closure_parameter_requirement_failure<Item: Idable>(
+  for itemType: Item.Type = Item.self,
+  _ payload: @escaping (_ itemID: Item.ID) -> Void
+) where Item.ID : Sendable {
+  Container(data: { (input: TestInput) in payload(input.value) })
+  // expected-error@-1 {{generic struct 'TestInput' requires that 'Item.ID' conform to 'Collection'}}
+}
+
+// Since implicit result implies `()` it should be allowed to be converted to e.g. `Void` and `Any`
+func test_implicit_result_conversions() {
+  func test_optional(_ x: Int) {
+    let _: Any? = {
+      switch x {
+      case 0:
+        return 1
+      default:
+        return
+      }
+    }()
+  }
+
+  func testAny(_: () -> Any) {}
+
+  testAny { } // Ok
+  testAny { return } // Ok
+  testAny {
+    _ = 42
+    return // Ok
+  }
+}
+
+// Random example reduced from swift-build which tripped an assert not
+// previously covered by our test suite
+do {
+  struct S {
+    var x: [Int: [String]] = [:]
+  }
+
+  let s = [S]()
+
+  let _: [Int: Set<String>] = s.map(\.x)
+      .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
+      .mapValues { Set($0) }
 }

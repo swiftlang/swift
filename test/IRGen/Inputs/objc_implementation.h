@@ -1,3 +1,4 @@
+#if __OBJC__
 #import <Foundation/Foundation.h>
 
 @interface ImplClass: NSObject <NSCopying>
@@ -31,11 +32,13 @@
 - (void)category2Method:(int)param;
 
 @end
+#endif
 
 extern void implFunc(int param);
 extern void implFuncCName(int param) __asm__("_implFuncAsmName");
+extern void implFuncRenamed_C(int param) __attribute__((swift_name("implFuncRenamed_Swift(param:)")));
 
-
+#if __OBJC__
 @interface NoImplClass
 
 - (void)noImplMethod:(int)param;
@@ -57,3 +60,4 @@ extern void implFuncCName(int param) __asm__("_implFuncAsmName");
 @property (assign) int afterInt;
 
 @end
+#endif

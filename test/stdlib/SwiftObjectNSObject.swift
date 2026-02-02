@@ -16,7 +16,6 @@
 // RUN: %target-build-swift %s -g -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -o %t/SwiftObjectNSObject
 // RUN: %target-codesign %t/SwiftObjectNSObject
 // RUN: %target-run %t/SwiftObjectNSObject 2> %t/log.txt
-// RUN: cat %t/log.txt 1>&2
 // RUN: %FileCheck %s < %t/log.txt
 // REQUIRES: executable_test
 

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -191,3 +191,123 @@ extension Unicode {
     }
   }
 }
+
+extension Unicode.Scalar {
+  var _isExtendedPictographic: Bool {
+    _swift_stdlib_isExtendedPictographic(value)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_getMphIdx(
+  _ scalar: UInt32,
+  _ levels: Int,
+  _ keys: UnsafePointer<UInt64>,
+  _ ranks: UnsafePointer<UInt16>,
+  _ sizes: UnsafePointer<UInt16>
+) -> Int
+
+@_extern(c)
+func _swift_stdlib_getScalarBitArrayIdx(
+  _ scalar: UInt32,
+  _ bitArrays: UnsafePointer<UInt64>,
+  _ ranks: UnsafePointer<UInt16>
+) -> Int
+
+//===----------------------------------------------------------------------===//
+// Normalization
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_getNormData(_ scalar: UInt32) -> UInt16
+
+@_extern(c)
+func _swift_stdlib_getDecompositionEntry(_ scalar: UInt32) -> UInt32
+
+@_extern(c)
+func _swift_stdlib_getComposition(_ x: UInt32, _ y: UInt32) -> UInt32
+
+@_extern(c)
+var _swift_stdlib_nfd_decompositions: UnsafePointer<UInt8>?
+
+//===----------------------------------------------------------------------===//
+// Grapheme Breaking
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_getGraphemeBreakProperty(_ scalar: UInt32) -> UInt8
+
+@_extern(c)
+func _swift_stdlib_isInCB_Consonant(_ scalar: UInt32) -> Bool
+
+//===----------------------------------------------------------------------===//
+// Word Breaking
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_getWordBreakProperty(_ scalar: UInt32) -> UInt8
+
+//===----------------------------------------------------------------------===//
+// Unicode.Scalar.Properties
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_getBinaryProperties(_ scalar: UInt32) -> UInt64
+
+@_extern(c)
+func _swift_stdlib_getNumericType(_ scalar: UInt32) -> UInt8
+
+@_extern(c)
+func _swift_stdlib_getNumericValue(_ scalar: UInt32) -> Double
+
+@_extern(c)
+func _swift_stdlib_getNameAlias(_ scalar: UInt32) -> UnsafePointer<UInt8>?
+
+@_extern(c)
+func _swift_stdlib_getMapping(_ scalar: UInt32, _ mapping: UInt8) -> Int32
+
+@_extern(c)
+func _swift_stdlib_getSpecialMapping(
+  _ scalar: UInt32,
+  _ mapping: UInt8,
+  _ length: UnsafeMutablePointer<Int>
+) -> UnsafePointer<UInt8>?
+
+@_extern(c)
+func _swift_stdlib_getScalarName(
+  _ scalar: UInt32,
+  _ buffer: UnsafeMutablePointer<UInt8>?,
+  _ capacity: Int
+) -> Int
+
+@_extern(c)
+func _swift_stdlib_getAge(_ scalar: UInt32) -> UInt16
+
+@_extern(c)
+func _swift_stdlib_getGeneralCategory(_ scalar: UInt32) -> UInt8
+
+@_extern(c)
+func _swift_stdlib_getScript(_ scalar: UInt32) -> UInt8
+
+@_extern(c)
+func _swift_stdlib_getScriptExtensions(
+  _ scalar: UInt32,
+  _ count: UnsafeMutablePointer<UInt8>
+) -> UnsafeMutablePointer<UInt8>?
+
+@_extern(c)
+func _swift_stdlib_getCaseMapping(
+  _ scalar: UInt32,
+  _ buffer: UnsafeMutablePointer<UInt32>
+)
+
+//===----------------------------------------------------------------------===//
+// Emoji
+//===----------------------------------------------------------------------===//
+
+@_extern(c)
+func _swift_stdlib_isExtendedPictographic(_ scalar: UInt32) -> Bool

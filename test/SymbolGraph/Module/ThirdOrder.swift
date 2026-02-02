@@ -11,8 +11,8 @@
 
 @_exported import B
 
-// BASE-NOT: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::s:1A10SomeStructV1BE05InnerB0V"
-// EXT-DAG: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::s:1A10SomeStructV1BE05InnerB0V"
+// BASE-NOT: "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:1A10SomeStructV1BE05InnerB0V"
+// EXT-DAG: "s:SQsRi_zRi0_zrlE2neoiySbx_xtFZ::SYNTHESIZED::s:1A10SomeStructV1BE05InnerB0V"
 
 // BASE-NOT: "s:1A10SomeStructV1BE05InnerB0V06NestedB0V"
 // EXT-DAG: "s:1A10SomeStructV1BE05InnerB0V06NestedB0V"

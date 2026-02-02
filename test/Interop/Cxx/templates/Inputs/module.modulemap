@@ -172,3 +172,23 @@ module ManySpecializations {
   header "many-specializations.h"
   requires cplusplus
 }
+
+module UninstantiatableSpecialMembers {
+  header "uninstantiatable-special-members.h"
+  requires cplusplus
+}
+
+module VariableTemplate {
+  header "variable-template.h"
+  requires cplusplus
+}
+
+module ForwardDeclaredSpecialization {
+  header "ForwardDeclaredSpecialization.h"
+  requires cplusplus
+}
+
+module ClassTemplateWithFrt {
+  header "class-template-with-frt.h"
+  requires cplusplus
+}

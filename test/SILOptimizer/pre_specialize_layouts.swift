@@ -1,22 +1,20 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -emit-module-path %t/pre_specialized_module_layouts.swiftmodule %S/Inputs/pre_specialized_module_layouts.swift
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT -check-prefix=OPT-%target-os
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -I %t -Onone -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=NONE -check-prefix=NONE-%target-os
+// RUN: %target-swift-frontend -emit-module-path %t/pre_specialized_module_layouts.swiftmodule %S/Inputs/pre_specialized_module_layouts.swift
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT -check-prefix=OPT-%target-os
+// RUN: %target-swift-frontend -I %t -Onone -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=NONE -check-prefix=NONE-%target-os
 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -O -emit-module-path %t/pre_specialized_module_layouts.swiftmodule %S/Inputs/pre_specialized_module_layouts.swift
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -O -emit-module-path %t/pre_specialized_module_layouts.swiftmodule %S/Inputs/pre_specialized_module_layouts.swift
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -O -enable-library-evolution -emit-module-path %t/pre_specialized_module_layouts.swiftmodule %S/Inputs/pre_specialized_module_layouts.swift
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -O -enable-library-evolution -emit-module-path %t/pre_specialized_module_layouts.swiftmodule %S/Inputs/pre_specialized_module_layouts.swift
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module_layouts.swiftinterface %S/Inputs/pre_specialized_module_layouts.swift -module-name pre_specialized_module_layouts
-// RUN: %target-swift-frontend -enable-experimental-feature LayoutPrespecialization -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
-
-// REQUIRES: swift_feature_LayoutPrespecialization
+// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module_layouts.swiftinterface %S/Inputs/pre_specialized_module_layouts.swift -module-name pre_specialized_module_layouts
+// RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 import pre_specialized_module_layouts
 
@@ -160,7 +158,8 @@ internal func testEmitIntoClient<T>(t: T) {
 // OPT:   [[R8:%.*]] = unchecked_addr_cast [[R7]] : $*AnyObject to $*SomeClass
 // OPT:   [[F6:%.*]] = function_ref @$s30pre_specialized_module_layouts14InternalThing2V9computedZxvryXl_Ts5 : $@yield_once @convention(method) (@guaranteed InternalThing2<AnyObject>) -> @yields @in_guaranteed AnyObject
 // OPT:   ([[R9:%.*]], {{%.*}}) = begin_apply [[F6]]({{.*}}) : $@yield_once @convention(method) (@guaranteed InternalThing2<AnyObject>) -> @yields @in_guaranteed AnyObject
-// OPT:   [[R10:%.*]] = unchecked_addr_cast [[R9]] : $*AnyObject to $*SomeClass
+// OPT:   [[LD:%.*]] = load [[R9]]
+// OPT:   [[R10:%.*]] = unchecked_ref_cast [[LD]] : $AnyObject to $SomeClass
 // OPT: } // end sil function '$s30pre_specialized_module_layouts16useInternalThingyyxlFAA9SomeClassC_Tg5'
 
 public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, overaligned: OveralignedReferenceWrapperStruct, array: [Int], stride96: Stride96) {
@@ -189,8 +188,9 @@ public func usePrespecializedEntryPoints(wrapperStruct: ReferenceWrapperStruct, 
 // OPT:   [[A1:%.*]] = unchecked_ref_cast [[P1]] : $SomeClass to $AnyObject
 // OPT:   [[R3:%.*]] = apply [[F1]]([[A1]]) : $@convention(thin) (@guaranteed AnyObject) -> @owned AnyObject
 // OPT:   store [[R3]] to [[R2]] : $*AnyObject
-// OPT:   [[F2:%.*]] = function_ref @$s22pre_specialize_layouts7consumeyyxlF0a20_specialized_module_C09SomeClassC_Ttg5 : $@convention(thin) () -> ()
-// OPT:   apply [[F2]]() : $@convention(thin) () -> ()
+// OPT:   [[F2:%.*]] = function_ref @$s22pre_specialize_layouts7consumeyyxlF0a20_specialized_module_C09SomeClassC_Tg5 : $@convention(thin) (@guaranteed SomeClass) -> ()
+// OPT:   [[L1:%.*]] = load [[R1]]
+// OPT:   apply [[F2]]([[L1]]) : $@convention(thin) (@guaranteed SomeClass) -> ()
 // OPT:   dealloc_stack [[R1]] : $*SomeClass
 // OPT: } // end sil function '$s22pre_specialize_layouts46usePrespecializedEntryPointsWithMarkerProtocol1ty0a20_specialized_module_C09SomeClassC_tF'
 public func usePrespecializedEntryPointsWithMarkerProtocol(t: SomeClass) {

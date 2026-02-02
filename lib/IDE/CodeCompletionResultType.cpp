@@ -466,7 +466,7 @@ bool CodeCompletionResultType::isBackedByUSRs() const {
   return llvm::all_of(
       getResultTypes(),
       [](const PointerUnion<Type, const USRBasedType *> &ResultType) {
-        return ResultType.is<const USRBasedType *>();
+        return isa<const USRBasedType *>(ResultType);
       });
 }
 
@@ -481,7 +481,7 @@ CodeCompletionResultType::getUSRBasedResultTypes(
       USRBasedTypes.push_back(USRType);
     } else {
       USRBasedTypes.push_back(
-          USRBasedType::fromType(ResultType.get<Type>(), Arena));
+          USRBasedType::fromType(cast<Type>(ResultType), Arena));
     }
   }
   return USRBasedTypes;
@@ -514,7 +514,7 @@ TypeRelation CodeCompletionResultType::calculateTypeRelation(
       Res = std::max(Res, USRTypeContext->typeRelation(USRType));
     } else {
       Res = std::max(
-          Res, calculateMaxTypeRelation(Ty.get<Type>(), *TypeContext, *DC));
+          Res, calculateMaxTypeRelation(cast<Type>(Ty), *TypeContext, *DC));
     }
   }
   return Res;

@@ -238,6 +238,9 @@ public:
   ASTPrinter &operator<<(QuotedString s);
 
   ASTPrinter &operator<<(unsigned long long N);
+
+  static void getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out);
+
   ASTPrinter &operator<<(UUID UU);
 
   ASTPrinter &operator<<(Identifier name);
@@ -442,7 +445,7 @@ StringRef getAccessorKindString(AccessorKind value);
 /// may be called multiple times if the declaration uses suppressible
 /// features.
 void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
-                                         PrintOptions &options,
+                                         const PrintOptions &options,
                                          Decl *decl,
                                          llvm::function_ref<void()> printBody);
 

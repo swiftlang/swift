@@ -19,4 +19,4 @@ public func test() {
 // CHECK: sil hidden [Onone] @$s4main8MyStructV3fooyyF : $@convention(method) <T> (MyStruct<T>) -> () {
 
 // EMBEDDED: // specialized MyStruct.foo()
-// EMBEDDED: sil [Onone] @$e4main8MyStructV3fooyyFAA1XV_Tg5 : $@convention(method) (MyStruct<X>) -> () {
+// EMBEDDED: sil shared [Onone] @$e4main8MyStructV3fooyyFAA1XV_Tg5 : $@convention(method) (MyStruct<X>) -> () {

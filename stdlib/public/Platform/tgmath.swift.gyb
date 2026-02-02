@@ -295,7 +295,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
   var quo = Int32(0)
-  let rem = remquo${f}(${CT}(x), ${CT}(y), &quo)
+  let rem = unsafe remquo${f}(${CT}(x), ${CT}(y), &quo)
   return (${T}(rem), Int(quo))
 }
 %  if T == 'Float80':
@@ -313,7 +313,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 @_transparent
 @_unavailableInEmbedded
 public func nan(_ tag: String) -> ${T} {
-  return ${T}(nan${f}(tag))
+  return ${T}(unsafe nan${f}(tag))
 }
 %  if T == 'Float80':
 #endif

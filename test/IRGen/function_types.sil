@@ -26,8 +26,8 @@ entry(%x : $@convention(thin) () -> ()):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @thick_func_value(ptr %0, ptr %1) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call ptr @swift_retain(ptr returned %1) {{#[0-9]+}}
-// CHECK-NEXT:    call void @swift_release(ptr %1) {{#[0-9]+}}
+// CHECK-NEXT:    call{{( preserve_mostcc)?}} ptr @swift_retain{{(Direct)?}}(ptr returned %1) {{#[0-9]+}}
+// CHECK-NEXT:    call{{( preserve_mostcc)?}} void @swift_release{{(Direct)?}}(ptr %1) {{#[0-9]+}}
 // CHECK-NEXT:    %3 = insertvalue { ptr, ptr } undef, ptr %0, 0
 // CHECK-NEXT:    %4 = insertvalue { ptr, ptr } %3, ptr %1, 1
 // CHECK-NEXT:    ret { ptr, ptr } %4
@@ -52,9 +52,9 @@ struct X {}
 
 sil @out_void_return : $@convention(thin) () -> @out X
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @use_void_return_value(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @use_void_return_value(ptr noalias sret({{.*}}) captures(none) %0) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call swiftcc void @out_void_return(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0)
+// CHECK-NEXT:    call swiftcc void @out_void_return(ptr noalias sret({{.*}}) captures(none) %0)
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
 sil @use_void_return_value : $@convention(thin) () -> @out X {

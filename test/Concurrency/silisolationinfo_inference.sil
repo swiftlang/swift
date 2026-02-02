@@ -22,9 +22,88 @@ class NonSendableKlass {
 }
 
 actor MyActor {
+  init()
+  @MainActor init(_ x: NonSendableKlass)
+  init() async
+
   var ns: NonSendableKlass
+  @MainActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+
+  var nsComputed: NonSendableKlass { get set }
+  @MainActor var globalActorNSComputed: NonSendableKlass { get set }
+  nonisolated var nsNonisolatedComputed: NonSendableKlass { get set }
+
+  func getNS() -> NonSendableKlass
+  @MainActor func getNSGlobalActor() -> NonSendableKlass
+  nonisolated func getNSNonisolated() -> NonSendableKlass
 
   func doSomething() async -> NonSendableKlass
+}
+
+actor CustomActorInstance {}
+
+@globalActor
+struct CustomActor {
+  static let shared = CustomActorInstance()
+}
+
+@MainActor class MainActorIsolatedKlass {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+
+  var nsComputed: NonSendableKlass { get }
+  @CustomActor var globalActorNSComputed: NonSendableKlass { get set }
+  nonisolated var nsNonisolatedComputed: NonSendableKlass { get set }
+
+  func getNS() -> NonSendableKlass
+  @CustomActor func getNSGlobalActor() -> NonSendableKlass
+  nonisolated func getNSNonisolated() -> NonSendableKlass
+
+  class var nsClassComputed: NonSendableKlass { get set }
+  @CustomActor class var globalActorNSClassComputed: NonSendableKlass { get set }
+  nonisolated(unsafe) class var nsNonisolatedUnsafeClassComputed: NonSendableKlass { get set }
+  nonisolated class var nsNonisolatedClassComputed: NonSendableKlass { get set }
+
+  class func getNSClassFunc() -> NonSendableKlass
+  @CustomActor class func getNSGlobalActorClassFunc() -> NonSendableKlass
+  nonisolated class func getNSNonisolatedClassFunc() -> NonSendableKlass
+}
+
+class NonisolatedKlass {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+
+  var nsComputed: NonSendableKlass { get set }
+  @CustomActor var globalActorNSComputed: NonSendableKlass { get set }
+  nonisolated var nsNonisolatedComputed: NonSendableKlass { get set }
+
+  func getNS() -> NonSendableKlass
+  @CustomActor func getNSGlobalActor() -> NonSendableKlass
+  nonisolated func getNSNonisolated() -> NonSendableKlass
+
+  class var nsClassComputed: NonSendableKlass { get set }
+  @CustomActor class var globalActorNSClassComputed: NonSendableKlass { get set }
+  nonisolated(unsafe) class var nsNonisolatedUnsafeClassComputed: NonSendableKlass { get set }
+  nonisolated class var nsNonisolatedClassComputed: NonSendableKlass { get set }
+
+  class func getNSClassFunc() -> NonSendableKlass
+  @CustomActor class func getNSGlobalActorClassFunc() -> NonSendableKlass
+  nonisolated class func getNSNonisolatedClassFunc() -> NonSendableKlass
+}
+
+@MainActor struct MainActorIsolatedStruct {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
+}
+
+struct NonisolatedStruct {
+  var ns: NonSendableKlass
+  @CustomActor var globalActorNS: NonSendableKlass
+  nonisolated(unsafe) var nsNonisolatedUnsafe: NonSendableKlass
 }
 
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
@@ -892,6 +971,1042 @@ bb0(%0 : @guaranteed $Optional<MyActor>):
   debug_value [trace] %1d
   end_borrow %1b
   destroy_value %1a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//////////////////////////////////////////////
+// MARK: Global Actor On Static Field Tests //
+//////////////////////////////////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MyActor, #MyActor.ns
+// CHECK: Isolation: 'self'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_actor : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MyActor, #MyActor.globalActorNS
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_actor_globalactor : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MyActor, #MyActor.nsNonisolatedUnsafe
+// CHECK: Isolation: 'self'-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_actor_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_actor_nonisolated_unsafe : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = ref_element_addr %0 : $MyActor, #MyActor.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorklass : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorklass_globalactor : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsNonisolatedUnsafe
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorklass_nonisolated_unsafe : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedklass : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedklass_globalactor : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.nsNonisolatedUnsafe
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedklass_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedklass_nonisolated_unsafe : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = ref_element_addr %0 : $NonisolatedKlass, #NonisolatedKlass.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct : $@convention(thin) (@guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_globalactor : $@convention(thin) (@guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_nonisolated_unsafe : $@convention(thin) (@guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : $*MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : $*MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
+bb0(%0 : $*MainActorIsolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct : $@convention(thin) (@guaranteed NonisolatedStruct) -> () {
+bb0(%0 : @guaranteed $NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_globalactor : $@convention(thin) (@guaranteed NonisolatedStruct) -> () {
+bb0(%0 : @guaranteed $NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_nonisolated_unsafe : $@convention(thin) (@guaranteed NonisolatedStruct) -> () {
+bb0(%0 : @guaranteed $NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedStruct, let, name "self"
+  %1 = struct_extract %0 : $NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
+bb0(%0 : $*NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.ns
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.globalActorNS
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
+bb0(%0 : $*NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.globalActorNS
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
+bb0(%0 : $*NonisolatedStruct):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+///////////////////////////////
+// MARK: Computed Properties //
+///////////////////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_actor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MyActor, #MyActor.nsComputed!getter : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK: Isolation: 'self'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_actor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_actor : $@convention(thin) (@guaranteed @sil_isolated MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = class_method %0 : $MyActor, #MyActor.nsComputed!getter : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MyActor, #MyActor.globalActorNSComputed!getter : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_actor_globalactor : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = class_method %0, #MyActor.globalActorNSComputed!getter : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_actor_nonisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MyActor, #MyActor.nsNonisolatedComputed!getter : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_actor_nonisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_actor_nonisolated : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = class_method %0 : $MyActor, #MyActor.nsNonisolatedComputed!getter : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_globalactorklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsComputed!getter : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_globalactorklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_globalactorklass : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsComputed!getter : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.globalActorNSComputed!getter : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_globalactorklass_globalactor : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = class_method %0, #MainActorIsolatedKlass.globalActorNSComputed!getter : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_globalactorklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsNonisolatedComputed!getter : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_globalactorklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_globalactorklass_nonisolated : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.nsNonisolatedComputed!getter : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.nsComputed!getter : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.nsComputed!getter : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.globalActorNSComputed!getter : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass_globalactor : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = class_method %0, #NonisolatedKlass.globalActorNSComputed!getter : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.nsNonisolatedComputed!getter : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_computedproperty_nonisolatedklass_nonisolated : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.nsNonisolatedComputed!getter : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//////////////////////////////////
+// MARK: class method functions //
+//////////////////////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_actor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MyActor, #MyActor.getNS : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK: Isolation: 'self'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_actor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_actor : $@convention(thin) (@guaranteed @sil_isolated MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = class_method %0 : $MyActor, #MyActor.getNS : (isolated MyActor) -> () -> NonSendableKlass, $@convention(method) (@sil_isolated @guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MyActor, #MyActor.getNSGlobalActor : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_actor_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_actor_globalactor : $@convention(thin) (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = class_method %0, #MyActor.getNSGlobalActor : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_actor_nonisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MyActor, #MyActor.getNSNonisolated : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_actor_nonisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_actor_nonisolated : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MyActor, let, name "self"
+  %1 = class_method %0 : $MyActor, #MyActor.getNSNonisolated : (MyActor) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MyActor) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_globalactorklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.getNS : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_globalactorklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_globalactorklass : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.getNS : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.getNSGlobalActor : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_globalactorklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_globalactorklass_globalactor : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = class_method %0, #MainActorIsolatedKlass.getNSGlobalActor : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_globalactorklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.getNSNonisolated : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_globalactorklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_globalactorklass_nonisolated : $@convention(thin) (@guaranteed MainActorIsolatedKlass) -> () {
+bb0(%0 : @guaranteed $MainActorIsolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $MainActorIsolatedKlass, let, name "self"
+  %1 = class_method %0 : $MainActorIsolatedKlass, #MainActorIsolatedKlass.getNSNonisolated : (MainActorIsolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed MainActorIsolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.getNS : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_nonisolatedklass: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_nonisolatedklass : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.getNS : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.getNSGlobalActor : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_nonisolatedklass_globalactor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_nonisolatedklass_globalactor : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = class_method %0, #NonisolatedKlass.getNSGlobalActor : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_method_nonisolatedklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.getNSNonisolated : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_method_nonisolatedklass_nonisolated: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_method_nonisolatedklass_nonisolated : $@convention(thin) (@guaranteed NonisolatedKlass) -> () {
+bb0(%0 : @guaranteed $NonisolatedKlass):
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value %0 : $NonisolatedKlass, let, name "self"
+  %1 = class_method %0 : $NonisolatedKlass, #NonisolatedKlass.getNSNonisolated : (NonisolatedKlass) -> () -> NonSendableKlass, $@convention(method) (@guaranteed NonisolatedKlass) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//////////////////////////////
+// MARK: metatype allocator //
+//////////////////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_metatype_actor: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MyActor.Type, #MyActor.init!allocator : (MyActor.Type) -> () -> MyActor, $@convention(method) (@thick MyActor.Type) -> @owned MyActor
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_metatype_actor: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_metatype_actor : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MyActor.Type
+  %1 = class_method %0, #MyActor.init!allocator : (MyActor.Type) -> () -> MyActor, $@convention(method) (@thick MyActor.Type) -> @owned MyActor
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_metatype_actor_global: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MyActor.Type, #MyActor.init!allocator : (MyActor.Type) -> (NonSendableKlass) -> MyActor, $@convention(method) (@owned NonSendableKlass, @thick MyActor.Type) -> @owned MyActor
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_metatype_actor_global: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_metatype_actor_global : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MyActor.Type
+  %1 = class_method %0, #MyActor.init!allocator : (MyActor.Type) -> (NonSendableKlass) -> MyActor, $@convention(method) (@owned NonSendableKlass, @thick MyActor.Type) -> @owned MyActor
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on test_globalactor_inference_on_nominal_metatype_actor_global_2: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MyActor.Type, #MyActor.init!allocator : (MyActor.Type) -> () async -> MyActor, $@convention(method) @async (@thick MyActor.Type) -> @owned MyActor
+// CHECK: Isolation: 'self'-isolated (actor-async-allocating-init)
+// CHECK: end running test 1 of 1 on test_globalactor_inference_on_nominal_metatype_actor_global_2: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @test_globalactor_inference_on_nominal_metatype_actor_global_2 : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MyActor.Type
+  %1 = class_method %0, #MyActor.init!allocator : (MyActor.Type) -> () async -> MyActor, $@convention(method) @async (@thick MyActor.Type) -> @owned MyActor
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//////////////////////////////////////
+// MARK: dynamic 'class' properties //
+//////////////////////////////////////
+//
+// DISCUSSION: This is for methods on a class called a 'class method', that is
+// methods that are dynamic methods on the metatype. These can only appear on
+// classes, not on actors.
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_classproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.nsClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_classproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_classproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.nsClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_classproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.nsClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_classproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_classproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+%1 = class_method %0, #MainActorIsolatedKlass.nsClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_globalactorclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.globalActorNSClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_globalactorclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_globalactorclassproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.globalActorNSClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_globalactorclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.globalActorNSClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_globalactorclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_globalactorclassproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.globalActorNSClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_nonisolatedunsafeclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.nsNonisolatedUnsafeClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_nonisolatedunsafeclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_nonisolatedunsafeclassproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.nsNonisolatedUnsafeClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_nonisolatedunsafeclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.nsNonisolatedUnsafeClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+// CHECK: Isolation: main actor-isolated: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_nonisolatedunsafeclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_nonisolatedunsafeclassproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.nsNonisolatedUnsafeClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_nonisolatedclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.nsNonisolatedClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_nonisolatedclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_nonisolatedclassproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.nsNonisolatedClassComputed!getter : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_nonisolatedclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.nsNonisolatedClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_nonisolatedclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_nonisolatedclassproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.nsNonisolatedClassComputed!setter : (MainActorIsolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick MainActorIsolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_classproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.nsClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on nonisolated_class_classproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_classproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.nsClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_classproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.nsClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on nonisolated_class_classproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_classproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+%1 = class_method %0, #NonisolatedKlass.nsClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_globalactorclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.globalActorNSClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on nonisolated_class_globalactorclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_globalactorclassproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.globalActorNSClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_globalactorclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.globalActorNSClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on nonisolated_class_globalactorclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_globalactorclassproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.globalActorNSClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_nonisolatedunsafeclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.nsNonisolatedUnsafeClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on nonisolated_class_nonisolatedunsafeclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_nonisolatedunsafeclassproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.nsNonisolatedUnsafeClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_nonisolatedunsafeclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.nsNonisolatedUnsafeClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+// CHECK: Isolation: disconnected: nonisolated(unsafe)
+// CHECK: end running test 1 of 1 on nonisolated_class_nonisolatedunsafeclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_nonisolatedunsafeclassproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.nsNonisolatedUnsafeClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_nonisolatedclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.nsNonisolatedClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on nonisolated_class_nonisolatedclassproperty_getter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_nonisolatedclassproperty_getter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.nsNonisolatedClassComputed!getter : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_nonisolatedclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.nsNonisolatedClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on nonisolated_class_nonisolatedclassproperty_setter: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_nonisolatedclassproperty_setter : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.nsNonisolatedClassComputed!setter : (NonisolatedKlass.Type) -> (NonSendableKlass) -> (), $@convention(method) (@owned NonSendableKlass, @thick NonisolatedKlass.Type) -> ()
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+///////////////////////////////////
+// MARK: Dynamic 'class' methods //
+///////////////////////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_nonisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.getNSClassFunc : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_nonisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_nonisolatedclassmethod : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.getNSClassFunc : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_globalactorisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.getNSGlobalActorClassFunc : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_globalactorisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_globalactorisolatedclassmethod : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.getNSGlobalActorClassFunc : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on globalactor_isolated_class_nonisolatedclassmethod_: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick MainActorIsolatedKlass.Type, #MainActorIsolatedKlass.getNSNonisolatedClassFunc : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on globalactor_isolated_class_nonisolatedclassmethod_: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @globalactor_isolated_class_nonisolatedclassmethod_ : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick MainActorIsolatedKlass.Type
+  %1 = class_method %0, #MainActorIsolatedKlass.getNSNonisolatedClassFunc : (MainActorIsolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick MainActorIsolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_nonisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.getNSClassFunc : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on nonisolated_class_nonisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_nonisolatedclassmethod : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.getNSClassFunc : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_globalactorisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.getNSGlobalActorClassFunc : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: global actor 'CustomActor'-isolated
+// CHECK: end running test 1 of 1 on nonisolated_class_globalactorisolatedclassmethod: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_globalactorisolatedclassmethod : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.getNSGlobalActorClassFunc : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonisolated_class_nonisolatedclassmethod_: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = class_method %0 : $@thick NonisolatedKlass.Type, #NonisolatedKlass.getNSNonisolatedClassFunc : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on nonisolated_class_nonisolatedclassmethod_: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @nonisolated_class_nonisolatedclassmethod_ : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = metatype $@thick NonisolatedKlass.Type
+  %1 = class_method %0, #NonisolatedKlass.getNSNonisolatedClassFunc : (NonisolatedKlass.Type) -> () -> NonSendableKlass, $@convention(method) (@thick NonisolatedKlass.Type) -> @owned NonSendableKlass
+  debug_value [trace] %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_sendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var MyActor }
+// CHECK: IsSendable: no
+// CHECK: end running test 1 of 1 on var_box_with_sendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @var_box_with_sendable_type_is_nonsendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ var MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var MyActor }                 // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @var_box_with_sendable_type_is_nonsendable_isolationinfo : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ var MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_sendable_type_is_sendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let MyActor }
+// CHECK: IsSendable: yes
+// CHECK: end running test 1 of 1 on let_box_with_sendable_type_is_sendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @let_box_with_sendable_type_is_sendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ let MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let MyActor }                 // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @let_box_with_sendable_type_is_sendable_isolationinfo_inference : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ let MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var NonSendableKlass }
+// CHECK: IsSendable: no
+// CHECK: end running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @var_box_with_nonsendable_type_is_nonsendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ var NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var NonSendableKlass }        // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ var NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let NonSendableKlass }
+// CHECK: IsSendable: no
+// CHECK: end running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @let_box_with_nonsendable_type_is_nonsendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ let NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let NonSendableKlass }        // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ let NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
   %9999 = tuple ()
   return %9999 : $()
 }

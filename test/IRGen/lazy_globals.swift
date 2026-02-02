@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-ir -primary-file %s | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
-// CHECK: @"[[T:.*]]Wz" = internal global i64 0, align 8
 // CHECK: @"$s12lazy_globals1xSivp" = hidden global %TSi zeroinitializer, align 8
 // CHECK: @"$s12lazy_globals1ySivp" = hidden global %TSi zeroinitializer, align 8
 // CHECK: @"$s12lazy_globals1zSivp" = hidden global %TSi zeroinitializer, align 8
+// CHECK: @"[[T:.*]]Wz" = internal global i64 0, align 8
 
 // CHECK: define internal void @"[[T]]WZ"(ptr %0) {{.*}} {
 // CHECK: entry:
@@ -39,4 +39,3 @@ var (x, y, z) = (1, 2, 3)
 // CHECK:   ret i64 [[V]]
 // CHECK: }
 func getX() -> Int { return x }
-

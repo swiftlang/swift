@@ -55,7 +55,8 @@ void realizeTypeRequirement(DeclContext *dc,
                             Type constraintType,
                             SourceLoc loc,
                             SmallVectorImpl<StructuralRequirement> &result,
-                            SmallVectorImpl<RequirementError> &errors);
+                            SmallVectorImpl<RequirementError> &errors,
+                            bool isFromInheritanceClause);
 
 void realizeRequirement(DeclContext *dc,
                         Requirement req, RequirementRepr *reqRepr,
@@ -81,6 +82,8 @@ bool performConcreteContraction(
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors,
     bool debug);
+
+Type stripBoundDependentMemberTypes(Type t);
 
 } // end namespace rewriting
 

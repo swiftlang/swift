@@ -46,6 +46,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Allocator.h"
@@ -234,6 +235,10 @@ private:
   llvm::StringMap<SILFunction *> FunctionTable;
   llvm::StringMap<SILFunction *> ZombieFunctionTable;
 
+  /// Lookup table for SIL functions by their asmnames, for those that
+  /// have them.
+  llvm::StringMap<SILFunction *> FunctionByAsmNameTable;
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
 
@@ -308,6 +313,9 @@ private:
 
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
+
+  /// Lookup table for SIL Global Variables, indexed by their asmnames.
+  llvm::StringMap<SILGlobalVariable *> GlobalVariableByAsmNameMap;
 
   /// The list of SILGlobalVariables in the module.
   GlobalListType silGlobals;
@@ -394,10 +402,6 @@ private:
   bool parsedAsSerializedSIL;
 
   /// Set if we have registered a deserialization notification handler for
-  /// lowering ownership in non transparent functions.
-  /// This gets set in NonTransparent OwnershipModelEliminator pass.
-  bool regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  /// Set if we have registered a deserialization notification handler for
   /// lowering ownership in transparent functions.
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
@@ -449,14 +453,8 @@ public:
     deserializationNotificationHandlers.erase(handler);
   }
 
-  bool hasRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    return regDeserializationNotificationHandlerForNonTransparentFuncOME;
-  }
   bool hasRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     return regDeserializationNotificationHandlerForAllFuncOME;
-  }
-  void setRegisteredDeserializationNotificationHandlerForNonTransparentFuncOME() {
-    regDeserializationNotificationHandlerForNonTransparentFuncOME = true;
   }
   void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     regDeserializationNotificationHandlerForAllFuncOME = true;
@@ -599,6 +597,12 @@ public:
 
   /// Erase a global SIL variable from the module.
   void eraseGlobalVariable(SILGlobalVariable *G);
+
+  /// Erase a differentiability witness from the module.
+  void eraseDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+
+  /// Erase all differentiability witnesses for function f.
+  void eraseAllDifferentiabilityWitnesses(SILFunction *f);
 
   /// Create and return an empty SIL module suitable for generating or parsing
   /// SIL into.
@@ -825,14 +829,20 @@ public:
   /// Look for a global variable by name.
   ///
   /// \return null if this module has no such global variable
-  SILGlobalVariable *lookUpGlobalVariable(StringRef name) const {
+  SILGlobalVariable *lookUpGlobalVariable(StringRef name,
+                                          bool byAsmName = false) const {
+    if (byAsmName)
+      return GlobalVariableByAsmNameMap.lookup(name);
+
     return GlobalVariableMap.lookup(name);
   }
 
   /// Look for a function by name.
   ///
   /// \return null if this module has no such function
-  SILFunction *lookUpFunction(StringRef name) const {
+  SILFunction *lookUpFunction(StringRef name, bool byAsmName = false) const {
+    if (byAsmName)
+      return FunctionByAsmNameTable.lookup(name);
     return FunctionTable.lookup(name);
   }
 
@@ -866,6 +876,11 @@ public:
   ///
   /// Returns true if linking succeeded, false otherwise.
   bool linkFunction(SILFunction *F, LinkingMode LinkMode);
+
+  /// Attempt to deserialize witness table for protocol conformance \p PC.
+  ///
+  /// Returns true if linking succeeded, false otherwise.
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
@@ -983,6 +998,8 @@ public:
   }
 
   IndexTrieNode *getIndexTrieRoot() { return indexTrieRoot.get(); }
+
+  TypeExpansionContext getMaximalTypeExpansionContext() const;
 
   /// Can value operations (copies and destroys) on the given lowered type
   /// be performed in this module?
@@ -1146,10 +1163,21 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   return OS;
 }
 
-void verificationFailure(const Twine &complaint,
-              const SILInstruction *atInstruction,
-              const SILArgument *atArgument,
-              const std::function<void()> &extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILWitnessTable *wtable,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILFunction *fn,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILInstruction *atInstruction,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, const SILArgument *atArgument,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
+    const Twine &complaint, SILValue atValue,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
   switch (mod.getStage()) {

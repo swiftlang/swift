@@ -21,6 +21,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/LifetimeDependence.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -109,7 +111,6 @@ case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
     case TypeKind::Error:
-    case TypeKind::Unresolved:
     case TypeKind::TypeVariable:
     case TypeKind::Placeholder:
     case TypeKind::SILToken:
@@ -118,29 +119,27 @@ case TypeKind::Id:
     case TypeKind::Integer:
       return t;
 
+    // BuiltinGenericType subclasses
+    case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {
-      auto bfaTy = cast<BuiltinFixedArrayType>(base);
-      
-      Type transSize = doIt(bfaTy->getSize(),
-                            TypePosition::Invariant);
-      if (!transSize) {
-        return Type();
+      auto bgaTy = cast<BuiltinGenericType>(base);
+
+      llvm::SmallVector<Type, 2> transReplacements;
+
+      for (auto t : bgaTy->getSubstitutions().getReplacementTypes()) {
+        Type transTy = doIt(t, TypePosition::Invariant);
+        if (!transTy) {
+          return Type();
+        }
+        transReplacements.push_back(transTy);
       }
-      
-      Type transElement = doIt(bfaTy->getElementType(),
-                               TypePosition::Invariant);
-      if (!transElement) {
-        return Type();
-      }
-      
-      CanType canTransSize = transSize->getCanonicalType();
-      CanType canTransElement = transElement->getCanonicalType();
-      if (canTransSize != bfaTy->getSize()
-          || canTransElement != bfaTy->getElementType()) {
-        return BuiltinFixedArrayType::get(canTransSize, canTransElement);
-      }
-      
-      return bfaTy;
+
+      // TODO: translate conformances. No builtin types yet have conformance
+      // requirements in their generic signatures.
+      auto transSubs = SubstitutionMap::get(bgaTy->getGenericSignature(),
+                                            transReplacements,
+                                            ArrayRef<ProtocolConformanceRef>{});
+      return bgaTy->getWithSubstitutions(transSubs);
     }
 
     case TypeKind::PrimaryArchetype:
@@ -186,7 +185,7 @@ case TypeKind::Id:
 
       auto *newEnv = GenericEnvironment::forOpenedExistential(
           genericSig, existentialTy, newSubMap, uuid);
-      return newEnv->mapTypeIntoContext(local->getInterfaceType());
+      return newEnv->mapTypeIntoEnvironment(local->getInterfaceType());
     }
 
     case TypeKind::ElementArchetype: {
@@ -763,16 +762,17 @@ case TypeKind::Id:
       if (!anyChanged)
         return t;
 
-      if (asDerived().shouldUnwrapVanishingTuples()) {
-        // Handle vanishing tuples -- If the transform would yield a singleton
-        // tuple, and we didn't start with one, flatten to produce the
-        // element type.
-        if (elements.size() == 1 &&
-            !elements[0].getType()->is<PackExpansionType>() &&
-            !(tuple->getNumElements() == 1 &&
-              !tuple->getElementType(0)->is<PackExpansionType>())) {
-          return elements[0].getType();
-        }
+      // Handle vanishing tuples -- If the transform would yield a singleton
+      // tuple, and we didn't start with one, flatten to produce the
+      // element type. Avoid flattening if we have a type variable singeton,
+      // since it could be subtituted with a pack, TypeSimplifier handles the
+      // flattening in this case.
+      if (elements.size() == 1 &&
+          !elements[0].getType()->is<PackExpansionType>() &&
+          !elements[0].getType()->is<TypeVariableType>() &&
+          !(tuple->getNumElements() == 1 &&
+            !tuple->getElementType(0)->is<PackExpansionType>())) {
+        return elements[0].getType();
       }
 
       return TupleType::get(elements, ctx);
@@ -885,6 +885,21 @@ case TypeKind::Id:
             isUnchanged = false;
 
           extInfo = extInfo->withGlobalActor(globalActorType);
+        }
+
+        // Transform the sendable dependent type if present.
+        if (auto sendableDep = origExtInfo.getSendableDependentType()) {
+          auto [newSendableDep, isSendable] =
+              asDerived().transformSendableDependentType(sendableDep);
+          if (!newSendableDep) {
+            // If we're no longer sendable dependent, update the @Sendable bit.
+            extInfo = extInfo->withSendableDependentType(Type());
+            extInfo = extInfo->withSendable(isSendable);
+            isUnchanged = false;
+          } else if (newSendableDep.getPointer() != sendableDep.getPointer()) {
+            extInfo = extInfo->withSendableDependentType(newSendableDep);
+            isUnchanged = false;
+          }
         }
       }
 
@@ -1140,9 +1155,11 @@ case TypeKind::Id:
     return SubstitutionMap::get(sig, newSubs, LookUpConformanceInModule());
   }
 
-  bool shouldUnwrapVanishingTuples() const { return true; }
-
   bool shouldDesugarTypeAliases() const { return false; }
+
+  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+    return std::make_pair(ty, false);
+  }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {
     return doIt(fieldTy, pos)->getCanonicalType();

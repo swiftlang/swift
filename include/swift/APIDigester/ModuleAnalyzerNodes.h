@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,11 +17,6 @@
 #ifndef __SWIFT_ABI_DIGESTER_MODULE_NODES_H__
 #define __SWIFT_ABI_DIGESTER_MODULE_NODES_H__
 
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclObjC.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Sema/Lookup.h"
-#include "clang/Sema/Sema.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -163,6 +158,7 @@ struct CheckerOptions {
   StringRef LocationFilter;
   std::vector<std::string> ToolArgs;
   llvm::StringSet<> SPIGroupNamesToIgnore;
+  llvm::StringSet<> SPIGroupNamesToIgnoreNewAPI;
 };
 
 class SDKContext {
@@ -242,7 +238,9 @@ public:
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
     auto smRange = node->getSourceRange();
-    auto range = SourceRange(SourceLoc(smRange.Start), SourceLoc(smRange.End));
+    auto range =
+        SourceRange(SourceLoc::getFromPointer(smRange.Start.getPointer()),
+                    SourceLoc::getFromPointer(smRange.End.getPointer()));
     Diags.diagnose(range.Start, ID, std::forward<ArgTypes>(args)...)
       .highlight(range);
   }

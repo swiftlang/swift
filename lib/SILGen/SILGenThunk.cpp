@@ -284,7 +284,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     CanGenericSignature sig, CalleeTypeInfo &calleeInfo) {
   auto convention = *calleeInfo.foreign.async;
   auto resumeType =
-      calleeInfo.substResultType->mapTypeOutOfContext()->getReducedType(sig);
+      calleeInfo.substResultType->mapTypeOutOfEnvironment()->getReducedType(sig);
 
   CanAnyFunctionType completionHandlerOrigTy = [&]() {
     auto completionHandlerOrigTy =
@@ -392,7 +392,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         continuation = SGF.B.createUncheckedAddrCast(
             loc, underlyingValueAddr,
             SILType::getPrimitiveAddressType(
-                F->mapTypeIntoContext(continuationType)->getCanonicalType()));
+                F->mapTypeIntoEnvironment(continuationType)->getCanonicalType()));
 
         // If we are not using checked bridging, we load the continuation from
         // memory since we are going to pass it in registers, not in memory to
@@ -480,7 +480,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         // native Swift error.
         auto nativeError = SGF.emitBridgedToNativeError(loc, matchedError);
         Type replacementTypes[]
-          = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
+          = {F->mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          LookUpConformanceInModule());
@@ -500,7 +500,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       }
 
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                            F->mapTypeIntoContext(resumeType));
+                                            F->mapTypeIntoEnvironment(resumeType));
       
       // Prepare the argument for the resume intrinsic, using the non-error
       // arguments to the callback.
@@ -558,7 +558,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
             prepareArgument(
                 /*destBuf*/ resumeEltBuf,
                 /*destFormalType*/
-                F->mapTypeIntoContext(resumeTuple.getElementTypes()[i])
+                F->mapTypeIntoEnvironment(resumeTuple.getElementTypes()[i])
                     ->getCanonicalType(),
                 /*arg*/ params[paramIndices[i]],
                 /*argFormalType*/
@@ -569,7 +569,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
           assert(params.size() == 2 + (bool)errorIndex + (bool)flagIndex);
           prepareArgument(/*destBuf*/ resumeArgBuf,
                           /*destFormalType*/
-                          F->mapTypeIntoContext(resumeType)->getCanonicalType(),
+                          F->mapTypeIntoEnvironment(resumeType)->getCanonicalType(),
                           /*arg*/ params[paramIndices[0]],
                           /*argFormalType*/
                           blockParams[blockParamIndex(0)].getParameterType());
@@ -578,7 +578,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         // Resume the continuation with the composed bridged result.
         ManagedValue resumeArg = SGF.emitManagedBufferWithCleanup(resumeArgBuf);
         Type replacementTypes[]
-          = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
+          = {F->mapTypeIntoEnvironment(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          LookUpConformanceInModule());
@@ -615,16 +615,16 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
 
   // Mangle the reabstraction thunk.
   // Substitute context parameters out of the "from" and "to" types.
-  auto fromInterfaceType = fromType->mapTypeOutOfContext()
+  auto fromInterfaceType = fromType->mapTypeOutOfEnvironment()
     ->getCanonicalType();
-  auto toInterfaceType = toType->mapTypeOutOfContext()
+  auto toInterfaceType = toType->mapTypeOutOfEnvironment()
     ->getCanonicalType();
   CanType dynamicSelfInterfaceType;
   if (dynamicSelfType)
-    dynamicSelfInterfaceType = dynamicSelfType->mapTypeOutOfContext()
+    dynamicSelfInterfaceType = dynamicSelfType->mapTypeOutOfEnvironment()
       ->getCanonicalType();
   if (fromGlobalActorBound)
-    fromGlobalActorBound = fromGlobalActorBound->mapTypeOutOfContext()
+    fromGlobalActorBound = fromGlobalActorBound->mapTypeOutOfEnvironment()
       ->getCanonicalType();
 
   Mangle::ASTMangler NewMangler(thunkType->getASTContext());

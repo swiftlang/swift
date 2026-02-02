@@ -1,3 +1,9 @@
+module StdAny {
+  header "std-any.h"
+  requires cplusplus
+  export *
+}
+
 module StdNumeric {
   header "std-numeric.h"
   requires cplusplus
@@ -7,6 +13,12 @@ module StdNumeric {
 module StdVector {
   header "std-vector.h"
   requires cplusplus
+  export *
+}
+
+module StdVectorNoCPlusPlusRequirement {
+  header "std-vector-no-cplusplus-requirement.h"
+  // NO requires cplusplus
   export *
 }
 
@@ -76,8 +88,32 @@ module StdFunction {
   export *
 }
 
+module StdVariant {
+  header "std-variant.h"
+  requires cplusplus
+  export *
+}
+
 module NoCXXStdlib {
   header "no-cxx-stdlib.h"
+  requires cplusplus
+  export *
+}
+
+module CustomSmartPtr {
+  header "custom-smart-ptr.h"
+  requires cplusplus
+  export *
+}
+
+module StdExpected {
+  header "std-expected.h"
+  requires cplusplus
+  export *
+}
+
+module StdEnableSharedFromThis {
+  header "std-enable-shared-from-this.h"
   requires cplusplus
   export *
 }

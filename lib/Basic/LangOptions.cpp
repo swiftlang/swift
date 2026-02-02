@@ -37,7 +37,7 @@ LangOptions::LangOptions() {
   // Add all promoted language features
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   enableFeature(Feature::FeatureName);
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
 #define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #include "swift/Basic/Features.def"
@@ -50,11 +50,6 @@ LangOptions::LangOptions() {
   disableFeature(Feature::AttachedMacros);
   disableFeature(Feature::ExtensionMacros);
 #endif
-
-  // Note: Introduce default-on language options here.
-  enableFeature(Feature::NoncopyableGenerics);
-  enableFeature(Feature::BorrowingSwitch);
-  enableFeature(Feature::MoveOnlyPartialConsumption);
 
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
@@ -146,13 +141,20 @@ static const SupportedConditionalValue SupportedConditionalCompilationHasAtomicB
   "_128"
 };
 
+static const SupportedConditionalValue SupportedConditionalCompilationObjectFileFormats[] = {
+  "MachO",
+  "ELF",
+  "COFF",
+  "Wasm",
+};
+
 static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
 #define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
-ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+static ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
   switch (Kind) {
   case PlatformConditionKind::OS:
     return SupportedConditionalCompilationOSs;
@@ -172,12 +174,14 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationPtrAuthSchemes;
   case PlatformConditionKind::HasAtomicBitWidth:
     return SupportedConditionalCompilationHasAtomicBitWidths;
+  case PlatformConditionKind::ObjectFileFormat:
+    return SupportedConditionalCompilationObjectFileFormats;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
-PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
-                                                     std::vector<StringRef> &suggestedValues) {
+static PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
+                                                            std::vector<StringRef> &suggestedValues) {
   std::string lower = V.lower();
   for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
@@ -196,8 +200,8 @@ PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind,
   return Kind;
 }
 
-bool isMatching(PlatformConditionKind Kind, const StringRef &V,
-                PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
+static bool isMatching(PlatformConditionKind Kind, const StringRef &V,
+                       PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
   // Compare against known values, ignoring case to avoid penalizing
   // characters with incorrect case.
   unsigned minDistance = std::numeric_limits<unsigned>::max();
@@ -236,6 +240,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::TargetEnvironment:
   case PlatformConditionKind::PtrAuth:
   case PlatformConditionKind::HasAtomicBitWidth:
+  case PlatformConditionKind::ObjectFileFormat:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -257,6 +262,9 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
+  // Note: BridgedASTContext_enumerateBuildConfigurationEntries has a redundant
+  // copy of these special cases.
+
   // Check a special case that "macOS" is an alias of "OSX".
   if (Kind == PlatformConditionKind::OS && Value == "macOS")
     return checkPlatformCondition(Kind, "OSX");
@@ -326,8 +334,8 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   if (state.isEnabled())
     return state;
 
-  if (auto version = feature.getLanguageVersion()) {
-    if (isSwiftVersionAtLeast(*version)) {
+  if (auto version = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(*version)) {
       return FeatureState(feature, FeatureState::Kind::Enabled);
     }
   }
@@ -340,8 +348,8 @@ bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
   if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageVersion()) {
-    if (isSwiftVersionAtLeast(*version))
+  if (auto version = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(*version))
       return true;
   }
 
@@ -649,6 +657,17 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
   } else if (Target.isArch64Bit()) {
     addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+  }
+
+  // Set the "objectFormat" platform condition.
+  if (Target.isOSBinFormatMachO()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "MachO");
+  } else if (Target.isOSBinFormatELF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "ELF");
+  } else if (Target.isOSBinFormatCOFF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "COFF");
+  } else if (Target.isOSBinFormatWasm()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "Wasm");
   }
 
   // Set the "runtime" platform condition.

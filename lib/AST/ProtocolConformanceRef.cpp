@@ -114,22 +114,22 @@ ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
   return IFS.lookupConformance(origType, proto, /*level=*/0);
 }
 
-ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
+ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfEnvironment() const {
   if (isConcrete()) {
     return getConcrete()->subst(
         MapTypeOutOfContext(),
-        MakeAbstractConformanceForGenericType(),
+        LookUpConformanceInModule(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
         MapTypeOutOfContext(),
-        MakeAbstractConformanceForGenericType(),
+        LookUpConformanceInModule(),
         SubstFlags::PreservePackExpansionLevel |
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isAbstract()) {
     auto *abstract = getAbstract();
-    return forAbstract(abstract->getType()->mapTypeOutOfContext(),
+    return forAbstract(abstract->getType()->mapTypeOutOfEnvironment(),
                        abstract->getProtocol());
   }
 
@@ -202,8 +202,12 @@ Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
   auto conformingType = abstract->getType();
   ASSERT(abstract->getProtocol() == assocType->getProtocol());
 
-  if (auto *archetypeType = conformingType->getAs<ArchetypeType>())
-    return archetypeType->getNestedType(assocType);
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+    auto witnessType = archetypeType->getNestedType(assocType);
+    if (!witnessType)
+      return ErrorType::get(assocType->getASTContext());
+    return witnessType;
+  }
 
   return DependentMemberType::get(conformingType, assocType);
 }
@@ -252,7 +256,7 @@ ProtocolConformanceRef::getAssociatedConformance(Type assocType,
     auto subjectType = computeSubjectType(archetypeType->getInterfaceType());
 
     return lookupConformance(
-        genericEnv->mapTypeIntoContext(subjectType),
+        genericEnv->mapTypeIntoEnvironment(subjectType),
         protocol);
   }
 

@@ -29,9 +29,10 @@ using namespace swift::unittest;
 using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
-    : Context(*ASTContext::get(
-          LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
-          SymbolGraphOpts, CASOpts, SerializationOpts, SourceMgr, Diags)) {
+    : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts,
+                               SearchPathOpts, ClangImporterOpts,
+                               SymbolGraphOpts, CASOpts, SerializationOpts,
+                               SourceMgr, Diags, SDKInfo)) {
   INITIALIZE_LLVM();
 
   registerParseRequestFunctions(Context.evaluator);
@@ -124,8 +125,8 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
   return ProtocolType::get(PD, parent, Context);
 }
 
-BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
-                                   TypeVariableType *typeVar) {
+const BindingSet &SemaTest::inferBindings(ConstraintSystem &cs,
+                                          TypeVariableType *typeVar) {
   for (auto *typeVar : cs.getTypeVariables()) {
     auto &node = cs.getConstraintGraph()[typeVar];
     node.resetBindingSet();
@@ -140,8 +141,20 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
       continue;
 
     auto &bindings = node.getBindingSet();
+
+    // FIXME: This is also called in inferTransitiveUnresolvedMemberRefBindings(),
+    // why do we need to call it here too?
     bindings.inferTransitiveProtocolRequirements();
-    bindings.finalize(/*transitive=*/true);
+
+    bindings.inferTransitiveKeyPathBindings();
+    (void) bindings.finalizeKeyPathBindings();
+
+    bindings.inferTransitiveUnresolvedMemberRefBindings();
+    bindings.finalizeUnresolvedMemberChainResult();
+
+    bindings.inferTransitiveSupertypeBindings();
+
+    bindings.determineLiteralCoverage();
   }
 
   auto &node = cs.getConstraintGraph()[typeVar];

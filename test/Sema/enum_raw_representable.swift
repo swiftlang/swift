@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 enum Foo : Int {
   case a, b, c
@@ -147,10 +147,12 @@ rdar32431165_2(42, E_32431165.bar)
 // or constructing raw representable type from second, both ways are valid.
 do {
   E_32431165.bar == "bar"
-  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{17-17=.rawValue}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'E_32431165' and 'String'}}
+  // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
 
   "bar" == E_32431165.bar
-  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{26-26=.rawValue}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'String' and 'E_32431165'}}
+  // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
 }
 
 func rdar32431165_overloaded() -> Int { 42 }     // expected-note {{'rdar32431165_overloaded()' produces 'Int', not the expected contextual result type 'E_32431165'}}
@@ -166,7 +168,8 @@ func test_candidate_diagnostic() {
 func rdar32432253(_ condition: Bool = false) {
   let choice: E_32431165 = condition ? .foo : .bar
   let _ = choice == "bar"
-  // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{17-17=.rawValue}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'E_32431165' and 'String'}}
+  // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
 }
 
 // https://github.com/apple/swift/issues/50682

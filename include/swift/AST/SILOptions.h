@@ -45,14 +45,17 @@ enum class CopyPropagationOption : uint8_t {
   // Do not add any copy propagation passes.
   Off = 0,
 
-  // Only add the copy propagation passes requested by other flags, currently
-  // just -enable-ossa-modules.
+  // Only add the copy propagation passes requested by other flags.
   RequestedPassesOnly,
 
-  // Add all relevant copy propagation passes.  If a setting, e.g.
-  // -enable-ossa-modules, requests to add copy propagation to the pipeline, do
-  // so.
-  On
+  // Run copy propagation during optimized builds only.
+  //
+  // If a setting, requests to add copy propagation
+  // to the performance pipeline, do so.
+  Optimizing,
+
+  // Run copy propagation during all builds and whenever requested.
+  Always
 };
 
 enum class DestroyHoistingOption : uint8_t {
@@ -90,11 +93,8 @@ public:
   /// observable end of lexical scope.
   LexicalLifetimesOption LexicalLifetimes = LexicalLifetimesOption::On;
 
-  /// Whether to run SIL copy propagation to shorten object lifetime in whatever
-  /// optimization pipeline is currently used.
-  ///
-  /// When this is 'On' the pipeline has default behavior.
-  CopyPropagationOption CopyPropagation = CopyPropagationOption::On;
+  /// Controls when to run SIL copy propagation, which shortens object lifetimes
+  CopyPropagationOption CopyPropagation = CopyPropagationOption::Optimizing;
 
   /// Whether to run the DestroyAddrHoisting pass.
   ///
@@ -107,10 +107,6 @@ public:
   /// Controls whether specific OSSA optimizations are run. For benchmarking
   /// purposes.
   bool EnableOSSAOptimizations = true;
-
-  /// Controls whether to turn on speculative devirtualization.
-  /// It is turned off by default.
-  bool EnableSpeculativeDevirtualization = false;
 
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
@@ -188,23 +184,12 @@ public:
   /// and go from OSSA to non-ownership SIL.
   bool StopOptimizationBeforeLoweringOwnership = false;
 
-  /// Do we always serialize SIL in OSSA form?
-  ///
-  /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = true;
-
   /// Allow recompilation of a non-OSSA module to an OSSA module when imported
   /// from another OSSA module.
   bool EnableRecompilationToOSSAModule = false;
 
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
-
-  /// Introduce linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = true;
-
-  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
-  bool OSSAVerifyComplete = false;
 
   /// Enable pack metadata stack "promotion".
   ///
@@ -308,13 +293,13 @@ public:
   /// Are we building in embedded Swift + -no-allocations?
   bool NoAllocations = false;
 
-  /// Should we use the experimental Swift based closure-specialization
-  /// optimization pass instead of the existing C++ one.
-  bool EnableExperimentalSwiftBasedClosureSpecialization = false;
-
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;
+
+  /// The names of the auxiliar files to which the backend should save optimization
+  /// records for the remaining (other than the main one) LLVMModules.
+  std::vector<std::string> AuxOptRecordFiles;
 
   /// The regex that filters the passes that should be saved to the optimization
   /// records.
@@ -322,6 +307,9 @@ public:
 
   /// The format used for serializing remarks (default: YAML)
   llvm::remarks::Format OptRecordFormat = llvm::remarks::Format::YAML;
+
+  /// Whether to apply _assemblyVision to all functions.
+  bool EnableGlobalAssemblyVision = false;
 
   /// Are there any options that indicate that functions should not be preserved
   /// for the debugger?
@@ -339,7 +327,7 @@ public:
   bool MergeableTraps = false;
 
   /// Whether the @yield_once_2 convention is used by accessors added with the
-  /// CoroutineAccessors feature (i.e. read2/modify2).
+  /// CoroutineAccessors feature (i.e. yielding borrow/mutate).
   bool CoroutineAccessorsUseYieldOnce2 = false;
 
   SILOptions() {}

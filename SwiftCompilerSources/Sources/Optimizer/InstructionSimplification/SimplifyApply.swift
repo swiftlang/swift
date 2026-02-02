@@ -177,7 +177,7 @@ private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: Simp
 
     let newApply = builder.createApply(
       function: apply.callee,
-      apply.replaceOpenedArchetypeInSubstituations(withConcreteType: concreteType, context),
+      apply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
       arguments: apply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context),
       isNonThrowing: apply.isNonThrowing, isNonAsync: apply.isNonAsync,
       specializationInfo: apply.specializationInfo)
@@ -197,7 +197,7 @@ private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context
 
     builder.createTryApply(
       function: tryApply.callee,
-      tryApply.replaceOpenedArchetypeInSubstituations(withConcreteType: concreteType, context),
+      tryApply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
       arguments: tryApply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context),
       normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
       isNonAsync: tryApply.isNonAsync,
@@ -216,8 +216,9 @@ private extension FullApplySite {
     // Make sure that existential archetype _is_ a replacement type and not e.g. _contained_ in a
     // replacement type, like
     //    apply %1<Array<@opened("...")>()
-    guard substitutionMap.replacementTypes.contains(where: { $0.isExistentialArchetype }),
-          substitutionMap.replacementTypes.allSatisfy({ $0.isExistentialArchetype || !$0.hasLocalArchetype })
+    // TODO: support non-root existential archetypes
+    guard substitutionMap.replacementTypes.contains(where: { $0.isRootExistentialArchetype }),
+          substitutionMap.replacementTypes.allSatisfy({ $0.isRootExistentialArchetype || !$0.hasLocalArchetype })
     else {
       return false
     }
@@ -237,9 +238,9 @@ private extension FullApplySite {
       let type = value.type
       // Allow three cases:
              // case 1. the argument _is_ the existential archetype
-      return type.isExistentialArchetype ||
+      return type.isRootExistentialArchetype ||
              // case 2. the argument _is_ a metatype of the existential archetype
-             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isExistentialArchetype) ||
+             (type.isMetatype && type.canonicalType.instanceTypeOfMetatype.isRootExistentialArchetype) ||
              // case 3. the argument has nothing to do with the existential archetype (or any other local archetype)
              !type.hasLocalArchetype
     }
@@ -269,7 +270,7 @@ private extension FullApplySite {
     return Array(newArgs)
   }
 
-  func replaceOpenedArchetypeInSubstituations(
+  func replaceOpenedArchetypeInSubstitutions(
     withConcreteType concreteType: CanonicalType,
     _ context: SimplifyContext
   ) -> SubstitutionMap {

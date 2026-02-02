@@ -1206,7 +1206,7 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
         }
         (void)deletedInstructions.insert(deadInst);
       });
-  InstructionDeleter deleter(std::move(callbacks));
+  InstructionDeleter deleter(std::move(callbacks), /*assumeFixedLifetimes=*/ false);
 
   unsigned startIndex = 0;
   while (startIndex < worklist.size()) {
@@ -1433,7 +1433,7 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
 
   // Replace the globalStringTablePointer builtins by a string_literal
   // instruction for an empty string and clean up dead code.
-  InstructionDeleter deleter;
+  InstructionDeleter deleter(/*assumeFixedLifetimes=*/ false);
   for (BuiltinInst *bi : globalStringTablePointerInsts) {
     SILBuilderWithScope builder(bi);
     StringLiteralInst *stringLiteral = builder.createStringLiteral(

@@ -67,17 +67,17 @@ public:
     /// Inherits isolation from the caller. This is only applicable
     /// to asynchronous function types.
     ///
-    /// NOTE: The difference in between NonIsolatedCaller and
-    /// NonIsolated is that NonIsolatedCaller is a strictly
+    /// NOTE: The difference in between NonIsolatedNonsending and
+    /// NonIsolated is that NonIsolatedNonsending is a strictly
     /// weaker form of nonisolation. While both in their bodies cannot
-    /// access isolated state directly, NonIsolatedCaller functions
+    /// access isolated state directly, NonIsolatedNonsending functions
     /// /are/ allowed to access state isolated to their caller via
     /// function arguments since we know that the callee will stay
     /// in the caller's isolation domain. In contrast, NonIsolated
     /// is strongly nonisolated and is not allowed to access /any/
     /// isolated state (even via function parameters) since it is
     /// considered safe to run on /any/ actor.
-    NonIsolatedCaller,
+    NonIsolatedNonsending,
   };
 
   static constexpr size_t NumBits = 3; // future-proof this slightly
@@ -103,7 +103,7 @@ public:
     return { Kind::Erased };
   }
   static FunctionTypeIsolation forNonIsolatedCaller() {
-    return { Kind::NonIsolatedCaller };
+    return { Kind::NonIsolatedNonsending };
   }
 
   Kind getKind() const { return value.getInt(); }
@@ -124,7 +124,27 @@ public:
     return getKind() == Kind::Erased;
   }
   bool isNonIsolatedCaller() const {
-    return getKind() == Kind::NonIsolatedCaller;
+    return getKind() == Kind::NonIsolatedNonsending;
+  }
+
+  /// Two function type isolations are equal if they have the same kind and
+  /// (when applicable) the same global actor types.
+  ///
+  /// Exact equality is the right thing to ask about when deciding whether
+  /// two isolations are the same statically, because we have to treat
+  /// different specializations of the same generic global actor type
+  /// as potentially different isolations. (Of course, you must be comparing
+  /// types that have been mapped into the same context.)
+  ///
+  /// Exact equality is *not* the right thing to ask about when deciding
+  /// whether two isolations might be the same dynamically, because two
+  /// different specializations of the same generic global actor type
+  /// could absolutely end up being the same in concrete specialization.
+  bool operator==(FunctionTypeIsolation other) const {
+    return value == other.value;
+  }
+  bool operator!=(FunctionTypeIsolation other) const {
+    return value != other.value;
   }
 
   // The opaque accessors below are just for the benefit of ExtInfoBuilder,
@@ -517,7 +537,8 @@ class ASTExtInfoBuilder {
     DifferentiabilityMaskOffset = 11,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
     SendingResultMask = 1 << 14,
-    NumMaskBits = 15
+    InOutResultMask = 1 << 15,
+    NumMaskBits = 16
   };
 
   static_assert(FunctionTypeIsolation::Mask == 0x7, "update mask manually");
@@ -529,15 +550,22 @@ class ASTExtInfoBuilder {
   Type globalActor;
   Type thrownError;
 
+  /// A dependent type that determines whether the function is @Sendable.
+  /// Only used within the constraint system, and must contain type variables,
+  /// a concrete dependent type should set the Sendable bit instead.
+  Type sendableDependentType;
+
   ArrayRef<LifetimeDependenceInfo> lifetimeDependencies;
 
   using Representation = FunctionTypeRepresentation;
 
   ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
                     Type globalActor, Type thrownError,
+                    Type sendableDependentType,
                     ArrayRef<LifetimeDependenceInfo> lifetimeDependencies)
       : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
-        thrownError(thrownError), lifetimeDependencies(lifetimeDependencies) {
+        thrownError(thrownError), sendableDependentType(sendableDependentType),
+        lifetimeDependencies(lifetimeDependencies) {
     assert(isThrowing() || !thrownError);
     assert(hasGlobalActorFromBits(bits) == !globalActor.isNull());
   }
@@ -549,7 +577,7 @@ public:
       : ASTExtInfoBuilder(Representation::Swift, false, false, Type(),
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
-                          std::nullopt /* LifetimeDependenceInfo */,
+                          {} /* LifetimeDependenceInfo */,
                           false /*sendingResult*/) {}
 
   // Constructor for polymorphic type.
@@ -557,10 +585,10 @@ public:
       : ASTExtInfoBuilder(rep, false, throws, thrownError,
                           DifferentiabilityKind::NonDifferentiable, nullptr,
                           FunctionTypeIsolation::forNonIsolated(),
-                          std::nullopt /* LifetimeDependenceInfo */,
+                          {} /* LifetimeDependenceInfo */,
                           false /*sendingResult*/) {}
 
-  // Constructor with no defaults.
+  // Constructor with almost no defaults.
   ASTExtInfoBuilder(Representation rep, bool isNoEscape, bool throws,
                     Type thrownError, DifferentiabilityKind diffKind,
                     const clang::Type *type, FunctionTypeIsolation isolation,
@@ -574,7 +602,7 @@ public:
                 (unsigned(isolation.getKind()) << IsolationMaskOffset) |
                 (sendingResult ? SendingResultMask : 0),
             ClangTypeInfo(type), isolation.getOpaqueType(), thrownError,
-            lifetimeDependencies) {}
+            /*sendableDependentType*/ Type(), lifetimeDependencies) {}
 
   void checkInvariants() const;
 
@@ -616,6 +644,11 @@ public:
   Type getGlobalActor() const { return globalActor; }
   Type getThrownError() const { return thrownError; }
 
+  /// A dependent type that determines whether the function is @Sendable. This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getSendableDependentType() const { return sendableDependentType; }
+
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     return lifetimeDependencies;
   }
@@ -639,6 +672,8 @@ public:
     return FunctionTypeIsolation::fromOpaqueValues(getIsolationKind(),
                                                    globalActor);
   }
+
+  constexpr bool hasInOutResult() const { return bits & InOutResultMask; }
 
   constexpr bool hasSelfParam() const {
     switch (getSILRepresentation()) {
@@ -670,35 +705,44 @@ public:
   // the following with methods instead of mutating these objects.
   [[nodiscard]]
   ASTExtInfoBuilder withRepresentation(Representation rep) const {
-    return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
-                             shouldStoreClangType(rep) ? clangTypeInfo
-                                                       : ClangTypeInfo(),
-                             globalActor, thrownError, lifetimeDependencies);
+    return ASTExtInfoBuilder(
+        (bits & ~RepresentationMask) | (unsigned)rep,
+        shouldStoreClangType(rep) ? clangTypeInfo : ClangTypeInfo(),
+        globalActor, thrownError, sendableDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
-    return ASTExtInfoBuilder(
-        noEscape ? (bits | NoEscapeMask) : (bits & ~NoEscapeMask),
-        clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
+    return ASTExtInfoBuilder(noEscape ? (bits | NoEscapeMask)
+                                      : (bits & ~NoEscapeMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withSendable(bool concurrent = true) const {
-    return ASTExtInfoBuilder(
-        concurrent ? (bits | SendableMask) : (bits & ~SendableMask),
-        clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
+    return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
+                                        : (bits & ~SendableMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withAsync(bool async = true) const {
     return ASTExtInfoBuilder(async ? (bits | AsyncMask) : (bits & ~AsyncMask),
                              clangTypeInfo, globalActor, thrownError,
-                             lifetimeDependencies);
+                             sendableDependentType, lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withThrows(bool throws, Type thrownError) const {
     assert(throws || !thrownError);
     return ASTExtInfoBuilder(
         throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
-        globalActor, thrownError, lifetimeDependencies);
+        globalActor, thrownError, sendableDependentType, lifetimeDependencies);
+  }
+
+  [[nodiscard]]
+  ASTExtInfoBuilder
+  withSendableDependentType(Type sendableDependentType) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]]
@@ -707,9 +751,10 @@ public:
   }
 
   [[nodiscard]] ASTExtInfoBuilder withSendingResult(bool sending = true) const {
-    return ASTExtInfoBuilder(
-        sending ? (bits | SendingResultMask) : (bits & ~SendingResultMask),
-        clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
+    return ASTExtInfoBuilder(sending ? (bits | SendingResultMask)
+                                     : (bits & ~SendingResultMask),
+                             clangTypeInfo, globalActor, thrownError,
+                             sendableDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]]
@@ -718,12 +763,14 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
-        clangTypeInfo, globalActor, thrownError, lifetimeDependencies);
+        clangTypeInfo, globalActor, thrownError, sendableDependentType,
+        lifetimeDependencies);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
     return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
-                             thrownError, lifetimeDependencies);
+                             thrownError, sendableDependentType,
+                             lifetimeDependencies);
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -734,10 +781,10 @@ public:
   [[nodiscard]]
   ASTExtInfoBuilder
   withSILRepresentation(SILFunctionTypeRepresentation rep) const {
-    return ASTExtInfoBuilder((bits & ~RepresentationMask) | (unsigned)rep,
-                             shouldStoreClangType(rep) ? clangTypeInfo
-                                                       : ClangTypeInfo(),
-                             globalActor, thrownError, lifetimeDependencies);
+    return ASTExtInfoBuilder(
+        (bits & ~RepresentationMask) | (unsigned)rep,
+        shouldStoreClangType(rep) ? clangTypeInfo : ClangTypeInfo(),
+        globalActor, thrownError, sendableDependentType, lifetimeDependencies);
   }
 
   /// \p lifetimeDependencies should be arena allocated and not a temporary
@@ -746,7 +793,7 @@ public:
   [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
       llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) const {
     return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
-                             lifetimeDependencies);
+                             sendableDependentType, lifetimeDependencies);
   }
 
   [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
@@ -759,7 +806,13 @@ public:
         (bits & ~IsolationMask) |
             (unsigned(isolation.getKind()) << IsolationMaskOffset),
         clangTypeInfo, isolation.getOpaqueType(), thrownError,
-        lifetimeDependencies);
+        sendableDependentType, lifetimeDependencies);
+  }
+
+  [[nodiscard]] ASTExtInfoBuilder withHasInOutResult() const {
+    return ASTExtInfoBuilder((bits | InOutResultMask), clangTypeInfo,
+                             globalActor, thrownError, sendableDependentType,
+                             lifetimeDependencies);
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
@@ -767,6 +820,7 @@ public:
     ID.AddPointer(clangTypeInfo.getType());
     ID.AddPointer(globalActor.getPointer());
     ID.AddPointer(thrownError.getPointer());
+    ID.AddPointer(sendableDependentType.getPointer());
     for (auto info : lifetimeDependencies) {
       info.Profile(ID);
     }
@@ -799,10 +853,10 @@ class ASTExtInfo {
   ASTExtInfo(ASTExtInfoBuilder builder) : builder(builder) {}
 
   ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
-             Type thrownError,
+             Type thrownError, Type sendableDependentType,
              llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo)
       : builder(bits, clangTypeInfo, globalActor, thrownError,
-                lifetimeDependenceInfo) {
+                sendableDependentType, lifetimeDependenceInfo) {
     builder.checkInvariants();
   };
 
@@ -851,11 +905,20 @@ public:
   Type getGlobalActor() const { return builder.getGlobalActor(); }
   Type getThrownError() const { return builder.getThrownError(); }
 
+  /// A dependent type that determines whether the function is @Sendable. This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getSendableDependentType() const {
+    return builder.getSendableDependentType();
+  }
+
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     return builder.getLifetimeDependencies();
   }
 
   FunctionTypeIsolation getIsolation() const { return builder.getIsolation(); }
+
+  constexpr bool hasInOutResult() const { return builder.hasInOutResult(); }
 
   /// Helper method for changing the representation.
   ///
@@ -903,6 +966,11 @@ public:
   [[nodiscard]]
   ASTExtInfo withAsync(bool async = true) const {
     return builder.withAsync(async).build();
+  }
+
+  [[nodiscard]]
+  ASTExtInfo withSendableDependentType(Type sendableDependentType) const {
+    return builder.withSendableDependentType(sendableDependentType).build();
   }
 
   [[nodiscard]] ASTExtInfo withSendingResult(bool sending = true) const {
@@ -1047,7 +1115,7 @@ public:
             makeBits(SILFunctionTypeRepresentation::Thick, false, false, false,
                      false, false, SILFunctionTypeIsolation::forUnknown(),
                      DifferentiabilityKind::NonDifferentiable),
-            ClangTypeInfo(nullptr), /*LifetimeDependenceInfo*/ std::nullopt) {}
+            ClangTypeInfo(nullptr), /*LifetimeDependenceInfo*/ {}) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
                     bool isSendable, bool isAsync, bool isUnimplementable,

@@ -81,14 +81,14 @@ public:
                                     const NominalTypeDecl *type);
 
   /// Print a variable that can be used to access type's metadata function
-  static void printMetadataAccessAsVariable(const ASTContext &Context,
+  static void printMetadataAccessAsVariable(ASTContext &Context,
       raw_ostream &os, StringRef metadataFuncName,
       ArrayRef<GenericRequirement> genericRequirements, int indent = 4,
       StringRef varName = "metadata");
 
   /// Print a variable that can be used to access type's metadata function and
   /// value witness table
-  static void printValueWitnessTableAccessAsVariable(const ASTContext &Context,
+  static void printValueWitnessTableAccessAsVariable(ASTContext &Context,
       raw_ostream &os, StringRef metadataFuncName,
       ArrayRef<GenericRequirement> genericRequirements, int indent = 4,
       StringRef metadataVarName = "metadata",
@@ -118,7 +118,7 @@ private:
   raw_ostream &os;
   raw_ostream &cPrologueOS;
   SwiftToClangInteropContext &interopContext;
-  const ASTContext &Context;
+  ASTContext &Context;
 };
 
 } // end namespace swift

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -update-borrowed-from -loop-unroll %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-unroll %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -44,15 +44,15 @@ sil @get_wrapper_struct : $@convention(thin) (@inout WrapperStruct) -> ()
 // CHECK:  builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_1'
 sil [ossa] @loop_unroll_1 : $@convention(thin) () -> () {
 bb0:
@@ -83,15 +83,15 @@ bb3:
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3:
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5:
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_2'
 sil [ossa] @loop_unroll_2 : $@convention(thin) () -> () {
 bb0:
@@ -122,15 +122,15 @@ bb3:
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3:
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5:
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_3'
 sil [ossa] @loop_unroll_3 : $@convention(thin) () -> () {
 bb0:
@@ -161,15 +161,15 @@ bb3:
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3:
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5:
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_4'
 sil [ossa] @loop_unroll_4 : $@convention(thin) () -> () {
 bb0:
@@ -194,11 +194,11 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_unroll_5 :
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb6
+// CHECK: bb5:
+// CHECK-NEXT:  br bb6
 // CHECK: bb6:
-// CHECK-NEXT:  br bb7
-// CHECK: bb7:
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-LABEL: } // end sil function 'loop_unroll_5'
@@ -225,11 +225,11 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_unroll_6 :
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb6
+// CHECK: bb5:
+// CHECK-NEXT:  br bb6
 // CHECK: bb6:
-// CHECK-NEXT:  br bb7
-// CHECK: bb7:
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'loop_unroll_6'
@@ -256,11 +256,11 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_unroll_7 :
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb6
+// CHECK: bb5:
+// CHECK-NEXT:  br bb6
 // CHECK: bb6:
-// CHECK-NEXT:  br bb7
-// CHECK: bb7:
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'loop_unroll_7'
@@ -292,14 +292,14 @@ bb3:
 // CHECK: bb2:
 // CHECK:   br bb3({{.*}})
 // CHECK: bb3({{.*}}):
-// CHECK:   br bb11({{.*}})
+// CHECK:   br bb10({{.*}})
 // CHECK: bb4:
-// CHECK:   br bb8({{.*}})
-// CHECK: bb8({{.*}}):
-// CHECK:   cond_br {{.*}}, bb9, bb10
-// CHECK: bb10:
-// CHECK:   br bb11({{.*}})
-// CHECK: bb11({{.*}}):
+// CHECK:   br bb7({{.*}})
+// CHECK: bb7({{.*}}):
+// CHECK:   cond_br {{.*}}, bb8, bb9
+// CHECK: bb9:
+// CHECK:   br bb10({{.*}})
+// CHECK: bb10({{.*}}):
 // CHECK:   return
 // CHECK-LABEL: } // end sil function 'unroll_with_exit_block_arg_1'
 sil [ossa] @unroll_with_exit_block_arg_1 : $@convention(thin) () -> () {
@@ -334,14 +334,14 @@ bb7(%72 : $Builtin.Int64):
 // CHECK: bb2:
 // CHECK:   br bb3{{.*}}
 // CHECK: bb3({{.*}}):
-// CHECK:   br bb11{{.*}}
+// CHECK:   br bb10{{.*}}
 // CHECK: bb4:
-// CHECK:   br bb8{{.*}}
-// CHECK: bb8({{.*}}):
-// CHECK:   cond_br {{.*}}, bb9, bb10
-// CHECK: bb10:
-// CHECK:   br bb11({{.*}})
-// CHECK: bb11({{.*}}):
+// CHECK:   br bb7{{.*}}
+// CHECK: bb7({{.*}}):
+// CHECK:   cond_br {{.*}}, bb8, bb9
+// CHECK: bb9:
+// CHECK:   br bb10({{.*}})
+// CHECK: bb10({{.*}}):
 // CHECK-LABEL: } // end sil function 'unroll_with_exit_block_arg_2'
 sil [ossa] @unroll_with_exit_block_arg_2 : $@convention(thin) () -> () {
 bb0:
@@ -654,38 +654,39 @@ bb5:
 sil [ossa] @testWithNonTrivialBBArg1 : $@convention(thin) (@owned Array<Klass>) -> () {
 bb0(%0 : @owned $Array<Klass>):
   %1 = integer_literal $Builtin.Int1, -1
-  %2 = struct $Bool (%1 : $Builtin.Int1)
+  %2 = struct $Bool (%1)
   %3 = integer_literal $Builtin.Int64, 0
   %4 = integer_literal $Builtin.Int64, 4
   %5 = integer_literal $Builtin.Int1, -1
   %6 = integer_literal $Builtin.Int64, 1
   %7 = function_ref @getElement : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
   %8 = function_ref @collectKlass : $@convention(thin) (@owned Klass) -> ()
-  %15 = struct $_DependenceToken ()
+  %9 = struct $_DependenceToken ()
   br bb1
 
 bb1:
-  %borrow = begin_borrow %0 : $Array<Klass>
-  br bb2(%borrow : $Array<Klass>, %3 : $Builtin.Int64)
+  %11 = begin_borrow %0
+  br bb2(%11, %3)
 
-bb2(%newArr : @guaranteed $Array<Klass>, %18 : $Builtin.Int64):
-  %19 = struct $Int64 (%18 : $Builtin.Int64)
-  %20 = builtin "sadd_with_overflow_Int64"(%18 : $Builtin.Int64, %6 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
-  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 0
-  %22 = apply %7(%19, %2, %15, %newArr) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
-  destroy_value %22 : $Klass
-  %31 = builtin "cmp_eq_Int64"(%21 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
-  end_borrow %newArr : $Array<Klass>
-  cond_br %31, bb3, bb2a
-
-bb2a:
-  %newborrow = begin_borrow %0 : $Array<Klass>
-  br bb2(%newborrow : $Array<Klass>, %21 : $Builtin.Int64)
+bb2(%13 : @reborrow $Array<Klass>, %14 : $Builtin.Int64):
+  %15 = borrowed %13 from (%0)
+  %16 = struct $Int64 (%14)
+  %17 = builtin "sadd_with_overflow_Int64"(%14, %6, %5) : $(Builtin.Int64, Builtin.Int1)
+  %18 = tuple_extract %17, 0
+  %19 = apply %7(%16, %2, %9, %15) : $@convention(method) (Int64, Bool, _DependenceToken, @guaranteed Array<Klass>) -> @owned Klass
+  destroy_value %19
+  %21 = builtin "cmp_eq_Int64"(%18, %4) : $Builtin.Int1
+  end_borrow %15
+  cond_br %21, bb4, bb3
 
 bb3:
-  destroy_value %0 : $Array<Klass>
-  %tup = tuple ()
-  return %tup : $()
+  %24 = begin_borrow %0
+  br bb2(%24, %18)
+
+bb4:
+  destroy_value %0
+  %27 = tuple ()
+  return %27
 }
 
 // CHECK-LABEL: sil [ossa] @$testWithNonTrivialBBArg2 : 

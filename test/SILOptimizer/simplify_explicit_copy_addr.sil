@@ -1,0 +1,38 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=explicit_copy_addr | %FileCheck %s --check-prefix=CHECK-ONONE --check-prefix=CHECK
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=explicit_copy_addr | %FileCheck %s --check-prefix=CHECK-O --check-prefix=CHECK
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL:      sil [ossa] @simplify_copy_take_init :
+// CHECK:            bb0(%0 : $*String, %1 : $*String):
+// CHECK-O-NEXT:       {{ }}copy_addr [take] %1 to [init] %0
+// CHECK-ONONE-NEXT:   explicit_copy_addr [take] %1 to [init] %0
+// CHECK-NEXT:         %3 = tuple ()
+// CHECK:            } // end sil function 'simplify_copy_take_init'
+sil [ossa] @simplify_copy_take_init : $@convention(thin) (@in String) -> @out String {
+bb0(%0 : $*String, %1 : $*String):
+  explicit_copy_addr [take] %1 to [init] %0
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL:      sil [ossa] @simplify_copy_assign :
+// CHECK:            bb0(%0 : $*String, %1 : $*String):
+// CHECK-O-NEXT:       {{ }}copy_addr %1 to %0
+// CHECK-ONONE-NEXT:   explicit_copy_addr %1 to %0
+// CHECK-NEXT:         %3 = tuple ()
+// CHECK:            } // end sil function 'simplify_copy_assign'
+sil [ossa] @simplify_copy_assign : $@convention(thin) (@inout String, @inout String) -> () {
+bb0(%0 : $*String, %1 : $*String):
+  explicit_copy_addr %1 to %0
+  %3 = tuple ()
+  return %3
+}
+
+
+

@@ -1744,6 +1744,81 @@ bb0:
   return %1 : $()
 }
 
+protocol P2 {
+  associatedtype A
+}
+
+// CHECK-LABEL: sil [ossa] @test_dependent_existential_archetype :
+// CHECK:         %2 = alloc_stack $(@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).A
+// CHECK-LABEL: } // end sil function 'test_dependent_existential_archetype'
+sil [ossa] @test_dependent_existential_archetype : $@convention(thin) (@thick any P2.Type) -> () {
+bb0(%0 : $@thick any P2.Type):
+  %1 = open_existential_metatype %0 to $@thick (@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).Type
+  %2 = alloc_stack $(@opened("0B7C132E-8010-11F0-8526-0EA13E3AABB4", any P2) Self).A
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [heuristic_always_inline] @heuristic_always_inline_attribute
+sil [heuristic_always_inline] @heuristic_always_inline_attribute : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil [always_inline] @always_inline_attribute
+sil [always_inline] @always_inline_attribute : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil @value_borrow :
+sil @value_borrow : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK: bb0([[VALUE:%[0-9]+]] :
+entry(%value : $AnyObject):
+  // CHECK: [[BORROW:%.*]] = make_borrow [[VALUE]]
+  %borrow = make_borrow %value
+  // CHECK: [[VALUE2:%.*]] = dereference_borrow [[BORROW]]
+  %value2 = dereference_borrow %borrow
+
+  %f = function_ref @value_borrow : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %r = apply %f(%value2) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @addr_borrow :
+sil @addr_borrow : $@convention(thin) (@in_guaranteed String) -> () {
+// CHECK: bb0([[ADDR:%[0-9]+]] :
+entry(%addr : $*String):
+  // CHECK: [[BORROW:%.*]] = make_addr_borrow [[ADDR]]
+  %borrow = make_addr_borrow %addr
+  // CHECK: [[ADDR:%.*]] = dereference_addr_borrow [[BORROW]]
+  %addr2 = dereference_addr_borrow %borrow
+
+  %f = function_ref @addr_borrow : $@convention(thin) (@in_guaranteed String) -> ()
+  %r = apply %f(%addr2) : $@convention(thin) (@in_guaranteed String) -> ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @addr_only_borrow :
+sil @addr_only_borrow : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK: bb0([[ADDR:%[0-9]+]] :
+entry(%addr : $*T):
+  // CHECK: [[BORROW_BUF:%.*]] = alloc_stack
+  %borrow_buf = alloc_stack $Builtin.Borrow<T>
+  // CHECK: init_borrow_addr [[BORROW_BUF]] : $*Builtin.Borrow<T> with [[ADDR]] : $*T
+  init_borrow_addr %borrow_buf with %addr
+  // CHECK: [[ADDR2:%.*]] = dereference_borrow_addr [[BORROW_BUF]]
+  %addr2 = dereference_borrow_addr %borrow_buf
+
+  %f = function_ref @addr_only_borrow : $@convention(thin) <U> (@in_guaranteed U) -> ()
+  %r = apply %f<T>(%addr2) : $@convention(thin) <U> (@in_guaranteed U) -> ()
+  dealloc_stack %borrow_buf
+  return %r : $()
+}
+
 class Foo2: Foo {}
 
 // CHECK-LABEL: sil_vtable Foo {
@@ -1773,4 +1848,3 @@ sil_vtable GenKlass {
 // CHECK-LABEL: sil_vtable $GenKlass<Int> {
 sil_vtable $GenKlass<Int> {
 }
-

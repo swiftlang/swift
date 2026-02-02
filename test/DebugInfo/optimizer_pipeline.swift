@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -g -Osize -parse-stdlib -parse-as-library -enable-ossa-modules -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -g -Osize -parse-stdlib -parse-as-library -o - | %FileCheck %s
 
 // REQUIRES: asserts
 

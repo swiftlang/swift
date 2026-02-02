@@ -65,7 +65,7 @@ static Type deriveRawRepresentable_Raw(DerivedConformance &derived) {
   //   typealias Raw = SomeType
   // }
   auto rawInterfaceType = cast<EnumDecl>(derived.Nominal)->getRawType();
-  return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
+  return derived.getConformanceContext()->mapTypeIntoEnvironment(rawInterfaceType);
 }
 
 static std::pair<BraceStmt *, bool>
@@ -90,7 +90,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = toRawDecl->mapTypeIntoContext(rawTy);
+  rawTy = toRawDecl->mapTypeIntoEnvironment(rawTy);
 
   if (enumDecl->isObjC()) {
     // Special case: ObjC enums are represented by their raw value, so just use
@@ -129,9 +129,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
 
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(
+        CaseStmt::createImplicit(C, CaseParentKind::Switch, labelItem, body));
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
@@ -154,7 +153,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived,
     if (auto *attr = afd->getAttrs().getAttribute<UsableFromInlineAttr>())
       attr->setInvalid();
     if (access.isPublic())
-      afd->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+      afd->addAttribute(new (C) InlinableAttr(/*implicit*/ false));
   }
 }
 
@@ -203,9 +202,9 @@ struct RuntimeVersionCheck {
   /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
+    auto domain = AvailabilityDomain::forPlatform(Platform);
     auto platformSpec = AvailabilitySpec::createForDomain(
-        C, AvailabilityDomain::forPlatform(Platform), SourceLoc(), Version,
-        SourceLoc());
+        C, domain, SourceLoc(), Version, SourceLoc());
 
     // wildcardSpec = "*"
     auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
@@ -217,7 +216,8 @@ struct RuntimeVersionCheck {
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
-    availableInfo->setAvailableRange(getVersionRange());
+    availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
+        domain, AvailabilityRange(getVersionRange()), std::nullopt));
 
     // earlyReturnBody = "{ return nil }"
     auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
@@ -303,7 +303,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
-  rawTy = initDecl->mapTypeIntoContext(rawTy);
+  rawTy = initDecl->mapTypeIntoEnvironment(rawTy);
 
   bool isStringEnum = rawTy->isString();
   llvm::SmallVector<Expr *, 16> stringExprs;
@@ -362,10 +362,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
                                   stmts, SourceLoc());
 
     // cases.append("case \(litPat): \(body)")
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     CaseLabelItem(litPat), SourceLoc(),
-                                     SourceLoc(), body,
-                                     /*case body var decls*/ std::nullopt));
+    cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                             CaseLabelItem(litPat), body));
     ++Idx;
   }
 
@@ -375,10 +373,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                   dfltLabelItem, SourceLoc(), SourceLoc(),
-                                   dfltBody,
-                                   /*case body var decls*/ std::nullopt));
+  cases.push_back(CaseStmt::createImplicit(C, CaseParentKind::Switch,
+                                           dfltLabelItem, dfltBody));
 
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
@@ -411,7 +407,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto parentDC = derived.getConformanceContext();
   auto rawInterfaceType = enumDecl->getRawType();
-  auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
+  auto rawType = parentDC->mapTypeIntoEnvironment(rawInterfaceType);
 
 
   assert([&]() -> bool {
@@ -463,7 +459,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (!computeAutomaticEnumValueKind(enumDecl))
     return false;
 
-  rawType = DC->mapTypeIntoContext(rawType);
+  rawType = DC->mapTypeIntoEnvironment(rawType);
 
   auto inherited = enumDecl->getInherited().getEntries();
   if (!inherited.empty() && inherited.front().wasValidated() &&
@@ -484,7 +480,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
   if (!rawValueDecls.empty()) {
     if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
       auto ty = alias->getDeclaredInterfaceType();
-      if (!DC->mapTypeIntoContext(ty)->isEqual(rawType)) {
+      if (!DC->mapTypeIntoEnvironment(ty)->isEqual(rawType)) {
         return false;
       }
     }

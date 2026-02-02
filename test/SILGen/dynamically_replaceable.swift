@@ -385,7 +385,7 @@ dynamic func funcWithDefaultArg(_ arg : String = String("hello")) {
   print("hello")
 }
 
-// IMPLICIT-LABEL: sil hidden [thunk] [ossa] @barfoo
+// IMPLICIT-LABEL: sil hidden [thunk] [asmname "barfoo"] [ossa] @$s23dynamically_replaceable6foobaryyFTo
 @_cdecl("barfoo")
 func foobar() {
 }

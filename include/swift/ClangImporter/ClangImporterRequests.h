@@ -17,12 +17,14 @@
 #define SWIFT_CLANG_IMPORTER_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
@@ -64,14 +66,16 @@ void simple_display(llvm::raw_ostream &out,
                     const ClangDirectLookupDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc);
 
-/// This matches SwiftLookupTable::SingleEntry;
-using SingleEntry = llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                                       clang::ModuleMacro *>;
+/// This matches SwiftLookupTable::SingleEntry
+using ClangDirectLookupEntry =
+    llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                       clang::ModuleMacro *>;
+
 /// Uses the appropriate SwiftLookupTable to find a set of clang decls given
 /// their name.
 class ClangDirectLookupRequest
     : public SimpleRequest<ClangDirectLookupRequest,
-                           SmallVector<SingleEntry, 4>(
+                           SmallVector<ClangDirectLookupEntry, 4>(
                                ClangDirectLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
@@ -81,8 +85,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SmallVector<SingleEntry, 4> evaluate(Evaluator &evaluator,
-                                       ClangDirectLookupDescriptor desc) const;
+  SmallVector<ClangDirectLookupEntry, 4>
+  evaluate(Evaluator &evaluator, ClangDirectLookupDescriptor desc) const;
 };
 
 /// The input type for a namespace member lookup request.
@@ -342,15 +346,9 @@ private:
 };
 
 enum class CxxRecordSemanticsKind {
-  Trivial,
-  Owned,
-  MoveOnly,
+  Value,
   Reference,
   Iterator,
-  // A record that is either not copyable/movable or not destructible.
-  MissingLifetimeOperation,
-  // A record that has no copy and no move operations
-  UnavailableConstructors,
   // A C++ record that represents a Swift class type exposed to C++ from Swift.
   SwiftClassType
 };
@@ -427,8 +425,10 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
+  ASTContext& ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -506,7 +506,7 @@ struct CustomRefCountingOperationResult {
 
   CustomRefCountingOperationResultKind kind;
   ValueDecl *operation;
-  std::string name;
+  StringRef name;
 };
 
 class CustomRefCountingOperation
@@ -537,10 +537,6 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
   ClangImporter::Implementation *impl;
-  // Only explicitly ~Escapable annotated types are considered ~Escapable.
-  // This is for backward compatibility, so we continue to import aggregates
-  // containing pointers as Escapable types.
-  bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
     return llvm::hash_combine(desc.type);
@@ -548,7 +544,7 @@ struct EscapabilityLookupDescriptor final {
 
   friend bool operator==(const EscapabilityLookupDescriptor &lhs,
                          const EscapabilityLookupDescriptor &rhs) {
-    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
+    return lhs.type == rhs.type;
   }
 
   friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
@@ -576,10 +572,83 @@ private:
 void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
 SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 
+// Swift value semantics of C++ types
+// These are usually equivalent, with the exception of references.
+// When a reference type is copied, the pointer’s value is copied rather than
+// the object’s storage. This means reference types can be imported as
+// copyable to Swift, even when they are non-copyable in C++.
+enum class CxxValueSemanticsKind { Unknown, Copyable, MoveOnly };
+
+struct CxxValueSemanticsDescriptor final {
+  const clang::Type *type;
+  ClangImporter::Implementation *importerImpl;
+
+  friend llvm::hash_code hash_value(const CxxValueSemanticsDescriptor &desc) {
+    return llvm::hash_combine(desc.type);
+  }
+
+  friend bool operator==(const CxxValueSemanticsDescriptor &lhs,
+                         const CxxValueSemanticsDescriptor &rhs) {
+    return lhs.type == rhs.type;
+  }
+
+  friend bool operator!=(const CxxValueSemanticsDescriptor &lhs,
+                         const CxxValueSemanticsDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class CxxValueSemantics
+    : public SimpleRequest<CxxValueSemantics,
+                           CxxValueSemanticsKind(
+                               CxxValueSemanticsDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  CxxValueSemanticsKind evaluate(Evaluator &evaluator,
+                                 CxxValueSemanticsDescriptor desc) const;
+};
+
+void simple_display(llvm::raw_ostream &out, CxxValueSemanticsDescriptor desc);
+SourceLoc extractNearestSourceLoc(CxxValueSemanticsDescriptor desc);
+
+struct ClangDeclExplicitSafetyDescriptor final {
+  const clang::Decl *decl;
+  bool isClass;
+
+  ClangDeclExplicitSafetyDescriptor(const clang::Decl *decl, bool isClass)
+      : decl(decl), isClass(isClass) {}
+
+  friend llvm::hash_code
+  hash_value(const ClangDeclExplicitSafetyDescriptor &desc) {
+    return llvm::hash_combine(desc.decl, desc.isClass);
+  }
+
+  friend bool operator==(const ClangDeclExplicitSafetyDescriptor &lhs,
+                         const ClangDeclExplicitSafetyDescriptor &rhs) {
+    return lhs.decl == rhs.decl && lhs.isClass == rhs.isClass;
+  }
+
+  friend bool operator!=(const ClangDeclExplicitSafetyDescriptor &lhs,
+                         const ClangDeclExplicitSafetyDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    ClangDeclExplicitSafetyDescriptor desc);
+SourceLoc extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc);
+
 /// Determine the safety of the given Clang declaration.
 class ClangDeclExplicitSafety
     : public SimpleRequest<ClangDeclExplicitSafety,
-                           ExplicitSafety(SafeUseOfCxxDeclDescriptor),
+                           ExplicitSafety(ClangDeclExplicitSafetyDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -592,7 +661,56 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ExplicitSafety evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
+  ExplicitSafety evaluate(Evaluator &evaluator,
+                          ClangDeclExplicitSafetyDescriptor desc) const;
+};
+
+struct ClangRefCountedSmartPointerDescriptor final {
+  NominalTypeDecl *smartPtr;
+
+  ClangRefCountedSmartPointerDescriptor(NominalTypeDecl *smartPtr)
+      : smartPtr(smartPtr) {}
+
+  friend llvm::hash_code
+  hash_value(const ClangRefCountedSmartPointerDescriptor &desc) {
+    return llvm::hash_combine(desc.smartPtr);
+  }
+
+  friend bool operator==(const ClangRefCountedSmartPointerDescriptor &lhs,
+                         const ClangRefCountedSmartPointerDescriptor &rhs) {
+    return lhs.smartPtr == rhs.smartPtr;
+  }
+
+  friend bool operator!=(const ClangRefCountedSmartPointerDescriptor &lhs,
+                         const ClangRefCountedSmartPointerDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    ClangRefCountedSmartPointerDescriptor desc);
+SourceLoc extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc);
+
+/// Determine the safety of the given Clang declaration.
+class ClangRefCountedSmartPointer
+    : public SimpleRequest<ClangRefCountedSmartPointer,
+                           importer::RefCountedPtrRequestResult(
+                               ClangRefCountedSmartPointerDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  importer::RefCountedPtrRequestResult
+  evaluate(Evaluator &evaluator,
+           ClangRefCountedSmartPointerDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE ClangImporter

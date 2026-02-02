@@ -352,3 +352,11 @@ func recursionMatchingTypeArgs2<T: P, V: P>(_ t: T.Type, _ v: V.Type) {
   recursionMatchingTypeArgs2(T.self, V.self) // expected-warning {{function call causes an infinite recursion}}
 }
 
+func testNoInfiniteRecursionWithOverloadingOnOptional() {
+  func test(handler: @escaping (Bool) -> Void) {
+  }
+
+  func test(handler: ((Bool) -> Void)?) {
+    test(handler: handler ?? { _ in }) // Ok
+  }
+}

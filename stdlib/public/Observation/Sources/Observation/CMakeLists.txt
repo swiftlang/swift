@@ -17,6 +17,7 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   Observable.swift
   ObservationRegistrar.swift
   ObservationTracking.swift
+  Observations.swift
   ThreadLocal.cpp
   ThreadLocal.swift
 
@@ -31,6 +32,15 @@ add_swift_target_library(swiftObservation ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _Concurrency
+  SWIFT_MODULE_DEPENDS_ANDROID Android
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_OPENBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WINDOWS WinSDK
+
   INSTALL_IN_COMPONENT stdlib
 
   MACCATALYST_BUILD_FLAVOR "zippered"

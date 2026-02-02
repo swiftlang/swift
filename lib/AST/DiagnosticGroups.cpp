@@ -68,7 +68,7 @@ constexpr const auto diagnosticGroupConnections = [] {
   constexpr auto diagnosticsCount = std::get<2>(sizes);
 
   // Declare all edges
-#define GROUP(Name, DocsFile)                                                  \
+#define GROUP(Name, Option, DocsFile)                                          \
   std::array<DiagGroupID, supergroupsCount[(size_t)DiagGroupID::Name]>         \
       Name##_supergroups{};                                                    \
   std::array<DiagGroupID, subgroupsCount[(size_t)DiagGroupID::Name]>           \
@@ -92,7 +92,7 @@ constexpr const auto diagnosticGroupConnections = [] {
 #include "swift/AST/DiagnosticsAll.def"
 
   // Produce the resulting structure with all the edges
-#define GROUP(Name, DocsFile)                                              \
+#define GROUP(Name, Option, DocsFile)                                          \
   GroupConnections(Name##_supergroups, Name##_subgroups, Name##_diagnostics),
   return std::tuple{
 #include "swift/AST/DiagnosticGroups.def"
@@ -100,7 +100,7 @@ constexpr const auto diagnosticGroupConnections = [] {
 }();
 
 std::unordered_map<std::string_view, DiagGroupID> nameToIDMap{
-#define GROUP(Name, DocsFile) {#Name, DiagGroupID::Name},
+#define GROUP(Name, Option, DocsFile) {#Name, DiagGroupID::Name},
 #include "swift/AST/DiagnosticGroups.def"
 };
 
@@ -119,11 +119,12 @@ void traverseDepthFirst(DiagGroupID id,
 } // end anonymous namespace
 
 constexpr const std::array<DiagGroupInfo, DiagGroupsCount> diagnosticGroupsInfo{
-#define GROUP(Name, DocsFile)                                              \
+#define GROUP(Name, Option, DocsFile)                                          \
   DiagGroupInfo{                                                               \
       DiagGroupID::Name,                                                       \
       #Name,                                                                   \
       DocsFile,                                                                \
+      DiagnosticGroupOptions::Option,                                          \
       llvm::ArrayRef<DiagGroupID>(                                             \
           std::get<(size_t)DiagGroupID::Name>(diagnosticGroupConnections)      \
               .supergroups),                                                   \

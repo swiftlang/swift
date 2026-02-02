@@ -35,6 +35,7 @@ set(RUNTIME_SOURCES
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift
+  BacktraceJSONFormatter.swift
   Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
@@ -43,6 +44,8 @@ set(RUNTIME_SOURCES
   Compression.swift
   Context.swift
   CoreSymbolication.swift
+  CrashLog.swift
+  CrashLogCapture.swift
   Dwarf.swift
   EightByteBuffer.swift
   Elf.swift
@@ -55,6 +58,7 @@ set(RUNTIME_SOURCES
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
+  Mangling.swift
   MemoryReader.swift
   OSReleaseScanner.swift
   ProcMapsScanner.swift

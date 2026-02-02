@@ -6,9 +6,13 @@ add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME CxxStdlib-apinotes
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
     COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes" "${output_dir}"
     COMMENT "Copying CxxStdlib API Notes to ${output_dir}"
     OUTPUT "${output_dir}/std.apinotes"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes")
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_span.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std_string_view.apinotes")
 
 swift_install_in_component(FILES std.apinotes
     DESTINATION "lib/swift/apinotes"
@@ -40,11 +44,12 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -cxx-interoperability-mode=default
     -Xfrontend -module-interface-preserve-types-as-written
+    -Xfrontend -disable-module-selectors-in-module-interface
 
     # This flag is unnecessary when building with newer compilers that allow
     # using C++ symbols in resilient overlays (see f4204568).
     -enable-experimental-feature AssumeResilientCxxTypes
-
+    -enable-experimental-feature Lifetimes
     -enable-experimental-feature AllowUnsafeAttribute
     -strict-memory-safety
 
@@ -63,7 +68,7 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     DEPLOYMENT_VERSION_XROS ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_XROS}
 
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX LINUX_STATIC WINDOWS ANDROID
+    TARGET_SDKS ALL_APPLE_PLATFORMS LINUX LINUX_STATIC WINDOWS ANDROID FREEBSD
     MACCATALYST_BUILD_FLAVOR zippered
     INSTALL_IN_COMPONENT compiler
     INSTALL_BINARY_SWIFTMODULE NON_DARWIN_ONLY

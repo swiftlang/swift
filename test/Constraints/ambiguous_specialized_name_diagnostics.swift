@@ -11,7 +11,7 @@
 // RUN:   -emit-module-path %t/B.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/src/main.swift \
-// RUN:   -module-name main -I %t -verify
+// RUN:   -module-name main -I %t -verify -verify-ignore-unrelated
 
 // https://github.com/apple/swift/issues/67799
 
@@ -38,10 +38,10 @@ import A
 import B
 
 func test() {
-  _ = S<Int>(t: 42) // expected-error {{ambiguous use of 'init(t:)'}}
+  _ = S<Int>(t: 42) // expected-error {{ambiguous use of 'S'}}
 
-  S<Int>(t: 42).test() // expected-error {{ambiguous use of 'init(t:)'}}
+  S<Int>(t: 42).test() // expected-error {{ambiguous use of 'S'}}
 
   S<Int>.staticFn()
-  // expected-error@-1 {{ambiguous use of 'staticFn()'}}
+  // expected-error@-1 {{ambiguous use of 'S'}}
 }

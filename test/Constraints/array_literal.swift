@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-swift-5.1-abi-triple
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -423,5 +423,18 @@ do {
   // Requires collection upcast from Array<(key: String, value: String)> to `Array<(String, String)>`
   func g(v: [String: String]) {
     let _: [(String, String)] = f { return Array(v) } + v // Ok
+  }
+}
+
+// Make sure that sbutyping works with empty literals.
+do {
+  class A {}
+
+  class B: A {}
+
+  func takesSequence<S>(_: S, _: S) where S: Sequence, S.Element: Sequence, S.Element.Element == A.Type {}
+
+  func test() {
+    takesSequence([[B.self]], [])
   }
 }

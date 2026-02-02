@@ -162,7 +162,7 @@ static int getSpecializationLevelRecursive(StringRef funcName,
       continue;
     Node *payload = param->getChild(1);
     if (payload->getKind() !=
-        Node::Kind::FunctionSignatureSpecializationParamPayload) {
+        Node::Kind::Identifier) {
       return SpecializationLevelLimit + 1; // unrecognized format
     }
     // Check if the specialized function is a specialization itself.
@@ -691,6 +691,19 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
       // Specializing (currently) always produces a retain in the caller.
       // That's not allowed for values of move-only type.
       if (ArgTy.isMoveOnly()) {
+        return false;
+      }
+
+      // Bail if it's an ObjectiveC block which might _not_ be copied onto the heap, i.e
+      // optimized by SimplifyCopyBlock. We can't do this because the optimization inserts
+      // retains+releases for captured arguments. That's not possible for stack-allocated blocks.
+      // TODO: avoid inserting retains+releases at all for captures of `partial_apply [on_stack]`
+      if (ArgTy.is<SILFunctionType>() &&
+          ArgTy.getFunctionRepresentation() == SILFunctionTypeRepresentation::Block &&
+          // A `copy_block` ensures that the block is copied onto the heap.
+          !isa<CopyBlockInst>(Arg) &&
+          // SimplifyCopyBlock only works for `partial_apply [on_stack]`.
+          PAI->isOnStack()) {
         return false;
       }
 

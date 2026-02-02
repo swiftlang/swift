@@ -56,6 +56,13 @@ static llvm::cl::opt<bool> DecllessDebugValueUseSILDebugInfo(
         "write SIL test cases for this pass"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> DiagnoseCopyDestroyAddr(
+    "assemblyvisionremarkgen-diagnose-copy-destroy-addr", llvm::cl::Hidden,
+    llvm::cl::desc(
+        "Emit opt remarks for copy_addr, destroy_addr instructions"),
+    llvm::cl::init(true));
+
+
 //===----------------------------------------------------------------------===//
 //                           Value To Decl Inferrer
 //===----------------------------------------------------------------------===//
@@ -63,12 +70,21 @@ static llvm::cl::opt<bool> DecllessDebugValueUseSILDebugInfo(
 namespace {
 
 struct ValueToDeclInferrer {
+
+  enum class NotePrefix {
+    of,
+    fromLocation,
+    toLocation,
+    inMemoryLocationOf
+  };
+
   using Argument = OptRemark::Argument;
   using ArgumentKeyKind = OptRemark::ArgumentKeyKind;
 
   SmallVector<std::pair<SILType, Projection>, 32> accessPath;
   SmallVector<Operand *, 32> rcIdenticalSecondaryUseSearch;
   RCIdentityFunctionInfo &rcfi;
+  NotePrefix currentNotePrefix = NotePrefix::of;
 
   ValueToDeclInferrer(RCIdentityFunctionInfo &rcfi) : rcfi(rcfi) {}
 
@@ -76,7 +92,8 @@ struct ValueToDeclInferrer {
   /// passed in value could be referring to. This is done just using heuristics
   bool infer(ArgumentKeyKind keyKind, SILValue value,
              SmallVectorImpl<Argument> &resultingInferredDecls,
-             bool allowSingleRefEltAddrPeek = false);
+             bool allowSingleRefEltAddrPeek = false,
+             NotePrefix notePrefix = NotePrefix::of);
 
   /// Print out a note to \p stream that beings at decl and then if
   /// useProjectionPath is set to true iterates the accessPath we computed for
@@ -196,7 +213,20 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
 void ValueToDeclInferrer::printNote(llvm::raw_string_ostream &stream,
                                     StringRef name,
                                     bool shouldPrintAccessPath) {
-  stream << "of '" << name;
+  switch (currentNotePrefix) {
+  case NotePrefix::of:
+    stream << "of '" << name;
+    break;
+  case NotePrefix::fromLocation:
+    stream << "from location '" << name;
+    break;
+  case NotePrefix::toLocation:
+    stream << "to location '" << name;
+    break;
+  case NotePrefix::inMemoryLocationOf:
+    stream << "in memory location of '" << name;
+    break;
+  }
   if (shouldPrintAccessPath)
     printAccessPath(stream);
   stream << "'";
@@ -314,7 +344,11 @@ bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
 bool ValueToDeclInferrer::infer(
     ArgumentKeyKind keyKind, SILValue value,
     SmallVectorImpl<Argument> &resultingInferredDecls,
-    bool allowSingleRefEltAddrPeek) {
+    bool allowSingleRefEltAddrPeek,
+    NotePrefix notePrefix) {
+
+  currentNotePrefix = notePrefix;
+
   // Clear the stored access path at end of scope.
   SWIFT_DEFER { accessPath.clear(); };
   ValueUseToDeclInferrer valueUseInferrer{
@@ -533,9 +567,77 @@ struct AssemblyVisionRemarkGeneratorInstructionVisitor
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi);
   void visitUnconditionalCheckedCastAddrInst(
       UnconditionalCheckedCastAddrInst *uccai);
+  void visitCopyAddrInst(CopyAddrInst *copy);
+  void visitDestroyAddrInst(DestroyAddrInst *destroy);
 };
 
 } // anonymous namespace
+
+void AssemblyVisionRemarkGeneratorInstructionVisitor::
+    visitCopyAddrInst(CopyAddrInst *copy) {
+  if (!DiagnoseCopyDestroyAddr)
+    return;
+
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, copy->getSrc(), inferredArgs,
+        true /*allow single ref elt peek*/,
+        ValueToDeclInferrer::NotePrefix::fromLocation);
+    (void)foundArgs;
+
+    // Use the actual source loc of the
+    auto remark = RemarkMissed("memory", *copy)
+                  << "Memory copy of value with type '"
+                  << NV("ValueType", copy->getSrc()->getType()) << "'";
+    if (foundArgs) {
+      for (auto arg : inferredArgs) {
+        remark << arg;
+      }
+    }
+    inferredArgs.clear();
+    foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, copy->getDest(), inferredArgs,
+        true /*allow single ref elt peek*/,
+        ValueToDeclInferrer::NotePrefix::toLocation);
+    if (foundArgs) {
+      for (auto arg : inferredArgs) {
+        remark << arg;
+      }
+    }
+
+    return remark;
+  });
+}
+
+void AssemblyVisionRemarkGeneratorInstructionVisitor::
+    visitDestroyAddrInst(DestroyAddrInst *destroy) {
+  if (!DiagnoseCopyDestroyAddr)
+    return;
+
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, destroy->getOperand(), inferredArgs,
+        true /*allow single ref elt peek*/,
+        ValueToDeclInferrer::NotePrefix::inMemoryLocationOf);
+    (void)foundArgs;
+
+    // Use the actual source loc of the
+    auto remark = RemarkMissed("memory", *destroy)
+                  << "Memory destroy of value with type '"
+                  << NV("ValueType", destroy->getOperand()->getType()) << "'";
+    if (foundArgs) {
+      for (auto arg : inferredArgs) {
+        remark << arg;
+      }
+    }
+
+    return remark;
+  });
+}
 
 void AssemblyVisionRemarkGeneratorInstructionVisitor::
     visitUnconditionalCheckedCastAddrInst(

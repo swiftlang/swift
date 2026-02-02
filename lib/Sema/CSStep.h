@@ -407,15 +407,12 @@ private:
       auto &log = getDebugLogger();
       log << "Type variables in scope = "
           << "[";
-      auto typeVars = CS.getTypeVariables();
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-      interleave(typeVars, [&](TypeVariableType *typeVar) {
-                   Type(typeVar).print(log, PO);
-                 },
-                 [&] {
-                   log << ", ";
-                 });
+      interleave(
+          CS.getTypeVariables(),
+          [&](TypeVariableType *typeVar) {
+            Type(typeVar).print(log, PrintOptions::forDebugging());
+          },
+          [&] { log << ", "; });
       log << "]" << '\n';
     }
 
@@ -543,19 +540,20 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
   bool SawFirstLiteralConstraint = false;
 
 public:
-  TypeVariableStep(BindingContainer &bindings,
+  TypeVariableStep(ConstraintSystem &cs,
+                   TypeVariableType *typeVar,
+                   const BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : BindingStep(bindings.getConstraintSystem(), {bindings}, solutions),
-        TypeVar(bindings.getTypeVariable()) {}
+      : BindingStep(cs, {cs, typeVar, bindings}, solutions),
+        TypeVar(typeVar) {}
 
   void setup() override;
 
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    Out << "TypeVariableStep for " << TypeVar->getString(PO) << '\n';
+    Out << "TypeVariableStep for ";
+    Out << TypeVar->getString(PrintOptions::forDebugging()) << '\n';
   }
 
 protected:
@@ -613,11 +611,18 @@ class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   std::optional<std::pair<Constraint *, Score>> LastSolvedChoice;
 
 public:
+  DisjunctionStep(
+      ConstraintSystem &cs,
+      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> &disjunction,
+      SmallVectorImpl<Solution> &solutions)
+      : DisjunctionStep(cs, disjunction.first, disjunction.second, solutions) {}
+
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
+                  llvm::TinyPtrVector<Constraint *> &favoredChoices,
                   SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction) {
+      : BindingStep(cs, {cs, disjunction, favoredChoices}, solutions),
+        Disjunction(disjunction) {
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
-    pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
   }
 
@@ -678,49 +683,6 @@ private:
   /// \return true if the choice has been accepted and system can be
   /// simplified further, false otherwise.
   bool attempt(const DisjunctionChoice &choice) override;
-
-  // Check if selected disjunction has a representative
-  // this might happen when there are multiple binary operators
-  // chained together. If so, disable choices which differ
-  // from currently selected representative.
-  void pruneOverloadSet(Constraint *disjunction) {
-    auto *choice = disjunction->getNestedConstraints().front();
-    if (choice->getKind() != ConstraintKind::BindOverload)
-      return;
-
-    auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
-    if (!typeVar)
-      return;
-
-    auto *repr = typeVar->getImpl().getRepresentative(nullptr);
-    if (!repr || repr == typeVar)
-      return;
-
-    for (auto overload : CS.getResolvedOverloads()) {
-      auto resolved = overload.second;
-      if (!resolved.boundType->isEqual(repr))
-        continue;
-
-      auto &representative = resolved.choice;
-      if (!representative.isDecl())
-        return;
-
-      // Disable all of the overload choices which are different from
-      // the one which is currently picked for representative.
-      for (auto *constraint : disjunction->getNestedConstraints()) {
-        if (constraint->isDisabled())
-          continue;
-
-        auto choice = constraint->getOverloadChoice();
-        if (!choice.isDecl() || choice.getDecl() == representative.getDecl())
-          continue;
-
-        constraint->setDisabled();
-        DisabledChoices.push_back(constraint);
-      }
-      break;
-    }
-  };
 
   // Figure out which of the solutions has the smallest score.
   static std::optional<Score>
@@ -860,8 +822,7 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
 
   /// The number of milliseconds until outer constraint system
   /// is considered "too complex" if timer is enabled.
-  std::optional<std::pair<ExpressionTimer::AnchorType, unsigned>>
-      OuterTimeRemaining = std::nullopt;
+  std::optional<unsigned> OuterTimeRemaining = std::nullopt;
 
   /// Conjunction constraint associated with this step.
   Constraint *Conjunction;
@@ -903,7 +864,7 @@ public:
 
     if (cs.Timer) {
       auto remainingTime = cs.Timer->getRemainingProcessTimeInSeconds();
-      OuterTimeRemaining.emplace(cs.Timer->getAnchor(), remainingTime);
+      OuterTimeRemaining.emplace(remainingTime);
     }
   }
 
@@ -918,11 +879,8 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining) {
-      auto anchor = OuterTimeRemaining->first;
-      auto remainingTime = OuterTimeRemaining->second;
-      CS.Timer.emplace(anchor, CS, remainingTime);
-    }
+    if (OuterTimeRemaining)
+      CS.Timer.emplace(CS, *OuterTimeRemaining);
   }
 
   StepResult resume(bool prevFailed) override;

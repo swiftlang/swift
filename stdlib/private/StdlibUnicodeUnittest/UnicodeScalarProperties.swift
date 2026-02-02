@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,7 +15,7 @@
 #if _runtime(_ObjC)
 import Foundation
 
-// Cache of opened files 
+// Cache of opened files
 var cachedFiles: [String: String] = [:]
 
 func readInputFile(_ filename: String) -> String {
@@ -128,10 +128,10 @@ func parseBinaryProperties(
 
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     // Get the property first because we may not care about it.
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     guard availableBinaryProperties.contains(filteredProperty) else {
       continue
     }
@@ -187,12 +187,12 @@ func parseNumericTypes(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     let numericType: Unicode.NumericType
 
     switch filteredProperty {
@@ -205,9 +205,9 @@ func parseNumericTypes(
     default:
       continue
     }
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     let scalars = parseScalars(String(filteredScalars))
 
     for scalar in scalars {
@@ -225,12 +225,12 @@ func parseNumericValues(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     let filteredProperty = components[3].filter { !$0.isWhitespace }
-    
+
     let value: Double
 
     // If we have a division, split the numerator and denominator and perform
@@ -247,7 +247,7 @@ func parseNumericValues(
     }
 
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     let scalars = parseScalars(String(filteredScalars))
 
     for scalar in scalars {
@@ -286,7 +286,7 @@ func parseMappings(
 ) {
   for line in data.split(separator: "\n") {
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
-    
+
     let scalarStr = components[0]
     guard let scalar = Unicode.Scalar(UInt32(scalarStr, radix: 16)!) else {
       continue
@@ -303,7 +303,7 @@ func parseMappings(
 
       result[scalar, default: [:]]["lower"] = mapping
     }
-    
+
     if let title = UInt32(components[14], radix: 16) {
       let mapping = String(Unicode.Scalar(title)!)
 
@@ -320,27 +320,27 @@ func parseSpecialMappings(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
-    
+
     // Conditional mappings have an extra component with the conditional name.
     // Ignore those.
     guard components.count == 5 else {
       continue
     }
-    
+
     guard let scalar = Unicode.Scalar(UInt32(components[0], radix: 16)!) else {
       continue
     }
-    
+
     let lower = components[1].split(separator: " ").map {
       Character(Unicode.Scalar(UInt32($0, radix: 16)!)!)
     }
-    
+
     let title = components[2].split(separator: " ").map {
       Character(Unicode.Scalar(UInt32($0, radix: 16)!)!)
     }
-    
+
     let upper = components[3].split(separator: " ").map {
       Character(Unicode.Scalar(UInt32($0, radix: 16)!)!)
     }
@@ -369,7 +369,7 @@ public let mappings: [Unicode.Scalar: [String: String]] = {
   #else
   let unicodeData = readInputFile("UnicodeData.txt")
   #endif
-  
+
   let specialCasing = readInputFile("SpecialCasing.txt")
 
   parseMappings(unicodeData, into: &result)
@@ -651,22 +651,22 @@ func parseCaseFoldings(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let components = line.split(separator: ";")
-    
+
     let status = components[1].filter { !$0.isWhitespace }
-    
+
     // We only care about Common and Full case mappings.
     guard status == "C" || status == "F" else {
       continue
     }
-    
+
     let scalar = Unicode.Scalar(parseScalars(String(components[0])).lowerBound)!
-    
+
     let mapping = components[2].split(separator: " ").map {
       Unicode.Scalar(UInt32($0, radix: 16)!)!
     }
-    
+
     var mappingString = ""
 
     for scalar in mapping {
@@ -710,6 +710,7 @@ extension Unicode {
     case bassaVah = "Bassa_Vah"
     case batak = "Batak"
     case bengali = "Bengali"
+    case beriaErfe = "Beria_Erfe"
     case bhaiksuki = "Bhaiksuki"
     case bopomofo = "Bopomofo"
     case brahmi = "Brahmi"
@@ -835,6 +836,7 @@ extension Unicode {
     case sharada = "Sharada"
     case shavian = "Shavian"
     case siddham = "Siddham"
+    case sidetic = "Sidetic"
     case signWriting = "SignWriting"
     case sinhala = "Sinhala"
     case sogdian = "Sogdian"
@@ -849,6 +851,7 @@ extension Unicode {
     case taiLe = "Tai_Le"
     case taiTham = "Tai_Tham"
     case taiViet = "Tai_Viet"
+    case taiYo = "Tai_Yo"
     case takri = "Takri"
     case tamil = "Tamil"
     case tangsa = "Tangsa"
@@ -860,6 +863,7 @@ extension Unicode {
     case tifinagh = "Tifinagh"
     case tirhuta = "Tirhuta"
     case todhri = "Todhri"
+    case tolongSiki = "Tolong_Siki"
     case toto = "Toto"
     case tuluTigalari = "Tulu_Tigalari"
     case ugaritic = "Ugaritic"
@@ -922,6 +926,7 @@ func classifyScriptProperty(
     case "bass", "bassavah":              return .bassaVah
     case "batk", "batak":                 return .batak
     case "beng", "bengali":               return .bengali
+    case "berf", "beriaerfe":             return .beriaErfe
     case "bhks", "bhaiksuki":             return .bhaiksuki
     case "bopo", "bopomofo":              return .bopomofo
     case "brah", "brahmi":                return .brahmi
@@ -1041,6 +1046,7 @@ func classifyScriptProperty(
     case "shaw", "shavian":               return .shavian
     case "shrd", "sharada":               return .sharada
     case "sidd", "siddham":               return .siddham
+    case "sidt", "sidetic":               return .sidetic
     case "sind", "khudawadi":             return .khudawadi
     case "sinh", "sinhala":               return .sinhala
     case "sogd", "sogdian":               return .sogdian
@@ -1058,6 +1064,7 @@ func classifyScriptProperty(
     case "taml", "tamil":                 return .tamil
     case "tang", "tangut":                return .tangut
     case "tavt", "taiviet":               return .taiViet
+    case "tayo", "taiyo":                 return .taiYo
     case "telu", "telugu":                return .telugu
     case "tfng", "tifinagh":              return .tifinagh
     case "tglg", "tagalog":               return .tagalog
@@ -1067,6 +1074,7 @@ func classifyScriptProperty(
     case "tirh", "tirhuta":               return .tirhuta
     case "tnsa", "tangsa":                return .tangsa
     case "todr", "todhri":                return .todhri
+    case "tols", "tolongsiki":            return .tolongSiki
     case "toto":                          return .toto
     case "tutg", "tulutigalari":          return .tuluTigalari
     case "ugar", "ugaritic":              return .ugaritic

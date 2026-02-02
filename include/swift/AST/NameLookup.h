@@ -33,7 +33,7 @@
 
 namespace swift {
 class ASTContext;
-class DeclName;
+class DeclNameRef;
 class Type;
 class TypeDecl;
 class ValueDecl;
@@ -155,11 +155,18 @@ public:
       : Results(Results.begin(), Results.end()),
         IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
 
+  using const_iterator = SmallVectorImpl<LookupResultEntry>::const_iterator;
+  const_iterator begin() const { return Results.begin(); }
+  const_iterator end() const {
+    return Results.begin() + IndexOfFirstOuterResult;
+  }
+
   using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() {
     return Results.begin() + IndexOfFirstOuterResult;
   }
+
   unsigned size() const { return innerResults().size(); }
   bool empty() const { return innerResults().empty(); }
 
@@ -193,9 +200,6 @@ public:
       IndexOfFirstOuterResult++;
       assert(IndexOfFirstOuterResult == Results.size() &&
              "found an outer result before an inner one");
-    } else {
-      assert(IndexOfFirstOuterResult > 0 &&
-             "found outer results without an inner one");
     }
   }
 
@@ -486,6 +490,14 @@ public:
 /// \returns true if any declarations were removed, false otherwise.
 bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 
+/// Remove any declarations in the given set that do not match the
+/// module selector, if it is not empty.
+///
+/// \returns true if any declarations were removed, false otherwise.
+bool removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
+                            Identifier moduleSelector,
+                            const DeclContext *dc);
+
 /// Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.
 ///
@@ -561,6 +573,7 @@ void tryExtractDirectlyReferencedNominalTypes(
 /// Once name lookup has gathered a set of results, perform any necessary
 /// steps to prune the result set before returning it to the caller.
 void pruneLookupResultSet(const DeclContext *dc, NLOptions options,
+                          Identifier moduleSelector,
                           SmallVectorImpl<ValueDecl *> &decls);
 
 /// Do nothing if debugClient is null.
@@ -604,6 +617,11 @@ void forEachPotentialAttachedMacro(
 
 /// Describes an inherited nominal entry.
 struct InheritedNominalEntry : Located<NominalTypeDecl *> {
+  /// The `TypeRepr` of the inheritance clause entry from which this nominal was
+  /// sourced, if any. For example, if this is a conformance to `Y` declared as
+  /// `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  TypeRepr *inheritedTypeRepr;
+
   ConformanceAttributes attributes;
 
   /// Whether this inherited entry was suppressed via "~".
@@ -612,10 +630,10 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
   InheritedNominalEntry() { }
 
   InheritedNominalEntry(NominalTypeDecl *item, SourceLoc loc,
-                        ConformanceAttributes attributes,
-                        bool isSuppressed)
-      : Located(item, loc), attributes(attributes),
-        isSuppressed(isSuppressed) {}
+                        TypeRepr *inheritedTypeRepr,
+                        ConformanceAttributes attributes, bool isSuppressed)
+      : Located(item, loc), inheritedTypeRepr(inheritedTypeRepr),
+        attributes(attributes), isSuppressed(isSuppressed) {}
 };
 
 /// Retrieve the set of nominal type declarations that are directly
@@ -759,12 +777,12 @@ public:
   ///
   /// \param stopAfterInnermostBraceStmt If lookup should consider
   /// local declarations inside the innermost syntactic scope only.
-  static void lookupLocalDecls(SourceFile *, DeclName, SourceLoc,
+  static void lookupLocalDecls(SourceFile *, DeclNameRef, SourceLoc,
                                bool stopAfterInnermostBraceStmt,
                                ABIRole roleFilter,
                                SmallVectorImpl<ValueDecl *> &);
 
-  static void lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
+  static void lookupLocalDecls(SourceFile *sf, DeclNameRef name, SourceLoc loc,
                                bool stopAfterInnermostBraceStmt,
                                SmallVectorImpl<ValueDecl *> &results) {
     lookupLocalDecls(sf, name, loc, stopAfterInnermostBraceStmt,
@@ -772,7 +790,7 @@ public:
   }
 
   /// Returns the result if there is exactly one, nullptr otherwise.
-  static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclName, SourceLoc);
+  static ValueDecl *lookupSingleLocalDecl(SourceFile *, DeclNameRef, SourceLoc);
 
   /// Entry point to record the visible statement labels from the given
   /// point.

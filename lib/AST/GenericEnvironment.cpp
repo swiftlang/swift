@@ -31,8 +31,8 @@ size_t GenericEnvironment::numTrailingObjects(
   case Kind::Primary:
     return 0;
 
-  case Kind::OpenedExistential:
-  case Kind::OpenedElement:
+  case Kind::Existential:
+  case Kind::Element:
   case Kind::Opaque:
     return 1;
   }
@@ -42,8 +42,8 @@ size_t GenericEnvironment::numTrailingObjects(
     OverloadToken<OpaqueEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
-  case Kind::OpenedExistential:
-  case Kind::OpenedElement:
+  case Kind::Existential:
+  case Kind::Element:
     return 0;
 
   case Kind::Opaque:
@@ -52,34 +52,34 @@ size_t GenericEnvironment::numTrailingObjects(
 }
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<OpenedExistentialEnvironmentData>) const {
+    OverloadToken<ExistentialEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::Opaque:
-  case Kind::OpenedElement:
+  case Kind::Element:
     return 0;
 
-  case Kind::OpenedExistential:
+  case Kind::Existential:
     return 1;
   }
 }
 
 size_t GenericEnvironment::numTrailingObjects(
-    OverloadToken<OpenedElementEnvironmentData>) const {
+    OverloadToken<ElementEnvironmentData>) const {
   switch (getKind()) {
   case Kind::Primary:
   case Kind::Opaque:
-  case Kind::OpenedExistential:
+  case Kind::Existential:
     return 0;
 
-  case Kind::OpenedElement:
+  case Kind::Element:
     return 1;
   }
 }
 
 size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
   return getGenericParams().size()
-       + (getKind() == Kind::OpenedElement ? getNumOpenedPackParams() : 0);
+       + (getKind() == Kind::Element ? getNumOpenedPackParams() : 0);
 }
 
 /// Retrieve the array containing the context types associated with the
@@ -99,7 +99,7 @@ ArrayRef<Type> GenericEnvironment::getContextTypes() const {
 }
 
 unsigned GenericEnvironment::getNumOpenedPackParams() const {
-  assert(getKind() == Kind::OpenedElement);
+  assert(getKind() == Kind::Element);
   return getGenericSignature().getInnermostGenericParams().size();
 }
 
@@ -130,24 +130,24 @@ OpaqueTypeDecl *GenericEnvironment::getOpaqueTypeDecl() const {
 
 CanGenericTypeParamType
 GenericEnvironment::getOpenedElementShapeClass() const {
-  assert(getKind() == Kind::OpenedElement);
-  auto environmentData = getTrailingObjects<OpenedElementEnvironmentData>();
+  assert(getKind() == Kind::Element);
+  auto environmentData = getTrailingObjects<ElementEnvironmentData>();
   return environmentData->shapeClass;
 }
 
 Type GenericEnvironment::getOpenedExistentialType() const {
-  assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedExistentialEnvironmentData>()->existential;
+  assert(getKind() == Kind::Existential);
+  return getTrailingObjects<ExistentialEnvironmentData>()->existential;
 }
 
 UUID GenericEnvironment::getOpenedExistentialUUID() const {
-  assert(getKind() == Kind::OpenedExistential);
-  return getTrailingObjects<OpenedExistentialEnvironmentData>()->uuid;
+  assert(getKind() == Kind::Existential);
+  return getTrailingObjects<ExistentialEnvironmentData>()->uuid;
 }
 
 UUID GenericEnvironment::getOpenedElementUUID() const {
-  assert(getKind() == Kind::OpenedElement);
-  return getTrailingObjects<OpenedElementEnvironmentData>()->uuid;
+  assert(getKind() == Kind::Element);
+  return getTrailingObjects<ElementEnvironmentData>()->uuid;
 }
 
 void GenericEnvironment::forEachPackElementArchetype(
@@ -155,7 +155,7 @@ void GenericEnvironment::forEachPackElementArchetype(
   auto packElements = getGenericSignature().getInnermostGenericParams();
   for (auto eltInterfaceType: packElements) {
     auto *elementArchetype =
-      mapTypeIntoContext(eltInterfaceType)->castTo<ElementArchetypeType>();
+      mapTypeIntoEnvironment(eltInterfaceType)->castTo<ElementArchetypeType>();
     function(elementArchetype);
   }
 }
@@ -194,7 +194,7 @@ void GenericEnvironment::forEachPackElementBinding(
   forEachPackElementGenericTypeParam([&](auto *genericParam) {
     assert(elementIt != packElements.end());
     auto *elementArchetype =
-        mapTypeIntoContext(*elementIt++)->castTo<ElementArchetypeType>();
+        mapTypeIntoEnvironment(*elementIt++)->castTo<ElementArchetypeType>();
     auto *packSubstitution = maybeApplyOuterContextSubstitutions(genericParam)
       ->getPackSubstitutionAsPackType();
     function(elementArchetype, packSubstitution);
@@ -203,22 +203,21 @@ void GenericEnvironment::forEachPackElementBinding(
   assert(elementIt == packElements.end());
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature signature)
-  : SignatureAndKind(signature, Kind::Primary)
-{
+GenericEnvironment::GenericEnvironment(GenericSignature sig)
+  : sig(sig), kind(Kind::Primary), canonical(true) {
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
                           Type());
 }
 
 GenericEnvironment::GenericEnvironment(
-    GenericSignature signature,
+    GenericSignature sig,
     Type existential, SubstitutionMap subs, UUID uuid)
-  : SignatureAndKind(signature, Kind::OpenedExistential)
-{
+  : sig(sig), kind(Kind::Existential), canonical(subs.isCanonical()) {
+  ASSERT(canonical);
   *getTrailingObjects<SubstitutionMap>() = subs;
-  new (getTrailingObjects<OpenedExistentialEnvironmentData>())
-    OpenedExistentialEnvironmentData{ existential, uuid };
+  new (getTrailingObjects<ExistentialEnvironmentData>())
+    ExistentialEnvironmentData{ existential, uuid };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -226,9 +225,8 @@ GenericEnvironment::GenericEnvironment(
 }
 
 GenericEnvironment::GenericEnvironment(
-      GenericSignature signature, OpaqueTypeDecl *opaque, SubstitutionMap subs)
-  : SignatureAndKind(signature, Kind::Opaque)
-{
+      GenericSignature sig, OpaqueTypeDecl *opaque, SubstitutionMap subs)
+  : sig(sig), kind(Kind::Opaque), canonical(subs.isCanonical()) {
   *getTrailingObjects<SubstitutionMap>() = subs;
   new (getTrailingObjects<OpaqueEnvironmentData>())
     OpaqueEnvironmentData{opaque};
@@ -238,15 +236,15 @@ GenericEnvironment::GenericEnvironment(
                           Type());
 }
 
-GenericEnvironment::GenericEnvironment(GenericSignature signature,
+GenericEnvironment::GenericEnvironment(GenericSignature sig,
                                        UUID uuid,
                                        CanGenericTypeParamType shapeClass,
                                        SubstitutionMap outerSubs)
-  : SignatureAndKind(signature, Kind::OpenedElement)
-{
+  : sig(sig), kind(Kind::Element), canonical(true) {
+  // FIXME: ASSERT(outerSubs.isCanonical());
   *getTrailingObjects<SubstitutionMap>() = outerSubs;
-  new (getTrailingObjects<OpenedElementEnvironmentData>())
-    OpenedElementEnvironmentData{uuid, shapeClass};
+  new (getTrailingObjects<ElementEnvironmentData>())
+    ElementEnvironmentData{uuid, shapeClass};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -255,9 +253,9 @@ GenericEnvironment::GenericEnvironment(GenericSignature signature,
   // Fill in the array of opened pack parameters.
   auto openedPacksBuffer = getOpenedPackParams();
   unsigned i = 0;
-  for (auto param : signature.getGenericParams()) {
+  for (auto param : sig.getGenericParams()) {
     if (!param->isParameterPack()) continue;
-    if (!signature->haveSameShape(param, shapeClass)) continue;
+    if (!sig->haveSameShape(param, shapeClass)) continue;
     openedPacksBuffer[i++] = param;
   }
   assert(i == openedPacksBuffer.size());
@@ -314,8 +312,8 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   case Kind::Primary:
     return type;
 
-  case Kind::OpenedExistential:
-  case Kind::OpenedElement:
+  case Kind::Existential:
+  case Kind::Element:
   case Kind::Opaque: {
     if (auto subs = getOuterSubstitutions()) {
       OuterSubstitutions replacer{subs,
@@ -328,7 +326,7 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
   }
 }
 
-Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
+Type GenericEnvironment::mapTypeIntoEnvironment(GenericEnvironment *env,
                                             Type type) {
   assert(!type->hasPrimaryArchetype() && "already have a contextual type");
 
@@ -338,7 +336,7 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
     return type;
   }
 
-  return env->mapTypeIntoContext(type);
+  return env->mapTypeIntoEnvironment(type);
 }
 
 Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
@@ -350,12 +348,12 @@ Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
   return type;
 }
 
-Type TypeBase::mapTypeOutOfContext() {
+Type TypeBase::mapTypeOutOfEnvironment() {
   assert(!hasTypeParameter() && "already have an interface type");
   return Type(this).subst(MapTypeOutOfContext(),
-    MakeAbstractConformanceForGenericType(),
-    SubstFlags::PreservePackExpansionLevel |
-    SubstFlags::SubstitutePrimaryArchetypes);
+                          LookUpConformanceInModule(),
+                          SubstFlags::PreservePackExpansionLevel |
+                          SubstFlags::SubstitutePrimaryArchetypes);
 }
 
 auto GenericEnvironment::getOrCreateNestedTypeStorage() -> NestedTypeStorage & {
@@ -387,7 +385,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
   // If this type parameter is equivalent to a concrete type,
   // map the concrete type into context and cache the result.
   if (!reducedType->isTypeParameter()) {
-    auto result = mapTypeIntoContext(reducedType);
+    auto result = mapTypeIntoEnvironment(reducedType);
     addMapping(canType, result);
     return result;
   }
@@ -446,7 +444,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     break;
   }
 
-  case Kind::OpenedExistential: {
+  case Kind::Existential: {
     if (rootGP->getDepth() < genericSig->getMaxDepth()) {
       result = maybeApplyOuterContextSubstitutions(reducedType);
       break;
@@ -479,7 +477,7 @@ GenericEnvironment::getOrCreateArchetypeFromInterfaceType(Type depType) {
     break;
   }
 
-  case Kind::OpenedElement: {
+  case Kind::Element: {
     if (rootGP->getDepth() < genericSig->getMaxDepth()) {
       result = maybeApplyOuterContextSubstitutions(reducedType);
       break;
@@ -555,7 +553,7 @@ struct MapTypeIntoContext: TypeTransform<MapTypeIntoContext> {
 
 }
 
-Type GenericEnvironment::mapTypeIntoContext(Type type) const {
+Type GenericEnvironment::mapTypeIntoEnvironment(Type type) const {
   assert(!type->hasPrimaryArchetype() && "already have a contextual type");
   if (!type->hasTypeParameter())
     return type;
@@ -564,7 +562,7 @@ Type GenericEnvironment::mapTypeIntoContext(Type type) const {
       .doIt(type, TypePosition::Invariant);
 }
 
-Type GenericEnvironment::mapTypeIntoContext(GenericTypeParamType *type) const {
+Type GenericEnvironment::mapTypeIntoEnvironment(GenericTypeParamType *type) const {
   return const_cast<GenericEnvironment *>(this)
       ->getOrCreateArchetypeFromInterfaceType(type);
 }
@@ -598,7 +596,7 @@ struct FindElementArchetypeForOpenedPackParam {
   }
 
   Type operator()(Type interfaceType) const {
-    return env->mapTypeIntoContext(getInterfaceType(interfaceType));
+    return env->mapTypeIntoEnvironment(getInterfaceType(interfaceType));
   }
 };
 
@@ -610,7 +608,7 @@ struct FindElementArchetypeForOpenedPackParam {
 /// does not apply outer substitutions, which might not be what you expect.
 Type
 GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
-  assert(getKind() == Kind::OpenedElement);
+  assert(getKind() == Kind::Element);
   assert(!type->hasTypeParameter() && "expected contextual type");
 
   if (!type->hasPackArchetype()) return type;
@@ -639,10 +637,10 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(CanType type) const 
 }
 
 /// Unlike mapContextualPackTypeIntoElementContext(), this also applies outer
-/// substitutions, so it behaves like mapTypeIntoContext() in that respect.
+/// substitutions, so it behaves like mapTypeIntoEnvironment() in that respect.
 Type
 GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
-  assert(getKind() == Kind::OpenedElement);
+  assert(getKind() == Kind::Element);
   assert(!type->hasPackArchetype());
 
   if (!type->hasParameterPack()) return type;
@@ -651,7 +649,7 @@ GenericEnvironment::mapPackTypeIntoElementContext(Type type) const {
   // substituted one, which is what mapContextualPackTypeIntoElementContext()
   // expects.
   auto contextualType = getOuterSubstitutions()
-    .getGenericSignature().getGenericEnvironment()->mapTypeIntoContext(type);
+    .getGenericSignature().getGenericEnvironment()->mapTypeIntoEnvironment(type);
 
   contextualType = mapContextualPackTypeIntoElementContext(contextualType);
   return maybeApplyOuterContextSubstitutions(contextualType);
@@ -684,7 +682,7 @@ GenericEnvironment::mapElementTypeIntoPackContext(Type type) const {
 
       return archetype->getInterfaceType();
     },
-    MakeAbstractConformanceForGenericType(),
+    LookUpConformanceInModule(),
     SubstFlags::PreservePackExpansionLevel |
     SubstFlags::SubstitutePrimaryArchetypes |
     SubstFlags::SubstituteLocalArchetypes);
@@ -754,7 +752,7 @@ GenericEnvironment::getForwardingSubstitutionMap() const {
   auto genericSig = getGenericSignature();
   return SubstitutionMap::get(genericSig,
                               BuildForwardingSubstitutions(this),
-                              MakeAbstractConformanceForGenericType());
+                              LookUpConformanceInModule());
 }
 
 OpenedElementContext

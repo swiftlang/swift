@@ -402,7 +402,8 @@ struct ResolvedRangeInfo {
                     /*Single entry*/true, /*UnhandledEffects*/{},
                     OrphanKind::None, {}, {}, {}) {}
   ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
-  void print(llvm::raw_ostream &OS) const;
+  void print(llvm::raw_ostream &OS,
+             const PrintOptions &PO = PrintOptions()) const;
   ExitState exit() const { return ExitInfo.Exit; }
   Type getType() const { return ExitInfo.ReturnType; }
 

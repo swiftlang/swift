@@ -74,17 +74,33 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
 #endif
 
 #elseif os(OpenBSD)
-public var stdin: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdin() }
-public var stdout: UnsafeMutablePointer<FILE> { return _swift_stdlib_stdout() }
-public var stderr: UnsafeMutablePointer<FILE> { return _swift_stdlib_stderr() }
+public var stdin: OpaquePointer { return OpaquePointer(_swift_stdlib_stdin()) }
+public var stdout: OpaquePointer { return OpaquePointer(_swift_stdlib_stdout()) }
+public var stderr: OpaquePointer { return OpaquePointer(_swift_stdlib_stderr()) }
 #elseif os(Windows)
-public var stdin: UnsafeMutablePointer<FILE> { return __acrt_iob_func(0) }
-public var stdout: UnsafeMutablePointer<FILE> { return __acrt_iob_func(1) }
-public var stderr: UnsafeMutablePointer<FILE> { return __acrt_iob_func(2) }
+public var stdin: UnsafeMutablePointer<FILE> {
+  return unsafe __acrt_iob_func(0)
+}
 
-public var STDIN_FILENO: Int32 { return _fileno(stdin) }
-public var STDOUT_FILENO: Int32 { return _fileno(stdout) }
-public var STDERR_FILENO: Int32 { return _fileno(stderr) }
+public var stdout: UnsafeMutablePointer<FILE> {
+  return unsafe __acrt_iob_func(1)
+}
+
+public var stderr: UnsafeMutablePointer<FILE> {
+  return unsafe __acrt_iob_func(2)
+}
+
+public var STDIN_FILENO: Int32 {
+  return unsafe _fileno(stdin)
+}
+
+public var STDOUT_FILENO: Int32 {
+  return unsafe _fileno(stdout)
+}
+
+public var STDERR_FILENO: Int32 {
+  return unsafe _fileno(stderr)
+}
 #endif
 
 
@@ -236,12 +252,12 @@ public func ioctl(
 // signal.h
 //===----------------------------------------------------------------------===//
 
-#if os(OpenBSD)
+#if os(OpenBSD) || os(FreeBSD)
 public var SIG_DFL: sig_t? { return nil }
 public var SIG_IGN: sig_t { return unsafeBitCast(1, to: sig_t.self) }
 public var SIG_ERR: sig_t { return unsafeBitCast(-1, to: sig_t.self) }
 public var SIG_HOLD: sig_t { return unsafeBitCast(3, to: sig_t.self) }
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
+#elseif os(Linux) || os(PS4) || os(Android) || os(Haiku)
 #if !canImport(SwiftMusl)
 public typealias sighandler_t = __sighandler_t
 #endif
@@ -272,10 +288,10 @@ public var SIG_HOLD: sighandler_t {
 #elseif os(Windows)
 public var SIG_DFL: _crt_signal_t? { return nil }
 public var SIG_IGN: _crt_signal_t {
-  return unsafeBitCast(1, to: _crt_signal_t.self)
+  return unsafe unsafeBitCast(1, to: _crt_signal_t.self)
 }
 public var SIG_ERR: _crt_signal_t {
-  return unsafeBitCast(-1, to: _crt_signal_t.self)
+  return unsafe unsafeBitCast(-1, to: _crt_signal_t.self)
 }
 #elseif os(WASI)
 // No signals support on WASI yet, see https://github.com/WebAssembly/WASI/issues/166.
@@ -334,7 +350,7 @@ extension timespec {
   @available(SwiftStdlib 5.7, *)
   public init(_ duration: Duration) {
     let comps = duration.components
-    self.init(tv_sec: Int(comps.seconds),
+    self.init(tv_sec: time_t(comps.seconds),
               tv_nsec: Int(comps.attoseconds / 1_000_000_000))
   }
 }
@@ -352,9 +368,19 @@ extension timeval {
   @available(SwiftStdlib 5.7, *)
   public init(_ duration: Duration) {
     let comps = duration.components
-  // Linux platforms define timeval as Int/Int
-  self.init(tv_sec: Int(comps.seconds),
-              tv_usec: Int(comps.attoseconds / 1_000_000_000_000))
+#if os(Linux)
+    // Linux platforms define timeval as Int/Int, except on 32-bit platforms
+    // where _TIME_BITS=64 is defined. Abuse time_t as an alias for the correct
+    // suseconds_t type, as it is not an alias to the 64-bit type on 32-bit
+    // platforms.
+    typealias _Seconds = time_t
+    typealias _Microseconds = time_t
+#else
+    typealias _Seconds = Int
+    typealias _Microseconds = Int // note: was Int32 in release/6.1
+#endif
+    self.init(tv_sec: _Seconds(comps.seconds),
+              tv_usec: _Microseconds(comps.attoseconds / 1_000_000_000_000))
   }
 }
 
@@ -384,3 +410,9 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 }
 #endif
 #endif // SWIFT_STDLIB_HAS_ENVIRON
+
+#if os(FreeBSD)
+@inlinable public func inet_pton(_ af: CInt, _ src: UnsafePointer<CChar>!, _ dst: UnsafeMutableRawPointer!) -> CInt {
+  __inet_pton(af, src, dst)
+}
+#endif

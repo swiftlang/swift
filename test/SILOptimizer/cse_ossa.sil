@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
 
 sil_stage canonical
 
@@ -87,40 +87,11 @@ bb3:
   return %6 : $()
 }
 
-// For now until the proper unreachable pruning code is committed for
-// SILCombine, we should not dce dead instructions in unreachable code.
-
-// CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// CHECK: bb0
-// CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
-// CHECK-LABEL: } // end sil function 'dead_inst_elimination_ignore_unreachable'
-sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int64, 24
-  br bb2
-
-bb1:
-  %1 = integer_literal $Builtin.Int64, 48
-  br bb2
-
-bb2:
-  %2 = tuple()
-  return %2 : $()
-}
-
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil [ossa] @exit : $@convention(thin) () -> Never {
-bb0:
-  br bb1
-
-bb1:
-  br bb1
-}
+sil [ossa] @exit : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
 // CHECK: store
@@ -700,12 +671,13 @@ bb0(%0 : $*Builtin.Int8):
 // CHECK-NOT: raw_pointer_to_ref
 // CHECK: tuple
 // CHECK-LABEL: } // end sil function 'cse_raw_pointer_to_ref'
-sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> (C, C) {
+sil [ossa] @cse_raw_pointer_to_ref : $@convention(thin) (Builtin.RawPointer) -> @owned (C, C) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %2 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
   %6 = tuple(%1: $C, %2: $C)
-  return %6 : $(C, C)
+  %7 = copy_value %6
+  return %7
 }
 
 // CHECK-LABEL: sil [ossa] @cse_unchecked_addr_cast :
@@ -1062,7 +1034,7 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
-protocol Proto : class {
+protocol Proto : AnyObject {
   func doThis()
   func doThat()
 }
@@ -1302,31 +1274,33 @@ struct S {
 // CHECK:         struct_extract
 // CHECK:         struct_extract
 // CHECK-LABEL: } // end sil function 'dont_rauw_guaranteed_with_nondominated_reborrow'
-sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> (@owned C) {
-entry(%instance : @owned $S):
-    cond_br undef, left, right
+sil [ossa] @dont_rauw_guaranteed_with_nondominated_reborrow : $@convention(thin) (@owned S) -> @owned C {
+bb0(%0 : @owned $S):
+  cond_br undef, bb1, bb2
 
-left:
-    %guaranteed_s_left = begin_borrow %instance : $S
-    %new = struct_extract %guaranteed_s_left : $S, #S.c
-    %old = struct_extract %guaranteed_s_left : $S, #S.c
-    %take_guaranteed_c = function_ref @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
-    apply %take_guaranteed_c(%new) : $@convention(thin) (@guaranteed C) -> ()
-    br exit(%old : $C, %guaranteed_s_left : $S, %instance : $S)
+bb1:
+  %2 = begin_borrow %0
+  %3 = struct_extract %2, #S.c
+  %4 = struct_extract %2, #S.c
+  %5 = function_ref @take_guaranteed_c : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3(%4, %2, %0)
 
-right:
-    destroy_value %instance : $S
-    %get_owned_s = function_ref @get_owned_s : $@convention(thin) () -> (@owned S)
-    %owned_s = apply %get_owned_s() : $@convention(thin) () -> (@owned S)
-    %guaranteed_s = begin_borrow %owned_s : $S
-    %projection = struct_extract %guaranteed_s : $S, #S.c
-    br exit(%projection : $C, %guaranteed_s : $S, %owned_s : $S)
-    
-exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
-    %copy = copy_value %proj : $C
-    end_borrow %borrow : $S
-    destroy_value %owned_s_2 : $S
-    return %copy : $C
+bb2:
+  destroy_value %0
+  %9 = function_ref @get_owned_s : $@convention(thin) () -> @owned S
+  %10 = apply %9() : $@convention(thin) () -> @owned S
+  %11 = begin_borrow %10
+  %12 = struct_extract %11, #S.c
+  br bb3(%12, %11, %10)
+
+bb3(%14 : @guaranteed $C, %15 : @reborrow $S, %16 : @owned $S):
+  %17 = borrowed %15 from (%16)
+  %18 = borrowed %14 from (%15)
+  %19 = copy_value %18
+  end_borrow %17
+  destroy_value %16
+  return %19
 }
 
 // CHECK-LABEL: sil [ossa] @type_value_test : {{.*}} {
@@ -1351,3 +1325,108 @@ bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
   return %14
 }
 
+struct Pair<let x: Int, let y: Int> {}
+// CHECK-LABEL: sil [ossa] @dont_cse_different_type_values : {{.*}} {
+// CHECK:         type_value
+// CHECK:         type_value
+// CHECK-LABEL: } // end sil function 'dont_cse_different_type_values'
+sil [ossa] @dont_cse_different_type_values : $@convention(method) <let x : Int, let y : Int> (Pair<x, y>) -> (Int, Int) {
+[global: ]
+bb0(%0 : $Pair<x, y>):
+  %2 = type_value $Int for x
+  %3 = type_value $Int for y
+  %4 = tuple (%2, %3)
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_block : {{.*}} {
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'dead_end_block'
+sil [ossa] @dead_end_block : $@convention(thin) (Builtin.RawPointer) -> @owned B {
+bb0(%0 : $Builtin.RawPointer):
+  %4 = raw_pointer_to_ref %0 to $E
+  %5 = copy_value %4
+  %6 = upcast %5 to $B
+  fix_lifetime %6
+  destroy_value %6
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %14 = raw_pointer_to_ref %0 to $E
+  %15 = copy_value %14
+  %16 = upcast %15 to $B
+  return %16
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// rdar168620481: bailout on uwnowed phis
+/////////////////////////////////////////////////////////////////////////////
+
+class Element {
+  @_hasStorage var skip: Optional<Unmanaged<Element>>
+  @_hasStorage var after: Optional<Element>
+}
+
+// The old value:
+//     %24 = unmanaged_to_ref %23 to $Element
+// cannot be replaced by
+//     %16 = copy_value %15
+// because %24 is used by phi node
+//     br bb2(%20, %24)
+//
+// Previously asserted in OwnershipLifetimeExtender::createPlusZeroCopy.
+// CHECK-LABEL: sil [ossa] @testUnownedPhi : {{.*}} {
+// CHECK:  unmanaged_to_ref %{{.*}} to $Element
+// CHECK-LABEL: } // end sil function 'testUnownedPhi'
+sil [ossa] @testUnownedPhi : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
+bb0(%0 : $Optional<Unmanaged<Element>>):
+  br bb1(%0)
+
+bb1(%2 : $Optional<Unmanaged<Element>>):
+  %3 = unchecked_enum_data %2, #Optional.some!enumelt
+  %4 = struct_extract %3, #Unmanaged._value
+  %5 = unmanaged_to_ref %4 to $Element
+  br bb2(%3, %5)
+
+
+bb2(%7 : $Unmanaged<Element>, %8 : @unowned $Element):
+  %9 = unchecked_ownership_conversion %8, @unowned to @guaranteed
+  %10 = ref_element_addr %9, #Element.after
+  %11 = load [copy] %10
+  %12 = begin_borrow [lexical] %11
+  switch_enum %12, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb6
+
+bb3(%14 : @guaranteed $Element):
+  %15 = unchecked_enum_data %12, #Optional.some!enumelt
+  %16 = copy_value %15
+  end_borrow %12
+  destroy_value %11
+  %19 = ref_to_unmanaged %16 to $@sil_unmanaged Element
+  %20 = struct $Unmanaged<Element> (%19)
+  destroy_value %16
+  end_borrow %9
+  %23 = struct_extract %20, #Unmanaged._value
+  %24 = unmanaged_to_ref %23 to $Element
+  cond_br undef, bb5, bb4
+
+bb4:
+  %26 = unchecked_ownership_conversion %24, @unowned to @guaranteed
+  %27 = ref_element_addr %26, #Element.skip
+  %28 = load [trivial] %27
+  end_borrow %26
+  br bb1(%28)
+
+bb5:
+  br bb2(%20, %24)
+
+bb6:
+  end_borrow %12
+  destroy_value %11
+  end_borrow %9
+  %35 = tuple ()
+  return %35
+}

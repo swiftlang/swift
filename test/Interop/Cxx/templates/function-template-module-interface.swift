@@ -20,7 +20,10 @@
 
 // CHECK: func lvalueReference<T>(_ ref: inout T)
 // CHECK: func constLvalueReference<T>(_: T)
-// CHECK: func PointerTemplateParameter<T>(_: UnsafeMutablePointer<T>)
+
+// CHECK: func pointerTemplateParameter<T>(_ t: UnsafeMutablePointer<T>!) -> Bool
+// CHECK: func pointerTemplateParameterNonnull<T>(_ t: UnsafeMutablePointer<T>) -> Bool
+// CHECK: func pointerTemplateParameterNullable<T>(_ t: UnsafeMutablePointer<T>?) -> Bool
 
 // CHECK: enum Orbiters {
 // CHECK:   static func galileo<T>(_: T)

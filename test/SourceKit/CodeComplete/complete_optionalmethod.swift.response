@@ -16,7 +16,7 @@
       key.kind: source.lang.swift.keyword,
       key.name: "self",
       key.description: "self",
-      key.typename: "T",
+      key.typename: "Proto",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,

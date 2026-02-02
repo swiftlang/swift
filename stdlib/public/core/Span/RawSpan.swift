@@ -21,7 +21,7 @@ import Swift
 /// When a `RawSpan` is created, it inherits the lifetime of the container
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
-/// ensuring spcial safety and avoiding buffer overflow errors.
+/// ensuring spatial safety and avoiding buffer overflow errors.
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 @frozen
@@ -30,10 +30,10 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `RawSpan`.
   ///
-  /// `_pointer` can be `nil` if and only if `_count` equals 0.
-  /// Otherwise, `_pointer` must point to memory that will remain
-  /// valid and not mutated as long as this `Span` exists.
-  /// The memory at `_pointer` must consist of `_count` initialized bytes.
+  /// If `_count` is zero, `_pointer` may point to valid memory or it may be `nil`,
+  /// but no accesses may be performed through it. Otherwise, `_pointer` must point
+  /// to initialized memory containing `_count` bytes, which must remain valid and
+  /// not be mutated during the lifetime of this `RawSpan`.
   @usableFromInline
   internal let _pointer: UnsafeRawPointer?
 
@@ -54,7 +54,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(immortal)
-  internal init() {
+  public init() {
     unsafe _pointer = nil
     _count = 0
   }
@@ -62,7 +62,7 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
   /// `pointer` must point to a region of `byteCount` initialized bytes,
-  /// or may be `nil` if `count` is 0.
+  /// or may be `nil` if `byteCount` is 0.
   ///
   /// The region of `byteCount` bytes of memory starting at `pointer`
   /// must remain valid, initialized and immutable
@@ -121,7 +121,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeRawBufferPointer>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -142,7 +142,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeMutableRawBufferPointer` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -163,7 +163,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeMutableRawBufferPointer>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -207,7 +207,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeBufferPointer<T>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -228,7 +228,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeBufferPointer<T>>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -249,7 +249,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: an `UnsafeMutableBufferPointer<T>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -270,7 +270,7 @@ extension RawSpan {
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeRawBufferPointer` to initialized memory.
+  ///   - buffer: a `Slice<UnsafeMutableBufferPointer<T>>` to initialized memory.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
@@ -288,14 +288,14 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The region of memory representing `byteCount` bytes starting at `pointer`
+  /// The region of memory representing `count` elements starting at `pointer`
   /// must remain valid, initialized and immutable
   /// throughout the lifetime of the newly-created `RawSpan`.
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
-  ///   - byteCount: the number of initialized bytes in the span.
+  ///   - count: the number of initialized elements in the span.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
@@ -340,12 +340,14 @@ extension RawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  public var byteCount: Int { _count }
+  @_semantics("fixed_storage.get_count")
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   /// A Boolean value indicating whether the span is empty.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { byteCount == 0 }
 
   /// The indices that are valid for subscripting the span, in ascending
@@ -378,13 +380,20 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(_ bounds: Range<Int>) -> Self {
+  public func extracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Byte offset range out of bounds"
     )
-    return unsafe _extracting(unchecked: bounds)
+    return unsafe extracting(unchecked: bounds)
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(_ bounds: Range<Int>) -> Self {
+    extracting(bounds)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -405,12 +414,20 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(unchecked bounds: Range<Int>) -> Self {
+  public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe RawSpan(_unchecked: newStart, byteCount: bounds.count)
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
+  @unsafe
+  @available(*, deprecated, renamed: "extracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(unchecked bounds: Range<Int>) -> Self {
+    unsafe extracting(unchecked: bounds)
+  }
+
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
@@ -426,8 +443,15 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
+  public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
+    extracting(bounds.relative(to: byteOffsets))
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
   public func _extracting(_ bounds: some RangeExpression<Int>) -> Self {
-    _extracting(bounds.relative(to: byteOffsets))
+    extracting(bounds)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -448,13 +472,21 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(
+  public func extracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
     let range = unsafe Range(
       _uncheckedBounds: (bounds.lowerBound, bounds.upperBound + 1)
     )
-    return unsafe _extracting(unchecked: range)
+    return unsafe extracting(unchecked: range)
+  }
+
+  @unsafe
+  @available(*, deprecated, renamed: "extracting(unchecked:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(unchecked bounds: ClosedRange<Int>) -> Self {
+    unsafe extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over all the bytes of this span.
@@ -466,6 +498,13 @@ extension RawSpan {
   /// - Returns: A span over all the bytes of this span.
   ///
   /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func extracting(_: UnboundedRange) -> Self {
+    self
+  }
+
+  @available(*, deprecated, renamed: "extracting(_:)")
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
@@ -494,13 +533,11 @@ extension RawSpan {
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    guard let _pointer = unsafe _pointer, byteCount > 0 else {
-      return try unsafe body(.init(start: nil, count: 0))
-    }
-    return try unsafe body(.init(start: _pointer, count: byteCount))
+    try unsafe body(.init(start: _pointer, count: byteCount))
   }
 }
 
@@ -561,7 +598,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -592,7 +629,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().load(fromByteOffset: offset, as: T.self)
   }
@@ -616,7 +653,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -648,7 +685,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
@@ -664,14 +701,23 @@ extension RawSpan {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
-  /// Returns the offsets where the memory of `span` is located within
+  /// Returns a Boolean value indicating whether two instances refer to the same
+  /// memory region.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe (self._pointer == other._pointer) && (self._count == other._count)
+  }
+
+  /// Returns the offsets where the memory of `other` is located within
   /// the memory represented by `self`
   ///
-  /// Note: `span` must be a subrange of `self`
+  /// Note: `other` must be a subrange of `self`
   ///
-  /// Parameters:
-  /// - span: a subrange of `self`
-  /// Returns: A range of offsets within `self`
+  /// - Parameters:
+  ///   - other: a subrange of `self`
+  /// - Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
@@ -708,11 +754,18 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(first maxLength: Int) -> Self {
+  public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(first:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(first maxLength: Int) -> Self {
+    extracting(first: maxLength)
   }
 
   /// Returns a span over all but the given number of trailing bytes.
@@ -731,12 +784,19 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(droppingLast k: Int) -> Self {
+  public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let count = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: count)
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(droppingLast:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(droppingLast k: Int) -> Self {
+    extracting(droppingLast: k)
   }
 
   /// Returns a span containing the trailing bytes of the span,
@@ -756,7 +816,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(last maxLength: Int) -> Self {
+  public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
     let newStart = unsafe _pointer?.advanced(by: byteCount &- newCount)
@@ -764,6 +824,13 @@ extension RawSpan {
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(last:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(last maxLength: Int) -> Self {
+    extracting(last: maxLength)
   }
 
   /// Returns a span over all but the given number of initial bytes.
@@ -782,7 +849,7 @@ extension RawSpan {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  public func _extracting(droppingFirst k: Int) -> Self {
+  public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newStart = unsafe _pointer?.advanced(by: droppedCount)
@@ -791,5 +858,12 @@ extension RawSpan {
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
+  }
+
+  @available(*, deprecated, renamed: "extracting(droppingFirst:)")
+  @_alwaysEmitIntoClient
+  @lifetime(copy self)
+  public func _extracting(droppingFirst k: Int) -> Self {
+    extracting(droppingFirst: k)
   }
 }

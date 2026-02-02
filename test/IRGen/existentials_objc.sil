@@ -22,7 +22,7 @@ bb0(%0 : $*Any, %1 : $T):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %T) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential(ptr noalias sret({{.*}}) captures(none) %0, ptr %1, ptr %T) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} [[ANY:%Any]], ptr %0, i32 0, i32 1
 // CHECK-NEXT:    store ptr %T, ptr [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[ANY]], ptr %0, i32 0, i32 0
@@ -37,7 +37,7 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias captures(none) dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: call ptr @"$sypWOb"(ptr %1, ptr %0)
 // CHECK-NEXT:    ret void
 

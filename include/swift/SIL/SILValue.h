@@ -38,6 +38,7 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
+class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -353,6 +354,30 @@ struct ValueOwnershipKind {
                       });
   }
 
+  // An initialized value whose nominal type has a deinit() must be 'owned'. For
+  // example, an owned struct/enum-with-deinit may be initialized by
+  // "forwarding" a trivial value. A struct/enum-with-deinit must be prevented
+  // from forwarding a guaranteed value.
+  //
+  // Simply consider all non-Copyable types to be 'owned'. This could instead be
+  // limited to isValueTypeWithDeinit(). However, forcing non-Copyable types to
+  // be owned is consistent with the fact that their type is non-Trivial and
+  // simplifies reasoning about non-Copyable ownership.
+  ValueOwnershipKind forwardToInit(SILType nominalType) {
+    if (nominalType.isMoveOnly()) {
+      switch (value) {
+      case OwnershipKind::Any:
+      case OwnershipKind::None:
+      case OwnershipKind::Owned:
+        return OwnershipKind::Owned;
+      case OwnershipKind::Guaranteed:
+      case OwnershipKind::Unowned:
+        ABORT("Cannot initialize a nonCopyable type with a guaranteed value");
+      }
+    }
+    return *this;
+  }
+
   StringRef asString() const;
 };
 
@@ -592,6 +617,8 @@ public:
 
   bool isBeginApplyToken() const;
 
+  bool isBorrowAccessorResult() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -702,7 +729,7 @@ public:
   /// Verify that this SILValue and its uses respects ownership invariants.
   ///
   /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1210,6 +1237,11 @@ private:
   template <unsigned N> friend class FixedOperandList;
   friend class TrailingOperandsList;
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Operand &op) {
+  op.print(OS);
+  return OS;
+}
 
 /// A class which adapts an array of Operands into an array of Values.
 ///

@@ -570,6 +570,24 @@ bb0:
   return %return : $()
 }
 
+class GenC<T> {
+}
+
+sil @takeGenC : $@convention(thin) <τ_0_0> (@owned GenC<τ_0_0>) -> ()
+
+// CHECK-LABEL: sil [ossa] @convert_function_with_generic_arg :
+// CHECK:         [[C:%.*]] = convert_function
+// CHECK:         apply [[C]]
+// CHECK:       } // end sil function 'convert_function_with_generic_arg'
+sil [ossa] @convert_function_with_generic_arg : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @takeGenC : $@convention(thin) <τ_0_0> (@owned GenC<τ_0_0>) -> ()
+  %9 = convert_function %2 to $@convention(thin) (@owned AnyObject) -> ()
+  %30 = apply %9(%0) : $@convention(thin) (@owned AnyObject) -> ()
+  %r = tuple ()
+  return %r
+}
+
 sil shared [transparent] [thunk] @genericClosure : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %12 = tuple ()
@@ -1019,3 +1037,29 @@ bb3:
   %rv = tuple()
   return %rv : $()
 }
+
+
+sil [_semantics "array.uninitialized"] [ossa] @adoptStorage : $@convention(thin) (@owned _ContiguousArrayStorage<Any>, Int) -> (@owned Array<Any>, UnsafeMutablePointer<Any>)
+
+// CHECK-LABEL: sil [ossa] @dont_remove_dead_adopt_storage :
+// CHECK-NOT:     destroy_value %
+// CHECK-LABEL: } // end sil function 'dont_remove_dead_adopt_storage'
+sil [ossa] @dont_remove_dead_adopt_storage : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = alloc_ref [tail_elems $Any * %1] $_ContiguousArrayStorage<Any>
+  %3 = function_ref @adoptStorage : $@convention(thin) (@owned _ContiguousArrayStorage<Any>, Int) -> (@owned Array<Any>, UnsafeMutablePointer<Any>)
+  %4 = apply %3(%2, %0) : $@convention(thin) (@owned _ContiguousArrayStorage<Any>, Int) -> (@owned Array<Any>, UnsafeMutablePointer<Any>)
+  // Array buffer is not initialized due to dead-end loop -> will lead to crash if buffer is destroyed here
+  br bb1
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value [dead_end] %4
+  unreachable
+}
+

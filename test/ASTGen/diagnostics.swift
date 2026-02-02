@@ -21,6 +21,10 @@ func testRegexLiteral() {
 func testEditorPlaceholder() -> Int {
   func foo(_ x: String) {}
   foo(<#T##x: String##String#>) // expected-error {{editor placeholder in source file}})
+
+  // Make sure we don't try to parse this as an editor placeholder.
+  _ = `<#foo#>` // expected-error {{cannot find '<#foo#>' in scope}}
+
   return <#T##Int#> // expected-error {{editor placeholder in source file}}
 }
 
@@ -40,7 +44,7 @@ struct S {
 }
 
 struct ExpansionRequirementTest<each T> {}
-extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-element requirements are not yet supported}}
+extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-type requirements between packs and concrete types are not yet supported}}
 
 
 #warning("this is a warning") // expected-warning {{this is a warning}}

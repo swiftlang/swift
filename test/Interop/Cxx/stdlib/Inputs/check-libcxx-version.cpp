@@ -6,7 +6,9 @@ int main() {
   return 1;
 #endif
 
-#if _LIBCPP_VERSION >= 170004
+  // the libc++ module was split into multiple top-level modules in Clang 17,
+  // and then re-merged into one module with submodules in Clang 20
+#if _LIBCPP_VERSION >= 170004 && _LIBCPP_VERSION < 200000
   return 0;
 #else
   return 1;

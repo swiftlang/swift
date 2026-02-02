@@ -707,14 +707,14 @@ public:
   }
 };
 
-class InavalidAvailabilityDomainError
-    : public llvm::ErrorInfo<InavalidAvailabilityDomainError> {
+class InvalidAvailabilityDomainError
+    : public llvm::ErrorInfo<InvalidAvailabilityDomainError> {
   friend ErrorInfo;
   static const char ID;
   void anchor() override;
 
 public:
-  InavalidAvailabilityDomainError() {}
+  InvalidAvailabilityDomainError() {}
 
   void log(raw_ostream &OS) const override {
     OS << "Invalid availability domain";

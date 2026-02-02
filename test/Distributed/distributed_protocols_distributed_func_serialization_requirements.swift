@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -verify-ignore-unknown -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -54,6 +54,7 @@ distributed actor ProtocolWithChecksSeqReqDA_MissingSystem: ProtocolWithChecksSe
   //
   // expected-error@-6{{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'DistributedActor'}}
   // expected-note@-7 {{add stubs for conformance}}
+  // expected-error@-8 {{type 'ProtocolWithChecksSeqReqDA_MissingSystem' does not conform to protocol 'Identifiable'}}
 
   // Entire conformance is doomed, so we didn't proceed to checking the functions; that's fine
   distributed func testAT() async throws -> NotCodable { .init() }

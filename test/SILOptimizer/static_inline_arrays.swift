@@ -7,6 +7,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,optimized_stdlib
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
 
 extension InlineArray: Collection {

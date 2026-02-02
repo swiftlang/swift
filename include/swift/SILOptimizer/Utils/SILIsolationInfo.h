@@ -53,10 +53,16 @@ public:
     /// function)... so we just use an artificial ActorInstance to represent
     /// self in this case.
     CapturedActorSelf = 0x2,
+
+    /// An actor instance in an async allocating init where we are going to
+    /// allocate the actual actor internally. This is considered to be isolated
+    /// to the actor instance.
+    ActorAsyncAllocatingInit = 0x3,
   };
 
-  /// Set to (SILValue(), $KIND) if we have an ActorAccessorInit|CapturedSelf.
-  /// Is null if we have (SILValue(), Kind::Value).
+  /// Set to (SILValue(), $KIND) if we have an
+  /// ActorAccessorInit|CapturedSelf|ActorAsyncAllocatingInit.  Is null if we
+  /// have (SILValue(), Kind::Value).
   llvm::PointerIntPair<SILValue, 2> value;
 
   ActorInstance(SILValue value, Kind kind)
@@ -94,6 +100,12 @@ public:
     return ActorInstance(SILValue(), Kind::CapturedActorSelf);
   }
 
+  /// See Kind::ActorAsyncAllocatingInit for explanation on what a
+  /// ActorAsyncAllocatingInit is.
+  static ActorInstance getForActorAsyncAllocatingInit() {
+    return ActorInstance(SILValue(), Kind::ActorAsyncAllocatingInit);
+  }
+
   explicit operator bool() const { return bool(value.getOpaqueValue()); }
 
   Kind getKind() const { return Kind(value.getInt()); }
@@ -117,6 +129,10 @@ public:
     return getKind() == Kind::CapturedActorSelf;
   }
 
+  bool isActorAsyncAllocatingInit() const {
+    return getKind() == Kind::ActorAsyncAllocatingInit;
+  }
+
   bool operator==(const ActorInstance &other) const {
     // If both are null, return true.
     if (!bool(*this) && !bool(other))
@@ -132,6 +148,7 @@ public:
       return getValue() == other.getValue();
     case Kind::ActorAccessorInit:
     case Kind::CapturedActorSelf:
+    case Kind::ActorAsyncAllocatingInit:
       return true;
     }
   }
@@ -185,8 +202,12 @@ public:
     /// parameter and should be allowed to merge into a self parameter.
     UnappliedIsolatedAnyParameter = 0x2,
 
+    /// If set, this was a TaskIsolated value from a nonisolated(nonsending)
+    /// parameter.
+    NonisolatedNonsendingTaskIsolated = 0x4,
+
     /// The maximum number of bits used by a Flag.
-    MaxNumBits = 2,
+    MaxNumBits = 3,
   };
 
   using Options = OptionSet<Flag>;
@@ -204,13 +225,19 @@ private:
   /// derived isolatedValue from.
   ActorInstance actorInstance;
 
+  /// When the isolation is introduced due to a (potentially) isolated
+  /// conformance, the protocol whose conformance might be isolated.
+  ProtocolDecl *isolatedConformance = nullptr;
+
   unsigned kind : 8;
   unsigned options : 8;
 
   SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
-                   ActorIsolation actorIsolation, Options options = Options())
+                   ActorIsolation actorIsolation, Options options = Options(),
+                   ProtocolDecl *isolatedConformance = nullptr)
       : actorIsolation(actorIsolation), isolatedValue(isolatedValue),
-        actorInstance(ActorInstance::getForValue(actorInstance)), kind(Actor),
+        actorInstance(ActorInstance::getForValue(actorInstance)),
+        isolatedConformance(isolatedConformance), kind(Actor),
         options(options.toRaw()) {
     assert((!actorInstance ||
             (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
@@ -219,22 +246,38 @@ private:
                  ->lookThroughAllOptionalTypes()
                  ->getAnyActor())) &&
            "actorInstance must be an actor if it is non-empty");
+    assert((getKind() != Disconnected || isolatedConformance == nullptr) &&
+        "isolated conformance cannot be introduced with disconnected region");
   }
 
   SILIsolationInfo(SILValue isolatedValue, ActorInstance actorInstance,
-                   ActorIsolation actorIsolation, Options options = Options())
+                   ActorIsolation actorIsolation, Options options = Options(),
+                   ProtocolDecl *isolatedConformance = nullptr)
       : actorIsolation(actorIsolation), isolatedValue(isolatedValue),
-        actorInstance(actorInstance), kind(Actor), options(options.toRaw()) {
+        actorInstance(actorInstance), isolatedConformance(isolatedConformance),
+        kind(Actor), options(options.toRaw())
+  {
     assert(actorInstance);
     assert(actorIsolation.getKind() == ActorIsolation::ActorInstance);
   }
 
-  SILIsolationInfo(Kind kind, SILValue isolatedValue)
-      : actorIsolation(), isolatedValue(isolatedValue), kind(kind), options(0) {
+  SILIsolationInfo(Kind kind, SILValue isolatedValue,
+                   ProtocolDecl *isolatedConformance = nullptr)
+      : actorIsolation(), isolatedValue(isolatedValue),
+        isolatedConformance(isolatedConformance), kind(kind), options(0) {
   }
 
   SILIsolationInfo(Kind kind, Options options = Options())
       : actorIsolation(), kind(kind), options(options.toRaw()) {}
+
+  /// Infer isolation region from the set of protocol conformances.
+  static SILIsolationInfo getFromConformances(
+      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
+
+  /// Determine the isolation of conformances that could be introduced by a
+  /// cast from sourceType to destType.
+  static SILIsolationInfo getForCastConformances(
+      SILValue value, CanType sourceType, CanType destType);
 
 public:
   SILIsolationInfo() : actorIsolation(), kind(Kind::Unknown), options(0) {}
@@ -257,6 +300,12 @@ public:
     return getOptions().contains(Flag::UnsafeNonIsolated);
   }
 
+  // Retrieve the protocol to which there is (or could be) an isolated
+  // conformance.
+  ProtocolDecl *getIsolatedConformance() const {
+    return isolatedConformance;
+  }
+
   SILIsolationInfo withUnsafeNonIsolated(bool newValue = true) const {
     assert(*this && "Cannot be unknown");
     auto self = *this;
@@ -267,6 +316,45 @@ public:
           self.getOptions().toRaw() & ~Options(Flag::UnsafeNonIsolated).toRaw();
     }
     return self;
+  }
+
+  bool isNonisolatedNonsendingTaskIsolated() const {
+    return getOptions().contains(Flag::NonisolatedNonsendingTaskIsolated);
+  }
+
+  SILIsolationInfo
+  withNonisolatedNonsendingTaskIsolated(bool newValue = true) const {
+    assert(*this && "Cannot be unknown");
+    assert(isTaskIsolated() && "Can only be task isolated");
+    auto self = *this;
+    if (newValue) {
+      self.options =
+          (self.getOptions() | Flag::NonisolatedNonsendingTaskIsolated).toRaw();
+    } else {
+      self.options = self.getOptions().toRaw() &
+                     ~Options(Flag::NonisolatedNonsendingTaskIsolated).toRaw();
+    }
+    return self;
+  }
+
+  /// Produce a new isolation info value that merges in the given isolated
+  /// conformance value.
+  ///
+  /// If both isolation infos have an isolation conformance, pick one
+  /// arbitrarily. Otherwise, the result has no isolated conformance.
+  SILIsolationInfo
+  withMergedIsolatedConformance(ProtocolDecl *newIsolatedConformance) const {
+    SILIsolationInfo result(*this);
+    if (!isolatedConformance || !newIsolatedConformance) {
+      result.isolatedConformance = nullptr;
+      return result;
+    }
+
+    result.isolatedConformance =
+      ProtocolDecl::compare(isolatedConformance, newIsolatedConformance) <= 0
+        ? isolatedConformance
+        : newIsolatedConformance;
+    return result;
   }
 
   /// Returns true if this actor isolation is derived from an unapplied
@@ -289,16 +377,16 @@ public:
     return self;
   }
 
-  void print(llvm::raw_ostream &os) const;
+  void print(SILFunction *fn, llvm::raw_ostream &os) const;
 
   /// Print a textual representation of the text info that is meant to be
   /// included in other logging output for types that compose with
   /// SILIsolationInfo. As a result, we only print state that can fit on
   /// one line.
-  void printForOneLineLogging(llvm::raw_ostream &os) const;
+  void printForOneLineLogging(SILFunction *fn, llvm::raw_ostream &os) const;
 
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) {
+    print(fn, llvm::dbgs());
     llvm::dbgs() << '\n';
   }
 
@@ -307,12 +395,20 @@ public:
   ///
   /// We do this programatically since task-isolated code needs a very different
   /// form of diagnostic than other cases.
-  void printForCodeDiagnostic(llvm::raw_ostream &os) const;
+  void printForCodeDiagnostic(SILFunction *fn, llvm::raw_ostream &os) const;
 
-  void printForDiagnostics(llvm::raw_ostream &os) const;
+  /// Overload of printForCodeDiagnostics that returns an interned StringRef
+  /// owned by the AST.
+  StringRef printForCodeDiagnostic(SILFunction *fn) const;
 
-  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
-    printForDiagnostics(llvm::dbgs());
+  void printForDiagnostics(SILFunction *fn, llvm::raw_ostream &os) const;
+
+  /// Overload of printForDiagnostics that returns an interned StringRef owned
+  /// by the AST.
+  StringRef printForDiagnostics(SILFunction *fn) const;
+
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics(SILFunction *fn)) {
+    printForDiagnostics(fn, llvm::dbgs());
     llvm::dbgs() << '\n';
   }
 
@@ -427,10 +523,13 @@ public:
             Flag::UnappliedIsolatedAnyParameter};
   }
 
-  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
-                                                 Type globalActorType) {
+  static SILIsolationInfo getGlobalActorIsolated(
+      SILValue value,
+      Type globalActorType,
+      ProtocolDecl *isolatedConformance = nullptr) {
     return {value, SILValue() /*no actor instance*/,
-            ActorIsolation::forGlobalActor(globalActorType)};
+            ActorIsolation::forGlobalActor(globalActorType),
+            Options(), isolatedConformance};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(SILValue value,
@@ -442,8 +541,9 @@ public:
                                                     isolation.getGlobalActor());
   }
 
-  static SILIsolationInfo getTaskIsolated(SILValue value) {
-    return {Kind::Task, value};
+  static SILIsolationInfo getTaskIsolated(
+      SILValue value, ProtocolDecl *isolatedConformance = nullptr) {
+    return {Kind::Task, value, isolatedConformance};
   }
 
   /// Attempt to infer the isolation region info for \p inst.
@@ -460,24 +560,48 @@ public:
     return {};
   }
 
-  /// A helper that is used to ensure that we treat certain builtin values as
-  /// non-Sendable that the AST level otherwise thinks are non-Sendable.
+  /// Infer isolation of conformances for the given instruction.
+  static SILIsolationInfo getConformanceIsolation(SILInstruction *inst);
+
+  /// Return SILIsolationInfo based off of the attached ActorIsolation of \p
+  /// fn. If \p fn does not have an actor isolation set, returns an invalid
+  /// SILIsolationInfo.
+  static SILIsolationInfo getFunctionIsolation(SILFunction *fn);
+
+private:
+  /// A helper that defines at the SIL level what we considered Sendable.
   ///
-  /// E.x.: Builtin.RawPointer and Builtin.NativeObject
-  ///
-  /// TODO: Fix the type checker.
+  /// NOTE: This can differ from the AST in certain cases since we treat certain
+  /// builtin values such as Builtin.RawPointer and Builtin.NativeObject as
+  /// non-Sendable even though they are considered Sendable by the AST today.
   static bool isNonSendableType(SILType type, SILFunction *fn);
 
   static bool isSendableType(SILType type, SILFunction *fn) {
     return !isNonSendableType(type, fn);
   }
 
-  static bool isNonSendableType(SILValue value) {
-    return isNonSendableType(value->getType(), value->getFunction());
+public:
+  /// Returns true if \p value is a Sendable value.
+  ///
+  /// NOTE: This can use value based information to determine sendable for
+  /// values that are from a type perspective non-SEndable. E.x.: a
+  /// non-payloaded case of a non-Sendable enum.
+  static bool isSendable(SILValue value);
+
+  /// Returns true if \p value is a non-Sendable value.
+  ///
+  /// NOTE: This just invokes isSendable and inverts the results.
+  static bool isNonSendable(SILValue value) { return !isSendable(value); }
+
+  static bool boxContainsOnlySendableFields(AllocBoxInst *abi) {
+    return boxTypeContainsOnlySendableFields(abi->getBoxType(),
+                                             abi->getFunction());
   }
 
-  static bool isSendableType(SILValue value) {
-    return !isNonSendableType(value);
+  static bool boxTypeContainsOnlySendableFields(CanSILBoxType boxType,
+                                                SILFunction *fn) {
+    return llvm::all_of(boxType->getSILFieldTypes(*fn),
+                        [&](SILType type) { return isSendableType(type, fn); });
   }
 
   bool hasSameIsolation(ActorIsolation actorIsolation) const;
@@ -493,6 +617,19 @@ public:
   /// Returns true if this SILIsolationInfo is deeply equal to other. This means
   /// that the isolation and the isolated value match.
   bool isEqual(const SILIsolationInfo &other) const;
+
+  /// A helper function that prints ActorIsolation like we normally do except
+  /// that it prints nonisolated(nonsending) as nonisolated. This is needed in
+  /// certain cases when talking about use-after-free uses in send non sendable.
+  static void printActorIsolationForDiagnostics(
+      SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
+      StringRef openingQuotationMark = "'", bool asNoun = false);
+
+  /// Overload for printActorIsolationForDiagnostics that produces a StringRef.
+  static StringRef
+  printActorIsolationForDiagnostics(SILFunction *fn, ActorIsolation iso,
+                                    StringRef openingQuotationMark = "'",
+                                    bool asNoun = false);
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 
@@ -557,43 +694,33 @@ public:
         SILIsolationInfo::getDisconnected(isUnsafeNonIsolated));
   }
 
-  SWIFT_DEBUG_DUMP { innerInfo.dump(); }
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) { innerInfo.dump(fn); }
 
-  void printForDiagnostics(llvm::raw_ostream &os) const {
-    innerInfo.printForDiagnostics(os);
+  void printForDiagnostics(SILFunction *fn, llvm::raw_ostream &os) const {
+    innerInfo.printForDiagnostics(fn, os);
   }
 
-  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
-    innerInfo.dumpForDiagnostics();
+  StringRef printForDiagnostics(SILFunction *fn) const {
+    return innerInfo.printForDiagnostics(fn);
   }
 
-  void printForCodeDiagnostic(llvm::raw_ostream &os) const {
-    innerInfo.printForCodeDiagnostic(os);
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics(SILFunction *fn)) {
+    innerInfo.dumpForDiagnostics(fn);
   }
 
-  void printForOneLineLogging(llvm::raw_ostream &os) const {
-    innerInfo.printForOneLineLogging(os);
+  void printForCodeDiagnostic(SILFunction *fn, llvm::raw_ostream &os) const {
+    innerInfo.printForCodeDiagnostic(fn, os);
+  }
+
+  StringRef printForCodeDiagnostic(SILFunction *fn) const {
+    return innerInfo.printForCodeDiagnostic(fn);
+  }
+
+  void printForOneLineLogging(SILFunction *fn, llvm::raw_ostream &os) const {
+    innerInfo.printForOneLineLogging(fn, os);
   }
 };
 
 } // namespace swift
-
-namespace llvm {
-
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const swift::SILIsolationInfo &isolationInfo) {
-  isolationInfo.printForOneLineLogging(os);
-  return os;
-}
-
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const swift::SILDynamicMergedIsolationInfo &isolationInfo) {
-  isolationInfo.printForOneLineLogging(os);
-  return os;
-}
-
-} // namespace llvm
 
 #endif

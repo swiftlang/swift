@@ -1,5 +1,5 @@
 // Hardcode x86_64 macOS because Apple Silicon was born ABI-stable
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/Inputs/objc_implementation.h -target x86_64-apple-macosx10.14.3 -enable-experimental-feature ObjCImplementation
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -import-objc-header %S/Inputs/objc_implementation.h -target x86_64-apple-macosx10.14.3 -enable-experimental-feature ObjCImplementation
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_ObjCImplementation

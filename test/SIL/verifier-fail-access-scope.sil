@@ -1,0 +1,17 @@
+// RUN: not --crash %target-sil-opt %s -o /dev/null
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil [ossa] @write_in_read_only_scope : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = begin_access [read] [dynamic] %0
+  store %1 to [trivial] %0
+  end_access %2
+  %5 = tuple()
+  return %5
+}

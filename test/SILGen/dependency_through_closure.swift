@@ -1,16 +1,16 @@
-// RUN: %target-swift-emit-silgen -verify -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes %s
+// RUN: %target-swift-emit-silgen -verify -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableTypes
 
 @_addressableForDependencies
 struct Owner {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     func reference() -> Reference { fatalError() }
 }
 
 struct Reference: ~Escapable {
-    @lifetime(immortal)
+    @_lifetime(immortal)
     init() { fatalError() }
 
     func use() {}

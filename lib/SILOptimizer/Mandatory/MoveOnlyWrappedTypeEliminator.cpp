@@ -48,7 +48,7 @@
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 
 using namespace swift;
 
@@ -60,6 +60,28 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorVisitor
     : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
+
+  // Instructions waiting to be visited.
+  llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts;
+  llvm::SmallVector<SILInstruction *, 8> deferredInsts;
+
+  SILMoveOnlyWrappedTypeEliminatorVisitor(llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts):
+    pendingInsts(pendingInsts)
+  {}
+
+  // If 'user's operand is not yet visited, push it onto the end of
+  // 'pendingInsts' and pretend we didn't see it yet. This is only relevant for
+  // non-address operands in which ownership should be consistent.
+  bool waitFor(SILInstruction *user, SILValue operand) {
+    if (auto *def = operand.getDefiningInstruction()) {
+      if (pendingInsts.contains(def)) {
+        deferredInsts.push_back(user);
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool visitSILInstruction(SILInstruction *inst) {
     llvm::errs() << "Unhandled SIL Instruction: " << *inst;
     llvm_unreachable("error");
@@ -79,6 +101,9 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
 
   bool visitStoreInst(StoreInst *si) {
+    if (!waitFor(si, si->getSrc())) {
+      return false;
+    }
     if (!si->getSrc()->getType().isTrivial(*si->getFunction()))
       return false;
     si->setOwnershipQualifier(StoreOwnershipQualifier::Trivial);
@@ -86,6 +111,9 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
 
   bool visitStoreBorrowInst(StoreBorrowInst *si) {
+    if (!waitFor(si, si->getSrc())) {
+      return false;
+    }
     if (!si->getSrc()->getType().isTrivial(*si->getFunction()))
       return false;
     SILBuilderWithScope b(si);
@@ -177,41 +205,50 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
 
 #define NO_UPDATE_NEEDED(CLS)                                                  \
   bool visit##CLS##Inst(CLS##Inst *inst) { return false; }
-  NO_UPDATE_NEEDED(AllocStack)
+  NO_UPDATE_NEEDED(AddressToPointer)
   NO_UPDATE_NEEDED(AllocBox)
-  NO_UPDATE_NEEDED(ProjectBox)
+  NO_UPDATE_NEEDED(AllocStack)
+  NO_UPDATE_NEEDED(AutoreleaseValue)
+  NO_UPDATE_NEEDED(BeginAccess)
+  NO_UPDATE_NEEDED(Branch)
+  NO_UPDATE_NEEDED(BridgeObjectToRef)
+  NO_UPDATE_NEEDED(Builtin)
+  NO_UPDATE_NEEDED(CheckedCastBranch)
+  NO_UPDATE_NEEDED(ClassMethod)
+  NO_UPDATE_NEEDED(ConvertFunction)
+  NO_UPDATE_NEEDED(CopyAddr)
+  NO_UPDATE_NEEDED(DeallocBox)
+  NO_UPDATE_NEEDED(DeallocStack)
   NO_UPDATE_NEEDED(DebugValue)
+  NO_UPDATE_NEEDED(DestroyAddr)
+  NO_UPDATE_NEEDED(DestructureStruct)
+  NO_UPDATE_NEEDED(DestructureTuple)
+  NO_UPDATE_NEEDED(EndAccess)
+  NO_UPDATE_NEEDED(EndCOWMutationAddr)
+  NO_UPDATE_NEEDED(ExistentialMetatype)
+  NO_UPDATE_NEEDED(ExplicitCopyAddr)
+  NO_UPDATE_NEEDED(FixLifetime)
+  NO_UPDATE_NEEDED(IgnoredUse)
+  NO_UPDATE_NEEDED(MarkDependence)
+  NO_UPDATE_NEEDED(MarkDependenceAddr)
+  NO_UPDATE_NEEDED(ObjCMethod)
+  NO_UPDATE_NEEDED(Object)
+  NO_UPDATE_NEEDED(OpenExistentialAddr)
+  NO_UPDATE_NEEDED(OpenExistentialBox)
+  NO_UPDATE_NEEDED(OpenExistentialRef)
+  NO_UPDATE_NEEDED(ProjectBox)
+  NO_UPDATE_NEEDED(RefElementAddr)
+  NO_UPDATE_NEEDED(RefToBridgeObject)
+  NO_UPDATE_NEEDED(SelectEnum)
   NO_UPDATE_NEEDED(StructElementAddr)
   NO_UPDATE_NEEDED(TupleElementAddr)
   NO_UPDATE_NEEDED(UncheckedTakeEnumDataAddr)
-  NO_UPDATE_NEEDED(DestructureTuple)
-  NO_UPDATE_NEEDED(DestructureStruct)
-  NO_UPDATE_NEEDED(SelectEnum)
-  NO_UPDATE_NEEDED(MarkDependence)
-  NO_UPDATE_NEEDED(MarkDependenceAddr)
-  NO_UPDATE_NEEDED(DestroyAddr)
-  NO_UPDATE_NEEDED(DeallocStack)
-  NO_UPDATE_NEEDED(DeallocBox)
-  NO_UPDATE_NEEDED(Branch)
-  NO_UPDATE_NEEDED(ExplicitCopyAddr)
-  NO_UPDATE_NEEDED(CopyAddr)
-  NO_UPDATE_NEEDED(RefElementAddr)
-  NO_UPDATE_NEEDED(CheckedCastBranch)
-  NO_UPDATE_NEEDED(Object)
-  NO_UPDATE_NEEDED(OpenExistentialRef)
-  NO_UPDATE_NEEDED(OpenExistentialAddr)
-  NO_UPDATE_NEEDED(OpenExistentialBox)
-  NO_UPDATE_NEEDED(ConvertFunction)
-  NO_UPDATE_NEEDED(RefToBridgeObject)
-  NO_UPDATE_NEEDED(BridgeObjectToRef)
-  NO_UPDATE_NEEDED(BeginAccess)
-  NO_UPDATE_NEEDED(EndAccess)
-  NO_UPDATE_NEEDED(ClassMethod)
-  NO_UPDATE_NEEDED(FixLifetime)
-  NO_UPDATE_NEEDED(AddressToPointer)
-  NO_UPDATE_NEEDED(ExistentialMetatype)
-  NO_UPDATE_NEEDED(Builtin)
-  NO_UPDATE_NEEDED(IgnoredUse)
+  NO_UPDATE_NEEDED(MakeBorrow)
+  NO_UPDATE_NEEDED(MakeAddrBorrow)
+  NO_UPDATE_NEEDED(InitBorrowAddr)
+  NO_UPDATE_NEEDED(DereferenceBorrow)
+  NO_UPDATE_NEEDED(DereferenceAddrBorrow)
+  NO_UPDATE_NEEDED(DereferenceBorrowAddr)
 #undef NO_UPDATE_NEEDED
 
   bool eliminateIdentityCast(SingleValueInstruction *svi) {
@@ -228,6 +265,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
   ELIMINATE_POTENTIAL_IDENTITY_CAST(Upcast)
   ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedAddrCast)
+  ELIMINATE_POTENTIAL_IDENTITY_CAST(UncheckedRefCast)
   ELIMINATE_POTENTIAL_IDENTITY_CAST(UnconditionalCheckedCast)
 #undef ELIMINATE_POTENTIAL_IDENTITY_CAST
   // We handle apply sites by just inserting a convert_function that converts
@@ -332,6 +370,9 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
     return true;
   };
 
+  // (1) Check each value's type for the MoveOnly wrapper, (2) strip the wrapper
+  // type, and (3) add all uses to 'touchedInsts' in forward order for
+  // efficiency.
   for (auto &bb : *fn) {
     for (auto *arg : bb.getArguments()) {
       bool relevant = visitValue(arg);
@@ -377,9 +418,18 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
     madeChange = true;
   }
 
-  SILMoveOnlyWrappedTypeEliminatorVisitor visitor;
-  while (!touchedInsts.empty()) {
-    visitor.visit(touchedInsts.pop_back_val());
+  SILMoveOnlyWrappedTypeEliminatorVisitor visitor{touchedInsts};
+  while(true) {
+    while (!touchedInsts.empty()) {
+      visitor.visit(touchedInsts.pop_back_val());
+    }
+    if (visitor.deferredInsts.empty())
+      break;
+
+    for (auto *inst : visitor.deferredInsts) {
+      touchedInsts.insert(inst);
+    }
+    visitor.deferredInsts.clear();
   }
 
   return madeChange;

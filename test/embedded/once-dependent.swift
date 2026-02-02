@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
@@ -9,7 +9,7 @@
 
 public struct MyStructA {
   static var singleton = MyStructA()
-  
+
   init() {
     print("MyStructA.init")
     _ = MyStructB.singleton
@@ -19,7 +19,7 @@ public struct MyStructA {
 
 public struct MyStructB {
   static var singleton = MyStructB()
-  
+
   init() {
     print("MyStructB.init")
     _ = MyStructC.singleton
@@ -29,7 +29,7 @@ public struct MyStructB {
 
 public struct MyStructC {
   static var singleton = MyStructC()
-  
+
   init() {
     print("MyStructC.init")
     print("MyStructC.init done")

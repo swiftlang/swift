@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -253,7 +254,6 @@ private:
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
-    CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
     // Using statements for nested types.
     if (outputLang == OutputLanguageMode::Cxx) {
       for (const Decl *member : members) {
@@ -373,7 +373,12 @@ private:
     if (outputLang == OutputLanguageMode::Cxx) {
       // FIXME: Non objc class.
       ClangClassTypePrinter(os).printClassTypeDecl(
-          CD, [&]() { printMembers(CD->getAllMembers()); }, owningPrinter);
+          CD,
+          [&]() {
+            CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
+            printMembers(CD->getAllMembers());
+          },
+          owningPrinter);
       recordEmittedDeclInCurrentCxxLexicalScope(CD);
       return;
     }
@@ -426,6 +431,7 @@ private:
     printer.printValueTypeDecl(
         SD, /*bodyPrinter=*/
         [&]() {
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
           printMembers(SD->getAllMembers());
           for (const auto *ed :
                owningPrinter.interopContext.getExtensionsForNominalType(SD)) {
@@ -922,6 +928,7 @@ private:
           os << "  }\n"; // operator cases()'s closing bracket
           os << "\n";
 
+          CxxEmissionScopeRAII cxxScopeRAII(owningPrinter);
           printMembers(ED->getAllMembers());
 
           for (const auto *ext :
@@ -1244,7 +1251,8 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult() &&
+        (isa<FuncDecl>(AFD) &&
+         cast<FuncDecl>(AFD)->getResultInterfaceType()->hasDynamicSelfType() &&
          !AFD->hasAsync())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
@@ -1415,7 +1423,7 @@ private:
       // because it's a diagnostic inflicted on /clients/, but it's close
       // enough. It really is invalid to call +new when -init is unavailable.
       StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
-      if (!getASTContext().isSwiftVersionAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(5))
         annotationName = "SWIFT_DEPRECATED_MSG";
       os << "+ (nonnull instancetype)new " << annotationName
          << "(\"-init is unavailable\");\n";
@@ -1566,7 +1574,7 @@ private:
     }
     os << "\n";
     if (representation.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return representation;
   }
 
@@ -1676,7 +1684,7 @@ private:
         FD->getParameters(), funcTy->isThrowing(), funcTy);
     os << "}\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -1702,9 +1710,24 @@ public:
     };
 
     for (auto AvAttr : D->getSemanticAvailableAttrs()) {
-      if (AvAttr.getPlatform() == PlatformKind::none) {
-        if (AvAttr.isUnconditionallyUnavailable() &&
-            !AvAttr.getDomain().isSwiftLanguage()) {
+      auto domain = AvAttr.getDomain();
+      if (auto domainDecl = domain.getDecl()) {
+        // If the domain is defined in a Clang module then the attr can be
+        // printed.
+        if (domainDecl->hasClangNode()) {
+          // Versioned custom domains aren't supported yet.
+          ASSERT(!domain.isVersioned());
+
+          maybePrintLeadingSpace();
+          os << "SWIFT_AVAILABILITY_DOMAIN("
+             << domain.getNameForAttributePrinting() << ","
+             << (AvAttr.isUnconditionallyUnavailable() ? "1" : "0") << ")";
+        }
+        continue;
+      }
+
+      if (domain.isUniversal()) {
+        if (AvAttr.isUnconditionallyUnavailable()) {
           // Availability for *
           if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
             // rename
@@ -1749,6 +1772,9 @@ public:
       }
 
       // Availability for a specific platform
+      if (!domain.isPlatform())
+        continue;
+
       if (!AvAttr.getIntroduced().has_value() &&
           !AvAttr.getDeprecated().has_value() &&
           !AvAttr.getObsoleted().has_value() &&
@@ -1795,11 +1821,25 @@ public:
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
         break;
+      case PlatformKind::DriverKit:
+        plat = "driverkit";
+        break;
+      case PlatformKind::Swift:
+      case PlatformKind::anyAppleOS:
+        // FIXME: [runtime availability] Figure out how to support this.
+        ASSERT(0);
+        break;
+      case PlatformKind::FreeBSD:
+        plat = "freebsd";
+        break;
       case PlatformKind::OpenBSD:
         plat = "openbsd";
         break;
       case PlatformKind::Windows:
         plat = "windows";
+        break;
+      case PlatformKind::Android:
+        plat = "android";
         break;
       case PlatformKind::none:
         llvm_unreachable("handled above");
@@ -2341,7 +2381,7 @@ private:
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang typedecl?");
 
       maybePrintTagKeyword(alias);
@@ -2351,7 +2391,7 @@ private:
         printNullability(optionalKind);
     } else if (auto *clangObjCClass
                = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-      assert(!alias->isGeneric()
+      assert(!alias->hasGenericParamList()
              && "generic typealias backed by clang interface?");
 
       os << clangObjCClass->getName() << " *";
@@ -2385,8 +2425,15 @@ private:
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
-    if (isa<EnumDecl>(NTD) && !NTD->hasClangNode()) {
-      os << "enum ";
+    auto *ED = dyn_cast<EnumDecl>(NTD);
+    if (ED && !NTD->hasClangNode()) {
+      if (ED->isCDeclEnum()) {
+        // We should be able to use the tag macro for all printed enums but
+        // for now restrict it to @c to guard it behind the feature flag.
+        os << "SWIFT_ENUM_TAG ";
+      } else {
+        os << "enum ";
+      }
       return;
     }
 
@@ -2666,7 +2713,7 @@ private:
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
       const ClassDecl *extendedClass = extension->getSelfClassDecl();
-      assert(extendedClass->isGeneric());
+      assert(extendedClass->hasGenericParamList());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
@@ -2941,6 +2988,17 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
   return false;
 }
 
+bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
+  for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>())
+    if (attr->getExposureKind() == ExposureKind::NotCxx)
+      return true;
+  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    return hasExposeNotCxxAttr(ED->getExtendedNominal());
+  return false;
+}
+
 static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
                                   const llvm::StringSet<> &exposedModules) {
   if (VD->hasClangNode())
@@ -2992,6 +3050,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
   if (requiresExposedAttribute && !hasExposeAttr(VD))
     return false;
 
+  if (hasExposeNotCxxAttr(VD))
+    return false;
+
   if (!isVisible(VD))
     return false;
 
@@ -3006,7 +3067,7 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
       return false;
   }
 
-  // In C output mode print only the C variant `@cdecl` (no `@_cdecl`),
+  // In C output mode print only the C variant `@c` (no `@_cdecl`),
   // while in other modes print only `@_cdecl`.
   std::optional<ForeignLanguage> cdeclKind = std::nullopt;
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
@@ -3016,9 +3077,17 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
        (outputLang == OutputLanguageMode::C))
     return false;
 
-  // C output mode only accepts @cdecl functions.
+  // C output mode only prints @c functions and enums.
   if (outputLang == OutputLanguageMode::C &&
-      !cdeclKind) {
+      !cdeclKind && !isa<EnumDecl>(VD)) {
+    return false;
+  }
+
+  // The C mode prints @c enums and reject other enums,
+  // while other modes accept other enums and reject @c ones.
+  if (isa<EnumDecl>(VD) &&
+      VD->getAttrs().hasAttribute<CDeclAttr>() !=
+        (outputLang == OutputLanguageMode::C)) {
     return false;
   }
 
@@ -3091,6 +3160,8 @@ const TypeDecl *DeclAndTypePrinter::getObjCTypeDecl(const TypeDecl* TD) {
 
 StringRef
 DeclAndTypePrinter::maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
+  if (!decl)
+    return StringRef();
   StringRef name = decl->getName();
   if (!name.consume_front("OS_"))
     return StringRef();

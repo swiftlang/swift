@@ -174,7 +174,7 @@ class ArrayInfo {
   /// Classify uses of the array into forEach uses, read-only uses etc. and set
   /// the fields of this instance appropriately. This function will recursively
   /// classify the uses of borrows and copy-values of the array as well.
-  void classifyUsesOfArray(SILValue arrayValue);
+  void classifyUsesOfArray(SILValue arrayValue, bool isInInitSection);
 
 public:
   ArrayInfo() {}
@@ -293,7 +293,7 @@ static TryApplyInst *isForEachUseOfArray(SILInstruction *user, SILValue array) {
   return apply;
 }
 
-void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
+void ArrayInfo::classifyUsesOfArray(SILValue arrayValue, bool isInInitSection) {
   for (Operand *operand : arrayValue->getUses()) {
     auto *user = operand->getUser();
     if (isIncidentalUse(user))
@@ -314,15 +314,21 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     }
     // Recursively classify begin_borrow, copy_value, and move_value uses.
     if (BeginBorrowInst *beginBorrow = dyn_cast<BeginBorrowInst>(user)) {
-      classifyUsesOfArray(beginBorrow);
+      if (isInInitSection) {
+        // This begin_borrow is used to get the element addresses for array
+        // initialization. This is happening between the allocate-uninitialized
+        // and the finalize-array intrinsic calls. We can igore this.
+        continue;
+      }
+      classifyUsesOfArray(beginBorrow, isInInitSection);
       continue;
     }
     if (CopyValueInst *copyValue = dyn_cast<CopyValueInst>(user)) {
-      classifyUsesOfArray(copyValue);
+      classifyUsesOfArray(copyValue, isInInitSection);
       continue;
     }
     if (MoveValueInst *moveValue = dyn_cast<MoveValueInst>(user)) {
-      classifyUsesOfArray(moveValue);
+      classifyUsesOfArray(moveValue, isInInitSection);
       continue;
     }
     if (DestroyValueInst *destroyValue = dyn_cast<DestroyValueInst>(user)) {
@@ -337,8 +343,8 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     if (arrayOp.doesNotChangeArray())
       continue;
     
-    if (arrayOp.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
-      classifyUsesOfArray((ApplyInst *)arrayOp);
+    if (arrayOp.getKind() == ArrayCallKind::kArrayFinalizeIntrinsic) {
+      classifyUsesOfArray((ApplyInst *)arrayOp, /*isInInitSection*/ false);
       continue;
     }
     
@@ -357,7 +363,7 @@ bool ArrayInfo::tryInitialize(ApplyInst *apply) {
   if (!arrayAllocateUninitCall.mapInitializationStores(elementStoreMap))
     return false;
   // Collect information about uses of the array value.
-  classifyUsesOfArray(arrayValue);
+  classifyUsesOfArray(arrayValue, /*isInInitSection=*/ true);
   return true;
 }
 

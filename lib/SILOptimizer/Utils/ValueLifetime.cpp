@@ -29,26 +29,30 @@ void ValueLifetimeBoundary::visitInsertionPoints(
     }
     auto *predBB = user->getParent();
     for (SILBasicBlock *succ : predBB->getSuccessors()) {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
       if (deBlocks && deBlocks->isDeadEnd(succ))
         continue;
+#endif
 
-      assert(succ->getSinglePredecessorBlock() == predBB);
+      ASSERT(succ->getSinglePredecessorBlock() == predBB);
       visitor(succ->begin());
     }
   }
   for (SILBasicBlock *edge : boundaryEdges) {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
     if (deBlocks && deBlocks->isDeadEnd(edge))
       continue;
+#endif
 
     visitor(edge->begin());
   }
 }
 
 void ValueLifetimeAnalysis::propagateLiveness() {
-  bool defIsInstruction = defValue.is<SILInstruction *>();
-  assert(liveBlocks.empty() && "frontier computed twice");
-  assert(
-      (!defIsInstruction || !userSet.count(defValue.get<SILInstruction *>())) &&
+  bool defIsInstruction = isa<SILInstruction *>(defValue);
+  ASSERT(liveBlocks.empty() && "frontier computed twice");
+  ASSERT(
+      (!defIsInstruction || !userSet.count(cast<SILInstruction *>(defValue))) &&
       "definition cannot be its own use");
 
   // Compute the def block only if we have a SILInstruction. If we have a
@@ -69,13 +73,13 @@ void ValueLifetimeAnalysis::propagateLiveness() {
     if (defIsInstruction && userBlock == defBB)
       ++numUsersBeforeDef;
   }
-  assert((defValue.is<SILInstruction *>() || (numUsersBeforeDef == 0)) &&
+  ASSERT((isa<SILInstruction *>(defValue) || (numUsersBeforeDef == 0)) &&
          "Non SILInstruction defValue with users before the def?!");
 
   // Don't count any users in the defBB which are actually located _after_ the
   // defValue.
   if (defIsInstruction) {
-    auto instIter = defValue.get<SILInstruction *>()->getIterator();
+    auto instIter = cast<SILInstruction *>(defValue)->getIterator();
     while (numUsersBeforeDef > 0 && ++instIter != defBB->end()) {
       if (userSet.count(&*instIter))
         --numUsersBeforeDef;
@@ -84,7 +88,7 @@ void ValueLifetimeAnalysis::propagateLiveness() {
 
   // Initialize the hasUsersBeforeDef field.
   hasUsersBeforeDef = numUsersBeforeDef > 0;
-  assert(defIsInstruction || !hasUsersBeforeDef);
+  ASSERT(defIsInstruction || !hasUsersBeforeDef);
 
   // Now propagate liveness backwards until we hit the block that defines the
   // value.
@@ -108,7 +112,7 @@ void ValueLifetimeAnalysis::propagateLiveness() {
 SILInstruction *ValueLifetimeAnalysis::findLastUserInBlock(SILBasicBlock *bb) {
   // Walk backwards in bb looking for last use of the value.
   for (auto &inst : llvm::reverse(*bb)) {
-    assert(defValue.dyn_cast<SILInstruction *>() != &inst &&
+    ASSERT(defValue.dyn_cast<SILInstruction *>() != &inst &&
            "Found def before finding use!");
 
     if (userSet.count(&inst))
@@ -123,7 +127,7 @@ void ValueLifetimeAnalysis::computeLifetime(
     llvm::function_ref<void(SILInstruction *)> visitLastUser,
     llvm::function_ref<void(SILBasicBlock *predBB, SILBasicBlock *succBB)>
         visitBoundaryEdge) {
-  assert(!isAliveAtBeginOfBlock(getFunction()->getEntryBlock()) &&
+  ASSERT(!isAliveAtBeginOfBlock(getFunction()->getEntryBlock()) &&
          "Can't compute frontier for def which does not dominate all uses");
 
   /// The lifetime ends if we have a live block and a not-live successor.
@@ -143,7 +147,7 @@ void ValueLifetimeAnalysis::computeLifetime(
           //
           // This should never happen if we have a SILArgument since the
           // SILArgument can not have any uses before it in a block.
-          assert(defValue.is<SILInstruction *>() &&
+          ASSERT(isa<SILInstruction *>(defValue) &&
                  "SILArguments dominate all instructions in their defining "
                  "blocks");
           usedAndRedefinedInSucc = true;
@@ -154,14 +158,14 @@ void ValueLifetimeAnalysis::computeLifetime(
       // Here, the basic block bb uses the value and later redefines the value.
       // Therefore, this value's lifetime ends after its last use preceding the
       // re-definition of the value.
-      auto ii = defValue.get<SILInstruction *>()->getReverseIterator();
+      auto ii = cast<SILInstruction *>(defValue)->getReverseIterator();
       for (; ii != bb->rend(); ++ii) {
         if (userSet.count(&*ii)) {
           visitLastUser(&*ii);
           break;
         }
       }
-      assert(ii != bb->rend() &&
+      ASSERT(ii != bb->rend() &&
              "There must be a user in bb before definition");
     }
     if (liveInSucc) {
@@ -233,7 +237,7 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
     // frontier, add all successor blocks to the frontier.
     auto *termBB = lastUser->getParent();
     for (const SILSuccessor &succ : termBB->getSuccessors()) {
-      assert(!isAliveAtBeginOfBlock(succ)
+      ASSERT(!isAliveAtBeginOfBlock(succ)
              && "out-of-sync with computeLifetime");
 
       if (deBlocks && deBlocks->isDeadEnd(succ))
@@ -266,7 +270,7 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
   BasicBlockSet unhandledFrontierBlocks(getFunction());
   bool unhandledFrontierBlocksFound = false;
   for (SILBasicBlock *frontierBB : frontierBlocks) {
-    assert(mode != UsersMustPostDomDef);
+    ASSERT(mode != UsersMustPostDomDef);
     bool needSplit = false;
     // If the value is live only in part of the predecessor blocks we have to
     // split those predecessor edges.
@@ -292,7 +296,7 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
   // Split critical edges from the lifetime region to not yet handled frontier
   // blocks.
   for (SILBasicBlock *frontierPred : liveOutBlocks) {
-    assert(mode != UsersMustPostDomDef);
+    ASSERT(mode != UsersMustPostDomDef);
     auto *term = frontierPred->getTerminator();
     // Cache the successor blocks because splitting critical edges invalidates
     // the successor list iterator of T.
@@ -302,7 +306,7 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
 
     for (unsigned i = 0, e = succBlocks.size(); i != e; ++i) {
       if (unhandledFrontierBlocks.contains(succBlocks[i])) {
-        assert((isCriticalEdge(term, i) || userSet.count(term)) &&
+        ASSERT((isCriticalEdge(term, i) || userSet.count(term)) &&
                "actually not a critical edge?");
         noCriticalEdges = false;
         if (mode != AllowToModifyCFG) {
@@ -393,7 +397,7 @@ void ValueLifetimeAnalysis::dump() const {
   if (auto *ii = defValue.dyn_cast<SILInstruction *>()) {
     llvm::errs() << *ii;
   } else {
-    llvm::errs() << *defValue.get<SILArgument *>();
+    llvm::errs() << *cast<SILArgument *>(defValue);
   }
   for (SILInstruction *use : userSet) {
     llvm::errs() << "  use: " << *use;

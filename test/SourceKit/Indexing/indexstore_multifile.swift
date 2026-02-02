@@ -17,7 +17,7 @@ struct Foo {
 // CHECK: indexstore_multifile.o-{{.*}}
 // CHECK: module-name: indexstoremodule
 // CHECK: main-path: SOURCE_DIR{{/|\\}}test{{/|\\}}SourceKit{{/|\\}}Indexing{{/|\\}}indexstore_multifile.swift
-// CHECK: out-file: BUILD_DIR{{.*}}indexstore_multifile.o
+// CHECK: out-file: TMP_DIR{{/|\\}}indexstore_multifile.o
 // CHECK: is-debug: 1
 // CHECK: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
 // CHECK: Record | user | SOURCE_DIR{{/|\\}}test{{/|\\}}SourceKit{{/|\\}}Indexing{{/|\\}}indexstore_multifile.swift | indexstore_multifile.swift-{{.*}}

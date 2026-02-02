@@ -184,11 +184,6 @@ StringRef getCurrentCompilerSerializationTag();
 /// same serialization tag.
 StringRef getCurrentCompilerChannel();
 
-/// Retrieves the value of the upcoming C++ interoperability compatibility
-/// version that's going to be presented as some new concrete version to the
-/// users.
-unsigned getUpcomingCxxInteropCompatVersion();
-
 /// Retrieves the version of the running compiler. It could be a tag or
 /// a "development" version that only has major/minor.
 std::string getCompilerVersion();

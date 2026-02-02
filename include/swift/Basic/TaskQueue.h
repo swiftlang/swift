@@ -205,8 +205,8 @@ public:
   /// \param Context an optional context which will be associated with the task
   /// \param SeparateErrors Controls whether error output is reported separately
   virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                       ArrayRef<const char *> Env = std::nullopt,
-                       void *Context = nullptr, bool SeparateErrors = false);
+                       ArrayRef<const char *> Env = {}, void *Context = nullptr,
+                       bool SeparateErrors = false);
 
   /// Synchronously executes the tasks in the TaskQueue.
   ///
@@ -240,8 +240,8 @@ class DummyTaskQueue : public TaskQueue {
     bool SeparateErrors;
 
     DummyTask(const char *ExecPath, ArrayRef<const char *> Args,
-              ArrayRef<const char *> Env = std::nullopt,
-              void *Context = nullptr, bool SeparateErrors = false)
+              ArrayRef<const char *> Env = {}, void *Context = nullptr,
+              bool SeparateErrors = false)
         : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
           SeparateErrors(SeparateErrors) {}
   };
@@ -254,8 +254,8 @@ public:
   virtual ~DummyTaskQueue();
 
   void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-               ArrayRef<const char *> Env = std::nullopt,
-               void *Context = nullptr, bool SeparateErrors = false) override;
+               ArrayRef<const char *> Env = {}, void *Context = nullptr,
+               bool SeparateErrors = false) override;
 
   bool
   execute(TaskBeganCallback Began = TaskBeganCallback(),

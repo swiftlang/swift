@@ -4,6 +4,7 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftCompile.cpp
   SwiftCompletion.cpp
   SwiftConformingMethodList.cpp
+  SwiftSignatureHelp.cpp
   SwiftDocSupport.cpp
   SwiftEditor.cpp
   SwiftEditorInterfaceGen.cpp

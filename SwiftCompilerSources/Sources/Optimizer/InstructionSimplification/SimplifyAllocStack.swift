@@ -179,7 +179,8 @@ private extension AllocStackInst {
   ///   use %3
   /// ```
   func optimizeExistential(_ context: SimplifyContext) -> Bool {
-    guard type.isExistential || type.isExistentialArchetype,
+    // TODO: support non-root existential archetypes
+    guard type.isExistential || type.isRootExistentialArchetype,
           let concreteFormalType = getConcreteTypeOfExistential()
     else {
       return false
@@ -206,24 +207,35 @@ private extension AllocStackInst {
           iea.replace(with: newAlloc, context)
         }
       case let oea as OpenExistentialAddrInst:
-        assert(oea.uses.ignoreUsers(ofType: DestroyAddrInst.self).isEmpty)
+        assert(oea.uses.ignore(usersOfType: DestroyAddrInst.self).isEmpty)
         oea.replace(with: newAlloc, context)
       case let cab as CheckedCastAddrBranchInst:
         let builder = Builder(before: cab, context)
         builder.createCheckedCastAddrBranch(
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: cab.destination, targetFormalType: cab.targetFormalType,
-          isolatedConformances: cab.isolatedConformances,
+          options: cab.checkedCastOptions,
           consumptionKind: cab.consumptionKind,
           successBlock: cab.successBlock, failureBlock: cab.failureBlock)
         context.erase(instruction: cab)
       case let ucca as UnconditionalCheckedCastAddrInst:
         let builder = Builder(before: ucca, context)
         builder.createUnconditionalCheckedCastAddr(
-          isolatedConformances: ucca.isolatedConformances,
+          options: ucca.checkedCastOptions,
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: ucca.destination, targetFormalType: ucca.targetFormalType)
         context.erase(instruction: ucca)
+      case let dv as DebugValueInst:
+        if dv.location.isInlined {
+          // We cannot change the type of an inlined instance of a variable
+          // without renaming the inlined function to get a unique
+          // specialization suffix (prior art exists in
+          // SILCloner::remapFunction()).
+          // For now, just remove affected inlined variables.
+          use.set(to: Undef.get(type: type, context), context)
+        } else {
+          use.set(to: newAlloc, context)
+        }
       default:
         use.set(to: newAlloc, context)
       }
@@ -246,7 +258,7 @@ private extension AllocStackInst {
            is DebugValueInst:
         break
       case let oea as OpenExistentialAddrInst:
-        if !oea.uses.ignoreUsers(ofType: DestroyAddrInst.self).isEmpty {
+        if !oea.uses.ignore(usersOfType: DestroyAddrInst.self).isEmpty {
           return nil
         }
       case let iea as InitExistentialAddrInst:

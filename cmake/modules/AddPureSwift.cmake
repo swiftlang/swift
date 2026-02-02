@@ -292,6 +292,9 @@ function(add_pure_swift_host_library name)
   force_target_link_libraries(${name} PUBLIC
     ${APSHL_SWIFT_DEPENDENCIES}
   )
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   if(APSHL_EMIT_MODULE)
     set(module_triple "${SWIFT_HOST_MODULE_TRIPLE}")
@@ -457,6 +460,9 @@ function(add_pure_swift_host_tool name)
   force_target_link_libraries(${name} PUBLIC
     ${APSHT_SWIFT_DEPENDENCIES}
   )
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC

@@ -67,11 +67,13 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
 
+  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   public var wrappedValue: Wrapped // expected-note {{property declared here}}
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
+    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context}}
     self.wrappedValue = wrappedValue
   }
 }
@@ -113,7 +115,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0 // expected-error{{'nonisolated' is not supported on properties with property wrappers}}
+  @WrapperActor var actorSynced: Int = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
 
   func testActorSynced() {
     _ = actorSynced

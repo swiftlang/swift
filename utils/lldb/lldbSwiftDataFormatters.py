@@ -62,10 +62,10 @@ def SmallBitVectorSummaryProvider(valobj, internal_dict):
 
 class DemangleNodePayloadKind(Enum):
     NONE = 0
-    TEXT = 1
-    INDEX = 2
-    ONE_CHILD = 3
-    TWO_CHILDREN = 4
+    ONE_CHILD = 1
+    TWO_CHILDREN = 2
+    TEXT = 3
+    INDEX = 4
     MANY_CHILDREN = 5
 
 

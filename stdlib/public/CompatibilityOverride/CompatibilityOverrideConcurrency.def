@@ -246,28 +246,6 @@ OVERRIDE_TASK(continuation_await, void,
               swift::, (ContinuationAsyncContext *context),
               (context))
 
-OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
-                   SWIFT_CC(swiftasync), swift::,
-                   (OpaqueValue *result,
-                       SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-                       AsyncLet *alet, TaskContinuationFunction *resumeFn,
-                       AsyncContext *callContext),
-                   (result, callerContext, alet, resumeFn, callContext))
-
-OVERRIDE_ASYNC_LET(asyncLet_wait_throwing, void,
-                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
-                   swift::,
-                   (OpaqueValue *result,
-                       SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-                       AsyncLet *alet,
-                       ThrowingTaskFutureWaitContinuationFunction *resume,
-                       AsyncContext *callContext),
-                   (result, callerContext, alet, resume, callContext))
-
-OVERRIDE_ASYNC_LET(asyncLet_end, void,
-                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                   swift::, (AsyncLet *alet), (alet))
-
 OVERRIDE_ASYNC_LET(asyncLet_get, void,
                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
                    swift::,

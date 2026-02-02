@@ -803,9 +803,7 @@ static void emitApplyArgument(IRGenFunction &IGF,
     
     // If a substitution is in play, just bitcast the address.
     if (isSubstituted) {
-      auto origType = IGF.IGM.getStoragePointerType(
-          silConv.getSILType(origParam, origFnTy, context));
-      addr = IGF.Builder.CreateBitCast(addr, origType);
+      addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.PtrTy);
     }
     
     out.add(addr);
@@ -865,37 +863,52 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
 }
 
 llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
+  // If the coroutine allocation function is always available, call it directly.
+  auto coroAllocPtr = IGM.getCoroFrameAllocFn();
+  auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
+  if (coroAllocFn->getLinkage() != llvm::GlobalValue::ExternalWeakLinkage)
+    return coroAllocFn;
+
+  // Otherwise, create a stub function to call it when available, or malloc
+  // when it isn't.
   return IGM.getOrCreateHelperFunction(
-    "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
-    {IGM.SizeTy, IGM.Int64Ty},
-    [&](IRGenFunction &IGF) {
-      auto parameters = IGF.collectParameters();
-      auto *size = parameters.claimNext();
-      auto coroAllocPtr = IGF.IGM.getCoroFrameAllocFn();
-      auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
-      coroAllocFn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
-      auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
-      auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
-        llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
-        llvm::ConstantPointerNull::get(
-            cast<llvm::PointerType>(coroFrameAllocFn->getType())));
-      auto *coroFrameAllocReturn = IGF.createBasicBlock("return-coroFrameAlloc");
-      auto *mallocReturn = IGF.createBasicBlock("return-malloc");
-      IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn, mallocReturn);
+      "__swift_coroFrameAllocStub", IGM.Int8PtrTy, {IGM.SizeTy, IGM.Int64Ty},
+      [&](IRGenFunction &IGF) {
+        auto parameters = IGF.collectParameters();
+        auto *size = parameters.claimNext();
+        auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
+        auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
+            llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
+            llvm::ConstantPointerNull::get(
+                cast<llvm::PointerType>(coroFrameAllocFn->getType())));
+        auto *coroFrameAllocReturn =
+            IGF.createBasicBlock("return-coroFrameAlloc");
+        auto *mallocReturn = IGF.createBasicBlock("return-malloc");
+        IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn,
+                                 mallocReturn);
 
-      IGF.Builder.emitBlock(coroFrameAllocReturn);
-      auto *mallocTypeId = parameters.claimNext();
-      auto *coroFrameAllocCall = IGF.Builder.CreateCall(IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
-      IGF.Builder.CreateRet(coroFrameAllocCall);
+        IGF.Builder.emitBlock(coroFrameAllocReturn);
+        auto *mallocTypeId = parameters.claimNext();
+        auto *coroFrameAllocCall = IGF.Builder.CreateCall(
+            IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
+        IGF.Builder.CreateRet(coroFrameAllocCall);
 
-      IGF.Builder.emitBlock(mallocReturn);
-      auto *mallocCall = IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
-      IGF.Builder.CreateRet(mallocCall);
-    },
-    /*setIsNoInline=*/false,
-    /*forPrologue=*/false,
-    /*isPerformanceConstraint=*/false,
-    /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+        IGF.Builder.emitBlock(mallocReturn);
+        auto *mallocCall =
+            IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
+        IGF.Builder.CreateRet(mallocCall);
+      },
+      /*setIsNoInline=*/false,
+      /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false,
+      /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+}
+
+FunctionPointer irgen::getCoroFrameAllocStubFunctionPointer(IRGenModule &IGM) {
+  auto *fn = cast<llvm::Function>(getCoroFrameAllocStubFn(IGM));
+  auto sig = Signature::forFunction(fn);
+  return FunctionPointer::forDirect(FunctionPointerKind::Function, fn, nullptr,
+                                    sig);
 }
 
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
@@ -1026,9 +1039,7 @@ public:
     if (nativeResultSchema.requiresIndirect()) {
       assert(origNativeSchema.requiresIndirect());
       auto resultAddr = origParams.claimNext();
-      resultAddr = subIGF.Builder.CreateBitCast(
-          resultAddr, IGM.getStoragePointerType(origConv.getSILResultType(
-                          IGM.getMaximalTypeExpansionContext())));
+      resultAddr = subIGF.Builder.CreateBitCast(resultAddr, IGM.PtrTy);
       args.add(resultAddr);
       useSRet = false;
     } else if (origNativeSchema.requiresIndirect()) {
@@ -1050,8 +1061,7 @@ public:
     for (auto resultType : origConv.getIndirectSILResultTypes(
              IGM.getMaximalTypeExpansionContext())) {
       auto addr = origParams.claimNext();
-      addr = subIGF.Builder.CreateBitCast(
-          addr, IGM.getStoragePointerType(resultType));
+      addr = subIGF.Builder.CreateBitCast(addr, IGM.PtrTy);
       auto useOpaque =
           useSRet && !isa<FixedTypeInfo>(IGM.getTypeInfo(resultType));
       if (useOpaque)
@@ -1077,9 +1087,8 @@ public:
       bool isIndirectParam = origConv.isSILIndirect(origParamInfo);
       if (!isIndirectParam && nativeSchemaOrigParam.requiresIndirect()) {
         auto addr = origParams.claimNext();
-        if (addr->getType() != ti.getStorageType()->getPointerTo())
-          addr = subIGF.Builder.CreateBitCast(addr,
-                                           ti.getStorageType()->getPointerTo());
+        if (addr->getType() != IGM.PtrTy)
+          addr = subIGF.Builder.CreateBitCast(addr, IGM.PtrTy);
         args.add(addr);
         continue;
       }
@@ -1492,7 +1501,8 @@ public:
     auto prototype = subIGF.IGM.getOpaquePtr(
       subIGF.IGM.getAddrOfContinuationPrototype(
         cast<SILFunctionType>(
-          unsubstType->mapTypeOutOfContext()->getCanonicalType())));
+          unsubstType->mapTypeOutOfEnvironment()->getCanonicalType()),
+        origType->getInvocationGenericSignature()));
 
     
     // Use free as our allocator.
@@ -1631,7 +1641,6 @@ public:
 
     /// Get the continuation function pointer
     ///
-    auto sig = Signature::forCoroutineContinuation(subIGF.IGM, origType);
     auto schemaAndEntity =
       getCoroutineResumeFunctionPointerAuth(subIGF.IGM, origType);
     auto pointerAuth = PointerAuthInfo::emit(subIGF, schemaAndEntity.first,
@@ -2165,7 +2174,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   }
 
   // Derive the callee function pointer.
-  auto fnTy = origSig.getType()->getPointerTo();
+  auto *fnTy = IGM.PtrTy;
   FunctionPointer fnPtr = [&]() -> FunctionPointer {
     // If we found a function pointer statically, great.
     if (staticFnPtr) {
@@ -2674,8 +2683,8 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
   
   // Create the helper.
   llvm::Type *args[] = {
-    blockTL.getStorageType()->getPointerTo(),
-    blockTL.getStorageType()->getPointerTo(),
+      IGM.PtrTy,
+      IGM.PtrTy,
   };
   auto copyTy = llvm::FunctionType::get(IGM.VoidTy, args, /*vararg*/ false);
   // TODO: Give these predictable mangled names and shared linkage.
@@ -2713,9 +2722,8 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   // TODO
   
   // Create the helper.
-  auto destroyTy = llvm::FunctionType::get(IGM.VoidTy,
-                                       blockTL.getStorageType()->getPointerTo(),
-                                       /*vararg*/ false);
+  auto destroyTy = llvm::FunctionType::get(IGM.VoidTy, IGM.PtrTy,
+                                           /*vararg*/ false);
   // TODO: Give these predictable mangled names and shared linkage.
   auto func = llvm::Function::Create(destroyTy,
                                      llvm::GlobalValue::InternalLinkage,

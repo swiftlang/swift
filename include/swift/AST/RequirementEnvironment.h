@@ -114,7 +114,8 @@ public:
   }
 
   /// Retrieve the substitution map that maps the interface types of the
-  /// requirement to the interface types of the witness thunk signature.
+  /// requirement to the archetypes of the witness thunk signature's
+  /// generic environment.
   SubstitutionMap getRequirementToWitnessThunkSubs() const {
     return reqToWitnessThunkSigMap;
   }

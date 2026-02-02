@@ -19,7 +19,9 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "clang/AST/Attr.h"
+#include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -74,6 +76,7 @@ namespace dependencies {
 namespace swift {
 enum class ResultConvention : uint8_t;
 class ASTContext;
+class CASOptions;
 class CompilerInvocation;
 class ClangImporterOptions;
 class ClangInheritanceInfo;
@@ -82,6 +85,7 @@ class ClangNode;
 class ConcreteDeclRef;
 class Decl;
 class DeclContext;
+class DiagnosticEngine;
 class EffectiveClangContext;
 class EnumDecl;
 class FuncDecl;
@@ -96,6 +100,7 @@ class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
 class ValueDecl;
+class ConstructorDecl;
 class VisibleDeclConsumer;
 using ModuleDependencyIDSetVector =
     llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
@@ -145,6 +150,17 @@ typedef llvm::PointerUnion<const clang::Decl *, const clang::MacroInfo *,
                            const clang::Type *, const clang::Token *>
     ImportDiagnosticTarget;
 
+/// Addition file mapping information for ClangImporter.
+struct ClangInvocationFileMapping {
+  /// Mapping from a file name to an existing file path.
+  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// MemoryBuffer for files to be overriden.
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> overridenFiles;
+
+  bool requiresBuiltinHeadersInSystemModules = false;
+};
+
 /// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
@@ -163,10 +179,9 @@ public:
 private:
   Implementation &Impl;
 
-  bool requiresBuiltinHeadersInSystemModules = false;
+  ClangInvocationFileMapping clangFileMapping;
 
-  ClangImporter(ASTContext &ctx,
-                DependencyTracker *tracker,
+  ClangImporter(ASTContext &ctx, DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
 
   /// Creates a clone of Clang importer's compiler instance that has been
@@ -199,9 +214,22 @@ public:
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+         const IRGenOptions *IRGenOpts = nullptr,
+         std::string swiftPCHHash = "",
+         DependencyTracker *tracker = nullptr,
          DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
          bool ignoreFileMapping = false);
+
+  static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
+
+  /// Compute the file system used by the ClangImporter from
+  /// ClangInvocationFileMapping.
+  static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  computeClangImporterFileSystem(
+      const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
+      bool suppressDiagnostics = false,
+      llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
 
   std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -224,8 +252,9 @@ public:
   ///
   /// \return a pair of the Clang Driver and the diagnostic engine, which needs
   /// to be alive during the use of the Driver.
-  static std::pair<clang::driver::Driver,
-                   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+  static std::tuple<clang::driver::Driver,
+                    llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>,
+                    std::unique_ptr<clang::DiagnosticOptions>>
   createClangDriver(
       const LangOptions &LangOpts,
       const ClangImporterOptions &ClangImporterOpts,
@@ -488,32 +517,16 @@ public:
   bool dumpPrecompiledModule(StringRef modulePath, StringRef outputPath);
 
   bool runPreprocessor(StringRef inputPath, StringRef outputPath);
-  const clang::Module *getClangOwningModule(ClangNode Node) const;
+
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
+  const clang::Module *getClangOwningModule(ClangNode Node) const override;
+
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
-
-  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  using LookupModuleOutputCallback =
-      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
-                                     clang::tooling::dependencies::ModuleOutputKind)>;
-  
-  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  bridgeClangModuleDependencies(
-      const ASTContext &ctx,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
-      LookupModuleOutputCallback LookupModuleOutput,
-      RemapPathCallback remapPath = nullptr);
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport = false) override;
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
@@ -549,6 +562,11 @@ public:
   clang::CodeGenOptions &getCodeGenOpts() const;
 
   std::string getClangModuleHash() const;
+
+  /// Get clang file mapping.
+  const ClangInvocationFileMapping &getClangFileMapping() const {
+    return clangFileMapping;
+  }
 
   /// Get clang import creation cc1 args for swift explicit module build.
   std::vector<std::string> getSwiftExplicitModuleDirectCC1Args() const;
@@ -623,8 +641,8 @@ public:
   resolveStableSerializationPath(
                             const StableSerializationPath &path) const override;
 
-  bool isSerializable(const clang::Type *type,
-                      bool checkCanonical) const override;
+  SerializableInfo isSerializable(const clang::Type *type,
+                                  bool checkCanonical) const override;
 
   clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,
@@ -638,6 +656,17 @@ public:
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
+
+  bool needsClosureConstructor(
+      const clang::CXXRecordDecl *recordDecl) const override;
+
+  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const override;
+  bool isDeconstructedSwiftClosure(const clang::Type *type) const override;
+
+  const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const override;
+
+  FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
 
   bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
 
@@ -654,10 +683,15 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
+  /// Returns a decl that was imported earlier or null if it was not found in
+  /// the cache.
+  virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) override;
+
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
-  bool isClonedMemberDecl(ValueDecl *decl) override;
+  ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -691,6 +725,23 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
+/// Returns true if the given C/C++ reference type uses "immortal"
+/// retain/release functions.
+bool hasImmortalAttrs(const clang::RecordDecl *decl);
+
+struct ReturnOwnershipInfo {
+  ReturnOwnershipInfo(const clang::NamedDecl *decl);
+
+  bool hasRetainAttr() const {
+    return hasReturnsRetained || hasReturnsUnretained;
+  }
+  bool hasConflictingAttr() const {
+    return hasReturnsRetained && hasReturnsUnretained;
+  }
+
+  bool hasReturnsRetained = false;
+  bool hasReturnsUnretained = false;
+};
 
 /// Returns true if the given module has a 'cplusplus' requirement.
 bool requiresCPlusPlus(const clang::Module *module);
@@ -713,11 +764,12 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
+/// Determine whether the given Clang record declaration has one of the
+/// attributes that makes it import as a reference types.
+bool hasImportAsRefAttr(const clang::RecordDecl *decl);
+
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-/// Determine whether type is a c++ foreign reference type.
-bool isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type);
 
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
@@ -734,6 +786,12 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 /// This mapping is conservative: the resulting Swift access should be at _most_
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
+
+/// Lookup and return the copy constructor of \a decl
+///
+/// Returns nullptr if \a decl doesn't have a valid copy constructor
+const clang::CXXConstructorDecl *
+findCopyConstructor(const clang::CXXRecordDecl *decl);
 
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///
@@ -814,16 +872,18 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 
   if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
     std::optional<T> result;
-    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
-      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
-        result = baseMatch;
-        return false;
-      }
+    if (recordDecl->isCompleteDefinition()) {
+      recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+        if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+          result = baseMatch;
+          return false;
+        }
 
-      return true;
-    });
+        return true;
+      });
 
-    return result;
+      return result;
+    }
   }
 
   return std::nullopt;
@@ -832,17 +892,24 @@ std::optional<T> matchSwiftAttrConsideringInheritance(
 /// Matches a `swift_attr("...")` on the record type pointed to by the given
 /// Clang type, searching base classes if it's a C++ class.
 ///
-/// \param type A Clang pointer type.
+/// \param type A Clang pointer or reference type.
 /// \param patterns List of attribute name-value pairs to match.
 /// \returns Matched value or std::nullopt.
 template <typename T>
 std::optional<T> matchSwiftAttrOnRecordPtr(
     const clang::QualType &type,
     llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  clang::QualType pointeeType;
   if (const auto *ptrType = type->getAs<clang::PointerType>()) {
-    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
-      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
-    }
+    pointeeType = ptrType->getPointeeType();
+  } else if (const auto *refType = type->getAs<clang::ReferenceType>()) {
+    pointeeType = refType->getPointeeType();
+  } else {
+    return std::nullopt;
+  }
+
+  if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
+    return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
   }
   return std::nullopt;
 }
@@ -855,18 +922,32 @@ std::optional<T> matchSwiftAttrOnRecordPtr(
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getCxxRefConventionWithAttrs(const clang::Decl *decl);
-} // namespace importer
 
-struct ClangInvocationFileMapping {
-  /// Mapping from a file name to an existing file path.
-  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
-
-  /// Mapping from a file name to a string of characters that represents the
-  /// contents of the file.
-  SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
-
-  bool requiresBuiltinHeadersInSystemModules;
+enum class RefCountedPtrError {
+  NotAnnotated,
+  MissingToRawPointer,
+  ToRawPointerLookupFailure,
+  ToRawPointerLookupAmbiguity,
+  ToRawPointerNotFunction,
+  ToRawPointerWrongSignature,
+  CtorLookupAmbiguity,
+  CtorLookupFailure,
+  CtorWrongParamType
 };
+
+struct RefCountedPtrInfo {
+  ConstructorDecl *toSmartPtr;
+};
+
+struct RefCountedPtrRequestResult {
+  std::variant<RefCountedPtrInfo, RefCountedPtrError> result;
+  ValueDecl *toRawPtrFunc = nullptr;
+  StringRef toRawPtrName = "";
+};
+
+RefCountedPtrRequestResult
+getClangRefCountedSmartPointer(NominalTypeDecl *decl);
+} // namespace importer
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
@@ -878,15 +959,6 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
     const ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
-
-/// Apply the given file mapping to the specified 'fileSystem', used
-/// primarily to inject modulemaps on platforms with non-modularized
-/// platform libraries.
-ClangInvocationFileMapping applyClangInvocationMapping(
-    const ASTContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
-    bool suppressDiagnostics = false);
 
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {
@@ -916,6 +988,9 @@ public:
   /// metadata for cases of (nested) inheritance.
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
       : access(computeAccess(prev, base)) {}
+
+  /// Initialize an instance of this class at a particular given access level.
+  ClangInheritanceInfo(clang::AccessSpecifier access) : access(access) {}
 
   /// Whether this info represents a case of nested private inheritance.
   bool isNestedPrivate() const { return !access.has_value(); }

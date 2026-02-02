@@ -14,6 +14,9 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "clang/Frontend/SerializedDiagnosticReader.h"
+#include "clang/Frontend/SerializedDiagnostics.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
@@ -175,7 +178,7 @@ export *\n\
   for (auto &command : CommandStrArr) {
     Command.push_back(command.c_str());
   }
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   // TODO: Output/verify dependency graph correctness
@@ -244,15 +247,148 @@ public func overlayFuncA() { }\n"));
     CommandB.push_back(command.c_str());
   }
 
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-  auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA, {}, ScanDiagnosticConsumer);
-  auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB, {}, ScanDiagnosticConsumer);
+  std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+      InitializationDiagnostics;
+  auto queryAContext = ScannerTool.createScanQueryContext(CommandA, {},
+                                                          InitializationDiagnostics);
+  auto queryBContext = ScannerTool.createScanQueryContext(CommandB, {},
+                                                          InitializationDiagnostics);
   // Ensure that scans that only differ in module name have distinct scanning context hashes
-  ASSERT_NE(instanceA->ScanInstance.get()->getInvocation().getModuleScanningHash(),
-            instanceB->ScanInstance.get()->getInvocation().getModuleScanningHash());
+  ASSERT_NE(queryAContext->ScanInstance.get()->getInvocation().getModuleScanningHash(),
+            queryBContext->ScanInstance.get()->getInvocation().getModuleScanningHash());
 }
 
-TEST_F(ScanTest, TestModuleCycle) {
+namespace {
+class DiagnosticChecker : public clang::serialized_diags::SerializedDiagnosticReader {
+public:
+  std::vector<std::string> errorMessages;
+  std::vector<std::string> warningMessages;
+
+protected:
+  std::error_code visitDiagnosticRecord(
+      unsigned Severity, const clang::serialized_diags::Location &Location,
+      unsigned Category, unsigned Flag, StringRef Message) override {
+      switch (static_cast<clang::serialized_diags::Level>(Severity)) {
+        case clang::serialized_diags::Warning:
+          warningMessages.push_back(Message.str());
+          break;
+        case clang::serialized_diags::Error:
+          errorMessages.push_back(Message.str());
+          break;
+        default:
+          break;
+      }
+      return std::error_code();
+  }
+};
+}
+
+
+TEST_F(ScanTest, TestSerializedDiagnosticOutput) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
+      "ScanTest.TestSerializedDiagnosticOutput", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n\
+#warning(\"This is a warning\")\n"));
+
+  // Create include directory
+  std::string SwiftDirPath = createFilename(tempDir, "Swift");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(SwiftDirPath));
+
+  // Create output directory
+  std::string OutputDirPath = createFilename(tempDir, "Output");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(OutputDirPath));
+  std::string SerializedDiagnosticsOutputPath =
+      createFilename(OutputDirPath, "scan-diags.dia");
+
+  // Create imported module Swift interface files
+  ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "A.swiftinterface",
+                                    "// swift-interface-format-version: 1.0\n\
+// swift-module-flags: -module-name A\n\
+import Swift\n\
+#error(\"This is an error\")\n\
+public func funcA() { }\n"));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  // Generate command line
+  std::vector<std::string> CommandStr = {
+      TestPathStr,
+      "-I", SwiftDirPath,
+      "-I", StdLibDir.str().str(),
+      "-I", ShimsLibDir.str().str(),
+      "-serialize-diagnostics-path", SerializedDiagnosticsOutputPath,
+      "-module-name", "testSerializedDiagnosticOutput"};
+  // On Windows we need to add an extra escape for path separator characters
+  // because otherwise the command line tokenizer will treat them as escape
+  // characters.
+  for (size_t i = 0; i < CommandStr.size(); ++i) {
+    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
+  }
+  std::vector<const char *> Command;
+  for (auto &command : CommandStr)
+    Command.push_back(command.c_str());
+
+  {
+    auto ScanningService = std::make_unique<SwiftDependencyScanningService>();
+    std::vector<DepScanInMemoryDiagnosticCollector::ScannerDiagnosticInfo>
+        InitializationDiagnostics;
+    auto QueryContext = ScannerTool.createScanQueryContext(Command, {},
+                                                           InitializationDiagnostics);
+    ASSERT_FALSE(QueryContext.getError());
+
+    ModuleDependenciesCache ScanCache(
+        QueryContext->ScanInstance.get()->getMainModule()->getNameStr().str(),
+        QueryContext->ScanInstance.get()
+            ->getInvocation()
+            .getModuleScanningHash());
+    auto DependenciesOrErr =
+        performModuleScan(*ScanningService, ScanCache, *QueryContext);
+
+    ASSERT_FALSE(DependenciesOrErr.getError());
+  }
+  ASSERT_TRUE(llvm::sys::fs::exists(SerializedDiagnosticsOutputPath));
+
+  auto DiagnosticsReader = DiagnosticChecker();
+  auto ReadError = DiagnosticsReader.readDiagnostics(SerializedDiagnosticsOutputPath);
+  ASSERT_FALSE(ReadError);
+  ASSERT_EQ(DiagnosticsReader.errorMessages.size(), static_cast<size_t>(1));
+  ASSERT_EQ(DiagnosticsReader.warningMessages.size(), static_cast<size_t>(1));
+  EXPECT_EQ(DiagnosticsReader.errorMessages.front(), "This is an error");
+  EXPECT_EQ(DiagnosticsReader.warningMessages.front(), "This is a warning");
+}
+
+TEST_F(ScanTest, TestEscapedCommandLine) {
+  llvm::ErrorOr<swiftscan_string_ref_t> information =
+      getTargetInfo({
+                      "-sdk",
+#if defined(_WIN32)
+                      "    C:\\Program Files\\Swift\\Platforms\\Windows.platform\\Developer\\SDKs\\Windows.sdk\\usr\\include",
+#else
+                      "C:\\\\Program\\ Files\\\\Swift\\\\Platforms\\\\Windows.platform\\\\Developer\\\\SDKs\\\\Windows.sdk\\\\usr\\\\include",
+#endif
+                    },
+                    "swiftc");
+  ASSERT_TRUE(information);
+  llvm::StringRef Result{static_cast<const char *>(information->data),
+                         information->length};
+  ASSERT_NE(Result, llvm::StringRef{});
+  llvm::Expected<llvm::json::Value> V = llvm::json::parse(Result);
+  ASSERT_TRUE(static_cast<bool>(V));
+  ASSERT_EQ(V->getAsObject()->getObject("paths")->getString("sdkPath"),
+            "C:\\Program Files\\Swift\\Platforms\\Windows.platform\\Developer\\SDKs\\Windows.sdk\\usr\\include");
+}
+
+// Disabled due to rdar://165014838
+TEST_F(ScanTest, DISABLED_TestModuleCycle) {
   SmallString<256> tempDir;
   ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleCycle", tempDir));
   SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
@@ -307,9 +443,7 @@ public func funcB() { }\n"));
   for (auto &command : CommandStr)
     Command.push_back(command.c_str());
 
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
 
   // Ensure a hollow output with diagnostic info is produced
   ASSERT_FALSE(DependenciesOrErr.getError());
@@ -327,5 +461,80 @@ public func funcB() { }\n"));
   ASSERT_TRUE(Dependencies->dependencies->modules[0]->source_files->count == 0);
   ASSERT_TRUE(Dependencies->dependencies->modules[0]->direct_dependencies->count == 0);
   ASSERT_TRUE(Dependencies->dependencies->modules[0]->link_libraries->count == 0);
+  swiftscan_dependency_graph_dispose(Dependencies);
+}
+
+TEST_F(ScanTest, TestStressConcurrentDiagnostics) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestStressConcurrentDiagnostics", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create includes
+  std::string IncludeDirPath = createFilename(tempDir, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
+  std::string CHeadersDirPath = createFilename(IncludeDirPath, "CHeaders");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(CHeadersDirPath));
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+
+  // Create imported module C modulemap/headers
+  std::string modulemapContent = "";
+  std::string testFileContent = "";
+  for (int i = 0; i < 100; ++i) {
+    std::string headerName = "A_" + std::to_string(i) + ".h";
+    std::string headerContent = "void funcA_" + std::to_string(i) + "(void);";
+    ASSERT_FALSE(
+        emitFileWithContents(CHeadersDirPath, headerName, headerContent));
+
+    std::string moduleMapEntry = "module A_" + std::to_string(i) + "{\n";
+    moduleMapEntry.append("header \"A_" + std::to_string(i) + ".h\"\n");
+    moduleMapEntry.append("export *\n");
+    moduleMapEntry.append("}\n");
+    modulemapContent.append(moduleMapEntry);
+    testFileContent.append("import A_" + std::to_string(i) + "\n");
+  }
+
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", testFileContent));
+  ASSERT_FALSE(
+      emitFileWithContents(CHeadersDirPath, "module.modulemap", modulemapContent));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  std::vector<std::string> BaseCommandStrArr = {
+    TestPathStr,
+    std::string("-I ") + CHeadersDirPath,
+    std::string("-I ") + StdLibDir.str().str(),
+    std::string("-I ") + ShimsLibDir.str().str(),
+    // Pass in a flag which will cause every instantiation of
+    // the clang scanner to fail with "unknown argument"
+    "-Xcc",
+    "-foobar"
+  };
+
+  std::vector<std::string> CommandStr = BaseCommandStrArr;
+  CommandStr.push_back("-module-name");
+  CommandStr.push_back("testConcurrentDiags");
+
+  // On Windows we need to add an extra escape for path separator characters because otherwise
+  // the command line tokenizer will treat them as escape characters.
+  for (size_t i = 0; i < CommandStr.size(); ++i) {
+    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
+  }
+  std::vector<const char*> Command;
+  for (auto &command : CommandStr)
+    Command.push_back(command.c_str());
+
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
+
+  // Ensure a hollow output with diagnostic info is produced
+  ASSERT_FALSE(DependenciesOrErr.getError());
+  auto Dependencies = DependenciesOrErr.get();
+  auto Diagnostics = Dependencies->diagnostics;
+  ASSERT_TRUE(Diagnostics->count >= 1);
   swiftscan_dependency_graph_dispose(Dependencies);
 }

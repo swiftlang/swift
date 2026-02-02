@@ -11,7 +11,7 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
@@ -19,7 +19,7 @@
 // RUN:   %t/main.swift @%t/MyApp.cmd
 
 /// Test that if there are non-existing module-map file passed through -Xcc, this still compiles.
-// RUN: %target-swift-frontend \
+// RUN: %target-swift-frontend-plain \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \

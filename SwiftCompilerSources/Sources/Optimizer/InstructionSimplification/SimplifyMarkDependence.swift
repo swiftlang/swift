@@ -19,7 +19,7 @@ extension MarkDependenceInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if isRedundant ||
        // A literal lives forever, so no mark_dependence is needed.
-       // This pattern can occur after StringOptimization when a utf8CString of a literal is replace
+       // This pattern can occur after StringOptimization when a utf8CString of a literal is replaced
        // by the string_literal itself.
        value.isLiteral
     {
@@ -42,9 +42,13 @@ extension MarkDependenceAddrInst : OnoneSimplifiable, SILCombineSimplifiable {
 
 private extension MarkDependenceInstruction {
   var isRedundant: Bool {
-    if base.type.isObject && base.type.isTrivial(in: base.parentFunction) {
+    if base.type.isObject && base.type.isTrivial(in: base.parentFunction)
+         && !(base.definingInstruction is BeginApplyInst) {
       // Sometimes due to specialization/builtins, we can get a mark_dependence whose base is a trivial
       // typed object. Trivial values live forever. Therefore the mark_dependence does not have a meaning.
+      // begin_apply is a special case. A dependency on the token is limited to the coroutine scope (ideally, the token
+      // would have a non-trivial type like $Builtin.Token).
+      //
       // Note: the mark_dependence is still needed for lifetime diagnostics. So it's important that this
       //       simplification does not run before the lifetime diagnostic pass.
       return true

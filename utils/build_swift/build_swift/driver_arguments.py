@@ -71,7 +71,7 @@ def _apply_default_arguments(args):
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = 'Debug'
+        args.build_variant = 'RelWithDebInfo'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -201,6 +201,9 @@ def _apply_default_arguments(args):
 
     # --test-optimize-none-with-implicit-dynamic implies --test.
     if args.test_optimize_none_with_implicit_dynamic:
+        args.test = True
+
+    if args.test_optimize_none_with_opaque_values:
         args.test = True
 
     # If none of tests specified skip swift stdlib test on all platforms
@@ -546,6 +549,27 @@ def create_argument_parser():
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for xrOS')
 
+    option('--darwin-test-deployment-version-osx', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_OSX,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building macOS tests')
+    option('--darwin-test-deployment-version-ios', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building iOS tests')
+    option('--darwin-test-deployment-version-tvos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building tvOS tests')
+    option('--darwin-test-deployment-version-watchos', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building watchOS tests')
+    option('--darwin-test-deployment-version-xros', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+           metavar='MAJOR.MINOR',
+           help='deployment target version to use when building visionOS tests')
+
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
            help='Pass through extra options to CMake in the form of comma '
@@ -686,6 +710,12 @@ def create_argument_parser():
                 "for each cross-compiled toolchain's destdir, useful when building "
                 "multiple toolchains and can be disabled if only cross-compiling one.")
 
+    option('--cross-compile-build-swift-tools', toggle_true,
+           default=True,
+           help="Cross-compile the Swift compiler, other host tools from the "
+                "compiler repository, and various macros for each listed "
+                "--cross-compile-hosts platform.")
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
@@ -823,11 +853,18 @@ def create_argument_parser():
     option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
            help='build the \'minimal\' freestanding stdlib variant into a '
                 'separate build directory ')
+
+    # Wasm options
+
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
+    option(['--install-wasmkit'], toggle_true('install_wasmkit'),
+           help='install SourceKitLSP')
+
+    # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),
            help='build Swift Testing')
@@ -908,7 +945,7 @@ def create_argument_parser():
 
     with mutually_exclusive_group():
 
-        set_defaults(build_variant='Debug')
+        set_defaults(build_variant='RelWithDebInfo')
 
         option(['-d', '--debug'], store('build_variant'),
                const='Debug',
@@ -1110,6 +1147,12 @@ def create_argument_parser():
            help='run the test suite in optimize none with implicit dynamic'
                 'mode too (implies --test)')
 
+    # NOTE: this mode is meant to aid the bring-up of opaque values
+    # and once its enabled by default, we can remove this.
+    option('--test-optimize-none-with-opaque-values', toggle_true,
+           help='run the executable tests again, compiling them with '
+                '-enable-sil-opaque-values (implies --test)')
+
     option('--long-test', toggle_true,
            help='run the long test suite')
 
@@ -1204,6 +1247,12 @@ def create_argument_parser():
            default=False,
            help='Build and preview standard library documentation with Swift-DocC.'
                 'Note: this builds Swift-DocC to perform the docs build.')
+    option('--stdlib-docs-static-hosting', toggle_true,
+           default=False,
+           help='Build the standard library documentation for static hosting.')
+    option('--stdlib-docs-hosting-base-path', store,
+           default='/',
+           help='The base path for hosting the standard library documentation.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,
@@ -1403,7 +1452,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,
@@ -1421,8 +1470,14 @@ def create_argument_parser():
                 'Can be called multiple times '
                 'to add multiple such options.')
 
-    option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
-           help='do not generate testing targets for LLVM')
+    with mutually_exclusive_group():
+        set_defaults(llvm_include_tests=True)
+
+        option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
+               help='do not generate testing targets for LLVM')
+
+        option('--llvm-include-tests', toggle_true('llvm_include_tests'),
+               help='generate testing targets for LLVM')
 
     option('--llvm-cmake-options', append,
            type=argparse.ShellSplitType(),
@@ -1436,11 +1491,6 @@ def create_argument_parser():
                 'These are the last arguments passed to CMake and can override '
                 'existing options.',
            default=[])
-
-    option('--llvm-build-compiler-rt-with-use-runtimes', toggle_true, default=True,
-           help='Switch to LLVM_ENABLE_RUNTIMES as the mechanism to build compiler-rt'
-                'It will become the default with LLVM 21, this flag is '
-                'meant to stage its introduction and account for edge cases')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')

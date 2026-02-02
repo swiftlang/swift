@@ -212,6 +212,7 @@ struct CompletionRequest {
   bool includeObjectLiterals = true;
   bool addInitsToTopLevel = false;
   bool addCallWithNoDefaultArgs = true;
+  bool verifyUSRToDecl = false;
 
   CompletionRequest(const char *path, unsigned offset,
                     ArrayRef<const char *> args) {
@@ -294,6 +295,7 @@ swiftide_complete_cancellable(swiftide_connection_t _conn,
   result->context.setIncludeObjectLiterals(req.includeObjectLiterals);
   result->context.setAddInitsToTopLevel(req.addInitsToTopLevel);
   result->context.setAddCallWithNoDefaultArgs(req.addCallWithNoDefaultArgs);
+  result->context.setVerifyUSRToDecl(req.verifyUSRToDecl);
 
   conn->codeComplete(
       req.path, req.offset, req.compilerArguments, fileSystem, result->context,
@@ -659,6 +661,42 @@ void swiftide_completion_item_get_doc_brief(
     return handler(nullptr);
   }
   handler(item.getBriefDocComment().data());
+}
+
+void swiftide_completion_item_get_doc_full_as_xml(
+    swiftide_completion_response_t _response, swiftide_completion_item_t _item,
+    void (^handler)(const char *)) {
+  auto &response = *static_cast<CompletionResult *>(_response);
+  auto &item = *static_cast<CodeCompletionResult *>(_item);
+
+  response.scratch.clear();
+  {
+    llvm::raw_svector_ostream OS(response.scratch);
+    item.printFullDocCommentAsXML(OS);
+  }
+
+  if (response.scratch.empty()) {
+    return handler(nullptr);
+  }
+  handler(response.scratch.c_str());
+}
+
+void swiftide_completion_item_get_doc_raw(
+    swiftide_completion_response_t _response, swiftide_completion_item_t _item,
+    void (^handler)(const char *)) {
+  auto &response = *static_cast<CompletionResult *>(_response);
+  auto &item = *static_cast<CodeCompletionResult *>(_item);
+
+  response.scratch.clear();
+  {
+    llvm::raw_svector_ostream OS(response.scratch);
+    item.printRawDocComment(OS);
+  }
+
+  if (response.scratch.empty()) {
+    return handler(nullptr);
+  }
+  handler(response.scratch.c_str());
 }
 
 void swiftide_completion_item_get_associated_usrs(

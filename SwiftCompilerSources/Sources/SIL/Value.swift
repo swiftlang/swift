@@ -101,6 +101,10 @@ public enum Ownership {
     }
   }
 
+  public init(in function: Function, of type: Type, with convention: ArgumentConvention) {
+    self = Ownership(bridged: BridgedValueOwnership_init(function.bridged, type.bridged, convention.bridged))
+  }
+
   public var _bridged: BridgedValue.Ownership {
     switch self {
       case .unowned:    return BridgedValue.Ownership.Unowned
@@ -243,9 +247,9 @@ extension Value {
   /// struct S { var c1: C; var c2: C }
   /// let s: S
   ///
-  /// `s.allContainedAddresss` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
+  /// `s.allContainedAddresses` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
   ///
-  public var allContainedAddresss: ProjectedValue {
+  public var allContainedAddresses: ProjectedValue {
     if type.isAddress {
       // This is the regular case: the path selects any sub-fields of an address.
       return at(SmallProjectionPath(.anyValueFields))
@@ -298,6 +302,10 @@ public final class Undef : Value {
   public var hasTrivialNonPointerType: Bool { false }
 
   public var isLexical: Bool { false }
+
+  public static func get(type: Type, _ context: some MutatingContext) -> Undef {
+    context._bridged.getSILUndef(type.bridged).value as! Undef
+  }
 }
 
 final class PlaceholderValue : Value {

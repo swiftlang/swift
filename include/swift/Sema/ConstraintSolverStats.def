@@ -18,7 +18,6 @@
 #  error #define CS_STATISTIC(Name, Description) before including
 #endif
 
-CS_STATISTIC(ASTBytesAllocated, "bytes allocated in solver arena")
 CS_STATISTIC(NumTypeVariablesBound, "# of type variables bound")
 CS_STATISTIC(NumTypeVariableBindings, "# of type variable bindings attempted")
 CS_STATISTIC(NumDisjunctions, "# of disjunctions explored")

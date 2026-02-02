@@ -19,6 +19,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -26,6 +27,9 @@
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -211,7 +215,8 @@ static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 /// heuristic that looks at the trip count and the cost of the instructions in
 /// the loop to determine whether we should unroll this loop.
 static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
-                                   IsSelfRecursiveAnalysis *SRA) {
+                                   IsSelfRecursiveAnalysis *SRA,
+                                   DeadEndBlocks *deb) {
   assert(Loop->getSubLoops().empty() && "Expect innermost loops");
   if (TripCount > 32)
     return false;
@@ -227,7 +232,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
     (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
-      if (!canDuplicateLoopInstruction(Loop, &Inst))
+      if (!canDuplicateLoopInstruction(Loop, &Inst, deb))
         return false;
       if (instructionInlineCost(Inst) != InlineCost::Free)
         ++Cost;
@@ -388,7 +393,7 @@ updateSSA(SILFunction *Fn, SILLoop *Loop,
 
 /// Try to fully unroll the loop if we can determine the trip count and the trip
 /// count is below a threshold.
-static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA) {
+static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEndBlocks *deb) {
   assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
 
   LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
@@ -409,7 +414,7 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA) {
     return false;
   }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA)) {
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA, deb)) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }
@@ -490,6 +495,7 @@ class LoopUnrolling : public SILFunctionTransform {
     auto *Fun = getFunction();
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
     IsSelfRecursiveAnalysis *SRA = PM->getAnalysis<IsSelfRecursiveAnalysis>();
+    DeadEndBlocks *deb = PM->getAnalysis<DeadEndBlocksAnalysis>()->get(Fun);
 
     LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
                             << Fun->getName() << "\n");
@@ -517,10 +523,15 @@ class LoopUnrolling : public SILFunctionTransform {
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)
-      Changed |= tryToUnrollLoop(Loop, SRA);
+      Changed |= tryToUnrollLoop(Loop, SRA, deb);
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      removeUnreachableBlocks(*Fun);
+      if (Fun->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), Fun);
+      if (Fun->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), Fun);
     }
   }
 };

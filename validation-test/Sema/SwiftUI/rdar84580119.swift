@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-cpu-apple-macosx10.15 -swift-version 5
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
@@ -14,8 +14,8 @@ extension EnvironmentValues {
   var myHorizontalAlignment: AlignmentID? {
     get { fatalError() }
     set { self[\.MyHorizontalAlignmentEnvironmentKey.self] = newValue }
-    // expected-error@-1 {{subscript 'subscript(_:)' requires that 'any AlignmentID' be a class type}}
-    // expected-error@-2 {{cannot infer key path type from context; consider explicitly specifying a root type}}
+    // expected-error@-1 {{value of type 'EnvironmentValues' has no member 'MyHorizontalAlignmentEnvironmentKey'}}
+    // expected-error@-2 {{missing argument label 'keyPath:' in subscript}}
   }
 }
 

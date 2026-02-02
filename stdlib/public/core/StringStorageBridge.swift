@@ -16,6 +16,8 @@ import SwiftShims
 
 internal var _cocoaASCIIEncoding:UInt { 1 } /* NSASCIIStringEncoding */
 internal var _cocoaUTF8Encoding:UInt { 4 } /* NSUTF8StringEncoding */
+internal var _cocoaUTF16Encoding:UInt { 10 } /* NSUTF16StringEncoding and NSUnicodeStringEncoding*/
+internal var _cocoaMacRomanEncoding:UInt { 30 } /* NSMacOSRomanStringEncoding */
 
 extension String {
   @available(SwiftStdlib 5.6, *)
@@ -41,25 +43,17 @@ extension String {
 
 // ObjC interfaces.
 extension _AbstractStringStorage {
+  
   @inline(__always)
   @_effects(releasenone)
   internal func _getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, _ aRange: _SwiftNSRange
   ) {
-    _precondition(aRange.location >= 0 && aRange.length >= 0,
-                  "Range out of bounds")
-    // Note: `count` is counting UTF-8 code units, while `aRange` is measured in
-    // UTF-16 offsets. This precondition is a necessary, but not sufficient test
-    // for validity. (More precise checks are done in UTF16View._nativeCopy.)
-    _precondition(aRange.location + aRange.length <= Int(count),
-                  "Range out of bounds")
-
     let range = unsafe Range(
       _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-    let str = asString
-    unsafe str._copyUTF16CodeUnits(
+    unsafe utf16._nativeCopy(
       into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
-      range: range)
+      offsetRange: range)
   }
 
   @inline(__always)
@@ -69,13 +63,14 @@ extension _AbstractStringStorage {
   ) -> Int8 {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
+         (_cocoaMacRomanEncoding, true),
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       unsafe outputPtr.initialize(from: start, count: count)
       unsafe outputPtr[count] = 0
       return 1
     default:
-      return  unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
+      return unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
     }
   }
 
@@ -84,10 +79,53 @@ extension _AbstractStringStorage {
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
+         (_cocoaMacRomanEncoding, true),
          (_cocoaUTF8Encoding, _):
       return unsafe start
     default:
-      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+      return unsafe _cocoaCStringUsingEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @_effects(readonly)
+  internal func _lengthOfBytes(using encoding: UInt) -> UInt {
+    switch encoding {
+    case _cocoaASCIIEncoding:
+      if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return UInt(count)
+      }
+      return 0
+    case _cocoaUTF8Encoding:
+      return UInt(count)
+    case _cocoaUTF16Encoding:
+      return UInt(UTF16Length) * 2
+    case _cocoaMacRomanEncoding:
+      if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
+        return UInt(count)
+      }
+      fallthrough
+    default:
+      return _cocoaLengthOfBytesInEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  // The caller info isn't useful here anyway because it's never client code,
+  // so this makes sure that _character(at:) doesn't have inlined assertion bits
+  @inline(never)
+  internal func _characterAtIndexOutOfBounds() -> Never {
+    _preconditionFailure("String index is out of bounds")
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _character(at offset: Int) -> UInt16 {
+    if _fastPath(isASCII) {
+      if (_fastPath(offset < count && offset >= 0)) {
+        return unsafe UInt16((start + offset).pointee)
+      }
+      _characterAtIndexOutOfBounds()
+    } else {
+      return utf16[nativeNonASCIIOffset: offset]
     }
   }
 
@@ -132,21 +170,30 @@ extension _AbstractStringStorage {
 
       // At this point we've proven that it is a non-Swift NSString
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
-
+      
+      if UTF16Length != otherUTF16Length {
+        return 0
+      }
+      
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
-        // UTF16 length == UTF8 length iff ASCII
-        if otherUTF16Length == self.count {
-          return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
+        // otherUTF16Length is the same as the byte count here since it's ASCII
+        // self.count could still be utf8
+        if count != otherUTF16Length {
+          return false
         }
-        return false
+        return unsafe (start == ascii || (memcmp(start, ascii, otherUTF16Length) == 0))
       }) {
         return asciiEqual ? 1 : 0
       }
-
-      if self.UTF16Length != otherUTF16Length {
-        return 0
+      
+      if let utf16Ptr = unsafe _stdlib_binary_CFStringGetCharactersPtr(other) {
+        let utf16Buffer = unsafe UnsafeBufferPointer(
+          start: utf16Ptr,
+          count: otherUTF16Length
+        )
+        return unsafe utf16.elementsEqual(utf16Buffer) ? 1 : 0
       }
 
       /*
@@ -163,7 +210,11 @@ extension __StringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      // UTF16View does this, but there's still a little overhead
+      if isASCII {
+        return count
+      }
+      return utf16.count
     }
   }
 
@@ -180,8 +231,7 @@ extension __StringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = asString
-    return str.utf16[str._toUTF16Index(offset)]
+    _character(at: offset)
   }
 
   @objc(getCharacters:range:)
@@ -202,6 +252,16 @@ extension __StringStorage {
     }
     return nil
   }
+  
+  @objc(_fastUTF8StringContents:utf8Length:)
+  @_effects(readonly)
+  final internal func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8,
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>? {
+    unsafe outUTF8Length.pointee = UInt(count)
+    return unsafe start
+  }
 
   @objc(UTF8String)
   @_effects(readonly)
@@ -212,7 +272,7 @@ extension __StringStorage {
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    return unsafe _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
@@ -231,6 +291,12 @@ extension __StringStorage {
       }
       return _cocoaUTF8Encoding
     }
+  }
+  
+  @objc(lengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func lengthOfBytes(using encoding: UInt) -> UInt {
+    _lengthOfBytes(using: encoding)
   }
 
   @objc(isEqualToString:)
@@ -259,7 +325,11 @@ extension __SharedStringStorage {
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return asString.utf16.count // UTF16View special-cases ASCII for us.
+      // UTF16View does this, but there's still a little overhead
+      if isASCII {
+        return count
+      }
+      return utf16.count
     }
   }
 
@@ -276,8 +346,7 @@ extension __SharedStringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    let str = asString
-    return str.utf16[str._toUTF16Index(offset)]
+    _character(at: offset)
   }
 
   @objc(getCharacters:range:)
@@ -297,6 +366,12 @@ extension __SharedStringStorage {
       return _cocoaUTF8Encoding
     }
   }
+  
+  @objc(lengthOfBytesUsingEncoding:)
+  @_effects(readonly)
+  final internal func lengthOfBytes(using encoding: UInt) -> UInt {
+    _lengthOfBytes(using: encoding)
+  }
 
   @objc(_fastCStringContents:)
   @_effects(readonly)
@@ -308,6 +383,16 @@ extension __SharedStringStorage {
     }
     return nil
   }
+  
+  @objc(_fastUTF8StringContents:utf8Length:)
+  @_effects(readonly)
+  final internal func _fastUTF8StringContents(
+    _ requiresNulTermination: Int8,
+    _ outUTF8Length: UnsafeMutablePointer<UInt>
+  ) -> UnsafePointer<UInt8>? {
+    unsafe outUTF8Length.pointee = UInt(count)
+    return unsafe start
+  }
 
   @objc(UTF8String)
   @_effects(readonly)
@@ -318,7 +403,7 @@ extension __SharedStringStorage {
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    return _cString(encoding: encoding)
+    return unsafe _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)

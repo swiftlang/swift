@@ -1,10 +1,12 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:     -module-name Swift \
 // RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     -enable-experimental-feature AddressableTypes \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
 
 sil_stage raw
 
@@ -60,6 +62,11 @@ struct NEWrap : ~Escapable {
   // TODO: dependsOn(immortal)
   @_unsafeNonescapableResult
   init() { }
+}
+
+@_addressableForDependencies
+public struct InlineInt {
+  var i: Builtin.Int64
 }
 
 sil @coroutine : $@yield_once @convention(method) (@guaranteed NE) -> @yields @guaranteed NE
@@ -212,6 +219,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-LABEL: dependence_access: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $*NE
 // CHECK-NEXT: Leaf use: operand #0 of   end_access %{{.*}} : $*NE
+// CHECK-NEXT: Returned inout: %0 = argument of bb0 : $*NE
 // CHECK-NEXT: dependence_access: lifetime_dependence_use with: %0
 sil [ossa] @dependence_access : $@convention(thin) (@inout NE, @owned C) -> () {
 bb0(%0 : $*NE, %1 : @owned $C):
@@ -252,6 +260,7 @@ bb0(%0 : @guaranteed $NE):
 
 // CHECK-LABEL: dependence_coroutine: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NE
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value %{{.*}} : $NE
 // CHECK-NEXT: Leaf use: operand #0 of   %{{.*}} = end_apply %{{.*}} as $()
 // CHECK-NEXT: dependence_coroutine: lifetime_dependence_use with: %0
 sil [ossa] @dependence_coroutine : $@convention(thin) (@guaranteed NE) -> () {
@@ -342,6 +351,29 @@ bb0(%0 : @owned $NCNEInt):
   specify_test "lifetime_dependence_use %0"
   %nd = drop_deinit %0 : $NCNEInt
   destroy_value %nd : $NCNEInt
+  %99 = tuple()
+  return %99 : $()
+}
+
+// =============================================================================
+// isAddressable
+// =============================================================================
+
+sil [ossa] @addressableForInoutDepHelper : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> () {
+bb(%0 : $*InlineInt, %1 : $*NE):
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on addressableForInoutDep: addressable_arguments with: @instruction.operand[1]
+// CHECK: Arg Index: 0 of Apply:   %{{.*}} = apply %{{.*}}(%0, %1) : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> ()
+// CHECK: isAddressable: true
+// CHECK-LABEL: end running test 1 of 1 on addressableForInoutDep: addressable_arguments with: @instruction.operand[1]
+sil [ossa] @addressableForInoutDep : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> () {
+bb(%0 : $*InlineInt, %1 : $*NE):
+  %f = function_ref @addressableForInoutDepHelper : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> ()
+  specify_test "addressable_arguments @instruction.operand[1]"
+  %call = apply %f(%0, %1) : $@convention(thin) (@in_guaranteed InlineInt, @lifetime(borrow address_for_deps 0) @inout NE) -> ()
   %99 = tuple()
   return %99 : $()
 }

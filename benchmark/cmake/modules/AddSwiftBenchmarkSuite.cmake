@@ -363,6 +363,10 @@ function (swift_benchmark_compile_archopts)
     list(APPEND common_options "-g")
   endif()
 
+  if("${optflag}" STREQUAL "Onone")
+    list(APPEND common_options "-DDEBUG")
+  endif()
+
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
@@ -399,6 +403,10 @@ function (swift_benchmark_compile_archopts)
       "-c"
       "-target" "${target}"
       "-${driver_opt}")
+
+  if(${optflag} STREQUAL "Onone")
+    list(APPEND common_options_driver "-DDEBUG")
+  endif()
 
   if(SWIFT_BENCHMARK_GENERATE_DEBUG_INFO)
     list(APPEND common_options_driver "-g")

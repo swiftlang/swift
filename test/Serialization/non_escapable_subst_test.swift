@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t  %S/Inputs/ne_types.swift \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature Lifetimes \
 // RUN: -enable-experimental-feature AddressableTypes \
 // RUN: -enable-library-evolution \
 // RUN: -emit-module-path %t/ne_types.swiftmodule 
 
 // RUN: %target-swift-frontend -emit-silgen -I %t %s \
-// RUN: -enable-experimental-feature LifetimeDependence
+// RUN: -enable-experimental-feature Lifetimes
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableTypes
 
 import ne_types

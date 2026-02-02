@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,13 +30,13 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Compression.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/SMLoc.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -340,7 +340,8 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
 
   StringRef FileContent = Buf.Buffer->getBuffer();
   SerializedFile File = {Filename.str(),
-                         convertSourceLoc(SM, SourceLoc(Buf.IncludeLoc)),
+                         convertSourceLoc(SM, SourceLoc::getFromPointer(
+                                                  Buf.IncludeLoc.getPointer())),
                          {},
                          IsFileBacked ? "" : FileContent};
 
@@ -501,8 +502,7 @@ DiagnosticSerializer::deserializeSourceLoc(const SerializedSourceLoc &Loc) {
     return createDeserializationError("File doesn't exist in SourceManager");
   auto &Info = SrcMgr.getLLVMSourceMgr().getBufferInfo(BufID->second);
   const char *Buffer = Info.Buffer->getBufferStart();
-  llvm::SMLoc SL = llvm::SMLoc::getFromPointer(Buffer + Loc.Offset);
-  return SourceLoc(SL);
+  return SourceLoc::getFromPointer(Buffer + Loc.Offset);
 }
 
 llvm::Expected<CharSourceRange> DiagnosticSerializer::deserializeSourceRange(
@@ -644,13 +644,13 @@ DiagnosticSerializer::serializeEmittedDiagnostics(llvm::raw_ostream &os) {
     if (!File.Content.empty() || !File.ContentCASID.empty())
       continue;
 
-    auto Ref =
-        SrcMgr.getFileSystem()->getObjectRefForFileContent(File.FileName);
-    if (!Ref)
-      return llvm::createFileError(File.FileName, Ref.getError());
+    if (auto CASFS =
+            dyn_cast<llvm::cas::CASBackedFileSystem>(SrcMgr.getFileSystem())) {
+      auto Ref = CASFS->getObjectRefForFileContent(File.FileName);
+      if (!Ref)
+        return Ref.takeError();
 
-    if (*Ref) {
-      File.ContentCASID = CAS.getID(**Ref).toString();
+      File.ContentCASID = CAS.getID(*Ref).toString();
       continue;
     }
 
@@ -721,7 +721,7 @@ public:
             Instance.getInvocation().getFrontendOptions().InputsAndOutputs),
         Diags(Instance.getDiags()), CAS(*Instance.getSharedCASInstance()) {
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
-    llvm::MappedPrefix::transformJoinedIfValid(
+    llvm::MappedPrefix::transformPairs(
         Instance.getInvocation().getFrontendOptions().CacheReplayPrefixMap,
         Prefixes);
     Mapper.addRange(Prefixes);

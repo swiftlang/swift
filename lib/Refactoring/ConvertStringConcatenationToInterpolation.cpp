@@ -21,7 +21,7 @@ findConcatenatedExpressions(const ResolvedRangeInfo &Info, ASTContext &Ctx) {
 
   switch (Info.Kind) {
   case RangeKind::SingleExpression:
-    E = Info.ContainedNodes[0].get<Expr *>();
+    E = cast<Expr *>(Info.ContainedNodes[0]);
     break;
   case RangeKind::PartOfExpression:
     E = Info.CommonExprParent;

@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -typecheck %s \
-// RUN:     -verify -verify-additional-file %S/Inputs/custom-modules/ConflictingNames.h -verify-ignore-unknown
+// RUN:     -verify -verify-ignore-unrelated -verify-additional-file %S/Inputs/custom-modules/ConflictingNames.h -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 

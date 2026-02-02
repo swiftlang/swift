@@ -52,6 +52,14 @@ OperatorsTestSuite.test("caret (^)") {
   expectEqual(61, result.value)
 }
 
+OperatorsTestSuite.test("tilde (~)") {
+  let lhs = LoadableIntWrapper(value: 42)
+
+  let result = ~lhs
+
+  expectEqual(-43, result.value)
+}
+
 OperatorsTestSuite.test("percent (%)") {
   let lhs = LoadableIntWrapper(value: 11)
   let rhs = LoadableIntWrapper(value: 2)

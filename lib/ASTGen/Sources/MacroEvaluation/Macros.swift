@@ -14,6 +14,7 @@ import ASTBridging
 import BasicBridging
 @_spi(PluginMessage) @_spi(ExperimentalLanguageFeature) import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
+import SwiftIfConfig
 import SwiftParser
 import SwiftSyntax
 @_spi(ExperimentalLanguageFeature) @_spi(Compiler) import SwiftSyntaxMacroExpansion
@@ -419,7 +420,7 @@ func makeExpansionOutputResult(
 @_cdecl("swift_Macros_expandFreestandingMacro")
 @usableFromInline
 func expandFreestandingMacro(
-  diagEnginePtr: UnsafeMutableRawPointer,
+  cContext: BridgedASTContext,
   macroPtr: UnsafeRawPointer,
   discriminatorText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
@@ -461,7 +462,7 @@ func expandFreestandingMacro(
   let expandedSource: String? = expandFreestandingMacroImpl(
     macroPtr: macroPtr,
     macroRole: macroRole,
-    diagEnginePtr: diagEnginePtr,
+    cContext: cContext,
     expansionSyntax: expansion,
     sourceFilePtr: sourceFilePtr,
     discriminator: discriminator
@@ -476,7 +477,7 @@ func expandFreestandingMacro(
 func expandFreestandingMacroImpl(
   macroPtr: UnsafeRawPointer,
   macroRole: MacroRole,
-  diagEnginePtr: UnsafeMutableRawPointer,
+  cContext: BridgedASTContext,
   expansionSyntax: FreestandingMacroExpansionSyntax,
   sourceFilePtr: UnsafePointer<ExportedSourceFile>,
   discriminator: String
@@ -505,14 +506,15 @@ func expandFreestandingMacroImpl(
   }
 
   // Send the message.
-  let message = HostToPluginMessage.expandFreestandingMacro(
-    macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
-    macroRole: pluginMacroRole,
-    discriminator: discriminator,
-    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!,
-    lexicalContext: pluginLexicalContext(of: expansionSyntax)
-  )
   do {
+    let message = HostToPluginMessage.expandFreestandingMacro(
+      macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
+      macroRole: pluginMacroRole,
+      discriminator: discriminator,
+      syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!,
+      lexicalContext: pluginLexicalContext(of: expansionSyntax),
+      staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
+    )
     let result = try macro.plugin.sendMessageAndWait(message)
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
@@ -527,14 +529,14 @@ func expandFreestandingMacroImpl(
 
     // Process the result.
     if !diagnostics.isEmpty {
-      let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: diagEnginePtr)
+      let diagEngine = PluginDiagnosticsEngine(cContext: cContext)
       diagEngine.add(exportedSourceFile: sourceFilePtr)
       diagEngine.emit(diagnostics, messageSuffix: " (from macro '\(macroName)')")
     }
     return expandedSource
 
   } catch let error {
-    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    let srcMgr = SourceManager(cContext: cContext)
     srcMgr.insert(sourceFilePtr)
     srcMgr.diagnose(
       diagnostic: .init(
@@ -552,7 +554,7 @@ func expandFreestandingMacroImpl(
 @_cdecl("swift_Macros_expandAttachedMacro")
 @usableFromInline
 func expandAttachedMacro(
-  diagEnginePtr: UnsafeMutableRawPointer,
+  cContext: BridgedASTContext,
   macroPtr: UnsafeRawPointer,
   discriminatorText: UnsafePointer<CChar>,
   qualifiedTypeText: UnsafePointer<CChar>,
@@ -610,7 +612,7 @@ func expandAttachedMacro(
   let conformanceList = String(cString: conformanceListText)
 
   let expandedSource: String? = expandAttachedMacroImpl(
-    diagEnginePtr: diagEnginePtr,
+    cContext: cContext,
     macroPtr: macroPtr,
     rawMacroRole: rawMacroRole,
     discriminator: discriminator,
@@ -645,7 +647,7 @@ private func pluginLexicalContext(of node: some SyntaxProtocol) -> [PluginMessag
 }
 
 func expandAttachedMacroImpl(
-  diagEnginePtr: UnsafeMutableRawPointer,
+  cContext: BridgedASTContext,
   macroPtr: UnsafeRawPointer,
   rawMacroRole: UInt8,
   discriminator: String,
@@ -718,18 +720,19 @@ func expandAttachedMacroImpl(
 
 
   // Send the message.
-  let message = HostToPluginMessage.expandAttachedMacro(
-    macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
-    macroRole: macroRole,
-    discriminator: discriminator,
-    attributeSyntax: customAttributeSyntax,
-    declSyntax: declSyntax,
-    parentDeclSyntax: parentDeclSyntax,
-    extendedTypeSyntax: extendedTypeSyntax,
-    conformanceListSyntax: conformanceListSyntax,
-    lexicalContext: pluginLexicalContext(of: declarationNode)
-  )
   do {
+    let message = HostToPluginMessage.expandAttachedMacro(
+      macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
+      macroRole: macroRole,
+      discriminator: discriminator,
+      attributeSyntax: customAttributeSyntax,
+      declSyntax: declSyntax,
+      parentDeclSyntax: parentDeclSyntax,
+      extendedTypeSyntax: extendedTypeSyntax,
+      conformanceListSyntax: conformanceListSyntax,
+      lexicalContext: pluginLexicalContext(of: declarationNode),
+      staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
+    )
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
     switch try macro.plugin.sendMessageAndWait(message) {
@@ -756,7 +759,7 @@ func expandAttachedMacroImpl(
 
     // Process the result.
     if !diagnostics.isEmpty {
-      let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: diagEnginePtr)
+      let diagEngine = PluginDiagnosticsEngine(cContext: cContext)
       diagEngine.add(exportedSourceFile: customAttrSourceFilePtr)
       diagEngine.add(exportedSourceFile: declarationSourceFilePtr)
       if let parentDeclSourceFilePtr = parentDeclSourceFilePtr {
@@ -767,7 +770,7 @@ func expandAttachedMacroImpl(
     return expandedSource
 
   } catch let error {
-    let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
+    let srcMgr = SourceManager(cContext: cContext)
     srcMgr.insert(customAttrSourceFilePtr)
     srcMgr.insert(declarationSourceFilePtr)
     if let parentDeclSourceFilePtr = parentDeclSourceFilePtr {
@@ -787,3 +790,11 @@ func expandAttachedMacroImpl(
   }
 }
 
+extension StaticBuildConfiguration {
+  /// Form the JSON representation of this static build configuration.
+  var asJSON: String {
+    get throws {
+      try String(decoding: JSON.encode(self), as: UTF8.self)
+    }
+  }
+}

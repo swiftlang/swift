@@ -15,22 +15,22 @@ import Foundation
 // CHECK:  retain_value %0
 // CHECK:  retain_value %0
 // CHECK: bb1
-// CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
+// CHECK:  convert_escape_to_noescape %
 // CHECK: bb5
 // CHECK:  retain_value %1
 // CHECK:  retain_value %1
 // CHECK: bb6
-// CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
+// CHECK:  convert_escape_to_noescape %
 // CHECK: bb10
-// CHECK:  [[F:%.*]] = function_ref @noescapeBlock3
+// CHECK:  [[F:%.*]] = function_ref @$sSo14noescapeBlock3yyySSSgXESg_AcBtFTo
 // CHECK:  apply [[F]]
 // CHECK:  release_value {{.*}} : $Optional<NSString>
-// CHECK:  release_value %1 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
 // CHECK:  release_value {{.*}} : $Optional<@convention(block) @noescape (Optional<NSString>) -> ()>
-// CHECK:  release_value %0 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
 // CHECK:  release_value {{.*}} : $Optional<@convention(block) @noescape (Optional<NSString>)
+// CHECK:  release_value %1 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
+// CHECK:  release_value %0 : $Optional<@callee_guaranteed (@guaranteed Optional<String>) -> ()>
 public func bridgeNoescapeBlock( optFn: ((String?) -> ())?, optFn2: ((String?) -> ())?) {
   noescapeBlock3(optFn, optFn2, "Foobar")
 }
@@ -53,7 +53,6 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:  [[V1_UNWRAPPED:%.*]] = unchecked_enum_data [[V1]]
 // CHECK:  [[CVT:%.*]] = convert_escape_to_noescape [[V1_UNWRAPPED]]
 // CHECK:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[CVT]]
-// CHECK:  strong_release [[V2]]
 // CHECK:  br [[NEXT_BB:bb[0-9]+]]([[SOME]] :
 //
 // CHECK: [[NEXT_BB]]([[SOME_PHI:%.*]] :
@@ -77,11 +76,11 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:   br bb5([[NONE_BLOCK]] : {{.*}}, [[NONE]] :
 //
 // CHECK: bb5([[BLOCK_PHI:%.*]] : $Optional<{{.*}}>, [[SWIFT_CLOSURE_PHI:%.*]] :
-// CHECK:  [[F:%.*]] = function_ref @noescapeBlock
+// CHECK:  release_value [[SWIFT_CLOSURE_PHI]]
+// CHECK:  [[F:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo
 // CHECK:  apply [[F]]([[BLOCK_PHI]])
 // CHECK:  release_value [[BLOCK_PHI]]
-// CHECK:  release_value [[SWIFT_CLOSURE_PHI]]
-// CHECK-NEXT: return
+// CHECK:  return
 
 // NOPEEPHOLE-LABEL: sil @$s1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
 // NOPEEPHOLE: bb0:
@@ -93,11 +92,11 @@ public func returnOptionalEscape() -> (() ->())?
 //
 // NOPEEPHOLE: [[SOME_BB]]([[V2:%.*]]: $@callee_guaranteed () -> ()):
 // NOPEEPHOLE-NEXT:  strong_retain [[V2]]
+// NOPEEPHOLE-NEXT:  strong_release [[V2]]
 // NOPEEPHOLE-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[V2]]
 // NOPEEPHOLE-NEXT:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[V2]]
 // NOPEEPHOLE-NEXT:  [[MDI:%.*]] = mark_dependence [[CVT]] : $@noescape @callee_guaranteed () -> () on [[V2]]
 // NOPEEPHOLE-NEXT:  [[NOESCAPE_SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt, [[MDI]]
-// NOPEEPHOLE-NEXT:  strong_release [[V2]]
 // NOPEEPHOLE-NEXT:  br bb2([[NOESCAPE_SOME]] : $Optional<{{.*}}>, [[SOME]] : $Optional<{{.*}}>, [[SOME]] : $Optional<{{.*}}>)
 //
 // NOPEEPHOLE: bb2([[NOESCAPE_SOME:%.*]] : $Optional<{{.*}}>, [[SOME1:%.*]] : $Optional<{{.*}}>, [[SOME:%.*]] : $Optional<{{.*}}>):
@@ -110,13 +109,12 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE:   br bb5
 //
 // NOPEEPHOLE: bb5([[BLOCK_PHI:%.*]] : $Optional<{{.*}}>, [[SWIFT_CLOSURE_PHI:%.*]] :
-// NOPEEPHOLE-NEXT: function_ref noescapeBlock
-// NOPEEPHOLE-NEXT:  [[F:%.*]] = function_ref @noescapeBlock :
+// NOPEEPHOLE-NEXT:  release_value [[SWIFT_CLOSURE_PHI]]
+// NOPEEPHOLE:  [[F:%.*]] = function_ref @$sSo13noescapeBlockyyyyXESgFTo :
 // NOPEEPHOLE-NEXT:  apply [[F]]([[BLOCK_PHI]])
 // NOPEEPHOLE-NEXT:  release_value [[BLOCK_PHI]]
 // NOPEEPHOLE-NEXT:  tuple
 // NOPEEPHOLE-NEXT:  release_value [[SOME]]
-// NOPEEPHOLE-NEXT:  release_value [[SWIFT_CLOSURE_PHI]]
 // NOPEEPHOLE-NEXT: return
 // NOPEEPHOLE: } // end sil function '$s1A19bridgeNoescapeBlockyyF'
 public func bridgeNoescapeBlock() {

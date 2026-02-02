@@ -45,7 +45,7 @@ static SILValue emitActorPropertyReference(
     SILGenFunction &SGF, SILLocation loc, SILValue actorSelf,
     VarDecl *property) {
   assert(property);
-  Type formalType = SGF.F.mapTypeIntoContext(property->getInterfaceType());
+  Type formalType = SGF.F.mapTypeIntoEnvironment(property->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType).getAddressType();
   return SGF.B.createRefElementAddr(loc, actorSelf, property, loweredType);
 }
@@ -58,19 +58,22 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
                                VarDecl* prop, SILValue value,
                                IsTake_t isTake) {
-  Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
+  Type formalType = SGF.F.mapTypeIntoEnvironment(prop->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType);
 
   auto fieldAddr = emitActorPropertyReference(SGF, loc, actorSelf, prop);
 
-  if (loweredType.isAddressOnly(SGF.F)) {
+  if (loweredType.isAddressOnly(SGF.F) && SGF.useLoweredAddresses()) {
     SGF.B.createCopyAddr(loc, value, fieldAddr, isTake, IsInitialization);
   } else {
     if (value->getType().isAddress()) {
       SGF.emitSemanticLoadInto(loc, value, SGF.F.getTypeLowering(value->getType()),
           fieldAddr, SGF.getTypeLowering(loweredType), isTake, IsInitialization);
     } else {
-      value = SGF.B.emitCopyValueOperation(loc, value);
+      // If it's not semantically a take, copy it.
+      if (isTake == IsNotTake)
+        value = SGF.B.emitCopyValueOperation(loc, value);
+
       SGF.B.emitStoreValueOperation(
         loc, value, fieldAddr, StoreOwnershipQualifier::Init);
     }
@@ -200,24 +203,35 @@ void SILGenFunction::emitDistActorIdentityInit(ConstructorDecl *ctor,
 
   // --- prepare `Self.self` metatype
   auto *selfTyDecl = ctor->getParent()->getSelfNominalTypeDecl();
-  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType());
+  auto selfTy = F.mapTypeIntoEnvironment(selfTyDecl->getDeclaredInterfaceType());
   auto selfMetatype = getLoweredType(MetatypeType::get(selfTy));
   SILValue selfMetatypeValue = B.createMetatype(loc, selfMetatype);
 
-  // --- create a temporary storage for the result of the call
-  // it will be deallocated automatically as we exit this scope
   VarDecl *var = classDecl->getDistributedActorIDProperty();
-  auto resultTy = getLoweredType(F.mapTypeIntoContext(var->getInterfaceType()));
-  auto temp = emitTemporaryAllocation(loc, resultTy);
+  if (useLoweredAddresses()) {
+    // --- create a temporary storage for the result of the call
+    // it will be deallocated automatically as we exit this scope
+    auto resultTy = getLoweredType(F.mapTypeIntoEnvironment(var->getInterfaceType()));
+    auto temp = emitTemporaryAllocation(loc, resultTy);
 
-  // --- emit the call itself.
-  emitDistributedActorSystemWitnessCall(
-      B, loc, C.Id_assignID,
-      actorSystem, getLoweredType(selfTy),
-      { temp, selfMetatypeValue });
+    // --- emit the call itself.
+    emitDistributedActorSystemWitnessCall(
+        B, loc, C.Id_assignID,
+        actorSystem, getLoweredType(selfTy),
+        { selfMetatypeValue }, temp);
 
-  // --- initialize the property.
-  initializeProperty(*this, loc, borrowedSelfArg, var, temp, IsTake);
+    // --- initialize the property.
+    initializeProperty(*this, loc, borrowedSelfArg, var, temp, IsTake);
+  } else {
+    // --- emit the call itself.
+    auto result = emitDistributedActorSystemWitnessCall(
+        B, loc, C.Id_assignID,
+        actorSystem, getLoweredType(selfTy),
+        { selfMetatypeValue });
+
+    // --- initialize the property.
+    initializeProperty(*this, loc, borrowedSelfArg, var, result.value(), IsTake);
+  }
 }
 
 // TODO(distributed): rename to DistributedActorID
@@ -249,7 +263,7 @@ void InitializeDistActorIdentity::emit(SILGenFunction &SGF, CleanupLocation loc,
     auto borrowedSelf = actorSelf.borrow(SGF, loc);
 
     // load the actorSystem value
-    Type formalType = SGF.F.mapTypeIntoContext(systemVar->getInterfaceType());
+    Type formalType = SGF.F.mapTypeIntoEnvironment(systemVar->getInterfaceType());
     SILType loweredType = SGF.getLoweredType(formalType).getAddressType();
     auto ref =
       SGF.B.createRefElementAddr(loc, borrowedSelf, systemVar, loweredType);
@@ -281,8 +295,7 @@ void InitializeDistActorIdentity::dump(SILGenFunction &) const {
 
 bool SILGenFunction::shouldReplaceConstantForApplyWithDistributedThunk(
     FuncDecl *func) const {
-  auto isDistributedFuncOrAccessor =
-      func->isDistributed();
+  auto isDistributedFuncOrAccessor = func->isDistributed();
   if (auto acc = dyn_cast<AccessorDecl>(func)) {
     isDistributedFuncOrAccessor =
         acc->getStorage()->isDistributed();
@@ -348,7 +361,7 @@ void SILGenFunction::emitDistributedActorReady(
   SGFContext sgfCxt;
   {
     VarDecl *property = classDecl->getDistributedActorSystemProperty();
-    Type formalType = F.mapTypeIntoContext(property->getInterfaceType());
+    Type formalType = F.mapTypeIntoEnvironment(property->getInterfaceType());
     SILType loweredType = getLoweredType(formalType).getAddressType();
     SILValue actorSystemRef = emitActorPropertyReference(
                                 *this, loc, borrowedSelf.getValue(), property);
@@ -361,27 +374,6 @@ void SILGenFunction::emitDistributedActorReady(
 
 // ==== ------------------------------------------------------------------------
 // MARK: remote instance initialization
-
-/// emit a call to the distributed actor system's resolve function:
-///
-/// \verbatim
-///     system.resolve(id:as:)
-/// \endverbatim
-static void createDistributedActorFactory_resolve(
-    SILGenFunction &SGF, ASTContext &C, FuncDecl *fd, SILValue idValue,
-    SILValue actorSystemValue, Type selfTy, SILValue selfMetatypeValue,
-    SILType resultTy, SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
-  auto &B = SGF.B;
-
-  auto loc = SILLocation(fd);
-  loc.markAutoGenerated();
-
-  // // ---- actually call system.resolve(id: id, as: Self.self)
-  emitDistributedActorSystemWitnessCall(
-      B, loc, C.Id_resolve, actorSystemValue, SGF.getLoweredType(selfTy),
-      { idValue, selfMetatypeValue },
-      std::make_pair(normalBB, errorBB));
-}
 
 /// Function body of:
 /// \verbatim
@@ -417,7 +409,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   // type: SpecificDistributedActor
   auto *selfTyDecl = DC->getSelfClassDecl();
   assert(selfTyDecl->isDistributedActor());
-  auto selfTy = F.mapTypeIntoContext(selfTyDecl->getDeclaredInterfaceType());
+  auto selfTy = F.mapTypeIntoEnvironment(selfTyDecl->getDeclaredInterfaceType());
   auto returnTy = getLoweredType(selfTy);
 
   // ==== Prepare all the basic blocks
@@ -436,9 +428,15 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
 
   // ==== Call `try system.resolve(id: id, as: Self.self)`
   {
-    createDistributedActorFactory_resolve(
-        *this, C, fd, idArg, actorSystemArg, selfTy, selfMetatypeValue,
-        optionalReturnTy, switchBB, errorBB);
+    auto loc = SILLocation(fd);
+    loc.markAutoGenerated();
+
+    // // ---- actually call system.resolve(id: id, as: Self.self)
+    emitDistributedActorSystemWitnessCall(
+        B, loc, C.Id_resolve, actorSystemArg, getLoweredType(selfTy),
+        { idArg, selfMetatypeValue },
+        /*indirectResult=*/std::nullopt,
+        std::make_pair(switchBB, errorBB));
   }
 
   // ==== switch resolved { ... }

@@ -21,15 +21,16 @@
 
 # TODO:
 # Platform support:
-#   - Work on/Verify cross-compiling
-#   - Work on/Verify Windows and Linux native builds
+#   - Work on/Verify Linux native builds
 # Embedded
 #   -- -Xfrontend -emit-empty-object-file
-# Catalyst Support
-#   -- Will need shadow invocations to generate swiftmodules for Swift parts
-# Install *.abi.json, swiftdoc, and swiftsourceinfo
 
 cmake_minimum_required(VERSION 3.29)
+# TODO before requiring CMake 4.1 or later
+# and/or enforcing CMP0195, please check/update
+# the implementation  of `emit_swift_interface`
+# in `EmitSwiftInterface.cmake`
+# to ensure it keeps laying down nested swiftmodule folders
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
@@ -38,23 +39,16 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
 set(CMAKE_POSITION_INDEPENDENT_CODE YES)
 
 set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
-list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
+list(APPEND CMAKE_MODULE_PATH
+  ${SwiftCore_CMAKE_MODULES_DIR}
+  "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
 include(CMakeWorkarounds)
-# NOTE: always use the 3-component style as the expansion as
-# `${PROJECT_VERSION}` will not extend this to the complete form and this can
-# change the behaviour for comparison with non-SemVer compliant parsing. If
-# possible, use the 4-version component as that is used to differentiate the
-# builds of the runtime for Windows.
-if($ENV{BUILD_NUMBER})
-  # NOTE: SxS modules have a limit on each component being [0-65535].
-  # https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-versions
-  math(EXPR BUILD_NUMBER "$ENV{BUILD_NUMBER} % 65535")
-  set(BUILD_NUMBER ".${BUILD_NUMBER}")
-endif()
+
+include(SwiftProjectVersion)
 project(SwiftCore
   LANGUAGES C CXX Swift
-  VERSION 6.1.0${BUILD_NUMBER})
+  VERSION ${SWIFT_RUNTIME_VERSION})
 
 # The Swift standard library is not intended for use as a sub-library as part of
 # another project. It is tightly coupled with the compiler version.
@@ -112,9 +106,11 @@ defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS versi
 defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
-defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
+defaulted_option(SwiftCore_ENABLE_REMOTE_MIRROR "Enable RemoteMirror runtime support")
+defaulted_option(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release in the runtime/stdlib")
 defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
+option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Requires os_log(3) and the os_signpost(3) API." OFF)
 option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" ON)
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
 option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context descriptor lookups based on well-known short manglings." ON)
@@ -176,6 +172,8 @@ add_compile_options(
 # frontned and `clang-cl` (and `clang`) currently do not support `/WX:nnnn`. As
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
+# Ensure all symbols are fully resolved on Linux
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -185,6 +183,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-strict-memory-safety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
   "$<$<AND:$<BOOL:${SwiftCore_OPTIMIZATION_REMARKS}>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=${SwiftCore_OPTIMIZATION_REMARKS}>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
@@ -192,13 +191,17 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:-no-link-objc-runtime>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
   "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+if(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE)
+  find_package(SwiftSwiftDirectRuntime REQUIRED)
+  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
+endif()
 
 include(ExperimentalFeatures)
 
@@ -210,7 +213,7 @@ add_subdirectory(Demangling)
 add_subdirectory(Threading)
 add_subdirectory(runtime)
 add_subdirectory(stubs)
-add_subdirectory(core)
+add_subdirectory(Core)
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
   add_subdirectory(CommandLineSupport)
 endif()
@@ -219,6 +222,10 @@ if(SwiftCore_ENABLE_ONONESUPPORT)
 endif()
 if(SwiftCore_ENABLE_CONCURRENCY)
   add_subdirectory(Concurrency)
+endif()
+if(SwiftCore_ENABLE_REMOTE_MIRROR)
+  add_subdirectory(RemoteInspection)
+  add_subdirectory(SwiftRemoteMirror)
 endif()
 
 # Inter-project install info

@@ -743,7 +743,7 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
   if (auto *SF = MSF.dyn_cast<SourceFile*>()) {
     SF->walk(Writer);
   } else {
-    MSF.get<ModuleDecl*>()->walk(Writer);
+    cast<ModuleDecl *>(MSF)->walk(Writer);
   }
 
   SmallVector<uint64_t, 8> scratch;
@@ -809,7 +809,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
   if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
     writer.emitSourceFileInfo(BasicSourceFileInfo(SF));
   } else {
-    auto *M = MSF.get<ModuleDecl *>();
+    auto *M = cast<ModuleDecl *>(MSF);
     M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
       writer.emitSourceFileInfo(info);
     });

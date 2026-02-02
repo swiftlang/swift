@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -42,7 +42,7 @@ func parseWordBreakTests(
 
         // If this is a break, record the +1 count. Otherwise it is × which is
         // not a break.
-        if components[i] == "÷" {
+        if components[i].hasPrefix("÷") {
           words.append("")
         }
       }

@@ -153,14 +153,14 @@ enum BazEnum<T> {
 // BAZ_INT_ENUM_NO_DOT-DAG: Keyword[self]/CurrNominal:        .self[#BazEnum<Int>.Type#]; name=self
 // BAZ_INT_ENUM_NO_DOT-DAG: Keyword/CurrNominal:              .Type[#BazEnum<Int>.Type#]; name=Type
 
-// BAZ_T_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:    .Baz1[#BazEnum<_>#]{{; name=.+$}}
-// BAZ_T_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:    .Baz2({#_#})[#BazEnum<_>#]{{; name=.+$}}
-// BAZ_T_ENUM_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .bazInstanceFunc({#(self): &BazEnum<_>#})[#() -> Void#]{{; name=.+$}}
+// BAZ_T_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:    .Baz1[#BazEnum<T>#]{{; name=.+$}}
+// BAZ_T_ENUM_NO_DOT-DAG: Decl[EnumElement]/CurrNominal:    .Baz2({#T#})[#BazEnum<T>#]{{; name=.+$}}
+// BAZ_T_ENUM_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .bazInstanceFunc({#(self): &BazEnum<T>#})[#() -> Void#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
-// BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVarT[#_#]{{; name=.+$}}
+// BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticVar]/CurrNominal:      .staticVarT[#T#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Invalid]:   .bazStaticFunc()[#Void#]{{; name=.+$}}
-// BAZ_T_ENUM_NO_DOT-DAG: Keyword[self]/CurrNominal:        .self[#BazEnum<_>.Type#]; name=self
-// BAZ_T_ENUM_NO_DOT-DAG: Keyword/CurrNominal:              .Type[#BazEnum<_>.Type#]; name=Type
+// BAZ_T_ENUM_NO_DOT-DAG: Keyword[self]/CurrNominal:        .self[#BazEnum<T>.Type#]; name=self
+// BAZ_T_ENUM_NO_DOT-DAG: Keyword/CurrNominal:              .Type[#BazEnum<T>.Type#]; name=Type
 
 // BAZ_INT_ENUM_DOT: Begin completions, 8 items
 // BAZ_INT_ENUM_DOT-DAG: Keyword[self]/CurrNominal:        self[#BazEnum<Int>.Type#]; name=self
@@ -173,13 +173,13 @@ enum BazEnum<T> {
 // BAZ_INT_ENUM_DOT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Invalid]:   bazStaticFunc()[#Void#]{{; name=.+$}}
 
 // BAZ_T_ENUM_DOT: Begin completions, 8 items
-// BAZ_T_ENUM_DOT-DAG: Keyword[self]/CurrNominal:        self[#BazEnum<_>.Type#]; name=self
-// BAZ_T_ENUM_DOT-DAG: Keyword/CurrNominal:              Type[#BazEnum<_>.Type#]; name=Type
-// BAZ_T_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:    Baz1[#BazEnum<_>#]{{; name=.+$}}
-// BAZ_T_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:    Baz2({#_#})[#BazEnum<_>#]{{; name=.+$}}
-// BAZ_T_ENUM_DOT-DAG: Decl[InstanceMethod]/CurrNominal: bazInstanceFunc({#(self): &BazEnum<_>#})[#() -> Void#]{{; name=.+$}}
+// BAZ_T_ENUM_DOT-DAG: Keyword[self]/CurrNominal:        self[#BazEnum<T>.Type#]; name=self
+// BAZ_T_ENUM_DOT-DAG: Keyword/CurrNominal:              Type[#BazEnum<T>.Type#]; name=Type
+// BAZ_T_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:    Baz1[#BazEnum<T>#]{{; name=.+$}}
+// BAZ_T_ENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:    Baz2({#T#})[#BazEnum<T>#]{{; name=.+$}}
+// BAZ_T_ENUM_DOT-DAG: Decl[InstanceMethod]/CurrNominal: bazInstanceFunc({#(self): &BazEnum<T>#})[#() -> Void#]{{; name=.+$}}
 // BAZ_T_ENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:      staticVar[#Int#]{{; name=.+$}}
-// BAZ_T_ENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:      staticVarT[#_#]{{; name=.+$}}
+// BAZ_T_ENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:      staticVarT[#T#]{{; name=.+$}}
 // BAZ_T_ENUM_DOT-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Invalid]:   bazStaticFunc()[#Void#]{{; name=.+$}}
 
 enum QuxEnum : Int {

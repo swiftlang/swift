@@ -16,6 +16,7 @@
 #ifndef SWIFT_IMPORTER_CFTYPEINFO_H
 #define SWIFT_IMPORTER_CFTYPEINFO_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -91,20 +92,20 @@ public:
 
   bool isRecord() const {
     assert(isValid());
-    return !Decl.isNull() && Decl.is<const clang::RecordDecl *>();
+    return !Decl.isNull() && isa<const clang::RecordDecl *>(Decl);
   }
   const clang::RecordDecl *getRecord() const {
     assert(isRecord());
-    return Decl.get<const clang::RecordDecl *>();
+    return cast<const clang::RecordDecl *>(Decl);
   }
 
   bool isTypedef() const {
     assert(isValid());
-    return !Decl.isNull() && Decl.is<const clang::TypedefNameDecl *>();
+    return !Decl.isNull() && isa<const clang::TypedefNameDecl *>(Decl);
   }
   const clang::TypedefNameDecl *getTypedef() const {
     assert(isTypedef());
-    return Decl.get<const clang::TypedefNameDecl *>();
+    return cast<const clang::TypedefNameDecl *>(Decl);
   }
 };
 }

@@ -423,6 +423,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(ObjCExistentialMetatypeToObjectInst, objc_existential_metatype_to_object,
                       SingleValueInstruction, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ImplicitActorToOpaqueIsolationCastInst, implicitactor_to_opaqueisolation_cast,
+                      SingleValueInstruction, None, DoesNotRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
     // retain X
@@ -467,7 +469,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
-                    SingleValueInstruction, None, MayRelease)
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // A move_value is an OSSA only instruction. Its result does not have any side
   // effects relative to other OSSA values like copy_value.
   SINGLE_VALUE_INST(MoveValueInst, move_value, SingleValueInstruction, None,
@@ -518,6 +521,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(CopyableToMoveOnlyWrapperAddrInst,
                     copyable_to_moveonlywrapper_addr, SingleValueInstruction,
                     None, DoesNotRelease)
+  SINGLE_VALUE_INST(UncheckedOwnershipInst, unchecked_ownership,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // IsUnique does not actually write to memory but should be modeled
   // as such. Its operand is a pointer to an object reference. The
@@ -720,14 +725,28 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(RebindMemoryInst, rebind_memory,
                     SILInstruction, MayReadWrite, DoesNotRelease)
 
-SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, RebindMemoryInst)
-NODE_RANGE(ValueBase, SILPhiArgument, RebindMemoryInst)
+  // Borrows
+  SINGLE_VALUE_INST(MakeBorrowInst, make_borrow,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(DereferenceBorrowInst, dereference_borrow,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(MakeAddrBorrowInst, make_addr_borrow,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(DereferenceAddrBorrowInst, dereference_addr_borrow,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(DereferenceBorrowAddrInst, dereference_borrow_addr,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+
+SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, DereferenceBorrowAddrInst)
+NODE_RANGE(ValueBase, SILPhiArgument, DereferenceBorrowAddrInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
   TERMINATOR(UnreachableInst, unreachable,
              TermInst, None, DoesNotRelease)
   TERMINATOR(ReturnInst, return,
+             TermInst, None, DoesNotRelease)
+  TERMINATOR(ReturnBorrowInst, return_borrow,
              TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowInst, throw,
              TermInst, None, DoesNotRelease)
@@ -837,8 +856,6 @@ NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
-NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
-               SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignOrInitInst, assign_or_init,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
@@ -882,6 +899,8 @@ NON_VALUE_INST(AbortApplyInst, abort_apply,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(PackElementSetInst, pack_element_set,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+NON_VALUE_INST(InitBorrowAddrInst, init_borrow_addr,
+               SILInstruction, MayReadWrite, DoesNotRelease)
 
 // Runtime failure
 // FIXME: Special MemBehavior for runtime failure?

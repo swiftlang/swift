@@ -25,6 +25,7 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/DenseMap.h"
@@ -66,6 +67,11 @@ namespace irgen {
   class TypeInfo;
   enum class ValueWitness : unsigned;
 
+enum AllowsTaskAlloc_t : bool {
+  DoesNotAllowTaskAlloc = false,
+  AllowsTaskAlloc = true,
+};
+
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -98,7 +104,9 @@ public:
 
   friend class Scope;
 
-  Address createErrorResultSlot(SILType errorType, bool isAsync, bool setSwiftErrorFlag = true, bool isTypedError = false);
+  Address createErrorResultSlot(SILType errorType, bool isAsync,
+                                bool setSwiftErrorFlag = true,
+                                bool isTypedError = false);
 
   //--- Function prologue and epilogue
   //-------------------------------------------
@@ -106,8 +114,8 @@ public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
                         Explosion &scalars, bool isSwiftCCReturn,
-                        bool isOutlined, bool mayPeepholeLoad = false,
-                        SILType errorType = {});
+                        bool isOutlined, bool mayPeepholeLoad,
+                        SILType errorType);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -302,12 +310,21 @@ public:
                        const llvm::Twine &name = "");
 
   StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
-  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
-                                 Alignment align, bool allowTaskAlloc = true,
-                                 const llvm::Twine &name = "");
+  StackAddress
+  emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize, Alignment align,
+                    AllowsTaskAlloc_t allowTaskAlloc = AllowsTaskAlloc,
+                    llvm::Value *mallocTypeId = nullptr,
+                    const llvm::Twine &name = "");
   void emitDeallocateDynamicAlloca(StackAddress address,
                                    bool allowTaskDealloc = true,
-                                   bool useTaskDeallocThrough = false);
+                                   bool useTaskDeallocThrough = false,
+                                   bool forCalleeCoroutineFrame = false);
+
+  StackAddress emitDynamicStackAllocation(SILType type,
+                                          StackAllocationIsNested_t isNested,
+                                          const llvm::Twine &name = "");
+  void emitDynamicStackDeallocation(StackAddress address,
+                                    StackAllocationIsNested_t isNested);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -324,7 +341,6 @@ public:
   void emitMemCpy(Address dest, Address src, llvm::Value *size);
 
   llvm::Value *emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
-                                 llvm::Type *objectType,
                                  const llvm::Twine &name = "");
   Address emitByteOffsetGEP(llvm::Value *base, llvm::Value *offset,
                             const TypeInfo &type,
@@ -396,9 +412,8 @@ public:
 
   // Emit a call to the given generic type metadata access function.
   MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
-                                          llvm::Function *accessFunction,
-                                          ArrayRef<llvm::Value *> args,
-                                          DynamicMetadataRequest request);
+      llvm::Function *accessFunction, ArrayRef<llvm::Value *> args,
+      DynamicMetadataRequest request, bool hasPacks = false);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
@@ -620,6 +635,9 @@ public:
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
 
+  // Routines to deal with box (embedded) runtime calls.
+  void emitReleaseBox(llvm::Value *value);
+
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
@@ -763,7 +781,7 @@ public:
   void bindLocalTypeDataFromSelfWitnessTable(
                 const ProtocolConformance *conformance,
                 llvm::Value *selfTable,
-                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
+                llvm::function_ref<CanType (CanType)> mapTypeIntoEnvironment);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);

@@ -1,8 +1,8 @@
 // RUN: %target-sil-opt -test-runner \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   %s -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage raw
 
@@ -11,10 +11,33 @@ import Swift
 
 struct S : ~Copyable {}
 
+class C {}
+
+struct SRef : ~Copyable {
+  var c: C
+}
+
+struct SDeinit : ~Copyable {
+  static var c: C
+
+  deinit {
+    Self.c = C()
+  }
+}
+
 struct SCopyable {}
+
+struct ArrayWrapperOfSCopyable {
+  let array: [SCopyable]
+}
+
+struct ArrayWrapperOfC {
+  let array: [C]
+}
 
 // CHECK-LABEL: begin {{.*}} print-type-lowering with: @argument[0]
 // CHECK:       isLexical: true
+// CHECK:       hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end {{.*}} print-type-lowering with: @argument[0]
 sil [ossa] @move_only_argument : $@convention(thin) (@owned S) -> () {
 bb0(%0 : @owned $S):
@@ -26,6 +49,7 @@ bb0(%0 : @owned $S):
 
 // CHECK-LABEL: begin {{.*}} print-type-lowering with: @argument[0]
 // CHECK:       isOrContainsPack: true
+// CHECK:       hasOnlyDefaultDeinit: false
 // CHECK-LABEL: end {{.*}} print-type-lowering with: @argument[0]
 sil @pack_argument : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> () {
 bb0(%0 : $*Pack{repeat each T}):
@@ -104,6 +128,7 @@ entry(%instance : $*GE<T>):
 
 // CHECK-LABEL: begin {{.*}} token: print_ast_type_lowering with: %instance
 // CHECK:       isTrivial: true
+// CHECK:       hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end {{.*}} token: print_ast_type_lowering with: %instance
 sil @token : $@convention(thin) (@in Builtin.RawPointer) -> () {
 entry(%addr : $*Builtin.RawPointer):
@@ -147,6 +172,10 @@ extension GENE: Escapable where T: Escapable {}
 // CHECK-LABEL: begin running test 1 of 1 on gsnc_argument: print-type-lowering with: @argument[0]
 // CHECK: Type Lowering for lowered type: $*GSNC<T>.
 // CHECK: isTrivial: false.
+
+// FIXME: Lower BitwiseCopyable archetypes as trivial!
+// HECK: hasOnlyDefaultDeinit: true
+
 // CHECK-LABEL: end running test 1 of 1 on gsnc_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsnc_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GSNC<T>) -> () {
 bb0(%0 : $*GSNC<T>):
@@ -157,6 +186,10 @@ bb0(%0 : $*GSNC<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gsne_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: false.
+
+// FIXME: Lower BitwiseCopyable archetypes as trivial!
+// HECK: hasOnlyDefaultDeinit: true
+
 // CHECK-LABEL: end running test 1 of 1 on gsne_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsne_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GSNE<T>) -> () {
 bb0(%0 : $*GSNE<T>):
@@ -167,6 +200,10 @@ bb0(%0 : $*GSNE<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on genc_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: false.
+
+// FIXME: Lower BitwiseCopyable archetypes as trivial!
+// HECK: hasOnlyDefaultDeinit: true
+
 // CHECK-LABEL: end running test 1 of 1 on genc_argument: print-type-lowering with: @argument[0]
 sil [ossa] @genc_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GENC<T>) -> () {
 bb0(%0 : $*GENC<T>):
@@ -177,6 +214,10 @@ bb0(%0 : $*GENC<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gene_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: false.
+
+// FIXME: Lower BitwiseCopyable archetypes as trivial!
+// HECK: hasOnlyDefaultDeinit: true
+
 // CHECK-LABEL: end running test 1 of 1 on gene_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gene_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GENE<T>) -> () {
 bb0(%0 : $*GENE<T>):
@@ -189,11 +230,18 @@ struct Bitwise<T: BitwiseCopyable>: BitwiseCopyable {
   var x: T
 }
 
-// TODO: This should return 'isTrivial: true'. This is particularly inexcusable because the 'Bitwise' cannot be
-// nontrivial over any 'T', *and* the declaration itself is declared BitwiseCopyable.
+// TODO: This should return 'isTrivial: true' and
+// 'hasOnlyDefaultDeinit: true' . This is particularly inexcusable
+// because the 'Bitwise' cannot be nontrivial over any 'T', *and* the
+// declaration itself is declared BitwiseCopyable.
 //
 // CHECK-LABEL: begin running test 1 of 1 on bitwise_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: false.
+
+
+// FIXME: Lower BitwiseCopyable archetypes as trivial!
+// HECK: hasOnlyDefaultDeinit: true
+
 // CHECK-LABEL: end running test 1 of 1 on bitwise_argument: print-type-lowering with: @argument[0]
 sil [ossa] @bitwise_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed Bitwise<T>) -> () {
 bb0(%0 : $*Bitwise<T>):
@@ -204,6 +252,7 @@ bb0(%0 : $*Bitwise<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gsnc_specialized_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on gsnc_specialized_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsnc_specialized_argument : $@convention(thin) (@in_guaranteed GSNC<SCopyable>) -> () {
 bb0(%0 : $*GSNC<SCopyable>):
@@ -214,6 +263,7 @@ bb0(%0 : $*GSNC<SCopyable>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gsne_specialized_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on gsne_specialized_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsne_specialized_argument : $@convention(thin) (@in_guaranteed GSNE<SCopyable>) -> () {
 bb0(%0 : $*GSNE<SCopyable>):
@@ -224,6 +274,7 @@ bb0(%0 : $*GSNE<SCopyable>):
 
 // CHECK-LABEL: begin running test 1 of 1 on genc_specialized_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on genc_specialized_argument: print-type-lowering with: @argument[0]
 sil [ossa] @genc_specialized_argument : $@convention(thin) (@in_guaranteed GENC<SCopyable>) -> () {
 bb0(%0 : $*GENC<SCopyable>):
@@ -234,6 +285,7 @@ bb0(%0 : $*GENC<SCopyable>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gene_specialized_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on gene_specialized_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gene_specialized_argument : $@convention(thin) (@in_guaranteed GENE<SCopyable>) -> () {
 bb0(%0 : $*GENE<SCopyable>):
@@ -250,8 +302,7 @@ extension GSNCInt: Copyable where T: Copyable  {}
 
 struct GSNEInt<T: ~Escapable>: ~Escapable {
     var x: Int
-    // TODO: dependsOn(immortal)
-    @_unsafeNonescapableResult
+    @_lifetime(immortal)
     init() { x = 0 }
 }
 
@@ -273,6 +324,7 @@ extension GENEInt: Escapable where T: Escapable {}
 
 // CHECK-LABEL: begin running test 1 of 1 on gsncint_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on gsncint_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsncint_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GSNCInt<T>) -> () {
 bb0(%0 : $*GSNCInt<T>):
@@ -283,6 +335,7 @@ bb0(%0 : $*GSNCInt<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gsneint_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on gsneint_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gsneint_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GSNEInt<T>) -> () {
 bb0(%0 : $*GSNEInt<T>):
@@ -293,6 +346,7 @@ bb0(%0 : $*GSNEInt<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on gencint_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on gencint_argument: print-type-lowering with: @argument[0]
 sil [ossa] @gencint_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GENCInt<T>) -> () {
 bb0(%0 : $*GENCInt<T>):
@@ -303,9 +357,95 @@ bb0(%0 : $*GENCInt<T>):
 
 // CHECK-LABEL: begin running test 1 of 1 on geneint_argument: print-type-lowering with: @argument[0]
 // CHECK: isTrivial: true.
+// CHECK: hasOnlyDefaultDeinit: true
 // CHECK-LABEL: end running test 1 of 1 on geneint_argument: print-type-lowering with: @argument[0]
 sil [ossa] @geneint_argument : $@convention(thin) <T: BitwiseCopyable> (@in_guaranteed GENEInt<T>) -> () {
 bb0(%0 : $*GENEInt<T>):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// =============================================================================
+// CustomDeinit
+// Generic struct and generic enum with BitwiseCopyable members are checked above.
+// =============================================================================
+
+// CHECK-LABEL: begin running test 1 of 1 on noncopyable_argument: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: true
+// CHECK-LABEL: end running test 1 of 1 on noncopyable_argument: print-type-lowering with: @argument[0]
+sil [ossa] @noncopyable_argument : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on ref_argument: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: false
+// CHECK-LABEL: end running test 1 of 1 on ref_argument: print-type-lowering with: @argument[0]
+sil [ossa] @ref_argument : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on sref_argument: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: false
+// CHECK-LABEL: end running test 1 of 1 on sref_argument: print-type-lowering with: @argument[0]
+sil [ossa] @sref_argument : $@convention(thin) (@guaranteed SRef) -> () {
+bb0(%0 : @guaranteed $SRef):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on noncopyable_deinit: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: false
+// CHECK-LABEL: end running test 1 of 1 on noncopyable_deinit: print-type-lowering with: @argument[0]
+sil [ossa] @noncopyable_deinit : $@convention(thin) (@guaranteed SDeinit) -> () {
+bb0(%0 : @guaranteed $SDeinit):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on array_wrapper_scopyable: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: true
+// CHECK-LABEL: end running test 1 of 1 on array_wrapper_scopyable: print-type-lowering with: @argument[0]
+sil [ossa] @array_wrapper_scopyable : $@convention(thin) (@guaranteed ArrayWrapperOfSCopyable) -> () {
+bb0(%0 : @guaranteed $ArrayWrapperOfSCopyable):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on array_wrapper_c: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: false
+// CHECK-LABEL: end running test 1 of 1 on array_wrapper_c: print-type-lowering with: @argument[0]
+sil [ossa] @array_wrapper_c : $@convention(thin) (@guaranteed ArrayWrapperOfC) -> () {
+bb0(%0 : @guaranteed $ArrayWrapperOfC):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on rawspan_argument: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: true
+// CHECK-LABEL: end running test 1 of 1 on rawspan_argument: print-type-lowering with: @argument[0]
+sil [ossa] @rawspan_argument : $@convention(thin) (@guaranteed RawSpan) -> () {
+bb0(%0 : @guaranteed $RawSpan):
+  specify_test "print-type-lowering @argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on span_argument: print-type-lowering with: @argument[0]
+// CHECK: hasOnlyDefaultDeinit: true
+// CHECK-LABEL: end running test 1 of 1 on span_argument: print-type-lowering with: @argument[0]
+sil [ossa] @span_argument : $@convention(thin) <T>(@guaranteed Span<T>) -> () {
+bb0(%0 : @guaranteed $Span<T>):
   specify_test "print-type-lowering @argument[0]"
   %retval = tuple ()
   return %retval : $()

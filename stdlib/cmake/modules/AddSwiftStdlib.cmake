@@ -19,6 +19,52 @@ function(add_dependencies_multiple_targets)
   endif()
 endfunction()
 
+# Compute the deployment version
+function(deployment_version result_var_name)
+  set(arguments
+    SDK
+    DEPLOYMENT_VERSION_OSX
+    DEPLOYMENT_VERSION_IOS
+    DEPLOYMENT_VERSION_TVOS
+    DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
+  )
+  cmake_parse_arguments(GETDEP
+    ""
+    "${arguments}"
+    ""
+    ${ARGN})
+
+  if("${GETDEP_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+    # Check if there's a specific OS deployment version needed for this invocation
+    if("${GETDEP_SDK}" STREQUAL "OSX")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_OSX})
+    elseif("${GETDEP_SDK}" STREQUAL "IOS" OR "${GETDEP_SDK}" STREQUAL "IOS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_IOS})
+    elseif("${GETDEP_SDK}" STREQUAL "TVOS" OR "${GETDEP_SDK}" STREQUAL "TVOS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_TVOS})
+    elseif("${GETDEP_SDK}" STREQUAL "WATCHOS" OR "${GETDEP_SDK}" STREQUAL "WATCHOS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_WATCHOS})
+    elseif("${GETDEP_SDK}" STREQUAL "XROS" OR "${GETDEP_SDK}" STREQUAL "XROS_SIMULATOR")
+      set(DEPLOYMENT_VERSION ${GETDEP_DEPLOYMENT_VERSION_XROS})
+    endif()
+
+    if("${DEPLOYMENT_VERSION}" STREQUAL "")
+      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${GETDEP_SDK}_DEPLOYMENT_VERSION}")
+    endif()
+  endif()
+
+  if("${GETDEP_SDK}" STREQUAL "ANDROID")
+    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+  endif()
+
+  if("${GETDEP_SDK}" STREQUAL "FREESTANDING")
+    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${GETDEP_SDK}_DEPLOYMENT_VERSION}")
+  endif()
+
+  set("${result_var_name}" "${DEPLOYMENT_VERSION}" PARENT_SCOPE)
+endfunction()
+
 # Usage:
 # _add_target_variant_c_compile_link_flags(
 #   SDK sdk
@@ -52,32 +98,19 @@ function(_add_target_variant_c_compile_link_flags)
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
-  if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-    # Check if there's a specific OS deployment version needed for this invocation
-    if("${CFLAGS_SDK}" STREQUAL "OSX")
-      if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
-        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
-      else()
-        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
-      endif()
-    elseif("${CFLAGS_SDK}" STREQUAL "IOS" OR "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "TVOS" OR "${CFLAGS_SDK}" STREQUAL "TVOS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_TVOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "WATCHOS" OR "${CFLAGS_SDK}" STREQUAL "WATCHOS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_WATCHOS})
-    elseif("${CFLAGS_SDK}" STREQUAL "XROS" OR "${CFLAGS_SDK}" STREQUAL "XROS_SIMULATOR")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_XROS})
-    endif()
-
-    if("${DEPLOYMENT_VERSION}" STREQUAL "")
-      set(DEPLOYMENT_VERSION "${SWIFT_SDK_${CFLAGS_SDK}_DEPLOYMENT_VERSION}")
-    endif()
+  if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
+    set(DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST}")
+  else()
+    set(DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_OSX}")
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
-  endif()
+  deployment_version(DEPLOYMENT_VERSION
+    SDK ${CFLAGS_SDK}
+    DEPLOYMENT_VERSION_OSX "${DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${CFLAGS_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${CFLAGS_DEPLOYMENT_VERSION_XROS}")
 
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "^Clang|AppleClang$" AND
@@ -151,12 +184,7 @@ function(_add_target_variant_c_compile_link_flags)
   endif()
 
   _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
-  if (_lto_flag_out)
-    list(APPEND result "${_lto_flag_out}")
-    # Disable opaque pointers in lto mode.
-    #list(APPEND result "-Xclang")
-    #list(APPEND result "-no-opaque-pointers")
-  endif()
+  list(APPEND result "${_lto_flag_out}")
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
@@ -237,8 +265,8 @@ function(_add_target_variant_c_compile_flags)
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     is_build_type_with_debuginfo("${CFLAGS_BUILD_TYPE}" debuginfo)
     if(debuginfo)
-      _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
-      if(_lto_flag_out)
+      _is_lto_enabled("${CFLAGS_ENABLE_LTO}" _lto_enabled)
+      if(_lto_enabled)
         list(APPEND result "-gline-tables-only")
       else()
         list(APPEND result "-g")
@@ -357,7 +385,7 @@ function(_add_target_variant_c_compile_flags)
     list(APPEND result "-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER=1")
   endif()
 
-  if(SWIFT_STDLIB_STABLE_ABI)
+  if(SWIFT_STDLIB_STABLE_ABI AND NOT "${CFLAGS_SDK}" STREQUAL "LINUX_STATIC")
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=1")
   else()
     list(APPEND result "-DSWIFT_LIBRARY_EVOLUTION=0")
@@ -456,10 +484,6 @@ function(_add_target_variant_c_compile_flags)
 
   if(SWIFT_STDLIB_TRACING)
     list(APPEND result "-DSWIFT_STDLIB_TRACING")
-  endif()
-
-  if(SWIFT_STDLIB_CONCURRENCY_TRACING)
-    list(APPEND result "-DSWIFT_STDLIB_CONCURRENCY_TRACING")
   endif()
 
   if(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
@@ -1001,6 +1025,14 @@ function(add_swift_target_library_single target name)
   endif()
 
   # Define availability macros.
+  deployment_version(DEPLOYMENT_VERSION
+    SDK "${SWIFTLIB_SINGLE_SDK}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
+
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
 
@@ -1024,14 +1056,14 @@ function(add_swift_target_library_single target name)
           string(REGEX MATCH "[0-9]+(\.[0-9]+)+" ios_version "${ios_platform_version}")
           string(REGEX MATCH "macOS ([0-9]+(\.[0-9]+)+)" macos_platform_version "${def}")
           string(REGEX MATCH "[0-9]+(\.[0-9]+)+" macos_version "${macos_platform_version}")
-          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${SWIFT_SDK_OSX_DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
-            string(REGEX REPLACE ":.*" ": macOS ${SWIFT_SDK_OSX_DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
+            string(REGEX REPLACE ":.*" ": macOS ${DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
           endif()
         else()
           string(REGEX MATCH "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
           string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
-          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
-            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}" current "${current}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${DEPLOYMENT_VERSION}")
+            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${DEPLOYMENT_VERSION}" current "${current}")
           endif()
         endif()
       endif()
@@ -1879,9 +1911,6 @@ endfunction()
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
-# IMPORTS_NON_OSSA
-#   Imports a non-ossa module
-#
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 #   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
@@ -1943,8 +1972,7 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED
-        IMPORTS_NON_OSSA)
+        INSTALL_WITH_SHARED)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -2109,10 +2137,6 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
   endif()
 
-  if (NOT SWIFTLIB_IMPORTS_NON_OSSA)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
-  endif()
-
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
     set(SWIFTLIB_INSTALL_BINARY_SWIFTMODULE TRUE)
   endif()
@@ -2217,6 +2241,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "ANDROID")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_ANDROID})
     elseif(sdk STREQUAL "LINUX_STATIC")
       list(APPEND swiftlib_module_depends_flattened
           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX_STATIC})
@@ -2504,6 +2531,13 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-shared")
         # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
+        # Ensure compatibility with Android 15+ devices using 16KB memory pages.
+        list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
+      endif()
+
+      # This is a Android-specific hack till we transition the stdlib fully to versioned triples.
+      if(sdk STREQUAL "ANDROID" AND name STREQUAL "swiftSwiftReflectionTest")
+        list(APPEND swiftlib_swift_compile_flags_all "-target" "${SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE}${SWIFT_ANDROID_API_LEVEL}")
       endif()
 
       if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)

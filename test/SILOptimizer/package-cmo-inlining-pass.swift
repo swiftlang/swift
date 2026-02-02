@@ -40,13 +40,10 @@ package struct PkgStruct {
 // CHECK: *** SIL function after {{.*}} EarlyPerfInliner (early-inline)
 // CHECK: sil package [ossa] @$s3Lib3fooyS2iF : $@convention(thin) (Int) -> Int {
 // CHECK:   [[PKG_ALLOC:%.*]] = alloc_stack $PkgStruct
-// CHECK:   [[PKG_INIT:%.*]] = alloc_stack [var_decl] $PkgStruct, var, name "self"
-// CHECK:   [[FIELD1_IVAR:%.*]] = struct_element_addr [[PKG_INIT]] : $*PkgStruct, #PkgStruct.field1
+// CHECK:   [[FIELD1_IVAR:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field1
 // CHECK:   store {{.*}} to [trivial] [[FIELD1_IVAR]] : $*Int
-// CHECK:   [[FIELD2_IVAR:%.*]] = struct_element_addr [[PKG_INIT]] : $*PkgStruct, #PkgStruct.field2
+// CHECK:   [[FIELD2_IVAR:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field2
 // CHECK:   store {{.*}} to [trivial] [[FIELD2_IVAR]] : $*Int
-// CHECK:   [[PKG_STR:%.*]] = load [trivial] [[PKG_INIT]]
-// CHECK:   store [[PKG_STR]] to [trivial] [[PKG_ALLOC]] : $*PkgStruct
 // CHECK:   [[FIELD1:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field1
 // CHECK:   load [trivial] [[FIELD1]] : $*Int
 // CHECK:   [[FIELD2:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field2

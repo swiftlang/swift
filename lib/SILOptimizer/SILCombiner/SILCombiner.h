@@ -127,16 +127,11 @@ private:
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
   
-  /// For invoking Swift instruction passes.
-  SwiftPassInvocation swiftPassInvocation;
-
 public:
   SILCombiner(SILFunctionTransform *parentTransform,
               bool removeCondFails, bool enableCopyPropagation);
 
   bool runOnFunction(SILFunction &F);
-
-  bool shouldRemoveCondFail(CondFailInst &);
 
   void clear() {
     Iteration = 0;
@@ -251,8 +246,6 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
-  SILInstruction *visitBuiltinInst(BuiltinInst *BI);
-  SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
 
@@ -342,7 +335,7 @@ public:
   /// try to visit it.
   bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
 
-  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// Apply OSSACanonicalizeOwned to the extended lifetime of any copy
   /// introduced during SILCombine for an owned value.
   void canonicalizeOSSALifetimes(SILInstruction *currentInst);
 

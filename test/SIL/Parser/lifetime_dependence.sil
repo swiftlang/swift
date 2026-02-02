@@ -1,8 +1,8 @@
 // RUN: %target-sil-opt %s \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN: | %FileCheck %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -11,14 +11,14 @@ import Swift
 
 struct BufferView : ~Escapable {
   @_hasStorage let ptr: UnsafeRawBufferPointer { get }
-  @lifetime(borrow ptr) @inlinable init(_ ptr: UnsafeRawBufferPointer) 
-  @lifetime(borrow a) init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) 
+  @_lifetime(borrow ptr) @inlinable init(_ ptr: UnsafeRawBufferPointer) 
+  @_lifetime(borrow a) init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) 
 }
 
-@lifetime(borrow x) 
+@_lifetime(borrow x) 
 func derive(_ x: borrowing BufferView) -> BufferView
 
-@lifetime(copy x)
+@_lifetime(copy x)
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView
 
 sil hidden [unsafe_nonescapable_result] @bufferviewinit1 : $@convention(method) (UnsafeRawBufferPointer, @thin BufferView.Type) -> @owned BufferView {

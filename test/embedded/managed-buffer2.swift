@@ -5,7 +5,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 struct CountAndCapacity {
@@ -19,36 +19,36 @@ final class TestManagedBuffer<T> : ManagedBuffer<CountAndCapacity, T> {
       CountAndCapacity(count: 0, capacity: $0.capacity)
     }
     return r as! TestManagedBuffer
-  
+
   }
 
   var count: Int {
     get { return header.count }
     set { header.count = newValue }
   }
-  
+
   var myCapacity: Int {
     return header.capacity
   }
-  
+
   deinit {
     teardown()
   }
 
   func teardown() {
     let count = self.count
-    
+
     withUnsafeMutablePointerToElements { (x: UnsafeMutablePointer<T>) -> () in
       for i in stride(from: 0, to: count, by: 2) {
         (x + i).deinitialize(count: 1)
       }
     }
   }
-  
+
   func append(_ x: T) {
     let count = self.count
     precondition(count + 1 <= myCapacity)
-    
+
     withUnsafeMutablePointerToElements { (p: UnsafeMutablePointer<T>) -> () in
       (p + count).initialize(to: x)
     }

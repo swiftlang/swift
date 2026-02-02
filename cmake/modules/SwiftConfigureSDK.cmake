@@ -32,6 +32,7 @@ function(_report_sdk prefix)
     message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
     message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
     message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+    message(STATUS "  Deployment version for tests: ${SWIFT_SDK_${prefix}_TEST_DEPLOYMENT_VERSION}")
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
     message(STATUS "  Simulator: ${SWIFT_SDK_${prefix}_IS_SIMULATOR}")
   endif()
@@ -53,7 +54,7 @@ function(_report_sdk prefix)
     endforeach()
   elseif("${prefix}" STREQUAL "ANDROID")
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-      message(STATUS " NDK: $ENV{SWIFT_ANDROID_NDK_PATH}")
+      message(STATUS " NDK: ${SWIFT_ANDROID_NDK_PATH}")
     endif()
     if(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
       message(STATUS " Sysroot: ${SWIFT_ANDROID_NATIVE_SYSROOT}")
@@ -138,6 +139,7 @@ endfunction()
 #     triple_name        # The name used in Swift's -triple
 #     availability_name  # The name used in Swift's @availability
 #     architectures      # A list of architectures this SDK supports
+#     test_deployment_version # Deployment versions to be used for tests
 #   )
 #
 # Sadly there are three OS naming conventions.
@@ -170,7 +172,8 @@ endfunction()
 #
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
-    triple_name module_name availability_name architectures)
+    triple_name module_name availability_name architectures
+    test_deployment_version)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -202,6 +205,11 @@ macro(configure_sdk_darwin
   # Set other variables.
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "${deployment_version}")
+  if(NOT "${test_deployment_version}" STREQUAL "")
+    set(SWIFT_SDK_${prefix}_TEST_DEPLOYMENT_VERSION "${test_deployment_version}")
+  else()
+    set(SWIFT_SDK_${prefix}_TEST_DEPLOYMENT_VERSION "${deployment_version}")
+  endif()
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_AVAILABILITY_NAME "${availability_name}")
@@ -432,7 +440,8 @@ macro(configure_sdk_unix name architectures)
         string(REGEX REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
         message(STATUS "FreeBSD Version: ${freebsd_system_version}")
 
-        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd")
+        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd${freebsd_system_version}")
+        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_MODULE "${arch}-unknown-freebsd")
       elseif("${prefix}" STREQUAL "OPENBSD")
         if(NOT arch STREQUAL "x86_64" AND NOT arch STREQUAL "aarch64")
           message(FATAL_ERROR "unsupported arch for OpenBSD: ${arch}")
@@ -466,7 +475,7 @@ macro(configure_sdk_unix name architectures)
         if(SWIFT_ENABLE_WASI_THREADS)
           set(SWIFT_SDK_WASI_ARCH_wasm32_TRIPLE "wasm32-unknown-wasip1-threads")
         else()
-          set(SWIFT_SDK_WASI_ARCH_wasm32_TRIPLE "wasm32-unknown-wasi")
+          set(SWIFT_SDK_WASI_ARCH_wasm32_TRIPLE "wasm32-unknown-wasip1")
         endif()
       elseif("${prefix}" STREQUAL "EMSCRIPTEN")
         set(SWIFT_SDK_EMSCRIPTEN_ARCH_${arch}_TRIPLE "${arch}-unknown-emscripten")

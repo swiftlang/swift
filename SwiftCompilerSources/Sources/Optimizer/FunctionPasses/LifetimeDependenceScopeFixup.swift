@@ -106,6 +106,7 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
 
   let localReachabilityCache = LocalVariableReachabilityCache()
 
+  var mustFixStackNesting = false
   for instruction in function.instructions {
     guard let markDep = instruction as? MarkDependenceInstruction else {
       continue
@@ -122,6 +123,7 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     guard scopeExtension.extendScopes(dependence: newLifetimeDep) else {
       continue
     }
+    mustFixStackNesting = mustFixStackNesting || scopeExtension.mustFixStackNesting
     let args = scopeExtension.findArgumentDependencies()
 
     // If the scope cannot be extended to the caller, this must be the outermost dependency level.
@@ -133,10 +135,17 @@ let lifetimeDependenceScopeFixupPass = FunctionPass(
     // Redirect the dependence base to the function arguments. This may create additional mark_dependence instructions.
     markDep.redirectFunctionReturn(to: args, context)
   }
+  if mustFixStackNesting {
+    context.fixStackNesting(in: function)
+  }
 }
 
 private extension Type {
   func mayHaveMutableSpan(in function: Function, _ context: FunctionPassContext) -> Bool {
+    // Escapable and Copyable types cannot have MutableSpan
+    if isEscapable || !isMoveOnly {
+      return false
+    }
     if hasArchetype {
       return true
     }
@@ -171,6 +180,24 @@ private extension Type {
     }
     return false
   }
+
+  // Returns true if a type maybe Array/ArraySlice/ContiguousArray which are optimized COW types.
+  // The standard library introduces builtins begin_cow_mutation/end_cow_mutation for such types which are then used to optimize uniqueness checks.
+  func mayHaveOptimizedCOWType(in function: Function) -> Bool {
+    // Trivial types cannot be Array/ArraySlice/ContiguousArray.
+    if isTrivial(in: function) {
+      return false
+    }
+    // Builtin types do not contain Array/ArraySlice/ContiguousArray.
+    if isBuiltinType {
+      return false
+    }
+    // ~Copyable types cannot contain Array/ArraySlice/ContiguousArray.
+    if isMoveOnly {
+      return false
+    }
+    return true
+  }
 }
 
 /// Insert end_cow_mutation_addr for lifetime dependent values that maybe of type MutableSpan and depend on a mutable address.
@@ -198,7 +225,8 @@ private func createEndCOWMutationIfNeeded(lifetimeDep: LifetimeDependence, _ con
       return
   }
 
-  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) else {
+  guard lifetimeDep.dependentValue.type.mayHaveMutableSpan(in: lifetimeDep.dependentValue.parentFunction, context) &&
+    lifetimeDep.parentValue.type.mayHaveOptimizedCOWType(in: lifetimeDep.dependentValue.parentFunction) else {
     return
   }
 
@@ -285,6 +313,9 @@ private struct ScopeExtension {
   // Initialized after walking dependent uses. True if the scope can be extended into the caller.
   var dependsOnCaller: Bool?
 
+  // Does scope extension potentially invalidate stack nesting?
+  var mustFixStackNesting = false
+
   // Scopes listed in RPO over an upward walk. The outermost scope is first.
   var scopes = SingleInlineArray<ExtendableScope>()
 
@@ -329,7 +360,7 @@ private struct ScopeExtension {
 // violation, and that subsequent optimizations do not shrink the inner access `%a1`.
 extension ScopeExtension {
   mutating func extendScopes(dependence: LifetimeDependence) -> Bool {
-    log("Scope fixup for lifetime dependent instructions: \(dependence)")
+    log("Scope fixup for lifetime dependent instructions:\n\(dependence)")
 
     gatherExtensions(dependence: dependence)
 
@@ -357,9 +388,12 @@ extension ScopeExtension {
 private struct ExtendableScope {
   enum Introducer {
     case scoped(ScopedInstruction)
+    case stack(Instruction)
     case owned(Value)
   }
 
+  // scope.allocStackInstruction is always valid for Introducer.allocStack and is valid for Introducer.scoped when
+  // ScopedInstruction is a store_borrow.
   let scope: LifetimeDependence.Scope
   let introducer: Introducer
 
@@ -367,6 +401,8 @@ private struct ExtendableScope {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst
+    case let .stack(initializingStore):
+      return initializingStore
     case let .owned(value):
       if let definingInst = value.definingInstructionOrTerminator {
         return definingInst
@@ -374,25 +410,48 @@ private struct ExtendableScope {
       return value.parentBlock.instructions.first!
     }
   }
+
   var endInstructions: LazyMapSequence<LazyFilterSequence<UseList>, Instruction> {
     switch introducer {
     case let .scoped(scopedInst):
       return scopedInst.scopeEndingOperands.users
+    case .stack:
+      // For alloc_stack without a store-borrow scope, include the deallocs in its scope to ensure that we never shorten
+      // the original allocation. It's possible that some other use depends on the address.
+      //
+      // Same as 'AllocStackInst.deallocations' but as an Instruction list...
+      return scope.allocStackInstruction!.uses.lazy.filter
+      { $0.instruction is DeallocStackInst }.lazy.map { $0.instruction }
+
     case let .owned(value):
       return value.uses.endingLifetime.users
     }
   }
 
-  // Allow scope extension as long as `beginInst` is scoped instruction and does not define a variable scope.
+  var deallocs: LazyMapSequence<LazyFilterSequence<UseList>, DeallocStackInst>? {
+    guard let allocStack = scope.allocStackInstruction else {
+      return nil
+    }
+    return allocStack.deallocations
+  }
+
+  // Allow scope extension as long as `beginInst` does not define a variable scope and is either a scoped instruction or
+  // a store to a singly-initialized temporary.
   init?(_ scope: LifetimeDependence.Scope, beginInst: Instruction?) {
     self.scope = scope
     guard let beginInst = beginInst, VariableScopeInstruction(beginInst) == nil else {
       return nil
     }
-    guard let scopedInst = beginInst as? ScopedInstruction else {
-      return nil
+    // Check for "scoped" store_borrow extension before checking allocStackInstruction.
+    if let scopedInst = beginInst as? ScopedInstruction {
+      self.introducer = .scoped(scopedInst)
+      return
     }
-    self.introducer = .scoped(scopedInst)
+    if scope.allocStackInstruction != nil {
+      self.introducer = .stack(beginInst)
+      return
+    }
+    return nil
   }
 
   // Allow extension of owned temporaries that
@@ -459,11 +518,14 @@ extension ScopeExtension {
       switch initializer {
       case let .store(initializingStore: store, initialAddress: _):
         if let sb = store as? StoreBorrowInst {
-          // Follow the source for nested scopes.
+          // Follow the stored value since the owner of the borrowed value needs to cover this allocation.
           gatherExtensions(valueOrAddress: sb.source)
-          scopes.push(ExtendableScope(scope, beginInst: sb)!)
+        }
+        if scope.allocStackInstruction != nil {
+          scopes.push(ExtendableScope(scope, beginInst: store)!)
           return
         }
+        break
       case .argument, .yield:
         // TODO: extend indirectly yielded scopes.
         break
@@ -646,11 +708,14 @@ extension ScopeExtension {
     do {
       // The innermost scope that must be extended must dominate all uses.
       var walker = LifetimeDependentUseWalker(function, localReachabilityCache, context) {
-        inRangeUses.append($0.instruction)
+        inRangeUses.append($0)
         return .continueWalk
       }
       defer {walker.deinitialize()}
-      _ = walker.walkDown(dependence: dependence)
+      // walkDown may abort if any utility used by address use walker, such asLocalVarUtils, has unhandled cases.
+      if walker.walkDown(dependence: dependence) == .abortWalk {
+        return nil
+      }
       dependsOnCaller = walker.dependsOnCaller
     }
     for owner in owners {
@@ -666,7 +731,7 @@ extension ScopeExtension {
 
     log("Scope fixup for dependent uses:\n\(useRange)")
 
-    // Lifetime dependenent uses may not be dominated by `innermostScope`. The dependent value may be used by a phi or
+    // Lifetime dependent uses may not be dominated by `innermostScope`. The dependent value may be used by a phi or
     // stored into a memory location. The access may be conditional relative to such uses. If any use was not dominated,
     // then `useRange` will include the function entry. There is no way to directly check if `useRange` is
     // valid. `useRange.blockRange.isValid` is not a strong enough check because it will always succeed when
@@ -695,17 +760,16 @@ extension ScopeExtension {
     var extendedUseRange = InstructionRange(begin: useRange.begin!, ends: useRange.ends, context)
 
     // Insert the first instruction of the exit blocks to mimic `useRange`. There is no way to directly copy
-    // `useRange`. Inserting the exit block instructions is innacurate, but for the purpose of canExtend() below, it has
+    // `useRange`. Inserting the exit block instructions is inaccurate, but for the purpose of canExtend() below, it has
     // the same effect as a copy of `useRange`.
     extendedUseRange.insert(contentsOf: useRange.exits)
     defer { extendedUseRange.deinitialize() }
 
-    // Append each scope that needs extention to scopesToExtend from the inner to the outer scope.
+    // Append each scope that needs extension to scopesToExtend from the inner to the outer scope.
     for extScope in scopes.reversed() {
-      // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to to
-      // cover this scope's end instructions. The extended scope must at least cover the original scopes because the
-      // original scopes may protect other operations.
       var mustExtend = false
+      // Iterating over scopeEndInst ignores unreachable paths which may not include the dealloc_stack. This is fine
+      // because the stack allocation effectively covers the entire unreachable path.
       for scopeEndInst in extScope.endInstructions {
         switch extendedUseRange.overlaps(pathBegin: extScope.firstInstruction, pathEnd: scopeEndInst, context) {
         case .containsPath, .containsEnd, .disjoint:
@@ -715,6 +779,10 @@ extension ScopeExtension {
           break
         case .containsBegin, .overlappedByPath:
           // containsBegin can occur when the extendable scope has the same begin as the use range.
+          //
+          // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to
+          // to cover this scope's end instructions. The extended scope must at least cover the original scopes because
+          // the original scopes may protect other operations.
           extendedUseRange.insert(scopeEndInst)
           break
         }
@@ -739,9 +807,9 @@ extension ScopeExtension {
   // Extend the scopes that actually required extension.
   //
   // Consumes 'useRange'
-  private func extend(scopesToExtend: SingleInlineArray<ExtendableScope>,
-                      over useRange: inout InstructionRange,
-                      _ context: some MutatingContext) {
+  private mutating func extend(scopesToExtend: SingleInlineArray<ExtendableScope>,
+                               over useRange: inout InstructionRange,
+                               _ context: some MutatingContext) {
     var deadInsts = [Instruction]()
     for extScope in scopesToExtend {
       // Extend 'useRange' to to cover this scope's end instructions. 'useRange' cannot be extended until the
@@ -769,6 +837,9 @@ extension ScopeExtension {
 
     // Delete original end instructions.
     for deadInst in deadInsts {
+      if deadInst is DeallocStackInst {
+        mustFixStackNesting = true
+      }
       context.erase(instruction: deadInst)
     }
   }
@@ -785,13 +856,10 @@ extension ExtendableScope {
       switch initializer {
       case .argument, .yield:
         // A yield is already considered nested within the coroutine.
-        break
-      case let .store(initializingStore, _):
-        if let sb = initializingStore as? StoreBorrowInst {
-          return canExtend(storeBorrow: sb, over: &range)
-        }
+        return true
+      case .store:
+        return self.scope.allocStackInstruction != nil
       }
-      return true
     default:
       // non-yield scopes can always be ended at any point.
       return true
@@ -801,7 +869,7 @@ extension ExtendableScope {
   func canExtend(beginApply: BeginApplyInst, over range: inout InstructionRange, _ context: some Context) -> Bool {
     let canEndAtBoundary = { (boundaryInst: Instruction) in
       switch beginApply.endReaches(block: boundaryInst.parentBlock, context) {
-      case .abortReaches, .endReaches:
+      case .abortReaches, .endReaches, .deadEndReaches:
         return true
       case .none:
         return false
@@ -820,78 +888,85 @@ extension ExtendableScope {
     return true
   }
 
-  /// A store borrow is considered to be nested within the scope of its stored values. It is, however, also
-  /// restricted to the range of its allocation.
-  ///
-  /// TODO: consider rewriting the dealloc_stack instructions if we ever find that SILGen emits them sooner that
-  /// we need for lifetime dependencies.
-  func canExtend(storeBorrow: StoreBorrowInst, over range: inout InstructionRange) -> Bool {
-    // store_borrow can be extended if all deallocations occur after the use range.
-    return storeBorrow.allocStack.deallocations.allSatisfy({ !range.contains($0) })
-  }
-
   /// Extend this scope over the 'range' boundary. Return the old scope ending instructions to be deleted.
   func extend(over range: inout InstructionRange, _ context: some MutatingContext) -> [Instruction] {
     // Collect the original end instructions and extend the range to to cover them. The resulting access scope
     // must cover the original scope because it may protect other memory operations.
-    let endsToErase = self.endInstructions
-    var unusedEnds = InstructionSet(context)
-    for end in endsToErase {
+    let originalScopeEnds = [Instruction](self.endInstructions)
+    // Track scope-ending instructions that have not yet been reused as range-ending instructions.
+    var unreusedEnds = InstructionSet(context)
+    for end in originalScopeEnds {
       assert(range.inclusiveRangeContains(end))
-      unusedEnds.insert(end)
+      unreusedEnds.insert(end)
     }
-    defer { unusedEnds.deinitialize() }
+    defer { unreusedEnds.deinitialize() }
+
+    // Never reuse dealloc_stack to avoid running data flow.
+    var endsToErase = [Instruction]()
+    if let deallocs = self.deallocs {
+      endsToErase.append(contentsOf: deallocs.map { $0 })
+      for dealloc in deallocs {
+        unreusedEnds.erase(dealloc)
+      }
+    }
+
     for end in range.ends {
-      let location = end.location.autoGenerated
+      let location = end.location.asAutoGenerated
       switch end {
       case is BranchInst:
         assert(end.parentBlock.singleSuccessor!.terminator is ReturnInst,
                "a phi only ends a use range if it is a returned value")
         fallthrough
-      case is ReturnInst:
+      case is ReturnInstruction:
         // End this inner scope just before the return. The mark_dependence base operand will be redirected to a
         // function argument.
         let builder = Builder(before: end, location: location, context)
         // Insert newEnd so that this scope will be nested in any outer scopes.
-        range.insert(createEndInstruction(builder, context))
+        range.insert(contentsOf: createEndInstructions(builder, context))
         continue
       default:
         break
       }
-      if unusedEnds.contains(end) {
-        unusedEnds.erase(end)
-        assert(!unusedEnds.contains(end))
+      // If this range ending instruction was also scope-ending, then mark it as reused by removing it from the set.
+      if unreusedEnds.contains(end) {
+        unreusedEnds.erase(end)
+        assert(!unreusedEnds.contains(end))
         continue
       }
       Builder.insert(after: end, location: location, context) {
-        range.insert(createEndInstruction($0, context))
+        range.insert(contentsOf: createEndInstructions($0, context))
       }
     }
     for exitInst in range.exits {
-      let location = exitInst.location.autoGenerated
+      let location = exitInst.location.asAutoGenerated
       let builder = Builder(before: exitInst, location: location, context)
-      range.insert(createEndInstruction(builder, context))
+      range.insert(contentsOf: createEndInstructions(builder, context))
     }
-    return endsToErase.filter { unusedEnds.contains($0) }
+    endsToErase.append(contentsOf: originalScopeEnds.filter { unreusedEnds.contains($0) })
+    return endsToErase
   }
 
   /// Create a scope-ending instruction at 'builder's insertion point.
-  func createEndInstruction(_ builder: Builder, _ context: some Context) -> Instruction {
+  func createEndInstructions(_ builder: Builder, _ context: some Context) -> SingleInlineArray<Instruction> {
     switch self.scope {
     case let .access(beginAccess):
-      return builder.createEndAccess(beginAccess: beginAccess)
+      return SingleInlineArray(element: builder.createEndAccess(beginAccess: beginAccess))
     case let .borrowed(beginBorrow):
-      return builder.createEndBorrow(of: beginBorrow.value)
+      return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow.value))
     case let .yield(yieldedValue):
       let beginApply = yieldedValue.definingInstruction as! BeginApplyInst
       // createEnd() returns non-nil because beginApply.endReaches() was checked by canExtend()
-      return beginApply.createEnd(builder, context)!
+      return SingleInlineArray(element: beginApply.createEnd(builder, context)!)
     case let .initialized(initializer):
       switch initializer {
       case let .store(initializingStore: store, initialAddress: _):
+        var endInsts = SingleInlineArray<Instruction>()
         if let sb = store as? StoreBorrowInst {
-          // FIXME: we may need to rewrite the dealloc_stack.
-          return builder.createEndBorrow(of: sb)
+          endInsts.append(builder.createEndBorrow(of: sb))
+        }
+        if let allocStack = self.scope.allocStackInstruction {
+          endInsts.append(builder.createDeallocStack(allocStack))
+          return endInsts
         }
         break
       case .argument, .yield:
@@ -899,14 +974,14 @@ extension ExtendableScope {
         break
       }
     case let .owned(value):
-      return builder.createDestroyValue(operand: value)
+      return SingleInlineArray(element: builder.createDestroyValue(operand: value))
     case let .local(varInst):
       switch varInst {
       case let .beginBorrow(beginBorrow):
         // FIXME: we may need to rewrite the dealloc_stack.
-        return builder.createEndBorrow(of: beginBorrow)
+        return SingleInlineArray(element: builder.createEndBorrow(of: beginBorrow))
       case let .moveValue(moveValue):
-        return builder.createDestroyValue(operand: moveValue)
+        return SingleInlineArray(element: builder.createDestroyValue(operand: moveValue))
       }
     default:
       break
@@ -929,64 +1004,62 @@ private extension BeginApplyInst {
       return builder.createEndApply(beginApply: self)
     case .abortReaches:
       return builder.createAbortApply(beginApply: self)
+    case .deadEndReaches:
+      return builder.createEndBorrow(of: self.token)
     }
   }
 
   enum EndReaches {
     case endReaches
     case abortReaches
+    case deadEndReaches
   }
 
   /// Return the single kind of coroutine termination that reaches 'reachableBlock' or nil.
   func endReaches(block reachableBlock: BasicBlock, _ context: some Context) -> EndReaches? {
-    var endBlocks = BasicBlockSet(context)
-    var abortBlocks = BasicBlockSet(context)
+    // TODO: use InlineArray<3> once bootstrapping is fixed.
+    var endingBlockMap: [(EndReaches, BasicBlockSet)] = [
+      (.endReaches, BasicBlockSet(context)),
+      (.abortReaches, BasicBlockSet(context)),
+      (.deadEndReaches, BasicBlockSet(context))
+    ]
     defer {
-      endBlocks.deinitialize()
-      abortBlocks.deinitialize()
+      for index in endingBlockMap.indices {
+        endingBlockMap[index].1.deinitialize()
+      }
     }
     for endInst in endInstructions {
+      let endKind: EndReaches
       switch endInst {
       case let endApply as EndApplyInst:
         // Cannot extend the scope of a coroutine when the resume produces a value.
         if !endApply.type.isEmpty(in: parentFunction) {
           return nil
         }
-        endBlocks.insert(endInst.parentBlock)
+        endKind = .endReaches
       case is AbortApplyInst:
-        abortBlocks.insert(endInst.parentBlock)
+        endKind = .abortReaches
+      case is EndBorrowInst:
+        endKind = .deadEndReaches
       default:
         fatalError("invalid begin_apply ending instruction")
       }
+      let endingBlocksIndex = endingBlockMap.firstIndex(where: { $0.0 == endKind })!
+      endingBlockMap[endingBlocksIndex].1.insert(endInst.parentBlock)
     }
     var endReaches: EndReaches?
     var backwardWalk = BasicBlockWorklist(context)
     defer { backwardWalk.deinitialize() }
 
     let backwardVisit = { (block: BasicBlock) -> WalkResult in
-      if endBlocks.contains(block) {
-        switch endReaches {
-        case .none:
-          endReaches = .endReaches
-          break
-        case .endReaches:
-          break
-        case .abortReaches:
-          return .abortWalk
+      for (endKind, endingBlocks) in endingBlockMap {
+        if endingBlocks.contains(block) {
+          if let endReaches = endReaches, endReaches != endKind {
+            return .abortWalk
+          }
+          endReaches = endKind
+          return .continueWalk
         }
-        return .continueWalk
-      }
-      if abortBlocks.contains(block) {
-        switch endReaches {
-        case .none:
-          endReaches = .abortReaches
-          break
-        case .abortReaches:
-          break
-        case .endReaches:
-          return .abortWalk
-        }
-        return .continueWalk
       }
       if block == self.parentBlock {
         // the insertion point is not dominated by the coroutine
@@ -1014,7 +1087,7 @@ private extension BeginApplyInst {
 private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   let function: Function
   let context: Context
-  let visitor: (Operand) -> WalkResult
+  let visitor: (Instruction) -> WalkResult
   let localReachabilityCache: LocalVariableReachabilityCache
   var visitedValues: ValueSet
 
@@ -1022,7 +1095,7 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   var dependsOnCaller = false
 
   init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: Context,
-       visitor: @escaping (Operand) -> WalkResult) {
+       visitor: @escaping (Instruction) -> WalkResult) {
     self.function = function
     self.context = context
     self.visitor = visitor
@@ -1041,42 +1114,42 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   mutating func deadValue(_ value: Value, using operand: Operand?)
   -> WalkResult {
     if let operand {
-      return visitor(operand)
+      return visitor(operand.instruction)
     }
     return .continueWalk
   }
 
   mutating func leafUse(of operand: Operand) -> WalkResult {
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func escapingDependence(on operand: Operand) -> WalkResult {
     log(">>> Escaping dependence: \(operand)")
-    _ = visitor(operand)
+    _ = visitor(operand.instruction)
     // Make a best-effort attempt to extend the access scope regardless of escapes. It is possible that some mandatory
     // pass between scope fixup and diagnostics will make it possible for the LifetimeDependenceDefUseWalker to analyze
     // this use.
     return .continueWalk
   }
 
-  mutating func inoutDependence(argument: FunctionArgument, on operand: Operand) -> WalkResult {
+  mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(functionExit)
   }
 
   mutating func returnedDependence(result operand: Operand) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func returnedDependence(address: FunctionArgument,
                                    on operand: Operand) -> WalkResult {
     dependsOnCaller = true
-    return visitor(operand)
+    return visitor(operand.instruction)
   }
 
   mutating func yieldedDependence(result: Operand) -> WalkResult {
-    return .continueWalk
+    return visitor(result.instruction)
   }
 
   mutating func storeToYieldDependence(address: Value, of operand: Operand) -> WalkResult {

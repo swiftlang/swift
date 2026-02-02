@@ -107,7 +107,7 @@ PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
-PROTOCOL(Sendable)
+REPRESSIBLE_PROTOCOL(Sendable)
 PROTOCOL(SendableMetatype)
 PROTOCOL(UnsafeSendable)
 

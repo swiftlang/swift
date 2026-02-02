@@ -1,0 +1,1 @@
+xcrun swiftc -O Automaton.swift Enumeration.swift Monoids.swift Presentation.swift RewritingSystem.swift Solver.swift Standalone.swift Strategy.swift Trie.swift -O -swift-version 6 -g -wmo -parse-as-library -o Monoids $@

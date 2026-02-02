@@ -10,11 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/PostfixCompletion.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
-#include "swift/Sema/CompletionContextFinder.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -27,8 +26,7 @@ bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
   if (BaseDecl != Other.BaseDecl)
     return false;
 
-  // These properties should match if we are talking about the same BaseDecl.
-  assert(IsBaseDeclUnapplied == Other.IsBaseDeclUnapplied);
+  // This should match if we are talking about the same BaseDecl.
   assert(BaseIsStaticMetaType == Other.BaseIsStaticMetaType);
 
   auto baseTy = tryMergeBaseTypeForCompletionLookup(BaseTy, Other.BaseTy, DC);
@@ -56,6 +54,12 @@ bool PostfixCompletionCallback::Result::tryMerge(const Result &Other,
   ExpectsNonVoid &= Other.ExpectsNonVoid;
   IsImpliedResult |= Other.IsImpliedResult;
   IsInAsyncContext |= Other.IsInAsyncContext;
+
+  // Note this may differ if we pre-check multiple times since pre-checking
+  // changes the recorded apply level.
+  // FIXME: We ought to fix completion to not pre-check multiple times.
+  IsBaseDeclUnapplied |= Other.IsBaseDeclUnapplied;
+
   return true;
 }
 
@@ -65,37 +69,6 @@ void PostfixCompletionCallback::addResult(const Result &Res) {
       return;
   }
   Results.push_back(Res);
-}
-
-void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
-  assert(!gotCallback());
-
-  // Default to checking the completion expression in isolation.
-  Expr *fallbackExpr = CompletionExpr;
-  DeclContext *fallbackDC = DC;
-
-  auto finder = CompletionContextFinder::forFallback(DC);
-  if (finder.hasCompletionExpr()) {
-    if (auto fallback = finder.getFallbackCompletionExpr()) {
-      fallbackExpr = fallback->E;
-      fallbackDC = fallback->DC;
-    }
-  }
-
-  if (isa<AbstractClosureExpr>(fallbackDC)) {
-    // If the expression is embedded in a closure, the constraint system tries
-    // to retrieve that closure's type, which will fail since we won't have
-    // generated any type variables for it. Thus, fallback type checking isn't
-    // available in this case.
-    return;
-  }
-
-  SyntacticElementTarget completionTarget(fallbackExpr, fallbackDC, CTP_Unused,
-                                          Type(),
-                                          /*isDiscared=*/true);
-
-  typeCheckForCodeCompletion(completionTarget, /*needsPrecheck*/ true,
-                             [&](const Solution &S) { sawSolution(S); });
 }
 
 static ActorIsolation
@@ -119,25 +92,26 @@ getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
                                         getClosureActorIsolationThunk);
 }
 
-/// Returns \c true if \p Choice refers to a function that hasn't been called
-/// yet.
-static bool isUnappliedFunctionRef(const OverloadChoice &Choice) {
-  if (!Choice.isDecl()) {
+/// Returns \c true if \p Choice refers to a function that has been fully
+/// applied, including the curried self if present.
+static bool isFullyAppliedFunctionRef(const Solution &S,
+                                      const OverloadChoice &Choice) {
+  auto *D = Choice.getDeclOrNull();
+  if (!D)
     return false;
-  }
-  auto fnRefKind = Choice.getFunctionRefInfo();
 
-  if (fnRefKind.isUnapplied())
+  switch (Choice.getFunctionRefInfo().getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
+    // No argument lists have been applied.
+    return false;
+  case FunctionRefInfo::ApplyLevel::SingleApply:
+    // The arguments have been applied, check to see if the curried self has
+    // been applied if present.
+    return !D->hasCurriedSelf() || hasAppliedSelf(S, Choice);
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
+    // All argument lists have been applied.
     return true;
-
-  // We consider curried member calls as unapplied. E.g.
-  //   MyStruct.someInstanceFunc(theInstance)#^COMPLETE^#
-  // is unapplied.
-  if (fnRefKind.isSingleApply()) {
-    if (auto BaseTy = Choice.getBaseType())
-      return BaseTy->is<MetatypeType>() && !Choice.getDeclOrNull()->isStatic();
   }
-  return false;
 }
 
 void PostfixCompletionCallback::sawSolutionImpl(
@@ -166,7 +140,8 @@ void PostfixCompletionCallback::sawSolutionImpl(
   bool IsBaseDeclUnapplied = false;
   if (auto SelectedOverload = S.getOverloadChoiceIfAvailable(CalleeLocator)) {
     ReferencedDecl = SelectedOverload->choice.getDeclOrNull();
-    IsBaseDeclUnapplied = isUnappliedFunctionRef(SelectedOverload->choice);
+    IsBaseDeclUnapplied = ReferencedDecl && !isFullyAppliedFunctionRef(
+                                                S, SelectedOverload->choice);
   }
 
   bool BaseIsStaticMetaType = S.isStaticallyDerivedMetatype(ParsedExpr);
@@ -445,7 +420,7 @@ void PostfixCompletionCallback::collectResults(
     // tuple. But that doesn’t really make sense so we shouldn't be suggesting
     // any operators based on `Void`.
     if (IncludeOperators && !Result.BaseIsStaticMetaType &&
-        !Result.BaseTy->isVoid() &&
+        !Result.BaseTy->isVoid() && !Result.BaseTy->hasError() &&
         !ProcessedBaseTypes.contains(Result.BaseTy)) {
       addOperatorResults(Result.BaseTy, Operators, DC, Lookup);
     }

@@ -33,6 +33,10 @@ let package = Package(
     .executableTarget(
       name: "GenScripts",
       dependencies: ["GenUtils"]
+    ),
+    .executableTarget(
+      name: "GenEmoji",
+      dependencies: ["GenUtils"]
     )
   ]
 )

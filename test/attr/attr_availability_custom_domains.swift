@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:  -enable-experimental-feature CustomAvailability \
 // RUN:  -define-enabled-availability-domain EnabledDomain \
+// RUN:  -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:  -define-enabled-availability-domain RedefinedDomain \
 // RUN:  -define-disabled-availability-domain DisabledDomain \
 // RUN:  -define-dynamic-availability-domain DynamicDomain \
@@ -22,6 +23,9 @@ func availableInEnabledDomainWithWildcard() { }
 @available(EnabledDomain, introduced: 1.0) // expected-error {{unexpected version number for EnabledDomain}}
 func introducedInEnabledDomain() { }
 
+@available(AlwaysEnabledDomain, introduced: 1.0) // expected-error {{unexpected version number for AlwaysEnabledDomain}}
+func introducedInAlwaysEnabledDomain() { }
+
 @available(EnabledDomain 1.0) // expected-error {{unexpected version number for EnabledDomain}}
 func introducedInEnabledDomainShort() { }
 
@@ -30,6 +34,9 @@ func introducedInEnabledDomainShortWithWildcard() { }
 
 @available(macOS 10.10, EnabledDomain, *) // expected-error {{EnabledDomain availability must be specified alone}}
 func introducedInMacOSAndAvailableInEnabledDomain() { }
+
+@available(macOS 10.10, AlwaysEnabledDomain, *) // expected-error {{AlwaysEnabledDomain availability must be specified alone}}
+func introducedInMacOSAndAvailableInAlwaysEnabledDomain() { }
 
 @available(EnabledDomain, macOS 10.10, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
 // expected-error@-1 {{expected declaration}}
@@ -57,5 +64,13 @@ func deprecatedInRedefinedDomain() { }
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-warning {{unrecognized platform name 'UnknownDomain'}}
+@available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
 func availableInUnknownDomain() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain)
+func availableInEnabledDomainTwice() { }
+
+@available(EnabledDomain)
+@available(EnabledDomain, unavailable)
+func availableAndUnavailableInEnabledDomain() { }

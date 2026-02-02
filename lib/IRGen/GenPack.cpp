@@ -467,9 +467,9 @@ irgen::emitTypeMetadataPack(IRGenFunction &IGF, CanPackType packType,
   }
 
   assert(packType->containsPackExpansionType());
-  auto pack = IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
-                                    IGF.IGM.getPointerAlignment(),
-                                    /*allowTaskAlloc=*/true);
+  auto pack =
+      IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
+                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
 
   auto visitFn =
     [&](CanType eltTy, unsigned staticIndex,
@@ -519,8 +519,7 @@ irgen::emitTypeMetadataPackRef(IRGenFunction &IGF, CanPackType packType,
   std::tie(pack, shape) = emitTypeMetadataPack(IGF, packType, request);
 
   auto *metadata = pack.getAddress().getAddress();
-  metadata = IGF.Builder.CreatePointerCast(
-      metadata, IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+  metadata = IGF.Builder.CreatePointerCast(metadata, IGF.IGM.PtrTy);
 
   if (!IGF.canStackPromotePackMetadata()) {
     metadata = IGF.Builder.CreateCall(
@@ -613,9 +612,9 @@ irgen::emitWitnessTablePack(IRGenFunction &IGF, CanPackType packType,
   }
 
   assert(packType->containsPackExpansionType());
-  auto pack = IGF.emitDynamicAlloca(IGF.IGM.WitnessTablePtrTy, shape,
-                                    IGF.IGM.getPointerAlignment(),
-                                    /*allowTaskAlloc=*/true);
+  auto pack =
+      IGF.emitDynamicAlloca(IGF.IGM.WitnessTablePtrTy, shape,
+                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
 
   auto index = 0;
   auto visitFn = [&](CanType eltTy, unsigned staticIndex,
@@ -754,8 +753,7 @@ llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
   std::tie(pack, shape) = emitWitnessTablePack(IGF, packType, conformance);
 
   auto *result = pack.getAddress().getAddress();
-  result = IGF.Builder.CreatePointerCast(
-      result, IGF.IGM.WitnessTablePtrTy->getPointerTo());
+  result = IGF.Builder.CreatePointerCast(result, IGF.IGM.PtrTy);
 
   if (!IGF.canStackPromotePackMetadata()) {
     result = IGF.Builder.CreateCall(
@@ -1052,7 +1050,7 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
 void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
                                                GenericEnvironment *environment,
                                                llvm::Value *index) {
-  assert(environment->getKind() == GenericEnvironment::Kind::OpenedElement);
+  ASSERT(environment->getKind() == GenericEnvironment::Kind::Element);
 
   // Record the generic type parameters of interest.
   llvm::SmallPtrSet<CanType, 2> openablePackParams;
@@ -1156,8 +1154,7 @@ Address irgen::emitStorageAddressOfPackElement(IRGenFunction &IGF, Address pack,
   assert(elementType.isAddress() && "direct packs not currently supported");
   auto elementSize = getPackElementSize(IGF.IGM, packType);
   auto elementAddress = IGF.Builder.CreateArrayGEP(pack, index, elementSize);
-  return IGF.Builder.CreateElementBitCast(elementAddress,
-                                 IGF.IGM.getStoragePointerType(elementType));
+  return IGF.Builder.CreateElementBitCast(elementAddress, IGF.IGM.PtrTy);
 }
 
 Size irgen::getPackElementSize(IRGenModule &IGM, CanSILPackType ty) {
@@ -1187,9 +1184,9 @@ StackAddress irgen::allocatePack(IRGenFunction &IGF, CanSILPackType packType) {
   }
 
   assert(packType->containsPackExpansionType());
-  auto addr = IGF.emitDynamicAlloca(IGF.IGM.OpaquePtrTy, shape,
-                                    IGF.IGM.getPointerAlignment(),
-                                    /*allowTaskAlloc=*/true);
+  auto addr =
+      IGF.emitDynamicAlloca(IGF.IGM.OpaquePtrTy, shape,
+                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
 
   return addr;
 }
@@ -1258,10 +1255,9 @@ irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF, CanTupleType type,
       llvm::ConstantInt::get(IGF.IGM.SizeTy, 1));
 
   // Allocate space for the label string; we fill it in below.
-  StackAddress labelString = IGF.emitDynamicAlloca(
-                                IGF.IGM.Int8Ty, labelLength,
-                                IGF.IGM.getPointerAlignment(),
-                                /*allowTaskAlloc=*/true);
+  StackAddress labelString =
+      IGF.emitDynamicAlloca(IGF.IGM.Int8Ty, labelLength,
+                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
 
   // Get the static label string, where each pack expansion is one element.
   auto *staticLabelString = getTupleLabelsString(IGF.IGM, type);
@@ -1374,9 +1370,8 @@ irgen::emitDynamicFunctionParameterFlags(IRGenFunction &IGF,
                                          AnyFunctionType::CanParamArrayRef params,
                                          CanPackType packType,
                                          llvm::Value *shapeExpression) {
-  auto array =
-      IGF.emitDynamicAlloca(IGF.IGM.Int32Ty, shapeExpression,
-                            Alignment(4), /*allowTaskAlloc=*/true);
+  auto array = IGF.emitDynamicAlloca(IGF.IGM.Int32Ty, shapeExpression,
+                                     Alignment(4), AllowsTaskAlloc);
 
   unsigned numExpansions = 0;
 
@@ -1434,9 +1429,9 @@ irgen::emitInducedTupleTypeMetadataPack(
     IRGenFunction &IGF, llvm::Value *tupleMetadata) {
   auto *shape = emitTupleTypeMetadataLength(IGF, tupleMetadata);
 
-  auto pack = IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
-                                    IGF.IGM.getPointerAlignment(),
-                                    /*allowTaskAlloc=*/true);
+  auto pack =
+      IGF.emitDynamicAlloca(IGF.IGM.TypeMetadataPtrTy, shape,
+                            IGF.IGM.getPointerAlignment(), AllowsTaskAlloc);
   auto elementForIndex =
     [&](llvm::Value *index) -> llvm::Value * {
       return irgen::emitTupleTypeMetadataElementType(IGF, tupleMetadata, index);

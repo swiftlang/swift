@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/redundant_conformance_A.swift
 // RUN: %target-swift-frontend -emit-module -o %t -I %t %S/Inputs/redundant_conformance_B.swift
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t
 
 import redundant_conformance_A
 import redundant_conformance_B

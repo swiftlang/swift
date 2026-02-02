@@ -741,6 +741,11 @@ bool HoistDestroys::checkFoldingBarrier(
     auto loadee = load->getOperand();
     auto relativeAccessStorage = RelativeAccessStorageWithBase::compute(loadee);
     if (relativeAccessStorage.getStorage().hasIdenticalStorage(storage)) {
+      // Only fold into access scopes which aren't [read].
+      auto scoped = AccessStorageWithBase::computeInScope(loadee);
+      auto *bai = dyn_cast_or_null<BeginAccessInst>(scoped.base);
+      if (bai && bai->getAccessKind() == SILAccessKind::Read)
+        return true;
       // If the access path from the loaded address to its root storage involves
       // a (layout non-equivalent) typecast--a load [take] of the casted address
       // would not be equivalent to a load [copy] followed by a destroy_addr of
@@ -760,6 +765,11 @@ bool HoistDestroys::checkFoldingBarrier(
     auto source = copy->getSrc();
     auto relativeAccessStorage = RelativeAccessStorageWithBase::compute(source);
     if (relativeAccessStorage.getStorage().hasIdenticalStorage(storage)) {
+      // Only fold into access scopes which aren't [read].
+      auto scoped = AccessStorageWithBase::computeInScope(source);
+      auto *bai = dyn_cast_or_null<BeginAccessInst>(scoped.base);
+      if (bai && bai->getAccessKind() == SILAccessKind::Read)
+        return true;
       // If the access path from the copy_addr'd address to its root storage
       // involves a (layout non-equivalent) typecast--a copy_addr [take] of the
       // casted address would not be equivalent to a copy_addr followed by a
@@ -980,7 +990,7 @@ void DestroyAddrHoisting::hoistDestroys(
     if (!continueWithNextSubpassRun(asi))
       return;
     changed |= ::hoistDestroys(asi,
-                               /*ignoreDeinitBarriers=*/!asi->isLexical(),
+                               /*ignoreDeinitBarriers=*/false,
                                remainingDestroyAddrs, deleter, calleeAnalysis);
   }
   // Arguments enclose everything.

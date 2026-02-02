@@ -1,4 +1,5 @@
-REQUIRES: shell
+REQUIRES: rsync
+UNSUPPORTED: OS=windows-msvc
 
 RUN: export SWIFT_BACKTRACE=
 RUN: not %debug-remote-run false >%t.txt 2>%t.errs.txt

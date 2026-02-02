@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-borrowed-from -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
 //
 // REQUIRES: swift_in_compiler
 
@@ -70,42 +70,17 @@ entry(%0 : @guaranteed $C, %1 : $*C):
 
 // CHECK-LABEL: enclosing_def_trivial: enclosing_values with: %phi
 // CHECK: } // end sil function 'enclosing_def_trivial'
-// CHECK: Enclosing values for: %{{.*}} = argument of bb1 : $FakeOptional<C>
+// CHECK: Enclosing values for:   %3 = borrowed %2 : $FakeOptional<C> from ()
 // CHECK-NEXT: enclosing_def_trivial: enclosing_values with: %phi
 sil [ossa] @enclosing_def_trivial : $@convention(thin) () -> () {
 entry:
   %trivial = enum $FakeOptional<C>, #FakeOptional.none!enumelt
   br none(%trivial : $FakeOptional<C>)
 
-none(%phi : @guaranteed $FakeOptional<C>):
+none(%2 : @guaranteed $FakeOptional<C>):
+  %phi = borrowed %2 from ()
   specify_test "find_enclosing_defs %phi"
   specify_test "enclosing_values %phi"
-  %retval = tuple ()
-  return %retval : $()
-}
-
-// There is an introducer but no enclosing def if the guaranteed value
-// is produced from a an unreachable loop.
-
-// CHECK-LABEL: enclosing_def_unreachable: find_enclosing_defs with: %phiCycle
-// CHECK: } // end sil function 'enclosing_def_unreachable'
-// CHECK: Enclosing Defs:
-// CHECK-NEXT: enclosing_def_unreachable: find_enclosing_defs with: %phiCycle
-
-// CHECK-LABEL: enclosing_def_unreachable: enclosing_values with: %phiCycle
-// CHECK: } // end sil function 'enclosing_def_unreachable'
-// CHECK: Enclosing values for: %{{.*}} = argument of bb1 : $C
-// CHECK-NEXT: enclosing_def_unreachable: enclosing_values with: %phiCycle
-sil [ossa] @enclosing_def_unreachable : $@convention(thin) () ->() {
-entry:
-  br exit
-
-unreachable_loop(%phiCycle : @guaranteed $C):
-  specify_test "find_enclosing_defs %phiCycle"
-  specify_test "enclosing_values %phiCycle"
-  br unreachable_loop(%phiCycle : $C)
-
-exit:
   %retval = tuple ()
   return %retval : $()
 }
@@ -131,7 +106,8 @@ entry(%0 : @guaranteed $C):
   %some = enum $FakeOptional<D>, #FakeOptional.some!enumelt, %cast : $D
   br switch(%some : $FakeOptional<D>)
 
-switch(%somePhi : @guaranteed $FakeOptional<D>):
+switch(%5 : @guaranteed $FakeOptional<D>):
+  %somePhi = borrowed %5 from (%borrow)
   switch_enum %somePhi : $FakeOptional<D>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%payload : @guaranteed $D):
@@ -158,12 +134,12 @@ exit:
 // CHECK: enclosing_def_single_outer: find_enclosing_defs with: %reborrow3
 // CHECK: } // end sil function 'enclosing_def_single_outer'
 // CHECK: Enclosing Defs:
-// CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: %6 = argument of bb2 : $C
 // CHECK-NEXT: enclosing_def_single_outer: find_enclosing_defs with: %reborrow3
 
 // CHECK: enclosing_def_single_outer: enclosing_values with: %reborrow3
 // CHECK: } // end sil function 'enclosing_def_single_outer'
-// CHECK: Enclosing values for:  %{{.*}} = argument of bb2 : $C
+// CHECK: Enclosing values for:   %7 = borrowed %6 : $C from (%0 : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: enclosing_def_single_outer: enclosing_values with: %reborrow3
 
@@ -172,10 +148,12 @@ entry(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
   br bb2(%borrow : $C)
 
-bb2(%reborrow2 : @guaranteed $C):
+bb2(%3 : @guaranteed $C):
+  %reborrow2 = borrowed %3 from (%0)
   br bb3(%reborrow2 : $C)
 
-bb3(%reborrow3 : @guaranteed $C):
+bb3(%6 : @guaranteed $C):
+  %reborrow3 = borrowed %6 from (%0)
   specify_test "find_enclosing_defs %reborrow3"
   specify_test "enclosing_values %reborrow3"
   end_borrow %reborrow3 : $C
@@ -187,17 +165,17 @@ bb3(%reborrow3 : @guaranteed $C):
 
 // CHECK-LABEL: enclosing_def_reborrow: find_enclosing_defs with: %reborrow_inner3
 // CHECK: sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
-// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C, %{{.*}} : @reborrow $C):
+// CHECK: bb1({{.*}} : @reborrow $C, %{{.*}} : @reborrow $C):
 // CHECK: } // end sil function 'enclosing_def_reborrow'
 // CHECK: Enclosing Defs:
-// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
+// CHECK-NEXT: %9 = argument of bb2 : $C
 // CHECK-NEXT: enclosing_def_reborrow: find_enclosing_defs with: %reborrow_inner3
 
 // CHECK-LABEL: enclosing_def_reborrow: enclosing_values with: %reborrow_inner3
 // CHECK: sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb1([[REBORROW:%.*]] : @reborrow $C, %{{.*}} : @reborrow $C):
 // CHECK: } // end sil function 'enclosing_def_reborrow'
-// CHECK: Enclosing values for: %{{.*}} = argument of bb2 : $C
+// CHECK: Enclosing values for:   %10 = borrowed %9 : $C from (%4 : $C)
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: enclosing_def_reborrow: enclosing_values with: %reborrow_inner3
 sil [ossa] @enclosing_def_reborrow : $@convention(thin) (@guaranteed C) -> () {
@@ -206,10 +184,13 @@ entry(%0 : @guaranteed $C):
   %borrow_inner = begin_borrow %borrow_outer : $C
   br bb2(%borrow_outer : $C, %borrow_inner : $C)
 
-bb2(%reborrow_outer : @guaranteed $C, %reborrow_inner : @guaranteed $C):
+bb2(%4 : @guaranteed $C, %5 : @guaranteed $C):
+  %reborrow_inner = borrowed %5 from (%4)
+  %reborrow_outer = borrowed %4 from (%0)
   br bb3(%reborrow_inner : $C)
 
-bb3(%reborrow_inner3 : @guaranteed $C):
+bb3(%9 : @guaranteed $C):
+  %reborrow_inner3 = borrowed %9 from (%4)
   specify_test "find_enclosing_defs %reborrow_inner3"
   specify_test "enclosing_values %reborrow_inner3"
   end_borrow %reborrow_inner3 : $C
@@ -232,27 +213,32 @@ bb3(%reborrow_inner3 : @guaranteed $C):
 // CHECK: sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb1([[REBORROW:%.*]] : @guaranteed $C,
 // CHECK: } // end sil function 'enclosing_def_cycle'
-// CHECK: Enclosing values for: %{{.*}} = argument of bb1 : $C
+// CHECK: Enclosing values for:   %7 = borrowed %6 : $C from (%0 : $C, %1 : $C)
 // CHECK-NEXT: %1 = begin_borrow %0
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: enclosing_def_cycle: enclosing_values with: %forward
 sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
-entry(%0 : @guaranteed $C):
+bb0(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
   %aggregate1 = struct $PairC(%borrow : $C, %borrow : $C)
   %first1 = struct_extract %aggregate1 : $PairC, #PairC.first
-  br bb2(%borrow : $C, %first1 : $C)
+  br bb1(%borrow : $C, %first1 : $C)
 
-bb2(%reborrow_outer : @guaranteed $C, %forward : @guaranteed $C):
+bb1(%5 : @guaranteed $C, %6 : @guaranteed $C):
+  %forward = borrowed %6 from (%0, %borrow)
+  %reborrow_outer = borrowed %5 from (%0)
   specify_test "find_enclosing_defs %forward"
   specify_test "enclosing_values %forward"
   %aggregate2 = struct $PairC(%reborrow_outer : $C, %forward : $C)
   %first2 = struct_extract %aggregate2 : $PairC, #PairC.first
-  br bb2(%reborrow_outer : $C, %first2 : $C)
+  cond_br undef, bb2, bb3
 
-exit:
-  %retval = tuple ()
-  return %retval : $()
+bb2:
+  br bb1(%reborrow_outer : $C, %first2 : $C)
+
+bb3:
+  end_borrow %borrow
+  unreachable
 }
 
 // CHECK-LABEL: enclosing_def_example: enclosing_values with: %0
@@ -298,12 +284,12 @@ bb0(%0 : @owned $C,
 }
 
 // CHECK-LABEL: enclosing_def_reborrow_example: enclosing_values with: %outerReborrow
-// CHECK: Enclosing values for: %{{.*}} = argument of bb1 : $C
+// CHECK: Enclosing values for:   %7 = borrowed %4 : $C from (%0 : $C)
 // CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: enclosing_def_reborrow_example: enclosing_values with: %outerReborrow
 
 // CHECK-LABEL: enclosing_def_reborrow_example: enclosing_values with: %innerReborrow
-// CHECK: Enclosing values for: %{{.*}} = argument of bb1 : $C
+// CHECK: Enclosing values for:   %6 = borrowed %5 : $C from (%4 : $C)
 // CHECK-NEXT: %{{.*}} = argument of bb1 : $C
 // CHECK-NEXT: enclosing_def_reborrow_example: enclosing_values with: %innerReborrow
 sil [ossa] @enclosing_def_reborrow_example : $@convention(thin) (@guaranteed C) -> () {
@@ -311,7 +297,9 @@ bb0(%0 : @guaranteed $C):
   %outerBorrow = begin_borrow %0 : $C
   %innerBorrow = begin_borrow %outerBorrow : $C
   br bb1(%outerBorrow : $C, %innerBorrow : $C)
-bb1(%outerReborrow : @guaranteed $C, %innerReborrow : @guaranteed $C):  
+bb1(%4 : @guaranteed $C, %5 : @guaranteed $C):  
+  %innerReborrow = borrowed %5 from (%4)
+  %outerReborrow = borrowed %4 from (%0)
   specify_test "enclosing_values %outerReborrow"
   specify_test "enclosing_values %innerReborrow"
   end_borrow %innerReborrow : $C

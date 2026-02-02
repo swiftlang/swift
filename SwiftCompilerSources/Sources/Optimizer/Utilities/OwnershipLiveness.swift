@@ -84,7 +84,27 @@ func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false
                                         visitInnerUses: visitInnerUses, context).acquireRange
 }
 
-/// If any interior pointer may escape, then record the first instance here. If 'ignoseEscape' is true, this
+/// Compute the live range for the borrow scopes of a guaranteed value. This returns a separate instruction range for
+/// each of the value's borrow introducers.
+///
+/// TODO: This should return a single multiply-defined instruction range.
+func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
+  -> SingleInlineArray<(BeginBorrowValue, InstructionRange)> {
+  assert(value.ownership == .guaranteed)
+
+  var ranges = SingleInlineArray<(BeginBorrowValue, InstructionRange)>()
+  // If introducers is empty, then the dependence is on a trivial value, so
+  // there is no ownership range.
+  for beginBorrow in value.getBorrowIntroducers(context) {
+    /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
+    /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
+    /// like LifetimeDependence.Scope.computeRange().
+    ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
+  }
+  return ranges
+}
+
+/// If any interior pointer may escape, then record the first instance here. If 'ignoreEscape' is true, this
 /// immediately aborts the walk, so further instances are unavailable.
 ///
 /// .escaping may either be a non-address operand with
@@ -457,6 +477,8 @@ extension OwnershipUseVisitor {
       return dependentUse(of: operand, dependentValue: mdi)
     case let bfi as BorrowedFromInst where !bfi.borrowedPhi.isReborrow:
       return dependentUse(of: operand, dependentValue: bfi)
+    case let mbi as MakeBorrowInst:
+      return dependentUse(of: operand, dependentValue: mbi)
     default:
       return borrowingUse(of: operand,
                           by: BorrowingInstruction(operand.instruction)!)
@@ -606,9 +628,13 @@ extension InteriorUseWalker: OwnershipUseVisitor {
     if value.type.isTrivial(in: function) {
       return .continueWalk
     }
-    guard value.type.isEscapable(in: function) else {
+    guard value.mayEscape else {
       // Non-escapable dependent values can be lifetime-extended by copying, which is not handled by
-      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this.
+      // InteriorUseWalker. LifetimeDependenceDefUseWalker does this. Alternatively, we could continue to `walkDownUses`
+      // but later recognize a copy of a `mayEscape` value to be a pointer escape at that point.
+      //
+      // This includes partial_apply [on_stack] which can currently be copied. Although a better solution would be to
+      // make copying an on-stack closure illegal SIL.
       return pointerEscapingUse(of: operand)
     }
     if useVisitor(operand) == .abortWalk {
@@ -697,7 +723,7 @@ extension InteriorUseWalker: AddressUseVisitor {
       if handleInner(borrowed: sb) == .abortWalk {
         return .abortWalk
       }
-      return sb.uses.filterUsers(ofType: EndBorrowInst.self).walk {
+      return sb.uses.filter(usersOfType: EndBorrowInst.self).walk {
         useVisitor($0)
       }
     case let load as LoadBorrowInst:
@@ -785,6 +811,10 @@ extension InteriorUseWalker {
     }
     if let inst = operand.instruction as? ForwardingInstruction {
       return inst.forwardedResults.walk { walkDownUses(of: $0) }
+    }
+    // TODO: Represent apply of borrow accessors as ForwardingOperation and use that over ForwardingInstruction
+    if let apply = operand.instruction as? FullApplySite, apply.hasGuaranteedResult {
+      return walkDownUses(of: apply.singleDirectResult!)
     }
     // TODO: verify that ForwardInstruction handles all .forward operand ownership and assert that only phis can be
     // reached: assert(Phi(using: operand) != nil)
@@ -903,4 +933,30 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var boundary = LivenessBoundary(value: value, range: range, context)
   defer { boundary.deinitialize() }
   print(boundary)
+}
+
+//
+// TODO: Move this to InstructionRange.swift when computeLinearLiveness is in the SIL module.
+//
+let rangeOverlapsPathTest = FunctionTest("range_overlaps_path") {
+  function, arguments, context in
+  let rangeValue = arguments.takeValue()
+  print("Range of: \(rangeValue)")
+  var range = computeLinearLiveness(for: rangeValue, context)
+  defer { range.deinitialize() }
+  let pathInst = arguments.takeInstruction()
+  print("Path begin: \(pathInst)")
+  if let pathBegin = pathInst as? ScopedInstruction {
+    for end in pathBegin.endInstructions {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end, context))
+    }
+    return
+  }
+  if let pathValue = pathInst as? SingleValueInstruction, pathValue.ownership == .owned {
+    for end in pathValue.uses.endingLifetime {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end.instruction, context))
+    }
+    return
+  }
+  print("Test specification error: not a scoped or owned instruction: \(pathInst)")
 }

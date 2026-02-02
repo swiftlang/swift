@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 import StdlibUnittest
 

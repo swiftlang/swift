@@ -302,15 +302,12 @@ pullback(at: [1, 2, 3], of: identity)(FloatArrayTan([4, -5, 6]))
 // DEBUG-NEXT:  [AD] Setting adjoint value for (**%[[#D2]]**, %[[#D3]]) = destructure_tuple %[[#D1]] : $(Array<Float>, Builtin.RawPointer)
 // DEBUG-NEXT:  [AD] No debug variable found.
 // DEBUG-NEXT:  [AD] The new adjoint value, replacing the existing one, is: Zero[$Array<Float>.DifferentiableView]
-// DEBUG-NEXT:  [AD] The following active value is loop-local, checking if it's adjoint is a projection
-// DEBUG-NEXT:  [AD] Materializing adjoint for Zero[$Array<Float>.DifferentiableView]
-// DEBUG-NEXT:  [AD] Recorded temporary   %[[#]] = load [take] %[[#]] : $*Array<Float>.DifferentiableView
-// DEBUG-NEXT:  [AD] Adjoint for the following value is a projection, skipping:   %[[#D4:]] = pointer_to_address %[[#D5:]] : $Builtin.RawPointer to [strict] $*Float
-// DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   %[[#D6:]] = apply %[[#]]<Float>(%[[#D2]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
-// DEBUG-NEXT:  [AD] Setting adjoint value for   %[[#D6]] = apply %[[#]]<Float>(%[[#D2]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+
+
+// DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   [[AP1:%.*]] = apply [[F1:%.*]]<Float>(%[[#D2]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+// DEBUG-NEXT:  [AD] Setting adjoint value for   [[AP1]] = apply [[F1]]<Float>(%[[#D2]]) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 // DEBUG-NEXT:  [AD] No debug variable found.
 // DEBUG-NEXT:  [AD] The new adjoint value, replacing the existing one, is: Zero[$Array<Float>.DifferentiableView]
 // DEBUG-NEXT:  [AD] The following active value is loop-local, checking if it's adjoint is a projection
-// DEBUG-NEXT:  [AD] Adjoint for the following value is a projection, skipping:   %[[#]] = begin_access [modify] [static] %[[#D0]] : $*Array<Float>
-
+// DEBUG-NEXT:  [AD] Adjoint for the following value is a projection, skipping:   [[BA:%.*]] = begin_access [modify] [static] %[[#D0]] : $*Array<Float>
 // DEBUG-NEXT:  [AD] End search for adjoints of loop-local active values

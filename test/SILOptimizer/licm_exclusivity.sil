@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=checked -enable-sil-verify-all %s -loop-invariant-code-motion | %FileCheck %s
 
 sil_stage canonical
 
@@ -251,4 +251,35 @@ bb1:
 bb2:
   %10 = tuple ()
   return %10 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_access_with_conflict_with_store :
+// CHECK:       bb1:
+// CHECK-NEXT:    begin_access
+// CHECK-LABEL: } // end sil function 'dont_hoist_access_with_conflict_with_store'
+sil [ossa] @dont_hoist_access_with_conflict_with_store : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %1 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  %3 = begin_access [read] [dynamic] %1
+  %4 = load [trivial] %3
+  fix_lifetime %4
+  end_access %3 : $*X
+  cond_br undef, bb2, bb3
+bb2:
+  store %0 to [trivial] %1
+  br bb4
+bb3:
+  br bb4
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %10 = tuple ()
+  return %10
 }

@@ -28,7 +28,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -597,7 +596,7 @@ EmitPolymorphicParameters::EmitPolymorphicParameters(IRGenFunction &IGF,
 
 
 CanType EmitPolymorphicParameters::getTypeInContext(CanType type) const {
-  return Fn.mapTypeIntoContext(type)->getCanonicalType();
+  return Fn.mapTypeIntoEnvironment(type)->getCanonicalType();
 }
 
 CanType EmitPolymorphicParameters::getArgTypeInContext(unsigned paramIndex) const {
@@ -769,7 +768,7 @@ void EmitPolymorphicParameters::injectAdHocDistributedRequirements() {
   auto loc = Fn.getLocation();
 
   auto *funcDecl = dyn_cast_or_null<FuncDecl>(loc.getAsDeclContext());
-  if (!(funcDecl && funcDecl->isGeneric()))
+  if (!(funcDecl && funcDecl->hasGenericParamList()))
     return;
 
   if (!funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
@@ -963,13 +962,17 @@ namespace {
 
     void addAssociatedType(AssociatedTypeDecl *assocType) {
       // In Embedded Swift witness tables don't have associated-types entries.
-      if (assocType->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      auto &langOpts = assocType->getASTContext().LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials))
         return;
       Entries.push_back(WitnessTableEntry::forAssociatedType(assocType));
     }
 
     void addAssociatedConformance(const AssociatedConformance &req) {
-      if (req.getAssociation()->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      auto &langOpts = req.getAssociation()->getASTContext().LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
           !req.getAssociatedRequirement()->requiresClass()) {
         // If it's not a class protocol, the associated type can never be used to create
         // an existential. Therefore this witness entry is never used at runtime
@@ -1281,6 +1284,9 @@ static llvm::Value *emitWitnessTableAccessorCall(
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
+    // Witness table accesses only require abstract type metadata; this
+    // is so that we can create the witness tables without introducing
+    // cycle problems.
     *srcMetadataCache = IGF.emitAbstractTypeMetadataRef(conformingType);
   }
 
@@ -1478,7 +1484,7 @@ public:
           Conformance(*SILWT->getConformance()->getRootConformance()),
           ConformanceInContext(*mapConformanceIntoContext(SILWT->getConformance()->getRootConformance())),
           ConcreteType(Conformance.getDeclContext()
-                         ->mapTypeIntoContext(Conformance.getType())
+                         ->mapTypeIntoEnvironment(Conformance.getType())
                          ->getCanonicalType()) {}
 
     void defineAssociatedTypeWitnessTableAccessFunction(
@@ -1726,7 +1732,9 @@ public:
       SILEntries = SILEntries.slice(1);
 
       // In Embedded Swift witness tables don't have associated-types entries.
-      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+      auto &langOpts = IGM.Context.LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials))
         return;
 
 #ifndef NDEBUG
@@ -1742,7 +1750,22 @@ public:
       (void)entry;
 #endif
 
-      auto typeWitness = Conformance.getTypeWitness(assocType);
+      Type typeWitness;
+      if (SILWT->isSpecialized())
+        typeWitness = entry.getAssociatedTypeWitness().Witness;
+      else
+        typeWitness = Conformance.getTypeWitness(assocType);
+
+      if (IGM.isEmbeddedWithExistentials()) {
+        // In Embedded Swift associated type witness point to the metadata.
+        llvm::Constant *witnessEntry = IGM.getAddrOfTypeMetadata(
+          typeWitness->getCanonicalType());
+        auto &schema = IGM.getOptions().PointerAuth
+                          .ProtocolAssociatedTypeAccessFunctions;
+        Table.addSignedPointer(witnessEntry, schema, assocType);
+        return;
+      }
+
       llvm::Constant *typeWitnessAddr =
           IGM.getAssociatedTypeWitness(
             typeWitness,
@@ -1766,8 +1789,9 @@ public:
       auto &entry = SILEntries.front();
       (void)entry;
       SILEntries = SILEntries.slice(1);
-
-      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+      auto &langOpts = IGM.Context.LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded) &&
+          !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
           !requirement.getAssociatedRequirement()->requiresClass()) {
         // If it's not a class protocol, the associated type can never be used to create
         // an existential. Therefore this witness entry is never used at runtime
@@ -1953,7 +1977,7 @@ void WitnessTableBuilderBase::defineAssociatedTypeWitnessTableAccessFunction(
         &Conformance,
         destTable.getAddress(),
         [&](CanType type) {
-          return Conformance.getDeclContext()->mapTypeIntoContext(type)
+          return Conformance.getDeclContext()->mapTypeIntoEnvironment(type)
                    ->getCanonicalType();
         });
 
@@ -2121,7 +2145,7 @@ llvm::Function *FragileWitnessTableBuilder::buildInstantiationFunction() {
     const auto &condConformance = SILConditionalConformances[idx];
     CanType reqTypeInContext =
       Conformance.getDeclContext()
-        ->mapTypeIntoContext(condConformance.getType())
+        ->mapTypeIntoEnvironment(condConformance.getType())
         ->getCanonicalType();
     if (auto archetype = dyn_cast<ArchetypeType>(reqTypeInContext)) {
       auto condProto = condConformance.getProtocol();
@@ -2729,7 +2753,8 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     // In Embedded Swift, only class-bound wtables are allowed.
-    if (!wt->getConformance()->getProtocol()->requiresClass())
+    if (!wt->getConformance()->getProtocol()->requiresClass() &&
+        !Context.LangOpts.hasFeature(Feature::EmbeddedExistentials))
       return;
   }
 
@@ -3445,6 +3470,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
       return MetadataResponse::forComplete(associatedWTable);
     }
 
+    // Witness table lookups only require abstract metadata.
     auto *sourceMetadata =
         IGF.emitAbstractTypeMetadataRef(sourceType);
 
@@ -3512,6 +3538,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
         associatedMetadata = response.getMetadata();
       } else {
         // Ok, fall back to realizing the (possibly concrete) type.
+        // Witness table lookups only require abstract metadata.
         associatedMetadata =
           IGF.emitAbstractTypeMetadataRef(sourceKey.Type);
       }
@@ -3748,7 +3775,9 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   auto proto = conformance.getProtocol();
 
   // In Embedded Swift, only class-bound wtables are allowed.
-  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  auto &langOpts = srcType->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded) &&
+      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
     assert(proto->requiresClass());
   }
 
@@ -3757,8 +3786,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   // Look through any opaque types we're allowed to.
   if (srcType->hasOpaqueArchetype()) {
-    std::tie(srcType, conformance) =
-      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType, conformance);
+    srcType = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType);
+    conformance = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(conformance);
   }
   
   // If we don't have concrete conformance information, the type must be
@@ -4413,7 +4442,7 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
     helperFn->getFunctionType(), helperFn, {wtable});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
-  auto fn = IGF.Builder.CreateBitCast(call, signature.getType()->getPointerTo());
+  auto fn = IGF.Builder.CreateBitCast(call, IGM.PtrTy);
   return FunctionPointer::createUnsigned(fnType, fn, signature, true);
 }
 
@@ -4443,8 +4472,7 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   auto fnType = IGF.IGM.getSILTypes().getConstantFunctionType(
       IGF.IGM.getMaximalTypeExpansionContext(), member);
   Signature signature = IGF.IGM.getSignature(fnType);
-  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
-                                           signature.getType()->getPointerTo());
+  witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr, IGF.IGM.PtrTy);
 
   auto &schema = fnType->isAsync()
                      ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
@@ -4528,6 +4556,28 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      DynamicMetadataRequest request) {
   auto &IGM = IGF.IGM;
 
+  // Im embedded with existentials mode the type metadata is directly referenced
+  // by the witness table.
+  if (IGM.isEmbeddedWithExistentials()) {
+    auto proto = assocType->getProtocol();
+    assert(!IGF.IGM.isResilient(proto, ResilienceExpansion::Maximal));
+    assert(!IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables);
+
+    auto &protoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
+    auto index = protoInfo.getAssociatedTypeIndex(IGM, assocType);
+    auto slot =
+      slotForLoadOfOpaqueWitness(IGF, wtable, index.forProtocolWitnessTable(),
+                                 false/*isRelativeTable*/);
+    llvm::Value *assocTypeMetadata = IGF.emitInvariantLoad(slot);
+
+    if (auto &schema = IGF.getOptions().PointerAuth.ProtocolAssociatedTypeAccessFunctions) {
+      auto authInfo = PointerAuthInfo::emit(IGF, schema, slot.getAddress(), assocType);
+      assocTypeMetadata = emitPointerAuthAuth(IGF, assocTypeMetadata, authInfo);
+
+    }
+
+    return MetadataResponse::forComplete(assocTypeMetadata);
+  }
   // Extract the requirements base descriptor.
   auto reqBaseDescriptor =
     IGM.getAddrOfProtocolRequirementsBaseDescriptor(
@@ -4619,9 +4669,13 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         }
         genericParamCounts.push_back(genericParamCount);
 
+        SmallVector<Requirement, 2> reqs;
+        SmallVector<InverseRequirement, 2> inverses;
+        signature->getRequirementsWithInverses(reqs, inverses);
+
         auto flags = GenericEnvironmentFlags()
           .withNumGenericParameterLevels(genericParamCounts.size())
-          .withNumGenericRequirements(signature.getRequirements().size());
+          .withNumGenericRequirements(reqs.size());
 
         ConstantStructBuilder fields = builder.beginStruct();
         fields.setPacked(true);
@@ -4648,7 +4702,7 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
         fields.addAlignmentPadding(Alignment(4));
 
         // Generic requirements
-        irgen::addGenericRequirements(*this, fields, signature);
+        irgen::addGenericRequirements(*this, fields, signature, reqs, inverses);
         return fields.finishAndCreateFuture();
       });
 }

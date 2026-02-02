@@ -101,6 +101,14 @@ extension Function {
         //     %2 = ref_element_addr %1   // class projection
         return getSideEffects()
       }
+      if convention.isIndirectIn && !argument.path.hasClassProjection {
+        // Even if an indirect argument is unused, pretend that the function reads from it. If the unused
+        // argument is passed to another generic function and that function is specialized, the argument
+        // may be re-abstracted and the specializer inserts a load from the indirect argument.
+        // Therefore we must be prepared that unused indirect argument might get loaded from -
+        // even if it's not the case right now.
+        result.memory.read = true
+      }
     } else {
       // Direct arguments:
       if argument.path.mayHaveTwoClassProjections {
@@ -505,6 +513,14 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     /// This is true when the function (or a callee, transitively) contains a
     /// deinit barrier instruction.
     public var isDeinitBarrier: Bool
+    
+    public static var noEffects: GlobalEffects {
+      return GlobalEffects(memory: .noEffects, ownership: .noEffects, allocates: false, isDeinitBarrier: false)
+    }
+    
+    public var isOnlyReading: Bool {
+      return !memory.write && ownership == .noEffects && !allocates && !isDeinitBarrier
+    }
 
     /// When called with default arguments, it creates an "effect-free" GlobalEffects.
     public init(memory: Memory = Memory(read: false, write: false),
@@ -642,6 +658,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     public mutating func merge(with other: Ownership) {
       copy = copy || other.copy
       destroy = destroy || other.destroy
+    }
+    
+    public static var noEffects: Ownership {
+      return Ownership(copy: false, destroy: false)
     }
 
     public static var worstEffects: Ownership {

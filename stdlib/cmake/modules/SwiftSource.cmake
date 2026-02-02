@@ -549,7 +549,9 @@ function(_compile_swift_files
   endif()
 
   # The standard library and overlays are built resiliently when SWIFT_STDLIB_STABLE_ABI=On.
-  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE AND SWIFT_STDLIB_STABLE_ABI)
+  if(SWIFTFILE_IS_STDLIB AND NOT SWIFTFILE_IS_FRAGILE
+      AND SWIFT_STDLIB_STABLE_ABI
+      AND NOT "${SWIFTFILE_SDK}" STREQUAL "LINUX_STATIC")
     list(APPEND swift_flags "-enable-library-evolution")
     list(APPEND swift_flags "-library-level" "api")
     list(APPEND swift_flags "-Xfrontend" "-require-explicit-availability=ignore")
@@ -647,6 +649,12 @@ function(_compile_swift_files
     list(APPEND swift_flags "-strict-concurrency=complete")
   endif()
 
+  list(APPEND swift_flags "-Werror" "StrictMemorySafety")
+
+  if (SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES)
+    list(APPEND swift_flags "-Xfrontend" "-enable-sil-opaque-values")
+  endif()
+
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
@@ -721,7 +729,9 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_MODULE_INTERFACES AND NOT SWIFTFILE_IS_FRAGILE)
+    if(SWIFT_ENABLE_MODULE_INTERFACES
+        AND NOT SWIFTFILE_IS_FRAGILE
+        AND NOT "${SWIFTFILE_SDK}" STREQUAL "LINUX_STATIC")
       set(interface_file "${module_base}.swiftinterface")
       set(interface_file_static "${module_base_static}.swiftinterface")
       set(private_interface_file "${module_base}.private.swiftinterface")
@@ -1015,13 +1025,13 @@ function(_compile_swift_files
   # need to work around this by avoiding long command line arguments. This can
   # be achieved by writing the list of file paths to a file, then reading that
   # list in the Python script.
-  string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
-  string(SHA1 file_name "'${source_files_quoted}'")
+  string(REPLACE ";" "\n" source_files_quoted "${source_files}")
+  string(SHA1 file_name "${source_files_quoted}")
   set(file_path_target "filelist-${file_name}")
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
 
   if (NOT TARGET ${file_path_target})
-    file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
+    file(WRITE "${file_path}.tmp" "${source_files_quoted}")
     add_custom_command_target(unused_var
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}"
       CUSTOM_TARGET_NAME ${file_path_target}

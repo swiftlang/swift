@@ -3,6 +3,8 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/STLExtras.h"
 #include <algorithm>
 #include <swift/APIDigester/ModuleAnalyzerNodes.h>
@@ -752,7 +754,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         AccessorKind unknownKind = (AccessorKind)((uint8_t)(AccessorKind::Last) + 1);
         Info.AccKind = llvm::StringSwitch<AccessorKind>(
           GetScalarString(Pair.getValue()))
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) .Case(#KEYWORD, AccessorKind::ID)
 #include "swift/AST/AccessorKinds.def"
           .Default(unknownKind);
@@ -1063,10 +1065,11 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
   llvm::raw_string_ostream OS(S);
   PrintOptions PO = getTypePrintOpts(Ctx.getOpts());
   PO.SkipAttributes = true;
+  NonRecursivePrintOptions OPO;
   if (IsImplicitlyUnwrappedOptional)
-    PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    OPO |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
 
-  Ty.print(OS, PO);
+  Ty.print(OS, PO, OPO);
   return Ctx.buffer(OS.str());
 }
 
@@ -1117,8 +1120,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler(VD->getASTContext());
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
-                                    /*bool respectOriginallyDefinedIn*/true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, /*addPrefix*/ true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
@@ -1165,8 +1167,9 @@ static StringRef getSimpleName(ValueDecl *VD) {
   }
   if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
     switch(AD->getAccessorKind()) {
-#define ACCESSOR(ID) \
-case AccessorKind::ID: return #ID;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+    case AccessorKind::ID:                                                     \
+      return #ID;
 #include "swift/AST/AccessorKinds.def"
     }
   }
@@ -1376,7 +1379,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   for (auto attr : D->getSemanticAvailableAttrs()) {
     auto domain = attr.getDomain();
 
-    if (domain.isSwiftLanguage() && attr.getIntroduced()) {
+    if (domain.isSwiftLanguageMode() && attr.getIntroduced()) {
       return buffer(attr.getIntroduced()->getAsString());
     }
   }
@@ -1761,7 +1764,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
     // These decls are considered effectively public because they are usable
     // from inline, so we have to manually exclude them here.
-    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (D->isAlwaysEmittedIntoClient())
       return true;
   } else {
     if (D->isPrivateSystemDecl(false))
@@ -1984,7 +1987,7 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;
-    for (auto &Conf: NTD->getAllConformances()) {
+    for (auto &Conf: NTD->getAllConformances(/*sorted=*/true)) {
       if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
         Root->addConformance(constructConformanceNode(Conf));
       Seen.insert(Conf);
@@ -2005,7 +2008,7 @@ SwiftDeclCollector::SwiftDeclCollector(SDKContext &Ctx,
   }
   assert(!Modules.empty());
   for (auto M: Modules) {
-    llvm::SmallVector<Decl*, 512> Decls;
+    llvm::SmallVector<Decl*> Decls;
     swift::getTopLevelDeclsForDisplay(M, Decls);
     for (auto D : Decls) {
       if (Ctx.shouldIgnore(D))
@@ -2267,7 +2270,7 @@ struct ScalarEnumerationTraits<DeclKind> {
 template<>
 struct ScalarEnumerationTraits<AccessorKind> {
   static void enumeration(Output &out, AccessorKind &value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   out.enumCase(value, #KEYWORD, AccessorKind::ID);
 #include "swift/AST/AccessorKinds.def"

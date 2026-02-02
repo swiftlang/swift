@@ -122,7 +122,7 @@ bool Parser::startsParameterName(bool isClosure) {
     // contextual keywords, so look ahead one more token (two total) and see
     // if we have a ':' that would
     // indicate that this is an argument label.
-    return lookahead<bool>(2, [&](CancellableBacktrackingScope &) {
+    return lookahead(2, [&](CancellableBacktrackingScope &) {
       if (Tok.is(tok::colon))
         return true; // isolated :
 
@@ -180,7 +180,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // Per SE-0155, enum elements may not have empty parameter lists.
     if (paramContext == ParameterContextKind::EnumElement) {
       decltype(diag::enum_element_empty_arglist) diagnostic;
-      if (Context.isSwiftVersionAtLeast(5)) {
+      if (Context.isLanguageModeAtLeast(5)) {
         diagnostic = diag::enum_element_empty_arglist;
       } else {
         diagnostic = diag::enum_element_empty_arglist_swift4;
@@ -235,7 +235,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // is this token the identifier of an argument label? `inout` is a
         // reserved keyword but the other modifiers are not.
         if (!Tok.is(tok::kw_inout)) {
-          bool partOfArgumentLabel = lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+          bool partOfArgumentLabel = lookahead(1, [&](CancellableBacktrackingScope &) {
             if (Tok.is(tok::colon))
               return true;  // isolated :
 
@@ -247,8 +247,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
         
         if (Tok.isContextualKeyword("isolated")) {
-          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
-                    .warnUntilSwiftVersion(6);
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
+                   Tok.getText())
+              .warnUntilLanguageMode(6);
           // did we already find an 'isolated' type modifier?
           if (param.IsolatedLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
@@ -263,8 +264,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
 
         if (Tok.isContextualKeyword("_const")) {
-          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
-                    .warnUntilSwiftVersion(6);
+          diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
+                   Tok.getText())
+              .warnUntilLanguageMode(6);
           param.CompileConstLoc = consumeToken();
           continue;
         }
@@ -273,7 +275,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
             Tok.isContextualKeyword("sending")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed,
                    Tok.getText())
-              .warnUntilSwiftVersion(6);
+              .warnUntilLanguageMode(6);
           if (param.SendingLoc.isValid()) {
             diagnose(Tok, diag::parameter_specifier_repeated)
                 .fixItRemove(Tok.getLoc());
@@ -456,9 +458,9 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                 diagnose(typeStartLoc, diag::parameter_unnamed)
                     .fixItInsert(typeStartLoc, "_: ");
             } else {
-                diagnose(typeStartLoc, diag::parameter_unnamed)
-                    .warnUntilSwiftVersion(6)
-                    .fixItInsert(typeStartLoc, "_: ");
+              diagnose(typeStartLoc, diag::parameter_unnamed)
+                  .warnUntilLanguageMode(6)
+                  .fixItInsert(typeStartLoc, "_: ");
             }
           }
         }

@@ -42,6 +42,7 @@ class BasicBlockBitfield;
 class NodeBitfield;
 class OperandBitfield;
 class CalleeCache;
+class SILTypeProperties;
 class SILUndef;
 
 namespace Lowering {
@@ -51,7 +52,7 @@ class AbstractionPattern;
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
-enum Inline_t { InlineDefault, NoInline, AlwaysInline };
+enum Inline_t { InlineDefault, NoInline, HeuristicAlwaysInline, AlwaysInline };
 enum IsThunk_t {
   IsNotThunk,
   IsThunk,
@@ -92,7 +93,8 @@ enum class PerformanceConstraints : uint8_t {
   NoLocks = 2,
   NoRuntime = 3,
   NoExistentials = 4,
-  NoObjCBridging = 5
+  NoObjCBridging = 5,
+  ManualOwnership = 6,
 };
 
 class SILSpecializeAttr final {
@@ -235,6 +237,8 @@ private:
   /// The lowered type of the function.
   CanSILFunctionType LoweredType;
 
+  CanSILFunctionType LoweredTypeInContext;
+
   /// The context archetypes of the function.
   GenericEnvironment *GenericEnv = nullptr;
 
@@ -316,7 +320,12 @@ private:
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
-  /// Name of a section if @_section attribute was used, otherwise empty.
+  /// The name that this function should have when it is lowered to LLVM IR.
+  ///
+  /// If empty, use the SIL function's name directly.
+  StringRef AsmName;
+
+  /// Name of a section if @section attribute was used, otherwise empty.
   StringRef Section;
 
   /// Name of a Wasm export if @_expose(wasm) attribute was used, otherwise
@@ -387,7 +396,7 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Whether attribute @_used was present
+  /// Whether attribute @used was present
   unsigned MarkedAsUsed : 1;
 
   /// Whether cross-module references to this function should always use weak
@@ -468,6 +477,9 @@ private:
   /// Note that this flag is not serialized, because it's computed locally
   /// within a module by the MandatoryOptimizations pass.
   unsigned IsPerformanceConstraint : 1;
+
+  unsigned NeedBreakInfiniteLoops : 1;
+  unsigned NeedCompleteLifetimes : 1;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -571,6 +583,9 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+
+  CanSILFunctionType getLoweredFunctionTypeInContext() const;
+
   CanSILFunctionType
   getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
 
@@ -657,6 +672,10 @@ public:
   void setEntryCount(ProfileCounter Count) { EntryCount = Count; }
 
   bool isNoReturnFunction(TypeExpansionContext context) const;
+
+  /// True if this function should have a non-unique definition based on the
+  /// embedded linkage model.
+  bool hasNonUniqueDefinition() const;
 
   /// Unsafely rewrite the lowered type of this function.
   ///
@@ -784,10 +803,17 @@ public:
     return TypeExpansionContext(*this);
   }
 
+  SILTypeProperties getTypeProperties(Lowering::AbstractionPattern orig,
+                                      Type subst) const;
+  SILTypeProperties getTypeProperties(Type subst) const;
+  SILTypeProperties getTypeProperties(SILType type) const;
+
   const Lowering::TypeLowering &
-  getTypeLowering(Lowering::AbstractionPattern orig, Type subst);
+  getTypeLowering(Lowering::AbstractionPattern orig, Type subst) const;
 
   const Lowering::TypeLowering &getTypeLowering(Type t) const;
+
+  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   SILType getLoweredType(Lowering::AbstractionPattern orig, Type subst) const;
 
@@ -800,8 +826,6 @@ public:
   SILType getLoweredLoadableType(Type t) const;
 
   SILType getLoweredType(SILType t) const;
-
-  const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 
   bool isTypeABIAccessible(SILType type) const;
 
@@ -909,6 +933,14 @@ public:
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
   }
+
+  /// Helper method that determines whether this SILFunction is a Swift runtime
+  /// function, such as swift_retain.
+  bool isSwiftRuntimeFunction() const;
+
+  /// Helper method that determines whether a function with the given name and
+  /// parent module is a Swift runtime function such as swift_retain.
+  static bool isSwiftRuntimeFunction(StringRef name, const ModuleDecl *module);
 
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the object's definition might be required outside the
@@ -1075,6 +1107,31 @@ public:
 
   void setIsPerformanceConstraint(bool flag = true) {
     IsPerformanceConstraint = flag;
+  }
+
+  /// True if the current pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might
+  /// have become an infinite loop.
+  bool needBreakInfiniteLoops() const { return NeedBreakInfiniteLoops; }
+
+  /// If `flag` is true, notifies that a pass has deleted a basic block which
+  /// might end up in an infinite loop. A pass can set the notification to `false`
+  /// again if a basic block has been deleted but the pass knows that this cannot
+  /// cause any infinite loops.
+  void setNeedBreakInfiniteLoops(bool flag = true) {
+    NeedBreakInfiniteLoops = flag;
+  }
+
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off.
+  bool needCompleteLifetimes() const { return NeedCompleteLifetimes; }
+
+  /// If `flag` is true, notifies that a pass has inserted an `unreachable`
+  /// instruction which might have cut off any lifetimes. A pass can set the
+  /// notification to `false` again if an `unreachable` was inserted but the
+  /// pass knows that this didn't cut off any lifetimes.
+  void setNeedCompleteLifetimes(bool flag = true) {
+    NeedCompleteLifetimes = flag;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
@@ -1318,7 +1375,7 @@ public:
                              SubstitutionMap forwardingSubs) {
     GenericEnv = env;
     CapturedEnvs = capturedEnvs;
-    ForwardingSubMap = forwardingSubs;
+    ForwardingSubMap = forwardingSubs.getCanonical();
   }
 
   /// Retrieve the generic signature from the generic environment of this
@@ -1328,12 +1385,12 @@ public:
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  Type mapTypeIntoContext(Type type) const;
+  Type mapTypeIntoEnvironment(Type type) const;
 
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
   /// SILFunction.
-  SILType mapTypeIntoContext(SILType type) const;
+  SILType mapTypeIntoEnvironment(SILType type) const;
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration() {
@@ -1392,14 +1449,18 @@ public:
       return false;
 
     auto *V = getLocation().getAsASTNode<ValueDecl>();
-    return V && V->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
+    return V && V->isAlwaysEmittedIntoClient();
   }
 
-  /// Return whether this function has attribute @_used on it
+  /// Return whether this function has attribute @used on it
   bool markedAsUsed() const { return MarkedAsUsed; }
   void setMarkedAsUsed(bool value) { MarkedAsUsed = value; }
 
-  /// Return custom section name if @_section was used, otherwise empty
+  /// Return custom assembler name, otherwise empty.
+  StringRef asmName() const { return AsmName; }
+  void setAsmName(StringRef value);
+
+  /// Return custom section name if @section was used, otherwise empty
   StringRef section() const { return Section; }
   void setSection(StringRef value) { Section = value; }
 
@@ -1463,6 +1524,10 @@ public:
     return actorIsolation;
   }
 
+  bool isNonisolatedNonsending() const {
+    return actorIsolation && actorIsolation->isCallerIsolationInheriting();
+  }
+
   /// Return the source file that this SILFunction belongs to if it exists.
   SourceFile *getSourceFile() const;
 
@@ -1497,6 +1562,8 @@ public:
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
     assert(BB->getParent() == this);
+    if (hasOwnership())
+      setNeedBreakInfiniteLoops();
     BlockList.erase(BB);
   }
 
@@ -1527,7 +1594,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        return isa<ReturnInst>(TI);
+        return isa<ReturnInst>(TI) || isa<ReturnBorrowInst>(TI);
     });
   }
 
@@ -1537,7 +1604,7 @@ public:
     return std::find_if(begin(), end(),
       [](const SILBasicBlock &BB) -> bool {
         const TermInst *TI = BB.getTerminator();
-        return isa<ReturnInst>(TI);
+        return isa<ReturnInst>(TI) || isa<ReturnBorrowInst>(TI);
     });
   }
 
@@ -1674,7 +1741,8 @@ public:
   }
 
   /// Verifies the lifetime of memory locations in the function.
-  void verifyMemoryLifetime(CalleeCache *calleeCache);
+  void verifyMemoryLifetime(CalleeCache *calleeCache,
+                            DeadEndBlocks *deadEndBlocks);
 
   /// Verifies ownership of the function.
   /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks

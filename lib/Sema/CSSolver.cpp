@@ -22,6 +22,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -58,11 +59,17 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
 TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
-                                     unsigned options) {
+                                     unsigned options,
+                                     PreparedOverloadBuilder *preparedOverload) {
   ++TotalNumTypeVariables;
   auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
                                      locator, options);
-  addTypeVariable(tv);
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    preparedOverload->addedTypeVariable(tv);
+  } else {
+    addTypeVariable(tv);
+  }
   return tv;
 }
 
@@ -73,9 +80,7 @@ Solution ConstraintSystem::finalize() {
   Solution solution(*this, CurrentScore);
 
   // Update the best score we've seen so far.
-  auto &ctx = getASTContext();
-  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
   if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
     solverState->BestScore = CurrentScore;
@@ -90,10 +95,6 @@ Solution ConstraintSystem::finalize() {
       llvm_unreachable("Solver left free type variables");
 
     case FreeTypeVariableBinding::Allow:
-      break;
-
-    case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, ctx.TheUnresolvedType);
       break;
     }
   }
@@ -669,20 +670,27 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.activateConstraint(constraint);
   }
 
+  auto &ctx = CS.getASTContext();
+
   // If global constraint debugging is off and we are finished logging the
   // current solution attempt, switch debugging back off.
-  const auto &tyOpts = CS.getASTContext().TypeCheckerOpts;
-  if (!tyOpts.DebugConstraintSolver &&
-      tyOpts.DebugConstraintSolverAttempt &&
-      tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+  if (!ctx.TypeCheckerOpts.DebugConstraintSolver &&
+      ctx.TypeCheckerOpts.DebugConstraintSolverAttempt &&
+      ctx.TypeCheckerOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options -= ConstraintSystemFlags::DebugConstraints;
   }
 
   // This statistic is special because it's not a counter; we just update
   // it in one shot at the end.
-  ASTBytesAllocated = CS.getASTContext().getSolverMemory();
+  if (ctx.Stats) {
+    auto &counters = ctx.Stats->getFrontendCounters();
+    int64_t bytes = CS.getAllocator().getBytesAllocated();
+    counters.NumSolverBytesAllocated += bytes;
+    counters.MaxSolverBytesAllocated =
+        std::max(counters.MaxSolverBytesAllocated, bytes);
+  }
 
-  // Write our local statistics back to the overall statistics.
+  // Write our local debug statistics back to the overall debug statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "swift/Sema/ConstraintSolverStats.def"
 
@@ -800,562 +808,6 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
   return std::move(solutions[0]);
 }
 
-bool ConstraintSystem::Candidate::solve(
-    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
-  // Don't attempt to solve candidate if there is closure
-  // expression involved, because it's handled specially
-  // by parent constraint system (e.g. parameter lists).
-  bool containsClosure = false;
-  E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-    if (isa<ClosureExpr>(childExpr)) {
-      containsClosure = true;
-      return nullptr;
-    }
-    return childExpr;
-  });
-
-  if (containsClosure)
-    return false;
-
-  auto cleanupImplicitExprs = [&](Expr *expr) {
-    expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-      Type type = childExpr->getType();
-      if (childExpr->isImplicit() && type && type->hasTypeVariable())
-        childExpr->setType(Type());
-      return childExpr;
-    });
-  };
-
-  // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(DC, std::nullopt);
-
-  // Set up expression type checker timer for the candidate.
-  cs.startExpressionTimer(E);
-
-  // Generate constraints for the new system.
-  if (auto generatedExpr = cs.generateConstraints(E, DC)) {
-    E = generatedExpr;
-  } else {
-    // Failure to generate constraint system for sub-expression
-    // means we can't continue solving sub-expressions.
-    cleanupImplicitExprs(E);
-    return true;
-  }
-
-  // If this candidate is too complex given the number
-  // of the domains we have reduced so far, let's bail out early.
-  if (isTooComplexGiven(&cs, shrunkExprs))
-    return false;
-
-  auto &ctx = cs.getASTContext();
-  if (cs.isDebugMode()) {
-    auto &log = llvm::errs();
-    auto indent = cs.solverState ? cs.solverState->getCurrentIndent() : 0;
-    log.indent(indent) << "--- Solving candidate for shrinking at ";
-    auto R = E->getSourceRange();
-    if (R.isValid()) {
-      R.print(log, ctx.SourceMgr, /*PrintText=*/ false);
-    } else {
-      log << "<invalid range>";
-    }
-    log << " ---\n";
-
-    E->dump(log, indent);
-    log << '\n';
-    cs.print(log);
-  }
-
-  // If there is contextual type present, add an explicit "conversion"
-  // constraint to the system.
-  if (!CT.isNull()) {
-    auto constraintKind = ConstraintKind::Conversion;
-    if (CTP == CTP_CallArgument)
-      constraintKind = ConstraintKind::ArgumentConversion;
-    if (!CT->hasUnboundGenericType()) {
-      cs.addConstraint(constraintKind, cs.getType(E), CT,
-                       cs.getConstraintLocator(E), /*isFavored=*/true);
-    }
-  }
-
-  // Try to solve the system and record all available solutions.
-  llvm::SmallVector<Solution, 2> solutions;
-  {
-    SolverState state(cs, FreeTypeVariableBinding::Allow);
-
-    // Use solve which doesn't try to filter solution list.
-    // Because we want the whole set of possible domain choices.
-    cs.solveImpl(solutions);
-  }
-
-  if (cs.isDebugMode()) {
-    auto &log = llvm::errs();
-    auto indent = cs.solverState ? cs.solverState->getCurrentIndent() : 0;
-    if (solutions.empty()) {
-      log << "\n";
-      log.indent(indent) << "--- No Solutions ---\n";
-    } else {
-      log << "\n";
-      log.indent(indent) << "--- Solutions ---\n";
-      for (unsigned i = 0, n = solutions.size(); i != n; ++i) {
-        auto &solution = solutions[i];
-        log << "\n";
-        log.indent(indent) << "--- Solution #" << i << " ---\n";
-        solution.dump(log, indent);
-      }
-    }
-  }
-
-  // Record found solutions as suggestions.
-  this->applySolutions(solutions, shrunkExprs);
-
-  // Let's double-check if we have any implicit expressions
-  // with type variables and nullify their types.
-  cleanupImplicitExprs(E);
-
-  // No solutions for the sub-expression means that either main expression
-  // needs salvaging or it's inconsistent (read: doesn't have solutions).
-  return solutions.empty();
-}
-
-void ConstraintSystem::Candidate::applySolutions(
-    llvm::SmallVectorImpl<Solution> &solutions,
-    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const {
-  // A collection of OSRs with their newly reduced domains,
-  // it's domains are sets because multiple solutions can have the same
-  // choice for one of the type variables, and we want no duplication.
-  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSetVector<ValueDecl *, 2>>
-    domains;
-  for (auto &solution : solutions) {
-    auto &score = solution.getFixedScore();
-
-    // Avoid any solutions with implicit value conversions
-    // because they might get reverted later when more context
-    // becomes available.
-    if (score.Data[SK_ImplicitValueConversion] > 0)
-      continue;
-
-    for (auto choice : solution.overloadChoices) {
-      // Some of the choices might not have locators.
-      if (!choice.getFirst())
-        continue;
-
-      auto anchor = choice.getFirst()->getAnchor();
-      auto *OSR = getAsExpr<OverloadSetRefExpr>(anchor);
-      // Anchor is not available or expression is not an overload set.
-      if (!OSR)
-        continue;
-
-      auto overload = choice.getSecond().choice;
-      auto type = overload.getDecl()->getInterfaceType();
-
-      // One of the solutions has polymorphic type associated with one of its
-      // type variables. Such functions can only be properly resolved
-      // via complete expression, so we'll have to forget solutions
-      // we have already recorded. They might not include all viable overload
-      // choices.
-      if (type->is<GenericFunctionType>()) {
-        return;
-      }
-
-      domains[OSR].insert(overload.getDecl());
-    }
-  }
-
-  // Reduce the domains.
-  for (auto &domain : domains) {
-    auto OSR = domain.getFirst();
-    auto &choices = domain.getSecond();
-
-    // If the domain wasn't reduced, skip it.
-    if (OSR->getDecls().size() == choices.size()) continue;
-
-    // Update the expression with the reduced domain.
-    MutableArrayRef<ValueDecl *> decls(
-                                Allocator.Allocate<ValueDecl *>(choices.size()),
-                                choices.size());
-
-    std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
-    OSR->setDecls(decls);
-
-    // Record successfully shrunk expression.
-    shrunkExprs.insert(OSR);
-  }
-}
-
-void ConstraintSystem::shrink(Expr *expr) {
-  if (getASTContext().TypeCheckerOpts.SolverDisableShrink)
-    return;
-
-  using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
-
-  // A collection of original domains of all of the expressions,
-  // so they can be restored in case of failure.
-  DomainMap domains;
-
-  struct ExprCollector : public ASTWalker {
-    Expr *PrimaryExpr;
-
-    // The primary constraint system.
-    ConstraintSystem &CS;
-
-    // All of the sub-expressions which are suitable to be solved
-    // separately from the main system e.g. binary expressions, collections,
-    // function calls, coercions etc.
-    llvm::SmallVector<Candidate, 4> Candidates;
-
-    // Counts the number of overload sets present in the tree so far.
-    // Note that the traversal is depth-first.
-    llvm::SmallVector<std::pair<Expr *, unsigned>, 4> ApplyExprs;
-
-    // A collection of original domains of all of the expressions,
-    // so they can be restored in case of failure.
-    DomainMap &Domains;
-
-    ExprCollector(Expr *expr, ConstraintSystem &cs, DomainMap &domains)
-        : PrimaryExpr(expr), CS(cs), Domains(domains) {}
-
-    MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Arguments;
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-      // A dictionary expression is just a set of tuples; try to solve ones
-      // that have overload sets.
-      if (auto collectionExpr = dyn_cast<CollectionExpr>(expr)) {
-        visitCollectionExpr(collectionExpr,
-                            CS.getContextualType(expr, /*forConstraint=*/false),
-                            CS.getContextualTypePurpose(expr));
-        // Don't try to walk into the dictionary.
-        return Action::SkipNode(expr);
-      }
-
-      // Let's not attempt to type-check closures or expressions
-      // which constrain closures, because they require special handling
-      // when dealing with context and parameters declarations.
-      if (isa<ClosureExpr>(expr)) {
-        return Action::SkipNode(expr);
-      }
-
-      // Similar to 'ClosureExpr', 'TapExpr' has a 'VarDecl' the type of which
-      // is determined by type checking the parent interpolated string literal.
-      if (isa<TapExpr>(expr)) {
-        return Action::SkipNode(expr);
-      }
-
-      // Same as TapExpr and ClosureExpr, we'll handle SingleValueStmtExprs
-      // separately.
-      if (isa<SingleValueStmtExpr>(expr))
-        return Action::SkipNode(expr);
-
-      if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
-        if (coerceExpr->isLiteralInit())
-          ApplyExprs.push_back({coerceExpr, 1});
-        visitCoerceExpr(coerceExpr);
-        return Action::SkipNode(expr);
-      }
-
-      if (auto OSR = dyn_cast<OverloadSetRefExpr>(expr)) {
-        Domains[OSR] = OSR->getDecls();
-      }
-
-      if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
-        auto func = applyExpr->getFn();
-        // Let's record this function application for post-processing
-        // as well as if it contains overload set, see walkToExprPost.
-        ApplyExprs.push_back(
-            {applyExpr, isa<OverloadSetRefExpr>(func) || isa<TypeExpr>(func)});
-      }
-
-      return Action::Continue(expr);
-    }
-
-    /// Determine whether this is an arithmetic expression comprised entirely
-    /// of literals.
-    static bool isArithmeticExprOfLiterals(Expr *expr) {
-      expr = expr->getSemanticsProvidingExpr();
-
-      if (auto prefix = dyn_cast<PrefixUnaryExpr>(expr))
-        return isArithmeticExprOfLiterals(prefix->getOperand());
-
-      if (auto postfix = dyn_cast<PostfixUnaryExpr>(expr))
-        return isArithmeticExprOfLiterals(postfix->getOperand());
-
-      if (auto binary = dyn_cast<BinaryExpr>(expr))
-        return isArithmeticExprOfLiterals(binary->getLHS()) &&
-               isArithmeticExprOfLiterals(binary->getRHS());
-
-      return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-      auto isSrcOfPrimaryAssignment = [&](Expr *expr) -> bool {
-        if (auto *AE = dyn_cast<AssignExpr>(PrimaryExpr))
-          return expr == AE->getSrc();
-        return false;
-      };
-
-      if (expr == PrimaryExpr || isSrcOfPrimaryAssignment(expr)) {
-        // If this is primary expression and there are no candidates
-        // to be solved, let's not record it, because it's going to be
-        // solved regardless.
-        if (Candidates.empty())
-          return Action::Continue(expr);
-
-        auto contextualType = CS.getContextualType(expr,
-                                                   /*forConstraint=*/false);
-        // If there is a contextual type set for this expression.
-        if (!contextualType.isNull()) {
-          Candidates.push_back(Candidate(CS, PrimaryExpr, contextualType,
-                                         CS.getContextualTypePurpose(expr)));
-          return Action::Continue(expr);
-        }
-
-        // Or it's a function application or assignment with other candidates
-        // present. Assignment should be easy to solve because we'd get a
-        // contextual type from the destination expression, otherwise shrink
-        // might produce incorrect results without considering aforementioned
-        // destination type.
-        if (isa<ApplyExpr>(expr) || isa<AssignExpr>(expr)) {
-          Candidates.push_back(Candidate(CS, PrimaryExpr));
-          return Action::Continue(expr);
-        }
-      }
-
-      if (!isa<ApplyExpr>(expr))
-        return Action::Continue(expr);
-
-      unsigned numOverloadSets = 0;
-      // Let's count how many overload sets do we have.
-      while (!ApplyExprs.empty()) {
-        auto &application = ApplyExprs.back();
-        auto applyExpr = application.first;
-
-        // Add overload sets tracked by current expression.
-        numOverloadSets += application.second;
-        ApplyExprs.pop_back();
-
-        // We've found the current expression, so record the number of
-        // overloads.
-        if (expr == applyExpr) {
-          ApplyExprs.push_back({applyExpr, numOverloadSets});
-          break;
-        }
-      }
-
-      // If there are fewer than two overloads in the chain
-      // there is no point of solving this expression,
-      // because we won't be able to reduce its domain.
-      if (numOverloadSets > 1 && !isArithmeticExprOfLiterals(expr))
-        Candidates.push_back(Candidate(CS, expr));
-
-      return Action::Continue(expr);
-    }
-
-  private:
-    /// Extract type of the element from given collection type.
-    ///
-    /// \param collection The type of the collection container.
-    ///
-    /// \returns Null type, ErrorType or UnresolvedType on failure,
-    /// properly constructed type otherwise.
-    Type extractElementType(Type collection) {
-      auto &ctx = CS.getASTContext();
-      if (!collection || collection->hasError())
-        return collection;
-
-      auto base = collection.getPointer();
-      auto isInvalidType = [](Type type) -> bool {
-        return type.isNull() || type->hasUnresolvedType() ||
-               type->hasError();
-      };
-
-      // Array type.
-      if (auto array = dyn_cast<ArraySliceType>(base)) {
-        auto elementType = array->getBaseType();
-        // If base type is invalid let's return error type.
-        return elementType;
-      }
-
-      // Map or Set or any other associated collection type.
-      if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
-        if (boundGeneric->hasUnresolvedType())
-          return boundGeneric;
-
-        // Avoid handling InlineArray, building a tuple would be wrong, and
-        // we want to eliminate shrink.
-        if (boundGeneric->getDecl() == ctx.getInlineArrayDecl())
-          return Type();
-
-        llvm::SmallVector<TupleTypeElt, 2> params;
-        for (auto &type : boundGeneric->getGenericArgs()) {
-          // One of the generic arguments in invalid or unresolved.
-          if (isInvalidType(type))
-            return type;
-
-          params.push_back(type);
-        }
-
-        // If there is just one parameter, let's return it directly.
-        if (params.size() == 1)
-          return params[0].getType();
-
-        return TupleType::get(params, ctx);
-      }
-
-      return Type();
-    }
-
-    bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
-      // Only generic identifier, array or dictionary.
-      switch (collectionTypeRepr->getKind()) {
-      case TypeReprKind::UnqualifiedIdent:
-        return cast<UnqualifiedIdentTypeRepr>(collectionTypeRepr)
-            ->hasGenericArgList();
-
-      case TypeReprKind::Array:
-      case TypeReprKind::Dictionary:
-        return true;
-
-      default:
-        break;
-      }
-
-      return false;
-    }
-
-    void visitCoerceExpr(CoerceExpr *coerceExpr) {
-      auto subExpr = coerceExpr->getSubExpr();
-      // Coerce expression is valid only if it has sub-expression.
-      if (!subExpr) return;
-
-      unsigned numOverloadSets = 0;
-      subExpr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        if (isa<OverloadSetRefExpr>(childExpr)) {
-          ++numOverloadSets;
-          return childExpr;
-        }
-
-        if (auto nestedCoerceExpr = dyn_cast<CoerceExpr>(childExpr)) {
-          visitCoerceExpr(nestedCoerceExpr);
-          // Don't walk inside of nested coercion expression directly,
-          // that is be done by recursive call to visitCoerceExpr.
-          return nullptr;
-        }
-
-        // If sub-expression we are trying to coerce to type is a collection,
-        // let's allow collector discover it with assigned contextual type
-        // of coercion, which allows collections to be solved in parts.
-        if (auto collectionExpr = dyn_cast<CollectionExpr>(childExpr)) {
-          auto *const typeRepr = coerceExpr->getCastTypeRepr();
-
-          if (typeRepr && isSuitableCollection(typeRepr)) {
-            const auto coercionType = TypeResolution::resolveContextualType(
-                typeRepr, CS.DC, std::nullopt,
-                // FIXME: Should we really be unconditionally complaining
-                // about unbound generics and placeholders here? For
-                // example:
-                // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
-                // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
-                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr,
-                /*packElementOpener*/ nullptr);
-
-            // Looks like coercion type is invalid, let's skip this sub-tree.
-            if (coercionType->hasError())
-              return nullptr;
-
-            // Visit collection expression inline.
-            visitCollectionExpr(collectionExpr, coercionType,
-                                CTP_CoerceOperand);
-          }
-        }
-
-        return childExpr;
-      });
-
-      // It's going to be inefficient to try and solve
-      // coercion in parts, so let's just make it a candidate directly,
-      // if it contains at least a single overload set.
-
-      if (numOverloadSets > 0)
-        Candidates.push_back(Candidate(CS, coerceExpr));
-    }
-
-    void visitCollectionExpr(CollectionExpr *collectionExpr,
-                             Type contextualType = Type(),
-                             ContextualTypePurpose CTP = CTP_Unused) {
-      // If there is a contextual type set for this collection,
-      // let's propagate it to the candidate.
-      if (!contextualType.isNull()) {
-        auto elementType = extractElementType(contextualType);
-        // If we couldn't deduce element type for the collection, let's
-        // not attempt to solve it.
-        if (!elementType ||
-            elementType->hasError() ||
-            elementType->hasUnresolvedType())
-          return;
-
-        contextualType = elementType;
-      }
-
-      for (auto element : collectionExpr->getElements()) {
-        unsigned numOverloads = 0;
-        element->walk(OverloadSetCounter(numOverloads));
-
-        // There are no overload sets in the element; skip it.
-        if (numOverloads == 0)
-          continue;
-
-        // Record each of the collection elements, which passed
-        // number of overload sets rule, as a candidate for solving
-        // with contextual type of the collection.
-        Candidates.push_back(Candidate(CS, element, contextualType, CTP));
-      }
-    }
-  };
-
-  ExprCollector collector(expr, *this, domains);
-
-  // Collect all of the binary/unary and call sub-expressions
-  // so we can start solving them separately.
-  expr->walk(collector);
-
-  llvm::SmallSetVector<OverloadSetRefExpr *, 4> shrunkExprs;
-  for (auto &candidate : collector.Candidates) {
-    // If there are no results, let's forget everything we know about the
-    // system so far. This actually is ok, because some of the expressions
-    // might require manual salvaging.
-    if (candidate.solve(shrunkExprs)) {
-      // Let's restore all of the original OSR domains for this sub-expression,
-      // this means that we can still make forward progress with solving of the
-      // top sub-expressions.
-      candidate.getExpr()->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        if (auto OSR = dyn_cast<OverloadSetRefExpr>(childExpr)) {
-          auto domain = domains.find(OSR);
-          if (domain == domains.end())
-            return childExpr;
-
-          OSR->setDecls(domain->getSecond());
-          shrunkExprs.remove(OSR);
-        }
-
-        return childExpr;
-      });
-    }
-  }
-
-  // Once "shrinking" is done let's re-allocate final version of
-  // the candidate list to the permanent arena, so it could
-  // survive even after primary constraint system is destroyed.
-  for (auto &OSR : shrunkExprs) {
-    auto choices = OSR->getDecls();
-    auto decls =
-        getASTContext().AllocateUninitialized<ValueDecl *>(choices.size());
-
-    std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
-    OSR->setDecls(decls);
-  }
-}
-
 bool constraints::debugConstraintSolverForTarget(
     ASTContext &C, SyntacticElementTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
@@ -1456,22 +908,11 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
     }
 
     case SolutionResult::Error:
-      maybeProduceFallbackDiagnostic(target);
+      maybeProduceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
 
     case SolutionResult::TooComplex: {
-      auto affectedRange = solution.getTooComplexAt();
-
-      // If affected range is unknown, let's use whole
-      // target.
-      if (!affectedRange)
-        affectedRange = target.getSourceRange();
-
-      getASTContext()
-          .Diags.diagnose(affectedRange->Start, diag::expression_too_complex)
-          .highlight(*affectedRange);
-
-      solution.markAsDiagnosed();
+      diagnoseTooComplex(target.getLoc(), solution);
       return std::nullopt;
     }
 
@@ -1485,16 +926,6 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return std::nullopt;
-      }
-
-      if (Options.contains(
-            ConstraintSystemFlags::AllowUnresolvedTypeVariables)) {
-        dumpSolutions(solution);
-        auto ambiguousSolutions = std::move(solution).takeAmbiguousSolutions();
-        std::vector<Solution> result(
-            std::make_move_iterator(ambiguousSolutions.begin()),
-            std::make_move_iterator(ambiguousSolutions.end()));
-        return std::move(result);
       }
 
       LLVM_FALLTHROUGH;
@@ -1516,6 +947,19 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
   llvm_unreachable("Loop always returns");
 }
 
+void ConstraintSystem::diagnoseTooComplex(SourceLoc fallbackLoc,
+                                          SolutionResult &result) {
+  auto affectedRange = result.getTooComplexAt();
+
+  SourceLoc loc = (affectedRange ? affectedRange->Start : fallbackLoc);
+  auto diag = getASTContext().Diags.diagnose(loc, diag::expression_too_complex);
+
+  if (affectedRange)
+    diag.highlight(*affectedRange);
+
+  result.markAsDiagnosed();
+}
+
 SolutionResult
 ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
@@ -1533,9 +977,8 @@ ConstraintSystem::solveImpl(SyntacticElementTarget &target,
 
   assert(!solverState && "cannot be used directly");
 
-  // Set up the expression type checker timer.
   if (Expr *expr = target.getAsExpr())
-    startExpressionTimer(expr);
+    startExpression(expr);
 
   if (generateConstraints(target, allowFreeTypeVariables))
     return SolutionResult::forError();
@@ -1591,10 +1034,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
-
-  setPhase(ConstraintSystemPhase::Solving);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
@@ -1720,10 +1159,7 @@ bool ConstraintSystem::solveForCodeCompletion(
     // Tell the constraint system what the contextual type is.
     setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Set up the expression type checker timer.
-    startExpressionTimer(expr);
-
-    shrink(expr);
+    startExpression(expr);
   }
 
   if (isDebugMode()) {
@@ -1815,12 +1251,6 @@ ConstraintSystem::filterDisjunction(
     // constraint, so instead let's keep the disjunction, but disable all
     // unviable choices.
     if (choice->getOverloadChoice().isKeyPathDynamicMemberLookup()) {
-      // Early simplification of the "keypath dynamic member lookup" choice
-      // is impossible because it requires constraints associated with
-      // subscript index expression to be present.
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
-        return SolutionKind::Unsolved;
-
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
         if (currentChoice->isDisabled())
           continue;
@@ -1854,63 +1284,6 @@ ConstraintSystem::filterDisjunction(
   }
 
   return SolutionKind::Unsolved;
-}
-
-// Attempt to find a disjunction of bind constraints where all options
-// in the disjunction are binding the same type variable.
-//
-// Prefer disjunctions where the bound type variable is also the
-// right-hand side of a conversion constraint, since having a concrete
-// type that we're converting to can make it possible to split the
-// constraint system into multiple ones.
-static Constraint *selectBestBindingDisjunction(
-    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
-
-  if (disjunctions.empty())
-    return nullptr;
-
-  auto getAsTypeVar = [&cs](Type type) {
-    return cs.simplifyType(type)->getRValueType()->getAs<TypeVariableType>();
-  };
-
-  Constraint *firstBindDisjunction = nullptr;
-  for (auto *disjunction : disjunctions) {
-    auto choices = disjunction->getNestedConstraints();
-    assert(!choices.empty());
-
-    auto *choice = choices.front();
-    if (choice->getKind() != ConstraintKind::Bind)
-      continue;
-
-    // We can judge disjunction based on the single choice
-    // because all of choices (of bind overload set) should
-    // have the same left-hand side.
-    // Only do this for simple type variable bindings, not for
-    // bindings like: ($T1) -> $T2 bind String -> Int
-    auto *typeVar = getAsTypeVar(choice->getFirstType());
-    if (!typeVar)
-      continue;
-
-    if (!firstBindDisjunction)
-      firstBindDisjunction = disjunction;
-
-    auto constraints = cs.getConstraintGraph().gatherNearbyConstraints(
-        typeVar,
-        [](Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Conversion;
-        });
-
-    for (auto *constraint : constraints) {
-      if (typeVar == getAsTypeVar(constraint->getSecondType()))
-        return disjunction;
-    }
-  }
-
-  // If we had any binding disjunctions, return the first of
-  // those. These ensure that we attempt to bind types earlier than
-  // trying the elements of other disjunctions, which can often mean
-  // we fail faster.
-  return firstBindDisjunction;
 }
 
 std::optional<std::pair<Constraint *, unsigned>>
@@ -2017,6 +1390,27 @@ tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
       return nullptr;
   }
 
+  // Don't attempt this optimization if call has number literals.
+  // This is intended to narrowly fix situations like:
+  //
+  // func test<T: FloatingPoint>(_: T) { ... }
+  // func test<T: Numeric>(_: T) { ... }
+  //
+  // test(42)
+  //
+  // The call should use `<T: Numeric>` overload even though the
+  // `<T: FloatingPoint>` is a more specialized version because
+  // selecting `<T: Numeric>` doesn't introduce non-default literal
+  // types.
+  if (auto *argFnType = cs.getAppliedDisjunctionArgumentFunction(disjunction)) {
+    if (llvm::any_of(
+            argFnType->getParams(), [](const AnyFunctionType::Param &param) {
+              auto *typeVar = param.getPlainType()->getAs<TypeVariableType>();
+              return typeVar && typeVar->getImpl().isNumberLiteralType();
+            }))
+      return nullptr;
+  }
+
   llvm::SmallVector<Constraint *, 4> choices;
   for (auto *choice : constraints) {
     if (choices.size() > 2)
@@ -2045,7 +1439,7 @@ tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
     assert(decl);
 
     auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->isGeneric())
+    if (!AFD || !AFD->hasGenericParamList())
       return false;
 
     if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
@@ -2293,6 +1687,8 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   // end of the partitioning.
   SmallVector<unsigned, 4> favored;
   SmallVector<unsigned, 4> everythingElse;
+  // Disfavored choices are part of `everythingElse` but introduced at the end.
+  SmallVector<unsigned, 4> disfavored;
   SmallVector<unsigned, 4> simdOperators;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
@@ -2323,6 +1719,11 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     if (auto *decl = getOverloadChoiceDecl(constraint)) {
       if (isa<VarDecl>(decl)) {
         everythingElse.push_back(index);
+        return true;
+      }
+
+      if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
+        disfavored.push_back(index);
         return true;
       }
     }
@@ -2368,6 +1769,9 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     return true;
   });
 
+  // Introduce disfavored choices at the end.
+  everythingElse.append(disfavored);
+
   // Local function to create the next partition based on the options
   // passed in.
   PartitionAppendCallback appendPartition =
@@ -2385,61 +1789,6 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   appendPartition(disabled);
 
   assert(Ordering.size() == Choices.size());
-}
-
-Constraint *ConstraintSystem::selectDisjunction() {
-  SmallVector<Constraint *, 4> disjunctions;
-
-  collectDisjunctions(disjunctions);
-  if (disjunctions.empty())
-    return nullptr;
-
-  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return disjunction;
-
-  // Pick the disjunction with the smallest number of favored, then active choices.
-  auto cs = this;
-  auto minDisjunction = std::min_element(disjunctions.begin(), disjunctions.end(),
-      [&](Constraint *first, Constraint *second) -> bool {
-        unsigned firstActive = first->countActiveNestedConstraints();
-        unsigned secondActive = second->countActiveNestedConstraints();
-        unsigned firstFavored = first->countFavoredNestedConstraints();
-        unsigned secondFavored = second->countFavoredNestedConstraints();
-
-        if (!isOperatorDisjunction(first) || !isOperatorDisjunction(second))
-          return firstActive < secondActive;
-
-        if (firstFavored == secondFavored) {
-          // Look for additional choices that are "favored"
-          SmallVector<unsigned, 4> firstExisting;
-          SmallVector<unsigned, 4> secondExisting;
-
-          existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
-          firstFavored += firstExisting.size();
-          existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
-          secondFavored += secondExisting.size();
-        }
-
-        // Everything else equal, choose the disjunction with the greatest
-        // number of resolved argument types. The number of resolved argument
-        // types is always zero for disjunctions that don't represent applied
-        // overloads.
-        if (firstFavored == secondFavored) {
-          if (firstActive != secondActive)
-            return firstActive < secondActive;
-
-          return (first->countResolvedArgumentTypes(*this) > second->countResolvedArgumentTypes(*this));
-        }
-
-        firstFavored = firstFavored ? firstFavored : firstActive;
-        secondFavored = secondFavored ? secondFavored : secondActive;
-        return firstFavored < secondFavored;
-      });
-
-  if (minDisjunction != disjunctions.end())
-    return *minDisjunction;
-
-  return nullptr;
 }
 
 Constraint *ConstraintSystem::selectConjunction() {
@@ -2560,8 +1909,8 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     conversionType = bindings.Bindings[0].BindingType;
   } else {
     for (const auto &literal : bindings.Literals) {
-      if (literal.second.viableAsBinding()) {
-        conversionType = literal.second.getDefaultType();
+      if (literal.viableAsBinding()) {
+        conversionType = literal.getDefaultType();
         break;
       }
     }

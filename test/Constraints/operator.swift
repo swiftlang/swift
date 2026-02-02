@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // https://github.com/apple/swift/issues/43735
 // Test constraint simplification of chains of binary operators.
@@ -285,7 +285,7 @@ func rdar60727310() {
 // FIXME: Bad diagnostic.
 func f_54877(_ e: Error) {
   func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
-  foo(e, ==) // expected-error {{type of expression is ambiguous without a type annotation}}
+  foo(e, ==) // expected-error {{failed to produce diagnostic for expression}}
 }
 
 // rdar://problem/62054241 - Swift compiler crashes when passing < as the sort function in sorted(by:) and the type of the array is not comparable
@@ -329,4 +329,67 @@ enum I60954 {
     // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
   init?<S>(_ string: S) where S: StringProtocol {} // expected-note{{where 'S' = 'I60954'}}
+}
+
+infix operator <<<>>> : DefaultPrecedence
+
+protocol P5 {
+}
+
+struct Expr : P6 {}
+
+protocol P6: P5 {
+}
+
+extension P6 {
+  public static func <<<>>> (lhs: Self, rhs: (any P5)?) -> Expr { Expr() }
+  public static func <<<>>> (lhs: (any P5)?, rhs: Self) -> Expr { Expr() }
+  public static func <<<>>> (lhs: Self, rhs: some P6) -> Expr { Expr() }
+
+  public static prefix func ! (value: Self) -> Expr {
+    Expr()
+  }
+}
+
+extension P6 {
+  public static func != (lhs: Self, rhs: some P6) -> Expr {
+    !(lhs <<<>>> rhs) // Ok
+  }
+}
+
+do {
+  struct Value : P6 {
+  }
+
+  struct Column: P6 {
+  }
+
+  func test(col: Column, val: Value) -> Expr {
+    col <<<>>> val // Ok
+  }
+
+  func test(col: Column, val: some P6) -> Expr {
+    col <<<>>> val // Ok
+  }
+
+  func test(col: some P6, val: Value) -> Expr {
+    col <<<>>> val // Ok
+  }
+}
+
+// Make sure that ?? selects an overload that doesn't produce an optional.
+do {
+  class Obj {
+    var x: String!
+  }
+
+  class Child : Obj {
+    func x() -> String? { nil }
+    static func x(_: Int) -> String { "" }
+  }
+
+  func test(arr: [Child], v: String, defaultV: Child) -> Child {
+    let result = arr.first { $0.x == v } ?? defaultV
+    return result // Ok
+  }
 }

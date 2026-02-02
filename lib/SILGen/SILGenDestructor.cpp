@@ -48,7 +48,7 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
   auto finishBB = createBasicBlock("finishDeinitBB");
   auto localBB = createBasicBlock("localActorDeinitBB");
 
-  auto selfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
+  auto selfTy = F.mapTypeIntoEnvironment(cd->getDeclaredInterfaceType());
   emitDistributedIfRemoteBranch(SILLocation(loc), selfValue, selfTy,
                                 /*if remote=*/remoteBB, /*if local=*/localBB);
 
@@ -57,8 +57,6 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
     B.emitBlock(remoteBB);
 
     auto cleanupLoc = CleanupLocation(loc);
-
-    auto &C = cd->getASTContext();
 
     {
       FullExpr CleanupScope(Cleanups, cleanupLoc);
@@ -74,10 +72,8 @@ void SILGenFunction::emitDistributedRemoteActorDeinit(
           continue;
 
         // Just to double-check, we only want to destroy `id` and `actorSystem`
-        if (vd->getBaseIdentifier() == C.Id_id ||
-            vd->getBaseIdentifier() == C.Id_actorSystem) {
+        if (vd->isSpecialDistributedActorProperty())
           destroyClassMember(cleanupLoc, borrowedSelf, vd);
-        }
       }
 
       if (cd->isRootDefaultActor()) {
@@ -164,7 +160,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   SILType classTy = selfValue->getType();
   if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
     Type superclassTy =
-      dd->mapTypeIntoContext(cd->getSuperclass());
+      dd->mapTypeIntoEnvironment(cd->getSuperclass());
     ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =
@@ -339,6 +335,17 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
   B.createReturn(loc, emitEmptyTuple(loc));
 }
 
+/// Determine whether the availability for the body the given destructor predates the introduction of
+/// support for isolated deinit.
+static bool availabilityPredatesIsolatedDeinit(DestructorDecl *dd) {
+  ASTContext &ctx = dd->getASTContext();
+  if (ctx.LangOpts.DisableAvailabilityChecking)
+    return false;
+
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return !deploymentAvailability.isContainedIn(ctx.getIsolatedDeinitAvailability());
+}
+
 void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
   MagicFunctionName = DeclName(SGM.M.getASTContext().getIdentifier("deinit"));
 
@@ -372,8 +379,15 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
       executor = B.createExtractExecutor(loc, actor);
     }
 
+    // Determine whether we need the main-actor back-deployment version of
+    // this function.
+    bool useMainActorBackDeploy =
+      ai.isMainActor() && availabilityPredatesIsolatedDeinit(dd);
+
     // Get deinitOnExecutor
-    FuncDecl *swiftDeinitOnExecutorDecl = SGM.getDeinitOnExecutor();
+    FuncDecl *swiftDeinitOnExecutorDecl =
+        useMainActorBackDeploy ? SGM.getDeinitOnExecutorMainActorBackDeploy()
+                               : SGM.getDeinitOnExecutor();
     if (!swiftDeinitOnExecutorDecl) {
       dd->diagnose(diag::missing_deinit_on_executor_function);
       return;
@@ -415,7 +429,8 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
         B.createIntegerLiteral(loc, wordTy, 0);
 
     // Schedule isolated execution
-    B.createApply(loc, swiftDeinitOnExecutorFunc, {},
+    B.createApply(loc, swiftDeinitOnExecutorFunc,
+                  getForwardingSubstitutionMap(),
                   {castedSelf, castedDeallocator, executor, flagsInst});
   });
 }
@@ -512,7 +527,7 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
                                                    ClassDecl *cd,
                                                    VarDecl *recursiveLink,
                                                    CleanupLocation cleanupLoc) {
-  auto selfTy = F.mapTypeIntoContext(cd->getDeclaredInterfaceType());
+  auto selfTy = F.mapTypeIntoEnvironment(cd->getDeclaredInterfaceType());
 
   auto selfTyLowered = getTypeLowering(selfTy).getLoweredType();
 
@@ -525,7 +540,7 @@ void SILGenFunction::emitRecursiveChainDestruction(ManagedValue selfValue,
 
   // var iter = self.link
   // self.link = nil
-  auto Ty = getTypeLowering(F.mapTypeIntoContext(recursiveLink->getInterfaceType())).getLoweredType();
+  auto Ty = getTypeLowering(F.mapTypeIntoEnvironment(recursiveLink->getInterfaceType())).getLoweredType();
   auto optionalNone = B.createOptionalNone(cleanupLoc, Ty);
   SILValue varAddr =
     B.createRefElementAddr(cleanupLoc, selfValue.getValue(), recursiveLink,
@@ -751,7 +766,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // instance variables before the object is actually deallocated.
 
   // Form a reference to the superclass -dealloc.
-  Type superclassTy = dd->mapTypeIntoContext(cd->getSuperclass());
+  Type superclassTy = dd->mapTypeIntoEnvironment(cd->getSuperclass());
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
   auto superclassDtorDecl = superclass->getDestructor();

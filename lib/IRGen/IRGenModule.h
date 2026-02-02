@@ -228,6 +228,10 @@ private:
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
 
+  // Stores the IGM from which a global variable is referenced the first time.
+  // It is used if a global variable has no source-file association.
+  llvm::DenseMap<SILGlobalVariable *, IRGenModule *> DefaultIGMForGlobalVariable;
+
   // The IGMs where specializations of functions are emitted. The key is the
   // non-specialized function.
   // Storing all specializations of a function in the same IGM increases the
@@ -327,6 +331,13 @@ private:
   /// The queue of SIL functions to emit.
   llvm::SmallVector<SILFunction *, 4> LazyFunctionDefinitions;
 
+  /// SIL global variables that have already been lazily emitted, or are
+  /// queued up.
+  llvm::SmallPtrSet<SILGlobalVariable *, 4> LazilyEmittedGlobalVariables;
+
+  /// The queue of SIL global variables to emit.
+  llvm::SmallVector<SILGlobalVariable *, 4> LazyGlobalVariables;
+
   /// Witness tables that have already been lazily emitted, or are queued up.
   llvm::SmallPtrSet<SILWitnessTable *, 4> LazilyEmittedWitnessTables;
 
@@ -338,8 +349,9 @@ private:
   llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
 
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
+  llvm::SmallVector<CanType, 4> LazySpecializedValueMetadata;
 
-  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedMetadata;
 
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
@@ -351,12 +363,16 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
+
+  /// ObjectStore for MCCAS backend if used.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
   
   std::atomic<int> QueueIndex;
   
   friend class CurrentIGMPtr;
 public:
-  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module,
+                       std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();
@@ -387,6 +403,12 @@ public:
   /// be determined, returns the IGM from which the function is referenced the
   /// first time.
   IRGenModule *getGenModule(SILFunction *f);
+
+  /// Get an IRGenModule for a global variable.
+  /// Returns the IRGenModule of the containing source file, or if this cannot
+  /// be determined, returns the IGM from which the global variable is
+  /// referenced the first time.
+  IRGenModule *getGenModule(SILGlobalVariable *v);
 
   /// Returns the primary IRGenModule. This is the first added IRGenModule.
   /// It is used for everything which cannot be correlated to a specific source
@@ -454,6 +476,8 @@ public:
 
   void addLazyFunction(SILFunction *f);
 
+  void addLazyGlobalVariable(SILGlobalVariable *v);
+
   void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
 
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
@@ -490,6 +514,7 @@ public:
 
   void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
+  void noteUseOfSpecializedValueMetadata(CanType valueType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
@@ -650,6 +675,18 @@ public:
                                            llvm::Constant *address);
 };
 
+enum class CStringSectionType {
+  Default,
+  ObjCClassName,
+  ObjCMethodName,
+  ObjCMethodType,
+  OSLogString,
+  // Place all new section types above this line
+  NumTypes,
+  // Place all alias below this line
+  ObjCPropertyName = ObjCMethodName,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -674,6 +711,7 @@ public:
   SILModuleConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
   ModuleDecl *ClangImporterModule = nullptr;
+  std::unique_ptr<llvm::raw_fd_ostream> RemarkStream;
 
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
@@ -703,14 +741,11 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
-  llvm::PointerType *PtrTy;            /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
   llvm::IntegerType *Int32Ty;          /// i32
-  llvm::PointerType *Int32PtrTy;       /// i32 *
   llvm::IntegerType *RelativeAddressTy;
-  llvm::PointerType *RelativeAddressPtrTy;
   llvm::IntegerType *Int64Ty;          /// i64
   union {
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
@@ -721,31 +756,74 @@ public:
     llvm::IntegerType *ProtocolDescriptorRefTy;
   };
   llvm::IntegerType *ObjCBoolTy;       /// i8 or i1
+
   union {
-    llvm::PointerType *Int8PtrTy;      /// i8*
-    llvm::PointerType *WitnessTableTy;
-    llvm::PointerType *ObjCSELTy;
-    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *PtrTy; /// ptr
+
+    llvm::PointerType *BridgeObjectPtrTy; /// %swift.bridge*
     llvm::PointerType *CaptureDescriptorPtrTy;
-  };
-  union {
+    llvm::PointerType *ContinuationAsyncContextPtrTy;
+    llvm::PointerType *CoroAllocationTy;
+    llvm::PointerType *CoroAllocatorPtrTy;
+    llvm::PointerType *CoroFunctionPointerPtrTy;
+    llvm::PointerType *DynamicReplacementLinkEntryPtrTy; /// %link_entry*
+    llvm::PointerType *DynamicReplacementsPtrTy;         /// { i8**, i8* }*
+    llvm::PointerType *ErrorPtrTy;                       /// %swift.error*
+    llvm::PointerType *FieldDescriptorPtrTy;
+    llvm::PointerType *FieldDescriptorPtrPtrTy;
+    llvm::PointerType *FullBoxMetadataPtrTy;  /// %swift.full_boxmetadata*
+    llvm::PointerType *FullHeapMetadataPtrTy; /// %swift.full_heapmetadata*
+    llvm::PointerType *FullTypeMetadataPtrTy; /// %swift.full_type*
+    llvm::PointerType *FunctionPtrTy;
+    llvm::PointerType *Int8PtrTy;      /// i8*
     llvm::PointerType *Int8PtrPtrTy;   /// i8**
+    llvm::PointerType *Int32PtrTy;     /// i32 *
+    llvm::PointerType *ObjCBlockPtrTy; /// %objc_block*
+    llvm::PointerType *ObjCClassPtrTy; /// %objc_class*
+    llvm::PointerType *ObjCPtrTy;      /// %objc_object*
+    llvm::PointerType *ObjCSELTy;
+    llvm::PointerType *ObjCSuperPtrTy; /// %objc_super*
+    llvm::PointerType *OpaquePtrTy;    /// %swift.opaque*
+    llvm::PointerType *OpaqueTypeDescriptorPtrTy;
+    llvm::PointerType
+        *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
+    llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
+    llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
+    llvm::PointerType *ProtocolRecordPtrTy;
+    llvm::PointerType *RelativeAddressPtrTy;
+    llvm::PointerType *RefCountedPtrTy; /// %swift.refcounted*
+#define CHECKED_REF_STORAGE(Name, ...)                                         \
+  llvm::PointerType *Name##ReferencePtrTy; /// %swift. #name _reference*
+#include "swift/AST/ReferenceStorage.def"
+    llvm::PointerType *SwiftAsyncLetPtrTy;
+    llvm::PointerType *SwiftContextPtrTy;
+    llvm::PointerType *SwiftJobPtrTy;
+    llvm::PointerType *SwiftTaskGroupPtrTy;
+    llvm::PointerType *SwiftTaskOptionRecordPtrTy;
+    llvm::PointerType *SwiftTaskPtrTy;
+    llvm::PointerType *AsyncFunctionPointerPtrTy;
+    llvm::PointerType *TaskContinuationFunctionPtrTy;
+    llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
+    llvm::PointerType *TypeContextDescriptorPtrTy;
+    llvm::PointerType *TypeMetadataPtrTy;    /// %swift.type*
+    llvm::PointerType *TypeMetadataPtrPtrTy; /// %swift.type**
+    llvm::PointerType *TypeMetadataRecordPtrTy;
+    llvm::PointerType *UnknownRefCountedPtrTy;
     llvm::PointerType *WitnessTablePtrTy;
+    llvm::PointerType *WitnessTablePtrPtrTy; /// i8***
+    llvm::PointerType *WitnessTableTy;
   };
+
   llvm::StructType *RefCountedStructTy;/// %swift.refcounted = type { ... }
   Size RefCountedStructSize;           /// sizeof(%swift.refcounted)
-  llvm::PointerType *RefCountedPtrTy;  /// %swift.refcounted*
 #define CHECKED_REF_STORAGE(Name, ...)                                         \
-  llvm::StructType *Name##ReferenceStructTy;                                   \
-  llvm::PointerType *Name##ReferencePtrTy; /// %swift. #name _reference*
+  llvm::StructType *Name##ReferenceStructTy; /// %swift. #name _reference
 #include "swift/AST/ReferenceStorage.def"
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
   llvm::StructType *NoEscapeFunctionPairTy;    /// { i8*, %swift.opaque* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
-  llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
-  llvm::PointerType *TypeMetadataPtrPtrTy; /// %swift.type**
   union {
     llvm::StructType *TypeMetadataResponseTy;   /// { %swift.type*, iSize }
     llvm::StructType *TypeMetadataDependencyTy; /// { %swift.type*, iSize }
@@ -754,63 +832,37 @@ public:
   llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
   llvm::StructType *TypeLayoutTy;  /// %swift.type_layout = { ... }
   llvm::StructType *TupleTypeMetadataTy;     /// %swift.tuple_type
-  llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
-  llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
   llvm::StructType *FullBoxMetadataStructTy; /// %swift.full_boxmetadata = type { ... }
-  llvm::PointerType *FullBoxMetadataPtrTy;/// %swift.full_boxmetadata*
+  llvm::StructType *EmbeddedExistentialsMetadataStructTy;
   llvm::StructType *FullTypeMetadataStructTy; /// %swift.full_type = type { ... }
   llvm::StructType *FullExistentialTypeMetadataStructTy; /// %swift.full_existential_type = type { ... }
-  llvm::PointerType *FullTypeMetadataPtrTy;/// %swift.full_type*
   llvm::StructType *FullForeignTypeMetadataStructTy; /// %swift.full_foreign_type = type { ... }
   llvm::StructType *ProtocolDescriptorStructTy; /// %swift.protocol = type { ... }
-  llvm::PointerType *ProtocolDescriptorPtrTy; /// %swift.protocol*
   llvm::StructType *ProtocolRequirementStructTy; /// %swift.protocol_requirement
-  union {
-    llvm::PointerType *ObjCPtrTy;      /// %objc_object*
-    llvm::PointerType *UnknownRefCountedPtrTy;
-  };
-  llvm::PointerType *BridgeObjectPtrTy;/// %swift.bridge*
   llvm::StructType *OpaqueTy;          /// %swift.opaque
-  llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::StructType *ObjCClassStructTy; /// %objc_class
-  llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
   llvm::StructType *ObjCSuperStructTy; /// %objc_super
-  llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
   llvm::StructType *ObjCBlockStructTy; /// %objc_block
-  llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::FunctionType *ObjCUpdateCallbackTy;
   llvm::StructType *ObjCFullResilientClassStubTy;   /// %objc_full_class_stub
   llvm::StructType *ObjCResilientClassStubTy;   /// %objc_class_stub
   llvm::StructType *ProtocolRecordTy;
-  llvm::PointerType *ProtocolRecordPtrTy;
   llvm::StructType *ProtocolConformanceDescriptorTy;
-  llvm::PointerType *ProtocolConformanceDescriptorPtrTy;
   llvm::StructType *TypeContextDescriptorTy;
-  llvm::PointerType *TypeContextDescriptorPtrTy;
   llvm::StructType *ClassContextDescriptorTy;
   llvm::StructType *MethodDescriptorStructTy; /// %swift.method_descriptor
   llvm::StructType *MethodOverrideDescriptorStructTy; /// %swift.method_override_descriptor
   llvm::StructType *MethodDefaultOverrideDescriptorStructTy; /// %swift.method_default_override_descriptor
   llvm::StructType *TypeMetadataRecordTy;
-  llvm::PointerType *TypeMetadataRecordPtrTy;
   llvm::StructType *FieldDescriptorTy;
-  llvm::PointerType *FieldDescriptorPtrTy;
-  llvm::PointerType *FieldDescriptorPtrPtrTy;
-  llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
-  llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
-  llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
   llvm::StructType *OpaqueTypeDescriptorTy;
-  llvm::PointerType *OpaqueTypeDescriptorPtrTy;
   llvm::Type *FloatTy;
   llvm::Type *DoubleTy;
   llvm::StructType *DynamicReplacementsTy; // { i8**, i8* }
-  llvm::PointerType *DynamicReplacementsPtrTy;
 
   llvm::StructType *DynamicReplacementLinkEntryTy; // %link_entry = { i8*, %link_entry*}
-  llvm::PointerType
-      *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::StructType *AccessibleFunctionRecordTy; // { i32*, i32*, i32*, i32}
@@ -821,12 +873,6 @@ public:
   llvm::StructType *SwiftTaskTy;
   llvm::StructType *SwiftJobTy;
   llvm::StructType *SwiftExecutorTy;
-  llvm::PointerType *AsyncFunctionPointerPtrTy;
-  llvm::PointerType *SwiftContextPtrTy;
-  llvm::PointerType *SwiftTaskPtrTy;
-  llvm::PointerType *SwiftAsyncLetPtrTy;
-  llvm::PointerType *SwiftTaskOptionRecordPtrTy;
-  llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialSerialExecutorTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
@@ -834,26 +880,22 @@ public:
   llvm::StructType  *SwiftInitialTaskExecutorOwnedPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftInitialTaskNameTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
-  llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
   llvm::IntegerType *ExecutorSecondTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
-  llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
   llvm::StructType *ContinuationAsyncContextTy;
-  llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *ClassMetadataBaseOffsetTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
   // clang-format on
 
-  llvm::StructType *CoroFunctionPointerTy; // { i32, i32 }
-  llvm::PointerType *CoroFunctionPointerPtrTy;
-  llvm::PointerType *CoroAllocationTy;
+  llvm::StructType *CoroFunctionPointerTy; // { i32, i32, i64 }
   llvm::FunctionType *CoroAllocateFnTy;
   llvm::FunctionType *CoroDeallocateFnTy;
   llvm::IntegerType *CoroAllocatorFlagsTy;
   llvm::StructType *CoroAllocatorTy;
-  llvm::PointerType *CoroAllocatorPtrTy;
+
+  llvm::StructType *SwiftImplicitActorType; // { %swift.refcounted, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -886,6 +928,7 @@ public:
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
   llvm::CallingConv::ID SwiftCoroCC;   /// swift calling convention for callee-allocated coroutines
+  llvm::CallingConv::ID SwiftDirectRR_CC; /// swift direct retain/release calling convention
 
   /// What kind of tail call should be used for async->async calls.
   llvm::CallInst::TailCallKind AsyncTailCallKind;
@@ -929,6 +972,8 @@ public:
 
   llvm::Type *getReferenceType(ReferenceCounting style);
 
+  llvm::PointerType *getOpaquePointerType(unsigned AddressSpace) const;
+
   static bool isLoadableReferenceAddressOnly(ReferenceCounting style) {
     switch (style) {
     case ReferenceCounting::Native:
@@ -968,7 +1013,6 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
-  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getExistentialType(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
@@ -977,8 +1021,6 @@ public:
 
   llvm::StructType *getValueWitnessTableTy();
   llvm::StructType *getEnumValueWitnessTableTy();
-  llvm::PointerType *getValueWitnessTablePtrTy();
-  llvm::PointerType *getEnumValueWitnessTablePtrTy();
 
   llvm::IntegerType *getTypeMetadataRequestParamTy();
   llvm::StructType *getTypeMetadataResponseTy();
@@ -1074,6 +1116,12 @@ public:
   SILType getLoweredType(AbstractionPattern orig, Type subst) const;
   SILType getLoweredType(Type subst) const;
   const Lowering::TypeLowering &getTypeLowering(SILType type) const;
+  SILTypeProperties getTypeProperties(SILType type) const;
+  SILTypeProperties getTypeProperties(SILType type,
+                                      TypeExpansionContext forExpansion) const;
+  SILTypeProperties getTypeProperties(AbstractionPattern origType,
+                                      Type substType,
+                                      TypeExpansionContext forExpansion) const;
   bool isTypeABIAccessible(SILType type) const;
 
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
@@ -1093,6 +1141,7 @@ public:
   const LoadableTypeInfo &
   getReferenceObjectTypeInfo(ReferenceCounting refcounting);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
@@ -1100,9 +1149,6 @@ public:
   llvm::Type *getStorageTypeForUnlowered(Type T);
   llvm::Type *getStorageTypeForLowered(CanType T);
   llvm::Type *getStorageType(SILType T);
-  llvm::PointerType *getStoragePointerTypeForUnlowered(Type T);
-  llvm::PointerType *getStoragePointerTypeForLowered(CanType T);
-  llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(CanType type);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   clang::CanQual<clang::Type> getClangType(CanType type);
@@ -1124,10 +1170,9 @@ public:
   CanType getRuntimeReifiedType(CanType type);
   Type substOpaqueTypesWithUnderlyingTypes(Type type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
-  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
-  std::pair<CanType, ProtocolConformanceRef>
-  substOpaqueTypesWithUnderlyingTypes(CanType type,
-                                      ProtocolConformanceRef conformance);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  ProtocolConformanceRef
+  substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion,
                    ClassDecl *asViewedFromRootClass = nullptr);
@@ -1158,7 +1203,7 @@ public:
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
 
-  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
+  bool isWellKnownBuiltinOrStructuralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -1180,9 +1225,10 @@ public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
       StringRef Str, bool willBeRelativelyAddressed = false,
       StringRef sectionName = "", StringRef name = "");
-  llvm::Constant *getAddrOfGlobalString(StringRef utf8,
-                                        bool willBeRelativelyAddressed = false,
-                                        bool useOSLogSection = false);
+  llvm::Constant *getAddrOfGlobalString(
+      StringRef utf8,
+      CStringSectionType sectionType = CStringSectionType::Default,
+      bool willBeRelativelyAddressed = false);
   llvm::Constant *getAddrOfGlobalUTF16String(StringRef utf8);
   llvm::Constant *
   getAddrOfGlobalIdentifierString(StringRef utf8,
@@ -1306,10 +1352,11 @@ private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalStrings;
-  llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
-    GlobalOSLogStrings;
+  // Maps sectionName -> string data -> constant
+  std::array<
+      llvm::StringMap<std::pair<llvm::GlobalVariable *, llvm::Constant *>>,
+      static_cast<size_t>(CStringSectionType::NumTypes)>
+      GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>>
     StringsForTypeRef;
@@ -1403,8 +1450,14 @@ private:
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
 
+  /// Captures a static object layout.
+  struct StaticObjectLayout {
+    std::unique_ptr<StructLayout> layout;
+    llvm::StructType *containerTy = nullptr;
+  };
+
   /// A cache for layouts of statically initialized objects.
-  llvm::DenseMap<SILGlobalVariable *, std::unique_ptr<StructLayout>>
+  llvm::DenseMap<SILGlobalVariable *, StaticObjectLayout>
     StaticObjectLayouts;
 
   /// A mapping from order numbers to the LLVM functions which we
@@ -1514,6 +1567,15 @@ public:
   const char *getReflectionTypeRefSectionName();
   const char *getMultiPayloadEnumDescriptorSectionName();
 
+  static constexpr const char ObjCClassNameSectionName[] =
+      "__TEXT,__objc_classname,cstring_literals";
+  static constexpr const char ObjCMethodNameSectionName[] =
+      "__TEXT,__objc_methname,cstring_literals";
+  static constexpr const char ObjCMethodTypeSectionName[] =
+      "__TEXT,__objc_methtype,cstring_literals";
+  static constexpr const char OSLogStringSectionName[] =
+      "__TEXT,__oslogstring,cstring_literals";
+
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
   llvm::ArrayRef<CanType> getOrCreateSpecialStlibBuiltinTypes();
@@ -1619,6 +1681,8 @@ public:
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
+  llvm::ConstantInt *getMallocTypeId(llvm::Function *fn);
+
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
   void emitStructDecl(StructDecl *D);
@@ -1661,7 +1725,7 @@ public:
   llvm::ConstantInt *getInt32(uint32_t value);
   llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
-  llvm::Constant *getBool(bool condition);
+  llvm::ConstantInt *getBool(bool condition);
 
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
@@ -1679,6 +1743,7 @@ public:
   SILFunction *getSILFunctionForCoroFunctionPointer(llvm::Constant *cfp);
 
   llvm::Constant *getAddrOfGlobalCoroMallocAllocator();
+  llvm::Constant *getAddrOfGlobalCoroTypedMallocAllocator();
   llvm::Constant *getAddrOfGlobalCoroAsyncTaskAllocator();
 
   llvm::Function *getAddrOfDispatchThunk(SILDeclRef declRef,
@@ -1870,7 +1935,8 @@ public:
 
   void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
 
-  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
+  llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType,
+                                                 CanGenericSignature sig);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
                                      ForDefinition_t forDefinition);
@@ -1994,6 +2060,8 @@ public:
 
   /// Returns true if the given Clang function does not throw exceptions.
   bool isCxxNoThrow(clang::FunctionDecl *fd, bool defaultNoThrow = false);
+
+  bool isEmbeddedWithExistentials() const;
 
 private:
   llvm::Constant *

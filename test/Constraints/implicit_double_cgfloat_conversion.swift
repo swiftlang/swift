@@ -337,19 +337,6 @@ func test_implicit_conversion_clash_with_partial_application_check() {
   }
 }
 
-// rdar://99352676
-// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF : $@convention(thin) () -> () {
-func test_init_validation() {
-  class Foo {
-    static let bar = 100.0
-
-    func getBar() -> CGFloat? {
-      return Self.bar
-      // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
-    }
-  }
-}
-
 func test_ternary_and_nil_coalescing() {
   func test(_: Double?) {}
 
@@ -359,5 +346,61 @@ func test_ternary_and_nil_coalescing() {
 
   func test_nil_coalescing(v: CGFloat?) {
     test(v ?? 0.0) // Ok
+  }
+}
+
+do {
+  struct G<T> {
+    init(_: T) {}
+  }
+
+  func round(_: Double) -> Double {}
+  func round<T: FloatingPoint>(_: T) -> T {}
+
+  func test_cgfloat_over_double(withColors colors: Int, size: CGSize) -> G<CGFloat> {
+    let g = G(1.0 / CGFloat(colors))
+    return g // Ok
+  }
+
+  func test_no_ambiguity(width: Int, height: Int) -> CGFloat {
+    let v = round(CGFloat(width / height) * 10) / 10.0
+    return v // Ok
+  }
+}
+
+func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
+  // Make sure that @autoclosure thunk calls CGFloat./ and not Double./
+  // CHECK-LABEL: sil private [transparent] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
+  // CHECK: [[CGFLOAT_DIV_OP:%.*]] = function_ref @$s12CoreGraphics7CGFloatV34implicit_double_cgfloat_conversionE1doiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
+  // CHECK-NEXT: {{.*}} = apply [[CGFLOAT_DIV_OP]]({{.*}}, %2) : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
+  let ratio = v ?? (2.0 / 16.0)
+  let _: CGFloat = ratio // Ok
+}
+
+// Make sure that optimizer doesn't favor CGFloat -> Double conversion
+// in presence of CGFloat initializer, otherwise it could lead to ambiguities.
+func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
+  func test(_: CGFloat) -> CGFloat { 0 }
+  func test(_: Double) -> Double { 0 }
+
+  func hasCGFloatElement<C: Collection>(_: C) where C.Element == CGFloat {}
+
+  let arr = [test(CGFloat(v))]
+  hasCGFloatElement(arr) // Ok
+
+  var total = 0.0 // This is Double by default
+  total += test(CGFloat(v)) + CGFloat(v) // Ok
+}
+
+// rdar://99352676
+// CHECK-LABEL: sil private [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF3FooL_C6getBar12CoreGraphics7CGFloatVSgyF : $@convention(method) (@guaranteed Foo) -> Optional<CGFloat>
+func test_init_validation() {
+  class Foo {
+    static let bar = 100.0
+
+    func getBar() -> CGFloat? {
+      return Self.bar
+      // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
+    }
   }
 }

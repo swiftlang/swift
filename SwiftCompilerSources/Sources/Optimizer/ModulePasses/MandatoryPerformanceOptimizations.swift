@@ -40,23 +40,21 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
+
+  // It's not required to set the perf_constraint flag on all functions in embedded mode.
+  // Embedded mode already implies that flag.
+  if !moduleContext.options.enableEmbeddedSwift {
+    setPerformanceConstraintFlags(moduleContext)
+  }
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
                                       _ moduleContext: ModulePassContext) {
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
-      if !context.loadFunction(function: f, loadCalleesRecursively: true) {
-        return
+      if context.loadFunction(function: f, loadCalleesRecursively: true) {
+        optimize(function: f, context, moduleContext, &worklist)
       }
-
-      // It's not required to set the perf_constraint flag on all functions in embedded mode.
-      // Embedded mode already implies that flag.
-      if !moduleContext.options.enableEmbeddedSwift {
-        f.set(isPerformanceConstraint: true, context)
-      }
-
-      optimize(function: f, context, moduleContext, &worklist)
     }
 
     // Generic specialization takes care of removing metatype arguments of generic functions.
@@ -64,6 +62,17 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
     // We need handle this case with a function signature optimization.
     removeMetatypeArgumentsInCallees(of: f, moduleContext)
 
+    worklist.addCallees(of: f, moduleContext)
+  }
+}
+
+private func setPerformanceConstraintFlags(_ moduleContext: ModulePassContext) {
+  var worklist = FunctionWorklist()
+  for f in moduleContext.functions where f.performanceConstraints != .none && f.isDefinition {
+    worklist.pushIfNotVisited(f)
+  }
+  while let f = worklist.pop() {
+    moduleContext.transform(function: f) { f.set(isPerformanceConstraint: true, $0) }
     worklist.addCallees(of: f, moduleContext)
   }
 }
@@ -108,7 +117,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           }
         }
       case let metatype as MetatypeInst:
-        if context.options.enableEmbeddedSwift {
+        if context.options.enableEmbeddedSwift,
+           metatype.type.representationOfMetatype == .thick {
           let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
           if instanceType.isClass {
             specializeVTable(forClassType: instanceType, errorLocation: metatype.location, moduleContext) {
@@ -128,9 +138,16 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       case let initExRef as InitExistentialRefInst:
         if context.options.enableEmbeddedSwift {
           for c in initExRef.conformances where c.isConcrete {
-            specializeWitnessTable(for: c, moduleContext) {
-              worklist.addWitnessMethods(of: $0)
-            }
+            specializeWitnessTable(for: c, moduleContext)
+            worklist.addWitnessMethods(of: c, moduleContext)
+          }
+        }
+
+      case let initExAddr as InitExistentialAddrInst:
+        if context.options.enableEmbeddedSwift {
+          for c in initExAddr.conformances where c.isConcrete && !c.protocol.isMarkerProtocol {
+            specializeWitnessTable(for: c, moduleContext)
+            worklist.addWitnessMethods(of: c, moduleContext)
           }
         }
 
@@ -139,14 +156,18 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         case .BuildOrdinaryTaskExecutorRef,
              .BuildOrdinarySerialExecutorRef,
              .BuildComplexEqualitySerialExecutorRef:
-          specializeWitnessTable(for: bi.substitutionMap.conformances[0], moduleContext) {
-            worklist.addWitnessMethods(of: $0)
-          }
+          let conformance = bi.substitutionMap.conformances[0]
+          specializeWitnessTable(for: conformance, moduleContext)
+          worklist.addWitnessMethods(of: conformance, moduleContext)
 
         default:
-          break
+          if !devirtualizeDeinits(of: bi, simplifyCtxt) {
+            // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+            if moduleContext.enableWMORequiredDiagnostics {
+              context.diagnosticEngine.diagnose(.deinit_not_visible, at: bi.location)
+            }
+          }
         }
-
 
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
@@ -205,6 +226,12 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     }
 
     changed = context.eliminateDeadAllocations(in: function) || changed
+  }
+
+  if function.isGlobalInitOnceFunction {
+    // Cleanup leftovers from simplification. The InitializeStaticGlobals pass cannot deal with dead
+    // stores in global init functions.
+    eliminateDeadStores(in: function, context)
   }
 }
 
@@ -289,7 +316,9 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
     return false
   }
 
-  if apply.parentFunction.isGlobalInitOnceFunction && callee.inlineStrategy == .always {
+  if apply.parentFunction.isGlobalInitOnceFunction && (
+      callee.inlineStrategy == .heuristicAlways ||
+      callee.inlineStrategy == .always) {
     // Some arithmetic operations, like integer conversions, are not transparent but `inline(__always)`.
     // Force inlining them in global initializers so that it's possible to statically initialize the global.
     return true
@@ -306,8 +335,7 @@ private func shouldInline(apply: FullApplySite, callee: Function, alreadyInlined
 
 private extension FullApplySite {
   func resultIsUsedInGlobalInitialization() -> SmallProjectionPath? {
-    guard parentFunction.isGlobalInitOnceFunction,
-          let global = parentFunction.getInitializedGlobal() else {
+    guard let global = parentFunction.initializedGlobal else {
       return nil
     }
 
@@ -392,7 +420,7 @@ private extension Value {
       //   var p = Point(x: 10, y: 20)
       //   let o = UnsafePointer(&p)
       // Therefore ignore the `end_access` use of a `begin_access`.
-      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignoreUsers(ofType: EndAccessInst.self)
+      let relevantUses = singleUseValue.uses.ignoreDebugUses.ignore(usersOfType: EndAccessInst.self)
 
       guard let use = relevantUses.singleUse else {
         return nil
@@ -431,39 +459,7 @@ private extension Value {
   }
 }
 
-private extension Function {
-  /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
-  func getInitializedGlobal() -> GlobalVariable? {
-    if !isDefinition {
-      return nil
-    }
-    for inst in self.entryBlock.instructions {
-      switch inst {
-      case let agi as AllocGlobalInst:
-        return agi.global
-      default:
-        break
-      }
-    }
-
-    return nil
-  }
-}
-
-fileprivate struct FunctionWorklist {
-  private(set) var functions = Array<Function>()
-  private var pushedFunctions = Set<Function>()
-  private var currentIndex = 0
-
-  mutating func pop() -> Function? {
-    if currentIndex < functions.count {
-      let f = functions[currentIndex]
-      currentIndex += 1
-      return f
-    }
-    return nil
-  }
-  
+extension FunctionWorklist {
   mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
     for f in moduleContext.functions {
       // Performance annotated functions
@@ -471,20 +467,10 @@ fileprivate struct FunctionWorklist {
         pushIfNotVisited(f)
       }
       
-      // Annotated global init-once functions
-      if f.isGlobalInitOnceFunction {
-        if let global = f.getInitializedGlobal(),
-           global.mustBeInitializedStatically {
-          pushIfNotVisited(f)
-        }
-      }
-      
-      // @const global init-once functions
-      if f.isGlobalInitOnceFunction {
-        if let global = f.getInitializedGlobal(),
-           global.mustBeInitializedStatically {
-          pushIfNotVisited(f)
-        }
+      // Initializers of globals which must be initialized statically.
+      if let global = f.initializedGlobal,
+         global.mustBeInitializedStatically {
+        pushIfNotVisited(f)
       }
     }
   }
@@ -500,7 +486,24 @@ fileprivate struct FunctionWorklist {
     for inst in function.instructions {
       switch inst {
       case let fri as FunctionRefInst:
-        pushIfNotVisited(fri.referencedFunction)
+        // In embedded swift all reachable functions must be handled - even if they are not called,
+        // e.g. referenced by a global.
+        if context.options.enableEmbeddedSwift {
+          pushIfNotVisited(fri.referencedFunction)
+        }
+      case let apply as ApplySite:
+        if let callee = apply.referencedFunction {
+          pushIfNotVisited(callee)
+        }
+      case let bi as BuiltinInst:
+        switch bi.id {
+        case .Once, .OnceWithContext:
+          if let fri = bi.operands[1].value as? FunctionRefInst {
+            pushIfNotVisited(fri.referencedFunction)
+          }
+        default:
+          break
+        }
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
           addVTableMethods(forClassType: alloc.type, context)
@@ -531,22 +534,45 @@ fileprivate struct FunctionWorklist {
     }
   }
 
-  mutating func addWitnessMethods(of witnessTable: WitnessTable) {
-    for entry in witnessTable.entries {
-      if case .method(_, let witness) = entry,
-         let method = witness,
-         // A new witness table can still contain a generic function if the method couldn't be specialized for
-         // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
-         !method.isGeneric
-      {
-        pushIfNotVisited(method)
-      }
-    }
+  mutating func addWitnessMethods(of conformance: Conformance, _ context: ModulePassContext) {
+    var visited = Set<Conformance>()
+    addWitnessMethodsRecursively(of: conformance, visited: &visited, context)
   }
 
-  mutating func pushIfNotVisited(_ element: Function) {
-    if pushedFunctions.insert(element).inserted {
-      functions.append(element)
+  private mutating func addWitnessMethodsRecursively(of conformance: Conformance,
+                                                     visited: inout Set<Conformance>,
+                                                     _ context: ModulePassContext)
+  {
+    guard conformance.isConcrete,
+          visited.insert(conformance).inserted
+    else {
+      return
+    }
+    let witnessTable: WitnessTable
+    if let wt = context.lookupWitnessTable(for: conformance) {
+      witnessTable = wt
+    } else if let wt = context.lookupWitnessTable(for: conformance.rootConformance) {
+      witnessTable = wt
+    } else {
+      return
+    }
+    for entry in witnessTable.entries {
+      switch entry {
+      case .invalid, .associatedType:
+        break
+      case .method(_, let witness):
+        if let method = witness,
+           // A new witness table can still contain a generic function if the method couldn't be specialized for
+           // some reason and an error has been printed. Exclude generic functions to not run into an assert later.
+           !method.isGeneric
+        {
+          pushIfNotVisited(method)
+        }
+      case .baseProtocol(_, let baseConf):
+        addWitnessMethodsRecursively(of: baseConf, visited: &visited, context)
+      case .associatedConformance(_, let assocConf):
+        addWitnessMethodsRecursively(of: assocConf, visited: &visited, context)
+      }
     }
   }
 }

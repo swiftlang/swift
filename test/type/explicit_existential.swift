@@ -1,14 +1,14 @@
-// RUN: %target-typecheck-verify-swift \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
 // RUN:   -verify-additional-prefix default-swift-mode-
 
-// RUN: %target-typecheck-verify-swift -swift-version 6 \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 6 \
 // RUN:   -verify-additional-prefix swift-6-
 
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature ExistentialAny \
 // RUN:   -verify-additional-prefix default-swift-mode- \
 // RUN:   -verify-additional-prefix explicit-any-
 
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny:migrate \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature ExistentialAny:migrate \
 //        To verify that the message is not followed by
 //        "; this will be an error ...".
 // RUN:   -verify-additional-prefix default-swift-mode- \
@@ -90,7 +90,7 @@ protocol HasAssoc {
 
 do {
   enum MyError: Error {
-    case bad(Any) // expected-swift-6-error {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-Sendable type 'Any'}}
+    case bad(Any) // expected-swift-6-warning {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-Sendable type 'Any'}}
   }
 
   func checkIt(_ js: Any) throws {

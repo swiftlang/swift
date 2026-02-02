@@ -1026,15 +1026,15 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     // Handle LLVM intrinsic functions.
     const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
-      auto IAttrs = IInfo.getOrCreateAttributes(getModule().getASTContext());
+      auto &IAttrs = IInfo.getOrCreateFnAttributes(getModule().getASTContext());
       auto MemEffects = IAttrs.getMemoryEffects();
       // Read-only.
       if (MemEffects.onlyReadsMemory() &&
-          IAttrs.hasFnAttr(llvm::Attribute::NoUnwind))
+          IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
         return MemoryBehavior::MayRead;
       // Read-none?
       return MemEffects.doesNotAccessMemory() &&
-                     IAttrs.hasFnAttr(llvm::Attribute::NoUnwind)
+                     IAttrs.hasAttribute(llvm::Attribute::NoUnwind)
                  ? MemoryBehavior::None
                  : MemoryBehavior::MayHaveSideEffects;
     }
@@ -1061,10 +1061,10 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     SILModule &M = ga->getFunction()->getModule();
     auto expansion = TypeExpansionContext::maximal(M.getAssociatedContext(),
                                                    M.isWholeModule());
-    const TypeLowering &tl =
-      M.Types.getTypeLowering(ga->getType().getObjectType(), expansion);
-    return tl.isFixedABI() ? MemoryBehavior::None :
-                             MemoryBehavior::MayHaveSideEffects;
+    SILTypeProperties props =
+      M.Types.getTypeProperties(ga->getType().getObjectType(), expansion);
+    return props.isFixedABI() ? MemoryBehavior::None
+                              : MemoryBehavior::MayHaveSideEffects;
   }
 
   if (auto *li = dyn_cast<LoadInst>(this)) {
@@ -1317,8 +1317,10 @@ bool SILInstruction::isAllocatingStack() const {
   }
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (BI->getBuiltinKind() == BuiltinValueKind::StackAlloc ||
-        BI->getBuiltinKind() == BuiltinValueKind::UnprotectedStackAlloc) {
+    // FIXME: BuiltinValueKind::StartAsyncLetWithLocalBuffer
+    if (auto BK = BI->getBuiltinKind();
+        BK && (*BK == BuiltinValueKind::StackAlloc ||
+               *BK == BuiltinValueKind::UnprotectedStackAlloc)) {
       return true;
     }
   }
@@ -1337,7 +1339,33 @@ SILValue SILInstruction::getStackAllocation() const {
   return cast<SingleValueInstruction>(this);
 }
 
+StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
+  assert(isAllocatingStack());
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    return ASI->isStackAllocationNested();
+  } else {
+    // TODO: implement for all remaining allocations
+    return StackAllocationIsNested;
+  }
+}
+
+void SILInstruction::setStackAllocationIsNested(
+    StackAllocationIsNested_t nested) {
+  assert(isAllocatingStack());
+  if (auto ASI = dyn_cast<AllocStackInst>(this)) {
+    assert(nested == StackAllocationIsNested);
+    ASI->setStackAllocationIsNested(nested);
+  } else if (!nested) {
+    llvm_unreachable("unimplemented");
+  }
+}
+
 bool SILInstruction::isDeallocatingStack() const {
+  // NOTE: If you're adding a new kind of deallocating instruction,
+  // there are several places scattered around the SIL optimizer which
+  // assume that the allocating instruction of a deallocating instruction
+  // is referenced by operand 0. Keep that true if you can.
+
   if (isa<DeallocStackInst>(this) ||
       isa<DeallocStackRefInst>(this) ||
       isa<DeallocPackInst>(this) ||
@@ -1345,7 +1373,9 @@ bool SILInstruction::isDeallocatingStack() const {
     return true;
 
   if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (BI->getBuiltinKind() == BuiltinValueKind::StackDealloc) {
+    // FIXME: BuiltinValueKind::FinishAsyncLet
+    if (auto BK = BI->getBuiltinKind();
+        BK && (*BK == BuiltinValueKind::StackDealloc)) {
       return true;
     }
   }
@@ -1525,13 +1555,9 @@ bool SILInstruction::isTriviallyDuplicatable() const {
 }
 
 bool SILInstruction::mayTrap() const {
-  if (auto *BI = dyn_cast<BuiltinInst>(this)) {
-    if (auto Kind = BI->getBuiltinKind()) {
-      if (Kind.value() == BuiltinValueKind::WillThrow) {
-        // We don't want willThrow instructions to be removed.
-        return true;
-      }
-    }
+  if (isBuiltinInst(this, BuiltinValueKind::WillThrow)) {
+    // We don't want willThrow instructions to be removed.
+    return true;
   }
   switch(getKind()) {
   case SILInstructionKind::CondFailInst:
@@ -1835,6 +1861,10 @@ MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const 
 
 /// Returns true if evaluation of this node may cause suspension of an
 /// async task.
+///
+/// If you change this function, you probably also need to change
+/// `isSuspensionPoint` in OptimizeHopToExecutor.cpp, which intentionally
+/// excludes several of these cases.
 bool SILInstruction::maySuspend() const {
   // await_async_continuation always suspends the current task.
   if (isa<AwaitAsyncContinuationInst>(this))
@@ -1847,6 +1877,13 @@ bool SILInstruction::maySuspend() const {
   // Fully applying an async function may suspend the caller.
   if (auto applySite = FullApplySite::isa(const_cast<SILInstruction*>(this))) {
     return applySite.getOrigCalleeType()->isAsync();
+  }
+
+  if (auto bi = dyn_cast<BuiltinInst>(this)) {
+    if (auto bk = bi->getBuiltinKind()) {
+      if (*bk == BuiltinValueKind::FinishAsyncLet)
+        return true;
+    }
   }
   
   return false;

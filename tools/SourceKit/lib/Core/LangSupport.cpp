@@ -21,4 +21,5 @@ void OptionsDictionary::anchor() {}
 void DocInfoConsumer::anchor() { }
 void TypeContextInfoConsumer::anchor() { }
 void ConformingMethodListConsumer::anchor() { }
+void SignatureHelpConsumer::anchor() {}
 void LangSupport::anchor() { }

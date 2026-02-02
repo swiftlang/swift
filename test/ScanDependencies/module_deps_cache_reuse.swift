@@ -2,10 +2,12 @@
 // RUN: mkdir -p %t/clang-module-cache
 
 // Run the scanner once, emitting the serialized scanner cache
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -Rdependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -o %t/deps_initial.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-SAVE
+// RUN: %target-swift-frontend -scan-dependencies -module-name FooReuse -module-load-mode prefer-interface -Rdependency-scan -validate-prior-dependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -o %t/deps_initial.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays &> %t/remarks_save.txt
+// RUN: cat %t/remarks_save.txt | %FileCheck %s -check-prefix CHECK-REMARK-SAVE
 
 // Run the scanner again, but now re-using previously-serialized cache
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -Rdependency-scan-cache -load-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-LOAD
+// RUN: %target-swift-frontend -scan-dependencies -module-name FooReuse -module-load-mode prefer-interface -Rdependency-scan -validate-prior-dependency-scan-cache -load-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays &> %t/remarks_load.txt
+// RUN: cat %t/remarks_load.txt | %FileCheck %s -check-prefix CHECK-REMARK-LOAD
 
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json &>/dev/null
@@ -19,13 +21,22 @@ import E
 import G
 import SubE
 
+// CHECK-REMARK-SAVE: remark: Number of named Clang module queries: '6'
+// CHECK-REMARK-SAVE: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '6'
+// CHECK-REMARK-SAVE: remark: Number of recorded Swift module dependencies: '8'
+// CHECK-REMARK-SAVE: remark: Number of recorded Clang module dependencies: '7'
 // CHECK-REMARK-SAVE: remark: Incremental module scan: Serializing module scanning dependency cache to:
-// CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
 
-// CHECK: "mainModuleName": "deps"
+// CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
+// CHECK-REMARK-LOAD: remark: Number of named Clang module queries: '0'
+// CHECK-REMARK-LOAD: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '0'
+// CHECK-REMARK-LOAD: remark: Number of recorded Swift module dependencies: '8'
+// CHECK-REMARK-LOAD: remark: Number of recorded Clang module dependencies: '7'
+
+// CHECK: "mainModuleName": "FooReuse"
 
 /// --------Main module
-// CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-LABEL: "modulePath": "FooReuse.swiftmodule",
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: module_deps_cache_reuse.swift
 // CHECK-NEXT: ],
@@ -36,12 +47,7 @@ import SubE
 // CHECK-DAG:     "clang": "F"
 // CHECK-DAG:     "swift": "G"
 // CHECK-DAG:     "swift": "SubE"
-// CHECK-DAG:     "swift": "Swift"
-// CHECK-DAG:     "swift": "SwiftOnoneSupport"
-// CHECK-DAG:     "swift": "_Concurrency"
-// CHECK-DAG:     "swift": "_StringProcessing"
 // CHECK-DAG:     "swift": "_cross_import_E"
-// CHECK-DAG:     "clang": "_SwiftConcurrencyShims"
 // CHECK: ],
 
 // CHECK:      "contextHash":
@@ -105,9 +111,7 @@ import SubE
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
 // CHECK-NEXT:   {
-// CHECK-DAG:     "clang": "F"
-// CHECK-DAG:     "swift": "Swift"
-// CHECK-DAG:     "swift": "SwiftOnoneSupport"
+// CHECK:     "clang": "F"
 // CHECK: ],
 
 /// --------Swift module A
@@ -116,19 +120,16 @@ import SubE
 // CHECK: directDependencies
 // CHECK-NEXT: {
 // CHECK-DAG:   "clang": "A"
-// CHECK-DAG:   "swift": "Swift"
 
 /// --------Swift module G
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}G-{{.*}}.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
-// CHECK-DAG:   "clang": "G"
-// CHECK-DAG:   "swift": "Swift"
-// CHECK-DAG:   "swift": "SwiftOnoneSupport"
+// CHECK:   "clang": "G"
 // CHECK: ],
 // CHECK-NEXT: "linkLibraries": [
 // CHECK-NEXT: ],
-// CHECK-NEXT: "details": {
+// CHECK: "details": {
 
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"
@@ -143,20 +144,5 @@ import SubE
 /// --------Swift module E
 // CHECK: "swift": "E"
 // CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
-// CHECK: "directDependencies"
-// CHECK-NEXT: {
-// CHECK: "swift": "Swift"
-
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
-
-/// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK: "clang": "SwiftShims"
-
-/// --------Clang module SwiftShims
-// CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
-

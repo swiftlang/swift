@@ -46,6 +46,12 @@ Func withUnsafeBytes(of:_:) is now without rethrows
 Func withUnsafeMutableBytes(of:_:) is now without rethrows
 Func withoutActuallyEscaping(_:do:) has generic signature change from <ClosureType, ResultType> to <ClosureType, ResultType, Failure where Failure : Swift.Error>
 Func withoutActuallyEscaping(_:do:) is now without rethrows
+Constructor Array.init(unsafeUninitializedCapacity:initializingWith:) has generic signature change from <Element> to <Element, E where E : Swift.Error>
+Constructor Array.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 type change from (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws -> Swift.Void to (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws(E) -> Swift.Void
+Constructor Array.init(unsafeUninitializedCapacity:initializingWith:) is now without rethrows
+Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has generic signature change from <Element> to <Element, E where E : Swift.Error>
+Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 type change from (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws -> Swift.Void to (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws(E) -> Swift.Void
+Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) is now without rethrows
 
 Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 
@@ -65,8 +71,6 @@ Protocol CodingKey has added inherited protocol Copyable
 Protocol CodingKey has added inherited protocol Escapable
 Protocol Collection has added inherited protocol Copyable
 Protocol Collection has added inherited protocol Escapable
-Protocol Comparable has added inherited protocol Copyable
-Protocol Comparable has added inherited protocol Escapable
 Protocol CustomDebugStringConvertible has added inherited protocol Copyable
 Protocol CustomDebugStringConvertible has added inherited protocol Escapable
 Protocol CustomLeafReflectable has added inherited protocol Copyable
@@ -85,8 +89,6 @@ Protocol Encodable has added inherited protocol Copyable
 Protocol Encodable has added inherited protocol Escapable
 Protocol Encoder has added inherited protocol Copyable
 Protocol Encoder has added inherited protocol Escapable
-Protocol Equatable has added inherited protocol Copyable
-Protocol Equatable has added inherited protocol Escapable
 Protocol Error has added inherited protocol Copyable
 Protocol Error has added inherited protocol Escapable
 Protocol ExpressibleByArrayLiteral has added inherited protocol Copyable
@@ -111,7 +113,6 @@ Protocol FixedWidthInteger has added inherited protocol Copyable
 Protocol FixedWidthInteger has added inherited protocol Escapable
 Protocol FloatingPoint has added inherited protocol Copyable
 Protocol FloatingPoint has added inherited protocol Escapable
-Protocol Hashable has added inherited protocol Copyable
 Protocol Hashable has added inherited protocol Escapable
 Protocol Identifiable has added inherited protocol Copyable
 Protocol Identifiable has added inherited protocol Escapable
@@ -363,8 +364,6 @@ Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies
-Struct String.UTF8View is now with @_addressableForDependencies
-Struct Substring.UTF8View is now with @_addressableForDependencies
 
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
@@ -375,3 +374,33 @@ Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change f
 
 Func type(of:) has generic signature change from <T, Metatype> to <T, Metatype where T : ~Copyable, T : ~Escapable>
 Func type(of:) has parameter 0 changing from Default to Shared
+
+// Equatable: ~Copyable & ~Escapable
+Func Equatable.!=(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Func Equatable.!=(_:_:) has parameter 0 changing from Default to Shared
+Func Equatable.!=(_:_:) has parameter 1 changing from Default to Shared
+Func Equatable.==(_:_:) has generic signature change from <Self where Self : Swift.Equatable> to <Self where Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Func Equatable.==(_:_:) has parameter 0 changing from Default to Shared
+Func Equatable.==(_:_:) has parameter 1 changing from Default to Shared
+
+// Comparable: ~Copyable & ~Escapable
+Protocol Comparable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Func Comparable.<(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable, Self : ~Escapable>
+Func Comparable.<(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.<(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.<=(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable, Self : ~Escapable>
+Func Comparable.<=(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.<=(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.>(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable, Self : ~Escapable>
+Func Comparable.>(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.>(_:_:) has parameter 1 changing from Default to Shared
+Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Swift.Comparable> to <Self where Self : Swift.Comparable, Self : ~Copyable, Self : ~Escapable>
+Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
+Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
+
+// Hashable: ~Copyable
+Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
+Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
+Func Hasher.combine(_:) has parameter 0 changing from Default to Shared

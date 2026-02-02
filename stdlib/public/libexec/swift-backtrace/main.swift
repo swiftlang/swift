@@ -26,6 +26,7 @@ import CRT
 @_spi(Contexts) import Runtime
 @_spi(Registers) import Runtime
 @_spi(MemoryReaders) import Runtime
+@_spi(CrashLog) import Runtime
 
 @main
 internal struct SwiftBacktrace {
@@ -491,6 +492,17 @@ Generate a backtrace for the parent process.
     sigprocmask(SIG_UNBLOCK, &mask, nil)
   }
 
+  static func getJsonBacktraceFormatterOptions() -> BacktraceJSONFormatterOptions {
+    var options = BacktraceJSONFormatterOptions(rawValue: 0)
+    if (args.registers == .all) { options.formUnion(.allRegisters) }
+    if (args.demangle) { options.formUnion(.demangle) }
+    if (args.sanitize == true) { options.formUnion(.sanitize) }
+    if (args.showImages == .mentioned) { options.formUnion(.mentionedImages) }
+    if (args.showImages != ImagesToShow.none) { options.formUnion(.images) }
+    if (args.threads == true) { options.formUnion(.allThreads) }
+    return options
+  }
+
   static func main() {
     unblockSignals()
     parseArguments()
@@ -669,7 +681,31 @@ Generate a backtrace for the parent process.
         writeln("Backtrace took \(formattedDuration)s")
         writeln("")
       case .json:
-        outputJSONCrashLog()
+        guard let target = target else {
+          print("swift-backtrace: unable to get target",
+                to: &standardError)
+          return
+        }
+
+        let crashLog = captureCrashLog(
+          imageMap: target.images,
+          backtraceDuration: backtraceDuration)
+
+        guard let crashLog else {
+          print("swift-backtrace: unable to build crash log",
+                to: &standardError)
+          return
+        }
+
+        let writer = SwiftBacktraceWriter()
+        let options = getJsonBacktraceFormatterOptions()
+
+        var backtraceFormatter = BacktraceJSONFormatter(
+          crashLog: crashLog,
+          writer: writer,
+          options: options)
+
+        backtraceFormatter.writeCrashLog(now: formatISO8601(now))
     }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -894,12 +930,11 @@ Generate a backtrace for the parent process.
       }
     }
 
+    dump(ndx: target.crashingThreadNdx, thread: crashingThread)
     if args.threads! {
-      for (ndx, thread) in target.threads.enumerated() {
+      for (ndx, thread) in target.threads.enumerated() where ndx != target.crashingThreadNdx {
         dump(ndx: ndx, thread: thread)
       }
-    } else {
-      dump(ndx: target.crashingThreadNdx, thread: crashingThread)
     }
 
     if args.registers! == .crashedOnly {
@@ -1463,7 +1498,7 @@ Generate a backtrace for the parent process.
     writeln("")
     writeln("\(theme.register("eflags")) \(hexFlags)  \(status)")
     writeln("")
-    writeln("\(theme.register("es")): \(es) \(theme.register("cs")): \(cs) \(theme.register("ss")): \(ss) \(theme.register("ds")): \(ds) \(theme.register("fs")): \(fs)) \(theme.register("gs")): \(gs)")
+    writeln("\(theme.register("es")): \(es) \(theme.register("cs")): \(cs) \(theme.register("ss")): \(ss) \(theme.register("ds")): \(ds) \(theme.register("fs")): \(fs) \(theme.register("gs")): \(gs)")
   }
 
   static func showRegisters(_ context: ARM64Context) {

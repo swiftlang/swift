@@ -25,7 +25,7 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
   if (AvAttr.getDomain().isPackageDescription())
     return { "SwiftPM" };
 
-  if (AvAttr.getDomain().isSwiftLanguage())
+  if (AvAttr.getDomain().isSwiftLanguageMode())
     return { "Swift" };
 
   // Platform-specific availability.
@@ -54,10 +54,20 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
       return { "watchOSAppExtension" };
     case swift::PlatformKind::visionOSApplicationExtension:
       return { "visionOSAppExtension" };
+    case PlatformKind::DriverKit:
+      return { "DriverKit" };
+    case swift::PlatformKind::Swift:
+      return { "Swift" };
+    case PlatformKind::anyAppleOS:
+      return { "Any Apple OS" };
+    case swift::PlatformKind::FreeBSD:
+      return { "FreeBSD" };
     case swift::PlatformKind::OpenBSD:
       return { "OpenBSD" };
     case swift::PlatformKind::Windows:
       return { "Windows" };
+    case swift::PlatformKind::Android:
+      return { "Android" };
     case swift::PlatformKind::none:
       return { "*" };
   }

@@ -221,6 +221,9 @@ namespace irgen {
   /// Emit a load of the 'isBitwiseTakable' value witness.
   llvm::Value *emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T);
 
+  /// Emit a load of the 'isBitwiseBorrowable' value witness.
+  llvm::Value *emitLoadOfIsBitwiseBorrowable(IRGenFunction &IGF, SILType T);
+
   /// Emit a load of the 'isInline' value witness.
   llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, SILType T);
 

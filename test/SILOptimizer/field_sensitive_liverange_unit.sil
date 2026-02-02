@@ -106,41 +106,6 @@ bb3:
   return %9999 : $()
 }
 
-// A single instruction occurs twice on the same liverange
-// boundary. Once as a last use, and once as a dead def.
-// This is a particularly problematic corner case.
-//
-// CHECK-LABEL: testDeadSelfKill: fieldsensitive_multidefuse_liverange
-// CHECK: FieldSensitive MultiDef lifetime analysis:
-// CHECK: def in range [0, 1) instruction: store {{%[^,]+}} to [init] [[STACK:%[^,]+]] :
-// CHECK: def in range [0, 1) instruction: store {{%[^,]+}} to [assign] [[STACK]]
-// CHECK: bb1: LiveWithin
-// CHECK: last user:   store {{%[^,]+}} to [assign] [[STACK]]
-// CHECK: dead def:   store {{%[^,]+}} to [assign] [[STACK]]
-sil [ossa] @testDeadSelfKill : $@convention(thin) () -> () {
-bb0:
-  br bb3
-
-bb1(%1 : @owned $C, %2 : @owned $C):
-  specify_test """
-                     fieldsensitive_multidefuse_liverange
-                     @instruction
-                     defs: 
-                     @instruction[+1] 0 1
-                     @instruction[+2] 0 1
-                     uses:
-                     @instruction[+2] true 0 1
-                     """
-  %stack = alloc_stack $C
-  store %1 to [init] %stack : $*C
-  store %2 to [assign] %stack : $*C
-  unreachable
-
-bb3:
-  %99 = tuple()
-  return %99 : $()
-}
-
 // A dead-end block with a def can still be a boundary edge. This can
 // only happen in OSSA with incomplete lifetimes.
 //

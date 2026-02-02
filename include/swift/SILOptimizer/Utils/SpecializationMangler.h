@@ -68,6 +68,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     BoxToValue = 3,
     BoxToStack = 4,
     InOutToOut = 5,
+    ClosurePropPreviousArg = 6, // the same closure as a previous `ClosureProp` argument
 
     First_Option = 0,
     Last_Option = 31,
@@ -82,14 +83,28 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     LastOptionSetEntry = 32768,
   };
 
-  using ArgInfo = std::pair<ArgumentModifierIntBase,
-                            NullablePtr<SILInstruction>>;
+  struct ArgInfo {
+    ArgumentModifier kind;
+    union {
+      SILInstruction *inst;
+      unsigned otherArgIdx; // only for `ClosurePropPreviousArg`
+    };
+
+    ArgInfo(ArgumentModifier kind) : kind(kind), inst(nullptr) {}
+
+    void append(ArgumentModifier modifier) {
+      kind = ArgumentModifier(ArgumentModifierIntBase(kind) | ArgumentModifierIntBase(modifier));
+    }
+  };
+
   // Information for each SIL argument in the original function before
   // specialization. This includes SIL indirect result argument required for
   // the original function type at the current stage of compilation.
   llvm::SmallVector<ArgInfo, 8> OrigArgs;
 
   ReturnValueModifierIntBase ReturnValue;
+
+  bool changedRepresentation = false;
 
 public:
   FunctionSignatureSpecializationMangler(ASTContext &Ctx, SpecializationPass Pass,
@@ -99,9 +114,8 @@ public:
   void setArgumentConstantProp(unsigned OrigArgIdx, SILInstruction *constInst);
   void appendStringAsIdentifier(StringRef str);
 
-  void setArgumentClosureProp(unsigned OrigArgIdx, PartialApplyInst *PAI);
-  void setArgumentClosureProp(unsigned OrigArgIdx,
-                              ThinToThickFunctionInst *TTTFI);
+  void setArgumentClosureProp(unsigned OrigArgIdx, SILInstruction *closure);
+  void setArgumentClosurePropPreviousArg(unsigned OrigArgIdx, unsigned otherArgIdx);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
   void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
@@ -111,6 +125,7 @@ public:
   void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setArgumentInOutToOut(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
+  void setChangedRepresentation() { changedRepresentation = true; }
 
   // For effects
   void setRemovedEffect(EffectKind effect);
@@ -120,8 +135,7 @@ public:
 private:
   void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);
-  void mangleArgument(ArgumentModifierIntBase ArgMod,
-                      NullablePtr<SILInstruction> Inst);
+  void mangleArgument(ArgInfo argInfo);
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
 

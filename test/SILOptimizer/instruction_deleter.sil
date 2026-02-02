@@ -57,3 +57,18 @@ sil [ossa] @doDeleteLoadTake : $() -> () {
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test {{.*}} on trackEndBorrow
+// CHECK: Tracking   end_borrow undef : $C
+// CHECK: sil [ossa] @trackEndBorrow : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK-NOT: end_borrow
+// CHECK-LABEL: } // end sil function 'trackEndBorrow'
+// CHECK-LABEL: end running test {{.*}} on trackEndBorrow
+sil [ossa] @trackEndBorrow : $() -> () {
+bb0:
+  specify_test "deleter_track_if_dead @instruction"
+  end_borrow undef : $C
+  %retval = tuple ()
+  return %retval : $()
+}

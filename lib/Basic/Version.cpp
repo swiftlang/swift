@@ -330,10 +330,6 @@ StringRef getCurrentCompilerChannel() {
   return StringRef();
 }
 
-unsigned getUpcomingCxxInteropCompatVersion() {
-  return SWIFT_VERSION_MAJOR + 1;
-}
-
 std::string getCompilerVersion() {
   std::string buf;
   llvm::raw_string_ostream OS(buf);

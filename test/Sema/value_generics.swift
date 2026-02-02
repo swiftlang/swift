@@ -1,9 +1,13 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 protocol P {}
+protocol Q {}
+class Class {}
 
-func invalid<let N>() {} // expected-error {{value generic 'N' must have an explicit value type declared}}
-                         // expected-error@-1 {{generic parameter 'N' is not used in function signature}}
+func invalid<let N>() { // expected-error {{value generic 'N' must have an explicit value type declared}}
+                        // expected-error@-1 {{generic parameter 'N' is not used in function signature}}
+  let x: String = N // Fine, we bind to a hole.
+}
 func invalid<let N>(_: A<N>) {} // expected-error {{value generic 'N' must have an explicit value type declared}}
 
 struct A<let N: Int> {
@@ -35,8 +39,6 @@ struct A<let N: Int> {
     fatalError()
   }
 }
-
-extension A where N: P {} // expected-error {{value generic type 'N' cannot conform to protocol 'P'}}
 
 extension A where N == Int {} // expected-error {{cannot constrain value parameter 'N' to be type 'Int'}}
 
@@ -75,7 +77,38 @@ func m(_: GenericWithIntParam<Int, 123>) {} // OK
 
 typealias One = 1 // expected-error {{expected type in type alias declaration}}
 
-struct B<let N: UInt8> {} // expected-error {{'UInt8' is not a supported value type for 'N'}}
+// Unsupported type in value type parameter definition.
+do {
+  struct S1<let N: UInt8> {}
+  // expected-error@-1:20 {{'UInt8' is not a supported value type for 'N'}}
+  struct S2<let N: Any> {}
+  // expected-error@-1:20 {{'Any' is not a supported value type for 'N'}}
+  struct S3<let N: AnyObject> {}
+  // expected-error@-1:20 {{'AnyObject' is not a supported value type for 'N'}}
+  struct S4<let N: Class> {}
+  // expected-error@-1:20 {{'Class' is not a supported value type for 'N'}}
+  struct S5<let N: P> {}
+  // expected-error@-1:20 {{'P' is not a supported value type for 'N'}}
+  struct S6<let N: P & Q> {}
+  // expected-error@-1:20 {{'P & Q' is not a supported value type for 'N'}}
+  struct S7<let N: ~Copyable> {}
+  // expected-error@-1:20 {{'~Copyable' is not a supported value type for 'N'}}
+}
+
+// Subtype constraint on value type parameter.
+
+struct S1<let x: Int> where x: Class, x: P, x: P & Q, x: Int, x: ~Copyable {}
+// expected-error@-1:30 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-2:40 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-3:46 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-4:56 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-5:64 {{cannot use type constraint with generic value parameter 'x'}}
+extension S1 where x: Class, x: P, x: P & Q, x: Int, x: ~Copyable {}
+// expected-error@-1:21 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-2:31 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-3:37 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-4:47 {{cannot use type constraint with generic value parameter 'x'}}
+// expected-error@-5:55 {{cannot use type constraint with generic value parameter 'x'}}
 
 struct C<let N: Int, let M: Int> {}
 

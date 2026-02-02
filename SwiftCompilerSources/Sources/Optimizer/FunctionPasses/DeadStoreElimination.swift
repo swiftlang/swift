@@ -53,6 +53,10 @@ import SIL
 let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
   (function: Function, context: FunctionPassContext) in
 
+  eliminateDeadStores(in: function, context)
+}
+
+func eliminateDeadStores(in function: Function, _ context: FunctionPassContext) {
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 10_000
@@ -76,7 +80,7 @@ let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
 
 private func tryEliminate(store: StoreInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
   // Check if the type can be expanded without a significant increase to code
-  // size. This pass splits values into its consitutent parts which effectively
+  // size. This pass splits values into its constituent parts which effectively
   // expands the value into projections which can increase code size.
   if !store.hasValidOwnershipForDeadStoreElimination || !store.source.type.shouldExpand(context) {
     return
@@ -167,8 +171,15 @@ private extension StoreInst {
 
   var hasValidOwnershipForDeadStoreElimination: Bool {
     switch storeOwnership {
-    case .unqualified, .trivial:
+    case .unqualified:
       return true
+    case .trivial:
+      // Storing a trivial enum case in a non-trivial enum must be treated like a non-trivial
+      // init or assign, e.g.
+      //   %1 = enum $Optional<String>, #Optional.none!enumelt
+      //   store %1 to [trivial] %0  // <- cannot delete this store!
+      //   store %2 to [assign] %0
+      return source.type.isTrivial(in: parentFunction)
     case .initialize, .assign:
       // In OSSA, non-trivial values cannot be dead-store eliminated because that could shrink
       // the lifetime of the original stored value (because it's not kept in memory anymore).

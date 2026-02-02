@@ -122,7 +122,7 @@ compares = [
   ///   result[i] = (a[i] ${op} b)
   /// }
   /// ```
-  @_alwaysEmitIntoClient @_transparent
+  @_alwaysEmitIntoClient @_transparent @_disfavoredOverload
   public static func .${op}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
     a .${op} Self(repeating: b)
   }
@@ -139,7 +139,7 @@ compares = [
   ///   result[i] = (a ${op} b[i])
   /// }
   /// ```
-  @_alwaysEmitIntoClient @_transparent
+  @_alwaysEmitIntoClient @_transparent @_disfavoredOverload
   public static func .${op}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
     Self(repeating: a) .${op} b
   }

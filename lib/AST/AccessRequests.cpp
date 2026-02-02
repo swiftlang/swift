@@ -61,12 +61,14 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
+    case AccessorKind::Borrow:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
+    case AccessorKind::Mutate:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
@@ -102,19 +104,15 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   // Special case for dtors and enum elements: inherit from container
   if (D->getKind() == DeclKind::Destructor ||
       D->getKind() == DeclKind::EnumElement) {
-    if (D->hasInterfaceType() && D->isInvalid()) {
-      return AccessLevel::Private;
-    } else {
-      auto container = dyn_cast<NominalTypeDecl>(DC);
-      if (D->getKind() == DeclKind::Destructor && !container) {
-        // A destructor in an extension means @_objcImplementation. An
-        // @_objcImplementation class's deinit is only called by the ObjC thunk,
-        // if at all, so it is nonpublic.
-        return AccessLevel::Internal;
-      }
-
-      return std::max(container->getFormalAccess(), AccessLevel::Internal);
+    auto container = dyn_cast<NominalTypeDecl>(DC);
+    if (D->getKind() == DeclKind::Destructor && !container) {
+      // A destructor in an extension means @_objcImplementation. An
+      // @_objcImplementation class's deinit is only called by the ObjC thunk,
+      // if at all, so it is nonpublic.
+      return AccessLevel::Internal;
     }
+
+    return std::max(container->getFormalAccess(), AccessLevel::Internal);
   }
 
   switch (DC->getContextKind()) {

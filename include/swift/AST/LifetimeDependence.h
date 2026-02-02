@@ -141,17 +141,7 @@ public:
     return getName().str() == "immortal";
   }
 
-  std::string getString() const {
-    switch (kind) {
-    case DescriptorKind::Named:
-      return getName().str().str();
-    case DescriptorKind::Ordered:
-      return std::to_string(getIndex());
-    case DescriptorKind::Self:
-      return "self";
-    }
-    llvm_unreachable("Invalid DescriptorKind");
-  }
+  std::string getString() const;
 };
 
 class LifetimeEntry final
@@ -170,7 +160,7 @@ private:
       : startLoc(startLoc), endLoc(endLoc), numSources(sources.size()),
         targetDescriptor(targetDescriptor) {
     std::uninitialized_copy(sources.begin(), sources.end(),
-                            getTrailingObjects<LifetimeDescriptor>());
+                            getTrailingObjects());
   }
 
   size_t numTrailingObjects(OverloadToken<LifetimeDescriptor>) const {
@@ -189,7 +179,7 @@ public:
   SourceLoc getEndLoc() const { return endLoc; }
 
   ArrayRef<LifetimeDescriptor> getSources() const {
-    return {getTrailingObjects<LifetimeDescriptor>(), numSources};
+    return getTrailingObjects(numSources);
   }
 
   std::optional<LifetimeDescriptor> getTargetDescriptor() const {
@@ -218,7 +208,7 @@ public:
         addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
         conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
-    assert(this->isImmortal() || inheritLifetimeParamIndices ||
+    ASSERT(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
     ASSERT(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
@@ -236,12 +226,12 @@ public:
         paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
       }
       if (scopeLifetimeParamIndices) {
-        assert(paramIndicesLength == 0 ||
+        ASSERT(paramIndicesLength == 0 ||
                paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
         paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
       }
       if (addressableParamIndices) {
-        assert(paramIndicesLength == 0 ||
+        ASSERT(paramIndicesLength == 0 ||
                paramIndicesLength == addressableParamIndices->getCapacity());
         paramIndicesLength = addressableParamIndices->getCapacity();
       }
@@ -324,8 +314,7 @@ public:
   /// Builds LifetimeDependenceInfo from a swift decl, either from the explicit
   /// lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers.
-  static std::optional<ArrayRef<LifetimeDependenceInfo>>
-  get(AbstractFunctionDecl *decl);
+  static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ValueDecl *decl);
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

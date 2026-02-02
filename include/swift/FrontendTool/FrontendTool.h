@@ -79,7 +79,8 @@ int performFrontend(ArrayRef<const char *> args,
                     FrontendObserver *observer = nullptr);
 
 bool performCompileStepsPostSema(CompilerInstance &Instance, int &ReturnValue,
-                                 FrontendObserver *observer);
+                                 FrontendObserver *observer,
+                                 ArrayRef<const char *> CommandLineArgs);
 
 } // namespace swift
 

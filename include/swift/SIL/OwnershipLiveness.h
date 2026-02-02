@@ -246,8 +246,7 @@ public:
 public:
   InteriorLiveness(SILValue def): OSSALiveness(def) {}
 
-  void compute(const DominanceInfo *domInfo,
-               InnerScopeHandlerRef handleInnerScope = InnerScopeHandlerRef());
+  void compute(InnerScopeHandlerRef handleInnerScope = InnerScopeHandlerRef());
 
   /// Compute the boundary from the blocks discovered during liveness analysis.
   void computeBoundary(PrunedLivenessBoundary &boundary) const {

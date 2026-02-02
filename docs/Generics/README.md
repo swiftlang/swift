@@ -18,7 +18,7 @@ It's written in TeX, so to typeset the PDF yourself, you need a TeX distribution
 
 ### Using `make`
 
-Running `make` in `docs/Generics/` will run `pdflatex` and `bibtex` in the right order to generate the final document with bibliography, index and cross-references:
+Running `make` in `docs/Generics/` will run `pdflatex` and `bibtex` in the right order to generate the final document with bibliography, index, and cross-references:
 
 ```
 cd docs/Generics/
@@ -48,7 +48,7 @@ pdflatex generics
 
 ## Reading the PDF
 
-The book makes use of internal hyperlinks so it is is best to use PDF reader with support for PDF bookmarks and back/forward history:
+The book makes use of internal hyperlinks so it is best to use PDF reader with support for PDF bookmarks and back/forward history:
 
 - Preview.app on macOS fits the bill; you can add Back/Forward buttons to the toolbar with **View** > **Customize Toolbar**.
 - [Skim.app](https://skim-app.sourceforge.io) is a BSD-licensed open source PDF reader for macOS.
@@ -61,16 +61,13 @@ This is a work in progress.
 
 The following chapters need some editing:
 
-- Part II:
-  - Substitution Maps
 - Part IV:
   - Completion
 
 The following chapters are not yet written:
 
 - Part III:
-  - Opaque Return Types
   - Existential Types
 - Part IV:
   - The Property Map
-  - Rule Minimization
+  - Minimization

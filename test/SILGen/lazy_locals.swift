@@ -50,4 +50,9 @@ func lazyLocalInClosure() {
     lazy var x = 0
     return x
   }
+  // https://github.com/swiftlang/swift/issues/83627
+  let _: (Int) -> Void = { (arg: _) in
+    lazy var val = arg
+    _ = val
+  }
 }

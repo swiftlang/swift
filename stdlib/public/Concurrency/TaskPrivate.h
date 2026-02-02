@@ -26,6 +26,7 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/DispatchShims.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Error.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/HeapObject.h"
@@ -301,11 +302,11 @@ namespace {
 ///   @_silgen_name("swift_task_future_wait_throwing")
 ///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 ///
-///   @_silgen_name("swift_asyncLet_wait")
-///   func _asyncLetGet<T>(_ task: Builtin.RawPointer) async -> T
+///   @_silgen_name("swift_asyncLet_get")
+///   func _asyncLet_get<T>(_ task: Builtin.RawPointer) async -> T
 ///
-///   @_silgen_name("swift_asyncLet_waitThrowing")
-///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
+///   @_silgen_name("swift_asyncLet_get_throwing")
+///   func _asyncLet_get_throwing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
 ///   @_silgen_name("swift_taskGroup_wait_next_throwing")
 ///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
@@ -728,10 +729,11 @@ public:
     return record_iterator::rangeBeginning(getInnermostRecord());
   }
 
-  void traceStatusChanged(AsyncTask *task, bool isStarting) {
+  void traceStatusChanged(AsyncTask *task, bool isStarting, bool wasRunning) {
     concurrency::trace::task_status_changed(
         task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
-        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued());
+        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued(),
+        wasRunning);
   }
 };
 
@@ -743,14 +745,48 @@ public:
 static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
   "ActiveTaskStatus is of incorrect size");
 
+struct TaskAllocatorConfiguration {
+#if SWIFT_CONCURRENCY_EMBEDDED
+
+  // Slab allocator is always enabled on embedded.
+  bool enableSlabAllocator() { return true; }
+
+#else
+
+  enum class EnableState : uint8_t {
+    Uninitialized,
+    Enabled,
+    Disabled,
+  };
+
+  static std::atomic<EnableState> enableState;
+
+  bool enableSlabAllocator() {
+    auto state = enableState.load(std::memory_order_relaxed);
+    if (SWIFT_UNLIKELY(state == EnableState::Uninitialized)) {
+      state = runtime::environment::concurrencyEnableTaskSlabAllocator()
+                  ? EnableState::Enabled
+                  : EnableState::Disabled;
+      enableState.store(state, std::memory_order_relaxed);
+    }
+
+    return SWIFT_UNLIKELY(state == EnableState::Enabled);
+  }
+
+#endif // SWIFT_CONCURRENCY_EMBEDDED
+};
+
 /// The size of an allocator slab. We want the full allocation to fit into a
 /// 1024-byte malloc quantum. We subtract off the slab header size, plus a
 /// little extra to stay within our limits even when there's overhead from
 /// malloc stack logging.
-static constexpr size_t SlabCapacity = 1024 - StackAllocator<0, nullptr>::slabHeaderSize() - 8;
+static constexpr size_t SlabCapacity =
+    1024 - 8 -
+    StackAllocator<0, nullptr, TaskAllocatorConfiguration>::slabHeaderSize();
 extern Metadata TaskAllocatorSlabMetadata;
 
-using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata>;
+using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata,
+                                     TaskAllocatorConfiguration>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {
@@ -854,6 +890,8 @@ struct AsyncTask::PrivateStorage {
       }
     }
 
+    _swift_tsan_release(task);
+
     // Destroy and deallocate any remaining task local items since the task is
     // completed. We need to do this before we destroy the task local
     // deallocator.
@@ -932,32 +970,40 @@ inline bool AsyncTask::isCancelled() const {
                           .isCancelled();
 }
 
-inline void AsyncTask::flagAsRunning() {
+inline uint32_t AsyncTask::flagAsRunning() {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   dispatch_thread_override_info_s threadOverrideInfo;
   threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
   qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
+  qos_class_t basePriorityCeil = overrideFloor;
+  qos_class_t taskBasePriority = (qos_class_t) _private().BasePriority;
 #endif
 
   auto oldStatus = _private()._status().load(std::memory_order_relaxed);
   assert(!oldStatus.isRunning());
   assert(!oldStatus.isComplete());
 
+  uint32_t dispatchOpaquePriority = 0;
   if (!oldStatus.hasTaskDependency()) {
     SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning() with no task dependency", this);
     assert(_private().dependencyRecord == nullptr);
 
     while (true) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-      // Task's priority is greater than the thread's - do a self escalation
+      // If the base priority is not equal to the current override floor then
+      // dispqatch may need to apply the base priority to the thread. If the
+      // current priority is higher than the override floor, then dispatch may
+      // need to apply a self-override. In either case, call into dispatch to
+      // do this.
       qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-      if (threadOverrideInfo.can_override && (maxTaskPriority > overrideFloor)) {
-        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x",
-            overrideFloor, this, maxTaskPriority);
+      if (threadOverrideInfo.can_override && (taskBasePriority != basePriorityCeil || maxTaskPriority > overrideFloor)) {
+        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x and base priority %#x",
+                             overrideFloor, this, maxTaskPriority, taskBasePriority);
 
-        (void) swift_dispatch_thread_override_self(maxTaskPriority);
+        dispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
         overrideFloor = maxTaskPriority;
+        basePriorityCeil = taskBasePriority;
       }
 #endif
       // Set self as executor and remove escalation bit if any - the task's
@@ -969,7 +1015,7 @@ inline void AsyncTask::flagAsRunning() {
       if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /* success */ std::memory_order_relaxed,
                /* failure */ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this, true);
+        newStatus.traceStatusChanged(this, true, oldStatus.isRunning());
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(
             (char *)&_private().ExclusivityAccessSet[0]);
@@ -986,14 +1032,19 @@ inline void AsyncTask::flagAsRunning() {
                        ActiveTaskStatus& newStatus) {
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-      // Task's priority is greater than the thread's - do a self escalation
+      // If the base priority is not equal to the current override floor then
+      // dispqatch may need to apply the base priority to the thread. If the
+      // current priority is higher than the override floor, then dispatch may
+      // need to apply a self-override. In either case, call into dispatch to
+      // do this.
       qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-      if (threadOverrideInfo.can_override && (maxTaskPriority > overrideFloor)) {
-        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x",
-            overrideFloor, this, maxTaskPriority);
+      if (threadOverrideInfo.can_override && (taskBasePriority != basePriorityCeil || maxTaskPriority > overrideFloor)) {
+        SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x and base priority %#x",
+                             overrideFloor, this, maxTaskPriority, taskBasePriority);
 
-        (void) swift_dispatch_thread_override_self(maxTaskPriority);
+        dispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
         overrideFloor = maxTaskPriority;
+        basePriorityCeil = taskBasePriority;
       }
 #endif
       // Set self as executor and remove escalation bit if any - the task's
@@ -1009,7 +1060,7 @@ inline void AsyncTask::flagAsRunning() {
     swift_task_enterThreadLocalContext(
         (char *)&_private().ExclusivityAccessSet[0]);
   }
-
+  return dispatchOpaquePriority;
 }
 
 /// TODO (rokhinip): We need the handoff of the thread to the next executor to

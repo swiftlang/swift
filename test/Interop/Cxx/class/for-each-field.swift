@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: reflection
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 @_spi(Reflection) import Swift
 import SimpleStructs

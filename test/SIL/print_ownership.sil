@@ -1,0 +1,56 @@
+// RUN: %target-sil-opt -sil-print-ownership %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ENABLE
+// RUN: %target-sil-opt %s | %FileCheck %s --check-prefix=CHECK --check-prefix=DISABLE
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+enum E {
+  case A
+  case B(AnyObject)
+}
+
+struct S {
+  var e: E
+  var o: AnyObject
+}
+
+struct T {
+  var s: S
+}
+
+// CHECK-LABEL: sil [ossa] @ossa_function :
+// CHECK:         enum $E{{.*}} ownership: none
+// ENABLE:        struct $S{{.*}} ownership: owned
+// ENABLE:        begin_apply {{.*}} ownership: -, guaranteed
+// DISABLE-NOT:   ownership
+// CHECK:       } // end sil function 'ossa_function'
+sil [ossa] @ossa_function : $@convention(thin) (@inout T, @owned AnyObject) -> () {
+bb0(%0 : $*T, %1 : @owned $AnyObject):
+  %2 = enum $E, #E.A!enumelt
+  %3 = struct $S (%2, %1)
+  %4 = struct_element_addr %0, #T.s
+  store %3 to [assign] %4
+  (%6, %7) = begin_apply undef() : $@yield_once () -> (@yields @in_guaranteed AnyObject)
+  end_apply %7 as $()
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil @non_ossa_function :
+// CHECK-NOT:     ownership
+// CHECK:       } // end sil function 'non_ossa_function'
+sil @non_ossa_function : $@convention(thin) (@inout T, @owned AnyObject) -> () {
+bb0(%0 : $*T, %1 : $AnyObject):
+  %2 = enum $E, #E.A!enumelt
+  %3 = struct $S (%2, %1)
+  %4 = struct_element_addr %0, #T.s
+  store %3 to %4
+  (%6, %7) = begin_apply undef() : $@yield_once () -> (@yields @in_guaranteed AnyObject)
+  end_apply %7 as $()
+  %9 = tuple ()
+  return %9
+}
+

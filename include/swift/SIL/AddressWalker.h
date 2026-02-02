@@ -26,6 +26,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -185,6 +186,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         llvm_unreachable("Never takes an address");
       // Point uses.
       case TermKind::ReturnInst:
+      case TermKind::ReturnBorrowInst:
       case TermKind::ThrowInst:
       case TermKind::YieldInst:
       case TermKind::TryApplyInst:
@@ -214,8 +216,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<AssignInst>(user) || isa<LoadUnownedInst>(user) ||
         isa<StoreUnownedInst>(user) || isa<EndApplyInst>(user) ||
         isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
-        isa<AssignByWrapperInst>(user) || isa<AssignOrInitInst>(user) ||
-        isa<BeginUnpairedAccessInst>(user) ||
+        isa<AssignOrInitInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user) ||
         isa<IsUniqueInst>(user) || isa<ValueMetatypeInst>(user) ||
@@ -229,7 +230,11 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
-        isa<MergeIsolationRegionInst>(user) || isa<EndCOWMutationAddrInst>(user)) {
+        isa<MergeIsolationRegionInst>(user) ||
+        isa<EndCOWMutationAddrInst>(user) ||
+        isa<MakeBorrowInst>(user) || isa<DereferenceBorrowInst>(user) ||
+        isa<MakeAddrBorrowInst>(user) || isa<DereferenceAddrBorrowInst>(user) ||
+        isa<InitBorrowAddrInst>(user) || isa<DereferenceBorrowAddrInst>(user)) {
       callVisitUse(op);
       continue;
     }
@@ -294,6 +299,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::AddressOfRawLayout:
         case BuiltinValueKind::FlowSensitiveSelfIsolation:
         case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
+        case BuiltinValueKind::TaskLocalValuePush:
           callVisitUse(op);
           continue;
         default:

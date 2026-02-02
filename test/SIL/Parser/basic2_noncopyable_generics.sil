@@ -1,15 +1,15 @@
 // RUN: %target-sil-opt                                      \
 // RUN:     %s                                               \
-// RUN:     -enable-experimental-feature LifetimeDependence   \
+// RUN:     -enable-experimental-feature Lifetimes   \
 // RUN: |                                                    \
 // RUN: %target-sil-opt                                      \
-// RUN:     -enable-experimental-feature LifetimeDependence   \
+// RUN:     -enable-experimental-feature Lifetimes   \
 // RUN: |                                                    \
 // RUN: %FileCheck %s
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
-// For -enable-experimental-feature LifetimeDependence
+// For -enable-experimental-feature Lifetimes
 
 // TODO: Once NoncopyableGenerics/NonescapableTypes is no longer behind a feature flag, merge this into basic2.
 
@@ -29,7 +29,7 @@ struct NCG<T> : ~Copyable {
 // CHECK-NEXT:    var t: T
 struct NEG<T : ~Escapable> : ~Escapable {
   var t: T
-  @lifetime(copy t)
+  @_lifetime(copy t)
   init(_ t: consuming T) {
     self.t = t
   }

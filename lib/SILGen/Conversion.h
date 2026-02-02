@@ -17,10 +17,12 @@
 #ifndef SWIFT_LOWERING_CONVERSION_H
 #define SWIFT_LOWERING_CONVERSION_H
 
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/ExternalUnion.h"
 #include "Initialization.h"
 #include "SGFContext.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/ExternalUnion.h"
+#include "swift/SIL/AbstractionPattern.h"
+#include <optional>
 
 namespace swift {
 namespace Lowering {
@@ -115,6 +117,7 @@ private:
 
   struct BridgingStorage {
     bool IsExplicit;
+    AbstractionPattern InputOrigType;
   };
 
   /// The types we store for reabstracting contexts.  In general, when
@@ -161,11 +164,11 @@ private:
   static_assert(decltype(Types)::union_is_trivially_copyable,
                 "define the special members if this changes");
 
-  Conversion(KindTy kind, CanType sourceType, CanType resultType,
-             SILType loweredResultTy, bool isExplicit)
+  Conversion(KindTy kind, AbstractionPattern inputOrigType, CanType sourceType,
+             CanType resultType, SILType loweredResultTy, bool isExplicit)
       : Kind(kind), SourceType(sourceType), ResultType(resultType),
         LoweredResultType(loweredResultTy) {
-    Types.emplaceAggregate<BridgingStorage>(kind, isExplicit);
+    Types.emplaceAggregate<BridgingStorage>(kind, isExplicit, inputOrigType);
   }
 
   Conversion(AbstractionPattern inputOrigType, CanType inputSubstType,
@@ -236,13 +239,19 @@ public:
                       outputOrigType, outputSubstType, outputLoweredTy);
   }
 
-  static Conversion getBridging(KindTy kind, CanType origType,
-                                CanType resultType, SILType loweredResultTy,
-                                bool isExplicit = false) {
+  static Conversion
+  getBridging(KindTy kind, CanType origType, CanType resultType,
+              SILType loweredResultTy,
+              std::optional<AbstractionPattern> inputOrigType = std::nullopt,
+              bool isExplicit = false) {
     assert(isBridgingKind(kind));
     assert((kind != Subtype || isAllowedConversion(origType, resultType)) &&
            "disallowed conversion for subtype relationship");
-    return Conversion(kind, origType, resultType, loweredResultTy, isExplicit);
+    if (inputOrigType)
+      return Conversion(kind, *inputOrigType, origType, resultType,
+                        loweredResultTy, isExplicit);
+    return Conversion(kind, AbstractionPattern(origType), origType, resultType,
+                      loweredResultTy, isExplicit);
   }
 
   static Conversion getSubtype(CanType origType, CanType substType,
@@ -288,6 +297,10 @@ public:
 
   bool isBridgingExplicit() const {
     return Types.get<BridgingStorage>(Kind).IsExplicit;
+  }
+
+  AbstractionPattern getBridgingOriginalInputType() const {
+    return Types.get<BridgingStorage>(Kind).InputOrigType;
   }
 
   CanType getSourceType() const {

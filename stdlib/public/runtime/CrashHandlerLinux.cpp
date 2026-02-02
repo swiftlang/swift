@@ -49,6 +49,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#define DEBUG_MEMSERVER 0
+
+#if DEBUG_MEMSERVER
+#include <stdio.h>
+#define memserver_error(x) perror(x)
+#else
+#define memserver_error(x)
+#endif
+
 #include "swift/Runtime/Backtrace.h"
 
 #include <cstring>
@@ -85,9 +94,9 @@ ssize_t safe_read(int fd, void *buf, size_t len) {
   while (ptr < end) {
     ssize_t ret;
     do {
-      ret = read(fd, buf, len);
-    } while (ret < 0 && errno == EINTR);
-    if (ret < 0)
+      ret = read(fd, ptr, len);
+    } while (ret <= 0 && errno == EINTR);
+    if (ret <= 0)
       return ret;
     total += ret;
     ptr += ret;
@@ -105,9 +114,9 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
   while (ptr < end) {
     ssize_t ret;
     do {
-      ret = write(fd, buf, len);
-    } while (ret < 0 && errno == EINTR);
-    if (ret < 0)
+      ret = write(fd, ptr, len);
+    } while (ret <= 0 && errno == EINTR);
+    if (ret <= 0)
       return ret;
     total += ret;
     ptr += ret;
@@ -646,7 +655,6 @@ wait_paused(uint32_t expected, const struct timespec *timeout)
 char memserver_stack[4096] __attribute__((aligned(SWIFT_PAGE_SIZE)));
 char memserver_buffer[4096];
 int memserver_fd;
-bool memserver_has_ptrace;
 sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
@@ -657,20 +665,28 @@ memserver_start()
   int fds[2];
 
   ret = socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
-  if (ret < 0)
+  if (ret < 0) {
+    memserver_error("memserver_start: socketpair failed");
     return ret;
+  }
 
   memserver_fd = fds[0];
   ret = clone(memserver_entry, memserver_stack + sizeof(memserver_stack),
 #if MEMSERVER_USE_PROCESS
               0,
 #else
-              CLONE_THREAD | CLONE_VM | CLONE_FILES
-              | CLONE_FS | CLONE_IO | CLONE_SIGHAND,
+              #ifndef __musl__
+              // Can't use CLONE_THREAD on musl because the clone() function
+              // there returns EINVAL if we do.
+              CLONE_THREAD | CLONE_SIGHAND |
+              #endif
+              CLONE_VM | CLONE_FILES | CLONE_FS | CLONE_IO,
 #endif
               NULL);
-  if (ret < 0)
+  if (ret < 0) {
+    memserver_error("memserver_start: clone failed");
     return ret;
+  }
 
 #if MEMSERVER_USE_PROCESS
   memserver_pid = ret;
@@ -695,21 +711,18 @@ memserver_fault(int sig) {
 
 ssize_t __attribute__((noinline))
 memserver_read(void *to, const void *from, size_t len) {
-  if (memserver_has_ptrace) {
-// This won't run for older Android APIs anyway, but it can't be compiled
-// either, as process_vm_readv() isn't available.
-#if !(defined(__ANDROID_API__) && __ANDROID_API__ < 23)
-    struct iovec local = { to, len };
-    struct iovec remote = { const_cast<void *>(from), len };
-    return process_vm_readv(memserver_pid, &local, 1, &remote, 1, 0);
-#endif
+  /* Earlier versions of this code tried to use process_vm_readv() if they
+     detected that CAP_SYS_PTRACE was enabled.  This is theoretically
+     slightly safer than using signals and memcpy(), but in practice it
+     turns out that some kernels don't support process_vm_readv() even
+     when CAP_SYS_PTRACE is enabled.
+
+     It seems simpler just to use the signal handlers instead. */
+  if (!sigsetjmp(memserver_fault_buf, 1)) {
+    memcpy(to, from, len);
+    return len;
   } else {
-    if (!sigsetjmp(memserver_fault_buf, 1)) {
-      memcpy(to, from, len);
-      return len;
-    } else {
-      return -1;
-    }
+    return -1;
   }
 }
 
@@ -718,33 +731,26 @@ memserver_entry(void *dummy __attribute__((unused))) {
   int fd = memserver_fd;
   int result = 1;
 
-#if MEMSERVER_USE_PROCESS
+#if MEMSERVER_USE_PROCESS || defined(__musl__)
   prctl(PR_SET_NAME, "[backtrace]");
 #endif
 
-// process_vm_readv() is not available for older Android APIs.
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 23
-  memserver_has_ptrace = false;
-#else
-  memserver_has_ptrace = !!prctl(PR_CAPBSET_READ, CAP_SYS_PTRACE);
-#endif
-
-  if (!memserver_has_ptrace) {
-    struct sigaction sa;
-    sigfillset(&sa.sa_mask);
-    sa.sa_handler = memserver_fault;
-    sa.sa_flags = SA_NODEFER;
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGBUS, &sa, NULL);
-  }
+  struct sigaction sa;
+  sigfillset(&sa.sa_mask);
+  sa.sa_handler = memserver_fault;
+  sa.sa_flags = SA_NODEFER;
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
 
   for (;;) {
     struct memserver_req req;
     ssize_t ret;
 
     ret = safe_read(fd, &req, sizeof(req));
-    if (ret != sizeof(req))
+    if (ret != sizeof(req)) {
+      memserver_error("memserver: terminating because safe_read() returned wrong size");
       break;
+    }
 
     uint64_t addr = req.addr;
     uint64_t bytes = req.len;
@@ -761,15 +767,19 @@ memserver_entry(void *dummy __attribute__((unused))) {
       resp.len = ret;
 
       ret = safe_write(fd, &resp, sizeof(resp));
-      if (ret != sizeof(resp))
+      if (ret != sizeof(resp)) {
+        memserver_error("memserver: terminating because safe_write() failed");
         goto fail;
+      }
 
       if (resp.len < 0)
         break;
 
       ret = safe_write(fd, memserver_buffer, resp.len);
-      if (ret != resp.len)
+      if (ret != resp.len) {
+        memserver_error("memserver: terminating because safe_write() failed (2)");
         goto fail;
+      }
 
       addr += resp.len;
       bytes -= resp.len;

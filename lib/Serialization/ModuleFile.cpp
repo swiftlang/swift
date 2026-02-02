@@ -210,6 +210,10 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     auto importPath = builder.copyTo(ctx);
     auto modulePath = importPath.getModulePath(dependency.isScoped());
     auto accessPath = importPath.getAccessPath(dependency.isScoped());
+    if (!getContext().LangOpts.DisableDeserializationOfExplicitPaths &&
+        !dependency.Core.BinaryModulePath.empty())
+      ctx.addExplicitModulePath(modulePath.front().Item.str(),
+                                dependency.Core.BinaryModulePath.str());
 
     auto module = getModule(modulePath, /*allowLoading*/true);
     if (!module || module->failedToLoad()) {
@@ -292,7 +296,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
 
   StringRef SDKPath = ctx.SearchPathOpts.getSDKPath();
   // In Swift 6 mode, we do not inherit search paths from loaded non-SDK modules.
-  if (!ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+  if (!ctx.isLanguageModeAtLeast(6) &&
       (SDKPath.empty() ||
        !Core->ModuleInputBuffer->getBufferIdentifier().starts_with(SDKPath))) {
     for (const auto &searchPath : Core->SearchPaths) {
@@ -426,9 +430,9 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
   bool isFramework = false;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(newBuf), nullptr, nullptr,
-      /*isFramework=*/isFramework, Ctx.SILOpts.EnableOSSAModules,
-      Ctx.LangOpts.SDKName, Ctx.SearchPathOpts.DeserializedPathRecoverer,
-      loadedModuleFile);
+      /*isFramework=*/isFramework,
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
 }
@@ -609,11 +613,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
                                     SourceLoc(), importPath.get());
       ID->setModule(M);
       if (Dep.isExported())
-        ID->getAttrs().add(
-            new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
       if (Dep.isImplementationOnly())
-        ID->getAttrs().add(
-            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false));
+        ID->addAttribute(new (Ctx)
+                             ImplementationOnlyAttr(/*IsImplicit=*/false));
 
       ImportDecls.push_back(ID);
     }
@@ -754,7 +757,7 @@ void ModuleFile::loadDerivativeFunctionConfigurations(
     return;
   auto &ctx = originalAFD->getASTContext();
   Mangle::ASTMangler Mangler(ctx);
-  auto mangledName = Mangler.mangleDeclAsUSR(originalAFD, "");
+  auto mangledName = Mangler.mangleDeclWithPrefix(originalAFD, "");
   auto configs = Core->DerivativeFunctionConfigurations->find(mangledName);
   if (configs == Core->DerivativeFunctionConfigurations->end())
     return;

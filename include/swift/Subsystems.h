@@ -80,6 +80,10 @@ namespace swift {
     class TypeConverter;
   }
 
+  namespace cas {
+    class SwiftCASOutputBackend;
+  }
+
   namespace fine_grained_dependencies {
     class SourceFileDepGraph;
   }
@@ -126,8 +130,7 @@ namespace swift {
   /// Resolve imports for a source file generated to adapt a given
   /// Clang module.
   void performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
-  );
+      SourceFile &SF, ModuleDecl *explicitOriginModule);
 
   /// Once type-checking is complete, this instruments code with calls to an
   /// intrinsic that record the expected values of local variables so they can
@@ -244,27 +247,33 @@ namespace swift {
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
              std::string>
-  getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx);
+  getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
+                     std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr);
 
   /// Turn the given Swift module into LLVM IR and return the generated module.
   /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
   performIRGeneration(ModuleDecl *M, const IRGenOptions &Opts,
                       const TBDGenOptions &TBDOpts,
-                      std::unique_ptr<SILModule> SILMod,
-                      StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                      std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
+                      const PrimarySpecificPaths &PSPs,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
                       ArrayRef<std::string> parallelOutputFilenames,
-                      llvm::GlobalVariable **outModuleHash = nullptr);
+                      ArrayRef<std::string> parallelIROutputFilenames,
+                      llvm::GlobalVariable **outModuleHash = nullptr,
+                      cas::SwiftCASOutputBackend *casBackend = nullptr);
 
   /// Turn the given Swift file into LLVM IR and return the generated module.
   /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
-  performIRGeneration(FileUnit *file, const IRGenOptions &Opts, 
+  performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
                       const TBDGenOptions &TBDOpts,
-                      std::unique_ptr<SILModule> SILMod,
-                      StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                      std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
+                      const PrimarySpecificPaths &PSPs,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
                       StringRef PrivateDiscriminator,
-                      llvm::GlobalVariable **outModuleHash = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr,
+                      cas::SwiftCASOutputBackend *casBackend = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR
@@ -330,7 +339,8 @@ namespace swift {
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
-  createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx);
+  createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS);
 
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {

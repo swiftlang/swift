@@ -97,6 +97,12 @@ bool canSILUseScalarCheckedCastInstructions(SILModule &M,
                                             CanType sourceType,
                                             CanType targetType);
 
+/// Can the given cast be performed by the scalar checked-cast instructions in
+/// the current SIL stage, or do we need to use the indirect instructions?
+bool canOptimizeToScalarCheckedCastInstructions(
+    SILFunction *func, CanType sourceType, CanType targetType,
+    CastConsumptionKind consumption);
+
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions at IRGen, or do we need to use the indirect instructions?
 bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,
@@ -107,7 +113,7 @@ bool canIRGenUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
-    CastingIsolatedConformances isolatedConformances,
+    CheckedCastInstOptions options,
     CastConsumptionKind consumption, SILValue src, CanType sourceType,
     SILValue dest, CanType targetType, SILBasicBlock *trueBB,
     SILBasicBlock *falseBB, ProfileCounter TrueCount = ProfileCounter(),
@@ -458,18 +464,18 @@ public:
         getModule(), getSourceFormalType(), getTargetFormalType());
   }
 
-  CastingIsolatedConformances getIsolatedConformances() const {
+  CheckedCastInstOptions getCheckedCastOptions() const {
     switch (getKind()) {
     case SILDynamicCastKind::CheckedCastAddrBranchInst:
-      return cast<CheckedCastAddrBranchInst>(inst)->getIsolatedConformances();
+      return cast<CheckedCastAddrBranchInst>(inst)->getCheckedCastOptions();
     case SILDynamicCastKind::CheckedCastBranchInst:
-      return cast<CheckedCastBranchInst>(inst)->getIsolatedConformances();
+      return cast<CheckedCastBranchInst>(inst)->getCheckedCastOptions();
     case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
       return cast<UnconditionalCheckedCastAddrInst>(inst)
-          ->getIsolatedConformances();
+          ->getCheckedCastOptions();
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return cast<UnconditionalCheckedCastInst>(inst)
-          ->getIsolatedConformances();
+          ->getCheckedCastOptions();
     }
   }
 };

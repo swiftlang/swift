@@ -28,6 +28,7 @@
 #include "IRGen.h"
 #include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace llvm {
@@ -325,6 +326,7 @@ public:
   virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                                  SILType T) const = 0;
 
@@ -354,12 +356,14 @@ public:
                         bool useStructLayouts) const = 0;
 
   /// Allocate a variable of this type on the stack.
-  virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                     const llvm::Twine &name) const = 0;
+  virtual StackAddress allocateStack(
+      IRGenFunction &IGF, SILType T, const llvm::Twine &name,
+      StackAllocationIsNested_t isNested = StackAllocationIsNested) const = 0;
 
   /// Deallocate a variable of this type.
-  virtual void deallocateStack(IRGenFunction &IGF, StackAddress addr,
-                               SILType T) const = 0;
+  virtual void deallocateStack(
+      IRGenFunction &IGF, StackAddress addr, SILType T,
+      StackAllocationIsNested_t isNested = StackAllocationIsNested) const = 0;
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.

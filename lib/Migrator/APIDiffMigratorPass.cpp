@@ -29,7 +29,7 @@
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
@@ -468,16 +468,18 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                          Type T, ReferenceMetaData Data) override {
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
+                          ReferenceMetaData Data) override {
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
     if (Data.isImplicit)
       return true;
 
     for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
-      if (isSimpleReplacement(Item, isDotMember(Range), RepText)) {
-        Editor.replace(Range, RepText);
+      if (isSimpleReplacement(Item, isDotMember(CharRange), RepText)) {
+        Editor.replace(CharRange, RepText);
         return true;
       }
     }
@@ -488,11 +490,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     ValueDecl *Target;
     CharSourceRange Result;
     ReferenceCollector(ValueDecl* Target) : Target(Target) {}
-    bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+    bool visitDeclReference(ValueDecl *D, SourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                             Type T, ReferenceMetaData Data) override {
       if (D == Target && !Data.isImplicit && Range.isValid()) {
-        Result = Range;
+        Result = Lexer::getCharSourceRangeFromSourceRange(
+            D->getASTContext().SourceMgr, Range);
         return false;
       }
       return true;
@@ -1400,10 +1403,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *BS = dyn_cast<BraceStmt>(S)) {
         for(auto Ele: BS->getElements()) {
-          if (Ele.is<Expr*>() && isSuperExpr(Ele.get<Expr*>())) {
+          if (isa<Expr *>(Ele) && isSuperExpr(cast<Expr *>(Ele))) {
             Editor.remove(Ele.getSourceRange());
           }
-	}
+        }
       }
       // We only handle top-level expressions, so avoid visiting further.
       return Action::SkipNode(S);

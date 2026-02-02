@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines the SyntacticElementTarget class.
+//  This file defines the SyntacticElementTarget class (a unit of
+//  type-checking).
 //
 //===----------------------------------------------------------------------===//
 
@@ -29,38 +30,8 @@
 namespace swift {
 
 namespace constraints {
-/// Describes information about a for-in loop over a sequence that needs to be
-/// tracked in the constraint system.
-struct SequenceIterationInfo {
-  /// The type of the sequence.
-  Type sequenceType;
-
-  /// The type of an element in the sequence.
-  Type elementType;
-
-  /// The type of the pattern that matches the elements.
-  Type initType;
-
-  /// Implicit `$iterator = <sequence>.makeIterator()`
-  PatternBindingDecl *makeIteratorVar;
-
-  /// Implicit `$iterator.next()` call.
-  Expr *nextCall;
-};
-
-/// Describes information about a for-in loop over a pack that needs to be
-/// tracked in the constraint system.
-struct PackIterationInfo {
-  /// The type of the pattern that matches the elements.
-  Type patternType;
-};
-
-/// Describes information about a for-in loop that needs to be tracked
-/// within the constraint system.
-using ForEachStmtInfo = TaggedUnion<SequenceIterationInfo, PackIterationInfo>;
-
-/// Describes the target to which a constraint system's solution can be
-/// applied.
+/// Describes the target (a unit of type-checking) to which a constraint
+/// system's solution can be applied.
 class SyntacticElementTarget {
 public:
   enum class Kind {
@@ -165,7 +136,6 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      ForEachStmtInfo info;
     } forEachPreamble;
 
     PatternBindingDecl *patternBinding;
@@ -262,8 +232,9 @@ public:
                     unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form an expression target for a ReturnStmt.
-  static SyntacticElementTarget
-  forReturn(ReturnStmt *returnStmt, Type contextTy, DeclContext *dc);
+  static SyntacticElementTarget forReturn(ReturnStmt *returnStmt,
+                                          Expr *returnExpr, Type contextTy,
+                                          DeclContext *dc);
 
   /// Form a target for the preamble of a for-in loop, excluding its where
   /// clause and body.
@@ -450,7 +421,7 @@ public:
   /// For a pattern initialization target, retrieve the pattern.
   Pattern *getInitializationPattern() const {
     if (kind == Kind::uninitializedVar)
-      return uninitializedVar.declaration.get<Pattern *>();
+      return cast<Pattern *>(uninitializedVar.declaration);
 
     assert(isForInitialization());
     return expression.pattern;
@@ -548,16 +519,6 @@ public:
     return expression.initialization.patternBindingIndex;
   }
 
-  const ForEachStmtInfo &getForEachStmtInfo() const {
-    assert(isForEachPreamble());
-    return forEachPreamble.info;
-  }
-
-  ForEachStmtInfo &getForEachStmtInfo() {
-    assert(isForEachPreamble());
-    return forEachPreamble.info;
-  }
-
   /// Whether this context infers an opaque return type.
   bool infersOpaqueReturnType() const;
 
@@ -589,7 +550,7 @@ public:
 
   void setPattern(Pattern *pattern) {
     if (kind == Kind::uninitializedVar) {
-      assert(uninitializedVar.declaration.is<Pattern *>());
+      assert(isa<Pattern *>(uninitializedVar.declaration));
       uninitializedVar.declaration = pattern;
       return;
     }
@@ -601,7 +562,6 @@ public:
 
     switch (getExprContextualTypePurpose()) {
     case CTP_Initialization:
-    case CTP_ForEachStmt:
     case CTP_ForEachSequence:
     case CTP_ExprPattern:
       break;
@@ -833,14 +793,14 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getSourceRange();
       }
-      return uninitializedVar.declaration.get<Pattern *>()->getSourceRange();
+      return cast<Pattern *>(uninitializedVar.declaration)->getSourceRange();
     }
 
     // For-in preamble target doesn't cover the body.
     case Kind::forEachPreamble:
       auto *stmt = forEachPreamble.stmt;
       SourceLoc startLoc = stmt->getForLoc();
-      SourceLoc endLoc = stmt->getParsedSequence()->getEndLoc();
+      SourceLoc endLoc = stmt->getSequence()->getEndLoc();
 
       if (auto *whereExpr = stmt->getWhere()) {
         endLoc = whereExpr->getEndLoc();
@@ -877,7 +837,7 @@ public:
               uninitializedVar.declaration.dyn_cast<VarDecl *>()) {
         return wrappedVar->getLoc();
       }
-      return uninitializedVar.declaration.get<Pattern *>()->getLoc();
+      return cast<Pattern *>(uninitializedVar.declaration)->getLoc();
     }
 
     case Kind::forEachPreamble:

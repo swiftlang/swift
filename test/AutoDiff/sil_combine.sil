@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
+// UNSUPPORTED: OS=wasip1
+
 // SILCombine tests for differentiation-related instructions.
 
 sil_stage canonical
@@ -58,7 +60,7 @@ bb0(%orig : $@callee_guaranteed (Float) -> Float):
 // CHECK:   [[DIFF_FN:%.*]] = differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : $@callee_guaranteed (Float) -> Float
 // CHECK:   [[EXTRACTED_VJP:%.*]] = differentiable_function_extract [vjp] [[DIFF_FN]] : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
 // CHECK:   return [[EXTRACTED_VJP]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK-LABEL: } // end sil function 'differentiable_function_extract_vjp_undefined' 
+// CHECK-LABEL: } // end sil function 'differentiable_function_extract_vjp_undefined'
 
 // MARK: `convert_function` hoisting
 

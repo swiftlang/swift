@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -23,6 +23,13 @@ extension TypeProperties {
   public func loweredType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
     function.bridged.getLoweredType(rawType.bridged, maximallyAbstracted).type.objectType
   }
+
+  // Lowers the AST type to a SIL type - in a specific function.
+  // In contrast to `loweredType`, this takes `AbstractionPattern` constructed from `function`'s
+  // `SubstGenericSignature` into account when getting the lowered type.
+  public func loweredTypeWithAbstractionPattern(in function: Function) -> Type {
+    function.bridged.getLoweredTypeWithAbstractionPattern(rawType.canonical.bridged).type
+  }
 }
 
 extension CanonicalType {
@@ -30,6 +37,11 @@ extension CanonicalType {
   // For example, if the AST type is a `AnyFunctionType` for which the lowered type would be a `SILFunctionType`.
   public var silType: Type? {
     BridgedType.createSILType(bridged).typeOrNil
+  }
+
+  public func getBoxFields(in function: Function) -> BoxFieldsArray {
+    precondition(isBox)
+    return BoxFieldsArray(boxType: self, function: function)
   }
 }
 

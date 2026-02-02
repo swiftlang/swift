@@ -16,6 +16,8 @@
 
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
@@ -27,6 +29,8 @@
 #include "swift/Basic/StringExtras.h"
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include <optional>
 
@@ -48,15 +52,25 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
     }
   }
 
+  if (auto cdeclAttr = VD->getAttrs().getAttribute<CDeclAttr>())
+    if (!customNamesOnly || !cdeclAttr->Name.empty())
+      return VD->getCDeclName();
+
   if (customNamesOnly)
     return StringRef();
 
   if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
     if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
       return II->getName();
-    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl))
+    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl)) {
       if (auto *anonTypedef = anonDecl->getTypedefNameForAnonDecl())
         return anonTypedef->getIdentifier()->getName();
+      if (auto *cfOptionsTy =
+              VD->getASTContext()
+                  .getClangModuleLoader()
+                  ->getTypeDefForCXXCFOptionsDefinition(anonDecl))
+        return cfOptionsTy->getDecl()->getName();
+    }
   }
 
   return VD->getBaseIdentifier().str();
@@ -220,15 +234,62 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
       auto r = ctx.getIdentifier(os.str());
       return r.str();
     }
-
-    // FIXME: String.Index should be exposed as String::Index, not
-    // _String_Index.
-    if (VD->getBaseIdentifier().str() == "Index") {
-      return "String_Index";
-    }
   }
 
   return VD->getBaseIdentifier().str();
+}
+
+namespace {
+struct ObjCTypeWalker : TypeWalker {
+  bool hadObjCType = false;
+  const ASTContext &ctx;
+  ObjCTypeWalker(const ASTContext &ctx) : ctx(ctx) {}
+  Action walkToTypePre(Type ty) override {
+    if (auto *nominal = ty->getNominalOrBoundGenericNominal()) {
+      if (auto clangDecl = nominal->getClangDecl()) {
+        if (cxx_translation::isObjCxxOnly(clangDecl, ctx)) {
+          hadObjCType = true;
+          return Action::Stop;
+        }
+      }
+    }
+    return Action::Continue;
+  }
+};
+} // namespace
+
+bool swift::cxx_translation::isObjCxxOnly(const ValueDecl *VD) {
+  ObjCTypeWalker walker{VD->getASTContext()};
+  VD->getInterfaceType().walk(walker);
+  return walker.hadObjCType;
+}
+
+bool swift::cxx_translation::isObjCxxOnly(const clang::Decl *D,
+                                          const ASTContext &ctx) {
+  // Check if this is decl can only be referred to from Objective-C.
+  if (isa<clang::ObjCInterfaceDecl>(D))
+    return true;
+
+  // By default, we import all modules in Obj-C++ mode, so there is no robust
+  // way to tell if something is coming from an Obj-C module. Use the
+  // requirements and the language options to check if we should actually
+  // consider the module to have ObjC constructs.
+  const auto &langOpts = D->getASTContext().getLangOpts();
+  // TODO: have a reasonable guess for headers specified via
+  // `-import-objc-header`.
+  if (!D->hasOwningModule())
+    return false;
+  auto clangModule = D->getOwningModule()->getTopLevelModule();
+  bool requiresObjC = false;
+  for (auto req : clangModule->Requirements)
+    if (req.RequiredState && req.FeatureName == "objc")
+      requiresObjC = true;
+  return langOpts.ObjC &&
+         (requiresObjC ||
+          llvm::any_of(ctx.LangOpts.ModulesRequiringObjC,
+                       [clangModule](StringRef moduleName) {
+                         return clangModule->getFullModuleName() == moduleName;
+                       }));
 }
 
 swift::cxx_translation::DeclRepresentation
@@ -244,9 +305,8 @@ swift::cxx_translation::getDeclRepresentation(
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
   GenericSignature genericSignature;
-  // Don't expose @_alwaysEmitIntoClient decls as they require their
-  // bodies to be emitted into client.
-  if (VD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+  // Don't expose decls with definitions that are emitted into the client.
+  if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AFD->hasAsync())
@@ -255,7 +315,7 @@ swift::cxx_translation::getDeclRepresentation(
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    if (AFD->isGeneric())
+    if (AFD->hasGenericParamList())
       genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
@@ -269,7 +329,7 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
-    if (typeDecl->isGeneric()) {
+    if (typeDecl->hasGenericParamList()) {
       if (isa<ClassDecl>(VD))
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
@@ -316,6 +376,9 @@ swift::cxx_translation::getDeclRepresentation(
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
+
+  if (isObjCxxOnly(VD))
+    return {ObjCxxOnly, std::nullopt};
 
   return {Representable, std::nullopt};
 }

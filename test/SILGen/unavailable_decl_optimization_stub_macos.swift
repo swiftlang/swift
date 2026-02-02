@@ -24,6 +24,14 @@ public func unavailableFunc() {}
 @available(macOS, unavailable)
 public func unavailableOnMacOSFunc() {}
 
+// CHECK-LABEL:     sil{{.*}}@$s4Test36unavailableFuncWithMacOSIntroductionyyF
+// CHECK:             [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
+// CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
+// CHECK:           } // end sil function '$s4Test36unavailableFuncWithMacOSIntroductionyyF'
+@available(*, unavailable)
+@available(macOS 12.0, *)
+public func unavailableFuncWithMacOSIntroduction() {}
+
 // CHECK-LABEL:     sil{{.*}}@$s4Test31unavailableOnMacOSExtensionFuncyyF
 // CHECK-NOT:         _diagnoseUnavailableCodeReached
 // CHECK:           } // end sil function '$s4Test31unavailableOnMacOSExtensionFuncyyF'

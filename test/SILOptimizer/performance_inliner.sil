@@ -962,7 +962,7 @@ bb0(%1 : $@thick Self.Type):
   return %8 : $()
 }
 
-sil [always_inline] @has_self_metadata : $@convention(method) (@thick X.Type) -> @owned X {
+sil [heuristic_always_inline] @has_self_metadata : $@convention(method) (@thick X.Type) -> @owned X {
 bb0(%1 : $@thick X.Type):
   %3 = unchecked_trivial_bit_cast %1 : $@thick X.Type to $@thick @dynamic_self X.Type
   %27 = upcast %3 : $@thick @dynamic_self X.Type to $@thick X.Type

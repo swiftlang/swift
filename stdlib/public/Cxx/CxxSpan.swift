@@ -66,7 +66,7 @@ public protocol CxxSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
+  init(_ unsafePointer: UnsafePointer<Element>!, _ count: Size)
 
   func size() -> Size
   func __dataUnsafe() -> UnsafePointer<Element>?
@@ -74,14 +74,14 @@ public protocol CxxSpan<Element> {
 
 extension CxxSpan {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
     unsafe precondition(unsafeBufferPointer.baseAddress != nil, 
                   "UnsafeBufferPointer should not point to nil")
     unsafe self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
     unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
@@ -89,7 +89,7 @@ extension CxxSpan {
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
-  @inlinable
+  @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: Span<Element>) {
     let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeRawPointer?, Int).self)
@@ -136,7 +136,7 @@ public protocol CxxMutableSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+  init(_ unsafeMutablePointer: UnsafeMutablePointer<Element>!, _ count: Size)
 
   func size() -> Size
   func __dataUnsafe() -> UnsafeMutablePointer<Element>?
@@ -144,7 +144,7 @@ public protocol CxxMutableSpan<Element> {
 
 extension CxxMutableSpan {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
-  @inlinable
+  @_alwaysEmitIntoClient
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
     unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
@@ -152,7 +152,7 @@ extension CxxMutableSpan {
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
-  @inlinable
+  @_alwaysEmitIntoClient
   @unsafe
   public init(_ span: consuming MutableSpan<Element>) {
     let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeMutableRawPointer?, Int).self)

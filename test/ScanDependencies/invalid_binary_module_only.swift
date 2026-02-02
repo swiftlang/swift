@@ -8,6 +8,5 @@
 
 import FooBar
 
-// CHECK: warning: module file '{{.*}}{{/|\\}}moduleInputs{{/|\\}}FooBar.swiftmodule' is incompatible with this Swift compiler: malformed
-// CHECK: error: Unable to find module dependency: 'FooBar'
-
+// CHECK: error: unable to resolve Swift module dependency to a compatible module: 'FooBar'
+// CHECK: note: found incompatible module '{{.*}}{{/|\\}}moduleInputs{{/|\\}}FooBar.swiftmodule': malformed

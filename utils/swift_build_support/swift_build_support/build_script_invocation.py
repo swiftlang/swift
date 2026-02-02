@@ -119,6 +119,8 @@ class BuildScriptInvocation(object):
             "--cmake-generator", args.cmake_generator,
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
+            "--cross-compile-build-swift-tools", str(
+                args.cross_compile_build_swift_tools).lower(),
             "--build-jobs", str(args.build_jobs),
             "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
@@ -256,7 +258,7 @@ class BuildScriptInvocation(object):
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
         if args.build_early_swift_driver:
-            configuration = 'release' if str(args.swift_build_variant) in [
+            configuration = 'release' if str(args.build_variant) in [
                 'Release',
                 'RelWithDebInfo'
             ] else 'debug'
@@ -623,7 +625,7 @@ class BuildScriptInvocation(object):
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
         # configured. Instead, handle this in the product for now.
         builder.add_product(products.LLVM,
-                            is_enabled=True)
+                            is_enabled=self.args.build_llvm or self.args.build_swift or self.args.build_lldb)
 
         builder.add_product(products.StaticSwiftLinuxConfig,
                             is_enabled=self.args.install_static_linux_config)

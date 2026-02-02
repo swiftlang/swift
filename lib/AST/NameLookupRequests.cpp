@@ -58,7 +58,7 @@ void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 std::optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
@@ -205,22 +205,15 @@ HasMissingDesignatedInitializersRequest::evaluate(Evaluator &evaluator,
 
 std::optional<NominalTypeDecl *>
 ExtendedNominalRequest::getCachedResult() const {
-  // Note: if we fail to compute any nominal declaration, it's considered
-  // a cache miss. This allows us to recompute the extended nominal types
-  // during extension binding.
-  // This recomputation is also what allows you to extend types defined inside
-  // other extensions, regardless of source file order. See \c bindExtensions(),
-  // which uses a worklist algorithm that attempts to bind everything until
-  // fixed point.
   auto ext = std::get<0>(getStorage());
-  if (!ext->hasBeenBound() || !ext->getExtendedNominal())
+  if (!ext->hasBeenBound())
     return std::nullopt;
-  return ext->getExtendedNominal();
+  return ext->ExtendedNominal.getPointer();
 }
 
 void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
   auto ext = std::get<0>(getStorage());
-  ext->setExtendedNominal(value);
+  const_cast<ExtensionDecl *>(ext)->setExtendedNominal(value);
 }
 
 void ExtendedNominalRequest::writeDependencySink(
@@ -434,10 +427,10 @@ void ModuleQualifiedLookupRequest::writeDependencySink(
 }
 
 //----------------------------------------------------------------------------//
-// LookupConformanceInModuleRequest computation.
+// LookupConformanceRequest computation.
 //----------------------------------------------------------------------------//
 
-void LookupConformanceInModuleRequest::writeDependencySink(
+void LookupConformanceRequest::writeDependencySink(
     evaluator::DependencyCollector &reqTracker,
     ProtocolConformanceRef lookupResult) const {
   if (lookupResult.isInvalid() || !lookupResult.isConcrete())
@@ -638,12 +631,12 @@ UnqualifiedLookupRequest::UnqualifiedLookupRequest(
 ) : SimpleRequest(contextualizeOptions(descriptor)) { }
 
 LookupInModuleRequest::LookupInModuleRequest(
-      const DeclContext *moduleOrFile, DeclName name, NLKind lookupKind,
-      namelookup::ResolutionKind resolutionKind,
+      const DeclContext *moduleOrFile, DeclName name, bool hasModuleSelector,
+      NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
       const DeclContext *moduleScopeContext,
       SourceLoc loc, NLOptions options
- ) : SimpleRequest(moduleOrFile, name, lookupKind, resolutionKind,
-                   moduleScopeContext,
+ ) : SimpleRequest(moduleOrFile, name, hasModuleSelector, lookupKind,
+                   resolutionKind, moduleScopeContext,
                    contextualizeOptions(moduleOrFile, loc, options)) { }
 
 ModuleQualifiedLookupRequest::ModuleQualifiedLookupRequest(

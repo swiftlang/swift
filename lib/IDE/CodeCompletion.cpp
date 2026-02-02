@@ -14,6 +14,7 @@
 #include "CodeCompletionDiagnostics.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
@@ -105,7 +106,7 @@ std::string swift::ide::removeCodeCompletionTokens(
 namespace {
 
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
-                                    public DoneParsingCallback {
+                                    public ReadyForTypeCheckingCallback {
   CodeCompletionContext &CompletionContext;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
@@ -175,25 +176,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
 
   /// \returns true on success, false on failure.
   bool typecheckParsedType() {
-    // If the type appeared inside an extension, make sure that extension has
-    // been bound.
-    auto SF = CurDeclContext->getParentSourceFile();
-    auto visitTopLevelDecl = [&](Decl *D) {
-      if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        if (ED->getSourceRange().contains(ParsedTypeLoc.getLoc())) {
-          ED->computeExtendedNominal();
-        }
-      }
-    };
-    for (auto item : SF->getTopLevelItems()) {
-      if (auto D = item.dyn_cast<Decl *>()) {
-        visitTopLevelDecl(D);
-      }
-    }
-    for (auto *D : SF->getHoistedDecls()) {
-      visitTopLevelDecl(D);
-    }
-
     assert(ParsedTypeLoc.getTypeRepr() && "should have a TypeRepr");
     if (ParsedTypeLoc.wasValidated() && !ParsedTypeLoc.isError()) {
       return true;
@@ -206,7 +188,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
         CurDeclContext,
         /*ProduceDiagnostics=*/false);
     if (!ty->hasError()) {
-      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoContext(ty));
+      ParsedTypeLoc.setType(CurDeclContext->mapTypeIntoEnvironment(ty));
       return true;
     }
 
@@ -233,8 +215,8 @@ public:
   CodeCompletionCallbacksImpl(Parser &P,
                               CodeCompletionContext &CompletionContext,
                               CodeCompletionConsumer &Consumer)
-      : CodeCompletionCallbacks(P), DoneParsingCallback(),
-        CompletionContext(CompletionContext), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), CompletionContext(CompletionContext),
+        Consumer(Consumer) {}
 
   void setAttrTargetDeclKind(std::optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
@@ -309,7 +291,7 @@ public:
   void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
 
-  void doneParsing(SourceFile *SrcFile) override;
+  void readyForTypeChecking(SourceFile *SrcFile) override;
 
 private:
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
@@ -901,13 +883,13 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
       // Note that `TypeContext` must stay alive for the duration of
       // `~CodeCodeCompletionResultBuilder()`.
       ExpectedTypeContext TypeContext;
-      TypeContext.setPossibleTypes({resultType});
+      TypeContext.setPossibleTypes({DC->mapTypeIntoEnvironment(resultType)});
 
       CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
                                           SemanticContextKind::None);
       Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
       Builder.addKeyword("nil");
-      Builder.addTypeAnnotation(resultType, {});
+      Builder.addTypeAnnotation(resultType, PrintOptions());
       Builder.setResultTypes(resultType);
       Builder.setTypeContext(TypeContext, DC);
     }
@@ -1473,38 +1455,25 @@ void CodeCompletionCallbacksImpl::typeCheckWithLookup(
     /// The attribute might not be attached to the AST if there is no var
     /// decl it could be attached to. Type check it standalone.
 
+    auto &ctx = CurDeclContext->getASTContext();
+
     // First try to check it as an attached macro.
-    (void)evaluateOrDefault(
-        CurDeclContext->getASTContext().evaluator,
-        ResolveMacroRequest{AttrWithCompletion, CurDeclContext},
-        ConcreteDeclRef());
+    (void)AttrWithCompletion->getResolvedMacro();
 
     // If that fails, type check as a call to the attribute's type. This is
     // how, e.g., property wrappers are modelled.
     if (!Lookup.gotCallback()) {
-      ASTNode Call = CallExpr::create(
-          CurDeclContext->getASTContext(), AttrWithCompletion->getTypeExpr(),
-          AttrWithCompletion->getArgs(), /*implicit=*/true);
-      typeCheckContextAt(
+      ASTNode Call =
+          CallExpr::create(ctx, AttrWithCompletion->getTypeExpr(),
+                           AttrWithCompletion->getArgs(), /*implicit=*/true);
+      swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::node(CurDeclContext, Call),
           CompletionLoc);
     }
   } else {
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         CompletionLoc);
-  }
-
-  // This (hopefully) only happens in cases where the expression isn't
-  // typechecked during normal compilation either (e.g. member completion in a
-  // switch case where there control expression is invalid). Having normal
-  // typechecking still resolve even these cases would be beneficial for
-  // tooling in general though.
-  if (!Lookup.gotCallback()) {
-    if (Context.TypeCheckerOpts.DebugConstraintSolver) {
-      llvm::errs() << "--- Fallback typecheck for code completion ---\n";
-    }
-    Lookup.fallbackTypeCheck(CurDeclContext);
   }
 }
 
@@ -1551,8 +1520,9 @@ void CodeCompletionCallbacksImpl::postfixCompletion(SourceLoc CompletionLoc,
 
       llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
           Context.CompletionCallback, &Lookup);
-      typeCheckContextAt(TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
-                         CompletionLoc);
+      swift::typeCheckASTNodeAtLoc(
+          TypeCheckASTNodeAtLocContext::node(CurDeclContext, AE),
+          CompletionLoc);
       Lookup.collectResults(/*IsLabeledTrailingClosure=*/true, CompletionLoc,
                             CurDeclContext, CompletionContext);
     }
@@ -1652,7 +1622,7 @@ void CodeCompletionCallbacksImpl::afterPoundCompletion(SourceLoc CompletionLoc,
   Consumer.handleResults(CompletionContext);
 }
 
-void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
+void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
   CompletionContext.CodeCompletionKind = Kind;
 
   if (Kind == CompletionKind::None) {
@@ -1711,7 +1681,7 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
 
   if (Kind != CompletionKind::TypeSimpleWithDot) {
     // Type member completion does not need a type-checked AST.
-    typeCheckContextAt(
+    swift::typeCheckASTNodeAtLoc(
         TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
         ParsedExpr ? ParsedExpr->getLoc()
                    : CurDeclContext->getASTContext()

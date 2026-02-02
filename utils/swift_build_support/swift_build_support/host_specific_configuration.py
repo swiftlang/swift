@@ -215,6 +215,11 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_none_with_implicit_dynamic-{}"
                         .format(subset_suffix, name))
+                if args.test_optimize_none_with_opaque_values and \
+                        not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift{}-optimize_none_with_opaque_values-{}"
+                        .format(subset_suffix, name))
 
             # Only pull in these flags when cross-compiling with
             # --cross-compile-hosts.

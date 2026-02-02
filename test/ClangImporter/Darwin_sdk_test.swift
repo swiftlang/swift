@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -verify
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 

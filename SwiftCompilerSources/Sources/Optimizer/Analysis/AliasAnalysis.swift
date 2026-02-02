@@ -15,7 +15,7 @@ import SIL
 
 extension FunctionPassContext {
   var aliasAnalysis: AliasAnalysis {
-    let bridgedAA = _bridged.getAliasAnalysis()
+    let bridgedAA = bridgedPassContext.getAliasAnalysis()
     return AliasAnalysis(bridged: bridgedAA, context: self)
   }
 }
@@ -97,8 +97,8 @@ struct AliasAnalysis {
         return false
       }
     }
-    // Finaly use escape info to check if one address "escapes" to the other address.
-    return v1.allContainedAddresss.canAddressAlias(with: v2.allContainedAddresss, context)
+    // Finally use escape info to check if one address "escapes" to the other address.
+    return v1.allContainedAddresses.canAddressAlias(with: v2.allContainedAddresses, context)
   }
 
   static func register() {
@@ -113,7 +113,7 @@ struct AliasAnalysis {
         bridgedAliasAnalysis.mutableCachePointer.assumingMemoryBound(to: Cache.self).deinitialize(count: 1)
       },
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedAddr: BridgedValue,
          bridgedInst: BridgedInstruction) -> BridgedMemoryBehavior in
@@ -121,7 +121,7 @@ struct AliasAnalysis {
         return aa.getMemoryEffect(of: bridgedInst.instruction, on: bridgedAddr.value).bridged
       },
       // isObjReleasedFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedObj: BridgedValue,
          bridgedInst: BridgedInstruction) -> Bool in
@@ -142,13 +142,13 @@ struct AliasAnalysis {
       },
 
       // isAddrVisibleFromObj
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedAddr: BridgedValue,
          bridgedObj: BridgedValue) -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let aa = AliasAnalysis(bridged: bridgedAliasAnalysis, context: context)
-        let addr = bridgedAddr.value.allContainedAddresss
+        let addr = bridgedAddr.value.allContainedAddresses
 
         // This is similar to `canReferenceSameFieldFn`, except that all addresses of all objects are
         // considered which are transitively visible from `bridgedObj`.
@@ -159,7 +159,7 @@ struct AliasAnalysis {
       },
 
       // mayAliasFn
-      { (bridgedCtxt: BridgedPassContext,
+      { (bridgedCtxt: BridgedContext,
          bridgedAliasAnalysis: BridgedAliasAnalysis,
          bridgedLhs: BridgedValue,
          bridgedRhs: BridgedValue) -> Bool in
@@ -220,7 +220,8 @@ struct AliasAnalysis {
          is StrongCopyUnmanagedValueInst,
          is StrongCopyWeakValueInst,
          is BeginBorrowInst,
-         is BeginCOWMutationInst:
+         is BeginCOWMutationInst,
+         is DebugStepInst:
       return .noEffects
 
     case let load as LoadInst:
@@ -327,7 +328,8 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
 
     case let debugValue as DebugValueInst:
-      if debugValue.operand.value.type.isAddress && memLoc.mayAlias(with: debugValue.operand.value, self) {
+      let v = debugValue.operand.value
+      if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
         return .init(read: true)
       } else {
         return .noEffects
@@ -338,7 +340,7 @@ struct AliasAnalysis {
         return .noEffects
       }
       if destroy.isDeadEnd {
-        // We don't have to take deinit effects into acount for a `destroy_value [dead_end]`.
+        // We don't have to take deinit effects into account for a `destroy_value [dead_end]`.
         // Such destroys are lowered to no-ops and will not call any deinit.
         return .noEffects
       }
@@ -434,6 +436,11 @@ struct AliasAnalysis {
       }
       let callee = builtin.operands[1].value
       return context.calleeAnalysis.getSideEffects(ofCallee: callee).memory
+    case .PrepareInitialization, .ZeroInitializer:
+      if builtin.arguments.count == 1, memLoc.mayAlias(with: builtin.arguments[0], self) {
+        return .init(write: true)
+      }
+      return .noEffects
     default:
       return defaultEffects(of: builtin, on: memLoc)
     }
@@ -465,7 +472,7 @@ struct AliasAnalysis {
   }
 
   // To avoid quadratic complexity for large functions, we limit the amount of work that the EscapeUtils are
-  // allowed to to. This keeps the complexity linear.
+  // allowed to do. This keeps the complexity linear.
   //
   // This arbitrary limit is good enough for almost all functions. It lets
   // the EscapeUtils do several hundred up/down walks which is much more than needed in most cases.
@@ -475,14 +482,14 @@ struct AliasAnalysis {
       for _ in function.instructions { numInsts += 1 }
       cache.estimatedFunctionSize = numInsts
     }
-    return 1000000 / cache.estimatedFunctionSize!
+    return 1_000_000 / cache.estimatedFunctionSize!
   }
 
   /// Returns true if the `instruction` (which in general writes to memory) is immutable in a certain scope,
   /// defined by `address`.
   ///
   /// That means that even if we don't know anything about `instruction`, we can be sure
-  /// that `instruction` cannot write to `address`, if it's inside the addresse's scope.
+  /// that `instruction` cannot write to `address`, if it's inside the address's scope.
   /// An immutable scope is for example a read-only `begin_access`/`end_access` scope.
   /// Another example is a borrow scope of an immutable copy-on-write buffer.
   private func isImmutable(instruction: Instruction, inScopeOf address: Value) -> Bool {
@@ -673,7 +680,7 @@ private enum ImmutableScope {
         }
 
         switch singleBorrowIntroducer {
-        case .beginBorrow, .loadBorrow, .reborrow:
+        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow:
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
@@ -768,7 +775,7 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -791,14 +798,14 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
 
 // In contrast to a full apply, the effects of a partial_apply don't depend on the callee
 // (a partial_apply doesn't call anything, it just creates a thick function pointer).
-// The only effects come from capturing the arguments (either consuming or guaranteeed).
+// The only effects come from capturing the arguments (either consuming or guaranteed).
 private struct PartialApplyEffectsVisitor : EscapeVisitorWithResult {
   let partialApply: PartialApplyInst
   var result = SideEffects.Memory.noEffects
 
   mutating func visitUse(operand: Operand, path: EscapePath) -> UseResult {
     let user = operand.instruction
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -841,7 +848,7 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
     if user == target {
       return .abort
     }
-    if user is ReturnInst {
+    if user is ReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }
@@ -968,3 +975,116 @@ private extension BridgedAliasAnalysis {
     UnsafeMutableRawPointer(aa)
   }
 }
+
+//===--------------------------------------------------------------------===//
+//                              Tests
+//===--------------------------------------------------------------------===//
+
+/// Prints the memory behavior of relevant instructions in relation to address values of the function.
+let aliasingTest = FunctionTest("aliasing") {
+  function, arguments, context in
+
+  let aliasAnalysis = context.aliasAnalysis
+
+  print("@\(function.name)")
+
+  let values = function.allValues
+
+  var pair = 0
+  for (index1, value1) in values.enumerated() {
+    for (index2, value2) in values.enumerated() {
+      if index2 >= index1 {
+        let result = aliasAnalysis.mayAlias(value1, value2)
+        precondition(result == aliasAnalysis.mayAlias(value2, value1), "alias analysis not symmetric")
+
+        print("PAIR #\(pair).")
+        print("  \(value1)")
+        print("  \(value2)")
+        if result {
+          print("  MayAlias")
+        } else if !value1.uses.isEmpty && !value2.uses.isEmpty {
+          print("  NoAlias")
+        } else {
+          print("  noalias?")
+        }
+
+        pair += 1
+      }
+    }
+  }
+}
+
+/// Prints the memory behavior of relevant instructions in relation to address values of the function.
+let memoryEffectsTest = FunctionTest("memory_effects") {
+  function, arguments, context in
+
+  let aliasAnalysis = context.aliasAnalysis
+
+  print("@\(function.name)")
+
+  let values = function.allValues
+
+  var currentPair = 0
+  for inst in function.instructions where inst.shouldTest {
+
+    for value in values where value.definingInstruction != inst {
+
+      if value.type.isAddress {
+        let read = inst.mayRead(fromAddress: value, aliasAnalysis)
+        let write = inst.mayWrite(toAddress: value, aliasAnalysis)
+        print("PAIR #\(currentPair).")
+        print("  \(inst)")
+        print("  \(value)")
+        print("  r=\(read ? 1 : 0),w=\(write ? 1 : 0)")
+        currentPair += 1
+      }
+    }
+  }
+  print()
+}
+
+private extension Instruction {
+  var shouldTest: Bool {
+    switch self {
+    case is ApplySite,
+         is EndApplyInst,
+         is AbortApplyInst,
+         is BeginAccessInst,
+         is EndAccessInst,
+         is EndCOWMutationInst,
+         is EndCOWMutationAddrInst,
+         is CopyValueInst,
+         is DestroyValueInst,
+         is StrongReleaseInst,
+         is IsUniqueInst,
+         is EndBorrowInst,
+         is LoadInst,
+         is LoadBorrowInst,
+         is StoreInst,
+         is CopyAddrInst,
+         is BuiltinInst,
+         is StoreBorrowInst,
+         is MarkDependenceInst,
+         is MarkDependenceAddrInst,
+         is DebugValueInst,
+         is DebugStepInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+private extension Function {
+  var allValues: [Value] {
+    var values: [Value] = []
+    for block in blocks {
+      values.append(contentsOf: block.arguments.map { $0 })
+      for inst in block.instructions {
+        values.append(contentsOf: inst.results)
+      }
+    }
+    return values
+  }
+}
+

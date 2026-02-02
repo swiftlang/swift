@@ -11,21 +11,27 @@ file(CONFIGURE
 ---
 version: 0
 case-sensitive: false
-use-external-names: false
+use-external-names: true
 roots:
   - name: "@WindowsSdkDir@/Include/@WindowsSDKVersion@/um"
     type: directory
     contents:
       - name: module.modulemap
         type: file
-        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk.modulemap"
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk_um.modulemap"
+  - name: "@WindowsSdkDir@/Include/@WindowsSDKVersion@/shared"
+    type: directory
+    contents:
+      - name: module.modulemap
+        type: file
+        external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/winsdk_shared.modulemap"
   - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/ucrt"
     type: directory
     contents:
       - name: module.modulemap
         type: file
         external-contents: "@CMAKE_CURRENT_SOURCE_DIR@/ucrt.modulemap"
-  - name: "@VCToolsInstallDir@include"
+  - name: "@VCToolsInstallDir@/include"
     type: directory
     contents:
       - name: module.modulemap
@@ -41,9 +47,12 @@ add_library(ClangModules INTERFACE)
 target_compile_options(ClangModules INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-overlay.yaml>")
 
+install(TARGETS ClangModules
+  EXPORT SwiftOverlayTargets)
 install(FILES
   ucrt.modulemap
   vcruntime.apinotes
   vcruntime.modulemap
-  winsdk.modulemap
+  winsdk_um.modulemap
+  winsdk_shared.modulemap
   DESTINATION ${CMAKE_INSTALL_DATAROOTDIR})

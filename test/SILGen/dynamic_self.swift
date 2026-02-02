@@ -1,10 +1,12 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 4 -O -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 4 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 5 -O -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -swift-version 5 -enable-upcoming-feature ImmutableWeakCaptures %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 protocol P {
   func f() -> Self
@@ -67,7 +69,7 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK: bb0([[GY:%[0-9]+]] : @guaranteed $GY<Int>):
   // CHECK:   [[GY_AS_GX:%[0-9]+]] = upcast [[GY]] : $GY<Int> to $GX<Array<Int>>
   // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX]] : $GX<Array<Int>>, #GX.f : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<Array<Int>>([[GY_AS_GX]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
   _ = gy.f()
@@ -238,7 +240,7 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
-    // CHECK:      [[WEAK_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[WEAK_SELF]]
+    // CHECK:      [[WEAK_SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[WEAK_SELF]]
     // CHECK:      [[FN:%.*]] = function_ref @$s12dynamic_self1ZC23testDynamicSelfCaptures1xACXDSi_tFyycfU1_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF_LIFETIME]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type

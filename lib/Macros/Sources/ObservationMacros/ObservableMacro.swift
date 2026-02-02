@@ -220,7 +220,7 @@ extension AccessorDeclSyntax {
     return AccessorDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: attributes,
-      modifier: modifier,
+      modifiers: modifiers,
       accessorSpecifier: accessorSpecifier,
       parameters: parameters,
       effectSpecifiers: effectSpecifiers,
@@ -272,18 +272,33 @@ extension PatternBindingListSyntax {
 
 extension VariableDeclSyntax {
   func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> VariableDeclSyntax {
+    var newAttribute = attribute
+    newAttribute.leadingTrivia = .newline
+
     let newAttributes = attributes.filter { attribute in
       switch attribute {
       case .attribute(let attr):
         attr.attributeName.identifier != toRemove.attributeName.identifier
       default: true
       }
-    } + [.attribute(attribute)]
+    } + [.attribute(newAttribute)]
+
+    var newModifiers = modifiers.privatePrefixed(prefix, in: context)
+    let hasModifiers = !newModifiers.isEmpty
+    if hasModifiers {
+      newModifiers.leadingTrivia += .newline
+    }
+
     return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
-      modifiers: modifiers.privatePrefixed(prefix, in: context),
-      bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
+      modifiers: newModifiers,
+      bindingSpecifier: TokenSyntax(
+        bindingSpecifier.tokenKind,
+        leadingTrivia: hasModifiers ? .space : .newline,
+        trailingTrivia: .space,
+        presence: .present
+      ),
       bindings: bindings.privatePrefixed(prefix, in: context),
       trailingTrivia: trailingTrivia
     )

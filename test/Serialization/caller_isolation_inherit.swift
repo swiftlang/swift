@@ -19,7 +19,7 @@ actor A {
 
   // CHECK-LABEL: // unspecifiedAsync<A>(_:)
   // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-  // CHECK-NEXT: sil @$s11WithFeature16unspecifiedAsyncyyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+  // CHECK-NEXT: sil @$s11WithFeature16unspecifiedAsyncyyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test1() async {
     // If unspecifiedAsync does not inherit the isolation of A, then we will get
     // an error.
@@ -32,12 +32,12 @@ actor A {
   func test1a() async {
     await WithFeature.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // unspecifiedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+  // CHECK: sil @$s11WithFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test1b() async {
     await WithFeature.unspecifiedAsyncCaller(ns)
   }
@@ -48,7 +48,7 @@ actor A {
   func test2() async {
     await WithoutFeature.unspecifiedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // unspecifiedAsyncConcurrent<A>(_:)
@@ -59,19 +59,19 @@ actor A {
     // an error.
     await WithoutFeature.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // unspecifiedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+  // CHECK: sil @$s14WithoutFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test2b() async {
     await WithoutFeature.unspecifiedAsyncCaller(ns)
   }
 
   // CHECK-LABEL: // nonisolatedAsync<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature16nonisolatedAsyncyyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+  // CHECK: sil @$s11WithFeature16nonisolatedAsyncyyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test3() async {
     await WithFeature.nonisolatedAsync(ns)
   }
@@ -82,12 +82,12 @@ actor A {
   func test3a() async {
     await WithFeature.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // nonisolatedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+  // CHECK: sil @$s11WithFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test3b() async {
     await WithFeature.nonisolatedAsyncCaller(ns)
   }
@@ -98,7 +98,7 @@ actor A {
   func test4() async {
     await WithoutFeature.nonisolatedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // nonisolatedAsyncConcurrent<A>(_:)
@@ -107,19 +107,19 @@ actor A {
   func test4a() async {
     await WithoutFeature.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // nonisolatedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0) -> ()
+  // CHECK: sil @$s14WithoutFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test4b() async {
     await WithoutFeature.nonisolatedAsyncCaller(ns)
   }
 
   // CHECK-LABEL: // S.unspecifiedAsync<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV16unspecifiedAsyncyyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: sil @$s11WithFeature1SV16unspecifiedAsyncyyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test5() async {
     let s = WithFeature.S()
     await s.unspecifiedAsync(ns)
@@ -132,12 +132,12 @@ actor A {
     let s = WithFeature.S()
     await s.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: sil @$s11WithFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test5b() async {
     let s = WithFeature.S()
     await s.unspecifiedAsyncCaller(ns)
@@ -145,7 +145,7 @@ actor A {
 
   // CHECK-LABEL: // S.nonisolatedAsync<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV16nonisolatedAsyncyyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: sil @$s11WithFeature1SV16nonisolatedAsyncyyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test6() async {
     let s = WithFeature.S()
     await s.nonisolatedAsync(ns)
@@ -158,12 +158,12 @@ actor A {
     let s = WithFeature.S()
     await s.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: sil @$s11WithFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test6b() async {
     let s = WithFeature.S()
     await s.nonisolatedAsyncCaller(ns)
@@ -176,7 +176,7 @@ actor A {
     let s = WithoutFeature.S()
     await s.unspecifiedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'unspecifiedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'unspecifiedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncConcurrent<A>(_:)
@@ -186,12 +186,12 @@ actor A {
     let s = WithoutFeature.S()
     await s.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: sil @$s14WithoutFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test7b() async {
     let s = WithoutFeature.S()
     await s.unspecifiedAsyncCaller(ns)
@@ -204,7 +204,7 @@ actor A {
     let s = WithoutFeature.S()
     await s.nonisolatedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'nonisolatedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'nonisolatedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncConcurrent<A>(_:)
@@ -214,12 +214,12 @@ actor A {
     let s = WithoutFeature.S()
     await s.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncCaller<A>(_:)
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: sil @$s14WithoutFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test8b() async {
     let s = WithoutFeature.S()
     await s.nonisolatedAsyncCaller(ns)

@@ -30,6 +30,7 @@ namespace llvm {
 }
 
 namespace swift {
+  enum class BuiltinValueKind : unsigned;
 
 namespace irgen {
   class Callee;
@@ -570,6 +571,13 @@ namespace irgen {
     Callee(CalleeInfo &&info, const FunctionPointer &fn,
            llvm::Value *firstData = nullptr,
            llvm::Value *secondData = nullptr);
+
+    static Callee forBuiltinRuntimeFunction(IRGenModule &IGM,
+                                            llvm::Constant *fnPtr,
+                                            BuiltinValueKind builtin,
+                                            SubstitutionMap subs,
+                                            FunctionPointerKind fpKind =
+                                              FunctionPointerKind::Function);
 
     SILFunctionTypeRepresentation getRepresentation() const {
       return Info.OrigFnType->getRepresentation();

@@ -418,9 +418,6 @@ bb0(%0 : $Int):
 // basic blocks to analysis state is re-hashed. The number of
 // blocks in this test is determined by the initial size of the
 // 'BlockOutAccesses' DenseMap in the implementation.
-//
-//  The unreachable block below must branch to bN where
-//    N = 3/4 * INITIAL_SIZE - 2
 sil [ossa] @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
  br bb1
@@ -471,8 +468,6 @@ bb22:
 bb23:
   %1 = tuple ()
   return %1 : $()
-bbUnreachable:
-  br bb22
 }
 
 // Check that a pointer_to_address access passes diagnostics.
@@ -1493,7 +1488,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $*TestDynamic):
 }
 
 // Dictionary.subscript.modify
-sil [serialized] [always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield_once @convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @noescape @callee_guaranteed () -> @out τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
+sil [serialized] [heuristic_always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield_once @convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0, @noescape @callee_guaranteed () -> @out τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> @yields @inout τ_0_1
 
 // -----------------------------------------------------------------------------
 // testBeginApplyOfClosure: DiagnoseStaticExclusivity must consider

@@ -5,11 +5,6 @@ func testGlobal() {
     let _ = _borrow global
 }
 
-func testLet() {
-    let t = String()
-    let _ = _borrow t
-}
-
 func testVar() {
     var t = String()
     t = String()

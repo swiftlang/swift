@@ -9,8 +9,7 @@
 // RUN:   -emit-module -verify -o %t -I %t \
 // RUN:   -import-bridging-header %t/BridgingHeader.h \
 // RUN:   -emit-clang-header-path %t/cdecl.h \
-// RUN:   -disable-objc-interop \
-// RUN:   -enable-experimental-feature CDecl
+// RUN:   -disable-objc-interop
 
 /// Check compatibility header directly
 // RUN: %FileCheck %s --input-file %t/cdecl.h
@@ -20,8 +19,6 @@
 /// Compile a client against the compatibility header
 // RUN: %clang-no-modules -c %t/Client.c -I %t -Werror \
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
-
-// REQUIRES: swift_feature_CDecl
 
 //--- module.modulemap
 
@@ -78,16 +75,16 @@ import CModule
 // CHECK: extern "C" {
 // CHECK: #endif
 
-@cdecl("mirror_struct")
+@c(mirror_struct)
 public func a_mirrorStruct(_ a: CStruct) -> CStruct { a }
 // CHECK: SWIFT_EXTERN struct CStruct mirror_struct(struct CStruct a) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("mirror_union")
+@c(mirror_union)
 public func b_mirrorStruct(_ a: CUnion) -> CUnion { a }
 // CHECK: SWIFT_EXTERN union CUnion mirror_union(union CUnion a) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
 
-@cdecl("TKGetDefaultToastSetting")
+@c(TKGetDefaultToastSetting)
 public func c_defaultToastSetting() -> TKTimeSetting { TKTimeSettingNormal } // It would be nice to import TKTimeSettingNormal as a member.
 // CHECK: SWIFT_EXTERN TKTimeSetting TKGetDefaultToastSetting(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 

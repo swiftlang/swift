@@ -89,9 +89,9 @@ private extension PartialApplyInst {
     guard isOnStack,
           let callee = referencedFunction,
           callee.isDefinition,
-          let argIdx = calleeArgumentIndex(of: closure),
+          let calleeArg = calleeArgument(of: closure, in: callee),
           // If the callee only _calls_ the closure argument, it does not escape.
-          callee.arguments[argIdx].uses.allSatisfy(isCalleeOperandOfApply)
+          calleeArg.uses.allSatisfy(isCalleeOperandOfApply)
     else {
       return true
     }

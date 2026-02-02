@@ -29,6 +29,8 @@ enum Optional<T> {
 
 protocol Error {}
 
+struct Bad: Error {}
+
 struct I {}
 
 class Klass {}
@@ -107,6 +109,10 @@ sil [ossa] @takeGuaranteedObject : $@convention(thin) (@guaranteed AnyObject) ->
 sil [ossa] @takeIndirectClass : $@convention(thin) (@in_guaranteed C) -> ()
 sil [ossa] @takeTuple : $@convention(thin) <τ_0_0> (@in_guaranteed (τ_0_0, C)) -> ()
 
+sil [ossa] @eraseToAny : $@convention(thin) <T> (@in_guaranteed T) -> @out Any
+sil [ossa] @produceInt : $@convention(thin) () -> Int
+sil [ossa] @produceBool : $@convention(thin) () -> Bool
+sil [ossa] @produceBad : $@convention(thin) () -> Bad
 
 sil [ossa] @takeIn : $@convention(thin) <T> (@in T) -> ()
 sil [ossa] @takeInGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -1452,6 +1458,142 @@ bad(%41 : @owned $any Error):
   throw %41 : $any Error
 }
 
+// While an '@error Error' turns into an '@error any Error', an '@error' of a concrete type remains as-is.
+// --------
+// CHECK-LABEL: sil [ossa] @f270_typedThrows_throwConcrete : $@convention(thin) (Bad) -> (Bad, @error Bad) {
+// CHECK:       bb0(%0 : $Bad):
+// CHECK:         return %0 : $Bad
+// CHECK:         throw %0 : $Bad
+// CHECK-LABEL: } // end sil function 'f270_typedThrows_throwConcrete'
+sil [ossa] @f270_typedThrows_throwConcrete : $@convention(thin) (Bad) -> (Bad, @error Bad) {
+bb0(%0 : $Bad):
+  %fn = function_ref @produceBool : $@convention(thin) () -> Bool
+  %cond = apply %fn() : $@convention(thin) () -> Bool
+  cond_br %cond, doThrow, doReturn
+
+doThrow:
+  throw %0
+
+doReturn:
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @f271_typedThrows_callConcrete : $@convention(thin) () -> () {
+// CHECK:         try_apply {{.*}} : $@convention(thin) (Bad) -> (Bad, @error Bad), normal bb2, error bb1
+// CHECK:         bb1({{.*}} : $Bad)
+// CHECK:         bb2({{.*}} : $Bad)
+// CHECK-LABEL: } // end sil function 'f271_typedThrows_callConcrete'
+sil [ossa] @f271_typedThrows_callConcrete : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @produceBad : $@convention(thin) () -> Bad
+  %arg = apply %fn() : $@convention(thin) () -> Bad
+  %callee = function_ref @f270_typedThrows_throwConcrete : $@convention(thin) (Bad) -> (Bad, @error Bad)
+  try_apply %callee(%arg) : $@convention(thin) (Bad) -> (Bad, @error Bad), normal normalBB, error errorBB
+
+normalBB(%r : $Bad):
+  ignored_use %r
+  br exitBB
+
+errorBB(%e : $Bad):
+  ignored_use %e
+  br exitBB
+
+exitBB:
+  %t = tuple ()
+  return %t
+}
+
+// Handle throwing a generic type conforming to Error via @error_indirect
+// --------
+// CHECK-LABEL: sil [ossa] @f272_typedThrows_throwGeneric : $@convention(thin) <GenBad, Result where GenBad : Error> (@in_guaranteed GenBad, @in_guaranteed Result) -> (@out Result, @error_indirect GenBad) {
+// CHECK:       bb0(%0 : $*Result, %1 : $*GenBad, %2 : $*GenBad, %3 : $*Result):
+// CHECK:         cond_br {{.*}}, bb2, bb1
+//
+// CHECK:       bb1:
+// CHECK:         copy_addr %3 to [init] %0 : $*Result
+// CHECK:         return {{.*}} : $()
+//
+// CHECK:       bb2:
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $GenBad
+// CHECK:         copy_addr %2 to [init] [[STACK]] : $*GenBad
+// CHECK:         copy_addr [take] [[STACK]] to [init] %1 : $*GenBad
+// CHECK:         dealloc_stack [[STACK]] : $*GenBad
+// CHECK:         throw_addr
+// CHECK-LABEL: } // end sil function 'f272_typedThrows_throwGeneric'
+sil [ossa] @f272_typedThrows_throwGeneric : $@convention(thin) <GenBad, Result where GenBad : Error> (@in_guaranteed GenBad, @in_guaranteed Result) -> (@out Result, @error_indirect GenBad) {
+bb0(%e : @guaranteed $GenBad, %r : @guaranteed $Result):
+  %fn = function_ref @produceBool : $@convention(thin) () -> Bool
+  %cond = apply %fn() : $@convention(thin) () -> Bool
+  cond_br %cond, doThrow, doReturn
+
+doReturn:
+  %rCopy = copy_value %r
+  return %rCopy
+
+doThrow:
+  %eCopy = copy_value %e
+  throw %eCopy
+}
+
+// CHECK-LABEL:  sil [ossa] @f273_typedThrows_callGeneric : $@convention(thin) () -> () {
+// CHECK:        bb0:
+// CHECK:          // function_ref produceBad
+// CHECK:          [[PROD:%[^,]+]] = function_ref @produceBad : $@convention(thin) () -> Bad
+// CHECK:          [[ARG1:%[^,]+]] = apply [[PROD]]() : $@convention(thin) () -> Bad
+// CHECK:          [[ARG2:%[^,]+]] = apply [[PROD]]() : $@convention(thin) () -> Bad
+// CHECK:          [[ARG1_IN:%[^,]+]] = alloc_stack $Bad
+// CHECK:          store [[ARG1]] to [trivial] [[ARG1_IN]] : $*Bad
+// CHECK:          [[ARG2_IN:%[^,]+]] = alloc_stack $Bad
+// CHECK:          store [[ARG2]] to [trivial] [[ARG2_IN]] : $*Bad
+// CHECK:          [[RESULT_OUT:%[^,]+]] = alloc_stack $Bad
+// CHECK:          [[ERR_OUT:%[^,]+]] = alloc_stack $Bad
+// CHECK:          try_apply {{.*}}<Bad, Bad>([[RESULT_OUT]], [[ERR_OUT]], [[ARG1_IN]], [[ARG2_IN]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Error> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_1, @error_indirect τ_0_0), normal bb2, error bb1
+
+// CHECK:        bb1:
+// CHECK:          [[ERR:%[^,]+]] = load [trivial] [[ERR_OUT]] : $*Bad
+// CHECK:          dealloc_stack [[ERR_OUT]] : $*Bad
+// CHECK:          dealloc_stack [[RESULT_OUT]] : $*Bad
+// CHECK:          dealloc_stack [[ARG2_IN]] : $*Bad
+// CHECK:          dealloc_stack [[ARG1_IN]] : $*Bad
+// CHECK:          ignored_use [[ERR]] : $Bad
+// CHECK:          ignored_use [[ERR]] : $Bad
+// CHECK:          br bb3
+
+// CHECK:        bb2(%11 : $()):
+// CHECK:          dealloc_stack [[ERR_OUT]] : $*Bad
+// CHECK:          [[RESULT:%[^,]+]] = load [trivial] [[RESULT_OUT]] : $*Bad
+// CHECK:          dealloc_stack [[RESULT_OUT]] : $*Bad
+// CHECK:          dealloc_stack [[ARG2_IN]] : $*Bad
+// CHECK:          dealloc_stack [[ARG1_IN]] : $*Bad
+// CHECK:          ignored_use [[RESULT]] : $Bad
+// CHECK:          br bb3
+
+// CHECK:        bb3:
+// CHECK:          return {{.*}} : $()
+// CHECK-LABEL:  } // end sil function 'f273_typedThrows_callGeneric'
+sil [ossa] @f273_typedThrows_callGeneric : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @produceBad : $@convention(thin) () -> Bad
+  %arg1 = apply %fn() : $@convention(thin) () -> Bad
+  %arg2 = apply %fn() : $@convention(thin) () -> Bad
+  %callee = function_ref @f272_typedThrows_throwGeneric : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Error> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_1, @error_indirect τ_0_0)
+  try_apply %callee<Bad, Bad>(%arg1, %arg2) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Error> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_1, @error_indirect τ_0_0), normal normalBB, error errorBB
+
+normalBB(%r : $Bad):
+  ignored_use %r
+  br exitBB
+
+errorBB(%e : $Bad):
+  ignored_use %e
+  ignored_use %e
+  br exitBB
+
+exitBB:
+  %t = tuple ()
+  return %t
+}
+
+
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
 // CHECK:         fix_lifetime [[ADDR]]
@@ -2146,6 +2288,7 @@ sil [ossa] @testUnreachable1NoDestroy : $@convention(thin) <T> () -> () {
 bb0:
     %instance = apply undef<T>() : $@convention(thin) <τ> () -> @out τ
     apply undef<T>(%instance) : $@convention(thin) <τ> (@in_guaranteed τ) -> ()
+    destroy_value [dead_end] %instance
     unreachable
 }
 
@@ -2555,6 +2698,32 @@ bb0:
   return %retval : $()
 }
 
+// Verify that ignored_use of an address-only type gets lowered correctly.
+// CHECK-LABEL: sil [ossa] @test_ignored_use : $@convention(thin) () -> () {
+// CHECK:          [[RETVAL_ADDR:%[^,]+]] = alloc_stack $Any
+// CHECK:          [[MAKE_INT:%[^,]+]] = function_ref @produceInt : $@convention(thin) () -> Builtin.Int64
+// CHECK:          [[INT:%[^,]+]] = apply [[MAKE_INT]]()
+// CHECK:          [[ERASE_FN:%[^,]+]] = function_ref @eraseToAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+// CHECK:          [[ARG_ADDR:%[^,]+]] = alloc_stack $Builtin.Int64
+// CHECK:          store [[INT]] to [trivial] [[ARG_ADDR]] : $*Builtin.Int64
+// CHECK:          = apply [[ERASE_FN]]<Builtin.Int64>([[RETVAL_ADDR]], [[ARG_ADDR]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+// CHECK:          dealloc_stack [[ARG_ADDR]] : $*Builtin.Int64
+// CHECK:          ignored_use [[RETVAL_ADDR]] : $*Any
+// CHECK:          destroy_addr [[RETVAL_ADDR]] : $*Any
+// CHECK:          dealloc_stack [[RETVAL_ADDR]] : $*Any
+// CHECK:       } // end sil function 'test_ignored_use'
+sil [ossa] @test_ignored_use : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @produceInt : $@convention(thin) () -> Int
+  %2 = apply %1() : $@convention(thin) () -> Int
+  %3 = function_ref @eraseToAny : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+  %4 = apply %3<Int>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Any
+  ignored_use %4
+  destroy_value %4
+  %5 = tuple ()
+  return %5
+}
+
 // CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[TP:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T]]
@@ -2766,6 +2935,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @test_store_borrow_1_copy_addr : {{.*}} {
+// CHECK:         alloc_stack
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack
 // CHECK:         apply undef<T>([[ADDR]])
 // CHECK:         [[COPY:%[^,]+]] = alloc_stack

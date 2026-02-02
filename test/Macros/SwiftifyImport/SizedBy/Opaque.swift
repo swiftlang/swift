@@ -28,7 +28,7 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr.count)!
+// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
 // CHECK-NEXT:     return unsafe nonnullUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), size)
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
@@ -39,7 +39,7 @@ func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr.count)!
+// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
 // CHECK-NEXT:     return unsafe impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), size)
 // CHECK-NEXT: }
 

@@ -532,89 +532,6 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
     IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection());
 }
 
-SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
-  // Remove runtime asserts such as overflow checks and bounds checks.
-  if (RemoveCondFails)
-    return eraseInstFromFunction(*CFI);
-
-  if (shouldRemoveCondFail(*CFI))
-    return eraseInstFromFunction(*CFI);
-
-  auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand());
-  if (!I)
-    return nullptr;
-
-  // Erase. (cond_fail 0)
-  if (!I->getValue().getBoolValue())
-    return eraseInstFromFunction(*CFI);
-
-  // Remove non-lifetime-ending code that follows a (cond_fail 1) and set the
-  // block's terminator to unreachable.
-
-  // Are there instructions after this point to delete?
-
-  // First check if the next instruction is unreachable.
-  if (isa<UnreachableInst>(std::next(SILBasicBlock::iterator(CFI))))
-    return nullptr;
-
-  // Otherwise, check if the only instructions are unreachables and destroys of
-  // lexical values.
-
-  // Collect all instructions and, in OSSA, the values they define.
-  llvm::SmallVector<SILInstruction *, 32> ToRemove;
-  ValueSet DefinedValues(CFI->getFunction());
-  for (auto Iter = std::next(CFI->getIterator());
-       Iter != CFI->getParent()->end(); ++Iter) {
-
-    if (isBeginScopeMarker(&*Iter)) {
-      for (auto *scopeUse : cast<SingleValueInstruction>(&*Iter)->getUses()) {
-        auto *scopeEnd = scopeUse->getUser();
-        if (isEndOfScopeMarker(scopeEnd)) {
-          ToRemove.push_back(scopeEnd);
-        }
-      }
-    }
-    if (!CFI->getFunction()->hasOwnership()) {
-      ToRemove.push_back(&*Iter);
-      continue;
-    }
-
-    for (auto result : Iter->getResults()) {
-      DefinedValues.insert(result);
-    }
-    // Look for destroys of lexical values whose def isn't after the cond_fail.
-    if (auto *dvi = dyn_cast<DestroyValueInst>(&*Iter)) {
-      auto value = dvi->getOperand();
-      if (!DefinedValues.contains(value) && value->isLexical())
-        continue;
-    }
-    ToRemove.push_back(&*Iter);
-  }
-
-  unsigned instructionsToDelete = ToRemove.size();
-  // If the last instruction is an unreachable already, it needn't be deleted.
-  if (isa<UnreachableInst>(ToRemove.back())) {
-    --instructionsToDelete;
-  }
-  if (instructionsToDelete == 0)
-    return nullptr;
-
-  for (auto *Inst : ToRemove) {
-    if (Inst->isDeleted())
-      continue;
-
-    // Replace any still-remaining uses with undef and erase.
-    Inst->replaceAllUsesOfAllResultsWithUndef();
-    eraseInstFromFunction(*Inst);
-  }
-
-  // Add an `unreachable` to be the new terminator for this block
-  Builder.setInsertionPoint(CFI->getParent());
-  Builder.createUnreachable(ArtificialUnreachableLocation());
-
-  return nullptr;
-}
-
 /// Whether there exists a unique value to which \p addr is always initialized
 /// at \p forInst.
 ///
@@ -904,6 +821,15 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   if (!DataAddrInst || !EnumAddrIns) {
     return nullptr;
   }
+  if (func->hasOwnership() &&
+      !DataAddrInst->getType().isTrivial(*func) &&
+      DataAddrInst->getParent() != EnumAddrIns->getParent()) {
+    // The init_enum_data_addr is in a different block than the inject_enum_addr.
+    // This might cause a leak because between the two blocks could be a CFG edge
+    // to a dead-end block with an `unreachable`
+    return nullptr;
+  }
+
   assert((EnumAddrIns == IEAI) &&
          "Found InitEnumDataAddrInst differs from IEAI");
   // Make sure the enum pattern instructions are the only ones which write to
@@ -1059,7 +985,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
         Builder.getBuilderContext(), /*noUndef*/ true);
   } else {
     auto loadQual = !func->hasOwnership() ? LoadOwnershipQualifier::Unqualified
-                    : DataAddrInst->getOperand()->getType().isTrivial(*func)
+                    : DataAddrInst->getType().isTrivial(*func)
                         ? LoadOwnershipQualifier::Trivial
                         : LoadOwnershipQualifier::Take;
     enumValue =
@@ -1118,11 +1044,16 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
     return nullptr;
 
   bool onlyLoads = true;
+  bool anyLoadCopies = false;
   bool onlyDestroys = true;
   for (auto U : getNonDebugUses(tedai)) {
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()) && !isa<LoadBorrowInst>(U->getUser()))
       onlyLoads = false;
+
+    if (auto *li = dyn_cast<LoadInst>(U->getUser()))
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+        anyLoadCopies = true;
 
     // If we have a load_borrow, perform an additional check that we do not have
     // any reborrow uses. We do not handle reborrows in this optimization.
@@ -1141,6 +1072,10 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   }
 
   if (onlyDestroys) {
+    // Destroying whole non-copyable enums with a deinit would wrongly trigger calling its deinit.
+    if (tedai->getOperand()->getType().isValueTypeWithDeinit())
+      return nullptr;
+
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
     // destroys with a destroy of its operand.
     while (!tedai->use_empty()) {
@@ -1164,6 +1099,11 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
   if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
+    return nullptr;
+
+  // If the enum is noncopyable and any loads cause copies, the transformation
+  // would be illegal because it would introduce a copy of the noncopyable enum.
+  if (tedai->getOperand()->getType().isMoveOnly() && anyLoadCopies)
     return nullptr;
 
   // Grab the EnumAddr.

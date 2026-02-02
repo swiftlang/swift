@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -84,10 +84,10 @@ extension ASTGenVisitor {
       ).asTypeRepr
     }
 
-    let id = self.generateIdentifier(node.name)
+    let nameRef = self.generateDeclNameRef(moduleSelector: node.moduleSelector, baseName: node.name)
 
     guard let generics = node.genericArgumentClause else {
-      return BridgedUnqualifiedIdentTypeRepr.createParsed(ctx, loc: loc, name: id).asTypeRepr
+      return BridgedUnqualifiedIdentTypeRepr.createParsed(ctx, name: nameRef.name, loc: nameRef.loc).asTypeRepr
     }
 
     let genericArguments = generics.arguments.lazy.map {
@@ -96,8 +96,8 @@ extension ASTGenVisitor {
 
     return BridgedUnqualifiedIdentTypeRepr.createParsed(
       self.ctx,
-      name: id,
-      nameLoc: loc,
+      name: nameRef.name,
+      nameLoc: nameRef.loc,
       genericArgs: genericArguments.bridgedArray(in: self),
       leftAngleLoc: self.generateSourceLoc(generics.leftAngle),
       rightAngleLoc: self.generateSourceLoc(generics.rightAngle)
@@ -109,7 +109,7 @@ extension ASTGenVisitor {
       self.ctx,
       count: self.generate(genericArgument: node.count.argument),
       element: self.generate(genericArgument: node.element.argument),
-      brackets: BridgedSourceRange(
+      brackets: .init(
         start: self.generateSourceLoc(node.leftSquare),
         end: self.generateSourceLoc(node.rightSquare)
       )
@@ -117,10 +117,10 @@ extension ASTGenVisitor {
   }
 
   func generate(memberType node: MemberTypeSyntax) -> BridgedDeclRefTypeRepr {
-    let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    let nameRef = self.generateDeclNameRef(moduleSelector: node.moduleSelector, baseName: node.name)
 
     let genericArguments: BridgedArrayRef
-    let angleRange: BridgedSourceRange
+    let angleRange: SourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
         self.generate(genericArgument: $0.argument)
@@ -135,8 +135,8 @@ extension ASTGenVisitor {
     return BridgedDeclRefTypeRepr.createParsed(
       self.ctx,
       base: self.generate(type: node.baseType),
-      name: name,
-      nameLoc: nameLoc,
+      name: nameRef.name,
+      nameLoc: nameRef.loc,
       genericArguments: genericArguments,
       angleRange: angleRange
     )
@@ -193,7 +193,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorTypeRepr.create(
       self.ctx,
-      range: BridgedSourceRange(start: loc, end: loc)
+      range: .init(start: loc)
     ).asTypeRepr
   }
 
@@ -318,8 +318,12 @@ extension ASTGenVisitor {
     // warning: using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead
     return .createParsed(
       self.ctx,
-      loc: self.generateSourceLoc(node.classKeyword),
-      name: self.ctx.getIdentifier("AnyObject")
+      name: BridgedDeclNameRef.createParsed(
+        self.ctx,
+        moduleSelector: nil,
+        baseName: .init(self.ctx.getIdentifier("AnyObject"))
+      ),
+      loc: BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.classKeyword))
     )
   }
 
@@ -357,12 +361,12 @@ extension ASTGenVisitor {
 
     // Specifiers
     var ownership: BridgedParamSpecifier = .default
-    var ownershipLoc: BridgedSourceLoc = nil
-    var isolatedLoc: BridgedSourceLoc = nil
-    var constLoc: BridgedSourceLoc = nil
-    var sendingLoc: BridgedSourceLoc = nil
+    var ownershipLoc: SourceLoc = nil
+    var isolatedLoc: SourceLoc = nil
+    var constLoc: SourceLoc = nil
+    var sendingLoc: SourceLoc = nil
     var lifetimeEntry: BridgedLifetimeEntry? = nil
-    var nonisolatedLoc: BridgedSourceLoc = nil
+    var nonisolatedLoc: SourceLoc = nil
 
     // TODO: Diagnostics for duplicated specifiers, and ordering.
     for node in node.specifiers {
@@ -502,7 +506,7 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   struct GeneratedGenericArguments {
     var arguments: BridgedArrayRef = .init()
-    var range: BridgedSourceRange = .init()
+    var range: SourceRange = .init()
   }
 
   /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in
@@ -528,11 +532,11 @@ extension ASTGenVisitor {
         // 'Foo.bar(_:baz:)'
         break
       }
-      let name = self.generateIdentifierAndSourceLoc(node.baseName)
+      let nameRef = self.generateDeclNameRef(declReferenceExpr: node)
       return BridgedUnqualifiedIdentTypeRepr .createParsed(
         self.ctx,
-        name: name.identifier,
-        nameLoc: name.sourceLoc,
+        name: nameRef.name,
+        nameLoc: nameRef.loc,
         genericArgs: genericArgs.arguments,
         leftAngleLoc: genericArgs.range.start,
         rightAngleLoc: genericArgs.range.end
@@ -551,12 +555,12 @@ extension ASTGenVisitor {
         // Function name. E.g. 'Foo.bar(_:baz:)'
         break
       }
-      let name = self.generateIdentifierAndSourceLoc(node.declName.baseName)
+      let nameRef = self.generateDeclNameRef(declReferenceExpr: node.declName)
       return BridgedDeclRefTypeRepr.createParsed(
         self.ctx,
         base: base,
-        name: name.identifier,
-        nameLoc: name.sourceLoc,
+        name: nameRef.name,
+        nameLoc: nameRef.loc,
         genericArguments: genericArgs.arguments,
         angleRange: genericArgs.range
       ).asTypeRepr

@@ -1,2 +1,4 @@
 template <class From, class To>
-To __swift_interopStaticCast(From from) { return static_cast<To>(from); }
+To _Nonnull __swift_interopStaticCast(From _Nonnull from) {
+  return static_cast<To>(from);
+}

@@ -48,15 +48,15 @@ public enum Alphabet : String {
 
 // CHECK-LABEL: sil [ossa] @$s4main14check_alphabetySiAA8AlphabetOF : $@convention(thin) (Alphabet) -> Int {
 public func check_alphabet(_ state : Alphabet) -> Int {
-  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
-  // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
+  // FRAGILE: witness_method $Alphabet, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
+  // RESILIENT: witness_method $Alphabet, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
   return state == .E ? 1 : 0
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main9compareItySbAA8AlphabetO_ADtF : $@convention(thin) (Alphabet, Alphabet) -> Bool {
 public func compareIt(_ state : Alphabet, _ rhs: Alphabet) -> Bool {
-  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
-  // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
+  // FRAGILE: witness_method $Alphabet, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
+  // RESILIENT: witness_method $Alphabet, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
   return state == rhs
 }
 
@@ -67,14 +67,14 @@ public enum AlphabetInt : Int {
 
 // CHECK-LABEL: sil [ossa] @$s4main18check_alphabet_intySiAA11AlphabetIntOF : $@convention(thin) (AlphabetInt) -> Int {
 public func check_alphabet_int(_ state : AlphabetInt) -> Int {
-  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
-  // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
+  // FRAGILE: witness_method $AlphabetInt, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
+  // RESILIENT: witness_method $AlphabetInt, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
   return state == .E ? 1 : 0
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main9compareItySbAA11AlphabetIntO_ADtF : $@convention(thin) (AlphabetInt, AlphabetInt) -> Bool {
 public func compareIt(_ state : AlphabetInt, _ rhs: AlphabetInt) -> Bool {
-  // FRAGILE: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
-  // RESILIENT: function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF
+  // FRAGILE: witness_method $AlphabetInt, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
+  // RESILIENT: witness_method $AlphabetInt, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
   return state == rhs
 }

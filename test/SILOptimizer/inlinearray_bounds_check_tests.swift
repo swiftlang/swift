@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil -O \
-// RUN:   -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
+// RUN:   -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL
 
 // RUN: %target-swift-frontend %s -emit-ir -O \
-// RUN:   -disable-availability-checking | %FileCheck %s  --check-prefix=CHECK-IR 
+// RUN:   -disable-availability-checking | %FileCheck %s  --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
@@ -131,7 +131,7 @@ public func inlinearray_sum_iterate_to_deducible_count2_wo_trap<let N: Int>(_ v:
 
 // Bounds check should be eliminated
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A42_sum_iterate_to_deducible_count2_with_trapySis11InlineArrayVyxSiG_SitSiRVzlF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A42_sum_iterate_to_deducible_count2_with_trapySis11InlineArrayVyxSiG_SitSiRVzlF :
 // CHECK-SIL: bb3
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
@@ -147,7 +147,7 @@ public func inlinearray_sum_iterate_to_deducible_count2_with_trap<let N: Int>(_ 
 
 // Bounds check should be eliminated
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A29_iterate_over_indices_wo_trapySis11InlineArrayVyxSiGSiRVzlF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A29_iterate_over_indices_wo_trapySis11InlineArrayVyxSiGSiRVzlF :
 // CHECK-SIL: bb3
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
@@ -166,7 +166,7 @@ public func inlinearray_iterate_over_indices_wo_trap<let N: Int>(_ v: InlineArra
 // Bounds check should be eliminated
 // Induction variable optimization eliminates the bounds check in SIL
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A31_iterate_over_indices_with_trapySis11InlineArrayVyxSiGSiRVzlF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A31_iterate_over_indices_with_trapySis11InlineArrayVyxSiGSiRVzlF :
 // CHECK-SIL: bb3
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
@@ -181,7 +181,7 @@ public func inlinearray_iterate_over_indices_with_trap<let N: Int>(_ v: InlineAr
 
 // Eliminate duplicate bounds check
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A17_element_equalityySbs11InlineArrayVyxSiG_SitSiRVzlF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A17_element_equalityySbs11InlineArrayVyxSiG_SitSiRVzlF :
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A17_element_equalityySbs11InlineArrayVyxSiG_SitSiRVzlF'
@@ -201,7 +201,7 @@ public func inlinearray_element_sum<let N: Int>(_ v: InlineArray<N, Int>, _ i: I
 
 // Bounds check should be eliminated
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A7_searchySiSgs11InlineArrayVyq_xG_xtSiRV_SQRzr0_lF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A7_searchySiSgs11InlineArrayVyq_xG_xtSiRV_SQRzr0_lF :
 // CHECK-SIL: bb3:
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
@@ -218,7 +218,7 @@ public func inlinearray_search<T : Equatable, let N: Int>(_ v: InlineArray<N, T>
 
 // Bounds check should be eliminated
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A11_search_splySiSgs11InlineArrayVyxSiG_SitSiRVzlF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A11_search_splySiSgs11InlineArrayVyxSiG_SitSiRVzlF :
 // CHECK-SIL: bb3:
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
@@ -235,7 +235,7 @@ public func inlinearray_search_spl<let N: Int>(_ v: InlineArray<N, Int>, _ elem:
 
 // Bounds check should be eliminated
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A18_binary_search_splySiSgs11InlineArrayVyxSiG_SitSiRVzlF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A18_binary_search_splySiSgs11InlineArrayVyxSiG_SitSiRVzlF :
 // CHECK-SIL: bb2
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
@@ -262,7 +262,7 @@ public func inlinearray_binary_search_spl<let N: Int>(_ v: InlineArray<N, Int>, 
 // This prevents LoopRotate which prevent bounds checks opts since it depends on induction variable analysis which doesn't work on unrotated loops.
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A35_sum_iterate_to_count_with_trap_splySis11InlineArrayVy$63_SiGF :
 // CHECK-SIL: bb2
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-NOT-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A35_sum_iterate_to_count_with_trap_splySis11InlineArrayVy$63_SiGF'
 public func inlinearray_sum_iterate_to_count_with_trap_spl(_ v: InlineArray<64, Int>) -> Int {
@@ -274,7 +274,7 @@ public func inlinearray_sum_iterate_to_count_with_trap_spl(_ v: InlineArray<64, 
 }
 
 // InlineArray is copied into a temporary within the loop in the "specialized" version
-// This prevents LoopRotate which prevent bounds checks opts since it depends on induction variable analysis which doesn't work on unrotated loops. 
+// This prevents LoopRotate which prevent bounds checks opts since it depends on induction variable analysis which doesn't work on unrotated loops.
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A37_sum_iterate_to_unknown_with_trap_splySis11InlineArrayVy$63_SiG_SitF :
 // CHECK-SIL: bb2
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
@@ -290,7 +290,7 @@ public func inlinearray_sum_iterate_to_unknown_with_trap_spl(_ v: InlineArray<64
 
 // Current codegen for this in SIL is very poor
 // First a temp is created and the elements are stored to it, then they get loaded from the temp to be stored in the let which is then loaded again to get the sum
-// However, LLVM can constant fold everything 
+// However, LLVM can constant fold everything
 public func local_inlinearray_sum_iterate_to_count_with_trap_spl() -> Int {
   var sum = 0
   let v : InlineArray = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16]
@@ -302,7 +302,7 @@ public func local_inlinearray_sum_iterate_to_count_with_trap_spl() -> Int {
 
 // Current codegen for this in SIL is very poor
 // First a temp is created and the elements are stored to it, then they get loaded from the temp to be stored in the let which is then loaded again to get the sum
-// LLVM cannot constant fold, it memsets, memcopies and then loops over to sum  
+// LLVM cannot constant fold, it memsets, memcopies and then loops over to sum
 public func local_inlinearray_repeating_init_sum_iterate_to_count_trap_spl() -> Int {
   var sum = 0
   let v = InlineArray<64, Int>(repeating: 64)
@@ -324,9 +324,9 @@ public func inlinearray_inc_by_one<let N: Int>(_ v: inout InlineArray<N, Int>, _
   }
 }
 
-// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A15_inc_by_one_splyys11InlineArrayVy$63_SiGz_SitF : 
+// CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A15_inc_by_one_splyys11InlineArrayVy$63_SiGz_SitF :
 // CHECK-SIL: bb2
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-NOT-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s30inlinearray_bounds_check_tests0A15_inc_by_one_splyys11InlineArrayVy$63_SiGz_SitF'
 public func inlinearray_inc_by_one_spl(_ v: inout InlineArray<64, Int>, _ n: Int) {

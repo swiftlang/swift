@@ -239,6 +239,9 @@ bb0(%m_in : @owned $M):
   %pa = partial_apply [callee_guaranteed] [on_stack] %getter(%mb) : $@convention(thin) (@guaranteed M) -> @owned String
   %die = function_ref @die : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
   apply %die(%pa) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+  destroy_value [dead_end] %pa
+  end_borrow %mb
+  destroy_value [dead_end] %m
   unreachable
 }
 

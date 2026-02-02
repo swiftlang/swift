@@ -29,39 +29,4 @@ VirtualMethodsTestSuite.test("value type") {
   expectEqual(789, d6.getPureInt())
 }
 
-if #available(SwiftStdlib 5.8, *) {
-  VirtualMethodsTestSuite.test("immortal reference type") {
-    let i = Immortal.create()
-    expectEqual(42, i.get42())
-    expectEqual(0, i.getIntValue())
-
-    let base = castToImmortalBase(i)
-    expectEqual(42, base.get42())
-    expectEqual(42, base.getOverridden42())
-    expectEqual(0, base.getIntValue())
-
-    i.setIntValue(566)
-    expectEqual(566, i.getIntValue())
-    expectEqual(566, base.getIntValue())
-
-    let d = DerivedFromImmortal.create()
-    expectEqual(42, d.get42())
-    expectEqual(42, d.getOverridden42())
-    d.setIntValue(321)
-    expectEqual(321, d.getIntValue())
-    let base2 = castToImmortalBase(castToImmortal(d))
-    expectEqual(321, base2.getIntValue())
-  }
-}
-
-#if !os(Windows) 
-// FIXME in Windows, non-trivial C++ class with trivial ABI is not yet available in Swift
-VirtualMethodsTestSuite.test("C++ virtual method with complex parameter") {
-  @available(SwiftStdlib 5.8, *)
-  func f(simpleClass: HasDestructor, immortalClass: Immortal2) {
-    immortalClass.virtualMethod(simpleClass)
-  }
-}
-#endif
-
 runAllTests()

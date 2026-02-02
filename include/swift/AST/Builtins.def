@@ -209,10 +209,11 @@ BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 
-// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
-// These have various types.
-// Since these operations will be lowered to SIL Instructions, we do not
-// assign any attributes on them.
+// BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL
+// instructions. They can never be invoked via a BuiltinInst and are instead
+// expected to just be used by SILGen to emit sequences of non-BuiltinInst
+// instructions. These have various types. Since these operations will be
+// lowered to SIL Instructions, we do not assign any attributes on them.
 #ifndef BUILTIN_SIL_OPERATION
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name, "")
 #endif
@@ -240,6 +241,7 @@ BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
 BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
 
 /// Take has type (Builtin.RawPointer) -> T
+/// where T: ~Copyable & ~Escapable
 BUILTIN_SIL_OPERATION(Take, "take", Special)
 
 /// Destroy has type (T.Type, Builtin.RawPointer) -> ()
@@ -539,6 +541,21 @@ BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 /// Returns the number of items in a pack.
 BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
+/// makeBorrow: @lifetime(borrow referent)<T: ~Copyable>(_ referent: borrowing T) -> Borrow<T>
+///
+/// Form a `Builtin.Borrow` referencing the argument.
+BUILTIN_SIL_OPERATION(MakeBorrow, "makeBorrow", Special)
+
+/// dereferenceBorrow: <T: ~Copyable>(_ borrow: Borrow<T>) -> T
+///
+/// Access the value referenced by a `Builtin.Borrow`.
+///
+/// Although this is modeled as returning `T` at the AST level, the builtin has
+/// special handling to produce the return value as a borrow of the referenced
+/// value. This handling only works in certain contexts, so this builtin should
+/// not generally be used directly.
+BUILTIN_SIL_OPERATION(DereferenceBorrow, "dereferenceBorrow", Special)
+
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
 // These functions accept a single argument of any type.
 #ifndef BUILTIN_RUNTIME_CALL
@@ -557,8 +574,9 @@ BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 /// nominal type is Optional.
 BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 
-// BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
-// These have various types.
+/// BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
+/// These have various types. They are emitted as BuiltinInst in a standard way
+/// by SILGen.
 #ifndef BUILTIN_MISC_OPERATION
 #define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)
@@ -680,8 +698,14 @@ BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 /// T must be trivial.
 BUILTIN_MISC_OPERATION(Select, "select", "n", Special)
 
-// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
+/// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
 BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
+
+/// Interleave has type (VecN<T>, VecN<T>) -> (VecN<T>, VecN<T>)
+BUILTIN_MISC_OPERATION(Interleave, "interleave", "n", Special)
+
+/// Deinterleave has type (VecN<T>, VecN<T>) -> (VecN<T>, VecN<T>)
+BUILTIN_MISC_OPERATION(Deinterleave, "deinterleave", "n", Special)
 
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
@@ -689,6 +713,17 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// assert_configuration has type () -> Builtin.Int32
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
+
+/// Is true, but the compiler doesn't know.
+/// This builtin is used to break infinite loops.
+/// Note that this builtin intentionally has side effects defined (Attrs = "").
+/// This prevents optimizations to move code with side effects over an "empty"
+/// infinite loop (into the pseudo exit of the loop). E.g.
+/// ```
+///   print("end of processing") // must not be moved into the pseudo-exit of the infinite loop
+///   while true {}
+/// ```
+BUILTIN_MISC_OPERATION(InfiniteLoopTrueCondition, "infinite_loop_true_condition", "", None)
 
 /// Ifdef has type () -> Bool.
 BUILTIN_MISC_OPERATION(Ifdef, "ifdef", "n", Special)
@@ -876,17 +911,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
-/// startAsyncLet()<T>: (
-///     __owned @escaping () async throws -> sending T
-/// ) -> Builtin.RawPointer
-///
-/// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
-///
-/// Create, initialize and start a new async-let and associated task.
-/// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
-BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
-
-/// startAsyncLetWithLocalBuffer()<T>: (
+/// startAsyncLetWithLocalBuffer: <T> (
 ///     __owned @escaping () async throws -> sending T,
 ///     _ resultBuf: Builtin.RawPointer
 /// ) -> Builtin.RawPointer
@@ -927,16 +952,11 @@ BUILTIN_MISC_OPERATION(FlowSensitiveSelfIsolation, "flowSensitiveSelfIsolation",
 BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
                        "flowSensitiveDistributedSelfIsolation", "", Special)
 
-/// endAsyncLet(): (Builtin.RawPointer) -> Void
+/// finishAsyncLet(Builtin.RawPointer, Builtin.RawPointer) -> Void
 ///
-/// DEPRECATED. The swift_asyncLet_finish intrinsic and endAsyncLetLifetime
-/// builtin are used instead.
-///
-/// Ends and destroys an async-let.
-/// The ClosureLifetimeFixup pass adds a second operand to the builtin to
-/// ensure that optimizations keep the stack-allocated closure arguments alive
-/// until the endAsyncLet.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
+/// End the scope of an async let. An async operation. Deallocates stack
+/// memory that was allocated by startAsyncLetWithLocalBuffer.
+BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
 
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
@@ -1179,6 +1199,42 @@ BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagn
 /// @objc protocol type. The answer is a tri-state of 0 = No, 1 = Yes, 2 =
 /// Maybe.
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
+
+/// Equivalent to calling swift_task_addCancellationHandler.
+///
+/// Signature: (handler: () -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandler,
+                                  "taskAddCancellationHandler", "",
+                                   Special)
+
+/// Equivalent to calling swift_task_removeCancellationHandler.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskRemoveCancellationHandler,
+                       "taskRemoveCancellationHandler", "", Special)
+
+/// Equivalent to calling swift_task_addPriorityEscalationHandler.
+///
+/// Signature: (handler: (UInt8, UInt8) -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddPriorityEscalationHandler,
+                                   "taskAddPriorityEscalationHandler", "",
+                                   Special)
+
+/// Equivalent to calling swift_task_removePriorityEscalationHandler.
+///
+/// Signature: (record: UnsafeRawPointer) -> ()
+BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
+                       "taskRemovePriorityEscalationHandler", "", Special)
+
+/// Equivalent to calling swift_task_localValuePush.
+///
+/// Signature: <Value> (key: Builtin.RawPointer, value: __owned Value) -> ()
+BUILTIN_MISC_OPERATION(TaskLocalValuePush, "taskLocalValuePush", "", Special)
+
+/// Equivalent to calling swift_task_localValuePop.
+///
+/// Signature: () -> ()
+BUILTIN_MISC_OPERATION(TaskLocalValuePop, "taskLocalValuePop", "", Special)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION
 #undef BUILTIN_UNARY_OPERATION

@@ -8,13 +8,14 @@
 class Klass {
   // Implicit deinit
   // CHECK: // Klass.deinit
-  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: // Isolation: global_actor. type: MainActor
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject {
 
   // Implicit deallocating deinit
   // CHECK: // Klass.__deallocating_deinit
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfD : $@convention(method) (@owned Klass) -> () {
+  // CHECK: swift_task_deinitOnExecutor
 
   // Implicit allocating init
   // CHECK: // Klass.__allocating_init()
@@ -64,6 +65,16 @@ struct NonIsolatedStructContainingKlass {
   // CHECK: // NonIsolatedStructContainingKlass.init()
   // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor32NonIsolatedStructContainingKlassVACycfC : $@convention(method) (@thin NonIsolatedStructContainingKlass.Type) -> @owned NonIsolatedStructContainingKlass {
+}
+
+struct NonCopyableStruct: ~Copyable {
+  var x: Int
+  var y: Int
+
+  // CHECK: NonCopyableStruct.deinit
+  // CHECK-NEXT: Isolation: nonisolated
+  deinit {
+  }
 }
 
 @globalActor
@@ -214,4 +225,53 @@ actor MyActor2 {
   // Since we are in a CustomActor, we can only call this if print is
   // NonIsolated and not if print was inferred to be main actor.
   print("123")
+}
+
+nonisolated func localDeclIsolation() async {
+  struct Local {
+    static func f() {}
+  }
+
+  Local.f()
+
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+}
+
+@CustomActor
+class CustomActorIsolated {
+  struct Nested {
+    // CHECK: // static CustomActorIsolated.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    static func f() {}
+  }
+
+  // CHECK: // CustomActorIsolated.customIsolated()
+  // CHECK-NEXT: // Isolation: global_actor. type: CustomActor
+  func customIsolated() {
+    Nested.f()
+  }
+}
+
+var global = 0
+
+func onMain() async {
+  await withTaskGroup { group in
+    group.addTask { }
+
+    await group.next()
+  }
+
+  struct Nested {
+    // CHECK: // static useGlobal() in Nested #1 in onMain()
+    // CHECK-NEXT: // Isolation: global_actor. type: MainActor
+    static func useGlobal() -> Int {
+      global
+    }
+  }
+
+  _ = Nested.useGlobal()
 }

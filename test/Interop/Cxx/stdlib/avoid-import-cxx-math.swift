@@ -2,7 +2,10 @@
 // RUN: %target-swift-frontend %s -typecheck -verify -cxx-interoperability-mode=swift-6
 // RUN: %target-swift-frontend %s -typecheck -verify -cxx-interoperability-mode=upcoming-swift
 
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
+
+// sin and cos are not found on FreeBSD (https://github.com/swiftlang/swift/issues/86103)
+// XFAIL: OS=freebsd
 
 import CxxStdlib
 

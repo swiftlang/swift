@@ -593,7 +593,7 @@ private:
 public:
   /// Lookup an unresolved context name and resolve it to a Clang
   /// named declaration.
-  clang::NamedDecl *resolveContext(StringRef unresolvedName);
+  const clang::NamedDecl *resolveContext(StringRef unresolvedName);
 
   /// Lookup the set of entities with the given base name.
   ///

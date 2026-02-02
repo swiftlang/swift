@@ -128,7 +128,7 @@ extension BinaryInteger {
     return count
   }
 
-  func writeToStdout() {
+  func writeToStdout(radix: Int = 10) {
     // Avoid withUnsafeTemporaryAllocation which is not typed-throws ready yet
     let byteCount = 64
     let stackBuffer = Builtin.stackAlloc(byteCount._builtinWordValue,
@@ -136,7 +136,7 @@ extension BinaryInteger {
     let buffer = unsafe UnsafeMutableRawBufferPointer(start: .init(stackBuffer),
         count: byteCount).baseAddress!.assumingMemoryBound(to: UInt8.self)
 
-    let count = unsafe _toStringImpl(buffer, 64, 10, false)
+    let count = unsafe _toStringImpl(buffer, 64, radix, false)
 
     unsafe printCharacters(UnsafeBufferPointer(start: buffer, count: count))
 
@@ -145,7 +145,12 @@ extension BinaryInteger {
 }
 
 public func print(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
-  integer.writeToStdout()
+  integer.writeToStdout(radix: 10)
+  print("", terminator: terminator)
+}
+
+internal func printAsHex(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
+  integer.writeToStdout(radix: 16)
   print("", terminator: terminator)
 }
 

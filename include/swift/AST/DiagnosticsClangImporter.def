@@ -73,6 +73,11 @@ GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
 
+WARNING(swift_name_attr_ignored, none,
+        "ignoring swift_name attribute %0; swift_name attributes have no "
+        "effect on method overrides",
+        (StringRef))
+
 GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
         (StringRef, StringRef))
@@ -99,9 +104,12 @@ GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,
         "cannot make type %0 sendable because '@Sendable' and '& Sendable' "
         "cannot be added to it",
         (Type))
-NOTE(clang_param_should_be_implicitly_sendable,none,
-     "parameter should be implicitly 'Sendable' because it is a completion "
-     "handler", ())
+
+GROUPED_WARNING(warn_clang_ignored_bounds_on_self, ClangDeclarationImport, none,
+                "bounds attribute '%0' ignored on parameter mapped to 'self'",
+                (StringRef))
+NOTE(note_swift_name_instance_method, none,
+     "swift_name maps free function to instance method here", ())
 
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
@@ -111,10 +119,6 @@ WARNING(implicit_bridging_header_imported_from_module,none,
 GROUPED_WARNING(import_multiple_mainactor_attr, ClangDeclarationImport, none,
       "this attribute for global actor '%0' is invalid; the declaration already has attribute for global actor '%1'",
       (StringRef, StringRef))
-
-GROUPED_WARNING(contradicting_mutation_attrs, ClangDeclarationImport, none,
-        "attribute '%0' is ignored when combined with attribute '%1'",
-        (StringRef, StringRef))
 
 GROUPED_WARNING(nonmutating_without_const, ClangDeclarationImport, none,
         "attribute 'nonmutating' has no effect on non-const method", ())
@@ -191,10 +195,10 @@ NOTE(projection_reference_not_imported, none, "C++ method '%0' that returns a re
 NOTE(projection_may_return_interior_ptr, none, "C++ method '%0' may return an "
                                     "interior pointer",
      (StringRef))
-NOTE(mark_self_contained, none, "annotate type '%0' with 'SWIFT_SELF_CONTAINED' in C++ to "
+NOTE(mark_self_contained, none, "annotate type '%0' with SWIFT_SELF_CONTAINED in C++ to "
                                  "make methods that return it available in Swift",
      (StringRef))
-NOTE(mark_safe_to_import, none, "annotate method '%0' with 'SWIFT_RETURNS_INDEPENDENT_VALUE' in C++ to "
+NOTE(mark_safe_to_import, none, "annotate method '%0' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to "
                                 "make it available in Swift",
      (StringRef))
 
@@ -223,8 +227,6 @@ ERROR(private_fileid_attr_repeated, none,
  ERROR(private_fileid_attr_on_incomplete_type, none,
      "SWIFT_PRIVATE_FILEID cannot be applied to incomplete type, '%0'",
      (StringRef))
- NOTE(private_fileid_attr_here, none,
-     "SWIFT_PRIVATE_FILEID annotation found here", ())
 
  GROUPED_WARNING(private_fileid_attr_format_invalid, ClangDeclarationImport, none,
      "SWIFT_PRIVATE_FILEID annotation on '%0' does not have a valid file ID",
@@ -259,14 +261,17 @@ ERROR(foreign_reference_types_invalid_retain_release, none,
 
 ERROR(foreign_reference_types_retain_non_void_or_self_return_type, none,
       "specified retain function '%0' is invalid; "
-      "retain function must have 'void' or parameter return type",
+      "retain function must either return have 'void', the reference count as an integer, or the parameter type",
       (StringRef))
 ERROR(foreign_reference_types_release_non_void_return_type, none,
       "specified release function '%0' is invalid; "
-      "release function must have 'void' return type",
+      "release function must either return 'void' or the reference count as an integer",
       (StringRef))
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",
+      (bool, StringRef))
+ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
+      "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
       (bool, StringRef))
 ERROR(conforms_to_missing_dot, none,
       "expected module name and protocol name separated by '.' in protocol "
@@ -297,19 +302,11 @@ ERROR(both_returns_retained_returns_unretained, none,
 ERROR(redundant_conformance_protocol,none,
      "redundant conformance of %0 to protocol '%1'", (Type, StringRef))
 
-ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
-      "%0 cannot be annotated with either SWIFT_RETURNS_RETAINED or "
+WARNING(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
+      "%0 should not be annotated with SWIFT_RETURNS_RETAINED or "
       "SWIFT_RETURNS_UNRETAINED because it is not returning "
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
-
-// TODO: In the next C++ interop version, convert this warning into an error and
-// stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
-// rdar://138806722
-GROUPED_WARNING(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
-        "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
-        "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
-        (const clang::NamedDecl *))
 
 GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
         "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "
@@ -348,11 +345,11 @@ NOTE(forward_declared_protocol_label, none,
 
 NOTE(forward_declared_interface_clashes_with_imported_objc_Swift_interface, none,
      "interface %0 is incomplete and cannot be imported as a stub; "
-     "its name conflicts with a %1 in module %2",
+     "its name conflicts with a %1 in module '%2'",
      (const clang::NamedDecl*, StringRef, StringRef))
 NOTE(forward_declared_protocol_clashes_with_imported_objc_Swift_protocol, none,
      "protocol %0 is incomplete and cannot be imported as a stub; "
-     "its name conflicts with a %1 in module %2",
+     "its name conflicts with a %1 in module '%2'",
      (const clang::NamedDecl*, StringRef, StringRef))
 
 GROUPED_WARNING(return_escapable_with_lifetimebound,  ClangDeclarationImport, none,
@@ -381,9 +378,64 @@ NOTE(ptr_to_nonescapable,none,
      "pointer to non-escapable type %0 cannot be imported",
      (const clang::Type*))
 
-NOTE(nonescapable_field_of_escapable, none,
-     "escapable record %0 cannot have non-escapable field '%1'",
-     (const clang::NamedDecl *, StringRef))
+NOTE(nonescapable_member_of_escapable, none,
+     "escapable record %1 cannot have non-escapable %select{field|base}0 '%2'",
+     (bool, const clang::NamedDecl *, StringRef))
+
+NOTE(refcounted_ptr_missing_torawpointer, none,
+     "SWIFT_REFCOUNTED_PTR on %0 is missing required "
+     "'_toRawPointer' parameter",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_torawpointer_lookup_failure, none,
+     "cannot find function '%0' specified in '_toRawPointer' "
+     "parameter of SWIFT_REFCOUNTED_PTR %1",
+     (StringRef, const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_torawpointer_lookup_ambiguity, none,
+     "there are multiple candidates of function '%0' specified in "
+     "'_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR %1",
+     (StringRef, const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_ctor_wrong_parameter_type, none,
+     "the constructor's parameter to create smart pointer from a raw pointer "
+     "does not match the return type of the raw pointer accessor in %0",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_ctor_lookup_failure, none,
+     "cannot find constructor to create smart pointer from a raw pointer to a "
+     "shared reference %0",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_ctor_lookup_ambiguity, none,
+     "there are multiple constructors to create smart pointer from a raw "
+     "pointer to a shared reference %0",
+     (const clang::NamedDecl *))
+
+NOTE(refcounted_ptr_torawpointer_not_function, none,
+     "%0 specified in '_toRawPointer' parameter of "
+     "SWIFT_REFCOUNTED_PTR on %1 is not a function",
+     (const Decl *, const clang::NamedDecl *))
+
+NOTE(
+    refcounted_ptr_torawpointer_wrong_signature, none,
+    "function %0 specified in '_toRawPointer' parameter of "
+    "SWIFT_REFCOUNTED_PTR on %1 has incorrect signature; expected a function "
+    "that takes no arguments and returns a pointer to a foreign reference type",
+    (const Decl *, const clang::NamedDecl *))
+
+ERROR(invalid_conditional_attr, none,
+      "%0 is invalid because it is only supported in "
+      "class templates",
+      (StringRef))
+
+ERROR(conflicting_swift_attrs, none,
+      "multiple conflicting annotations found on %0", (const clang::NamedDecl *))
+
+ERROR(repeating_swift_attrs, none, "multiple %0 annotations found on %1",
+      (StringRef, const clang::NamedDecl *))
+
+NOTE(annotation_here, none, "%0 annotation found here", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

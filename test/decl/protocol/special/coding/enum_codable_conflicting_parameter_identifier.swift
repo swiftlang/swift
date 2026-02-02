@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
 
 enum Duplicate : Codable { // expected-error {{type 'Duplicate' does not conform to protocol 'Decodable'}}
   // expected-error@-1 {{type 'Duplicate' does not conform to protocol 'Encodable'}}

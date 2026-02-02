@@ -19,9 +19,11 @@
 #ifndef SWIFT_DEMANGLING_DEMANGLE_H
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
+#include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Errors.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 
@@ -99,6 +101,7 @@ struct DemangleOptions {
 
 class Node;
 using NodePointer = Node *;
+class NodePrinter;
 
 enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
@@ -113,6 +116,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   BoxToStack = 7,
   InOutToOut = 8,
   ConstantPropKeyPath = 9,
+  ConstantPropStruct = 10,
+  ClosurePropPreviousArg = 11,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -159,7 +164,9 @@ enum class SpecializationPass : uint8_t {
   GenericSpecializer,
   MoveDiagnosticInOutToOut,
   AsyncDemotion,
-  LAST = AsyncDemotion
+  PackSpecialization,
+  EmbeddedWitnessCallSpecialization,
+  LAST = EmbeddedWitnessCallSpecialization
 };
 
 constexpr uint8_t MAX_SPECIALIZATION_PASS = 10;
@@ -190,6 +197,7 @@ public:
   };
 
   using IndexType = uint64_t;
+  using RemoteAddressType = std::pair<uint64_t, uint8_t>;
 
   friend class NodeFactory;
   
@@ -206,14 +214,20 @@ private:
     IndexType Index;
     NodePointer InlineChildren[2];
     NodeVector Children;
+    RemoteAddressType RemoteAddress;
   };
 
 
   Kind NodeKind;
 
   enum class PayloadKind : uint8_t {
-    None = 0, OneChild = 1, TwoChildren = 2,
-    Text, Index, ManyChildren
+    None = 0,
+    OneChild = 1,
+    TwoChildren = 2,
+    Text,
+    Index,
+    ManyChildren,
+    RemoteAddress
   };
   PayloadKind NodePayloadKind;
 
@@ -227,6 +241,10 @@ private:
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
     Index = index;
+  }
+  Node(Kind k, uint64_t remoteAddress, uint8_t addressSpace)
+      : NodeKind(k), NodePayloadKind(PayloadKind::RemoteAddress) {
+    RemoteAddress = {remoteAddress, addressSpace};
   }
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
@@ -279,6 +297,14 @@ public:
   uint64_t getIndex() const {
     assert(hasIndex());
     return Index;
+  }
+
+  bool hasRemoteAddress() const {
+    return NodePayloadKind == PayloadKind::RemoteAddress;
+  }
+  std::pair<uint64_t, uint8_t> getRemoteAddress() const {
+    assert(hasRemoteAddress());
+    return RemoteAddress;
   }
 
   using iterator = const NodePointer *;
@@ -465,16 +491,26 @@ public:
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// context or with a call of clear().
   NodePointer demangleTypeAsNode(llvm::StringRef MangledName);
-  
+
   /// Demangle the given symbol and return the readable name.
   ///
   /// \param MangledName The mangled symbol string, which start a mangling
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
-  std::string demangleSymbolAsString(
-      llvm::StringRef MangledName,
-      const DemangleOptions &Options = DemangleOptions());
+  std::string
+  demangleSymbolAsString(llvm::StringRef MangledName,
+                         const DemangleOptions &Options = DemangleOptions());
+
+  /// Demangle the given symbol and store the result in the `printer`.
+  ///
+  /// \param MangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
+  /// \param Printer The NodePrinter that will be used to demangle the symbol.
+  ///
+  /// \returns The demangled string.
+  void demangleSymbolAsString(llvm::StringRef MangledName,
+                              NodePrinter &Printer);
 
   /// Demangle the given type and return the readable name.
   ///
@@ -533,6 +569,16 @@ std::string
 demangleSymbolAsString(const char *mangledName, size_t mangledNameLength,
                        const DemangleOptions &options = DemangleOptions());
 
+/// Standalone utility function to demangle the given symbol as string. The
+/// demangled string is stored in the `printer`.
+///
+/// If performance is an issue when demangling multiple symbols,
+/// \param mangledName The mangled name string pointer.
+/// \param mangledNameLength The length of the mangledName string.
+/// \param printer The NodePrinter that will be used to demangle the symbol.
+void demangleSymbolAsString(const llvm::StringRef mangledName,
+                            NodePrinter &printer);
+
 /// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
@@ -545,7 +591,7 @@ demangleSymbolAsString(const std::string &mangledName,
   return demangleSymbolAsString(mangledName.data(), mangledName.size(),
                                 options);
 }
-  
+
 /// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
@@ -626,7 +672,7 @@ struct [[nodiscard]] ManglingError {
     InvalidImplCoroutineKind,
     InvalidImplFunctionAttribute,
     InvalidImplParameterConvention,
-    InvalidImplParameterSending,
+    InvalidImplParameterAttr,
     InvalidMetatypeRepresentation,
     MultiByteRelatedEntity,
     BadValueWitnessKind,
@@ -725,12 +771,18 @@ ManglingErrorOr<const char *> mangleNodeAsObjcCString(NodePointer node,
 /// \endcode
 ///
 /// \param Root A pointer to a parse tree generated by the demangler.
-/// \param Options An object encapsulating options to use to perform this demangling.
+/// \param Options An object encapsulating options to use to perform this
+/// demangling.
 ///
 /// \returns A string representing the demangled name.
-///
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
+
+/// Transform the node structure to a string, which is stored in the `Printer`.
+///
+/// \param Root A pointer to a parse tree generated by the demangler.
+/// \param Printer A NodePrinter used to pretty print the demangled Node.
+void nodeToString(NodePointer Root, NodePrinter &Printer);
 
 /// Transforms a mangled key path accessor thunk helper
 /// into the identfier/subscript that would be used to invoke it in swift code.
@@ -777,11 +829,14 @@ public:
 
   llvm::StringRef getStringRef() const { return Stream; }
 
+  size_t getStreamLength() { return Stream.length(); }
+
   /// Shrinks the buffer.
   void resetSize(size_t toPos) {
     assert(toPos <= Stream.size());
     Stream.resize(toPos);
   }
+
 private:
   std::string Stream;
 };
@@ -817,6 +872,162 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 std::string mangledNameForTypeMetadataAccessor(
     llvm::StringRef moduleName, llvm::StringRef typeName, Node::Kind typeKind,
     Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
+
+/// Base class for printing a Swift demangled node tree.
+///
+/// NodePrinter is used to convert demangled Swift symbol nodes into
+/// human-readable string representations. It handles formatting, indentation,
+/// and Swift-specific syntax.
+///
+/// The virtual methods in this class are meant to be overriden to allow
+/// external consumers (e.g lldb) to track the ranges of components of the
+/// demangled name.
+class NodePrinter {
+protected:
+  DemanglerPrinter Printer;
+  DemangleOptions Options;
+  bool SpecializationPrefixPrinted = false;
+  bool isValid = true;
+
+public:
+  NodePrinter(DemangleOptions options) : Options(options) {}
+
+  virtual ~NodePrinter() = default;
+
+  virtual void printRoot(NodePointer root) {
+    isValid = true;
+    print(root, 0);
+  }
+
+  std::string takeString() {
+    if (isValid)
+      return std::move(Printer).str();
+    return "";
+  }
+
+protected:
+  static const unsigned MaxDepth = 768;
+
+  size_t getStreamLength() { return Printer.getStreamLength(); }
+
+  /// Called when the node tree in valid.
+  ///
+  /// The demangler already catches most error cases and mostly produces valid
+  /// node trees. But some cases are difficult to catch in the demangler and
+  /// instead the NodePrinter bails.
+  void setInvalid() { isValid = false; }
+
+  void printChildren(Node::iterator begin, Node::iterator end, unsigned depth,
+                     const char *sep = nullptr);
+
+  void printChildren(NodePointer Node, unsigned depth,
+                     const char *sep = nullptr);
+
+  NodePointer getFirstChildOfKind(NodePointer Node, Node::Kind kind);
+
+  void printBoundGenericNoSugar(NodePointer Node, unsigned depth);
+
+  void printOptionalIndex(NodePointer node);
+
+  static bool isSwiftModule(NodePointer node) {
+    return (node->getKind() == Node::Kind::Module &&
+            node->getText() == STDLIB_NAME);
+  }
+
+  static bool isIdentifier(NodePointer node, StringRef desired) {
+    return (node->getKind() == Node::Kind::Identifier &&
+            node->getText() == desired);
+  }
+
+  bool printContext(NodePointer Context);
+
+  enum class SugarType {
+    None,
+    Optional,
+    ImplicitlyUnwrappedOptional,
+    Array,
+    Dictionary
+  };
+
+  enum class TypePrinting { NoType, WithColon, FunctionStyle };
+
+  /// Determine whether this is a "simple" type, from the type-simple
+  /// production.
+  bool isSimpleType(NodePointer Node);
+
+  void printWithParens(NodePointer type, unsigned depth);
+
+  SugarType findSugar(NodePointer Node);
+
+  void printBoundGeneric(NodePointer Node, unsigned depth);
+
+  NodePointer getChildIf(NodePointer Node, Node::Kind Kind);
+
+  virtual void printFunctionParameters(NodePointer LabelList,
+                                       NodePointer ParameterType,
+                                       unsigned depth, bool showTypes);
+
+  void printFunctionType(NodePointer LabelList, NodePointer node,
+                         unsigned depth);
+
+  void printImplFunctionType(NodePointer fn, unsigned depth);
+
+  virtual void printGenericSignature(NodePointer Node, unsigned depth);
+
+  void printFunctionSigSpecializationParams(NodePointer Node, unsigned depth);
+  void printNextParamChildNode(NodePointer nd, unsigned &idx,
+                               FunctionSigSpecializationParamKind kind,
+                               unsigned depth);
+
+  void printSpecializationPrefix(NodePointer node, StringRef Description,
+                                 unsigned depth,
+                                 StringRef ParamPrefix = StringRef());
+
+  /// The main big print function.
+  NodePointer print(NodePointer Node, unsigned depth,
+                    bool asPrefixContext = false);
+
+  NodePointer printAbstractStorage(NodePointer Node, unsigned depth,
+                                   bool asPrefixContent, StringRef ExtraName);
+
+  /// Utility function to print entities.
+  ///
+  /// \param Entity The entity node to print
+  /// \param depth The depth in the print() call tree.
+  /// \param asPrefixContext Should the entity printed as a context which as a
+  ///        prefix to another entity, e.g. the Abc in Abc.def()
+  /// \param TypePr How should the type of the entity be printed, if at all.
+  ///        E.g. with a colon for properties or as a function type.
+  /// \param hasName Does the entity has a name, e.g. a function in contrast to
+  ///        an initializer.
+  /// \param ExtraName An extra name added to the entity name (if any).
+  /// \param ExtraIndex An extra index added to the entity name (if any),
+  ///        e.g. closure #1
+  /// \param OverwriteName If non-empty, print this name instead of the one
+  ///        provided by the node. Gets printed even if hasName is false.
+  /// \return If a non-null node is returned it's a context which must be
+  ///         printed in postfix-form after the entity: "<entity> in <context>".
+  NodePointer printEntity(NodePointer Entity, unsigned depth,
+                          bool asPrefixContext, TypePrinting TypePr,
+                          bool hasName, StringRef ExtraName = "",
+                          int ExtraIndex = -1, StringRef OverwriteName = "");
+
+  virtual void printFunctionName(bool hasName, llvm::StringRef &OverwriteName,
+                                 llvm::StringRef &ExtraName, bool MultiWordName,
+                                 int &ExtraIndex,
+                                 swift::Demangle::NodePointer Entity,
+                                 unsigned int depth);
+
+  /// Print the type of an entity.
+  ///
+  /// \param Entity The entity.
+  /// \param type The type of the entity.
+  /// \param genericFunctionTypeList If not null, the generic argument types
+  ///           which is printed in the generic signature.
+  /// \param depth The depth in the print() call tree.
+  void printEntityType(NodePointer Entity, NodePointer type,
+                       NodePointer genericFunctionTypeList, unsigned depth);
+};
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle

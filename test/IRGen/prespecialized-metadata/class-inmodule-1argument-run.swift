@@ -44,29 +44,29 @@ func consume<T>(clazzType: MyGenericClazz<T>.Type) {
 
 
 public func doit() {
-  // CHECK: [[FLOAT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Float> @ 48
+  // CHECK: [[FLOAT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Float> @ [[@LINE+1]]
   consume(MyGenericClazz<Float>())
-  // CHECK: [[FLOAT_METADATA_ADDRESS]] MyGenericClazz<Float> @ 50
+  // CHECK: [[FLOAT_METADATA_ADDRESS]] MyGenericClazz<Float> @ [[@LINE+1]]
   consume(clazz: MyGenericClazz<Float>())
 
-  // CHECK: [[DOUBLE_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Double> @ 53
+  // CHECK: [[DOUBLE_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Double> @ [[@LINE+1]]
   consume(MyGenericClazz<Double>())
-  // CHECK: [[DOUBLE_METADATA_ADDRESS]] MyGenericClazz<Double> @ 55
+  // CHECK: [[DOUBLE_METADATA_ADDRESS]] MyGenericClazz<Double> @ [[@LINE+1]]
   consume(clazz: MyGenericClazz<Double>())
 
-  // CHECK: [[INT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Int> @ 58
+  // CHECK: [[INT_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<Int> @ [[@LINE+1]]
   consume(MyGenericClazz<Int>())
-  // CHECK: [[INT_METADATA_ADDRESS]] MyGenericClazz<Int> @ 60
+  // CHECK: [[INT_METADATA_ADDRESS]] MyGenericClazz<Int> @ [[@LINE+1]]
   consume(clazz: MyGenericClazz<Int>())
 
-  // CHECK: [[STRING_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<String> @ 63
+  // CHECK: [[STRING_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<String> @ [[@LINE+1]]
   consume(MyGenericClazz<String>())
-  // CHECK: [[STRING_METADATA_ADDRESS]] MyGenericClazz<String> @ 65
+  // CHECK: [[STRING_METADATA_ADDRESS]] MyGenericClazz<String> @ [[@LINE+1]]
   consume(clazz: MyGenericClazz<String>())
 
-  // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ 68
+  // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ [[@LINE+1]]
   consume(MyGenericClazz<MyGenericClazz<String>>())
-  // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ 70
+  // CHECK: [[NESTED_METADATA_ADDRESS:[0-9a-f]+]] MyGenericClazz<MyGenericClazz<String>> @ [[@LINE+1]]
   consume(clazz: MyGenericClazz<MyGenericClazz<String>>())
 
   // CHECK: [[FLOAT_METADATA_METATYPE_ADDRESS:[0-9a-f]+]] MyGenericClazz<Float>

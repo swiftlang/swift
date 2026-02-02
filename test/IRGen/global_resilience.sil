@@ -40,20 +40,20 @@ public struct LargeResilientStruct {
 sil_global [let] @largeGlobal : $LargeResilientStruct
 
 //
-// Size is known in this resilience domain, and global is hidden,
-// so allocate it directly.
-//
-
-// CHECK: @fixedGlobal = hidden global %T17global_resilience20LargeResilientStructV zeroinitializer
-sil_global hidden @fixedGlobal : $LargeResilientStruct
-
-//
 // Unknown size -- must call value witness functions for buffer
 // management.
 //
 
 // CHECK: @otherGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER]] zeroinitializer
 sil_global [let] @otherGlobal : $Size
+
+//
+// Size is known in this resilience domain, and global is hidden,
+// so allocate it directly.
+//
+
+// CHECK: @fixedGlobal = hidden global %T17global_resilience20LargeResilientStructV zeroinitializer
+sil_global hidden @fixedGlobal : $LargeResilientStruct
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @testSmallGlobal()
 sil @testSmallGlobal : $@convention(thin) () -> Int32 {

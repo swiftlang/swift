@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -enable-spec-devirt -O -Xllvm -sil-disable-pass=ExistentialSpecializer -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -O -Xllvm -sil-disable-pass=ExistentialSpecializer -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -100,23 +100,10 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // apply instructions.
 
 // CHECK-LABEL: sil [noinline] @$s34devirt_protocol_method_invocations05test_a1_b1_C11_invocationySiAA1CCF
-// CHECK-NOT: witness_method
-// CHECK: checked_cast
-// CHECK-NOT: checked_cast
-// CHECK: bb1(
-// CHECK-NOT: checked_cast
-// CHECK: return
-// CHECK: bb2(
-// CHECK-NOT: checked_cast
-// CHECK: function_ref
+// This used to check speculative-devirtualization, which we don't have anymore.
+// CHECK:         class_method
 // CHECK: apply
 // CHECK: apply
-// CHECK: br bb1(
-// CHECK: bb3
-// CHECK-NOT: checked_cast
-// CHECK: apply
-// CHECK: apply
-// CHECK: br bb1(
 
 // Check that calls of a method boo() from the protocol extension
 // get devirtualized and are not invoked via the expensive witness_method instruction

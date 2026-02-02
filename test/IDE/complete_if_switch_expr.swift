@@ -225,7 +225,7 @@ func testSkipTypeChecking8() throws -> E {
   return e
 }
 
-func testSkipTypeChecking8() throws -> E {
+func testSkipTypeChecking8a() throws -> E {
   // Only need to type-check the inner function in this case.
   let e: E = if Bool.random() {
     func localFunc() {

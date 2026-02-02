@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -source-filename %s -module-to-print=SwiftNameTests -function-definitions=false -F %S/Inputs/mock-sdk > %t.txt
-// RUN: diff -u <(tail -n +9 %s) %t.txt
+// RUN: tail -n +10 %s > %t/a
+// RUN: diff -u %t/a %t.txt
 
 // REQUIRES: objc_interop
 

@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
@@ -67,22 +68,24 @@ namespace swift {
     Complete,
   };
 
-  /// Access or distribution level of a library.
+  /// Intended distribution level of a module.
+  ///
+  /// Ordered from more private to more public.
   enum class LibraryLevel : uint8_t {
-    /// Application Programming Interface that is publicly distributed so
-    /// public decls are really public and only @_spi decls are SPI.
-    API,
+    /// This isn't a library or the library distribution intent is unknown.
+    Other,
 
-    /// System Programming Interface that has restricted distribution
-    /// all decls in the module are considered to be SPI including public ones.
-    SPI,
-
-    /// Internal Programming Interface that is not distributed and only usable
-    /// from within a project.
+    /// Internal Programming Interface: the module is not distributed and
+    /// only usable from within its project.
     IPI,
 
-    /// The library has some other undefined distribution.
-    Other
+    /// System Programming Interface: the module has restricted distribution,
+    /// all public decls in the module are considered to be SPI.
+    SPI,
+
+    /// Application Programming Interface: the module is distributed publicly,
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
   };
 
   enum class AccessNoteDiagnosticBehavior : uint8_t {
@@ -185,6 +188,9 @@ namespace swift {
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
 
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
@@ -239,9 +245,6 @@ namespace swift {
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
 
-    /// Require public declarations to declare that they are Sendable (or not).
-    bool RequireExplicitSendable = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
@@ -266,9 +269,6 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-
-    /// Emit a remark on early exit in explicit interface build
-    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -321,6 +321,8 @@ namespace swift {
     /// Flags for use by tests
     ///
 
+    bool UseStaticStandardLibrary = false;
+
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
@@ -330,10 +332,6 @@ namespace swift {
     /// language mode of clang on a per-header or even per-module basis. Also
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
-
-    /// The C++ interoperability source compatibility version. Defaults
-    /// to the Swift language version.
-    version::Version cxxInteropCompatVersion;
 
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
@@ -352,8 +350,6 @@ namespace swift {
     bool isUsingPlatformDefaultCXXStdlib() const {
       return CXXStdlib == PlatformDefaultCXXStdlib;
     }
-
-    bool CForeignReferenceTypes = false;
 
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
@@ -453,10 +449,13 @@ namespace swift {
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
 
+    /// Disable injecting deserializes module paths into the explict module map.
+    bool DisableDeserializationOfExplicitPaths = false;
+
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
-    bool ForceWorkaroundBrokenModules = false;
+    bool EnableWorkaroundBrokenModules = true;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -491,6 +490,9 @@ namespace swift {
     /// These are shared_ptrs so that this class remains copyable.
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
+
+    /// The path to load access notes from.
+    std::string AccessNotesPath;
 
     /// How should we emit diagnostics about access notes?
     AccessNoteDiagnosticBehavior AccessNoteBehavior =
@@ -578,9 +580,17 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineMaxRuleLength = 12;
 
-    /// Maximum concrete type nesting depth for requirement machine property map
-    /// algorithm.
+    /// Maximum concrete type nesting depth (when type is viewed as a tree) for
+    /// requirement machine property map algorithm.
     unsigned RequirementMachineMaxConcreteNesting = 30;
+
+    /// Maximum concrete type size (total number of nodes in the type tree) for
+    /// requirement machine property map algorithm.
+    unsigned RequirementMachineMaxConcreteSize = 4000;
+
+    /// Maximum number of "type difference" structures for the requirement machine
+    /// property map algorithm.
+    unsigned RequirementMachineMaxTypeDifferences = 13000;
 
     /// Maximum number of attempts to make when splitting concrete equivalence
     /// classes.
@@ -604,6 +614,14 @@ namespace swift {
     /// rewrite system.
     bool EnableRequirementMachineOpaqueArchetypes = false;
 
+    /// Maximum nesting depth for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionDepth = 500;
+
+    /// Maximum step count for type substitution operations, to prevent
+    /// runaway recursion.
+    unsigned MaxSubstitutionCount = 120000;
+
     /// Enable implicit lifetime dependence for ~Escapable return types.
     bool EnableExperimentalLifetimeDependenceInference = false;
 
@@ -626,11 +644,21 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Emits a remark with the content of each macro expansion line, for matching with -verify
+    bool RemarkMacroExpansions = false;
+
+    /// Enables dumping imports for each SourceFile.
+    bool DumpSourceFileImports = false;
+
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
     /// All block list configuration files to be honored in this compilation.
     std::vector<std::string> BlocklistConfigFilePaths;
+
+    /// List of top level modules to be considered as if they had require ObjC
+    /// in their module map.
+    llvm::SmallVector<StringRef> ModulesRequiringObjC;
 
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
@@ -673,18 +701,7 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      if (Target.isMacOSX()) {
-        llvm::VersionTuple OSVersion;
-        Target.getMacOSXVersion(OSVersion);
-        return OSVersion;
-      } else if (Target.isiOS()) {
-        return Target.getiOSVersion();
-      } else if (Target.isWatchOS()) {
-        return Target.getOSVersion();
-      } else if (Target.isXROS()) {
-        return Target.getOSVersion();
-      }
-      return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+      return getVersionForTriple(Target);
     }
 
     /// Sets an implicit platform condition.
@@ -727,16 +744,17 @@ namespace swift {
     ///
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
-    /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    /// check for isLanguageModeAtLeast(5).
+    bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
-    /// Whether the C++ interoperability compatibility version is at least
-    /// 'major'.
-    bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                          unsigned minor = 0) const {
-      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
+    /// Whether the "next major" language mode is being used. This isn't a real
+    /// language mode, it only exists to signal clients that expect to be
+    /// included in the next language mode when it becomes available.
+    bool isAtLeastFutureMajorLanguageMode() const {
+      using namespace version;
+      return isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion());
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.
@@ -932,6 +950,10 @@ namespace swift {
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
 
+    /// The maximum number of `@dynamicMemberLookup`s that can be chained to
+    /// resolve a member reference.
+    unsigned DynamicMemberLookupDepthLimit = 100;
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -968,19 +990,20 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
+    /// If non-zero, randomly shuffle disjunctions using this seed. For debugging.
+    unsigned ShuffleDisjunctionSeed = 0;
+
+    /// If non-zero, randomly shuffle disjunction choices using this seed. For
+    /// debugging
+    unsigned ShuffleDisjunctionChoicesSeed = 0;
+
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
-    /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
-
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
-
-    /// Disable constraint system performance hacks.
-    bool DisableConstraintSolverPerformanceHacks = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
@@ -994,6 +1017,13 @@ namespace swift {
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Enable the experimental "prepared overloads" optimization.
+    bool SolverEnablePreparedOverloads = true;
+
+    /// Enable experimental optimization to disable contradictory disjunction
+    /// choices.
+    bool SolverPruneDisjunctions = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1028,6 +1058,10 @@ namespace swift {
 
     /// The bridging header PCH file.
     std::string BridgingHeaderPCH;
+
+    /// Whether the bridging header and PCH file are considered to be
+    /// internal imports.
+    bool BridgingHeaderIsInternal = false;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1089,6 +1123,10 @@ namespace swift {
     /// When set, don't enforce warnings with -Werror.
     bool DebuggerSupport = false;
 
+    /// Prefer the serialized preprocessed header over the one on disk.
+    /// Used by LLDB.
+    bool PreferSerializedBridgingHeader = false;
+
     /// When set, ClangImporter is disabled, and all requests go to the
     /// DWARFImporter delegate.
     bool DisableSourceImport = false;
@@ -1105,6 +1143,15 @@ namespace swift {
     /// Whether the dependency scanner should construct all swift-frontend
     /// invocations directly from clang cc1 args.
     bool ClangImporterDirectCC1Scan = false;
+
+    /// Whether we should import values (initializer expressions) of constant
+    /// globals.
+    bool EnableConstValueImporting = true;
+
+    /// Whether the importer should expect all APINotes to be wrapped
+    /// in versioned attributes, where the importer must select the appropriate
+    /// ones to apply.
+    bool LoadVersionIndependentAPINotes = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

@@ -6,11 +6,11 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface -enable-library-evolution -swift-version 5 -parse-as-library
 
 /// Reading from swiftmodule
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown
 
 /// Reading from .private.swiftinterface
 // RUN: rm %t/SPIHelper.swiftmodule
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-ignore-unknown
 
 //// Reading from .swiftinterface should fail as it won't find the decls
 // RUN: rm %t/SPIHelper.private.swiftinterface
@@ -61,10 +61,16 @@ public func inlinable1() -> SPIClass { // expected-error {{class 'SPIClass' cann
   _ = [SPIClass]() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is an SPI imported from 'SPIHelper'}}
 }
 
+public let o1 = PublicType()
+public let o2 = PublicType()
+
 @_spi(S)
 @inlinable
 public func inlinable2() -> SPIClass {
   spiFunc()
   _ = SPIClass()
   _ = [SPIClass]()
+  let _ = o1 - o2
 }
+
+let _ = o1 - o2

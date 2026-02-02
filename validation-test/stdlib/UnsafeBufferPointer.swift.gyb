@@ -287,8 +287,11 @@ ${SelfName}TestSuite.test("badCount")
 
   let emptyAllocated = UnsafeMutablePointer<Float>.allocate(capacity: 0)
   defer { emptyAllocated.deallocate() }
+  
+  // Make sure we can't emit the error at compile time
+  @inline(never) var badCount: Int { -1 }
 
-  let buffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: -1)
+  let buffer = ${SelfType}(start: ${PointerType}(emptyAllocated), count: badCount)
   _ = buffer
 }
 

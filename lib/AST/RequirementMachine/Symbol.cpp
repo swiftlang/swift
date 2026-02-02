@@ -366,6 +366,8 @@ Symbol Symbol::forLayout(LayoutConstraint layout,
 /// Creates a superclass symbol, representing a superclass constraint.
 Symbol Symbol::forSuperclass(CanType type, ArrayRef<Term> substitutions,
                              RewriteContext &ctx) {
+  ASSERT(type.getClassOrBoundGenericClass() != nullptr);
+
   llvm::FoldingSetNodeID id;
   id.AddInteger(unsigned(Kind::Superclass));
   id.AddPointer(type.getPointer());

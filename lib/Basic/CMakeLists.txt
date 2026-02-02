@@ -59,6 +59,7 @@ add_swift_host_library(swiftBasic STATIC
   ParseableOutput.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LangOptionsBridging.cpp
   LoadDynamicLibrary.cpp
   Located.cpp
   Mangler.cpp

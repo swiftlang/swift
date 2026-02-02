@@ -1,0 +1,183 @@
+// RUN: %target-sil-opt -test-runner %s -enable-experimental-feature MoveOnlyEnumDeinits -o /dev/null | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct S1: ~Copyable {
+  deinit
+}
+
+struct S2: ~Copyable {
+  deinit
+}
+
+struct S3<T: ~Copyable>: ~Copyable {
+  @_hasStorage let t: T
+  deinit
+}
+
+enum E<T: ~Copyable>: ~Copyable {
+  case A(Int)
+  case B
+  case C(T)
+  deinit
+}
+
+struct StrWithoutDeinit: ~Copyable {
+  @_hasStorage var a: S1
+  @_hasStorage var b: S2
+  @_hasStorage let c: Int
+}
+
+struct S4: ~Copyable {
+  @_hasStorage var a: S1
+  @_hasStorage var b: S2
+}
+
+struct S5: ~Copyable {
+  @_hasStorage let a: Int
+  @_hasStorage let b: AnyObject
+}
+
+struct UnknownDeinit: ~Copyable {
+  deinit
+}
+
+sil @s1_deinit : $@convention(method) (@owned S1) -> () {
+[global: read]
+}
+
+sil @s2_deinit : $@convention(method) (@owned S2) -> () {
+[global: write]
+}
+
+sil @s3_deinit : $@convention(method) <T> (@in S3<T>) -> () {
+[global: read]
+}
+
+sil @e_deinit : $@convention(method) (@owned S4) -> () {
+[global: read]
+}
+
+sil_moveonlydeinit S1 {
+  @s1_deinit
+}
+
+sil_moveonlydeinit S2 {
+  @s2_deinit
+}
+
+sil_moveonlydeinit S3 {
+  @s3_deinit
+}
+
+sil_moveonlydeinit E {
+  @e_deinit
+}
+
+sil_global @g : $Int
+
+sil [ossa] @global_load_store : $@convention(thin) (@inout_aliasable Int, @guaranteed S1, @guaranteed S2, @guaranteed S3<S1>, @guaranteed S3<S2>, @guaranteed S4, @guaranteed S5, @guaranteed E<S4>, @guaranteed E<Int>, @guaranteed UnknownDeinit) -> () {
+bb0(%0 : $*Int, %1 : @guaranteed $S1, %2 : @guaranteed $S2, %3 : @guaranteed $S3<S1>, %4 : @guaranteed $S3<S2>, %5 : @guaranteed $S4, %6 : @guaranteed $S5, %7 : @guaranteed $E<S4>, %8 : @guaranteed $E<Int>, %9 : @guaranteed $UnknownDeinit):
+
+  // --- Int ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %0
+  // CHECK:       transparent:   %{{[0-9]+}} = load
+  // CHECK:       transparent:   store
+  // CHECK:       transparent:   %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %0
+  specify_test "destroy_barrier %0"
+
+  // --- S1 ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %1
+  // CHECK:       transparent:   %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %1
+  specify_test "destroy_barrier %1"
+
+  // --- S2 ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %2
+  // CHECK:       barrier:       %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %2
+  specify_test "destroy_barrier %2"
+
+  // --- S3<S1> ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %3
+  // CHECK:       transparent:   %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %3
+  specify_test "destroy_barrier %3"
+
+  // --- S3<S2> ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %4
+  // CHECK:       barrier:       %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %4
+  specify_test "destroy_barrier %4"
+
+  // --- S4 ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %5
+  // CHECK:       barrier:       %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %5
+  specify_test "destroy_barrier %5"
+
+  // --- S5 ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %6
+  // CHECK:       transparent:   %{{[0-9]+}} = load
+  // CHECK:       transparent:   store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %6
+  specify_test "destroy_barrier %6"
+
+  // --- E<S4> ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %7
+  // CHECK:       barrier:       %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %7
+  specify_test "destroy_barrier %7"
+
+  // --- E<Int> ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %8
+  // CHECK:       transparent:   %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %8
+  specify_test "destroy_barrier %8"
+
+  // --- UnknownDeinit ---
+  // CHECK-LABEL: begin running test {{.*}} on global_load_store: destroy_barrier with: %9
+  // CHECK:       barrier:       %{{[0-9]+}} = load
+  // CHECK:       barrier:       store
+  // CHECK:       barrier:       %{{[0-9]+}} = apply
+  // CHECK:       transparent:   %{{[0-9]+}} = tuple
+  // CHECK:       end running test {{.*}} on global_load_store: destroy_barrier with: %9
+  specify_test "destroy_barrier %9"
+
+  %l = load [trivial] %0
+  store %l to [trivial] %0
+  apply undef() : $() -> ()
+  %r = tuple ()
+  return %r
+}
+

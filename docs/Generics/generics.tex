@@ -39,14 +39,28 @@
 % Theorem-like environments: proposition, example, algorithm, etc.
 \usepackage{amsthm}
 
+\makeatletter
+
 % For the 'List of Algorithms'. Must load before hyperref.
 \usepackage{thmtools}
+
+% Workaround from https://github.com/muzimuzhi/thmtools/issues/72
+\IfFormatAtLeastTF{2024-11-01}{
+  \renewcommand*\@addtoreset[2]{%
+    \bgroup
+      \edef\aliasctr@@truelist{\aliasctr@follow{#2}}%
+      \let\@elt\relax
+      \expandafter\@cons\aliasctr@@truelist{{#1}}%
+    \egroup
+    \expandafter\xdef\csname theH#1\endcsname{%
+      \expandafter\noexpand\csname theH#2\endcsname.%
+      \noexpand\the\noexpand\value{#1}}%
+  }
+}{}
 
 \renewcommand\thmtformatoptarg[1]{#1}
 
 % thmtools doesn't offer enough customization options, so hack it up to not print "Algorithm" in each line of the "List of Algorithms"
-\makeatletter
-
 \renewcommand\thmt@mklistcmd{%
   \thmtlo@newentry
     \@xa\def\csname ll@\thmt@envname\endcsname{%
@@ -68,7 +82,6 @@
 }{%
   \ignorespacesafterend
 }
-
 \makeatother
 
 % Hyperlinks in PDF files. We enable numbering in PDF bookmark titles, and backreferences from bibliography entries, and make the section title in the TOC clickable.
@@ -80,7 +93,7 @@
 % \uptau for generic parameter notation
 \usepackage{upgreek}
 
-% rcases, etc
+% rcases, gather*, etc
 \usepackage{mathtools}
 
 % Nice horizontal rules in tables: \toprule, \midrule, \bottomrule
@@ -132,9 +145,6 @@
 % Each chapter is its own file.
 \usepackage{subfiles}
 
-% Strikethrough (\st)
-\usepackage[normalem]{ulem}
-
 % Line breaks in URLs in bibliography
 \usepackage{url}
 \def\UrlBreaks{\do\/\do-}
@@ -165,6 +175,7 @@
 
 % Use the same counter for all three so you get Definition 12.1, Proposition 12.2, Example 12.3 etc.
 \newtheorem{example}[definition]{Example}
+\newtheorem{remark}[definition]{Remark}
 
 % We don't want the statement of the theorem to use italics...
 % \theoremstyle{theorem}
@@ -172,6 +183,7 @@
 \newtheorem{lemma}[definition]{Lemma}
 \newtheorem{corollary}[definition]{Corollary}
 \newtheorem{theorem}[definition]{Theorem}
+\newtheorem{conjecture}[definition]{Conjecture}
 
 % 'listing' floating environment for source listings
 \DeclareNewTOC[
@@ -214,6 +226,8 @@
 \newcommand{\LemmaRef}[1]{\hyperref[#1]{Lemma~\ref*{#1}}}
 \newcommand{\AlgRef}[1]{\hyperref[#1]{Algorithm~\ref*{#1}}}
 \newcommand{\ExRef}[1]{\hyperref[#1]{Example~\ref*{#1}}}
+\newcommand{\RemarkRef}[1]{\hyperref[#1]{Remark~\ref*{#1}}}
+\newcommand{\ConjectureRef}[1]{\hyperref[#1]{Conjecture~\ref*{#1}}}
 \newcommand{\FigRef}[1]{\hyperref[#1]{Figure~\ref*{#1}}}
 \newcommand{\ListingRef}[1]{\hyperref[#1]{Listing~\ref*{#1}}}
 
@@ -241,7 +255,7 @@
          \\*(Cited on pages #2.)%
 \fi }
 
-% Request evalator requests
+% Request evaluator requests
 \newcommand{\Request}[1]{\textbf{#1}}
 
 % Generic parameters
@@ -249,6 +263,7 @@
 \newcommand{\rT}{\ttgp{0}{0}}
 \newcommand{\rU}{\ttgp{0}{1}}
 \newcommand{\rV}{\ttgp{0}{2}}
+\newcommand{\rO}{\ttgp{1}{0}}
 
 % Identifiers
 \newcommand{\tT}{\texttt{T}}
@@ -436,6 +451,21 @@
 
 % Archetypes print [[like this]]. Must be in math mode
 \newcommand{\archetype}[1]{[\![\texttt{#1}]\!]}
+\newcommand{\TypeObjCtx}[1]{\TypeObj{\EquivClass{#1}}}
+\newcommand{\ConfObjCtx}[1]{\ConfObj{\EquivClass{#1}}}
+\newcommand{\SubMapObjCtx}[2]{\SubMapObj{#1}{\EquivClass{#2}}}
+\newcommand{\ReqObjCtx}[1]{\ReqObj{\EquivClass{#1}}}
+\newcommand{\FwdMap}[1]{1_{\EquivClass{#1}}}
+
+% Opaque archetypes for Chapter 12
+\newcommand{\Opaque}[1]{\EquivClass{\circlearrowright \texttt{#1}}}
+\newcommand{\Ot}{\Opaque{\tT}}
+\newcommand{\Ox}{\Opaque{\rT}}
+\newcommand{\Oy}{\Opaque{\ttgp{1}{0}}}
+
+% Existential archetypes for Chapter 13
+\newcommand{\Exist}[1]{\EquivClass{\exists\,\texttt{#1}}}
+\newcommand{\Et}{\Exist{T}}
 
 % Generic environment operations
 \newcommand{\MapIn}{\mathsf{in}_G}
@@ -492,6 +522,32 @@
 \newcommand{\CRule}[1]{$\diamond\, #1$}
 
 %%%
+% Proof at the end of completion chapter
+%%%
+
+\newcommand{\CC}[2]{#1#2 \Eq #1}
+\newcommand{\TheM}{\Pres{t, p, q, a}{\CC{t}{p},\, \CC{t}{q},\, \CC{pa}{p},\, \CC{qa}{q}}}
+\newcommand{\TheMS}{\Pres{t,p,q,r,a}{\CC{t}{p},\, \CC{t}{q},\, \CC{pa}{p},\, \CC{qa}{q},\, \CC{p}{r},\, \CC{q}{r}}}
+\newcommand{\MS}{M_\succ}
+
+\newcommand{\Eq}{\Leftrightarrow}
+\newcommand{\Red}{\Rightarrow}
+\newcommand{\Irr}{\textsc{Irr}}
+\newcommand{\NotEq}{\not\Eq}
+\newcommand{\PAndQ}{\{p,q\}}
+
+\newcommand{\RInf}{R^\infty}
+
+\newcommand{\Rank}{\mathsf{rank}}
+\newcommand{\Deg}{\mathsf{deg}}
+\newcommand{\First}{\mathsf{first}}
+\newcommand{\Tail}{\mathsf{tail}}
+
+\newcommand{\Ell}{\ell(S_0)}
+\newcommand{\Ts}{\mathfrak{C}_1}
+\newcommand{\FP}{\mathrm{FP}}
+
+%%%
 % Math helpers
 %%%
 \newcommand{\Case}[1]{\smallskip\par($\bigstar$ Case #1.)}
@@ -504,10 +560,6 @@
 
 \DeclareMathOperator{\Src}{src}
 \DeclareMathOperator{\Dst}{dst}
-
-% Old substitution algebra notation
-\newcommand{\mathboxed}[1]{\boxed{\mbox{\vphantom{pI\texttt{pI}}#1}}}
-\newcommand{\ttbox}[1]{\boxed{\mbox{\vphantom{pI\texttt{pI}}\texttt{#1}}}}
 
 % GitHub links in 'Source Code Reference' sections
 \newcommand{\SourceFile}[1]{\href{https://github.com/swiftlang/swift/tree/main/#1}{\texttt{#1}}}
@@ -674,7 +726,7 @@
 
 \subfile{chapters/type-resolution}
 
-\part{Specialties}\label{part specialties}
+\part{Subtleties}\label{part subtleties}
 
 \subfile{chapters/extensions}
 
@@ -682,7 +734,7 @@
 
 \subfile{chapters/conformance-paths}
 
-\subfile{chapters/opaque-return-types}
+\subfile{chapters/opaque-result-types}
 
 \subfile{chapters/existential-types}
 
@@ -698,9 +750,7 @@
 
 \subfile{chapters/property-map}
 
-\subfile{chapters/concrete-conformances}
-
-\subfile{chapters/rule-minimization}
+\subfile{chapters/minimization}
 
 % Move subsequent PDF bookmarks to the top level since the Appendix, Bibliography and Index are not logically contained in Part V
 \bookmarksetup{startatroot}

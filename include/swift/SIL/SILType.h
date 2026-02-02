@@ -20,6 +20,7 @@
 
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Lifetime.h"
 #include "llvm/ADT/Hashing.h"
@@ -109,7 +110,7 @@ private:
   SILType(CanType ty, SILValueCategory category)
       : value(ty.getPointer(), unsigned(category)) {
     if (!ty) return;
-    assert(ty->isLegalSILType() &&
+    ASSERT(ty->isLegalSILType() &&
            "constructing SILType with type that should have been "
            "eliminated by SIL lowering");
   }
@@ -266,6 +267,8 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
+  bool isBuiltinImplicitActor() const { return is<BuiltinImplicitActorType>(); }
+
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -379,9 +382,17 @@ public:
   /// Whether the type's layout is known to include some flavor of pack.
   bool isOrContainsPack(const SILFunction &F) const;
 
+  /// Whether the elements of a @pack_owned or @pack_guaranteed pack type are
+  /// direct values or addresses.
+  bool isPackElementAddress() const;
+
   /// True if the type is an empty tuple or an empty struct or a tuple or
   /// struct containing only empty types.
   bool isEmpty(const SILFunction &F) const;
+
+  /// True if the type is an empty tuple or a tuple containing only empty
+  /// tuples.
+  bool isEmptyTuple(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
   /// be a scalar reference-counted type such as a class, box, or thick function
@@ -419,6 +430,9 @@ public:
   
   /// Returns true if the referenced type is guaranteed to have a
   /// single-retainable-pointer representation.
+  /// This does not include C++ imported `SWIFT_SHARED_REFERENCE` classes.
+  /// They act as Swift classes but are not compatible with Swift's
+  /// retain/release runtime functions.
   bool hasRetainablePointerRepresentation() const {
     return getASTType()->hasRetainablePointerRepresentation();
   }
@@ -660,6 +674,11 @@ public:
     return SILType(castTo<TupleType>().getElementType(index), getCategory());
   }
 
+  unsigned getNumPackElements() const {
+    SILPackType *packTy = castTo<SILPackType>();
+    return packTy->getNumElements();
+  }
+
   /// Given that this is a pack type, return the lowered type of the
   /// given pack element.  The result will have the same value
   /// category as the base type.
@@ -753,6 +772,13 @@ public:
   SILType subst(SILModule &M, SubstitutionMap subs) const;
   SILType subst(SILModule &M, SubstitutionMap subs,
                 TypeExpansionContext context) const;
+
+  /// Strip concurrency annotations from the representation type.
+  SILType stripConcurrency(bool recursive, bool dropGlobalActor) {
+    auto strippedASTTy = getASTType()->stripConcurrency(recursive, dropGlobalActor);
+    return SILType::getPrimitiveType(strippedASTTy->getCanonicalType(),
+                                     getCategory());
+  }
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
@@ -850,12 +876,12 @@ public:
   SILType removingAnyMoveOnlyWrapping(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
-  SILType mapTypeOutOfContext() const;
+  SILType mapTypeOutOfEnvironment() const;
 
   /// Given a lowered type (but without any particular value category),
   /// map it out of its current context.  Equivalent to
-  /// SILType::getPrimitiveObjectType(type).mapTypeOutOfContext().getASTType().
-  static CanType mapTypeOutOfContext(CanType type);
+  /// SILType::getPrimitiveObjectType(type).mapTypeOutOfEnvironment().getASTType().
+  static CanType mapTypeOutOfEnvironment(CanType type);
 
   /// Given two SIL types which are representations of the same type,
   /// check whether they have an abstraction difference.
@@ -939,6 +965,14 @@ public:
   /// True if a value of this type can have its address taken by a
   /// lifetime-dependent value.
   bool isAddressableForDeps(const SILFunction &function) const;
+  bool isAddressableForDeps(SILModule &module,
+                            TypeExpansionContext context) const;
+
+  /// True if destroying a value of this type might invoke a custom deinitialer
+  /// with side effects. This includes any recursive deinitializers that may be
+  /// invoked by releasing a reference. False if this only has default
+  /// deinitialization.
+  bool mayHaveCustomDeinit(const SILFunction &function) const;
 
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed
@@ -949,6 +983,13 @@ public:
 
   /// Returns true if this type is an actor or a distributed actor.
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
+
+  /// Is this a type whose value is a value that a function can use in an
+  /// isolated parameter position. This could be a type that actually conforms
+  /// to AnyActor or it could be a type like any Actor, Optional<any Actor> or
+  /// Builtin.ImplicitActor that do not conform to Actor but from which we can
+  /// derive a value that conforms to the Actor protocol.
+  bool canBeIsolatedTo() const { return getASTType()->canBeIsolatedTo(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
   ///
@@ -1015,8 +1056,31 @@ public:
   /// Return '()'
   static SILType getEmptyTupleType(const ASTContext &C);
 
+  /// Return (elementTypes) with control of category.
+  static SILType getTupleType(const ASTContext &ctx,
+                              ArrayRef<SILType> elementTypes,
+                              SILValueCategory category);
+
+  /// Return $(elementTypes)
+  static SILType getTupleObjectType(const ASTContext &ctx,
+                                    ArrayRef<SILType> elementTypes) {
+    return getTupleType(ctx, elementTypes, SILValueCategory::Object);
+  }
+
+  /// Return $*(elementTypes)
+  static SILType getTupleAddressType(const ASTContext &ctx,
+                                     ArrayRef<SILType> elementTypes) {
+    return getTupleType(ctx, elementTypes, SILValueCategory::Address);
+  }
+
   /// Get the type for opaque actor isolation values.
   static SILType getOpaqueIsolationType(const ASTContext &C);
+
+  /// Return Builtin.ImplicitActor.
+  static SILType getBuiltinImplicitActorType(const ASTContext &ctx);
+
+  /// Return UnsafeRawPointer.
+  static SILType getUnsafeRawPointer(const ASTContext &ctx);
 
   //
   // Utilities for treating SILType as a pointer-like type.

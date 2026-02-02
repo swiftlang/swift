@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -316,7 +316,7 @@ private:
   InFlightDiagnostic
   diagnose(DiagnosticEngine &Diags, const char *LocPtr, Diag<ArgTypes...> ID,
            typename detail::PassArgument<ArgTypes>::type... Args) const {
-    auto Loc = SourceLoc(llvm::SMLoc::getFromPointer(LocPtr));
+    auto Loc = SourceLoc::getFromPointer(LocPtr);
     return Diags.diagnose(Loc, ID, std::move(Args)...);
   }
 };
@@ -486,7 +486,7 @@ bool DependencyVerifier::diagnoseUnfulfilledObligations(
     // HACK: Diagnosing the end of the buffer will print a carat pointing
     // at the file path, but not print any of the buffer's contents, which
     // might be misleading.
-    auto Loc = SourceLoc(llvm::SMLoc::getFromPointer(InputFile.end()));
+    auto Loc = SourceLoc::getFromPointer(InputFile.end());
     switch (p.getKind()) {
     case Expectation::Kind::Negative:
       llvm_unreachable("Obligations may not be negative; only Expectations!");

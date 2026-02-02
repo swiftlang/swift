@@ -28,6 +28,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -112,7 +113,7 @@ std::string toFullyQualifiedProtocolNameString(const swift::ProtocolDecl &Protoc
 std::string toMangledTypeNameString(const swift::Type &Type) {
   auto PrintingType = Type;
   if (Type->hasArchetype())
-    PrintingType = Type->mapTypeOutOfContext();
+    PrintingType = Type->mapTypeOutOfEnvironment();
   return Mangle::ASTMangler(Type->getASTContext()).mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
@@ -123,10 +124,10 @@ namespace swift {
 bool
 parseProtocolListFromFile(StringRef protocolListFilePath,
                           DiagnosticEngine &diags,
+                          llvm::vfs::FileSystem &fs,
                           std::unordered_set<std::string> &protocols) {
   // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(protocolListFilePath);
+  auto FileBufOrErr = fs.getBufferForFile(protocolListFilePath);
   if (!FileBufOrErr) {
     diags.diagnose(SourceLoc(),
                    diag::const_extract_protocol_list_input_file_missing,
@@ -302,10 +303,8 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
 
     case ExprKind::Call: {
       auto callExpr = cast<CallExpr>(expr);
-      auto functionKind = callExpr->getFn()->getKind();
 
-      if (functionKind == ExprKind::DeclRef) {
-        auto declRefExpr = cast<DeclRefExpr>(callExpr->getFn());
+      if (auto declRefExpr = dyn_cast<DeclRefExpr>(callExpr->getFn())) {
         auto identifier =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
@@ -314,17 +313,15 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         return std::make_shared<FunctionCallValue>(identifier, parameters);
       }
 
-      if (functionKind == ExprKind::ConstructorRefCall) {
+      if (isa<ConstructorRefCallExpr>(callExpr->getFn())) {
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs(), declContext);
         return std::make_shared<InitCallValue>(callExpr->getType(), parameters);
       }
 
-      if (functionKind == ExprKind::DotSyntaxCall) {
-        auto dotSyntaxCallExpr = cast<DotSyntaxCallExpr>(callExpr->getFn());
+      if (auto dotSyntaxCallExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getFn())) {
         auto fn = dotSyntaxCallExpr->getFn();
-        if (fn->getKind() == ExprKind::DeclRef) {
-          auto declRefExpr = cast<DeclRefExpr>(fn);
+        if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
           auto baseIdentifierName =
               declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
@@ -355,14 +352,24 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         }
       }
 
+      if (auto functionConversionExpr = dyn_cast<FunctionConversionExpr>(callExpr->getFn())) {
+        if (auto declRefExpr = dyn_cast<DeclRefExpr>(functionConversionExpr->getSubExpr())) {
+          auto identifier =
+              declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
+
+          std::vector<FunctionParameter> parameters =
+              extractFunctionArguments(callExpr->getArgs(), declContext);
+          return std::make_shared<FunctionCallValue>(identifier, parameters);
+        }
+      }
+
       break;
     }
 
     case ExprKind::DotSyntaxCall: {
       auto dotSyntaxCallExpr = cast<DotSyntaxCallExpr>(expr);
       auto fn = dotSyntaxCallExpr->getFn();
-      if (fn->getKind() == ExprKind::DeclRef) {
-        auto declRefExpr = cast<DeclRefExpr>(fn);
+      if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
         auto caseName =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
         return std::make_shared<EnumValue>(caseName, std::nullopt);
@@ -414,7 +421,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       assert(!decl->hasDefaultExpr());
       switch (decl->getDefaultArgumentKind()) {
       case DefaultArgumentKind::NilLiteral:
-        return std::make_shared<RawLiteralValue>("nil");
+        return std::make_shared<NilLiteralValue>();
       case DefaultArgumentKind::EmptyArray:
         return std::make_shared<ArrayValue>(
             std::vector<std::shared_ptr<CompileTimeValue>>());
@@ -507,6 +514,22 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto derivedExpr = cast<DerivedToBaseExpr>(expr);
       return extractCompileTimeValue(derivedExpr->getSubExpr(), declContext);
     }
+
+    case ExprKind::OpenExistential: {
+      auto openExistentialExpr = cast<OpenExistentialExpr>(expr);
+      return extractCompileTimeValue(openExistentialExpr->getExistentialValue(), declContext);
+    }
+
+    case ExprKind::VarargExpansion: {
+      auto varargExpansionExpr = cast<VarargExpansionExpr>(expr);
+      return extractCompileTimeValue(varargExpansionExpr->getSubExpr(), declContext);
+    }
+
+    case ExprKind::ForceValue: {
+      auto forceValueExpr = cast<ForceValueExpr>(expr);
+      return extractCompileTimeValue(forceValueExpr->getSubExpr(), declContext);
+    }
+
     default: {
       break;
     }
@@ -623,7 +646,7 @@ ConstValueTypeInfo ConstantValueInfoRequest::evaluate(
   auto shouldExtract = [&](DeclContext *decl) {
     if (auto SF = extractionScope.dyn_cast<const SourceFile *>())
       return decl->getOutermostParentSourceFile() == SF;
-    return decl->getParentModule() == extractionScope.get<ModuleDecl *>();
+    return decl->getParentModule() == cast<ModuleDecl *>(extractionScope);
   };
 
   std::vector<ConstValueTypePropertyInfo> Properties;
@@ -1375,7 +1398,7 @@ void writeAssociatedTypeAliases(llvm::json::OStream &JSON,
                              toFullyQualifiedTypeNameString(type));
               JSON.attribute("substitutedMangledTypeName",
                              toMangledTypeNameString(type));
-              if (auto OpaqueTy = dyn_cast<OpaqueTypeArchetypeType>(type)) {
+              if (auto *OpaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
                 writeSubstitutedOpaqueTypeAliasDetails(JSON, *OpaqueTy);
               }
             });

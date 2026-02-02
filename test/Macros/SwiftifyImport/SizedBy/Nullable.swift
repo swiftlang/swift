@@ -24,7 +24,7 @@ func myFunc4(_ ptr: UnsafeMutableRawPointer?, _ len: CInt) -> UnsafeMutableRawPo
 // CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, size)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func myFunc2(_ ptr: inout MutableRawSpan?) {
 // CHECK-NEXT:     let len = CInt(exactly: ptr?.byteCount ?? 0)!
 // CHECK-NEXT:     return { () in
@@ -38,7 +38,7 @@ func myFunc4(_ ptr: UnsafeMutableRawPointer?, _ len: CInt) -> UnsafeMutableRawPo
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @lifetime(ptr2: copy ptr2) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
 // CHECK-NEXT: func myFunc3(_ ptr: inout MutableRawSpan?, _ ptr2: inout MutableRawSpan?) {
 // CHECK-NEXT:     let len = CInt(exactly: ptr?.byteCount ?? 0)!
 // CHECK-NEXT:     let len2 = CInt(exactly: ptr2?.byteCount ?? 0)!
@@ -69,7 +69,7 @@ func myFunc4(_ ptr: UnsafeMutableRawPointer?, _ len: CInt) -> UnsafeMutableRawPo
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func myFunc4(_ ptr: inout MutableRawSpan?) -> MutableRawSpan? {
 // CHECK-NEXT:     let len = CInt(exactly: ptr?.byteCount ?? 0)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime({ () in

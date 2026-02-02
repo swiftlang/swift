@@ -1,4 +1,4 @@
-// REQUIRES: swift_swift_parser, executable_test, objc_interop, concurrency
+// REQUIRES: swift_swift_parser, objc_interop, concurrency, string_processing
 // REQUIRES: swift_feature_MacrosOnImports
 // REQUIRES: OS=macosx
 
@@ -9,7 +9,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
 // Diagnostics testing
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -swift-version 5 -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t -DTEST_DIAGNOSTICS
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -swift-version 5 -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t -DTEST_DIAGNOSTICS
 
 // Emit IR just to make sure nothing else fails.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -swift-version 5 -g -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t | %FileCheck %s

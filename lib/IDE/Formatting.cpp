@@ -49,7 +49,7 @@ static void widenOrSet(SourceRange &First, SourceRange Second) {
 static bool isFirstTokenOnLine(SourceManager &SM, SourceLoc Loc) {
   assert(Loc.isValid());
   SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, Loc);
-  CommentRetentionMode SkipComments = CommentRetentionMode::None;
+  CommentRetentionMode SkipComments = CommentRetentionMode::AttachToNextToken;
   Token First = Lexer::getTokenAtLocation(SM, LineStart, SkipComments);
   return First.getLoc() == Loc;
 }
@@ -76,8 +76,8 @@ static std::optional<Token> getTokenAfter(SourceManager &SM, SourceLoc Loc,
                                           bool SkipComments = true) {
   assert(Loc.isValid());
   CommentRetentionMode Mode = SkipComments
-    ? CommentRetentionMode::None
-    : CommentRetentionMode::ReturnAsTokens;
+                                  ? CommentRetentionMode::AttachToNextToken
+                                  : CommentRetentionMode::ReturnAsTokens;
   assert(Lexer::getTokenAtLocation(SM, Loc, Mode).getLoc() == Loc);
   SourceLoc End = Lexer::getLocForEndOfToken(SM, Loc);
   Token Next = Lexer::getTokenAtLocation(SM, End, Mode);
@@ -587,15 +587,6 @@ private:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (auto *OE = EE->getOriginalExpr()) {
-        llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-        OE->walk(*this);
-      }
-      return Action::Continue(E);
-    }
-
     if (E->isImplicit())
       return Action::Continue(E);
 
@@ -823,8 +814,8 @@ class OutdentChecker: protected RangeWalker {
     } else if (R.isValid()) {
       // Check condition 2a.
       SourceLoc LineStart = Lexer::getLocForStartOfLine(SM, R);
-      Token First = Lexer::getTokenAtLocation(SM, LineStart,
-                                              CommentRetentionMode::None);
+      Token First = Lexer::getTokenAtLocation(
+          SM, LineStart, CommentRetentionMode::AttachToNextToken);
       IsOutdenting |= First.getLoc() == R;
     }
 
@@ -1487,17 +1478,6 @@ private:
           StringLiteralRange =
               Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
 
-        return Action::SkipNode(E);
-      }
-    }
-
-    // Walk through error expressions.
-    if (auto *EE = dyn_cast<ErrorExpr>(E)) {
-      if (Action.shouldVisitChildren()) {
-        if (auto *OE = EE->getOriginalExpr()) {
-          llvm::SaveAndRestore<ASTWalker::ParentTy>(Parent, EE);
-          OE->walk(*this);
-        }
         return Action::SkipNode(E);
       }
     }
@@ -2232,7 +2212,7 @@ private:
         if (Range.isValid() && overlapsTarget(Range))
           return IndentContext {ForLoc, !OutdentChecker::hasOutdent(SM, P)};
       }
-      if (auto *E = FS->getParsedSequence()) {
+      if (auto *E = FS->getSequence()) {
         SourceRange Range = FS->getInLoc();
         widenOrSet(Range, E->getSourceRange());
         if (Range.isValid() && isTargetContext(Range)) {

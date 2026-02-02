@@ -19,9 +19,11 @@ set TEMP=%~dp0..\..\tmp
 mkdir %TEMP% 2>&1 1>nul
 echo set PYTHON_HOME=%PYTHON_HOME%> %TEMP%\call-build.cmd
 echo set SKIP_TESTS=%SKIP_TESTS%>> %TEMP%\call-build.cmd
-echo set SKIP_PACKAGING=%SKIP_PACKAGING%>> %TEMP%\call-build.cmd
+echo set INCLUDE_PACKAGING=%INCLUDE_PACKAGING%>> %TEMP%\call-build.cmd
 echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
+echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
+echo set HOST_ARCH_NAME=%HOST_ARCH_NAME%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -60,24 +62,41 @@ set TMPDIR=%BuildRoot%\tmp
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
 :: Build the -Test argument, if any, by subtracting skipped tests
-set TestArg=-Test lld,lldb,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp,
-for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
-if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
+set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
+set "TestArg="
+set "Skip=,%SKIP_TESTS%,"
+for %%I in (%TestsList%) do (
+  if "!Skip:,%%I,=!" == "!Skip!" (
+      set "TestArg=!TestArg!%%I,"
+  )
+)
+set "TestArg=-Test !TestArg!"
 
-:: Build the -SkipPackaging argument, if any
-set SkipPackagingArg=-SkipPackaging
-if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
+:: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
+set "PackagingArg=-SkipPackaging"
+if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Stage %PackageRoot%"
+
+:: Build the arguments related to Windows SDK builds
+set "WindowsSDKArgs=-Windows"
+if "%INCLUDE_PACKAGING%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKLinkModes dynamic"
+if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArchitectures %WINDOWS_SDKS%"
+
+:: Build the -HostArchName argument, if any.
+set "HostArchNameArg="
+if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME%"
 
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
+  %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
-  %SkipPackagingArg% ^
+  %WindowsSDKArgs% ^
+  %PackagingArg% ^
   %TestArg% ^
-  -Stage %PackageRoot% ^
+  -IncludeSBoM ^
   -Summary || (exit /b 1)
 
 :: Clean up the module cache

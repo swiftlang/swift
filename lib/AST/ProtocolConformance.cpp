@@ -28,10 +28,12 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackConformance.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -216,7 +218,6 @@ void NormalProtocolConformance::setSourceKindAndImplyingConformance(
   Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
   if (auto implying = implyingConformance) {
     ImplyingConformance = implying;
-    PreconcurrencyLoc = implying->getPreconcurrencyLoc();
     Bits.NormalProtocolConformance.Options =
         implyingConformance->getOptions().toRaw();
     if (getProtocol()->isMarkerProtocol()) {
@@ -247,6 +248,18 @@ bool ProtocolConformance::isRetroactive() const {
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
     if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {
+      return false;
+    }
+
+    auto *useSF = getDeclContext()->getOutermostParentSourceFile();
+    auto blessesSF = [&](auto &blessed) {
+      auto blessedFileID = SourceFile::FileIDStr::parse(blessed.first);
+      return blessedFileID && blessedFileID->matches(useSF);
+    };
+    auto *clangDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+        conformingTypeDecl->getClangDecl());
+    if (clangDecl &&
+        llvm::any_of(importer::getPrivateFileIDAttrs(clangDecl), blessesSF)) {
       return false;
     }
   }
@@ -513,6 +526,18 @@ TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
 
   ASTContext &ctx = getDeclContext()->getASTContext();
   return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
+}
+
+SourceLoc NormalProtocolConformance::getPreconcurrencyLoc() const {
+  if (!isPreconcurrency()) {
+    return SourceLoc();
+  }
+
+  if (!getInheritedTypeRepr()) {
+    return SourceLoc();
+  }
+
+  return getInheritedTypeRepr()->findAttrLoc(TypeAttrKind::Preconcurrency);
 }
 
 bool NormalProtocolConformance::hasExplicitGlobalActorIsolation() const {
@@ -805,6 +830,42 @@ void NormalProtocolConformance::resolveValueWitnesses() const {
                     evaluator::SideEffect());
 }
 
+void NormalProtocolConformance::applyConformanceAttribute(
+    InFlightDiagnostic &diag, std::string attrStr) const {
+  TypeRepr *inheritedTypeRepr = nullptr;
+  {
+    // Look through implied conformances.
+    auto *conformance = this;
+    while (conformance->getSourceKind() == ConformanceEntryKind::Implied) {
+      conformance = conformance->getImplyingConformance();
+    }
+    inheritedTypeRepr = conformance->getInheritedTypeRepr();
+  }
+
+  if (!inheritedTypeRepr) {
+    return;
+  }
+
+  // FIXME: We shouldn't be applying the attribute to all the protocols in a
+  // composition.
+  SourceLoc insertionLoc = [&] {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(inheritedTypeRepr)) {
+      // If this is a modifier, append, rather than prepend, it to the
+      // attribute list. Because e.g. `@unsafe nonisolated P` does parse,
+      // whereas `nonisolated @unsafe P` does not.
+      if (attrStr[0] != '@') {
+        return attrTypeRepr->getTypeRepr()->getStartLoc();
+      }
+    }
+
+    return inheritedTypeRepr->getStartLoc();
+  }();
+
+  attrStr += " ";
+
+  diag.fixItInsert(insertionLoc, attrStr);
+}
+
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     NormalProtocolConformance *genericConformance,
@@ -990,9 +1051,12 @@ static bool isVanishingTupleConformance(
 
   auto replacementTypes = substitutions.getReplacementTypes();
   assert(replacementTypes.size() == 1);
-  auto packType = replacementTypes[0]->castTo<PackType>();
 
-  return (packType->getNumElements() == 1 &&
+  // This might not be an actual pack type with an invalid tuple conformance.
+  auto packType = replacementTypes[0]->getAs<PackType>();
+
+  return (packType &&
+          packType->getNumElements() == 1 &&
           !packType->getElementTypes()[0]->is<PackExpansionType>());
 }
 
@@ -1184,6 +1248,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add protocols for any synthesized protocol attributes.
   for (auto attr : getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->isSuppressed())
+      continue;
     addSynthesized(attr->getProtocol());
   }
 
@@ -1203,7 +1269,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
   }
 
-  // Actor classes conform to the actor protocol.
+  // Actor classes conform to the appropriate actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
     if (classDecl->isDistributedActor()) {
       addSynthesized(ctx.getProtocol(KnownProtocolKind::DistributedActor));

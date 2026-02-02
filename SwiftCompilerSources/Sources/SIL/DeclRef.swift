@@ -30,6 +30,14 @@ public struct DeclRef: CustomStringConvertible, NoReflectionChildren {
   public static func ==(lhs: DeclRef, rhs: DeclRef) -> Bool {
     lhs.bridged.isEqualTo(rhs.bridged)
   }
+
+  /// Do we have enough information to determine all callees that could
+  /// be reached by calling the function represented by Decl?
+  public func calleesAreStaticallyKnowable(_ context: some Context) -> Bool {
+    context._bridged.calleesAreStaticallyKnowable(bridged)
+  }
+
+  public var sourceFile: SourceFile? { SourceFile(bridged: bridged.getSourceFile()) }
 }
 
 extension DeclRef: DiagnosticArgument {

@@ -114,6 +114,18 @@ public:
            "Env must either be empty or null-terminated!");
   }
 
+  ~Task() {
+    // Ensure pipes are closed when the task is destroyed
+    if (Pipe >= 0) {
+      close(Pipe);
+      Pipe = -1;
+    }
+    if (ErrorPipe >= 0) {
+      close(ErrorPipe);
+      ErrorPipe = -1;
+    }
+  }
+
   const char *getExecPath() const { return ExecPath; }
   ArrayRef<const char *> getArgs() const { return Args; }
   StringRef getOutput() const { return Output; }

@@ -158,7 +158,7 @@ public enum _DebuggerSupport {
       default:
         return value.map(String.init(reflecting:))
       }
-    case .`class`?:
+    case .`class`?, .foreignReference?:
       switch value {
       case let x as CustomDebugStringConvertible:
         return x.debugDescription
@@ -327,6 +327,38 @@ public enum _DebuggerSupport {
       target: &target)
 
     return target
+  }
+
+  // Print an object or value without the caller having a concrete type.
+  //
+  // For simplicity of data handling in LLDB avoids using an enum return type,
+  // using (Bool, String) instead of Optional<String>.
+  @available(SwiftStdlib 6.3, *)
+  public static func stringForPrintObject(_ pointer: UnsafeRawPointer?, mangledTypeName: String) -> (Bool, String) {
+    guard let pointer = unsafe pointer else {
+      return (false, "invalid pointer")
+    }
+
+    guard let type =
+      unsafe _getTypeByMangledNameInContext(
+        mangledTypeName,
+        UInt(mangledTypeName.count),
+        genericContext: nil,
+        genericArguments: nil)
+      else {
+        return (false, "type not found for mangled name: \(mangledTypeName)")
+      }
+
+    func loadPointer<T>(type: T.Type) -> Any {
+      if type is AnyObject.Type {
+        unsafe unsafeBitCast(pointer, to: T.self)
+      } else {
+        unsafe pointer.load(as: T.self)
+      }
+    }
+
+    let anyValue = _openExistential(type, do: loadPointer)
+    return (true, stringForPrintObject(anyValue))
   }
 }
 

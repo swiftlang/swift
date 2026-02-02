@@ -72,13 +72,15 @@ struct UnboundImport {
       importOrUnderlyingModuleDecl;
 
   NullablePtr<ImportDecl> getImportDecl() const {
-    return importOrUnderlyingModuleDecl.is<NullablePtr<ImportDecl>>() ?
-           importOrUnderlyingModuleDecl.get<NullablePtr<ImportDecl>>() : nullptr;
+    return isa<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               ? cast<NullablePtr<ImportDecl>>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   NullablePtr<ModuleDecl> getUnderlyingModule() const {
-    return importOrUnderlyingModuleDecl.is<ModuleDecl *>() ?
-           importOrUnderlyingModuleDecl.get<ModuleDecl *>() : nullptr;
+    return isa<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               ? cast<ModuleDecl *>(importOrUnderlyingModuleDecl)
+               : nullptr;
   }
 
   /// Create an UnboundImport for a user-written import declaration.
@@ -187,6 +189,14 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
 
 public:
   ImportResolver(SourceFile &SF) : SF(SF), ctx(SF.getASTContext()) {
+    addImplicitImports();
+  }
+
+  // FIXME: Remove this ctor once namespace contents are imported to their
+  // corresponding module instead of the __ObjC module
+  ImportResolver(SourceFile &SF, ModuleDecl *explicitUnderlyingClangModule)
+      : SF(SF), ctx(SF.getASTContext()),
+        underlyingClangModule(explicitUnderlyingClangModule) {
     addImplicitImports();
   }
 
@@ -320,20 +330,12 @@ void swift::performImportResolution(SourceFile &SF) {
 }
 
 void swift::performImportResolutionForClangMacroBuffer(
-    SourceFile &SF, ModuleDecl *clangModule
-) {
-  // If we've already performed import resolution, bail.
-  if (SF.ASTStage == SourceFile::ImportsResolved)
-    return;
+    SourceFile &SF, ModuleDecl *explicitOriginModule) {
+  assert(SF.ASTStage == SourceFile::Unprocessed);
 
-  ImportResolver resolver(SF);
-  resolver.addImplicitImport(clangModule);
-
-  // FIXME: This is a hack that we shouldn't need, but be sure that we can
-  // see the Swift standard library.
-  if (auto stdlib = SF.getASTContext().getStdlibModule())
-    resolver.addImplicitImport(stdlib);
-
+  // `getWrapperForModule` has already declared all the implicit clang module
+  // imports we need
+  ImportResolver resolver(SF, explicitOriginModule);
   SF.setImports(resolver.getFinishedImports());
   SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
 
@@ -346,6 +348,26 @@ void swift::performImportResolutionForClangMacroBuffer(
 
 void ImportResolver::visitImportDecl(ImportDecl *ID) {
   assert(unboundImports.empty());
+
+  // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
+  ImportPath::Builder builder;
+  const ImportPath path = ID->getRealImportPath(builder);
+  const llvm::StringRef front = path.front().Item.str();
+  if (front == "std" || front.starts_with("std_")) {
+    SmallString<64> modulePathStr;
+    path.getString(modulePathStr);
+    auto diagKind = ctx.LangOpts.DebuggerSupport ? diag::sema_no_import_repl
+                                                 : diag::sema_no_import;
+    const SourceLoc importLoc = ID->getLoc();
+    const ImportPath sourcePath = ID->getImportPath();
+    const llvm::StringRef sourceFront = sourcePath.front().Item.str();
+    ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
+    ctx.Diags.diagnose(importLoc, diag::did_you_mean_cxxstdlib)
+        .fixItReplaceChars(importLoc, importLoc.getAdvancedLoc(sourceFront.size()), "CxxStdlib");
+    if (front != sourceFront)
+      ctx.Diags.diagnose(importLoc, diag::sema_module_aliased, sourceFront, front);
+    return;
+  }
 
   unboundImports.emplace_back(ID);
   bindPendingImports();
@@ -492,13 +514,15 @@ UnboundImport::getTopLevelModule(ModuleDecl *M, SourceFile &SF) {
 // MARK: Implicit imports
 //===----------------------------------------------------------------------===//
 
-static void tryStdlibFixit(ASTContext &ctx,
-                           StringRef moduleName,
-                           SourceLoc loc) {
-  if (moduleName.starts_with("std")) {
-    ctx.Diags.diagnose(loc, diag::did_you_mean_cxxstdlib)
-      .fixItReplaceChars(loc, loc.getAdvancedLoc(3), "CxxStdlib");
+ImportPath::Module getRealModulePath(ImportPath::Builder &builder, ImportPath::Module path, ASTContext &ctx) {
+  for (size_t i = 0; i < path.size(); i++) {
+    if (i == 0) {
+      builder.push_back(ctx.getRealModuleName(path[i].Item));
+    } else {
+      builder.push_back(path[i]);
+    }
   }
+  return builder.get().getModulePath(false);
 }
 
 static void diagnoseNoSuchModule(ModuleDecl *importingModule,
@@ -513,13 +537,20 @@ static void diagnoseNoSuchModule(ModuleDecl *importingModule,
                        importingModule->getName());
   } else {
     SmallString<64> modulePathStr;
-    modulePath.getString(modulePathStr);
+    ImportPath::Builder builder;
+    ImportPath::Module realModulePath = getRealModulePath(builder, modulePath, ctx);
+    realModulePath.getString(modulePathStr);
 
     auto diagKind = diag::sema_no_import;
     if (nonfatalInREPL && ctx.LangOpts.DebuggerSupport)
       diagKind = diag::sema_no_import_repl;
     ctx.Diags.diagnose(importLoc, diagKind, modulePathStr);
-    tryStdlibFixit(ctx, modulePathStr, importLoc);
+
+    const llvm::StringRef sourceFront = modulePath.front().Item.str();
+    const llvm::StringRef realFront = realModulePath.front().Item.str();
+    if (realFront != sourceFront)
+      ctx.Diags.diagnose(importLoc, diag::sema_module_aliased, sourceFront,
+                         realFront);
   }
 
   if (ctx.SearchPathOpts.getSDKPath().empty() &&
@@ -572,8 +603,13 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
       !clangImporter->importBridgingHeader(bridgingHeaderPath, module)) {
     auto *headerModule = clangImporter->getImportedHeaderModule();
     assert(headerModule && "Didn't load bridging header?");
-    imports.emplace_back(
+    AttributedImport<ImportedModule> import(
         ImportedModule(headerModule), SourceLoc(), ImportFlags::Exported);
+    if (ctx.ClangImporterOpts.BridgingHeaderIsInternal) {
+      import.accessLevel = AccessLevel::Internal;
+    }
+
+    imports.emplace_back(import);
   }
 
   // Implicitly import the underlying Clang half of this module if needed.
@@ -590,7 +626,18 @@ ModuleImplicitImportsRequest::evaluate(Evaluator &evaluator,
 }
 
 void ImportResolver::addImplicitImports() {
-  auto implicitImports = SF.getParentModule()->getImplicitImports();
+  // This is a workaround for the fact that namespaces are imported into the
+  // bridging header module. To allow correct lookup, we expose a ctor with an
+  // explicit underlying clang module input, which is the clang module that this
+  // macro expansion actually originates in.
+  const ModuleDecl *moduleToInherit = nullptr;
+  if (underlyingClangModule) {
+    moduleToInherit = underlyingClangModule;
+    boundImports.emplace_back(ImportedModule(underlyingClangModule));
+  } else {
+    moduleToInherit = SF.getParentModule();
+  }
+  auto implicitImports = moduleToInherit->getImplicitImports();
 
   // TODO: Support cross-module imports.
   for (auto &import : implicitImports.imports) {
@@ -882,8 +929,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                              diag::implementation_only_deprecated);
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
-    } else if ( // Non-resilient client
-        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    } else if (!ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+               !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
             targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
                          diag::implementation_only_requires_library_evolution,
@@ -906,8 +953,6 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                      targetName, importerName);
 
   if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
-    // This will catch Swift 6 language mode as well where
-    // it will be reported as an error.
     inFlight.fixItRemove(import.accessLevelRange);
   } else {
     SourceRange attrRange = import.accessLevelRange;
@@ -915,12 +960,17 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       inFlight.fixItReplace(attrRange, "internal");
     else
       inFlight.fixItInsert(import.importLoc, "internal ");
-
-    // Downgrade to warning only in pre-Swift 6 mode and
-    // when not using the experimental flag.
-    if (!ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport))
-      inFlight.limitBehavior(DiagnosticBehavior::Warning);
   }
+
+  // Report as an error when InternalImportsByDefault is enabled or
+  // the experimental AccessLevelOnImport (but not Swift 6), only in libraries
+  // that are meant to be distributed.
+  auto featureEnabled =
+    ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport) ||
+    ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault);
+  if (!featureEnabled ||
+      SF.getParentModule()->getLibraryLevel() < LibraryLevel::SPI)
+    inFlight.limitBehavior(DiagnosticBehavior::Warning);
 }
 
 void UnboundImport::diagnoseInvalidAttr(DeclAttrKind attrKind,
@@ -1157,7 +1207,6 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       error.fixItInsert(implicitImport->getStartLoc(),
                         diag::inconsistent_implicit_access_level_on_import_fixit,
                         otherAccessLevel);
-      error.flush();
       diags.diagnose(implicitImport,
                      diag::inconsistent_implicit_access_level_on_import_silence);
     }
@@ -1305,7 +1354,8 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
   // FIXME: Doesn't handle scoped testable imports correctly.
   assert(accessPath.size() == 1 && "can't handle sub-decl imports");
   SmallVector<ValueDecl *, 8> decls;
-  lookupInModule(topLevelModule, accessPath.front().Item, decls,
+  lookupInModule(topLevelModule, accessPath.front().Item,
+                 /*hasModuleSelector=*/true, decls,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext(),
                  import->getLoc(), NL_QualifiedDefault);
@@ -1350,7 +1400,6 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
 
     emittedDiag->fixItReplace(SourceRange(import->getKindLoc()),
                               getImportKindString(*actualKind));
-    emittedDiag->flush();
 
     if (decls.size() == 1)
       ctx.Diags.diagnose(decls.front(), diag::decl_declared_here,

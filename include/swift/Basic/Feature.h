@@ -82,7 +82,7 @@ struct Feature {
 
   /// Get the major language version in which this feature was introduced, or
   /// \c None if it does not have such a version.
-  std::optional<unsigned> getLanguageVersion() const;
+  std::optional<unsigned> getLanguageMode() const;
 };
 
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \

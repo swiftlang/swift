@@ -252,17 +252,17 @@ extension _DebugDescriptionPropertyMacro: PeerMacro {
     let summaryString = summarySegments.joined()
 
     // Serialize the type summary into a global record, in a custom section, for LLDB to load.
+    let (encodedValue, encodedType) = encodeTypeSummaryRecord(typeIdentifier, summaryString)
     let decl: DeclSyntax = """
         #if !os(Windows)
         #if os(Linux)
-        @_section(".lldbsummaries")
+        @section(".lldbsummaries")
         #else
-        @_section("__TEXT,__lldbsummaries")
+        @section("__TEXT,__lldbsummaries")
         #endif
-        @_used
-        static let _lldb_summary = (
-            \(raw: encodeTypeSummaryRecord(typeIdentifier, summaryString))
-        )
+        @used
+        static let _lldb_summary: \(raw: encodedType) =
+            \(raw: encodedValue)
         #endif
         """
 
@@ -303,23 +303,33 @@ fileprivate let ENCODING_VERSION: UInt = 1
 ///
 /// The strings (type identifier and summary) are encoded with both a length prefix (also ULEB)
 /// and with a null terminator.
-fileprivate func encodeTypeSummaryRecord(_ typeIdentifier: String, _ summaryString: String) -> String {
+fileprivate func encodeTypeSummaryRecord(_ typeIdentifier: String, _ summaryString: String) -> (valueString: String, typeString: String) {
   let encodedIdentifier = typeIdentifier.byteEncoded
   let encodedSummary = summaryString.byteEncoded
   let recordSize = UInt(encodedIdentifier.count + encodedSummary.count)
-  return """
+  return (valueString: """
+    (
     /* version */ \(swiftLiteral: ENCODING_VERSION.ULEBEncoded),
     /* record size */ \(swiftLiteral: recordSize.ULEBEncoded),
     /* "\(typeIdentifier)" */ \(swiftLiteral: encodedIdentifier),
     /* "\(summaryString)" */ \(swiftLiteral: encodedSummary)
+    )
+    """,
+    typeString: """
+    (
+    \(Array(repeating: "UInt8", count: ENCODING_VERSION.ULEBEncoded.count +
+        recordSize.ULEBEncoded.count + encodedIdentifier.count + 
+        encodedSummary.count).joined(separator: ", "))
+    )
     """
+  )
 }
 
 extension DefaultStringInterpolation {
   /// Generate a _partial_ Swift literal from the given bytes. It is partial in that must be embedded
   /// into some other syntax, specifically as a tuple.
   fileprivate mutating func appendInterpolation(swiftLiteral bytes: [UInt8]) {
-    let literalBytes = bytes.map({ "\($0) as UInt8" }).joined(separator: ", ")
+    let literalBytes = bytes.map({ "\($0)" }).joined(separator: ", ")
     appendInterpolation(literalBytes)
   }
 }

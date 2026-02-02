@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -parse-as-library -emit-sil %s -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -parse-as-library -emit-sil %s -o /dev/null -verify
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_SymbolLinkageMarkers
+// REQUIRES: swift_feature_CompileTimeValuesPreview
 
 @_silgen_name("g0") var g0: Int = 1
 @_silgen_name("g1") var g1: (Int, Int) = (1, 2)

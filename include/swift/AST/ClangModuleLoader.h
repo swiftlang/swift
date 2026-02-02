@@ -204,6 +204,10 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Returns a decl that was imported earlier or null if it was not found in
+  /// the cache.
+  virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) = 0;
+
   /// Clones an imported \param decl from its base class to its derived class
   /// \param newContext where it is inherited. Its access level is determined
   /// with respect to \param inheritance, which signifies whether \param decl
@@ -216,8 +220,12 @@ public:
                                           DeclContext *newContext,
                                           ClangInheritanceInfo inheritance) = 0;
 
-  /// Checks if \param decl is the original method or a clone from a base class
-  virtual bool isClonedMemberDecl(ValueDecl *decl) = 0;
+  /// Returns the original method if \param decl is a clone from a base class
+  virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
+
+  /// Returns true if we synthesize this member for every type so no need to
+  /// clone it for the derived classes.
+  virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -262,6 +270,11 @@ public:
   virtual const clang::Decl *
   resolveStableSerializationPath(const StableSerializationPath &path) const = 0;
 
+  struct SerializableInfo {
+    bool Serializable;
+    bool HasSwiftDecl;
+  };
+
   /// Determine whether the given type is serializable.
   ///
   /// If \c checkCanonical is true, checks the canonical type,
@@ -284,8 +297,8 @@ public:
   /// least, it's probably best to use conservative predicates
   /// that work both ways so that language behavior doesn't differ
   /// based on subtleties like the target module interface format.
-  virtual bool isSerializable(const clang::Type *type,
-                              bool checkCanonical) const = 0;
+  virtual SerializableInfo isSerializable(const clang::Type *type,
+                                          bool checkCanonical) const = 0;
 
   virtual clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,
@@ -297,6 +310,27 @@ public:
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
+  /// Determine whether this is a functional C++ type, e.g. std::function, for
+  /// which Swift provides a synthesized constructor that takes a Swift closure
+  /// as the single parameter.
+  virtual bool
+  needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const = 0;
+
+  /// Determine whether this is an instantiation of the __SwiftFunctionWrapper
+  /// type, which wraps around a Swift closure along with its context.
+  virtual bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const = 0;
+  virtual bool isDeconstructedSwiftClosure(const clang::Type* type) const = 0;
+
+  /// Given a functional C++ type, e.g. std::function, determine the
+  /// corresponding C++ closure type.
+  ///
+  /// \see needsClosureConstructor
+  virtual const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const = 0;
+
+  virtual FuncDecl *
+  getAvailabilityDomainPredicate(const clang::VarDecl *var) = 0;
 
   virtual std::optional<Type>
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
@@ -312,6 +346,12 @@ public:
   /// about the directly-parsed headers.
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
+
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
+  virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
 
   virtual DeclName
   importName(const clang::NamedDecl *D,

@@ -388,7 +388,7 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
           langOpts.WarnOnEditorPlaceholder);
 
   // Generate AST nodes.
-  SmallVector<ASTNode, 128> items;
+  SmallVector<ASTNode, 8> items;
   swift_ASTGen_buildTopLevelASTNodes(
       &Diags, exportedSourceFile, declContext, attachedDecl, Ctx,
       static_cast<SmallVectorImpl<ASTNode> *>(&items),
@@ -431,7 +431,7 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
 
   // If the buffer is generated source information, we might have more
   // context that we need to set up for parsing.
-  SmallVector<ASTNode, 128> items;
+  SmallVector<ASTNode, 8> items;
   if (auto generatedInfo = ctx.SourceMgr.getGeneratedSourceInfo(bufferID)) {
     if (generatedInfo->declContext)
       parser.CurDeclContext = generatedInfo->declContext;
@@ -494,7 +494,7 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
 
     case GeneratedSourceInfo::AccessorMacroExpansion: {
       ASTNode astNode = ASTNode::getFromOpaqueValue(generatedInfo->astNode);
-      auto attachedDecl = astNode.get<Decl *>();
+      auto attachedDecl = cast<Decl *>(astNode);
       auto accessorsForStorage = dyn_cast<AbstractStorageDecl>(attachedDecl);
 
       parser.parseTopLevelAccessors(accessorsForStorage, items);

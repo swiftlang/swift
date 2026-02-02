@@ -19,10 +19,40 @@ module _complex [system] [no_undeclared_includes] {
   export *
 }
 
+module _fenv [system] [no_undeclared_includes] {
+  use _float
+  use corecrt
+  header "fenv.h"
+  export *
+}
+
+module _float [system] [no_undeclared_includes] {
+  use corecrt
+  header "float.h"
+  export *
+}
+
+module _malloc [system] [no_undeclared_includes] {
+  use corecrt
+  header "malloc.h"
+  export *
+}
+
+module _stdlib [system] [no_undeclared_includes] {
+  use corecrt
+  use vcruntime
+  header "stdlib.h"
+  export *
+}
+
 module ucrt [system] {
 
   module C {
     export _complex
+    export _fenv
+    export _float
+    export _malloc
+    export _stdlib
 
     module ctype {
       header "ctype.h"

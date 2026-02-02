@@ -108,7 +108,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
     // ty. We return the cast as our value and as our new cast instruction.
     auto *cast =
         builder.createUnconditionalCheckedCast(
-          loc, dynamicCast.getIsolatedConformances(), load, silBridgedTy,
+          loc, dynamicCast.getCheckedCastOptions(), load, silBridgedTy,
           dynamicCast.getBridgedTargetType());
     return {cast, cast};
   }
@@ -144,7 +144,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
   // Ok, we need to perform the full cast optimization. This means that we are
   // going to replace the cast terminator in inst_block with a checked_cast_br.
   auto *ccbi = builder.createCheckedCastBranch(loc, false,
-                                               dynamicCast.getIsolatedConformances(),
+                                               dynamicCast.getCheckedCastOptions(),
                                                load,
                                                dynamicCast.getBridgedSourceType(),
                                                silBridgedTy,
@@ -331,8 +331,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     OptionalTy = OptionalType::get(Dest->getType().getASTType())
                      ->getImplementationType()
                      ->getCanonicalType();
-    Tmp = Builder.createAllocStack(Loc,
-                                   SILType::getPrimitiveObjectType(OptionalTy));
+    Tmp = Builder.createAllocStack(Loc, F->getLoweredType(OptionalTy));
     outOptionalParam = Tmp;
   } else {
     outOptionalParam = Dest;
@@ -446,10 +445,11 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
 static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
                             swift::SILFunctionConventions &substConv,
-                            TypeExpansionContext context) {
+                            const SILFunction *F) {
+  auto context = F->getTypeExpansionContext();
+
   // DestTy is the type which we want to convert to
-  SILType DestTy =
-      SILType::getPrimitiveObjectType(BridgedTargetTy->getCanonicalType());
+  SILType DestTy = F->getLoweredType(BridgedTargetTy->getCanonicalType());
   // ConvTy  is the return type of the _bridgeToObjectiveCImpl()
   auto ConvTy = substConv.getSILResultType(context).getObjectType();
   if (ConvTy == DestTy) {
@@ -567,7 +567,7 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
     // fails since we will trap.
     if (!isConditional) {
       return builder.createUnconditionalCheckedCast(
-          loc, dynamicCast.getIsolatedConformances(), newAI,
+          loc, dynamicCast.getCheckedCastOptions(), newAI,
           destLoweredTy, destFormalTy);
     }
 
@@ -592,7 +592,7 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
         newAI->getFunction()->createBasicBlockAfter(newAI->getParent());
     condBrSuccessBB->createPhiArgument(destLoweredTy, OwnershipKind::Owned);
     builder.createCheckedCastBranch(loc, /* isExact*/ false,
-                                    dynamicCast.getIsolatedConformances(),
+                                    dynamicCast.getCheckedCastOptions(),
                                     newAI,
                                     sourceFormalTy, destLoweredTy, destFormalTy,
                                     condBrSuccessBB, failureBB);
@@ -652,8 +652,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 
   // Check that this is a case that the authors of this code thought it could
   // handle.
-  if (!canOptimizeCast(BridgedTargetTy, substConv,
-                       F->getTypeExpansionContext())) {
+  if (!canOptimizeCast(BridgedTargetTy, substConv, F)) {
     return nullptr;
   }
 
@@ -1064,8 +1063,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // The unconditional_cast can be skipped, if the result of a cast
       // is not used afterwards.
       if (!ResultNotUsed) {
-        if (!dynamicCast.canSILUseScalarCheckedCastInstructions())
-          return nullptr;
+        ASSERT(dynamicCast.canSILUseScalarCheckedCastInstructions());
 
         CastedValue =
             emitSuccessfulScalarUnconditionalCast(Builder, Loc, dynamicCast);
@@ -1075,7 +1073,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       if (!CastedValue)
         CastedValue =
             Builder.createUnconditionalCheckedCast(
-              Loc, Inst->getIsolatedConformances(), Op, TargetLoweredType,
+              Loc, Inst->getCheckedCastOptions(), Op, TargetLoweredType,
               TargetFormalType);
     }
 
@@ -1160,13 +1158,13 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
 
       if (MI) {
         if (SuccessBB->getSinglePredecessorBlock() &&
-            canSILUseScalarCheckedCastInstructions(
-                Inst->getModule(), MI->getType().getASTType(),
-                Inst->getTargetFormalType())) {
+            canOptimizeToScalarCheckedCastInstructions(
+                Inst->getFunction(), MI->getType().getASTType(),
+                Inst->getTargetFormalType(), Inst->getConsumptionKind())) {
           SILBuilderWithScope B(Inst, builderContext);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/,
-              Inst->getIsolatedConformances(),
+              Inst->getCheckedCastOptions(),
               MI,
               Inst->getSourceFormalType(),
               Inst->getTargetLoweredType().getObjectType(),
@@ -1211,7 +1209,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/,
-        dynamicCast.getIsolatedConformances(),
+        dynamicCast.getCheckedCastOptions(),
         mi,
         // The cast is now from the MetatypeInst, so get the source formal
         // type from it.

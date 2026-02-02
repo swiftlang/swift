@@ -3,7 +3,204 @@
 > [!NOTE]
 > This is in reverse chronological order, so newer entries are added to the top.
 
+## Swift (next)
+
+* Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
+  instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
+  (by enqueueing on the global pool before calling the async target), and can improve performance
+  and ordering predictability of calling async code through these bridged APIs.
+
+* The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
+  `mutableBytes`) as well as the two generic `append()` methods of
+  `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
+  for omissions in the SE-0458, SE-0467 and SE-0485 proposals or their
+  implementations.
+
+  These `@unsafe` annotations are required because of a permissible compiler
+  optimization involving values of types that contain padding. When the compiler
+  stores such a value to addressable memory, it is free to skip any padding
+  bytes. This can potentially leave those bytes uninitialized. This optimization
+  is safe when the memory is only ever read as the same type as the value
+  stored. However, when reinterpreting the memory as raw bytes, the potentially
+  uninitialized bytes violate the prerequisite that `RawSpan` and
+  `MutableRawSpan` represent fully initialized memory. In the case of
+  `OutputRawSpan`, they violate the postcondition that the memory it has written
+  is fully initialized.
+
+  It is safe to use `bytes` when the `Element` type of `Span` or `MutableSpan`
+  has neither internal nor trailing padding bytes, as every byte is then known
+  to be initialized. The same constraint applies to the type parameter of
+  `OutputSpan.append(_:as:)`.
+
+  To safely use `MutableSpan`'s `mutableBytes`, an additional safety constraint
+  applies when the memory is to later be used again as `Element`. In that case,
+  the non-padding bytes of `Element` must allow every bit pattern to be
+  permissible in a valid value of `Element`.
+
+* [SE-0491][]:
+  You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
+  module selector is written before the name it qualifies and consists of the module name and two colons (`::`):
+  
+  ```swift
+  // This type conforms to the `View` protocol from `SwiftUI`, even if other
+  // modules have also declared a type named `View`:
+  struct MyView: SwiftUI::View { ... }
+  ```
+  
+  A module selector can also be applied to the name of a member; this is helpful if extensions in other modules have
+  added an ambiguous overload:
+  
+  ```swift
+  // Calls the `data(using:)` method added by `Foundation`, even if other
+  // modules have added identical overloads of `data(using:)`.
+  let data = "a little bit of text".Foundation::data(using: .utf8)
+  ```
+  
+  When a module selector is used, Swift skips past any enclosing scopes and starts its search at the top level of the
+  module; this means that certain declarations, such as local variables and generic parameter types, cannot be found
+  with a module selector. Constraints in `where` clauses also cannot use a module selector to refer to an associated
+  type.
+  
+  Module selectors are primarily intended to be used when working around unavoidable conflicts, such as when two
+  modules you don't control both use the same name. API designs which force clients to use a module selector are not
+  recommended; it is usually better to rename a declaration instead. (19481048)
+
+* If you maintain a module built with Library Evolution, you can now configure Swift to use module selectors to improve
+  the robustness of its module interface file. This is especially helpful if your module declares a type with the same
+  name as the module itself. To opt in to this behavior, add the `-enable-module-selectors-in-module-interface` flag to
+  the `OTHER_SWIFT_FLAGS` build setting.
+
+* Concurrency-related APIs like `Task` and string-processing-related APIs like `Regex` can now be qualified by the name
+  `Swift`, just like other standard library APIs:
+  
+  ```swift
+  Swift.Task { ... }
+  func match(_ regex: Swift.Regex<(Substring)>) { ... }
+  ```
+  
+  The old `_Concurrency` and `_StringProcessing` names are still supported for backwards compatibility, and Embedded
+  Swift projects must still explicitly `import _Concurrency` to access concurrency APIs.
+
 ## Swift 6.2
+
+* [SE-0472][]:
+  Introduced new `Task.immediate` and `taskGroup.addImmediateTask` APIs, which allow a task to run "immediately" in the
+  calling context if its isolation is compatible with the enclosing one. This can be used to create tasks which execute 
+  without additional scheduling overhead, and allow for finer-grained control over where a task begins running.
+
+  The canonical example for using this new API is using an unstructured immediate task like this:
+  
+  ```swift
+  func synchronous() { // synchronous function
+  // executor / thread: "T1"
+  let task: Task<Void, Never> = Task.immediate {
+  // executor / thread: "T1"
+  guard keepRunning() else { return } // synchronous call (1)
+  
+      // executor / thread: "T1"
+      await noSuspension() // potential suspension point #1 // (2)
+      
+      // executor / thread: "T1"
+      await suspend() // potential suspension point #2 // (3), suspend, (5)
+      // executor / thread: "other"
+  }
+  
+  // (4) continue execution
+  // executor / thread: "T1"
+  }
+  ```
+
+* [SE-0471][]:
+  Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
+  to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
+  and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
+  concurrency tasks.
+
+  ```swift
+  class NonSendableAhmed { 
+    var state: Int = 0
+  }
+
+  @MainActor
+  class Maria {
+    let friend: NonSendableAhmed
+
+    init() {
+      self.friend = NonSendableAhmed()
+    }
+
+    init(sharingFriendOf otherMaria: Maria) {
+      // While the friend is non-Sendable, this initializer and
+      // and the otherMaria are isolated to the MainActor. That is,
+      // they share the same executor. So, it's OK for the non-Sendable value
+      // to cross between otherMaria and self.
+      self.friend = otherMaria.friend
+    }
+    
+    isolated deinit {
+      // Used to be a potential data race. Now, deinit is also
+      // isolated on the MainActor, so this code is perfectly
+      // correct.
+      friend.state += 1
+    }
+  }
+    
+  func example() async {
+    let m1 = await Maria()
+    let m2 = await Maria(sharingFriendOf: m1)
+    doSomething(m1, m2)
+  }
+  ```
+
+* [SE-0469][]:
+  Swift concurrency tasks (both unstructured and structured, via the TaskGroup `addTask` APIs) may now be given 
+  human-readable names, which can be used to support debugging and identifying tasks.
+
+  ```swift
+  let getUsers = Task("Get Users for \(accountID)") {
+    await users.get(accountID)
+  }
+  ```
+
+* [SE-0462][]:
+  Task priority escalation may now be explicitly caused to a `Task`, as well as reacted to using the new task priority escalation handlers:      
+
+  ```swift
+  // priority: low
+  // priority: high!
+  await withTaskPriorityEscalationHandler {
+  await work()
+  } onPriorityEscalated: { oldPriority, newPriority in // may not be triggered if ->high escalation happened before handler was installed
+  // do something
+  }
+  ```
+* [SE-0461][]:
+  Nonisolated asynchronous functions may now execute on the calling actor, when the upcoming feature `NonisolatedNonsendingByDefault`
+  is enabled, or when explicitly opted-into using the `nonisolated(nonsending)` keywords. This allows for fine grained control
+  over where nonisolated asynchronous functions execute, and allows for the default behavior of their execution to be changed
+  from always executing on the global concurrent pool, to the calling actor, which can yield noticeable performance improvements 
+  thanks to less executor hopping when nonisolated and isolated code is invoked in sequence. 
+  
+  This also allows for safely using asynchronous functions on non-sendable types from actors, like so:
+
+  ```swift
+  class NotSendable {
+    func performSync() { ... }
+
+    nonisolated(nonsending)
+    func performAsync() async { ... }
+  }
+
+  actor MyActor {
+    let x: NotSendable
+
+    func call() async {
+      x.performSync() // okay
+
+      await x.performAsync() // okay
+    }
+  }
+  ```
 
 * The Swift compiler no longer diagnoses references to declarations that are
   potentially unavailable because the platform version might not be new enough
@@ -3749,7 +3946,7 @@ concurrency checking.
 
 * The C `long double` type is now imported as `Float80` on i386 and x86_64
   macOS and Linux. The tgmath functions in the Darwin and glibc modules now
-  support `Float80` as well as `Float` and `Double`. Several tgmath
+  support `Float80` as well as `Float` and `Double`. Several tgmath
   functions have been made generic over `[Binary]FloatingPoint` so that they
   will automatically be available for any conforming type.
 
@@ -10787,7 +10984,13 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+[SE-0461]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0461-async-function-isolation.md
+[SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
+[SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
+[SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
+[SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
+[SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

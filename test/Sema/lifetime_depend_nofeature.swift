@@ -11,20 +11,20 @@ struct EmptyNonEscapable: ~Escapable {} // expected-error{{an implicit initializ
 // Don't allow non-Escapable return values.
 func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a function cannot return a ~Escapable result}}
 
-func neInout(span: inout RawSpan) {} // OK
+func neInout(span: inout RawSpan) {} // DEFAULT OK
 
-func neInoutNEParam(span: inout RawSpan, _: RawSpan) {} // expected-error{{a function cannot have a ~Escapable 'inout' parameter 'span'}}
+func neInoutNEParam(span: inout RawSpan, _: RawSpan) {} // DEFAULT OK
 
 struct S {
   func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a ~Escapable result}}
 
   func neInout(span: inout RawSpan) {} // OK
 
-  func neInoutNEParam(span: inout RawSpan, _: RawSpan) {} // expected-error{{a method cannot have a ~Escapable 'inout' parameter 'span'}}
+  func neInoutNEParam(span: inout RawSpan, _: RawSpan) {} // DEFAULT OK
 
   mutating func mutatingNEInout(span: inout RawSpan) {} // OK
 
-  mutating func mutatingNEInoutParam(span: inout RawSpan, _: RawSpan) {} // expected-error{{a mutating method cannot have a ~Escapable 'inout' parameter 'span'}}
+  mutating func mutatingNEInoutParam(span: inout RawSpan, _: RawSpan) {} // DEFAULT OK
 }
 
 class C {
@@ -36,16 +36,15 @@ class C {
 extension MutableSpan {
   func method() {} // OK
 
-  mutating func mutatingMethod() {} // expected-error{{a mutating method cannot have a ~Escapable 'self'}}
+  mutating func mutatingMethod() {} // DEFAULT OK
 
   func neReturn(span: RawSpan) -> RawSpan { span } // expected-error{{a method cannot return a ~Escapable result}}
 
-  func neInout(span: inout RawSpan) {} // expected-error{{a method cannot have a ~Escapable 'inout' parameter 'span'}}
+  func neInout(span: inout RawSpan) {} // DEFAULT OK
 
-  mutating func mutatingNEInout(span: inout RawSpan) {} // expected-error{{a mutating method cannot have a ~Escapable 'self'}}
-  // expected-error@-1{{a mutating method cannot have a ~Escapable 'inout' parameter 'span'}}
+  mutating func mutatingNEInout(span: inout RawSpan) {} // DEFAULT OK
 }
 
 extension Span {
-  mutating func mutate() {} // expected-error{{a mutating method cannot have a ~Escapable 'self'}}
+  mutating func mutate() {} // DEFAULT OK
 }

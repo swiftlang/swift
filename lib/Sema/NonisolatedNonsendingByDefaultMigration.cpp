@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -55,6 +56,27 @@ public:
   /// behavior.
   void diagnose() const;
 };
+
+/// Determine whether the decl represents a test function that is
+/// annotated with `@Test` macro from the swift-testing framework.
+/// Such functions should be exempt from the migration because their
+/// execution is controlled by the framework and the change in
+/// behavior doesn't affect them.
+static bool isSwiftTestingTestFunction(ValueDecl *decl) {
+  if (!isa<FuncDecl>(decl))
+    return false;
+
+  return llvm::any_of(decl->getAttrs(), [](DeclAttribute *attr) {
+    auto customAttr = dyn_cast<CustomAttr>(attr);
+    if (!customAttr)
+      return false;
+
+    auto *macro = customAttr->getResolvedMacro();
+    return macro && macro->getBaseIdentifier().is("Test") &&
+           macro->getParentModule()->getName().is("Testing");
+  });
+}
+
 } // end anonymous namespace
 
 void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
@@ -70,6 +92,22 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
   if ((decl = node.dyn_cast<ValueDecl *>())) {
     // Diagnose only explicit nodes.
     if (decl->isImplicit()) {
+      return;
+    }
+
+    // Only diagnose declarations from the current module.
+    if (decl->getModuleContext() != ctx.MainModule) {
+      return;
+    }
+
+    // `@Test` test-case have special semantics.
+    if (isSwiftTestingTestFunction(decl)) {
+      return;
+    }
+
+    // A special declaration that was either synthesized by the compiler
+    // or a macro expansion.
+    if (decl->getBaseName().hasDollarPrefix()) {
       return;
     }
 
@@ -95,7 +133,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
     // The only subclass that can be explicit is this one.
     closure = cast<ClosureExpr>(anyClosure);
   } else {
-    functionRepr = node.get<FunctionTypeRepr *>();
+    functionRepr = cast<FunctionTypeRepr *>(node);
   }
 
   // The execution behavior changes only for nonisolated functions.

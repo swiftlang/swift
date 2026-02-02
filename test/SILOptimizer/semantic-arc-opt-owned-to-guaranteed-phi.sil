@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -semantic-arc-opts %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -37,22 +37,23 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  %borrow1 = begin_borrow %0 : $Klass
-  %copy1 = copy_value %borrow1 : $Klass
-  br bb3(%copy1 : $Klass, %borrow1 : $Klass)
+  %3 = begin_borrow %0
+  %4 = copy_value %3
+  br bb3(%4, %3)
 
 bb2:
-  %borrow2 = begin_borrow %1 : $Klass
-  %copy2 = copy_value %borrow2 : $Klass
-  br bb3(%copy2 : $Klass, %borrow2 : $Klass)
+  %6 = begin_borrow %1
+  %7 = copy_value %6
+  br bb3(%7, %6)
 
-bb3(%copy : @owned $Klass, %borrow : @guaranteed $Klass):
-  destroy_value %copy : $Klass
-  end_borrow %borrow : $Klass
-  destroy_value %0 : $Klass
-  destroy_value %1 : $Klass
-  %t = tuple ()
-  return %t : $()
+bb3(%9 : @owned $Klass, %10 : @reborrow $Klass):
+  %11 = borrowed %10 from (%1, %0)
+  destroy_value %9
+  end_borrow %11
+  destroy_value %0
+  destroy_value %1
+  %16 = tuple ()
+  return %16
 }
 
 // CHECK-LABEL: sil [ossa] @test_owned_to_guaranteed3 :
@@ -120,19 +121,20 @@ bbret:
 // CHECK-LABEL: } // end sil function 'test_borrowed_from_updating'
 sil [ossa] @test_borrowed_from_updating : $@convention(thin) (@guaranteed Optional<Klass>) -> () {
 bb0(%0 : @guaranteed $Optional<Klass>):
-  %1 = copy_value %0 : $Optional<Klass>
-  switch_enum %1 : $Optional<Klass>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+  %1 = copy_value %0
+  switch_enum %1, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+
 bb1:
-  unreachable
+  unreachable 
 
 bb2(%4 : @owned $Klass):
-  %5 = begin_borrow %4 : $Klass
-  br bb3(%5 : $Klass)
+  %5 = begin_borrow %4
+  br bb3(%5)
 
 bb3(%7 : @reborrow $Klass):
-  %8 = borrowed %7 : $Klass from (%4 : $Klass)
-  end_borrow %8 : $Klass
-  destroy_value %4 : $Klass
-  %r = tuple ()
-  return %r : $()
+  %8 = borrowed %7 from (%4)
+  end_borrow %8
+  destroy_value %4
+  %11 = tuple ()
+  return %11
 }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-objc-interop
 
 @objc enum Foo: Int32 {
   case Zim, Zang, Zung
@@ -26,7 +26,7 @@ enum NonObjCEnum: Int {
 
 class Bar {
   @objc func foo(x: Foo) {}
-  @objc func nonObjC(x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @objc func nonObjC(x: NonObjCEnum) {} //expected-error{{type of the parameter cannot be represented in Objective-C}} //expected-note{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 }
 
 // <rdar://problem/23681566> @objc enums with payloads rejected with no source location info

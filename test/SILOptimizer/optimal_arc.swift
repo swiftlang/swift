@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -O -emit-sil -O -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name test -O -emit-sil -primary-file %s | %FileCheck %s
 
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
@@ -50,5 +50,25 @@ struct TestCollection: RandomAccessCollection, RangeReplaceableCollection {
   }
 }
 
+class C {
+  func foo() {}
+}
+
+struct S: ~Copyable {
+  var c: C
+
+  // Check that there is only a single release in the deinit.
+
+  // CHECK-LABEL: sil hidden @$s4test1SVfD :
+  // CHECK-NOT:     retain
+  // CHECK-NOT:     release
+  // CHECK:         apply
+  // CHECK:         release
+  // CHECK-NOT:     release
+  // CHECK:       } // end sil function '$s4test1SVfD'
+  deinit {
+    c.foo()
+  }
+}
 
 

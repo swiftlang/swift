@@ -16,51 +16,51 @@
 //--- IndexTest.swift
 @freestanding(expression)
 macro freestandingExpr<T>(arg: T) = #externalMacro(module: "IndexMacros", type: "FreestandingExprMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | freestandingExpr(arg:) |  [[EXPR_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | freestandingExpr(arg:) |  [[EXPR_USR:.*]] | Def
 
 @freestanding(declaration, names: named(TestFree))
 macro freestandingDecl<T>(arg: T) = #externalMacro(module: "IndexMacros", type: "FreestandingDeclMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | freestandingDecl(arg:) |  [[DECL_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | freestandingDecl(arg:) |  [[DECL_USR:.*]] | Def
 
 @attached(accessor)
 macro Accessor() = #externalMacro(module: "IndexMacros", type: "SomeAccessorMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | Accessor() |  [[ACCESSOR_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | Accessor() |  [[ACCESSOR_USR:.*]] | Def
 
 @attached(extension, conformances: TestProto)
 macro Conformance() = #externalMacro(module: "IndexMacros", type: "SomeConformanceMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | Conformance() |  [[CONFORMANCE_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | Conformance() |  [[CONFORMANCE_USR:.*]] | Def
 
 @attached(member, names: named(memberFunc))
 macro Member() = #externalMacro(module: "IndexMacros", type: "SomeMemberMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | Member() |  [[MEMBER_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | Member() |  [[MEMBER_USR:.*]] | Def
 
 @attached(memberAttribute)
 macro MemberAttribute() = #externalMacro(module: "IndexMacros", type: "SomeMemberAttributeMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | MemberAttribute() |  [[MEMBER_ATTRIBUTE_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | MemberAttribute() |  [[MEMBER_ATTRIBUTE_USR:.*]] | Def
 
 @attached(peer, names: named(TestPeer))
 macro Peer<T>(arg: T) = #externalMacro(module: "IndexMacros", type: "SomePeerMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | Peer(arg:) |  [[PEER_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | Peer(arg:) |  [[PEER_USR:.*]] | Def
 
 @attached(peer, names: named(peerMember))
 macro PeerMember() = #externalMacro(module: "IndexMacros", type: "SomePeerMemberMacro")
-// CHECK: [[@LINE-1]]:7 | macro/Swift | PeerMember() |  [[PEER_MEMBER_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:7 | macro(internal)/Swift | PeerMember() |  [[PEER_MEMBER_USR:.*]] | Def
 
 protocol TestProto {}
-// CHECK: [[@LINE-1]]:10 | protocol/Swift | TestProto | [[PROTO_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:10 | protocol(internal)/Swift | TestProto | [[PROTO_USR:.*]] | Def
 
 func accessorLog() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | accessorLog() | [[ACC_LOG_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | accessorLog() | [[ACC_LOG_USR:.*]] | Def
 func exprLog() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | exprLog() | [[EXPR_LOG_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | exprLog() | [[EXPR_LOG_USR:.*]] | Def
 func freeLog() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | freeLog() | [[FREE_LOG_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | freeLog() | [[FREE_LOG_USR:.*]] | Def
 func memberLog() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | memberLog() | [[MEMBER_LOG_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | memberLog() | [[MEMBER_LOG_USR:.*]] | Def
 func peerLog() {}
-// CHECK: [[@LINE-1]]:6 | function/Swift | peerLog() | [[PEER_LOG_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:6 | function(internal)/Swift | peerLog() | [[PEER_LOG_USR:.*]] | Def
 
-// CHECK: [[@LINE+2]]:8 | struct/Swift | AddOne | [[ADD_ONE_USR:.*]] | Def
+// CHECK: [[@LINE+2]]:8 | struct(internal)/Swift | AddOne | [[ADD_ONE_USR:.*]] | Def
 @propertyWrapper
 struct AddOne {
   var value: Int = 1
@@ -77,8 +77,8 @@ struct AddOne {
 // CHECK: [[@LINE+1]]:19 | struct/Swift | Double | s:Sd | Ref
 #freestandingDecl<Double>(arg: 1.0)
 // Creates a `TestFree` struct with `freeFunc` calling `freeLog`
-// CHECK: [[@LINE-2]]:1 | struct/Swift | TestFree | [[FREE_STRUCT_USR:.*]] | Def,Impl
-// CHECK: [[@LINE-3]]:1 | instance-method/Swift | freeFunc() | [[FREE_FUNC_USR:.*]] | Def,Impl,RelChild
+// CHECK: [[@LINE-2]]:1 | struct(internal)/Swift | TestFree | [[FREE_STRUCT_USR:.*]] | Def,Impl
+// CHECK: [[@LINE-3]]:1 | instance-method(internal)/Swift | freeFunc() | [[FREE_FUNC_USR:.*]] | Def,Impl,RelChild
 // CHECK-NEXT: RelChild | struct/Swift | TestFree | [[FREE_STRUCT_USR]]
 // CHECK: [[@LINE-5]]:1 | function/Swift | freeLog() | [[FREE_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | freeFunc() | [[FREE_FUNC_USR]]
@@ -112,24 +112,24 @@ struct TestAttached {
 // CHECK-NEXT: RelCall,RelCont | instance-method/acc-get/Swift | getter:attachedMemberAccessors
 
 // `Member` adds a new member `memberFunc` that calls `memberLog`
-// CHECK: [[@LINE-16]]:14 | instance-method/Swift | memberFunc() | [[MEMBER_FUNC_USR:.*]] | Def,Impl,RelChild
+// CHECK: [[@LINE-16]]:14 | instance-method(internal)/Swift | memberFunc() | [[MEMBER_FUNC_USR:.*]] | Def,Impl,RelChild
 // CHECK: [[@LINE-17]]:14 | function/Swift | memberLog() | [[MEMBER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | memberFunc() | [[MEMBER_FUNC_USR]]
 
 // `Peer` adds a new inner type `TestPeer` that contains `peerFunc` with a call to `peerLog`
-// CHECK: [[@LINE-21]]:39 | struct/Swift | TestPeer | [[PEER_STRUCT_USR:.*]] | Def,Impl
-// CHECK: [[@LINE-22]]:39 | instance-method/Swift | peerFunc() | [[PEER_FUNC_USR:.*]] | Def,Impl,RelChild
+// CHECK: [[@LINE-21]]:39 | struct(internal)/Swift | TestPeer | [[PEER_STRUCT_USR:.*]] | Def,Impl
+// CHECK: [[@LINE-22]]:39 | instance-method(internal)/Swift | peerFunc() | [[PEER_FUNC_USR:.*]] | Def,Impl,RelChild
 // CHECK-NEXT: RelChild | struct/Swift | TestPeer | [[PEER_STRUCT_USR]]
 // CHECK: [[@LINE-24]]:39 | function/Swift | peerLog() | [[PEER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | peerFunc() | [[PEER_FUNC_USR]]
 
-// CHECK: [[@LINE+1]]:8 | struct/Swift | Outer | [[OUTER_USR:.*]] | Def
+// CHECK: [[@LINE+1]]:8 | struct(internal)/Swift | Outer | [[OUTER_USR:.*]] | Def
 struct Outer {
   // CHECK: [[@LINE+1]]:4 | macro/Swift | PeerMember() | [[PEER_MEMBER_USR]] | Ref
   @PeerMember
   var anyMember: Int
   // `PeerMember` adds a new `peerMember`
-  // CHECK: [[@LINE-3]]:3 | instance-property/Swift | peerMember | {{.*}} | Def,Impl,RelChild
+  // CHECK: [[@LINE-3]]:3 | instance-property(internal)/Swift | peerMember | {{.*}} | Def,Impl,RelChild
   // CHECK-NEXT: RelChild | struct/Swift | Outer | [[OUTER_USR]]
 
   // CHECK: [[@LINE+2]]:17 | macro/Swift | Member() | [[MEMBER_USR]] | Ref
@@ -138,7 +138,7 @@ struct Outer {
   struct TestInner {}
 }
 // `Member` adds a new member `memberFunc` that calls `memberLog`
-// CHECK: [[@LINE-4]]:16 | instance-method/Swift | memberFunc() | [[INNER_FUNC_USR:.*]] | Def,Impl
+// CHECK: [[@LINE-4]]:16 | instance-method(internal)/Swift | memberFunc() | [[INNER_FUNC_USR:.*]] | Def,Impl
 // CHECK-NEXT: RelChild | struct/Swift | TestInner
 // CHECK: [[@LINE-6]]:16 | function/Swift | memberLog() | [[MEMBER_LOG_USR]] | Ref,Call,Impl,RelCall,RelCont
 // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | memberFunc() | [[INNER_FUNC_USR]]

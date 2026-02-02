@@ -20,6 +20,9 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/SILContext.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
@@ -125,9 +128,9 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
 //                                Test
 //===----------------------------------------------------------------------===//
 
-void registerFunctionTest(BridgedStringRef name, void *nativeSwiftInvocation) {
+void registerTest(BridgedStringRef name, void *nativeSwiftContext) {
   swift::test::FunctionTest::createNativeSwiftFunctionTest(
-      name.unbridged(), nativeSwiftInvocation);
+      name.unbridged(), nativeSwiftContext, /*isSILTest=*/ true);
 }
 
 bool BridgedTestArguments::hasUntaken() const {
@@ -183,10 +186,15 @@ static_assert((int)BridgedFunction::PerformanceConstraints::NoLocks == (int)swif
 static_assert((int)BridgedFunction::PerformanceConstraints::NoRuntime == (int)swift::PerformanceConstraints::NoRuntime);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoExistentials == (int)swift::PerformanceConstraints::NoExistentials);
 static_assert((int)BridgedFunction::PerformanceConstraints::NoObjCBridging == (int)swift::PerformanceConstraints::NoObjCBridging);
+static_assert((int)BridgedFunction::PerformanceConstraints::ManualOwnership == (int)swift::PerformanceConstraints::ManualOwnership);
 
 static_assert((int)BridgedFunction::InlineStrategy::InlineDefault == (int)swift::InlineDefault);
 static_assert((int)BridgedFunction::InlineStrategy::NoInline == (int)swift::NoInline);
+static_assert((int)BridgedFunction::InlineStrategy::HeuristicAlwaysInline == (int)swift::HeuristicAlwaysInline);
 static_assert((int)BridgedFunction::InlineStrategy::AlwaysInline == (int)swift::AlwaysInline);
+
+static_assert((int)BridgedFunction::ABILanguage::Swift == (int)swift::SILFunctionLanguage::Swift);
+static_assert((int)BridgedFunction::ABILanguage::C == (int)swift::SILFunctionLanguage::C);
 
 static_assert((int)BridgedFunction::ThunkKind::IsNotThunk == (int)swift::IsNotThunk);
 static_assert((int)BridgedFunction::ThunkKind::IsThunk == (int)swift::IsThunk);
@@ -351,10 +359,10 @@ bool BridgedGlobalVar::canBeInitializedStatically() const {
   if (hasPublicVisibility(global->getLinkage()))
     expansion = ResilienceExpansion::Minimal;
 
-  auto &tl = global->getModule().Types.getTypeLowering(
+  auto props = global->getModule().Types.getTypeProperties(
       global->getLoweredType(),
       TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
-  return tl.isLoadable();
+  return props.isFixedABI();
 }
 
 bool BridgedGlobalVar::mustBeInitializedStatically() const {
@@ -541,4 +549,388 @@ BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAdd
                                            enumAddr.getSILValue(),
                                            defaultBlock.unbridged(),
                                            convertCases(enumAddr.getSILValue()->getType(), enumCases, numEnumCases))};
+}
+
+//===----------------------------------------------------------------------===//
+//                               BridgedCloner
+//===----------------------------------------------------------------------===//
+
+// Need to put the cloner Impl classes into namespace swift to forward reference it from SILBridging.h.
+namespace swift {
+
+class BridgedClonerImpl : public SILCloner<BridgedClonerImpl> {
+  friend class SILInstructionVisitor<BridgedClonerImpl>;
+  friend class SILCloner<BridgedClonerImpl>;
+
+  bool hasFixedLocation;
+  union {
+    SILDebugLocation fixedLocation;
+    ScopeCloner scopeCloner;
+  };
+
+  SILInstruction *result = nullptr;
+
+public:
+  BridgedClonerImpl(SILGlobalVariable *gVar)
+    : SILCloner<BridgedClonerImpl>(gVar),
+      hasFixedLocation(true),
+      fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
+
+  BridgedClonerImpl(SILInstruction *insertionPoint)
+    : SILCloner<BridgedClonerImpl>(*insertionPoint->getFunction()),
+      hasFixedLocation(true),
+      fixedLocation(insertionPoint->getDebugLocation()) {
+    Builder.setInsertionPoint(insertionPoint);
+  }
+
+  BridgedClonerImpl(SILFunction &emptyFunction)
+    : SILCloner<BridgedClonerImpl>(emptyFunction),
+      hasFixedLocation(false),
+      scopeCloner(ScopeCloner(emptyFunction)) {}
+
+  ~BridgedClonerImpl() {
+    if (hasFixedLocation) {
+      fixedLocation.~SILDebugLocation();
+    } else {
+      scopeCloner.~ScopeCloner();
+    }
+  }
+
+  SILValue getClonedValue(SILValue v) {
+    return getMappedValue(v);
+  }
+
+  SILInstruction *cloneInst(SILInstruction *inst) {
+    result = nullptr;
+    visit(inst);
+    ASSERT(result && "instruction not cloned");
+    return result;
+  }
+
+  SILLocation remapLocation(SILLocation loc) {
+    if (hasFixedLocation)
+      return fixedLocation.getLocation();
+    return loc;
+  }
+
+  const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (hasFixedLocation)
+      return fixedLocation.getScope();
+    return scopeCloner.getOrCreateClonedScope(DS);
+  }
+
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    result = Cloned;
+    SILCloner<BridgedClonerImpl>::postProcess(Orig, Cloned);
+  }
+};
+
+class BridgedTypeSubstClonerImpl : public TypeSubstCloner<BridgedTypeSubstClonerImpl> {
+  SILInstruction *result = nullptr;
+
+public:
+  BridgedTypeSubstClonerImpl(SILFunction &from, SILFunction &toEmptyFunction, SubstitutionMap subs)
+    : TypeSubstCloner<BridgedTypeSubstClonerImpl>(toEmptyFunction, from, subs) {}
+
+  SILValue getClonedValue(SILValue v) {
+    return getMappedValue(v);
+  }
+
+  SILInstruction *cloneInst(SILInstruction *inst) {
+    result = nullptr;
+    visit(inst);
+    ASSERT(result && "instruction not cloned");
+    return result;
+  }
+
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    result = Cloned;
+    SILClonerWithScopes<BridgedTypeSubstClonerImpl>::postProcess(Orig, Cloned);
+  }
+
+  SILFunction *getOriginal() { return &Original; }
+};
+
+} // namespace swift
+
+BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedContext context)
+  : cloner(new BridgedClonerImpl(var.getGlobal())) {
+  context.context->notifyNewCloner();
+}
+
+BridgedCloner::BridgedCloner(BridgedInstruction inst,
+                             BridgedContext context)
+    : cloner(new BridgedClonerImpl(inst.unbridged())) {
+  context.context->notifyNewCloner();
+}
+
+BridgedCloner::BridgedCloner(BridgedFunction emptyFunction, BridgedContext context)
+  : cloner(new BridgedClonerImpl(*emptyFunction.getFunction())) {
+  context.context->notifyNewCloner();
+}
+
+void BridgedCloner::destroy(BridgedContext context) {
+  delete cloner;
+  cloner = nullptr;
+  context.context->notifyClonerDestroyed();
+}
+
+BridgedFunction BridgedCloner::getCloned() const {
+  return { &cloner->getBuilder().getFunction() };
+}
+
+BridgedValue BridgedCloner::getClonedValue(BridgedValue v) {
+  return {cloner->getClonedValue(v.getSILValue())};
+}
+
+bool BridgedCloner::isValueCloned(BridgedValue v) const {
+  return cloner->isValueCloned(v.getSILValue());
+}
+
+void BridgedCloner::recordClonedInstruction(BridgedInstruction origInst, BridgedInstruction clonedInst) const {
+  cloner->recordClonedInstruction(origInst.unbridged(), clonedInst.unbridged());
+}
+
+void BridgedCloner::recordFoldedValue(BridgedValue orig, BridgedValue mapped) const {
+  cloner->recordFoldedValue(orig.getSILValue(), mapped.getSILValue());
+}
+
+BridgedInstruction BridgedCloner::clone(BridgedInstruction inst) const {
+  return {cloner->cloneInst(inst.unbridged())->asSILNode()};
+}
+
+void BridgedCloner::setInsertionBlockIfNotSet(BridgedBasicBlock block) const {
+  if (!cloner->getBuilder().hasValidInsertionPoint())
+    cloner->getBuilder().setInsertionPoint(block.unbridged());
+}
+
+BridgedBasicBlock BridgedCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+}
+
+void BridgedCloner::cloneFunctionBody(BridgedFunction originalFunction,
+                                      BridgedBasicBlock clonedEntryBlock,
+                                      BridgedValueArray clonedEntryBlockArgs) const {
+  llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
+  auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
+  cloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
+}
+
+void BridgedCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
+  cloner->cloneFunction(originalFunction.getFunction());
+}
+
+BridgedTypeSubstCloner::BridgedTypeSubstCloner(BridgedFunction fromFunction, BridgedFunction toFunction,
+                                               BridgedSubstitutionMap substitutions,
+                                               BridgedContext context)
+  : cloner(new BridgedTypeSubstClonerImpl(*fromFunction.getFunction(), *toFunction.getFunction(),
+                                          substitutions.unbridged())) {
+  context.context->notifyNewCloner();
+}
+
+void BridgedTypeSubstCloner::destroy(BridgedContext context) {
+  delete cloner;
+  cloner = nullptr;
+  context.context->notifyClonerDestroyed();
+}
+
+void BridgedTypeSubstCloner::cloneFunctionBody() const {
+  cloner->cloneFunction(cloner->getOriginal());
+}
+
+BridgedBasicBlock BridgedTypeSubstCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
+  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+}
+
+BridgedValue BridgedTypeSubstCloner::getClonedValue(BridgedValue v) {
+  return {cloner->getClonedValue(v.getSILValue())};
+}
+
+//===----------------------------------------------------------------------===//
+//                               BridgedContext
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedContext::getModuleDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  context->getModule()->print(os);
+  str.pop_back(); // Remove trailing newline.
+  return BridgedOwnedString(str);
+}
+
+OptionalBridgedFunction BridgedContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {
+  return {context->getModule()->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
+}
+
+BridgedFunction BridgedContext::
+createEmptyFunction(BridgedStringRef name,
+                    const BridgedParameterInfo * _Nullable bridgedParams,
+                    SwiftInt paramCount,
+                    bool hasSelfParam,
+                    BridgedFunction fromFunc) const {
+  llvm::SmallVector<SILParameterInfo> params;
+  for (unsigned idx = 0; idx < paramCount; ++idx) {
+    params.push_back(bridgedParams[idx].unbridged());
+  }
+  return {context->createEmptyFunction(name.unbridged(), params, hasSelfParam, fromFunc.getFunction())};
+}
+
+BridgedGlobalVar BridgedContext::createGlobalVariable(BridgedStringRef name, BridgedType type,
+                                                      BridgedLinkage linkage,
+                                                      bool isLet,
+                                                      bool markedAsUsed) const {
+  auto *global = SILGlobalVariable::create(
+      *context->getModule(),
+      (swift::SILLinkage)linkage, IsNotSerialized,
+      name.unbridged(), type.unbridged());
+  if (isLet)
+    global->setLet(true);
+  global->setMarkedAsUsed(markedAsUsed);
+  return {global};
+}
+
+void BridgedContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFunction destFunc) const {
+  context->moveFunctionBody(sourceFunc.getFunction(), destFunc.getFunction());
+}
+
+//===----------------------------------------------------------------------===//
+//                           SILContext
+//===----------------------------------------------------------------------===//
+
+SILContext::~SILContext() {}
+
+void SILContext::verifyEverythingIsCleared() {
+  ASSERT(allocatedSlabs.empty() && "StackList is leaking slabs");
+  ASSERT(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
+  ASSERT(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
+  ASSERT(numOperandSetsAllocated == 0 && "Not all OperandSets deallocated");
+  ASSERT(numClonersAllocated == 0 && "Not all cloners deallocated");
+}
+
+FixedSizeSlab *SILContext::allocSlab(FixedSizeSlab *afterSlab) {
+  FixedSizeSlab *slab = getModule()->allocSlab();
+  if (afterSlab) {
+    allocatedSlabs.insert(std::next(afterSlab->getIterator()), *slab);
+  } else {
+    allocatedSlabs.push_back(*slab);
+  }
+  return slab;
+}
+
+FixedSizeSlab *SILContext::freeSlab(FixedSizeSlab *slab) {
+  FixedSizeSlab *prev = nullptr;
+  assert(!allocatedSlabs.empty());
+  if (&allocatedSlabs.front() != slab)
+    prev = &*std::prev(slab->getIterator());
+
+  allocatedSlabs.remove(*slab);
+  getModule()->freeSlab(slab);
+  return prev;
+}
+
+BasicBlockSet *SILContext::allocBlockSet() {
+  ASSERT(numBlockSetsAllocated < BlockSetCapacity &&
+         "too many BasicBlockSets allocated");
+
+  auto *storage = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated;
+  BasicBlockSet *set = new (storage) BasicBlockSet(function);
+  aliveBlockSets[numBlockSetsAllocated] = true;
+  ++numBlockSetsAllocated;
+  return set;
+}
+
+void SILContext::freeBlockSet(BasicBlockSet *set) {
+  int idx = set - (BasicBlockSet *)blockSetStorage;
+  assert(idx >= 0 && idx < numBlockSetsAllocated);
+  assert(aliveBlockSets[idx] && "double free of BasicBlockSet");
+  aliveBlockSets[idx] = false;
+
+  while (numBlockSetsAllocated > 0 && !aliveBlockSets[numBlockSetsAllocated - 1]) {
+    auto *set = (BasicBlockSet *)blockSetStorage + numBlockSetsAllocated - 1;
+    set->~BasicBlockSet();
+    --numBlockSetsAllocated;
+  }
+}
+
+NodeSet *SILContext::allocNodeSet() {
+  ASSERT(numNodeSetsAllocated < NodeSetCapacity &&
+         "too many NodeSets allocated");
+
+  auto *storage = (NodeSet *)nodeSetStorage + numNodeSetsAllocated;
+  NodeSet *set = new (storage) NodeSet(function);
+  aliveNodeSets[numNodeSetsAllocated] = true;
+  ++numNodeSetsAllocated;
+  return set;
+}
+
+void SILContext::freeNodeSet(NodeSet *set) {
+  int idx = set - (NodeSet *)nodeSetStorage;
+  assert(idx >= 0 && idx < numNodeSetsAllocated);
+  assert(aliveNodeSets[idx] && "double free of NodeSet");
+  aliveNodeSets[idx] = false;
+
+  while (numNodeSetsAllocated > 0 && !aliveNodeSets[numNodeSetsAllocated - 1]) {
+    auto *set = (NodeSet *)nodeSetStorage + numNodeSetsAllocated - 1;
+    set->~NodeSet();
+    --numNodeSetsAllocated;
+  }
+}
+
+OperandSet *SILContext::allocOperandSet() {
+  ASSERT(numOperandSetsAllocated < OperandSetCapacity &&
+         "too many OperandSets allocated");
+
+  auto *storage = (OperandSet *)operandSetStorage + numOperandSetsAllocated;
+  OperandSet *set = new (storage) OperandSet(function);
+  aliveOperandSets[numOperandSetsAllocated] = true;
+  ++numOperandSetsAllocated;
+  return set;
+}
+
+void SILContext::freeOperandSet(OperandSet *set) {
+  int idx = set - (OperandSet *)operandSetStorage;
+  assert(idx >= 0 && idx < numOperandSetsAllocated);
+  assert(aliveOperandSets[idx] && "double free of OperandSet");
+  aliveOperandSets[idx] = false;
+
+  while (numOperandSetsAllocated > 0 && !aliveOperandSets[numOperandSetsAllocated - 1]) {
+    auto *set = (OperandSet *)operandSetStorage + numOperandSetsAllocated - 1;
+    set->~OperandSet();
+    --numOperandSetsAllocated;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                           BridgedVerifier
+//===----------------------------------------------------------------------===//
+
+static BridgedVerifier::VerifyFunctionFn verifyFunctionFunction = nullptr;
+
+void BridgedVerifier::registerVerifier(VerifyFunctionFn verifyFunctionFn) {
+  verifyFunctionFunction = verifyFunctionFn;
+}
+
+void BridgedVerifier::runSwiftFunctionVerification(SILFunction * _Nonnull f, SILContext * _Nonnull context) {
+  if (!verifyFunctionFunction)
+    return;
+
+  verifyFunctionFunction({context}, {f});
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedInstruction atInstruction) {
+  verificationFailure(message.unbridged(), atInstruction.unbridged(),
+                      /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedArgument atArgument) {
+  verificationFailure(message.unbridged(), atArgument.getArgument(),
+                      /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifierError(BridgedStringRef message,
+                                    BridgedValue atValue) {
+  verificationFailure(message.unbridged(), SILValue(atValue.getSILValue()),
+                      /*extraContext=*/nullptr);
 }

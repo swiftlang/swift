@@ -13,6 +13,8 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
+#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
+
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
@@ -83,6 +85,9 @@ public:
 
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
+
+  /// Imported noncopyable types that we have seen.
+  llvm::DenseSet<NominalTypeDecl *> importedNontrivialNoncopyableTypes;
 
   size_t anonymousSymbolCounter = 0;
 
@@ -282,6 +287,8 @@ public:
   void visitMacroDecl(MacroDecl *d);
   void visitMacroExpansionDecl(MacroExpansionDecl *d);
 
+  void visitImportedNontrivialNoncopyableType(NominalTypeDecl *nominal);
+
   // Same as AbstractStorageDecl::visitEmittedAccessors, but skips over skipped
   // (unavailable) decls.
   void visitEmittedAccessors(AbstractStorageDecl *D,
@@ -334,6 +341,10 @@ public:
 
   /// Emits the backing initializer for a property with an attached wrapper.
   void emitPropertyWrapperBackingInitializer(VarDecl *var);
+
+  /// Emits an init accessor that contains a call to the backing storage
+  /// initializer for a property with an attached property wrapper
+  void emitPropertyWrappedFieldInitAccessor(VarDecl *var);
 
   /// Emits argument generators, including default argument generators and
   /// property wrapper argument generators, for the given parameter list.
@@ -514,14 +525,10 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
-  /// Retrieve the _Concurrency._asyncLetStart intrinsic.
-  FuncDecl *getAsyncLetStart();
   /// Retrieve the _Concurrency._asyncLetGet intrinsic.
   FuncDecl *getAsyncLetGet();
   /// Retrieve the _Concurrency._asyncLetGetThrowing intrinsic.
   FuncDecl *getAsyncLetGetThrowing();
-  /// Retrieve the _Concurrency._asyncLetFinish intrinsic.
-  FuncDecl *getFinishAsyncLet();
 
   /// Retrieve the _Concurrency._taskFutureGet intrinsic.
   FuncDecl *getTaskFutureGet();
@@ -557,6 +564,8 @@ public:
   FuncDecl *getSwiftJobRun();
   /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
   FuncDecl *getDeinitOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutorMainActorBackDeploy intrinsic.
+  FuncDecl *getDeinitOnExecutorMainActorBackDeploy();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 
@@ -598,18 +607,19 @@ public:
   void emitLazyConformancesForType(NominalTypeDecl *NTD);
 
   /// Mark a protocol conformance as used, so we know we need to emit it if
-  /// it's in our TU.
-  void useConformance(ProtocolConformanceRef conformance);
+  /// it's in our TU. The SILInstruction is printed for debugging purposes if
+  /// the conformance turns out to be invalid.
+  void useConformance(SILInstruction *inst, ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given type as used.
-  void useConformancesFromType(CanType type);
+  void useConformancesFromType(SILInstruction *inst, CanType type);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionMap subs);
+  void useConformancesFromSubstitutions(SILInstruction *inst, SubstitutionMap subs);
 
   /// Mark _ObjectiveCBridgeable conformances as used for any imported types
   /// mentioned by the given type.
-  void useConformancesFromObjectiveCType(CanType type);
+  void useConformancesFromObjectiveCType(SILInstruction *inst, CanType type);
 
   /// Make a note of a member reference expression, which allows us
   /// to ensure that the conformance above is emitted wherever it

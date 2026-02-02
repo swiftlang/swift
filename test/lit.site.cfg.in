@@ -28,6 +28,7 @@ config.swift_src_root = lit_config.params.get("swift_src_root", "@SWIFT_SOURCE_D
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_module_triple = "@VARIANT_MODULE_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.external_embedded_platform = "@VARIANT_EXTERNAL_EMBEDDED_PLATFORM@" == "TRUE"
@@ -51,6 +52,7 @@ config.cmake_c_compiler = r'''@CMAKE_C_COMPILER@'''
 config.cmake_cxx_compiler = r'''@CMAKE_CXX_COMPILER@'''
 config.c_flags = r'''@CMAKE_C_FLAGS@'''
 config.exe_linker_flags = r'''@CMAKE_EXE_LINKER_FLAGS@'''
+config.shared_linker_flags = r'''@CMAKE_SHARED_LINKER_FLAGS@'''
 
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
@@ -143,7 +145,7 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
 if "@SWIFT_STDLIB_STATIC_PRINT@" == "TRUE":
     config.available_features.add('stdlib_static_print')
-if "@SWIFT_STDLIB_ENABLE_UNICODE_DATA" == "TRUE":
+if "@SWIFT_STDLIB_ENABLE_UNICODE_DATA@" == "TRUE":
     config.available_features.add('stdlib_unicode_data')
 if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
     config.available_features.add('string_processing')
@@ -172,6 +174,8 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 
 if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
+
+config.swift_sdks = "@SWIFT_SDKS@".split(";")
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

@@ -53,6 +53,10 @@ struct S5: ~Copyable {
   @_hasStorage let b: AnyObject
 }
 
+struct S6: ~Copyable {
+  deinit
+}
+
 // CHECK-LABEL: sil [ossa] @test_simple_struct :
 // CHECK:         [[D:%.*]] = function_ref @s1_deinit
 // CHECK:         apply [[D]](%0) : $@convention(method) (@owned S1) -> ()
@@ -304,10 +308,57 @@ bb0(%0 : $*S1):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_destroyArray :
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK:         [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[PTA:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*S1
+// CHECK:         br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IV:%.*]] : $Builtin.Word):
+// CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, %1 : $Builtin.Word)
+// CHECK:         cond_br [[CMP]], bb2, bb3
+// CHECK:       bb2:
+// CHECK:         [[ADDR:%.*]] = index_addr [[PTA]] :  $*S1, [[IV]]
+// CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
+// CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
+// CHECK:         apply [[DEINIT]]([[ELEMENT]])
+// CHECK:         [[ADD:%.*]] = builtin "sadd_with_overflow_Word"([[IV]] : $Builtin.Word, [[ONE]] : $Builtin.Word, [[FALSE]] : $Builtin.Int1)
+// CHECK:         [[INCR:%.*]] = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
+// CHECK:         br bb1([[INCR]] : $Builtin.Word)
+// CHECKL       bb3:
+// CHECK:       } // end sil function 'test_destroyArray'
+sil [ossa] @test_destroyArray : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin S1.Type                    // user: %10
+  %3 = builtin "destroyArray"<S1>(%2, %0, %1) : $()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @dont_create_non_public_function_ref_in_serialized_func :
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'dont_create_non_public_function_ref_in_serialized_func'
+sil [serialized] [ossa] @dont_create_non_public_function_ref_in_serialized_func : $@convention(thin) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  destroy_value %0
+  %r = tuple()
+  return %r
+}
+
+
 sil @s1_deinit : $@convention(method) (@owned S1) -> ()
 sil @s2_deinit : $@convention(method) (@owned S2) -> ()
 sil @s3_deinit : $@convention(method) <T> (@in S3<T>) -> ()
 sil @s4_deinit : $@convention(method) (@owned S4) -> ()
+
+sil hidden [ossa] @s6_deinit : $@convention(method) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  %1 = drop_deinit %0
+  () = destructure_struct %1
+  %r = tuple ()
+  return %r
+}
 
 sil_moveonlydeinit S1 {
   @s1_deinit
@@ -323,4 +374,8 @@ sil_moveonlydeinit S3 {
 
 sil_moveonlydeinit S4 {
   @s4_deinit
+}
+
+sil_moveonlydeinit S6 {
+  @s6_deinit
 }

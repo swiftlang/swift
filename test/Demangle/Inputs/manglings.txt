@@ -262,6 +262,7 @@ _$Ss17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013Bidirecti
 _T03foo4_123ABTf3psbpsb_n ---> function signature specialization <Arg[0] = [Constant Propagated String : u8'123'], Arg[1] = [Constant Propagated String : u8'123']> of foo
 _T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner(inout Swift.Int32, (Swift.Int32) -> ()) -> ()
 _$S4main5inneryys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner(inout Swift.Int32, (Swift.Int32) -> ()) -> ()
+$s3foo7closureSSTf1cC0_n ---> function signature specialization <Arg[0] = [Closure Propagated : closure, Argument Types : [Swift.String], Arg[1] = [Same As Argument 0]> of foo
 _T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> ()
 _$S3foo6testityyyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit(() -> (), () -> ()) -> ()
 _SocketJoinOrLeaveMulticast ---> _SocketJoinOrLeaveMulticast
@@ -298,6 +299,8 @@ _T0SqWOC ---> outlined init with copy of Swift.Optional
 _T0SqWOD ---> outlined assign with take of Swift.Optional
 _T0SqWOF ---> outlined assign with copy of Swift.Optional
 _T0SqWOH ---> outlined destroy of Swift.Optional
+_T0SqWOB ---> outlined init with take of Swift.Optional
+_T0SqWOb ---> outlined init with take of Swift.Optional
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
@@ -375,6 +378,8 @@ $s18resilient_protocol24ResilientDerivedProtocolPxAA0c4BaseE0Tn --> associated c
 $s3red4testyAA3ResOyxSayq_GAEs5ErrorAAq_sAFHD1__HCg_GADyxq_GsAFR_r0_lF ---> red.test<A, B where B: Swift.Error>(red.Res<A, B>) -> red.Res<A, [B]>
 $s3red4testyAA7OurTypeOy4them05TheirD0Vy5AssocQzGAjE0F8ProtocolAAxAA0c7DerivedH0HD1_AA0c4BaseH0HI1_AieKHA2__HCg_GxmAaLRzlF ---> red.test<A where A: red.OurDerivedProtocol>(A.Type) -> red.OurType<them.TheirType<A.Assoc>>
 $s17property_wrappers10WithTuplesV9fractionsSd_S2dtvpfP ---> property wrapper backing initializer of property_wrappers.WithTuples.fractions : (Swift.Double, Swift.Double, Swift.Double)
+$s16property_wrapper8MyStructV1xSivpfF ---> property wrapped field init accessor of property_wrapper.MyStruct.x : Swift.Int
+$s4main6myFuncyyF1xL_SivpfF ---> property wrapped field init accessor of x #1 : Swift.Int in main.myFunc() -> ()
 $sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTOTA ---> {T:$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTO} partial apply forwarder for @nonobjc __C.OS_dispatch_queue.sync(execute: () -> ()) -> ()
 $s4main1gyySiXCvp ---> main.g : @convention(c) (Swift.Int) -> ()
 $s4main1gyySiXBvp ---> main.g : @convention(block) (Swift.Int) -> ()
@@ -420,7 +425,7 @@ $s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Floa
 $s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()
-$SSSTf4pd44444_pf ---> function signature specialization <Arg[0] = [Constant Propagated Float : 44444], Return = > of Swift.String
+$SSSTf4pd44444_n ---> function signature specialization <Arg[0] = [Constant Propagated Float : 44444]> of Swift.String
 $sScA ---> Swift.Actor
 $sScGySiG ---> Swift.TaskGroup<Swift.Int>
 $s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>((@Swift.MainActor () -> A)?) -> (() -> A)?
@@ -436,6 +441,8 @@ $s16distributed_test1XC7computeyS2iFTF ---> distributed accessor for distributed
 $s27distributed_actor_accessors7MyActorC7simple2ySSSiFTETFHF ---> accessible function runtime record for distributed accessor for distributed thunk distributed_actor_accessors.MyActor.simple2(Swift.Int) -> Swift.String
 $s1A3bar1aySSYt_tF ---> A.bar(a: _const Swift.String) -> ()
 $s1t1fyyFSiAA3StrVcs7KeyPathCyADSiGcfu_SiADcfu0_33_556644b740b1b333fecb81e55a7cce98ADSiTf3npk_n ---> function signature specialization <Arg[1] = [Constant Propagated KeyPath : _556644b740b1b333fecb81e55a7cce98<t.Str,Swift.Int>]> of implicit closure #2 (t.Str) -> Swift.Int in implicit closure #1 (Swift.KeyPath<t.Str, Swift.Int>) -> (t.Str) -> Swift.Int in t.f() -> ()
+$s3foo4main1SVs5Int32VSbTf3npSSi3Si0_n ---> function signature specialization <Arg[1] = [Constant Propagated Struct : main.S][Constant Propagated Struct : Swift.Int32][Constant Propagated Integer : 3][Constant Propagated Struct : Swift.Bool][Constant Propagated Integer : 0]> of foo
+$e4test4BaseCyxGAA1PA2aEP3fooyyFTWTfr9 ---> representation changed of protocol witness for test.P.foo() -> () in conformance test.Base<A> : test.P in test
 $s21back_deploy_attribute0A12DeployedFuncyyFTwb ---> back deployment thunk for back_deploy_attribute.backDeployedFunc() -> ()
 $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback for back_deploy_attribute.backDeployedFunc() -> ()
 $s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
@@ -478,8 +485,8 @@ $s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC 
 
 $s9MacroUser0023macro_expandswift_elFCffMX436_4_23bitwidthNumberedStructsfMf_ ---> freestanding macro expansion #1 of bitwidthNumberedStructs in module MacroUser file macro_expand.swift line 437 column 5
 $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
-$s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
-$s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
+$s2hi1SV1iSivx ---> hi.S.i.yielding_mutate : Swift.Int
+$s2hi1SV1iSivy ---> hi.S.i.yielding_borrow : Swift.Int
 $s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
 
 $s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
@@ -489,12 +496,16 @@ $s3red7MyActorC3runyxxyYaKYAYTXEYaKlFZ ---> static red.MyActor.run<A>(@isolated(
 $s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@in_guaranteed sending ToolKit.TypedValue) -> sending (@out ToolKit.TypedValue, @error @owned Swift.Error) to @escaping @callee_guaranteed @async (@in sending ToolKit.TypedValue) -> (@out ToolKit.TypedValue, @error @out Swift.Error)
 $s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)
 $s3red7MyActorC3runyxxyYaKYCXEYaKlFZ ---> static red.MyActor.run<A>(nonisolated(nonsending) () async throws -> A) async throws -> A
-$s5thing1PP1sAA1SVvxTwc ---> coro function pointer to thing.P.s.modify2 : thing.S
+$s5thing1PP1sAA1SVvxTwc ---> coro function pointer to thing.P.s.yielding_mutate : thing.S
 _$s15raw_identifiers0020foospace_liaADEDGcjayyF ---> raw_identifiers.`foo space`() -> ()
 _$s15raw_identifiers0018_3times_pgaIGJCFbhayyF ---> raw_identifiers.`3 times`() -> ()
 _$s15raw_identifiers0019test_yeaIIBCEapkagayyF ---> raw_identifiers.`test +`() -> ()
 _$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo`() -> ()
 _$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()
-$s7Library1BC1iSivxTwd ---> default override of Library.B.i.modify2 : Swift.Int
-$s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.modify2 : Swift.Int
+$s7Library1BC1iSivxTwd ---> default override of Library.B.i.yielding_mutate : Swift.Int
+$s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.yielding_mutate : Swift.Int
 $s3use1xAA3OfPVy3lib1GVyAA1fQryFQOyQo_GAjE1PAAxAeKHD1_AIHO_HCg_Gvp ---> use.x : use.OfP<lib.G<<<opaque return type of use.f() -> some>>.0>>
+$sBAIgHgIL_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> () to @escaping @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> ()
+$sBAD ---> Builtin.ImplicitActor
+$sIeg_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed () -> () to @escaping @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> ()
+$sSiBW ---> Builtin.Borrow<Swift.Int>

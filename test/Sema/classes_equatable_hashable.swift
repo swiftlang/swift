@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s
 
 class Foo: Equatable {} 
 // expected-error@-1 {{type 'Foo' does not conform to protocol 'Equatable'}} 

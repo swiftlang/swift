@@ -1,0 +1,21 @@
+// RUN: %target-swift-frontend -parse-sil -emit-ir %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct O {
+  var arr: Builtin.FixedArray<1, I>
+  struct I {
+    var eyes: SIMD64<Int8>
+    var neighs: String
+  }
+}
+
+sil @copy : $@convention(thin) (@in_guaranteed O) -> (@out O) {
+entry(%out : $*O, %in : $*O):
+  copy_addr %in to [init] %out : $*O
+  %retval = tuple ()
+  return %retval : $()
+}

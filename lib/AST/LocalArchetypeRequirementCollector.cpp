@@ -135,14 +135,14 @@ GenericSignature swift::buildGenericSignatureWithCapturedEnvironments(
     case GenericEnvironment::Kind::Opaque:
       break;
 
-    case GenericEnvironment::Kind::OpenedExistential: {
+    case GenericEnvironment::Kind::Existential: {
       auto existentialTy = genericEnv->maybeApplyOuterContextSubstitutions(
           genericEnv->getOpenedExistentialType())
-              ->mapTypeOutOfContext();
+              ->mapTypeOutOfEnvironment();
       collector.addOpenedExistential(existentialTy);
       continue;
     }
-    case GenericEnvironment::Kind::OpenedElement: {
+    case GenericEnvironment::Kind::Element: {
       collector.addOpenedElement(
           genericEnv->getOpenedElementShapeClass());
       continue;
@@ -214,7 +214,7 @@ Type swift::mapLocalArchetypesOutOfContext(
     GenericSignature baseGenericSig,
     ArrayRef<GenericEnvironment *> capturedEnvs) {
   return type.subst(MapLocalArchetypesOutOfContext(baseGenericSig, capturedEnvs),
-                    MakeAbstractConformanceForGenericType(),
+                    LookUpConformanceInModule(),
                     SubstFlags::PreservePackExpansionLevel |
                     SubstFlags::SubstitutePrimaryArchetypes |
                     SubstFlags::SubstituteLocalArchetypes);
@@ -229,7 +229,7 @@ static Type mapIntoLocalContext(GenericTypeParamType *param, unsigned baseDepth,
   auto localInterfaceType = capturedEnv->getGenericSignature()
       .getInnermostGenericParams()[param->getIndex()];
   assert(localInterfaceType->getIndex() == param->getIndex());
-  return capturedEnvs[envIndex]->mapTypeIntoContext(localInterfaceType);
+  return capturedEnvs[envIndex]->mapTypeIntoEnvironment(localInterfaceType);
 }
 
 Type MapIntoLocalArchetypeContext::operator()(SubstitutableType *type) const {
@@ -239,7 +239,7 @@ Type MapIntoLocalArchetypeContext::operator()(SubstitutableType *type) const {
   if (param->getDepth() >= baseDepth)
     return mapIntoLocalContext(param, baseDepth, capturedEnvs);
 
-  return baseGenericEnv->mapTypeIntoContext(param);
+  return baseGenericEnv->mapTypeIntoEnvironment(param);
 }
 
 /// Given a substitution map for a call to a local function or closure, extend

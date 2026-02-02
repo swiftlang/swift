@@ -1,8 +1,8 @@
-//===--- AvailabilitySpec.h - Swift Availability Query ASTs -----*- C++ -*-===//
+//===--- AvailabilitySpec.h - Swift Availability Spec ASTs ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,13 +20,14 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Identifier.h"
-#include "swift/AST/PlatformKind.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 class ASTContext;
@@ -240,5 +241,21 @@ public:
 };
 
 } // end namespace swift
+
+namespace llvm {
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const swift::AvailabilitySpec *spec) {
+  spec->print(os);
+  return os;
+}
+
+inline llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os, const swift::SemanticAvailabilitySpec &spec) {
+  spec.print(os);
+  return os;
+}
+
+} // end namespace llvm
 
 #endif

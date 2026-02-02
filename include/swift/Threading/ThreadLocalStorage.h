@@ -78,6 +78,16 @@ inline void tls_alloc_once(once_t &token, tls_key_t &key, tls_dtor_t dtor) {
 
 // -- High-level TLS classes --------------------------------------------------
 
+/// An extremely silly class which exists to make pointer
+/// default-initialization constexpr.
+template <class T> struct TLSPointer {
+  T *Value;
+  constexpr TLSPointer() : Value(nullptr) {}
+  constexpr TLSPointer(T *value) : Value(value) {}
+  operator T *() const { return Value; }
+  T *operator->() const { return Value; }
+};
+
 // Validate a type stored in thread-local storage, using static asserts. Such
 // types must fit in a pointer and be trivially copyable/destructible.
 #define VALIDATE_THREAD_LOCAL_TYPE(T)                                          \

@@ -1,28 +1,27 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-sil | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-sil | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-ir  | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-ir  | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s    -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -O -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -primary-file %s    -emit-sil | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -primary-file %s -O -emit-sil | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -primary-file %s    -emit-ir  | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir  | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -primary-file %s    -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -primary-file %s -O -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend -primary-file %s    -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend -primary-file %s -O -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_SymbolLinkageMarkers
 
-@_used var g0: Int = 1
-@_used var g1: (Int, Int) = (42, 43)
-@_used var g2: Bool = true
-@_used func foo() {}
+@used var g0: Int = 1
+@used var g1: (Int, Int) = (42, 43)
+@used var g2: Bool = true
+@used func foo() {}
 
-// SIL: @_used @_hasStorage @_hasInitialValue var g0: Int { get set }
-// SIL: @_used @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
-// SIL: @_used @_hasStorage @_hasInitialValue var g2: Bool { get set }
-// SIL: @_used func foo()
+// SIL: @used @_hasStorage @_hasInitialValue var g0: Int { get set }
+// SIL: @used @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
+// SIL: @used @_hasStorage @_hasInitialValue var g2: Bool { get set }
+// SIL: @used func foo()
 
-// SIL: sil_global hidden @$s4used2g0Sivp : $Int
-// SIL: sil_global hidden @$s4used2g1Si_Sitvp : $(Int, Int)
-// SIL: sil_global hidden @$s4used2g2Sbvp : $Bool
+// SIL: sil_global hidden [used] @$s4used2g0Sivp : $Int
+// SIL: sil_global hidden [used] @$s4used2g1Si_Sitvp : $(Int, Int)
+// SIL: sil_global hidden [used] @$s4used2g2Sbvp : $Bool
 
 // SIL: sil hidden [used] @$s4used3fooyyF : $@convention(thin)
 

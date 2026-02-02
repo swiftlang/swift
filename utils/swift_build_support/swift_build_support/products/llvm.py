@@ -141,7 +141,7 @@ class LLVM(cmake_product.CMakeProduct):
                                                      'lib', 'darwin')
                 print('copying compiler-rt embedded builtins from {}'
                       ' into the local clang build directory {}.'.format(
-                          host_cxx_builtins_dir, dest_builtins_dir))
+                          host_cxx_builtins_dir, dest_builtins_dir), flush=True)
 
                 for _os in ['ios', 'watchos', 'tvos', 'xros']:
                     # Copy over the device .a when necessary
@@ -251,10 +251,13 @@ class LLVM(cmake_product.CMakeProduct):
                 # space/time efficient than -g on that platform.
                 llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
-        if not self.args._build_llvm:
+        build = True
+        if not self.args._build_llvm or (not self.args.cross_compile_build_swift_tools
+                                         and self.is_cross_compile_target(host_target)):
             # Indicating we don't want to build LLVM at all should
             # override everything.
             build_targets = []
+            build = False
         elif self.args.skip_build or not self.args.build_llvm:
             # We can't skip the build completely because the standalone
             # build of Swift depends on these.
@@ -271,10 +274,7 @@ class LLVM(cmake_product.CMakeProduct):
                     'llvm-size'
                 ])
         else:
-            # We build LLVMTestingSupport unconditionally
-            # to support scenarios where tests are run
-            # outside of `build-script` (e.g. with `run-test`)
-            build_targets = ['all', 'LLVMTestingSupport']
+            build_targets = ['all']
 
             if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
                self.is_cross_compile_target(host_target):
@@ -357,9 +357,6 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_embedded_stdlib and system() == "Darwin":
             # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
             llvm_cmake_options.define(
-                'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:STRING',
-                'armv6 armv6m armv7 armv7m armv7em')
-            llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
                 'STRING', 'armv6 armv6m armv7 armv7m armv7em')
@@ -369,28 +366,13 @@ class LLVM(cmake_product.CMakeProduct):
 
         if self.args.build_compiler_rt and \
                 not self.is_cross_compile_target(host_target):
-            if self.args.llvm_build_compiler_rt_with_use_runtimes:
-                llvm_enable_runtimes.append('compiler-rt')
-                # This accounts for previous incremental runs that may have set
-                # those in the LLVM CMakeCache.txt
-                llvm_cmake_options.undefine('LLVM_TOOL_COMPILER_RT_BUILD')
-                llvm_cmake_options.undefine('LLVM_BUILD_EXTERNAL_COMPILER_RT')
-            else:
-                # No need to unset anything,
-                # since we set LLVM_ENABLE_RUNTIMES explicitly
-                llvm_enable_projects.append('compiler-rt')
-                llvm_cmake_options.define(
-                    'LLVM_TOOL_COMPILER_RT_BUILD:BOOL', 'TRUE')
-                llvm_cmake_options.define(
-                    'LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL', 'TRUE')
-        else:
-            if not self.args.llvm_build_compiler_rt_with_use_runtimes:
-                # No need to unset anything,
-                # since we set LLVM_ENABLE_RUNTIMES explicitly
-                llvm_cmake_options.define(
-                    'LLVM_TOOL_COMPILER_RT_BUILD:BOOL', 'FALSE')
-                llvm_cmake_options.define(
-                    'LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL', 'FALSE')
+            llvm_enable_runtimes.append('compiler-rt')
+
+        # This accounts for previous incremental runs using the old
+        # way of build compiler_rt that may have set
+        # those in the LLVM CMakeCache.txt
+        llvm_cmake_options.undefine('LLVM_TOOL_COMPILER_RT_BUILD')
+        llvm_cmake_options.undefine('LLVM_BUILD_EXTERNAL_COMPILER_RT')
 
         if self.args.build_clang_tools_extra:
             llvm_enable_projects.append('clang-tools-extra')
@@ -440,6 +422,12 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define('LLVM_INCLUDE_TESTS', 'NO')
             llvm_cmake_options.define('CLANG_INCLUDE_TESTS', 'NO')
 
+        if ("-DLLVM_INCLUDE_TESTS=NO" not in llvm_cmake_options
+            and "-DLLVM_INCLUDE_TESTS:BOOL=FALSE" not in llvm_cmake_options):
+            # This supports scenarios where tests are run
+            # outside of `build-script` (e.g. with `run-test`)
+            build_targets.append('LLVMTestingSupport')
+
         build_root = os.path.dirname(self.build_dir)
         host_machine_target = targets.StdlibDeploymentTarget.host_target().name
         host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
@@ -458,8 +446,6 @@ class LLVM(cmake_product.CMakeProduct):
                                                 'clang-tidy-confusable-chars-gen')
             llvm_cmake_options.define('CLANG_TIDY_CONFUSABLE_CHARS_GEN',
                                       confusable_chars_gen)
-            pseudo_gen = os.path.join(host_build_dir, 'bin', 'clang-pseudo-gen')
-            llvm_cmake_options.define('CLANG_PSEUDO_GEN', pseudo_gen)
             llvm = os.path.join(host_build_dir, 'llvm')
             llvm_cmake_options.define('LLVM_NATIVE_BUILD', llvm)
 
@@ -471,7 +457,8 @@ class LLVM(cmake_product.CMakeProduct):
 
         self._handle_cxx_headers(host_target, platform)
 
-        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [])
+        self.build_with_cmake(build_targets, self.args.llvm_build_variant, [],
+                              build_llvm=build)
 
         # copy over the compiler-rt builtins for iOS/tvOS/watchOS to ensure
         # that Swift's stdlib can use compiler-rt builtins when targeting
@@ -556,7 +543,9 @@ class LLVM(cmake_product.CMakeProduct):
         Whether or not this product should be installed with the given
         arguments.
         """
-        return self.args.install_llvm
+        return self.args.install_llvm and (
+            self.args.cross_compile_build_swift_tools or
+            not self.is_cross_compile_target(host_target))
 
     def install(self, host_target):
         """
@@ -572,10 +561,9 @@ class LLVM(cmake_product.CMakeProduct):
            self.args.llvm_install_components != 'all':
             install_targets = []
             components = self.args.llvm_install_components.split(';')
-            if self.args.llvm_build_compiler_rt_with_use_runtimes and \
-               'compiler-rt' in components:
+            if 'compiler-rt' in components:
                 # This is a courtesy fallback to avoid breaking downstream presets
-                # we are not aware of
+                # that are still using the old compiler-rt install component
                 components.remove('compiler-rt')
                 components.append('builtins')
                 components.append('runtimes')
@@ -586,7 +574,7 @@ class LLVM(cmake_product.CMakeProduct):
             for component in components:
                 if self.is_cross_compile_target(host_target) \
                    or not self.args.build_compiler_rt:
-                    if component in ['compiler-rt', 'builtins', 'runtimes']:
+                    if component in ['builtins', 'runtimes']:
                         continue
                 install_targets.append('install-{}'.format(component))
 

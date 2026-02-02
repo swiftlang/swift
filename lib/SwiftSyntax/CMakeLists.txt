@@ -37,6 +37,7 @@ set_property(DIRECTORY "${binary_dir}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 set(SWIFT_SYNTAX_MODULES
   SwiftBasicFormat
   SwiftIfConfig
+  SwiftWarningControl
   SwiftParser
   SwiftParserDiagnostics
   SwiftDiagnostics

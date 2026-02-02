@@ -793,6 +793,82 @@ auto transform(const std::optional<OptionalElement> &value,
   }
   return std::nullopt;
 }
+
+/// A little wrapper that either wraps a `T &&` or a `const T &`.
+/// It allows you to defer the optimal decision about how to
+/// forward the value to runtime.
+template <class T>
+class maybe_movable_ref {
+  /// Actually a T&& if movable is true.
+  const T &ref;
+  bool movable;
+
+public:
+  // The maybe_movable_ref wrapper itself is, basically, either an
+  // r-value reference or an l-value reference. It is therefore
+  // move-only so that code working with it has to properly
+  // forward it around.
+  maybe_movable_ref(maybe_movable_ref &&other) = default;
+  maybe_movable_ref &operator=(maybe_movable_ref &&other) = default;
+
+  maybe_movable_ref(const maybe_movable_ref &other) = delete;
+  maybe_movable_ref &operator=(const maybe_movable_ref &other) = delete;
+
+  /// Allow the wrapper to be statically constructed from an r-value
+  /// reference in the movable state.
+  maybe_movable_ref(T &&ref) : ref(ref), movable(true) {}
+
+  /// Allow the wrapper to be statically constructed from a
+  /// const l-value reference in the non-movable state.
+  maybe_movable_ref(const T &ref) : ref(ref), movable(false) {}
+
+  /// Don't allow the wrapper to be statically constructed from
+  /// a non-const l-value reference without passing a flag
+  /// dynamically.
+  maybe_movable_ref(T &ref) = delete;
+
+  /// The fully-general constructor.
+  maybe_movable_ref(T &ref, bool movable) : ref(ref), movable(movable) {}
+
+  /// Check dynamically whether the reference is movable.
+  bool isMovable() const {
+    return movable;
+  }
+
+  /// Construct a T from the wrapped reference.
+  T construct() && {
+    if (isMovable()) {
+      return T(move());
+    } else {
+      return T(ref);
+    }
+  }
+
+  /// Get access to the value, conservatively returning a const
+  /// reference.
+  const T &get() const {
+    return ref;
+  }
+
+  /// Get access to the value, dynamically aserting that it is movable.
+  T &get_mutable() const {
+    assert(isMovable());
+    return const_cast<T&>(ref);
+  }
+
+  /// Return an r-value reference to the value, dynamically asserting
+  /// that it is movable.
+  T &&move() {
+    assert(isMovable());
+    return static_cast<T&&>(const_cast<T&>(ref));
+  }
+};
+
+template <class T>
+maybe_movable_ref<T> move_if(T &ref, bool movable) {
+  return maybe_movable_ref<T>(ref, movable);
+}
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_STLEXTRAS_H

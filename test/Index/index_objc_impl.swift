@@ -22,9 +22,9 @@
 // CHECK: extension/ext-class/Swift | ObjCClass | s:e:c:@CM@ObjcImpl@@objc(cs)ObjCClass(py)someObjCDeclaredVar | Def
 // CHECK: class/Swift | ObjCClass | c:objc(cs)ObjCClass | Ref
 @_objcImplementation public extension ObjCClass {
-  // CHECK: instance-property/Swift | someObjCDeclaredVar | c:@CM@ObjcImpl@@objc(cs)ObjCClass(py)someObjCDeclaredVar | Def
+  // CHECK: instance-property(public)/Swift | someObjCDeclaredVar | c:@CM@ObjcImpl@@objc(cs)ObjCClass(py)someObjCDeclaredVar | Def
   @objc var someObjCDeclaredVar: CInt = 1
 
   // Implicitly synthesized `override init()`:
-  // CHECK: constructor/Swift | init() | c:@CM@ObjcImpl@@objc(cs)ObjCClass(im)init | Def
+  // CHECK: constructor(public)/Swift | init() | c:@CM@ObjcImpl@@objc(cs)ObjCClass(im)init | Def
 }

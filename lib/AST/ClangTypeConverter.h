@@ -157,6 +157,7 @@ private:
   clang::QualType visitBuiltinRawPointerType(BuiltinRawPointerType *type);
   clang::QualType visitBuiltinIntegerType(BuiltinIntegerType *type);
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);
+  clang::QualType visitBuiltinVectorType(BuiltinVectorType *type);
   clang::QualType visitArchetypeType(ArchetypeType *type);
   clang::QualType visitDependentMemberType(DependentMemberType *type);
   template <bool templateArgument = false>

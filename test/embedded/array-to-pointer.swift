@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-experimental-feature Extern -enable-experimental-feature Embedded -c -o %t/main.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %t/main.o %t/print.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o %t/print.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
 
@@ -28,7 +28,7 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-@_silgen_name("print_long")
+@_extern(c, "print_long")
 func print_long(_: Int)
 
 public func print(_ n: Int, terminator: StaticString = "\n") {
@@ -45,10 +45,10 @@ func print(_ array: [Int]) {
     print("]")
 }
 
-@_silgen_name("memcmp")
+@_extern(c, "memcmp")
 func memcmp(_: UnsafeRawPointer, _: UnsafeRawPointer, _: Int) -> CInt
 
-@_silgen_name("memcpy")
+@_extern(c, "memcpy")
 func memcpy(_: UnsafeMutableRawPointer, _: UnsafeRawPointer, _: Int) -> UnsafeRawPointer
 
 func test() {

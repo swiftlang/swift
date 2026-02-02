@@ -30,7 +30,6 @@
 
 #include "swift/Basic/Assertions.h"
 #include "swift/LLVMPasses/Passes.h"
-#include "clang/AST/StableHash.h"
 #include "clang/Basic/PointerAuthOptions.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -55,6 +54,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SipHash.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/FunctionComparator.h"
@@ -258,7 +258,7 @@ private:
     FunctionEntry *First;
 
     /// A very cheap hash, used to early exit if functions do not match.
-    llvm::IRHash Hash;
+    llvm::stable_hash Hash;
 
   public:
     // Note the hash is recalculated potentially multiple times, but it is cheap.
@@ -416,9 +416,10 @@ private:
         if (auto *GO = dyn_cast<GlobalObject>(value))
           concatenatedCalleeNames += GO->getName();
       }
-      uint64_t rawHash = clang::getStableStringHash(concatenatedCalleeNames);
+      uint64_t hash =
+          llvm::getPointerAuthStableSipHash(concatenatedCalleeNames);
       IntegerType *discrTy = Type::getInt64Ty(Context);
-      discriminator = ConstantInt::get(discrTy, (rawHash % 0xFFFF) + 1);
+      discriminator = ConstantInt::get(discrTy, hash);
     }
   };
 
@@ -713,7 +714,7 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
 
   // All functions in the module, ordered by hash. Functions with a unique
   // hash value are easily eliminated.
-  std::vector<std::pair<IRHash, Function *>> HashedFuncs;
+  std::vector<std::pair<stable_hash, Function *>> HashedFuncs;
 
   for (Function &Func : M) {
     if (isEligibleFunction(&Func)) {
@@ -721,10 +722,11 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     }
   }
 
-  std::stable_sort(
-      HashedFuncs.begin(), HashedFuncs.end(),
-      [](const std::pair<IRHash, Function *> &a,
-         const std::pair<IRHash, Function *> &b) { return a.first < b.first; });
+  std::stable_sort(HashedFuncs.begin(), HashedFuncs.end(),
+                   [](const std::pair<stable_hash, Function *> &a,
+                      const std::pair<stable_hash, Function *> &b) {
+                     return a.first < b.first;
+                   });
 
   std::vector<FunctionEntry> FuncEntryStorage;
   FuncEntryStorage.reserve(HashedFuncs.size());
@@ -1044,8 +1046,9 @@ void SwiftMergeFunctions::replaceCallWithAddedPtrAuth(CallInst *origCall,
     copiedArgs.push_back(op);
   }
 
-  auto *newCall = CallInst::Create(origCall->getFunctionType(),
-    newCallee, copiedArgs, bundles, origCall->getName(), origCall);
+  auto *newCall =
+      CallInst::Create(origCall->getFunctionType(), newCallee, copiedArgs,
+                       bundles, origCall->getName(), origCall->getIterator());
   newCall->setAttributes(origCall->getAttributes());
   newCall->setTailCallKind(origCall->getTailCallKind());
   newCall->setCallingConv(origCall->getCallingConv());
@@ -1079,7 +1082,6 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   Function *NewFunction = Function::Create(funcType,
                                            FirstF->getLinkage(),
                                            FirstF->getName() + "Tm");
-  NewFunction->setIsNewDbgInfoFormat(FirstF->IsNewDbgInfoFormat);
   NewFunction->copyAttributesFrom(FirstF);
   // NOTE: this function is not externally available, do ensure that we reset
   // the DLL storage
@@ -1322,8 +1324,9 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
 
     auto *FType = FunctionType::get(Old->getFunctionType()->getReturnType(),
                                     OldParamTypes, false);
-    auto *FPtrType = PointerType::get(FType,
-                        cast<PointerType>(New->getType())->getAddressSpace());
+    auto *FPtrType =
+        PointerType::get(module->getContext(),
+                         cast<PointerType>(New->getType())->getAddressSpace());
 
     Value *Callee = ConstantExpr::getBitCast(New, FPtrType);
     CallInst *NewCI = Builder.CreateCall(FType, Callee, NewArgs);

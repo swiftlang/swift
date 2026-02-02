@@ -166,3 +166,9 @@ OUTPUT(YAMLOptRecordPath, TY_YAMLOptRecord)
 
 /// The output path for bitstream optimization record file.
 OUTPUT(BitstreamOptRecordPath, TY_BitstreamOptRecord)
+
+/// The output path to which we should output SIL as extra compilation output.
+OUTPUT(SILOutputPath, TY_SIL)
+
+/// The output path to which we should output LLVM IR as extra compilation output.
+OUTPUT(LLVMIROutputPath, TY_LLVM_IR)

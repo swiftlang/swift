@@ -210,7 +210,7 @@ func callBar() -> String {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s13objc_bridging7callBar{{.*}}F
 // CHECK: bb0:
-// CHECK:   [[BAR:%.*]] = function_ref @bar
+// CHECK:   [[BAR:%.*]] = function_ref @$sSo3barSSSgyFTo
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]() : $@convention(c) () -> @autoreleased Optional<NSString>
 // CHECK:   switch_enum [[OPT_BRIDGED]] : $Optional<NSString>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
@@ -236,7 +236,7 @@ func callSetBar(_ s: String) {
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   end_borrow [[BORROWED_NATIVE]]
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED]]
-// CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
+// CHECK:   [[SET_BAR:%.*]] = function_ref @$sSo6setBaryySSSgFTo
 // CHECK:   apply [[SET_BAR]]([[OPT_BRIDGED]])
 // CHECK:   destroy_value [[OPT_BRIDGED]]
 // CHECK: }
@@ -513,38 +513,38 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // imported C functions.
 
 // CHECK-ios-i386-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-ios-i386:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
-// CHECK-ios-i386:         function_ref @useBool : $@convention(c) (Bool) -> ()
-// CHECK-ios-i386:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
-// CHECK-ios-i386:         function_ref @getBool : $@convention(c) () -> Bool
+// CHECK-ios-i386:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (ObjCBool) -> ()
+// CHECK-ios-i386:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-ios-i386:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> ObjCBool
+// CHECK-ios-i386:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 // CHECK-macosx-x86_64-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-macosx-x86_64:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
-// CHECK-macosx-x86_64:         function_ref @useBool : $@convention(c) (Bool) -> ()
-// CHECK-macosx-x86_64:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
-// CHECK-macosx-x86_64:         function_ref @getBool : $@convention(c) () -> Bool
+// CHECK-macosx-x86_64:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (ObjCBool) -> ()
+// CHECK-macosx-x86_64:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-macosx-x86_64:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> ObjCBool
+// CHECK-macosx-x86_64:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 // FIXME: no distinction on x86_64, arm64 or watchos-i386, since SILGen looks
 // at the underlying Clang decl of the bridged decl to decide whether it needs
 // bridging.
 //
 // CHECK-watchos-i386-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-watchos-i386:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
-// CHECK-watchos-i386:         function_ref @useBool : $@convention(c) (Bool) -> ()
-// CHECK-watchos-i386:         function_ref @getBOOL : $@convention(c) () -> Bool
-// CHECK-watchos-i386:         function_ref @getBool : $@convention(c) () -> Bool
+// CHECK-watchos-i386:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-watchos-i386:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-watchos-i386:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> Bool
+// CHECK-watchos-i386:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 // CHECK-ios-x86_64-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-ios-x86_64:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
-// CHECK-ios-x86_64:         function_ref @useBool : $@convention(c) (Bool) -> ()
-// CHECK-ios-x86_64:         function_ref @getBOOL : $@convention(c) () -> Bool
-// CHECK-ios-x86_64:         function_ref @getBool : $@convention(c) () -> Bool
+// CHECK-ios-x86_64:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-ios-x86_64:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-ios-x86_64:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> Bool
+// CHECK-ios-x86_64:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 // CHECK-arm64-LABEL: sil hidden [ossa] @$s13objc_bridging5boolsySb_SbtSbF
-// CHECK-arm64:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
-// CHECK-arm64:         function_ref @useBool : $@convention(c) (Bool) -> ()
-// CHECK-arm64:         function_ref @getBOOL : $@convention(c) () -> Bool
-// CHECK-arm64:         function_ref @getBool : $@convention(c) () -> Bool
+// CHECK-arm64:         function_ref @$sSo7useBOOLyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-arm64:         function_ref @$sSo7useBoolyySbFTo : $@convention(c) (Bool) -> ()
+// CHECK-arm64:         function_ref @$sSo7getBOOLSbyFTo : $@convention(c) () -> Bool
+// CHECK-arm64:         function_ref @$sSo7getBoolSbyFTo : $@convention(c) () -> Bool
 
 func bools(_ x: Bool) -> (Bool, Bool) {
   useBOOL(x)
@@ -630,7 +630,7 @@ func castToCFunction(ptr: UnsafeRawPointer) {
   // CHECK: store %0 to [trivial] [[IN]] : $*UnsafeRawPointer
   // CHECK: [[META:%.*]] = metatype $@thick (@convention(c) (Optional<AnyObject>) -> ()).Type
   // CHECK: [[CASTFN:%.*]] = function_ref @$ss13unsafeBitCast_2toq_x_q_mtr0_lF
-  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
+  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (Optional<AnyObject>) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
   // CHECK: [[RESULT:%.*]] = load [trivial] [[OUT]] : $*@convention(c) (Optional<AnyObject>) -> ()
   typealias Fn = @convention(c) (AnyObject?) -> Void
   unsafeBitCast(ptr, to: Fn.self)(nil)

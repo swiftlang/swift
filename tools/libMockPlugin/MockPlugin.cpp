@@ -240,9 +240,8 @@ int TestRunner::run() {
     llvm::SmallVector<char, 0> response_data;
     llvm::raw_svector_ostream(response_data) << response;
     auto response_size = response_data.size();
-    auto response_header =
-        llvm::support::endian::byte_swap<uint64_t, llvm::endianness::little>(
-            response_size);
+    auto response_header = llvm::support::endian::byte_swap<uint64_t>(
+        response_size, llvm::endianness::little);
     ioSize = fwrite(&response_header, sizeof(response_header), 1, stdout);
     if (!ioSize) {
       llvm::errs() << "failed to write response header\n";

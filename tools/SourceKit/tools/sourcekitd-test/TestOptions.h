@@ -35,6 +35,7 @@ enum class SourceKitRequest {
   CodeCompleteSetPopularAPI,
   TypeContextInfo,
   ConformingMethodList,
+  SignatureHelp,
   ActiveRegions,
   CursorInfo,
   RangeInfo,

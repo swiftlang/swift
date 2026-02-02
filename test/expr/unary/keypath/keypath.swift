@@ -839,8 +839,8 @@ func test_keypath_with_method_refs() {
     init(val value: Int = 2024) { year = value }
     
     var add: (Int, Int) -> Int { return { $0 + $1 } }
-    func add(this: Int) -> Int { this + this}
-    func add(that: Int) -> Int { that + that }
+    func add(this: Int) -> Int { this + this} // expected-note 2 {{candidate has partially matching parameter list (this: Int)}}
+    func add(that: Int) -> Int { that + that } // expected-note 2 {{candidate has partially matching parameter list (that: Int)}}
     static func subtract(_ val: Int) -> Int { return millenium - val }
     nonisolated func nonisolatedNextYear() -> Int { return year + 1 }
     consuming func consume() { print(year) }
@@ -862,10 +862,10 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<S, (Int, Int) -> Int> = \.add
-  let _: KeyPath<S, (Int, Int) -> Int> = \.add()
+  let _: KeyPath<S, (Int, Int) -> Int> = \.add() // expected-error {{no exact matches in call to instance method 'add'}}
   // expected-error@-1 {{cannot assign value of type 'KeyPath<S, Int>' to type 'KeyPath<S, (Int, Int) -> Int>'}}
   // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and '(Int, Int) -> Int') are expected to be equal}}
-  let _: KeyPath<S, Int> = \.add() // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<S, Int> = \.add() // expected-error {{no exact matches in call to instance method 'add'}}
   let _: KeyPath<S, (Int) -> Int> = \.add(this:)
   let _: KeyPath<S, Int> = \.add(that: 1)
   let _: KeyPath<S, (Int) -> Int> = \.subtract // expected-error {{static member 'subtract' cannot be used on instance of type 'S'}}
@@ -924,10 +924,10 @@ func test_keypath_with_method_refs() {
     subscript(index: Int) -> Int { return index }
   }
 
-  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: KeyPath<A, Int> = \.foo.bar // expected-error {{failed to produce diagnostic for expression}}
   let _: KeyPath<A, Int> = \.faz.bar // expected-error {{static member 'faz()' cannot be used on instance of type 'A'}}
-  let _ = \A.foo.bar // expected-error {{type of expression is ambiguous without a type annotation}}
-  let _ = \A.Type.faz.bar // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _ = \A.foo.bar // expected-error {{failed to produce diagnostic for expression}}
+  let _ = \A.Type.faz.bar // expected-error {{failed to produce diagnostic for expression}}
   let _: KeyPath<A, Int> = \.foo().bar
   let _: KeyPath<A.Type, Int> = \.faz().bar
   let _ = \A.foo().bar
@@ -1186,8 +1186,7 @@ func f_56996() {
   _ = \Int.byteSwapped.init() // expected-error {{static member 'init()' cannot be used on instance of type 'Int'}}
   _ = \Int // expected-error {{key path must have at least one component}}
   _ = \Int? // expected-error {{key path must have at least one component}}
-  _ = \Int. // expected-error {{invalid component of Swift key path}}
-  // expected-error@-1 {{expected member name following '.'}}
+  _ = \Int. // expected-error {{expected member name following '.'}}
 }
 
 // https://github.com/apple/swift/issues/55805
@@ -1428,4 +1427,15 @@ func testKeyPathInout() {
   takesInout(\String.count)
   takesInoutOpt(\.count)
   takesInoutOpt(\String.count)
+}
+
+func testKeypathWithTypeReference() {
+  struct S {
+    enum Q {
+      static let i = 1
+    }
+  }
+  _ = \S.Q.Type.i // okay
+
+  _ = \S.Type.Q // expected-error {{key path cannot refer to type 'Q'}}
 }

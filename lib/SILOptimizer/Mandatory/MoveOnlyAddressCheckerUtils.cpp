@@ -243,7 +243,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/OSSALifetimeCompletion.h"
+#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -259,8 +259,8 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeOwned.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -472,6 +472,22 @@ static bool visitScopeEndsRequiringInit(
     return true;
   }
 
+  // Check for mutate accessor.
+  if (auto ai =
+          dyn_cast_or_null<ApplyInst>(operand->getDefiningInstruction())) {
+    if (ai->hasInoutResult()) {
+      auto *access =
+          dyn_cast<BeginAccessInst>(getAccessScope(ai->getSelfArgument()));
+      if (access) {
+        assert(access->getAccessKind() == SILAccessKind::Modify);
+        for (auto *inst : access->getEndAccesses()) {
+          visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+        }
+        return true;
+      }
+      return false;
+    }
+  }
   return false;
 }
 
@@ -1113,6 +1129,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
+  if (auto *applyInst = dyn_cast_or_null<ApplyInst>(
+          stripAccessMarkers(operand)->getDefiningInstruction())) {
+    if (applyInst->hasAddressResult()) {
+      LLVM_DEBUG(llvm::dbgs() << "Adding apply as init!\n");
+      return true;
+    }
+  }
+
   if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
@@ -1472,7 +1496,7 @@ struct MoveOnlyAddressCheckerPImpl {
   /// The instruction deleter used by \p canonicalizer.
   InstructionDeleter deleter;
 
-  /// State to run CanonicalizeOSSALifetime.
+  /// State to run OSSACanonicalizeOwned.
   OSSACanonicalizer canonicalizer;
 
   /// Per mark must check address use state.
@@ -2231,11 +2255,30 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  // Initializing a borrow from the value as a referent counts as a liveness
+  // use.
+  if (isa<InitBorrowAddrInst>(user)) {
+    assert(op->getOperandNumber() == InitBorrowAddrInst::Referent
+           && "should have handled dest above in memInstMustInitialize");
+
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+      return false;
+    }
+
+    for (auto leafRange : leafRanges) {
+      useState.recordLivenessUse(user, leafRange);
+    }
+    return true;
+  }
+
   // At this point, we have handled all of the non-loadTakeOrCopy/consuming
   // uses.
   if (auto *copyAddr = dyn_cast<CopyAddrInst>(user)) {
     assert(op->getOperandNumber() == CopyAddrInst::Src &&
-           "Should have dest above in memInstMust{Rei,I}nitialize");
+           "Should have handled dest above in memInstMust{Rei,I}nitialize");
 
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
@@ -2408,6 +2451,12 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
             checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
                              NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
+          moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
+              markedValue);
+          return true;
+        }
+
+        if (operand->isBorrowAccessorResult()) {
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
           return true;
@@ -2780,6 +2829,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     if (!ue || ue->isDestructive()) {
       llvm::errs() << "Found a write classified as a liveness use?!\n";
       llvm::errs() << "Use: " << *user;
+      user->getFunction()->dump();
       llvm_unreachable("standard failure");
     }
   }
@@ -4071,13 +4121,12 @@ bool MoveOnlyAddressChecker::check(
   return pimpl.changed;
 }
 bool MoveOnlyAddressChecker::completeLifetimes() {
-  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup
+  // TODO: Delete once OSSACompleteLifetime is run as part of SILGenCleanup
   bool changed = false;
 
   // Lifetimes must be completed inside out (bottom-up in the CFG).
   PostOrderFunctionInfo *postOrder = poa->get(fn);
-  OSSALifetimeCompletion completion(fn, domTree,
-                                    *deadEndBlocksAnalysis->get(fn));
+  OSSACompleteLifetime completion(fn, *deadEndBlocksAnalysis->get(fn));
   for (auto *block : postOrder->getPostOrder()) {
     for (SILInstruction &inst : reverse(*block)) {
       for (auto result : inst.getResults()) {
@@ -4086,7 +4135,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
           continue;
         }
         if (completion.completeOSSALifetime(
-                result, OSSALifetimeCompletion::Boundary::Availability) ==
+                result, OSSACompleteLifetime::Boundary::Availability) ==
             LifetimeCompletion::WasCompleted) {
           changed = true;
         }
@@ -4097,7 +4146,7 @@ bool MoveOnlyAddressChecker::completeLifetimes() {
         continue;
       }
       if (completion.completeOSSALifetime(
-              arg, OSSALifetimeCompletion::Boundary::Availability) ==
+              arg, OSSACompleteLifetime::Boundary::Availability) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
       }

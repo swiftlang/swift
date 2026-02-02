@@ -398,7 +398,7 @@ OutOfLoop:
   // there) move the release to the top of the block.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (&*BBI != &Release) {
-    Release.moveBefore(&*BBI);
+    Release.moveBefore(BBI);
     return true;
   }
 
@@ -520,7 +520,7 @@ OutOfLoop:
   // If we were able to move the retain down, move it now.
   // TODO: This is where we'd plug in some global algorithms someday.
   if (MadeProgress) {
-    Retain.moveBefore(&*BBI);
+    Retain.moveBefore(BBI);
     return true;
   }
 
@@ -1015,6 +1015,12 @@ void SwiftARCOpt::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
 
 static bool runSwiftARCOpts(Function &F, SwiftRCIdentity &RC) {
   bool Changed = false;
+
+  // Don't touch those functions that implement reference counting in the
+  // runtime.
+  if (!allowArcOptimizations(F.getName()))
+    return Changed;
+
   ARCEntryPointBuilder B(F);
 
   // First thing: canonicalize swift_retain and similar calls so that nothing

@@ -212,6 +212,8 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
   MaxRuleCount = langOpts.RequirementMachineMaxRuleCount;
   MaxRuleLength = langOpts.RequirementMachineMaxRuleLength;
   MaxConcreteNesting = langOpts.RequirementMachineMaxConcreteNesting;
+  MaxConcreteSize = langOpts.RequirementMachineMaxConcreteSize;
+  MaxTypeDifferences = langOpts.RequirementMachineMaxTypeDifferences;
   Stats = ctx.getASTContext().Stats;
 
   if (Stats)
@@ -247,6 +249,18 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
       out << "Rewrite system exceeded concrete type nesting depth limit\n";
       dump(out);
     });
+
+  case CompletionResult::MaxConcreteSize:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type size limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxTypeDifferences:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type difference limit\n";
+      dump(out);
+    });
   }
 }
 
@@ -274,6 +288,9 @@ RequirementMachine::initWithProtocolSignatureRequirements(
 
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithProtocolSignatureRequirements(protos);
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false, protos,
@@ -322,6 +339,9 @@ RequirementMachine::initWithGenericSignature(GenericSignature sig) {
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithGenericSignature(sig.getGenericParams(),
                                    sig.getRequirements());
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/false,
@@ -376,6 +396,9 @@ RequirementMachine::initWithProtocolWrittenRequirements(
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithProtocolWrittenRequirements(component, protos);
 
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
+
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true, component,
                     std::move(builder.ImportedRules),
@@ -422,6 +445,9 @@ RequirementMachine::initWithWrittenRequirements(
   // protocol requirement signatures.
   RuleBuilder builder(Context, System.getReferencedProtocols());
   builder.initWithWrittenRequirements(genericParams, requirements);
+
+  // Remember if any of our upstream protocols failed to complete.
+  Failed = builder.Failed;
 
   // Add the initial set of rewrite rules to the rewrite system.
   System.initialize(/*recordLoops=*/true,
@@ -496,14 +522,24 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
-        if (newRule.getNesting() > MaxConcreteNesting + System.getDeepestInitialRule()) {
+        auto nestingAndSize = newRule.getNestingAndSize();
+        if (nestingAndSize.first > MaxConcreteNesting + System.getMaxNestingOfInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
+                                ruleCount + i);
+        }
+        if (nestingAndSize.second > MaxConcreteSize + System.getMaxSizeOfInitialRule()) {
+          return std::make_pair(CompletionResult::MaxConcreteSize,
                                 ruleCount + i);
         }
       }
 
       if (System.getLocalRules().size() > MaxRuleCount) {
         return std::make_pair(CompletionResult::MaxRuleCount,
+                              System.getRules().size() - 1);
+      }
+
+      if (System.getTypeDifferenceCount() > MaxTypeDifferences) {
+        return std::make_pair(CompletionResult::MaxTypeDifferences,
                               System.getRules().size() - 1);
       }
     }
@@ -527,10 +563,6 @@ void RequirementMachine::freeze() {
 
 ArrayRef<Rule> RequirementMachine::getLocalRules() const {
   return System.getLocalRules();
-}
-
-bool RequirementMachine::isComplete() const {
-  return Complete;
 }
 
 GenericSignatureErrors RequirementMachine::getErrors() const {

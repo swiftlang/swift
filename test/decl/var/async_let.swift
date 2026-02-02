@@ -42,3 +42,39 @@ func testInterpolation() async {
   async let y = "\(12345)"
   _ = await y
 }
+
+// https://forums.swift.org/t/disable-constant-inferred-to-have-type-warning-when-using-async-let/83025
+
+func testVoidResultTypeDiagnostics() async {
+  async let void = print("hello")
+  await void
+  async let void2 = ()
+  await void2
+  async let void3 = Void()
+  await void3
+  async let void4 = { _ = 42 }()
+  await void4
+
+  @Sendable func syncVoid() {}
+  async let void5 = syncVoid()
+  await void5
+
+  @Sendable func asyncVoid() async {}
+  async let void6 = asyncVoid()
+  await void6
+
+  async let maybeVoid = { Bool.random() ? () : nil }()
+  await maybeVoid
+
+  do {
+    final class C: Sendable { func doit() {} }
+    let c: C? = nil
+    async let maybeVoid2 = c?.doit()
+    let _: ()? = await maybeVoid2
+  }
+
+  // expected-warning @+2 {{constant 'boxOVoid' inferred to have type '[()]', which may be unexpected}}
+  // expected-note @+1 {{add an explicit type annotation to silence this warning}}
+  async let boxOVoid = { [(), (), ()] }()
+  await boxOVoid // expected-warning {{expression of type '[()]' is unused}}
+}

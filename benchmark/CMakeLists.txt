@@ -39,7 +39,9 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfRef
     single-source/ArrayRemoveAll
     single-source/ArraySetElement
+    single-source/ArraySliceTests
     single-source/ArraySubscript
+    single-source/ArrayTests
     single-source/AsyncTree
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
@@ -65,6 +67,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ClassArrayGetter
     single-source/CodableTest
     single-source/Combos
+    single-source/ContiguousArrayTests
     single-source/CountAlgo
     single-source/DataBenchmarks
     single-source/DeadArray
@@ -80,6 +83,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryCompactMapValues
     single-source/DictionaryCopy
     single-source/DictionaryGroup
+    single-source/DictionaryIdentical
     single-source/DictionaryKeysContains
     single-source/DictionaryLiteralTest
     single-source/DictionaryOfAnyHashableStrings
@@ -109,6 +113,7 @@ set(SWIFT_BENCH_MODULES
     single-source/IndexPathTest
     single-source/InsertCharacter
     single-source/IntegerParsing
+    single-source/IntegerToString
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -139,6 +144,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverUnappliedMethod
     single-source/OpaqueConsumingUsers
     single-source/OpenClose
+    single-source/ParameterPacks
     single-source/Phonebook
     single-source/PointerArithmetics
     single-source/PolymorphicCalls
@@ -173,6 +179,7 @@ set(SWIFT_BENCH_MODULES
     # Disabled while layout prespecializations are experimental
     #single-source/SimpleArraySpecialization
     single-source/SequenceAlgos
+    single-source/SetIdentical
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
@@ -181,7 +188,6 @@ set(SWIFT_BENCH_MODULES
     single-source/SortLargeExistentials
     single-source/SortLettersInPlace
     single-source/SortStrings
-    single-source/StackPromo
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt
@@ -210,21 +216,33 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
-#    cxx-source/CxxSetToCollection
-#    cxx-source/CxxSpanTests
-#    cxx-source/CxxStringConversion
-#    cxx-source/CxxVectorSum
+    cxx-source/CxxSetToCollection
+    cxx-source/CxxSpanTests
+    cxx-source/CxxStringConversion
+    cxx-source/CxxVectorSum
     # TODO: rdar://92120528
     # cxx-source/ReadAccessor
 )
 
 set(SWIFT_MULTISOURCE_SWIFT_BENCHES
   multi-source/PrimsSplit
+  multi-source/Monoids
 )
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
     multi-source/PrimsSplit/Prims_main.swift)
+
+set(Monoids_sources
+    multi-source/Monoids/Automaton.swift
+    multi-source/Monoids/Benchmark.swift
+    multi-source/Monoids/Enumeration.swift
+    multi-source/Monoids/Monoids.swift
+    multi-source/Monoids/Presentation.swift
+    multi-source/Monoids/RewritingSystem.swift
+    multi-source/Monoids/Solver.swift
+    multi-source/Monoids/Strategy.swift
+    multi-source/Monoids/Trie.swift)
 
 set(BENCH_DRIVER_LIBRARY_FLAGS)
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)

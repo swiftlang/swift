@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func unavailableModulo(description: String = "<rdar://problem/27855641>") {
   _ = 42.0 % 2 // expected-error {{For floating point numbers use truncatingRemainder}}

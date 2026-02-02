@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift                          \
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated                          \
 // RUN:     -enable-builtin-module                              \
 // RUN:     -enable-experimental-feature LifetimeDependence     \
 // RUN:     -debug-diagnostic-names
@@ -6,6 +6,23 @@
 // REQUIRES: swift_feature_LifetimeDependence
 
 // This test file only exists in order to test without noncopyable_generics and can be deleted once that is always enabled.
+
+protocol P: ~BitwiseCopyable {
+  // expected-warning@-1 {{conformance to 'BitwiseCopyable' can only be suppressed on structs, classes, and enums; this will be an error in a future}}
+}
+
+protocol Q {
+  associatedtype V: ~BitwiseCopyable
+  // expected-warning@-1 {{conformance to 'BitwiseCopyable' can only be suppressed on structs, classes, and enums; this will be an error in a future}}
+}
+
+func test<T: ~BitwiseCopyable>(_: T) {
+  // expected-warning@-1 {{conformance to 'BitwiseCopyable' can only be suppressed on structs, classes, and enums; this will be an error in a future}}
+}
+
+func test<T>() -> T where T: ~BitwiseCopyable {
+  // expected-error@-1 {{type 'BitwiseCopyable' cannot be suppressed}}
+}
 
 @_nonescapable
 struct S_Implicit_Nonescapable {}

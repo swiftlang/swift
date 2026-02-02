@@ -39,6 +39,26 @@ FunctionTemplateTestSuite.test("constLvalueReferenceToBool<T> where T == Bool") 
   expectFalse(constLvalueReferenceToBool(false))
 }
 
+var nilPtr: UnsafeMutablePointer<CInt>? = nil
+var nilPtrIOU: UnsafeMutablePointer<CInt>! = nil
+var nonNilPtr: UnsafeMutablePointer<CInt> = .init(bitPattern: 123)!
+
+FunctionTemplateTestSuite.test("pointerTemplateParameter<T>") {
+  expectFalse(pointerTemplateParameter(nilPtr))
+  expectFalse(pointerTemplateParameter(nilPtrIOU))
+  expectTrue(pointerTemplateParameter(nonNilPtr))
+}
+
+FunctionTemplateTestSuite.test("pointerTemplateParameterNonnull<T>") {
+  expectTrue(pointerTemplateParameterNonnull(nonNilPtr))
+}
+
+FunctionTemplateTestSuite.test("pointerTemplateParameterNullable<T>") {
+  expectFalse(pointerTemplateParameterNullable(nilPtr))
+  expectFalse(pointerTemplateParameterNullable(nilPtrIOU))
+  expectTrue(pointerTemplateParameterNullable(nonNilPtr))
+}
+
 // TODO: Generics, Any, and Protocols should be tested here but need to be
 // better supported in ClangTypeConverter first.
 

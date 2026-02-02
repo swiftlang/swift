@@ -366,13 +366,15 @@ class SILFunctionArgument : public SILArgument {
       ValueOwnershipKind ownershipKind, ValueDecl *decl = nullptr,
       bool isNoImplicitCopy = false,
       LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-      bool isCapture = false, bool isParameterPack = false)
+      bool isCapture = false, bool isParameterPack = false,
+      bool isInferredImmutable = false)
       : SILArgument(ValueKind::SILFunctionArgument, parentBlock, type,
                     ownershipKind, decl) {
     sharedUInt32().SILFunctionArgument.noImplicitCopy = isNoImplicitCopy;
     sharedUInt32().SILFunctionArgument.lifetimeAnnotation = lifetimeAnnotation;
     sharedUInt32().SILFunctionArgument.closureCapture = isCapture;
     sharedUInt32().SILFunctionArgument.parameterPack = isParameterPack;
+    sharedUInt32().SILFunctionArgument.inferredImmutable = isInferredImmutable;
   }
 
   // A special constructor, only intended for use in
@@ -415,6 +417,16 @@ public:
     sharedUInt32().SILFunctionArgument.parameterPack = isPack;
   }
 
+  /// Returns true if this argument is inferred to be immutable.
+  bool isInferredImmutable() const {
+    return sharedUInt32().SILFunctionArgument.inferredImmutable;
+  }
+
+  /// Set whether this argument is inferred to be immutable.
+  void setInferredImmutable(bool newValue) {
+    sharedUInt32().SILFunctionArgument.inferredImmutable = newValue;
+  }
+
   LifetimeAnnotation getLifetimeAnnotation() const {
     return LifetimeAnnotation::Case(
         sharedUInt32().SILFunctionArgument.lifetimeAnnotation);
@@ -425,6 +437,15 @@ public:
   }
 
   bool isSending() const;
+
+  /// Returns true if this SILFunctionArgument is an 'inout sending' parameter.
+  bool isInOutSending() const;
+
+  bool isIsolated() const {
+    return !isIndirectResult() && !isIndirectErrorResult() &&
+           getKnownParameterInfo().getOptions().contains(
+               SILParameterInfo::Isolated);
+  }
 
   Lifetime getLifetime() const {
     return getType()
@@ -463,6 +484,7 @@ public:
     setLifetimeAnnotation(arg->getLifetimeAnnotation());
     setClosureCapture(arg->isClosureCapture());
     setFormalParameterPack(arg->isFormalParameterPack());
+    setInferredImmutable(arg->isInferredImmutable());
   }
 
   static bool classof(const SILInstruction *) = delete;

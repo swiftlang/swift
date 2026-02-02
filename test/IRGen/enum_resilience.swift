@@ -260,7 +260,7 @@ public func resilientEnumPartialApply(_ f: (Medium) -> Int) {
 
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias %1, ptr swiftself %2)
+// CHECK-LABEL: define internal swiftcc void @"$s14resilient_enum6MediumOSiIgnd_ACSiIegnr_TRTA"(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias %1, ptr swiftself %2)
 
 
 // Enums with resilient payloads from a different resilience domain

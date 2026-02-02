@@ -291,8 +291,8 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
     {
       // If both are concrete type requirements, prefer to eliminate the
       // one with the more deeply nested type.
-      unsigned ruleNesting = rule.getNesting();
-      unsigned otherRuleNesting = otherRule.getNesting();
+      unsigned ruleNesting = rule.getNestingAndSize().first;
+      unsigned otherRuleNesting = otherRule.getNestingAndSize().first;
 
       if (ruleNesting != otherRuleNesting) {
         if (ruleNesting > otherRuleNesting)

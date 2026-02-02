@@ -42,7 +42,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   if (MD) {
     out << "IR Generation for module " << MD->getName();
   } else {
-    auto *file = desc.Ctx.get<FileUnit *>();
+    auto *file = cast<FileUnit *>(desc.Ctx);
     out << "IR Generation for file ";
     simple_display(out, file);
   }
@@ -64,7 +64,7 @@ TinyPtrVector<FileUnit *> IRGenDescriptor::getFilesToEmit() const {
 
   // For a primary file, we emit IR for both it and potentially its
   // SynthesizedFileUnit.
-  auto *primary = Ctx.get<FileUnit *>();
+  auto *primary = cast<FileUnit *>(Ctx);
   TinyPtrVector<FileUnit *> files;
   files.push_back(primary);
 
@@ -74,14 +74,14 @@ TinyPtrVector<FileUnit *> IRGenDescriptor::getFilesToEmit() const {
 ModuleDecl *IRGenDescriptor::getParentModule() const {
   if (auto *file = Ctx.dyn_cast<FileUnit *>())
     return file->getParentModule();
-  return Ctx.get<ModuleDecl *>();
+  return cast<ModuleDecl *>(Ctx);
 }
 
 TBDGenDescriptor IRGenDescriptor::getTBDGenDescriptor() const {
   if (auto *file = Ctx.dyn_cast<FileUnit *>()) {
     return TBDGenDescriptor::forFile(file, TBDOpts);
   } else {
-    auto *M = Ctx.get<ModuleDecl *>();
+    auto *M = cast<ModuleDecl *>(Ctx);
     return TBDGenDescriptor::forModule(M, TBDOpts);
   }
 }
@@ -97,11 +97,11 @@ evaluator::DependencySource IRGenRequest::readDependencySource(
   auto &desc = std::get<0>(getStorage());
 
   // We don't track dependencies in whole-module mode.
-  if (desc.Ctx.is<ModuleDecl *>()) {
+  if (isa<ModuleDecl *>(desc.Ctx)) {
     return nullptr;
   }
 
-  auto *primary = desc.Ctx.get<FileUnit *>();
+  auto *primary = cast<FileUnit *>(desc.Ctx);
   return dyn_cast<SourceFile>(primary);
 }
 

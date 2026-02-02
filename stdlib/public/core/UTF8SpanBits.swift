@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
   /// Returns whether contents are known to be all-ASCII. A return value of
@@ -12,6 +24,8 @@ extension UTF8Span {
   /// contained non-ASCII content would report false for `isKnownASCII`, even
   /// if that String had subsequent mutation operations that removed any
   /// non-ASCII content.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var isKnownASCII: Bool {
     0 != _countAndFlags & Self._asciiBit
@@ -20,6 +34,8 @@ extension UTF8Span {
   /// Do a scan checking for whether the contents are all-ASCII.
   ///
   /// Updates the `isKnownASCII` bit if contents are all-ASCII.
+  ///
+  /// - Complexity: O(n)
   @lifetime(self: copy self)
   public mutating func checkForASCII() -> Bool {
     if isKnownASCII { return true }
@@ -35,7 +51,8 @@ extension UTF8Span {
 
   /// Returns whether the contents are known to be NFC. This is not
   /// always checked at initialization time and is set by `checkForNFC`.
-  // TODO: should this be @_unavailableInEmbedded
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var isKnownNFC: Bool {
     0 != _countAndFlags & Self._nfcBit
@@ -64,6 +81,8 @@ extension UTF8Span {
   /// algorithm. However, it cannot detect all NFC contents.
   ///
   /// Updates the `isKnownNFC` bit.
+  ///
+  /// - Complexity: O(n)
   @_unavailableInEmbedded
   @lifetime(self: copy self)
   public mutating func checkForNFC(
@@ -117,6 +136,9 @@ extension UTF8Span {
     0xFF00_0000_0000_0000
   }
 
+  /// The number of UTF-8 code units in the span.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var count: Int {
     Int(truncatingIfNeeded: _countAndFlags & Self._countMask)

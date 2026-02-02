@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // expected-error @+4 {{type annotation missing in pattern}}
 // expected-error @+3 {{cannot find operator '⁚' in scope}}

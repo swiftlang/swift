@@ -9,13 +9,13 @@ import MoveOnly
 
 // CHECK: [[BOX:%.*]] = project_box {{.*}} : ${ var MoveOnly }, 0
 
-// CHECK: [[CREATE_FN:%.*]] = function_ref @{{_ZN8MoveOnly6createEv|\?create\@MoveOnly\@\@SAPEAU1\@XZ}} : $@convention(c) () -> MoveOnly
+// CHECK: [[CREATE_FN:%.*]] = function_ref @$sSo8MoveOnlyV6createAByFZTo : $@convention(c) () -> MoveOnly
 // CHECK: [[CREATED_PTR:%.*]] = apply [[CREATE_FN]]() : $@convention(c) () -> MoveOnly
 // CHECK: store [[CREATED_PTR]] to [trivial] [[BOX]] : $*MoveOnly
 // CHECK: [[ACCESS_1:%.*]] = begin_access [read] [unknown] [[BOX]] : $*MoveOnly
 // CHECK: [[X_1:%.*]] = load [trivial] [[ACCESS_1]] : $*MoveOnly
 
-// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (MoveOnly) -> Int32
+// CHECK: [[TEST_FN:%.*]] = function_ref @$sSo8MoveOnlyV4tests5Int32VyFTo : $@convention(cxx_method) (MoveOnly) -> Int32
 // CHECK: apply [[TEST_FN]]([[X_1]]) : $@convention(cxx_method) (MoveOnly) -> Int32
 
 // CHECK: return
@@ -25,6 +25,4 @@ public func test() {
   _ = x.test()
 }
 
-// CHECK-LABEL: sil{{ \[available .*\] | }}[clang MoveOnly.create] @{{_ZN8MoveOnly6createEv|\?create\@MoveOnly\@\@SAPEAU1\@XZ}} : $@convention(c) () -> MoveOnly
-
-// CHECK-LABEL: sil{{ \[available .*\] | }}[clang MoveOnly.test] @{{_ZNK8MoveOnly4testEv|\?test\@MoveOnly\@\@QEBAHXZ}} : $@convention(cxx_method) (MoveOnly) -> Int32
+// CHECK-LABEL: sil {{.*}}[asmname "{{.*}}create{{.*}}"] [clang MoveOnly.create] @$sSo8MoveOnlyV6createAByFZTo : $@convention(c) () -> MoveOnly

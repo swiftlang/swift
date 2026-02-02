@@ -5,25 +5,25 @@ import CoreCooling
 // CHECK: sil hidden [ossa] @$s2cf8useEmAllyySo16CCMagnetismModelCF :
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $CCMagnetismModel):
 func useEmAll(_ model: CCMagnetismModel) {
-// CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased Optional<CCPowerSupply>
+// CHECK: function_ref @$sSo23CCPowerSupplyGetDefaultSo0aB3RefaSgyFTo : $@convention(c) () -> @autoreleased Optional<CCPowerSupply>
   let power = CCPowerSupplyGetDefault()
 
-// CHECK: function_ref @CCRefrigeratorCreate : $@convention(c) (Optional<CCPowerSupply>) -> Optional<Unmanaged<CCRefrigerator>>
+// CHECK: function_ref @$sSo20CCRefrigeratorCreateys9UnmanagedVySo0A3RefaGSgSo013CCPowerSupplyD0aSgFTo : $@convention(c) (Optional<CCPowerSupply>) -> Optional<Unmanaged<CCRefrigerator>>
   let unmanagedFridge = CCRefrigeratorCreate(power)
 
-// CHECK: function_ref @CCRefrigeratorSpawn : $@convention(c) (Optional<CCPowerSupply>) -> @owned Optional<CCRefrigerator>
+// CHECK: function_ref @$sSo19CCRefrigeratorSpawnySo0A3RefaSgSo013CCPowerSupplyC0aSgFTo : $@convention(c) (Optional<CCPowerSupply>) -> @owned Optional<CCRefrigerator>
   let managedFridge = CCRefrigeratorSpawn(power)
 
-// CHECK: function_ref @CCRefrigeratorOpen : $@convention(c) (Optional<CCRefrigerator>) -> ()
+// CHECK: function_ref @$sSo18CCRefrigeratorOpenyySo0A3RefaSgFTo : $@convention(c) (Optional<CCRefrigerator>) -> ()
   CCRefrigeratorOpen(managedFridge)
 
-// CHECK: function_ref @CCRefrigeratorCopy : $@convention(c) (Optional<CCRefrigerator>) -> @owned Optional<CCRefrigerator>
+// CHECK: function_ref @$sSo18CCRefrigeratorCopyySo0A3RefaSgADFTo : $@convention(c) (Optional<CCRefrigerator>) -> @owned Optional<CCRefrigerator>
   let copy = CCRefrigeratorCopy(managedFridge)
 
-// CHECK: function_ref @CCRefrigeratorClone : $@convention(c) (Optional<CCRefrigerator>) -> @autoreleased Optional<CCRefrigerator>
+// CHECK: function_ref @$sSo19CCRefrigeratorCloneySo0A3RefaSgADFTo : $@convention(c) (Optional<CCRefrigerator>) -> @autoreleased Optional<CCRefrigerator>
   let clone = CCRefrigeratorClone(managedFridge)
 
-// CHECK: function_ref @CCRefrigeratorDestroy : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
+// CHECK: function_ref @$sSo21CCRefrigeratorDestroyyySo0A3RefaSgFTo : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
 // CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>?, $@convention(objc_method) (CCMagnetismModel) -> @unowned_inner_pointer Optional<Unmanaged<CCRefrigerator>>

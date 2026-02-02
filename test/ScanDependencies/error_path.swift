@@ -5,11 +5,11 @@
 
 import P
 
-// CHECK:      {{.*}}{{/|\\}}Z.swiftinterface:3:8: error: Unable to find module dependency: 'missing_module'
+// CHECK:      {{.*}}{{/|\\}}Z.swiftinterface:3:8: error: unable to resolve module dependency: 'missing_module'
 // CHECK-NEXT: 1 | // swift-interface-format-version: 1.0
 // CHECK-NEXT: 2 | // swift-module-flags: -module-name Z
 // CHECK-NEXT: 3 | import missing_module
-// CHECK-NEXT:   |        |- error: Unable to find module dependency: 'missing_module'
+// CHECK-NEXT:   |        |- error: unable to resolve module dependency: 'missing_module'
 // CHECK-NEXT:   |        |- note: a dependency of Swift module 'Z': '{{.*}}{{/|\\}}Z.swiftinterface'
 // CHECK-NEXT:   |        |- note: a dependency of Swift module 'Y': '{{.*}}{{/|\\}}Y.swiftinterface'
 // CHECK-NEXT:   |        |- note: a dependency of Swift module 'P': '{{.*}}{{/|\\}}P.swiftinterface'

@@ -12,6 +12,8 @@
 
 #define DEBUG_TYPE "send-non-sendable"
 
+#include "swift/SIL/PrunedLiveness.h"
+
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -215,6 +217,32 @@ inferNameAndRootHelper(SILValue value) {
   return VariableNameInferrer::inferNameAndRoot(value);
 }
 
+/// Sometimes we use a store_borrow + temporary to materialize a borrowed value
+/// to be passed to another function. We want to emit the error on the function
+/// itself, not the store_borrow so we get the best location. We only do this if
+/// we can prove that we have a store_borrow to an alloc_stack, the store_borrow
+/// is the only thing stored into the alloc_stack, and except for the
+/// store_borrow, the alloc_stack has a single non_destroy user, a function we
+/// are calling.
+static Operand *
+findClosureUseThroughStoreBorrowTemporary(StoreBorrowInst *sbi) {
+  auto *asi = dyn_cast<AllocStackInst>(sbi->getDest());
+  if (!asi)
+    return {};
+  Operand *resultUse = nullptr;
+  for (auto *use : asi->getUses()) {
+    if (use == &sbi->getAllOperands()[StoreBorrowInst::Dest])
+      continue;
+    if (isa<EndBorrowInst>(use->getUser()))
+      continue;
+    auto fas = FullApplySite::isa(use->getUser());
+    if (!fas)
+      return {};
+    resultUse = use;
+  }
+  return resultUse;
+}
+
 /// Find a use corresponding to the potentially recursive capture of \p
 /// initialOperand that would be appropriate for diagnostics.
 ///
@@ -259,9 +287,15 @@ findClosureUse(Operand *initialOperand) {
     if (isIncidentalUse(user) && !isa<IgnoredUseInst>(user))
       continue;
 
+    // Ignore some instructions we do not care about.
+    if (isa<DestroyValueInst, EndBorrowInst, EndAccessInst, DeallocStackInst>(
+            user))
+      continue;
+
     // Look through some insts we do not care about.
     if (isa<CopyValueInst, BeginBorrowInst, ProjectBoxInst, BeginAccessInst>(
             user) ||
+        isa<MarkUnresolvedNonCopyableValueInst>(user) ||
         isMoveOnlyWrapperUse(user) ||
         // We want to treat move_value [var_decl] as a real use since we are
         // assigning to a var.
@@ -306,6 +340,17 @@ findClosureUse(Operand *initialOperand) {
       }
     }
 
+    // If we have a store_borrow, see if we are using it to just marshal a use
+    // to a full apply site.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(op->getUser());
+        sbi && op == &sbi->getAllOperands()[StoreBorrowInst::Src]) {
+      if (auto *use = findClosureUseThroughStoreBorrowTemporary(sbi)) {
+        if (visitedOperand.insert(use).second)
+          worklist.emplace_back(use, fArg);
+        continue;
+      }
+    }
+
     // Otherwise, we have a real use. Return it and the function argument that
     // it was derived from.
     return pair;
@@ -322,7 +367,7 @@ template <typename... T, typename... U>
 static InFlightDiagnostic diagnoseError(ASTContext &context, SourceLoc loc,
                                         Diag<T...> diag, U &&...args) {
   return std::move(context.Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                       .warnUntilSwiftVersion(6));
+                       .warnUntilLanguageMode(6));
 }
 
 template <typename... T, typename... U>
@@ -642,6 +687,216 @@ private:
 } // namespace
 
 //===----------------------------------------------------------------------===//
+//                         MARK: Diagnostic Evaluator
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DiagnosticEvaluator final
+    : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
+  RegionAnalysisFunctionInfo *info;
+  SmallFrozenMultiMap<Operand *, RequireInst, 8>
+      &sendingOpToRequireInstMultiMap;
+
+  /// An error that we know how to emit verbatim without needing to preprocess.
+  ///
+  /// A contrasting case here is the use after send error where we need to pair
+  /// sending operands to require insts.
+  SmallVectorImpl<PartitionOpError> &foundVerbatimErrors;
+
+  DiagnosticEvaluator(Partition &workingPartition,
+                      RegionAnalysisFunctionInfo *info,
+                      SmallFrozenMultiMap<Operand *, RequireInst, 8>
+                          &sendingOpToRequireInstMultiMap,
+                      SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
+                      SendingOperandToStateMap &operandToStateMap)
+      : PartitionOpEvaluatorBaseImpl(
+            workingPartition, info->getOperandSetFactory(), operandToStateMap),
+        info(info),
+        sendingOpToRequireInstMultiMap(sendingOpToRequireInstMultiMap),
+        foundVerbatimErrors(foundVerbatimErrors) {}
+
+  void handleLocalUseAfterSend(LocalUseAfterSendError &&error) const {
+    const auto &partitionOp = *error.op;
+    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
+    // Ignore this if we are erroring on a mutable base of a Sendable value and
+    // if when we sent the value's region was not closure captured.
+    if (error.op->getOptions().containsOnly(
+            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue) &&
+        !operandToStateMap.get(error.sendingOp).isClosureCaptured)
+      return;
+
+    sendingOpToRequireInstMultiMap.insert(
+        error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
+  }
+
+  void handleInOutSendingNotInitializedAtExitError(
+      InOutSendingNotInitializedAtExitError &&error) const {
+    const PartitionOp &partitionOp = *error.op;
+    Operand *sendingOp = error.sendingOp;
+
+    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
+    sendingOpToRequireInstMultiMap.insert(
+        sendingOp, RequireInst::forInOutReinitializationNeeded(
+                       partitionOp.getSourceInst()));
+  }
+
+  void handleUnknownCodePattern(UnknownCodePatternError &&error) const {
+    const PartitionOp &op = *error.op;
+
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(op.getSourceInst(),
+                  diag::regionbasedisolation_unknown_pattern);
+  }
+
+  void handleError(PartitionOpError &&error) {
+    switch (error.getKind()) {
+    case PartitionOpError::LocalUseAfterSend: {
+      return handleLocalUseAfterSend(
+          std::move(error).getLocalUseAfterSendError());
+    }
+    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
+    case PartitionOpError::InOutSendingReturned:
+    case PartitionOpError::SentNeverSendable:
+    case PartitionOpError::AssignNeverSendableIntoSendingResult:
+    case PartitionOpError::NonSendableIsolationCrossingResult:
+    case PartitionOpError::InOutSendingParametersInSameRegion:
+      // We are going to process these later... but dump so we can see that we
+      // handled an error here. The rest of the explicit handlers will dump as
+      // appropriate if they want to emit an error here (some will squelch the
+      // error).
+      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+      foundVerbatimErrors.emplace_back(std::move(error));
+      return;
+    case PartitionOpError::InOutSendingNotInitializedAtExit: {
+      return handleInOutSendingNotInitializedAtExitError(
+          std::move(error).getInOutSendingNotInitializedAtExitError());
+    }
+    case PartitionOpError::UnknownCodePattern: {
+      return handleUnknownCodePattern(
+          std::move(error).getUnknownCodePatternError());
+    }
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+  bool isActorDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
+  }
+
+  /// If \p element's representative is an indirect out parameter, return
+  /// that parameter.
+  SILValue getIndirectOutParameter(Element element) const {
+    auto rep = info->getValueMap().getRepresentativeValue(element);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isIndirectOutParameter())
+      return value;
+    return {};
+  }
+
+  SILValue getInOutSendingParameter(Element elt) const {
+    auto rep = info->getValueMap().getRepresentativeValue(elt);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isInoutConvention() &&
+        value->isSending())
+      return value;
+    return {};
+  }
+
+  bool isTaskIsolatedDerived(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
+  }
+
+  SILIsolationInfo::Kind hasSpecialDerivation(Element element) const {
+    return info->getValueMap().getIsolationRegion(element).getKind();
+  }
+
+  SILIsolationInfo getIsolationRegionInfo(Element element) const {
+    return info->getValueMap().getIsolationRegion(element);
+  }
+
+  /// Only return an element if we are already tracking value and it is
+  /// non-Sendable.
+  ///
+  /// TODO: Can we return only
+  std::optional<Element> getElement(SILValue value) const {
+    auto trackableValue = info->getValueMap().getTrackableValue(value);
+    if (trackableValue.value.isSendable())
+      return {};
+    return trackableValue.value.getID();
+  }
+
+  SILValue getRepresentative(SILValue value) const {
+    return info->getValueMap()
+        .getTrackableValue(value)
+        .value.getRepresentative()
+        .maybeGetValue();
+  }
+
+  RepresentativeValue getRepresentativeValue(Element element) const {
+    return info->getValueMap().getRepresentativeValue(element);
+  }
+
+  bool isClosureCaptured(Element element, Operand *op) const {
+    auto value = info->getValueMap().maybeGetRepresentative(element);
+    if (!value)
+      return false;
+    return info->isClosureCaptured(value, op);
+  }
+};
+
+} // namespace
+
+void SendNonSendableImpl::runDiagnosticEvaluator() {
+  // Then for each block...
+  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
+  for (auto [block, blockState] : info->getRange()) {
+    REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                             << "|--> Block bb" << block.getDebugID() << "\n");
+
+    if (!blockState.getLiveness()) {
+      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Dead block... skipping!\n");
+      continue;
+    }
+
+    REGIONBASEDISOLATION_LOG(
+        llvm::dbgs() << "Entry Partition: ";
+        blockState.getEntryPartition().print(llvm::dbgs()));
+
+    // Grab its entry partition and setup an evaluator for the partition that
+    // has callbacks that emit diagnsotics...
+    Partition workingPartition = blockState.getEntryPartition();
+    DiagnosticEvaluator eval(
+        workingPartition, info, sendingOpToRequireInstMultiMap,
+        foundVerbatimErrors, info->getSendingOperandToStateMap());
+
+    // And then evaluate all of our partition ops on the entry partition.
+    for (auto &partitionOp : blockState.getPartitionOps()) {
+      eval.apply(partitionOp);
+    }
+
+    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Exit Partition: ";
+                             workingPartition.print(llvm::dbgs()));
+  }
+
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "Finished walking blocks for diagnostics.\n");
+
+  // Now that we have found all of our sendingInsts/Requires emit errors.
+  sendingOpToRequireInstMultiMap.setFrozen();
+}
+
+//===----------------------------------------------------------------------===//
 //                MARK: UseAfterSend Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
@@ -682,29 +937,28 @@ public:
                                   ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!namedValuesIsolationInfo.isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(os);
-        os << ' ';
-      }
-    }
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
 
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
-          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-          callee.value(), isolationCrossing.getCallerIsolation());
+          isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+          callee.value(), callerIsolationStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_info_send_yields_race,
-                   name, descriptiveKindStr,
-                   isolationCrossing.getCalleeIsolation(),
-                   isolationCrossing.getCallerIsolation());
+                   isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+                   callerIsolationStr);
     }
     emitRequireInstDiagnostics();
   }
@@ -716,23 +970,23 @@ public:
                                   const ValueDecl *callee) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!namedValuesIsolationInfo.isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(os);
-        os << ' ';
-      }
-    }
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
 
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
-        name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-        callee, isolationCrossing.getCallerIsolation());
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_info_send_yields_race_callee,
+                 isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+                 callee, callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -740,7 +994,6 @@ public:
                                                  Identifier name) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     diagnoseNote(
@@ -752,17 +1005,22 @@ public:
                                   ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
+
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send_callee,
-                   inferredType, isolationCrossing.getCalleeIsolation(),
-                   callee.value(), isolationCrossing.getCallerIsolation());
+                   inferredType, calleeIsolationStr, callee.value(),
+                   callerIsolationStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send,
-                   inferredType, isolationCrossing.getCalleeIsolation(),
-                   isolationCrossing.getCallerIsolation());
+                   inferredType, calleeIsolationStr, callerIsolationStr);
     }
     emitRequireInstDiagnostics();
   }
@@ -770,14 +1028,12 @@ public:
   void emitNamedUseofStronglySentValue(SILLocation loc, Identifier name) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
     diagnoseNote(
         loc, diag::regionbasedisolation_named_value_used_after_explicit_sending,
-        name)
-        .highlight(loc.getSourceRange());
+        name);
 
     // Finally the require points.
     emitRequireInstDiagnostics();
@@ -786,7 +1042,6 @@ public:
   void emitTypedUseOfStronglySentValue(SILLocation loc, Type inferredType) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
@@ -805,23 +1060,21 @@ public:
       ApplyIsolationCrossing isolationCrossing) {
     // Emit the short error.
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!namedValuesIsolationInfo.isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(os);
-        os << ' ';
-      }
-    }
-
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
-        descriptiveKindStr, name, isolationCrossing.getCalleeIsolation(),
-        isolationCrossing.getCallerIsolation())
-        .highlight(loc.getSourceRange());
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_isolated_closure_yields_race,
+                 isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
+                 callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -830,12 +1083,18 @@ public:
       ApplyIsolationCrossing isolationCrossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
+
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+
     diagnoseNote(loc,
                  diag::regionbasedisolation_type_isolated_capture_yields_race,
-                 inferredType, isolationCrossing.getCalleeIsolation(),
-                 isolationCrossing.getCallerIsolation());
+                 inferredType, calleeIsolationStr, callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -861,7 +1120,7 @@ private:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -899,14 +1158,12 @@ private:
       auto require = requireInsts.pop_back_val();
       switch (require.getKind()) {
       case RequireInst::UseAfterSend:
-        diagnoseNote(*require, diag::regionbasedisolation_maybe_race)
-            .highlight(require->getLoc().getSourceRange());
+        diagnoseNote(*require, diag::regionbasedisolation_maybe_race);
         continue;
       case RequireInst::InOutReinitializationNeeded:
         diagnoseNote(
             *require,
-            diag::regionbasedisolation_inout_sending_must_be_reinitialized)
-            .highlight(require->getLoc().getSourceRange());
+            diag::regionbasedisolation_inout_sending_must_be_reinitialized);
         continue;
       }
       llvm_unreachable("Covered switch isn't covered?!");
@@ -1298,6 +1555,18 @@ public:
   ~SendNeverSentDiagnosticEmitter() {
     if (!emittedErrorDiagnostic) {
       emitUnknownPatternError();
+    } else if (auto proto = isolationRegionInfo.getIsolationInfo()
+                   .getIsolatedConformance()) {
+       // If the diagnostic comes from a (potentially) isolated conformance,
+       // add a note saying so and indicating where the isolated conformance
+       // can come in.
+       if (auto value = isolationRegionInfo.getIsolationInfo().getIsolatedValue()) {
+         if (auto loc = value.getLoc()) {
+           diagnoseNote(
+               loc, diag::regionbasedisolation_isolated_conformance_introduced,
+               proto);
+         }
+       }
     }
   }
 
@@ -1312,6 +1581,16 @@ public:
   }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    // If the failure is due to an isolated conformance, downgrade the error
+    // to a warning prior to Swift 7.
+    if (isolationRegionInfo.getIsolationInfo().getIsolatedConformance() &&
+        !sendingOperand->get()
+             ->getType()
+             .getASTType()
+             ->getASTContext()
+             .isAtLeastFutureMajorLanguageMode())
+      return DiagnosticBehavior::Warning;
+
     return sendingOperand->get()->getType().getConcurrencyDiagnosticBehavior(
         getOperand()->getFunction());
   }
@@ -1349,58 +1628,71 @@ public:
                        ApplyIsolationCrossing crossing) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc,
           diag::regionbasedisolation_typed_sendneversendable_via_arg_callee,
-          descriptiveKindStr, inferredType, crossing.getCalleeIsolation(),
-          callee.value());
+          descriptiveKindStr, inferredType, calleeIsolationStr, callee.value());
     } else {
-      diagnoseNote(
-          loc, diag::regionbasedisolation_typed_sendneversendable_via_arg,
-          descriptiveKindStr, inferredType, crossing.getCalleeIsolation());
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_typed_sendneversendable_via_arg,
+                   descriptiveKindStr, inferredType, calleeIsolationStr);
     }
   }
 
   void emitNamedFunctionArgumentClosure(SILLocation loc, Identifier name,
                                         ApplyIsolationCrossing crossing) {
     emitNamedOnlyError(loc, name);
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(os);
-        os << ' ';
-      }
-    }
+
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCallerIsolation());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
-                 descriptiveKindStr, name, crossing.getCalleeIsolation(),
-                 crossing.getCallerIsolation())
-        .highlight(loc.getSourceRange());
+                 isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
+                 callerIsolationStr);
+  }
+
+  void
+  emitNamedFunctionArgumentClosureMutable(SILLocation loc, Identifier name,
+                                          ApplyIsolationCrossing crossing) {
+    emitNamedOnlyError(loc, name);
+
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCallerIsolation());
+    diagnoseNote(
+        loc,
+        diag::regionbasedisolation_named_isolated_closure_yields_race_mutable,
+        calleeIsolationStr, name, getIsolationRegionInfo()->isTaskIsolated(),
+        callerIsolationStr);
   }
 
   void emitTypedSendingNeverSendableToSendingParam(SILLocation loc,
                                                    Type inferredType) {
     diagnoseError(loc, diag::regionbasedisolation_type_send_yields_race,
                   inferredType)
-        .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
@@ -1418,11 +1710,8 @@ public:
   void emitClosureErrorWithCapturedActor(Operand *partialApplyOp,
                                          Operand *actualUse,
                                          SILArgument *fArg) {
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForCodeDiagnostic(getFunction());
 
     diagnoseError(partialApplyOp,
                   diag::regionbasedisolation_typed_tns_passed_sending_closure,
@@ -1430,11 +1719,8 @@ public:
         .limitBehaviorIf(getDiagnosticBehaviorLimitForOperands(
             actualUse->getFunction(), {actualUse}));
 
-    descriptiveKindStr.clear();
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForDiagnostics(os);
-    }
+    descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
     diagnoseNote(actualUse, diag::regionbasedisolation_closure_captures_actor,
                  fArg->getDecl()->getName(), descriptiveKindStr);
   }
@@ -1449,11 +1735,8 @@ public:
   void emitSendingClosureParamDirectlyIsolated(Operand *partialApplyOp,
                                                Operand *actualUse,
                                                SILArgument *fArg) {
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForCodeDiagnostic(getFunction());
 
     diagnoseError(partialApplyOp,
                   diag::regionbasedisolation_typed_tns_passed_sending_closure,
@@ -1477,11 +1760,8 @@ public:
       return;
     }
 
-    descriptiveKindStr.clear();
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
-    }
+    descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     auto diag = diag::
         regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value;
@@ -1498,11 +1778,8 @@ public:
       return;
     }
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo()->printForCodeDiagnostic(os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo()->printForCodeDiagnostic(getFunction());
 
     auto emitMainError = [&] {
       auto behaviorLimit = getDiagnosticBehaviorLimitForOperands(
@@ -1510,7 +1787,6 @@ public:
       diagnoseError(loc,
                     diag::regionbasedisolation_typed_tns_passed_sending_closure,
                     descriptiveKindStr)
-          .highlight(loc.getSourceRange())
           .limitBehaviorIf(behaviorLimit);
     };
 
@@ -1534,11 +1810,8 @@ public:
       }
 
       emitMainError();
-      descriptiveKindStr.clear();
-      {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(os);
-      }
+      descriptiveKindStr =
+          getIsolationRegionInfo().printForDiagnostics(getFunction());
       auto diag = diag::
           regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region;
       diagnoseNote(actualUseInfo->first, diag, descriptiveKindStr,
@@ -1569,7 +1842,6 @@ public:
 
   void emitNamedOnlyError(SILLocation loc, Identifier name) {
     diagnoseError(loc, diag::regionbasedisolation_named_send_yields_race, name)
-        .highlight(getOperand()->getUser()->getLoc().getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
   }
 
@@ -1579,76 +1851,54 @@ public:
            "Should never be disconnected?!");
     emitNamedOnlyError(loc, name);
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     diagnoseNote(loc, diag::regionbasedisolation_named_send_nt_asynclet_capture,
-                 name, descriptiveKindStr)
-        .limitBehaviorIf(getBehaviorLimit());
+                 name, descriptiveKindStr);
   }
 
   void emitNamedIsolation(SILLocation loc, Identifier name,
                           ApplyIsolationCrossing isolationCrossing) {
     emitNamedOnlyError(loc, name);
-    SmallString<64> descriptiveKindStr;
-    SmallString<64> descriptiveKindStrWithSpace;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        {
-          llvm::raw_svector_ostream os(descriptiveKindStr);
-          getIsolationRegionInfo().printForDiagnostics(os);
-        }
-        descriptiveKindStrWithSpace = descriptiveKindStr;
-        descriptiveKindStrWithSpace.push_back(' ');
-      }
-    }
+
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
                    diag::regionbasedisolation_named_send_never_sendable_callee,
-                   name, descriptiveKindStrWithSpace,
-                   isolationCrossing.getCalleeIsolation(), callee.value(),
-                   descriptiveKindStr);
+                   isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+                   callee.value(), descriptiveKindStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_send_never_sendable,
-                   name, descriptiveKindStrWithSpace,
-                   isolationCrossing.getCalleeIsolation(), descriptiveKindStr);
+                   isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+                   descriptiveKindStr);
     }
   }
 
   void emitNamedSendingNeverSendableToSendingParam(SILLocation loc,
                                                    Identifier varName) {
     emitNamedOnlyError(loc, varName);
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(os);
-        os << ' ';
-      }
-    }
+
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
     auto diag = diag::regionbasedisolation_named_send_into_sending_param;
-    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+    diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName);
   }
 
   void emitNamedSendingReturn(SILLocation loc, Identifier varName) {
     emitNamedOnlyError(loc, varName);
-    SmallString<64> descriptiveKindStr;
-    SmallString<64> descriptiveKindStrWithSpace;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        {
-          llvm::raw_svector_ostream os(descriptiveKindStr);
-          getIsolationRegionInfo().printForDiagnostics(os);
-        }
-        descriptiveKindStrWithSpace = descriptiveKindStr;
-        descriptiveKindStrWithSpace.push_back(' ');
-      }
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
     auto diag = diag::regionbasedisolation_named_nosend_send_into_result;
-    diagnoseNote(loc, diag, descriptiveKindStrWithSpace, varName,
+    diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName,
                  descriptiveKindStr);
   }
 
@@ -1663,7 +1913,7 @@ private:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -1857,30 +2107,37 @@ bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
 bool SentNeverSendableDiagnosticInferrer::initForIsolatedPartialApply(
     Operand *op, AbstractClosureExpr *ace,
     std::optional<ActorIsolation> actualCallerIsolation) {
-  SmallVector<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>, 8>
-      foundCapturedIsolationCrossing;
-  ace->getIsolationCrossing(foundCapturedIsolationCrossing);
-  if (foundCapturedIsolationCrossing.empty())
+  auto diagnosticPair = findClosureUse(op);
+  if (!diagnosticPair)
     return false;
 
-  // We use getASTAppliedArgIndex instead of getAppliedArgIndex to ensure that
-  // we ignore for our indexing purposes any implicit initial parameters like
-  // isolated(any).
-  unsigned opIndex = ApplySite(op->getUser()).getASTAppliedArgIndex(*op);
-  for (auto &p : foundCapturedIsolationCrossing) {
-    if (std::get<1>(p) == opIndex) {
-      auto loc = RegularLocation(std::get<0>(p).getLoc());
-      auto crossing = std::get<2>(p);
-      auto declIsolation = crossing.getCallerIsolation();
-      auto closureIsolation = crossing.getCalleeIsolation();
-      if (!bool(declIsolation) && actualCallerIsolation) {
-        declIsolation = *actualCallerIsolation;
-      }
-      diagnosticEmitter.emitNamedFunctionArgumentClosure(
-          loc, std::get<0>(p).getDecl()->getBaseIdentifier(),
-          ApplyIsolationCrossing(declIsolation, closureIsolation));
+  auto *diagnosticOp = diagnosticPair->first;
+
+  ApplyIsolationCrossing crossing(
+      *op->getFunction()->getActorIsolation(),
+      *diagnosticOp->getFunction()->getActorIsolation());
+
+  // We do not need to worry about failing to infer a name here since we are
+  // going to be returning some form of a SILFunctionArgument which is always
+  // easy to find a name for.
+  if (auto rootValueAndName = inferNameAndRootHelper(op->get())) {
+    // See if our underlying value is a SILBox type that contains a Sendable
+    // type. In that case, we could have only emitted this error if we were
+    // escaping the box itself. In such a case, we want to emit a better
+    // diagnostic that mentions that the reason we are emitting an error is b/c
+    // the value is mutable.
+    if (auto boxTy = op->get()->getType().getAs<SILBoxType>();
+        boxTy && boxTy->getNumFields() == 1 && boxTy->isFieldMutable(0) &&
+        SILIsolationInfo::boxTypeContainsOnlySendableFields(
+            boxTy, op->getFunction())) {
+      diagnosticEmitter.emitNamedFunctionArgumentClosureMutable(
+          diagnosticOp->getUser()->getLoc(), rootValueAndName->first, crossing);
       return true;
     }
+
+    diagnosticEmitter.emitNamedFunctionArgumentClosure(
+        diagnosticOp->getUser()->getLoc(), rootValueAndName->first, crossing);
+    return true;
   }
 
   return false;
@@ -1970,7 +2227,6 @@ bool SentNeverSendableDiagnosticInferrer::run() {
           return true;
 
         // See if we can infer a name from the value.
-        SmallString<64> resultingName;
         if (auto varName = inferNameHelper(op->get())) {
           diagnosticEmitter.emitNamedSendingNeverSendableToSendingParam(
               loc, *varName);
@@ -2011,7 +2267,6 @@ bool SentNeverSendableDiagnosticInferrer::run() {
     }
 
     // See if we can infer a name from the value.
-    SmallString<64> resultingName;
     if (auto name = inferNameHelper(op->get())) {
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
@@ -2059,7 +2314,6 @@ bool SentNeverSendableDiagnosticInferrer::run() {
                           }) &&
              "All result info must be the same... if that changes... update "
              "this code!");
-      SmallString<64> resultingName;
       if (auto name = inferNameHelper(op->get())) {
         diagnosticEmitter.emitNamedSendingReturn(loc, *name);
         return true;
@@ -2096,6 +2350,653 @@ bool SentNeverSendableDiagnosticInferrer::run() {
   }
 
   diagnosticEmitter.emitUnknownUse(loc);
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+//               MARK: InOutSendingReturnedError Error Emitter
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class InOutSendingReturnedDiagnosticEmitter {
+  /// A region analysis function info that we use if we need to determine which
+  /// incoming block edge had an error upon it.
+  RegionAnalysisFunctionInfo *raFuncInfo;
+
+  /// The function exiting inst where the 'inout sending' parameter was actor
+  /// isolated.
+  TermInst *functionExitingInst;
+
+  /// The 'inout sending' param that we are emitting an error for.
+  SILValue inoutSendingParam;
+
+  /// The element number of the 'inout sending' param.
+  Element inoutSendingParamElement;
+
+  /// If we did not return the 'inout sending' param directly but instead
+  /// returned something else in the same region. This is that value.
+  ///
+  /// If we actually returned the inout sending parameter this is SILValue().
+  SILValue returnedValue;
+
+  /// If we had a failure due to returning a value that is actor isolated due to
+  /// it being in the same region as an out parameter. THis is the actor
+  /// isolation.
+  SILDynamicMergedIsolationInfo isolationInfo;
+
+  bool emittedErrorDiagnostic = false;
+
+public:
+  class LastValueEnum;
+
+  InOutSendingReturnedDiagnosticEmitter(
+      RegionAnalysisFunctionInfo *raFuncInfo, TermInst *functionExitingInst,
+      SILValue inoutSendingParam, Element inoutSendingParamElement,
+      SILValue erroringValue, SILDynamicMergedIsolationInfo isolationInfo)
+      : raFuncInfo(raFuncInfo), functionExitingInst(functionExitingInst),
+        inoutSendingParam(inoutSendingParam),
+        inoutSendingParamElement(inoutSendingParamElement),
+        returnedValue(erroringValue), isolationInfo(isolationInfo) {}
+
+  ~InOutSendingReturnedDiagnosticEmitter() {
+    // If we were supposed to emit a diagnostic and didn't emit an unknown
+    // pattern error.
+    if (!emittedErrorDiagnostic)
+      emitUnknownPatternError();
+  }
+
+  SILFunction *getFunction() const { return inoutSendingParam->getFunction(); }
+
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return inoutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+        getFunction());
+  }
+
+  void emitUnknownPatternError() {
+    if (shouldAbortOnUnknownPatternMatchError()) {
+      llvm::report_fatal_error(
+          "RegionIsolation: Aborting on unknown pattern match error");
+    }
+
+    diagnoseError(functionExitingInst,
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
+  }
+
+  void emit();
+
+  /// Called if we return the actual inout sending value.
+  void emitReturnInOutSendingError(SILDynamicMergedIsolationInfo isolationInfo,
+                                   SILLocation loc) {
+    // We should always be able to find a name for an inout sending param. If we
+    // do not, emit an unknown pattern error.
+    auto inoutSendingParamName = inferNameHelper(inoutSendingParam);
+    if (!inoutSendingParamName) {
+      return emitUnknownPatternError();
+    }
+
+    diagnoseError(
+        loc, diag::regionbasedisolation_inout_sending_cannot_be_returned_param,
+        *inoutSendingParamName)
+        .limitBehaviorIf(getBehaviorLimit());
+    if (isolationInfo->isActorIsolated()) {
+      diagnoseNote(
+          loc,
+          diag::
+              regionbasedisolation_inout_sending_cannot_be_returned_note_actor_param,
+          *inoutSendingParamName,
+          isolationInfo->printForDiagnostics(getFunction()));
+      return;
+    }
+    diagnoseNote(
+        loc,
+        diag::regionbasedisolation_inout_sending_cannot_be_returned_note_param,
+        *inoutSendingParamName);
+  }
+
+  void emitValueError(SILValue value,
+                      SILDynamicMergedIsolationInfo isolationInfo,
+                      SILLocation loc) {
+    // We should always be able to find a name for an inout sending param. If we
+    // do not, emit an unknown pattern error.
+    auto inoutSendingParamName = inferNameHelper(inoutSendingParam);
+    if (!inoutSendingParamName) {
+      return emitUnknownPatternError();
+    }
+
+    std::optional<Identifier> erroringEltName = inferNameHelper(value);
+    if (!erroringEltName) {
+      return emitUnknownPatternError();
+    }
+
+    diagnoseError(
+        loc, diag::regionbasedisolation_inout_sending_cannot_be_returned_value,
+        *erroringEltName)
+        .limitBehaviorIf(getBehaviorLimit());
+    if (isolationInfo->isActorIsolated()) {
+      diagnoseNote(
+          loc,
+          diag::
+              regionbasedisolation_inout_sending_cannot_be_returned_note_actor_value,
+          *erroringEltName, *inoutSendingParamName,
+          isolationInfo->printForDiagnostics(getFunction()));
+      return;
+    }
+    diagnoseNote(
+        loc,
+        diag::regionbasedisolation_inout_sending_cannot_be_returned_note_value,
+        *erroringEltName, *inoutSendingParamName);
+  }
+
+  /// Print \p value in a standard way. Allow for loc to override the specific
+  /// location used to emit the diagnostic fi non-standard.
+  void emitLastValueEnum(const LastValueEnum &value,
+                         SILDynamicMergedIsolationInfo isolationInfo,
+                         SILLocation loc = SILLocation::invalid());
+
+  /// Emit an error for use when we are processing the incoming value of a phi
+  /// argument or of the dynamic value of an indirect out parameter.
+  bool emitOutParamIncomingValueError(const LastValueEnum &value);
+
+  void emitDeclRefError(SILDeclRef declRef,
+                        SILDynamicMergedIsolationInfo isolationInfo,
+                        SILLocation loc) {
+    // We should always be able to find a name for an inout sending param. If we
+    // do not, emit an unknown pattern error.
+    auto inoutSendingParamName = inferNameHelper(inoutSendingParam);
+    if (!inoutSendingParamName) {
+      return emitUnknownPatternError();
+    }
+
+    diagnoseError(
+        loc,
+        diag::
+            regionbasedisolation_inout_sending_cannot_be_returned_value_result,
+        declRef.getAbstractFunctionDecl())
+        .limitBehaviorIf(getBehaviorLimit());
+
+    if (isolationInfo->isActorIsolated()) {
+      diagnoseNote(
+          loc,
+          diag::
+              regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_value,
+          declRef.getAbstractFunctionDecl(), *inoutSendingParamName,
+          isolationInfo.printForDiagnostics(getFunction()));
+      return;
+    }
+    diagnoseNote(
+        loc,
+        diag::
+            regionbasedisolation_inout_sending_cannot_be_returned_note_return_value,
+        declRef.getAbstractFunctionDecl(), *inoutSendingParamName);
+  }
+
+  ASTContext &getASTContext() const {
+    return functionExitingInst->getFunction()->getASTContext();
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilLanguageMode(6));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+};
+
+} // namespace
+
+static SILValue lookThroughAccess(SILValue value) {
+  while (true) {
+    // We look through access, copies, and loads.
+    if (auto *bai = dyn_cast<BeginAccessInst>(value)) {
+      value = bai->getOperand();
+      continue;
+    }
+
+    if (auto *cvi = dyn_cast<CopyValueInst>(value)) {
+      value = cvi->getOperand();
+      continue;
+    }
+
+    if (auto *bbi = dyn_cast<BeginBorrowInst>(value);
+        bbi && !bbi->isFromVarDecl()) {
+      value = bbi->getOperand();
+      continue;
+    }
+
+    if (auto *mvi = dyn_cast<MoveValueInst>(value);
+        mvi && !mvi->isFromVarDecl()) {
+      value = mvi->getOperand();
+      continue;
+    }
+
+    if (auto *li = dyn_cast<LoadInst>(value)) {
+      value = li->getOperand();
+      continue;
+    }
+
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(value)) {
+      value = lbi->getOperand();
+      continue;
+    }
+
+    return value;
+  }
+}
+
+class InOutSendingReturnedDiagnosticEmitter::LastValueEnum {
+public:
+  enum Kind {
+    None,
+    ApplySite,
+    CopyAddr,
+    Store,
+    Value,
+    ReturnTerm,
+  };
+
+private:
+  Kind kind;
+  std::variant<FullApplySite, SILValue, CopyAddrInst *, StoreInst *, Operand *>
+      value;
+
+  LastValueEnum() : kind(Kind::None), value() {}
+  LastValueEnum(FullApplySite inst) : kind(Kind::ApplySite), value(inst) {}
+  LastValueEnum(SILValue value) : kind(Kind::Value), value(value) {}
+  LastValueEnum(CopyAddrInst *inst) : kind(Kind::CopyAddr), value(inst) {}
+  LastValueEnum(StoreInst *inst) : kind(Kind::Store), value(inst) {}
+  LastValueEnum(Operand *branchUse) : kind(Kind::ReturnTerm), value(branchUse) {
+    assert(isa<TermInst>(branchUse->getUser()));
+    assert(branchUse->getUser()->getLoc().getKind() == SILLocation::ReturnKind);
+  }
+
+public:
+  static LastValueEnum get(SILValue value);
+  static LastValueEnum get(SILInstruction *inst);
+  static LastValueEnum get(Operand *use);
+  static bool isSupported(Operand *use);
+
+  operator bool() const { return getKind() != Kind::None; }
+
+  Kind getKind() const { return kind; }
+  bool isApplySite() const { return getKind() == Kind::ApplySite; }
+  bool isValue() const { return getKind() == Kind::Value; }
+  bool isStore() const { return getKind() == Kind::Store; }
+  bool isCopyAddr() const { return getKind() == Kind::CopyAddr; }
+
+  /// Is this a terminator instruction that is an incoming value to an epilogue
+  /// block and thus forms part of the return from a function.
+  bool isReturnTerm() const { return getKind() == Kind::ReturnTerm; }
+
+  FullApplySite getFullApplySite() const {
+    return std::get<FullApplySite>(value);
+  }
+  SILDeclRef getDeclRef() const {
+    return getFullApplySite().getCalleeFunction()->getDeclRef();
+  }
+  SILValue getValue() const {
+    switch (getKind()) {
+    case None:
+    case ApplySite:
+      return SILValue();
+    case CopyAddr:
+      return getCopyAddr()->getAllOperands()[CopyLikeInstruction::Src].get();
+    case Store:
+      return getStore()->getAllOperands()[CopyLikeInstruction::Src].get();
+    case Value:
+      return std::get<SILValue>(value);
+    case ReturnTerm:
+      return std::get<Operand *>(value)->get();
+    }
+  }
+  CopyAddrInst *getCopyAddr() const { return std::get<CopyAddrInst *>(value); }
+  StoreInst *getStore() const { return std::get<StoreInst *>(value); }
+  Operand *getReturnTerm() const { return std::get<Operand *>(value); }
+
+  SILBasicBlock *getParentBlock() const {
+    switch (getKind()) {
+    case None:
+      return nullptr;
+    case ApplySite:
+      return getFullApplySite()->getParent();
+    case Value:
+      return getValue()->getParentBlock();
+    case CopyAddr:
+      return getCopyAddr()->getParentBlock();
+    case Store:
+      return getStore()->getParentBlock();
+    case ReturnTerm:
+      return getReturnTerm()->getParentBlock();
+    }
+  }
+
+  SILInstruction *getDefiningInsertionPoint() const {
+    switch (getKind()) {
+    case None:
+      return nullptr;
+    case ApplySite:
+      return *getFullApplySite();
+    case Value:
+      return getValue()->getDefiningInsertionPoint();
+    case CopyAddr:
+      return getCopyAddr();
+    case Store:
+      return getStore();
+    case ReturnTerm:
+      return getReturnTerm()->getUser();
+    }
+  }
+
+  SILLocation getLoc() const {
+    switch (getKind()) {
+    case None:
+      return SILLocation::invalid();
+    case ApplySite:
+    case Value:
+    case CopyAddr:
+    case Store:
+    case ReturnTerm:
+      return getDefiningInsertionPoint()->getLoc();
+    }
+  }
+
+  bool operator==(SILValue otherValue) const {
+    switch (getKind()) {
+    case None:
+    case ApplySite:
+      return false;
+    case CopyAddr:
+    case Store:
+    case Value:
+    case ReturnTerm:
+      return lookThroughAccess(getValue()) == lookThroughAccess(otherValue);
+    }
+  }
+
+  static bool
+  findLastValuesForOutParam(SILFunctionArgument *fArg,
+                            SmallVectorImpl<LastValueEnum> &lastValues);
+
+  void print(llvm::raw_ostream &os) const {
+    switch (getKind()) {
+    case None:
+      os << "none\n";
+      return;
+    case ApplySite:
+      os << "apply site: " << *getFullApplySite();
+      return;
+    case CopyAddr:
+      os << "copy_addr: " << *getCopyAddr();
+      return;
+    case Store:
+      os << "store: " << *getStore();
+      return;
+    case Value:
+      os << "value: " << *getValue();
+      break;
+    case ReturnTerm:
+      os << "return term: " << *getReturnTerm()->getUser();
+    }
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+};
+
+InOutSendingReturnedDiagnosticEmitter::LastValueEnum
+InOutSendingReturnedDiagnosticEmitter::LastValueEnum::get(
+    SILInstruction *user) {
+  if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+    return {cai};
+  }
+
+  if (auto *si = dyn_cast<StoreInst>(user)) {
+    return {si};
+  }
+
+  if (auto fas = FullApplySite::isa(user)) {
+    return {fas};
+  }
+
+  return {};
+}
+
+InOutSendingReturnedDiagnosticEmitter::LastValueEnum
+InOutSendingReturnedDiagnosticEmitter::LastValueEnum::get(Operand *use) {
+  if (auto value = get(use->getUser()))
+    return value;
+
+  if (auto *ti = dyn_cast<TermInst>(use->getUser())) {
+    if (ti->getLoc().getKind() == SILLocation::ReturnKind) {
+      return {use};
+    }
+  }
+
+  return {};
+}
+
+bool InOutSendingReturnedDiagnosticEmitter::LastValueEnum::isSupported(
+    Operand *use) {
+  if (auto fas = FullApplySite::isa(use->getUser())) {
+    if (fas.isIndirectResultOperand(*use)) {
+      auto *fn = fas.getCalleeFunction();
+      return fn && fn->getDeclRef();
+    }
+  }
+
+  if (auto *ti = dyn_cast<TermInst>(use->getUser())) {
+    if (ti->getLoc().getKind() == SILLocation::ReturnKind) {
+      return true;
+    }
+  }
+
+  return isa<CopyAddrInst, StoreInst>(use->getUser());
+}
+
+InOutSendingReturnedDiagnosticEmitter::LastValueEnum
+InOutSendingReturnedDiagnosticEmitter::LastValueEnum::get(SILValue value) {
+  if (auto *inst = value->getDefiningInstruction()) {
+    if (auto e = get(inst))
+      return e;
+  }
+
+  return {value};
+}
+
+void InOutSendingReturnedDiagnosticEmitter::emitLastValueEnum(
+    const LastValueEnum &value, SILDynamicMergedIsolationInfo isolationInfo,
+    SILLocation loc) {
+  switch (value.getKind()) {
+  case LastValueEnum::None:
+    llvm::report_fatal_error("Found .none enum elt");
+  case LastValueEnum::ApplySite:
+    emitDeclRefError(value.getDeclRef(), isolationInfo,
+                     loc ? loc : value.getLoc());
+    return;
+  case LastValueEnum::Store:
+  case LastValueEnum::CopyAddr:
+    emitValueError(value.getValue(), isolationInfo, loc ? loc : value.getLoc());
+    return;
+  case LastValueEnum::Value:
+    emitValueError(value.getValue(), isolationInfo,
+                   loc ? loc : functionExitingInst->getLoc());
+    return;
+  case LastValueEnum::ReturnTerm:
+    emitValueError(value.getValue(), isolationInfo, loc ? loc : value.getLoc());
+    return;
+  }
+  llvm::report_fatal_error("Should never hit this");
+}
+
+bool InOutSendingReturnedDiagnosticEmitter::emitOutParamIncomingValueError(
+    const LastValueEnum &finalValue) {
+  auto *block = finalValue.getParentBlock();
+  auto state = raFuncInfo->getBlockState(block);
+  assert(state.isNonNull());
+
+  // Grab the exit partition of the block. We make a copy here on purpose
+  // since it /is/ possible for DiagnosticEvaluator to modify
+  auto workingExitPartition = state.get()->getExitPartition();
+
+  // See if given the exit partition of the block if we would emit an error
+  // when we execute an InOutSendingAtFunctionExit partition op.
+  SmallFrozenMultiMap<Operand *, RequireInst, 8> sendingOpToRequireInstMultiMap;
+  SmallVector<PartitionOpError, 2> errors;
+  DiagnosticEvaluator evaluator(workingExitPartition, raFuncInfo,
+                                sendingOpToRequireInstMultiMap, errors,
+                                raFuncInfo->getSendingOperandToStateMap());
+  PartitionOp op = PartitionOp::InOutSendingAtFunctionExit(
+      inoutSendingParamElement, finalValue.getDefiningInsertionPoint());
+  evaluator.apply(op);
+
+  // Check if we got an error. If we did not, then this is not one of the
+  // guilty code paths. Continue.
+  if (errors.empty()) {
+    return false;
+  }
+
+  // Loop through the errors to find our InOutReturnedError. We emit one error
+  // per return... but we emit for multiple returns separate diagnostics.
+  while (!errors.empty()) {
+    auto err = errors.pop_back_val();
+    if (err.getKind() != PartitionOpError::InOutSendingReturned)
+      continue;
+    auto castError = std::move(err).getInOutSendingReturnedError();
+    if (castError.inoutSendingElement != inoutSendingParamElement)
+      continue;
+    // Ok, we found an error. Lets emit it and return early.
+    if (finalValue == inoutSendingParam) {
+      emitReturnInOutSendingError(isolationInfo, finalValue.getLoc());
+      return true;
+    }
+
+    // Force us to use the location of the finalValue. We do not want to use the
+    // function exiting inst.
+    emitLastValueEnum(finalValue, isolationInfo, finalValue.getLoc());
+    return true;
+  }
+
+  return false;
+}
+
+void InOutSendingReturnedDiagnosticEmitter::emit() {
+  // Check if we had a separate erroring value that is our returned value. If we
+  // do not then we just returned the 'inout sending' parameter. Emit a special
+  // message and return.
+  if (inoutSendingParam == returnedValue) {
+    return emitReturnInOutSendingError(isolationInfo,
+                                       functionExitingInst->getLoc());
+  }
+
+  // Before we do anything, see if we have a phi argument that is an epilogue
+  // phi. In such a case, we want to process the incoming values.
+  if (auto *phi = dyn_cast<SILPhiArgument>(returnedValue)) {
+    bool handledValue = false;
+    phi->visitIncomingPhiOperands([&](Operand *op) {
+      if (op->getUser()->getLoc().getKind() != SILLocation::ReturnKind)
+        return true;
+      handledValue |=
+          emitOutParamIncomingValueError(LastValueEnum::get(op->get()));
+      return true;
+    });
+    if (handledValue)
+      return;
+  }
+
+  // Check if we have an indirect out parameter as our erroring returned value.
+  auto *fArg = dyn_cast<SILFunctionArgument>(returnedValue);
+  if (!fArg || !fArg->isIndirectResult()) {
+    // If we do not have one... emit a normal error.
+    return emitLastValueEnum(LastValueEnum::get(returnedValue), isolationInfo);
+  }
+
+  SmallVector<LastValueEnum, 8> finalValues;
+  if (!LastValueEnum::findLastValuesForOutParam(fArg, finalValues))
+    return emitLastValueEnum(LastValueEnum::get(returnedValue), isolationInfo);
+
+  // If we have a single value, then we have found our value.
+  if (finalValues.size() == 1) {
+    if (finalValues[0] == inoutSendingParam) {
+      return emitReturnInOutSendingError(isolationInfo,
+                                         finalValues[0].getLoc());
+    }
+    emitLastValueEnum(finalValues[0], isolationInfo);
+    return;
+  }
+
+  // If we have multiple finalValues, then that means that we had multiple
+  // return values. In such a case, we must have a single epilog block
+  // that our finalValues jointly dominate. That means that we need to
+  // determine which block the error actually occured along and emit an
+  // error for the value in that block. We know we are going to emit an
+  // error, so we can spend more time finding the better diagnostic since
+  // we are going to fail.
+  for (auto finalValue : finalValues) {
+    emitOutParamIncomingValueError(finalValue);
+  }
+}
+
+bool InOutSendingReturnedDiagnosticEmitter::LastValueEnum::
+    findLastValuesForOutParam(SILFunctionArgument *fArg,
+                              SmallVectorImpl<LastValueEnum> &lastValues) {
+  assert(fArg->isIndirectResult());
+  SmallVector<SILBasicBlock *, 8> visitedBlocks;
+  SSAPrunedLiveness prunedLiveRange(fArg->getFunction(), &visitedBlocks);
+
+  // Look for copy_addr and store uses into fArg. They should all be complete
+  // stores.
+  prunedLiveRange.initializeDef(fArg);
+  for (auto *use : fArg->getUses()) {
+    if (LastValueEnum::isSupported(use)) {
+      prunedLiveRange.updateForUse(use->getUser(), false /*lifetime ending*/);
+      continue;
+    }
+    return false;
+  }
+
+  PrunedLivenessBoundary boundary;
+  prunedLiveRange.computeBoundary(boundary);
+
+  for (auto *user : boundary.lastUsers) {
+    if (auto e = LastValueEnum::get(user)) {
+      lastValues.emplace_back(e);
+      continue;
+    }
+
+    llvm::report_fatal_error("Out of sync with earlier check");
+  }
+
   return true;
 }
 
@@ -2164,7 +3065,7 @@ public:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -2208,12 +3109,8 @@ void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   }
 
   // Then emit the note with greater context.
-  SmallString<64> descriptiveKindStr;
-  {
-    llvm::raw_svector_ostream os(descriptiveKindStr);
-    actorIsolatedRegionInfo.printForDiagnostics(os);
-    os << ' ';
-  }
+  auto descriptiveKindStr =
+      actorIsolatedRegionInfo.printForDiagnostics(getFunction());
 
   diagnoseError(
       functionExitingInst,
@@ -2299,7 +3196,7 @@ public:
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -2368,11 +3265,8 @@ static SILValue findOutParameter(SILValue v) {
 
 void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
   // Then emit the note with greater context.
-  SmallString<64> descriptiveKindStr;
-  {
-    llvm::raw_svector_ostream os(descriptiveKindStr);
-    isolatedValueIsolationRegionInfo.printForDiagnostics(os);
-  }
+  auto descriptiveKindStr =
+      isolatedValueIsolationRegionInfo.printForDiagnostics(getFunction());
 
   // Grab the var name if we can find it.
   if (auto varName = VariableNameInferrer::inferName(srcOperand->get())) {
@@ -2492,9 +3386,13 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
   SILValue representative;
 
   NonSendableIsolationCrossingResultDiagnosticEmitter(
-      RegionAnalysisValueMap &valueMap, Error error)
-      : valueMap(valueMap), error(error),
+      RegionAnalysisValueMap &valueMap, Error &&error)
+      : valueMap(valueMap), error(std::move(error)),
         representative(valueMap.getRepresentative(error.returnValueElement)) {}
+
+  SILFunction *getFunction() const {
+    return error.op->getSourceInst()->getFunction();
+  }
 
   void emit();
 
@@ -2508,7 +3406,7 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
     emittedErrorDiagnostic = true;
     return std::move(getASTContext()
                          .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilSwiftVersion(6));
+                         .warnUntilLanguageMode(6));
   }
 
   template <typename... T, typename... U>
@@ -2612,17 +3510,22 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   if (!isolationCrossing)
     return emitUnknownPatternError();
 
+  auto calleeIsolationStr = SILIsolationInfo::printActorIsolationForDiagnostics(
+      getFunction(), isolationCrossing->getCalleeIsolation());
+  auto callerIsolationStr = SILIsolationInfo::printActorIsolationForDiagnostics(
+      getFunction(), isolationCrossing->getCallerIsolation());
+
   auto type = getType();
   if (getCalledDecl()) {
-    diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result,
-                  type, isolationCrossing->getCalleeIsolation(), getCalledDecl(),
-                  isolationCrossing->getCallerIsolation())
-      .limitBehaviorIf(getBehaviorLimit());
+    diagnoseError(error.op->getSourceInst(),
+                  diag::rbi_isolation_crossing_result, type, calleeIsolationStr,
+                  getCalledDecl(), callerIsolationStr)
+        .limitBehaviorIf(getBehaviorLimit());
   } else {
-    diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result_no_decl,
-                  type, isolationCrossing->getCalleeIsolation(),
-                  isolationCrossing->getCallerIsolation())
-      .limitBehaviorIf(getBehaviorLimit());
+    diagnoseError(error.op->getSourceInst(),
+                  diag::rbi_isolation_crossing_result_no_decl, type,
+                  calleeIsolationStr, callerIsolationStr)
+        .limitBehaviorIf(getBehaviorLimit());
   }
   if (type->is<FunctionType>()) {
     diagnoseNote(error.op->getSourceInst(),
@@ -2661,179 +3564,135 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
 }
 
 //===----------------------------------------------------------------------===//
-//                         MARK: Diagnostic Evaluator
+//               MARK: InOutSendingParametersInSameRegionError
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-struct DiagnosticEvaluator final
-    : PartitionOpEvaluatorBaseImpl<DiagnosticEvaluator> {
-  RegionAnalysisFunctionInfo *info;
-  SmallFrozenMultiMap<Operand *, RequireInst, 8>
-      &sendingOpToRequireInstMultiMap;
+class InOutSendingParametersInSameRegionDiagnosticEmitter {
+  /// The function exiting inst where the 'inout sending' parameter was actor
+  /// isolated.
+  TermInst *functionExitingInst;
 
-  /// An error that we know how to emit verbatim without needing to preprocess.
-  ///
-  /// A contrasting case here is the use after send error where we need to pair
-  /// sending operands to require insts.
-  SmallVectorImpl<PartitionOpError> &foundVerbatimErrors;
+  /// The first 'inout sending' param in the region.
+  SILValue firstInOutSendingParam;
 
-  DiagnosticEvaluator(Partition &workingPartition,
-                      RegionAnalysisFunctionInfo *info,
-                      SmallFrozenMultiMap<Operand *, RequireInst, 8>
-                          &sendingOpToRequireInstMultiMap,
-                      SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
-                      SendingOperandToStateMap &operandToStateMap)
-      : PartitionOpEvaluatorBaseImpl(
-            workingPartition, info->getOperandSetFactory(), operandToStateMap),
-        info(info),
-        sendingOpToRequireInstMultiMap(sendingOpToRequireInstMultiMap),
-        foundVerbatimErrors(foundVerbatimErrors) {}
+  /// The second 'inout sending' param in the region.
+  SILValue secondInOutSendingParam;
 
-  void handleLocalUseAfterSend(LocalUseAfterSendError error) const {
-    const auto &partitionOp = *error.op;
-    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+  bool emittedErrorDiagnostic = false;
 
-    // Ignore this if we are erroring on a mutable base of a Sendable value and
-    // if when we sent the value's region was not closure captured.
-    if (error.op->getOptions().containsOnly(
-            PartitionOp::Flag::RequireOfMutableBaseOfSendableValue) &&
-        !operandToStateMap.get(error.sendingOp).isClosureCaptured)
-      return;
+public:
+  InOutSendingParametersInSameRegionDiagnosticEmitter(
+      TermInst *functionExitingInst, SILValue firstInOutSendingParam,
+      SILValue secondInOutSendingParam)
+      : functionExitingInst(functionExitingInst),
+        firstInOutSendingParam(firstInOutSendingParam),
+        secondInOutSendingParam(secondInOutSendingParam) {}
 
-    sendingOpToRequireInstMultiMap.insert(
-        error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
+  ~InOutSendingParametersInSameRegionDiagnosticEmitter() {
+    // If we were supposed to emit a diagnostic and didn't emit an unknown
+    // pattern error.
+    if (!emittedErrorDiagnostic)
+      emitUnknownPatternError();
   }
 
-  void handleInOutSendingNotInitializedAtExitError(
-      InOutSendingNotInitializedAtExitError error) const {
-    const PartitionOp &partitionOp = *error.op;
-    Operand *sendingOp = error.sendingOp;
-
-    REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
-
-    sendingOpToRequireInstMultiMap.insert(
-        sendingOp, RequireInst::forInOutReinitializationNeeded(
-                       partitionOp.getSourceInst()));
+  SILFunction *getFunction() const {
+    return functionExitingInst->getFunction();
   }
 
-  void handleUnknownCodePattern(UnknownCodePatternError error) const {
-    const PartitionOp &op = *error.op;
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    auto first =
+        firstInOutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+            getFunction());
+    auto second =
+        secondInOutSendingParam->getType().getConcurrencyDiagnosticBehavior(
+            getFunction());
+    if (!first)
+      return second;
+    if (!second)
+      return first;
+    return first->merge(*second);
+  }
 
+  void emitUnknownPatternError() {
     if (shouldAbortOnUnknownPatternMatchError()) {
       llvm::report_fatal_error(
           "RegionIsolation: Aborting on unknown pattern match error");
     }
 
-    diagnoseError(op.getSourceInst(),
-                  diag::regionbasedisolation_unknown_pattern);
+    diagnoseError(functionExitingInst,
+                  diag::regionbasedisolation_unknown_pattern)
+        .limitBehaviorIf(getBehaviorLimit());
   }
 
-  void handleError(PartitionOpError error) {
-    switch (error.getKind()) {
-    case PartitionOpError::LocalUseAfterSend: {
-      return handleLocalUseAfterSend(error.getLocalUseAfterSendError());
-    }
-    case PartitionOpError::InOutSendingNotDisconnectedAtExit:
-    case PartitionOpError::SentNeverSendable:
-    case PartitionOpError::AssignNeverSendableIntoSendingResult:
-    case PartitionOpError::NonSendableIsolationCrossingResult:
-      // We are going to process these later... but dump so we can see that we
-      // handled an error here. The rest of the explicit handlers will dump as
-      // appropriate if they want to emit an error here (some will squelch the
-      // error).
-      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
-      foundVerbatimErrors.emplace_back(error);
-      return;
-    case PartitionOpError::InOutSendingNotInitializedAtExit: {
-      return handleInOutSendingNotInitializedAtExitError(
-          error.getInOutSendingNotInitializedAtExitError());
-    }
-    case PartitionOpError::UnknownCodePattern: {
-      return handleUnknownCodePattern(error.getUnknownCodePatternError());
-    }
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
+  void emit();
+
+  ASTContext &getASTContext() const {
+    return functionExitingInst->getFunction()->getASTContext();
   }
 
-  bool isActorDerived(Element element) const {
-    return info->getValueMap().getIsolationRegion(element).isActorIsolated();
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(getASTContext()
+                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+                         .warnUntilLanguageMode(6));
   }
 
-  bool isTaskIsolatedDerived(Element element) const {
-    return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
   }
 
-  SILIsolationInfo::Kind hasSpecialDerivation(Element element) const {
-    return info->getValueMap().getIsolationRegion(element).getKind();
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
-  SILIsolationInfo getIsolationRegionInfo(Element element) const {
-    return info->getValueMap().getIsolationRegion(element);
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
 
-  std::optional<Element> getElement(SILValue value) const {
-    return info->getValueMap().getTrackableValue(value).value.getID();
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
   }
 
-  SILValue getRepresentative(SILValue value) const {
-    return info->getValueMap()
-        .getTrackableValue(value)
-        .value.getRepresentative()
-        .maybeGetValue();
-  }
-
-  RepresentativeValue getRepresentativeValue(Element element) const {
-    return info->getValueMap().getRepresentativeValue(element);
-  }
-
-  bool isClosureCaptured(Element element, Operand *op) const {
-    auto value = info->getValueMap().maybeGetRepresentative(element);
-    if (!value)
-      return false;
-    return info->isClosureCaptured(value, op);
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 };
 
 } // namespace
 
-void SendNonSendableImpl::runDiagnosticEvaluator() {
-  // Then for each block...
-  REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Walking blocks for diagnostics.\n");
-  for (auto [block, blockState] : info->getRange()) {
-    REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                             << "|--> Block bb" << block.getDebugID() << "\n");
-
-    if (!blockState.getLiveness()) {
-      REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Dead block... skipping!\n");
-      continue;
-    }
-
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs() << "Entry Partition: ";
-        blockState.getEntryPartition().print(llvm::dbgs()));
-
-    // Grab its entry partition and setup an evaluator for the partition that
-    // has callbacks that emit diagnsotics...
-    Partition workingPartition = blockState.getEntryPartition();
-    DiagnosticEvaluator eval(
-        workingPartition, info, sendingOpToRequireInstMultiMap,
-        foundVerbatimErrors, info->getSendingOperandToStateMap());
-
-    // And then evaluate all of our partition ops on the entry partition.
-    for (auto &partitionOp : blockState.getPartitionOps()) {
-      eval.apply(partitionOp);
-    }
-
-    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Exit Partition: ";
-                             workingPartition.print(llvm::dbgs()));
+void InOutSendingParametersInSameRegionDiagnosticEmitter::emit() {
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto firstName = inferNameHelper(firstInOutSendingParam);
+  if (!firstName) {
+    return emitUnknownPatternError();
+  }
+  auto secondName = inferNameHelper(secondInOutSendingParam);
+  if (!secondName) {
+    return emitUnknownPatternError();
   }
 
-  REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                           << "Finished walking blocks for diagnostics.\n");
+  diagnoseError(functionExitingInst,
+                diag::regionbasedisolation_inout_sending_in_same_region,
+                *firstName, *secondName)
+      .limitBehaviorIf(getBehaviorLimit());
 
-  // Now that we have found all of our sendingInsts/Requires emit errors.
-  sendingOpToRequireInstMultiMap.setFrozen();
+  diagnoseNote(functionExitingInst,
+               diag::regionbasedisolation_inout_sending_in_same_region_note,
+               *firstName, *secondName);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2848,7 +3707,8 @@ void SendNonSendableImpl::emitVerbatimErrors() {
     case PartitionOpError::InOutSendingNotInitializedAtExit:
       llvm_unreachable("Handled elsewhere");
     case PartitionOpError::AssignNeverSendableIntoSendingResult: {
-      auto error = erasedError.getAssignNeverSendableIntoSendingResultError();
+      auto error =
+          std::move(erasedError).getAssignNeverSendableIntoSendingResultError();
       REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
       AssignIsolatedIntoSendingResultDiagnosticEmitter emitter(
           error.op->getSourceOp(), error.destValue, error.srcValue,
@@ -2857,7 +3717,8 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       continue;
     }
     case PartitionOpError::InOutSendingNotDisconnectedAtExit: {
-      auto error = erasedError.getInOutSendingNotDisconnectedAtExitError();
+      auto error =
+          std::move(erasedError).getInOutSendingNotDisconnectedAtExitError();
       auto inoutSendingVal =
           info->getValueMap().getRepresentative(error.inoutSendingElement);
       auto isolationRegionInfo = error.isolationInfo;
@@ -2870,20 +3731,60 @@ void SendNonSendableImpl::emitVerbatimErrors() {
       emitter.emit();
       continue;
     }
+    case PartitionOpError::InOutSendingReturned: {
+      auto error = std::move(erasedError).getInOutSendingReturnedError();
+      auto inoutSendingVal =
+          info->getValueMap().getRepresentative(error.inoutSendingElement);
+      auto returnedValue =
+          info->getValueMap().getRepresentative(error.returnedValue);
+
+      REGIONBASEDISOLATION_LOG(error.print(llvm::dbgs(), info->getValueMap()));
+
+      InOutSendingReturnedDiagnosticEmitter emitter(
+          info, cast<TermInst>(error.op->getSourceInst()), inoutSendingVal,
+          error.inoutSendingElement, returnedValue, error.isolationInfo);
+      emitter.emit();
+      continue;
+    }
     case PartitionOpError::SentNeverSendable: {
-      auto e = erasedError.getSentNeverSendableError();
+      auto e = std::move(erasedError).getSentNeverSendableError();
       REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
       SentNeverSendableDiagnosticInferrer diagnosticInferrer(
-          info->getValueMap(), e);
+          info->getValueMap(), std::move(e));
       diagnosticInferrer.run();
       continue;
     }
     case PartitionOpError::NonSendableIsolationCrossingResult: {
-      auto e = erasedError.getNonSendableIsolationCrossingResultError();
+      auto e =
+          std::move(erasedError).getNonSendableIsolationCrossingResultError();
       REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
       NonSendableIsolationCrossingResultDiagnosticEmitter diagnosticInferrer(
-          info->getValueMap(), e);
+          info->getValueMap(), std::move(e));
       diagnosticInferrer.emit();
+      continue;
+    }
+    case PartitionOpError::InOutSendingParametersInSameRegion: {
+      auto e =
+          std::move(erasedError).getInOutSendingParametersInSameRegionError();
+      REGIONBASEDISOLATION_LOG(e.print(llvm::dbgs(), info->getValueMap()));
+      auto firstParam =
+          info->getValueMap().getRepresentativeValue(e.firstInoutSendingParam);
+      // Walk through our secondInOutSendingParams and use one that is not
+      // ignore.
+      for (auto paramElt : e.otherInOutSendingParams) {
+        auto paramValue =
+            info->getValueMap().getRepresentativeValue(paramElt).getValue();
+        if (auto behavior =
+                paramValue->getType().getConcurrencyDiagnosticBehavior(
+                    info->getFunction());
+            behavior && *behavior == DiagnosticBehavior::Ignore) {
+          continue;
+        }
+        InOutSendingParametersInSameRegionDiagnosticEmitter diagnosticEmitter(
+            cast<TermInst>(e.op->getSourceInst()), firstParam.getValue(),
+            paramValue);
+        diagnosticEmitter.emit();
+      }
       continue;
     }
     }

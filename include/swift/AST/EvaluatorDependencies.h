@@ -94,6 +94,9 @@ class DependencyRecorder {
 public:
   DependencyRecorder(bool shouldRecord) : shouldRecord(shouldRecord) {}
 
+  /// Whether dependency recording is enabled.
+  bool isRecordingEnabled() const { return shouldRecord; }
+
   /// Push a new empty set onto the activeRequestReferences stack.
   template<typename Request>
   void beginRequest();

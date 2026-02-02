@@ -5,3 +5,13 @@ Functions:
   Parameters:
   - Position: 0
     Type: "posix_spawnattr_t _Nullable * _Nonnull"
+- Name: posix_spawn
+  Parameters:
+  - Position: 2
+    Type: "const posix_spawn_file_actions_t _Nonnull * _Nullable"
+  - Position: 3
+    Type: "const posix_spawnattr_t _Nonnull * _Nullable"
+- Name: posix_spawn_file_actions_init
+  Parameters:
+  - Position: 0
+    Type: "posix_spawn_file_actions_t _Nullable * _Nonnull"

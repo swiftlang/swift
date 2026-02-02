@@ -582,7 +582,13 @@ bb2:
   %4 = function_ref @nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   end_borrow %3 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
   br bb2
+
+bb4:
+  unreachable
 }
 
 // load_borrow is currently not optimized
@@ -1304,7 +1310,13 @@ bb2:
   %4 = function_ref @nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   destroy_value %3 : $Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
   br bb2
+
+bb4:
+  unreachable
 }
 
 // CHECK-LABEL: sil [ossa] @load_copy_loop_promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
@@ -1922,3 +1934,17 @@ bb0(%0 : $MyInt, %1 : @guaranteed $Foo, %2 : @guaranteed $Baz):
   dealloc_stack %3 : $*MyInt
   return %38 : $MyInt
 } // end sil function '$s27capture_promotion_ownership05test_a1_B0SiycyFSiycfU_Tf2iii_n'
+
+sil_global @gi : $Int
+
+// CHECK:     sil [ossa] @test_global :
+// CHECK-NOT:   load
+// CHECK:       return %0
+// CHECK:     } // end sil function 'test_global'
+sil [ossa] @test_global : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = global_addr @gi : $*Int
+  store %0 to [trivial] %1
+  %3 = load [trivial] %1
+  return %3
+}

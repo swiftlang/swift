@@ -16,6 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -27,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
@@ -34,6 +37,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Config.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "swift/Parse/Lexer.h" // bad dependency
@@ -76,11 +80,6 @@ enum class DiagnosticOptions {
 
   /// A diagnostic warning about an unused element.
   NoUsage,
-
-  /// The diagnostic should be ignored by default, but will be re-enabled
-  /// by various warning options (-Wwarning, -Werror). This only makes sense
-  /// for warnings.
-  DefaultIgnore,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
@@ -89,17 +88,16 @@ struct StoredDiagnosticInfo {
   bool isAPIDigesterBreakage : 1;
   bool isDeprecation : 1;
   bool isNoUsage : 1;
-  bool defaultIgnore : 1;
   DiagGroupID groupID;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
                                  bool fatal, bool isAPIDigesterBreakage,
                                  bool deprecation, bool noUsage,
-                                 bool defaultIgnore, DiagGroupID groupID)
+                                 DiagGroupID groupID)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
         isAPIDigesterBreakage(isAPIDigesterBreakage),
         isDeprecation(deprecation), isNoUsage(noUsage),
-        defaultIgnore(defaultIgnore), groupID(groupID) {}
+        groupID(groupID) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
                                  DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
@@ -108,7 +106,6 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::APIDigesterBreakage,
                              opts == DiagnosticOptions::Deprecation,
                              opts == DiagnosticOptions::NoUsage,
-                             opts == DiagnosticOptions::DefaultIgnore,
                              groupID) {}
 };
 } // end anonymous namespace
@@ -153,14 +150,26 @@ static constexpr const char *const fixItStrings[] = {
 };
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our ignored diagnostics to defaults
-  ignoredDiagnostics.reserve(NumDiagIDs);
-  for (const auto &info : storedDiagnosticInfos) {
-    ignoredDiagnostics.push_back(info.defaultIgnore);
-  }
+  // Initialize ignored diagnostic groups to defaults
+  for (const auto &groupInfo : diagnosticGroupsInfo)
+    if (groupInfo.defaultIgnoreWarnings)
+      getDiagGroupInfoByID(groupInfo.id).traverseDepthFirst([&](auto group) {
+        addWarningGroupControl(group.id, WarningGroupBehavior::Ignored);
+      });
 
-  // Initialize warningsAsErrors to default
-  warningsAsErrors.resize(DiagGroupsCount);
+  // Initialize compilerIgnoredDiagnostics
+  compilerIgnoredDiagnostics.resize(NumDiagIDs);
+}
+
+bool DiagnosticState::isIgnoredDiagnosticGroupTree(DiagGroupID id) const {
+  bool anyEnabled = false;
+  getDiagGroupInfoByID(id).traverseDepthFirst([&](auto group) {
+    anyEnabled |=
+        !warningGroupBehaviorMap.contains(group.id) ||
+        warningGroupBehaviorMap.find(group.id)->second.getBehavior() !=
+            WarningGroupBehavior::Ignored;
+  });
+  return !anyEnabled;
 }
 
 Diagnostic::Diagnostic(DiagID ID)
@@ -174,6 +183,16 @@ std::optional<const DiagnosticInfo *> Diagnostic::getWrappedDiagnostic() const {
   }
 
   return std::nullopt;
+}
+
+SourceLoc Diagnostic::getLocOrDeclLoc() const {
+  if (auto loc = getLoc())
+    return loc;
+
+  if (auto *D = getDecl())
+    return D->getLoc();
+
+  return SourceLoc();
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -205,11 +224,14 @@ static char extractCharBefore(SourceManager &SM, SourceLoc Loc) {
   return chars[0];
 }
 
+detail::ActiveDiagnostic &InFlightDiagnostic::getActiveDiag() const {
+  return Engine->getActiveDiagnostic(*this);
+}
+
 InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && R.isValid())
-    Engine->getActiveDiagnostic()
-        .addRange(toCharSourceRange(Engine->SourceMgr, R));
+    getDiag().addRange(toCharSourceRange(Engine->SourceMgr, R));
   return *this;
 }
 
@@ -217,15 +239,14 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
                                                        SourceLoc End) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic()
-        .addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
+    getDiag().addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
   return *this;
 }
 
 InFlightDiagnostic &InFlightDiagnostic::highlightChars(CharSourceRange Range) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Range.getStart().isValid())
-    Engine->getActiveDiagnostic().addRange(Range);
+    getDiag().addRange(Range);
   return *this;
 }
 
@@ -260,7 +281,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
   return *this;
 }
 
@@ -270,8 +291,7 @@ InFlightDiagnostic::fixItReplace(SourceRange R, StringRef FormatString,
   auto &SM = Engine->SourceMgr;
   auto charRange = toCharSourceRange(SM, R);
 
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange, FormatString, Args));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange, FormatString, Args));
   return *this;
 }
 
@@ -307,9 +327,8 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
                                       ArrayRef<DiagnosticArgument> Args) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic().addFixIt(
-        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, Start, End),
-                          FormatString, Args));
+    getDiag().addFixIt(Diagnostic::FixIt(
+        toCharSourceRange(Engine->SourceMgr, Start, End), FormatString, Args));
   return *this;
 }
 
@@ -350,7 +369,7 @@ SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
 
 InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  auto decl = Engine->ActiveDiagnostic->getDecl();
+  auto decl = getDiag().getDecl();
   if (!decl)
     return *this;
 
@@ -428,22 +447,27 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   auto text1 = SM.extractText(charRange1);
   auto text2 = SM.extractText(charRange2);
 
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange1, "%0", {text2}));
-  Engine->getActiveDiagnostic().addFixIt(
-      Diagnostic::FixIt(charRange2, "%0", {text1}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange1, "%0", {text2}));
+  getDiag().addFixIt(Diagnostic::FixIt(charRange2, "%0", {text1}));
   return *this;
 }
 
 InFlightDiagnostic &
 InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
-  Engine->getActiveDiagnostic().setBehaviorLimit(limit);
+  getDiag().setBehaviorLimit(limit);
   return *this;
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
-    DiagnosticBehavior limit, unsigned majorVersion) {
+InFlightDiagnostic::limitBehaviorIfMorePermissive(DiagnosticBehavior limit) {
+  auto prev = getDiag().getBehaviorLimit();
+  getDiag().setBehaviorLimit(prev.merge(limit));
+  return *this;
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
+                                                   unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
     // If the behavior limit is a warning or less, wrap the diagnostic
     // in a message that this will become an error in a later Swift
@@ -470,14 +494,14 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
   return *this;
 }
 
-InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftVersion() {
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureLanguageMode() {
   using namespace version;
-  return warnUntilSwiftVersion(Version::getFutureMajorLanguageVersion());
+  return warnUntilLanguageMode(Version::getFutureMajorLanguageVersion());
 }
 
 InFlightDiagnostic &
-InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
-  return limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning,
+InFlightDiagnostic::warnUntilLanguageMode(unsigned majorVersion) {
+  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
                                         majorVersion);
 }
 
@@ -496,30 +520,33 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   // so we don't get a None return or influence future diagnostics.
   DiagnosticState tempState;
   Engine->state.swap(tempState);
-  llvm::SaveAndRestore<DiagnosticBehavior>
-      limit(Engine->getActiveDiagnostic().BehaviorLimit,
-            DiagnosticBehavior::Unspecified);
 
-  Engine->WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
-      Engine->getActiveDiagnostic(), /* includeDiagnosticName= */ false));
+  auto &ActiveDiag = getActiveDiag();
+  auto &Diag = ActiveDiag.Diag;
+
+  llvm::SaveAndRestore<DiagnosticBehavior> limit(
+      Diag.BehaviorLimit, DiagnosticBehavior::Unspecified);
+
+  ActiveDiag.WrappedDiagnostics.push_back(std::make_unique<DiagnosticInfo>(
+      Engine->diagnosticInfoForDiagnostic(Diag, /*diagName*/ false).value()));
 
   Engine->state.swap(tempState);
 
-  auto &wrapped = Engine->WrappedDiagnostics.back();
+  auto &wrapped = *ActiveDiag.WrappedDiagnostics.back();
 
   // Copy and update its arg list.
-  Engine->WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
-  wrapped.FormatArgs = Engine->WrappedDiagnosticArgs.back();
+  ActiveDiag.WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
+  wrapped.FormatArgs = ActiveDiag.WrappedDiagnosticArgs.back();
 
   // Overwrite the ID and arguments with those from the wrapper.
-  Engine->getActiveDiagnostic().ID = wrapper.ID;
-  Engine->getActiveDiagnostic().Args = wrapper.Args;
+  Diag.ID = wrapper.ID;
+  Diag.Args = wrapper.Args;
   // Intentionally keeping the original GroupID here
 
   // Set the argument to the diagnostic being wrapped.
   ASSERT(wrapper.getArgs().front().getKind() ==
          DiagnosticArgumentKind::Diagnostic);
-  Engine->getActiveDiagnostic().Args.front() = &wrapped;
+  Diag.Args.front() = &wrapped;
 
   return *this;
 }
@@ -530,7 +557,7 @@ void InFlightDiagnostic::flush() {
   
   IsActive = false;
   if (Engine)
-    Engine->flushActiveDiagnostic();
+    Engine->endDiagnostic(*this);
 }
 
 void Diagnostic::addChildNote(Diagnostic &&D) {
@@ -565,42 +592,41 @@ bool DiagnosticEngine::finishProcessing() {
   return hadError;
 }
 
-void DiagnosticEngine::setWarningsAsErrorsRules(
-    const std::vector<WarningAsErrorRule> &rules) {
-  std::vector<std::string> unknownGroups;
+bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (!sf || !sf->getExportedSourceFile())
+    return !state.isIgnoredDiagnosticGroupTree(groupID);
+  auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+  return swift_ASTGen_isWarningGroupEnabledInFile(
+         sf->getExportedSourceFile(),
+         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+         StringRef(getDiagGroupInfoByID(groupID).name));
+#else
+  // Fallback to checking only the command-line configuration
+  return !state.isIgnoredDiagnosticGroupTree(groupID);
+#endif
+}
+
+void DiagnosticState::setWarningGroupControlRules(
+    const llvm::SmallVector<WarningGroupBehaviorRule, 4> &rules) {
   for (const auto &rule : rules) {
-    bool isEnabled = [&] {
-      switch (rule.getAction()) {
-      case WarningAsErrorRule::Action::Enable:
-        return true;
-      case WarningAsErrorRule::Action::Disable:
-        return false;
-      }
-    }();
-    auto target = rule.getTarget();
-    if (auto group = std::get_if<WarningAsErrorRule::TargetGroup>(&target)) {
-      auto name = std::string_view(group->name);
-      // Validate the group name and set the new behavior for each diagnostic
-      // associated with the group and all its subgroups.
-      if (auto groupID = getDiagGroupIDByName(name);
-          groupID && *groupID != DiagGroupID::no_group) {
-        getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
-          state.setWarningsAsErrorsForDiagGroupID(*groupID, isEnabled);
-          for (DiagID diagID : group.diagnostics) {
-            state.setIgnoredDiagnostic(diagID, false);
-          }
-        });
-      } else {
-        unknownGroups.push_back(std::string(name));
-      }
-    } else if (std::holds_alternative<WarningAsErrorRule::TargetAll>(target)) {
-      state.setAllWarningsAsErrors(isEnabled);
+    if (rule.hasGroup()) {
+      getDiagGroupInfoByID(rule.getGroup()).traverseDepthFirst([&](auto group) {
+        addWarningGroupControl(group.id, rule.getBehavior());
+      });
     } else {
-      llvm_unreachable("unhandled WarningAsErrorRule::Target");
+      // A global override for all groups of `-warnings-as-errors` or
+      // `-no-warnings-as-errors`.
+      for (const auto &groupInfo : diagnosticGroupsInfo) {
+        // Does not apply to warnings which are default ignored
+        if (warningGroupBehaviorMap.contains(groupInfo.id) &&
+            warningGroupBehaviorMap.find(groupInfo.id)->second.getBehavior() ==
+                WarningGroupBehavior::Ignored)
+          continue;
+
+        addWarningGroupControl(groupInfo.id, rule.getBehavior());
+      }
     }
-  }
-  for (const auto &unknownGroup : unknownGroups) {
-    diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
   }
 }
 
@@ -877,6 +903,20 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Modifier.empty() && "Improper modifier for ValueDecl argument");
     }
 
+    // Handle declarations representing an AvailabilityDomain specially.
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (auto domain = AvailabilityDomain::forCustom(const_cast<ValueDecl *>(VD))) {
+        Out << "availability domain";
+
+        if (includeName) {
+          Out << " " << FormatOpts.OpeningQuotationMark;
+          Out << domain->getNameForDiagnostics();
+          Out << FormatOpts.ClosingQuotationMark;
+        }
+        break;
+      }
+    }
+
     if (includeName) {
       if (auto accessor = dyn_cast<AccessorDecl>(D)) {
         // If it's an accessor, describe that and then switch to discussing its
@@ -967,11 +1007,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       needsQualification = typeSpellingIsAmbiguous(type, Args, printOptions);
     }
 
-    // If a type has an unresolved type, print it with syntax sugar removed for
+    // If a type has a bare error type, print it with syntax sugar removed for
     // clarity. For example, print `Array<_>` instead of `[_]`.
-    if (type->hasUnresolvedType()) {
+    if (type->hasBareError())
       type = type->getWithoutSyntaxSugar();
-    }
 
     if (needsQualification &&
         isa<OpaqueTypeArchetypeType>(type.getPointer()) &&
@@ -1287,7 +1326,76 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
-DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
+std::optional<DiagnosticBehavior>
+DiagnosticState::determineUserControlledWarningBehavior(
+    const Diagnostic &diag, SourceManager &sourceMgr) const {
+  auto &diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
+  if (diagInfo.kind != DiagnosticKind::Warning)
+    return std::nullopt;
+
+  // Compute a behavior relying strictly on command-line provided
+  // `warningGroupBehaviorMap`.
+  std::optional<DiagnosticBehavior> userControlledBehavior;
+  if (warningGroupBehaviorMap.contains(diag.getGroupID())) {
+    switch (
+        warningGroupBehaviorMap.find(diag.getGroupID())->second.getBehavior()) {
+    case WarningGroupBehavior::AsWarning:
+      userControlledBehavior = DiagnosticBehavior::Warning;
+      break;
+    case WarningGroupBehavior::AsError:
+      userControlledBehavior = DiagnosticBehavior::Error;
+      break;
+    case WarningGroupBehavior::Ignored:
+      userControlledBehavior = DiagnosticBehavior::Ignore;
+      break;
+    case WarningGroupBehavior::None:
+      userControlledBehavior = std::nullopt;
+      break;
+    }
+  } else
+    userControlledBehavior = std::nullopt;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Use the combined global controls (command-line flags such as `-Werror`)
+  // and syntactic controls at the source location of this diagnostic to
+  // compute the configured emission behavior for this diagnostic group.
+  SourceLoc loc = diag.getLocOrDeclLoc();
+  if (loc.isValid()) {
+    auto sourceFiles = sourceMgr.getSourceFilesForBufferID(
+        sourceMgr.findBufferContainingLoc(loc));
+    if (!sourceFiles.empty()) {
+      SourceFile *SF = sourceFiles.front();
+      if (SF && SF->getExportedSourceFile()) {
+        auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+        WarningGroupBehavior behavior =
+            swift_ASTGen_warningGroupBehaviorAtPosition(
+                SF->getExportedSourceFile(),
+                BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+                StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
+        switch (behavior) {
+        case AsError:
+          userControlledBehavior = DiagnosticBehavior::Error;
+          break;
+        case AsWarning:
+          userControlledBehavior = DiagnosticBehavior::Warning;
+          break;
+        case Ignored:
+          userControlledBehavior = DiagnosticBehavior::Ignore;
+          break;
+        case None:
+          break;
+        }
+      }
+    }
+  }
+#endif
+
+  return userControlledBehavior;
+}
+
+DiagnosticBehavior
+DiagnosticState::determineBehavior(const Diagnostic &diag,
+                                   SourceManager &sourceMgr) const {
   // We determine how to handle a diagnostic based on the following rules
   //   1) Map the diagnostic to its "intended" behavior, applying the behavior
   //      limit for this particular emission
@@ -1317,16 +1425,22 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     if (!showDiagnosticsAfterFatalError && lvl != DiagnosticBehavior::Note)
       lvl = DiagnosticBehavior::Ignore;
 
-  //   3) If the user ignored this specific diagnostic, follow that
-  if (ignoredDiagnostics[(unsigned)diag.getID()])
-    lvl = DiagnosticBehavior::Ignore;
+  // Handle compiler-internal ignored diagnostics
+  if (compilerIgnoredDiagnostics[(unsigned)diag.getID()])
+      lvl = DiagnosticBehavior::Ignore;
 
-  //   4) If the user substituted a different behavior for this behavior, apply
+  //   3) If the user substituted a different behavior for this warning, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
-      lvl = DiagnosticBehavior::Error;
+    if (auto userControlBehavior =
+            determineUserControlledWarningBehavior(diag, sourceMgr))
+      lvl = *userControlBehavior;
     if (suppressWarnings)
+      lvl = DiagnosticBehavior::Ignore;
+  }
+
+  if (lvl == DiagnosticBehavior::Note) {
+    if (suppressNotes)
       lvl = DiagnosticBehavior::Ignore;
   }
   
@@ -1334,49 +1448,67 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
   }
+  return lvl;
+}
 
-  //   5) Update current state for use during the next diagnostic
-  if (lvl == DiagnosticBehavior::Fatal) {
+void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
+  // Update current state for use during the next diagnostic
+  if (behavior == DiagnosticBehavior::Fatal) {
     fatalErrorOccurred = true;
     anyErrorOccurred = true;
-  } else if (lvl == DiagnosticBehavior::Error) {
+  } else if (behavior == DiagnosticBehavior::Error) {
     anyErrorOccurred = true;
   }
 
   ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
-  previousBehavior = lvl;
-  return lvl;
+  previousBehavior = behavior;
 }
 
-void DiagnosticEngine::flushActiveDiagnostic() {
-  assert(ActiveDiagnostic && "No active diagnostic to flush");
-  handleDiagnostic(std::move(*ActiveDiagnostic));
-  ActiveDiagnostic.reset();
+InFlightDiagnostic DiagnosticEngine::beginDiagnostic(const Diagnostic &D) {
+  unsigned idx = ActiveDiagnostics.size();
+  ActiveDiagnostics.emplace_back(D);
+  NumActiveDiags += 1;
+  return InFlightDiagnostic(*this, idx);
 }
 
-void DiagnosticEngine::handleDiagnostic(Diagnostic &&diag) {
+void DiagnosticEngine::endDiagnostic(const InFlightDiagnostic &D) {
+  // Decrement the number of active diagnostics. We wait until all in-flight
+  // diagnostics have ended to ensure a FIFO ordering.
+  ASSERT(NumActiveDiags > 0 && "Unbalanced call to endDiagnostic");
+  NumActiveDiags -= 1;
+  if (NumActiveDiags > 0)
+    return;
+
+  for (auto &D : ActiveDiagnostics)
+    handleDiagnostic(std::move(D));
+
+  ActiveDiagnostics.clear();
+}
+
+detail::ActiveDiagnostic &
+DiagnosticEngine::getActiveDiagnostic(const InFlightDiagnostic &diag) {
+  return ActiveDiagnostics[diag.Idx];
+}
+
+void DiagnosticEngine::handleDiagnostic(detail::ActiveDiagnostic &&diag) {
   if (TransactionCount == 0) {
-    emitDiagnostic(diag);
-    WrappedDiagnostics.clear();
-    WrappedDiagnosticArgs.clear();
+    emitDiagnostic(diag.Diag);
   } else {
-    onTentativeDiagnosticFlush(diag);
+    onTentativeDiagnosticFlush(diag.Diag);
     TentativeDiagnostics.emplace_back(std::move(diag));
   }
 }
 
 void DiagnosticEngine::clearTentativeDiagnostics() {
   TentativeDiagnostics.clear();
-  WrappedDiagnostics.clear();
-  WrappedDiagnosticArgs.clear();
 }
 
 void DiagnosticEngine::emitTentativeDiagnostics() {
   for (auto &diag : TentativeDiagnostics) {
-    emitDiagnostic(diag);
+    emitDiagnostic(diag.Diag);
   }
   clearTentativeDiagnostics();
 }
@@ -1392,25 +1524,25 @@ void DiagnosticEngine::forwardTentativeDiagnosticsTo(
 std::optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
                                               bool includeDiagnosticName) {
-  auto behavior = state.determineBehavior(diagnostic);
+  auto behavior = state.determineBehavior(diagnostic, SourceMgr);
+  state.updateFor(behavior);
+
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
   // Figure out the source location.
-  SourceLoc loc = diagnostic.getLoc();
+  SourceLoc loc = diagnostic.getLocOrDeclLoc();
   if (loc.isInvalid() && diagnostic.getDecl()) {
+    // If the location of the decl is invalid, try to pretty-print it into a
+    // buffer and capture the source location there. Make sure we don't have an
+    // active request running since printing AST can kick requests that may
+    // themselves emit diagnostics. This won't help the underlying cycle, but it
+    // at least stops us from overflowing the stack.
     const Decl *decl = diagnostic.getDecl();
-    // If a declaration was provided instead of a location, and that declaration
-    // has a location we can point to, use that location.
-    loc = decl->getLoc();
-
-    // If the location of the decl is invalid still, try to pretty-print the
-    // declaration into a buffer and capture the source location there.
-    if (loc.isInvalid()) {
-      loc = evaluateOrDefault(
-          decl->getASTContext().evaluator, PrettyPrintDeclRequest{decl},
-          SourceLoc());
-    }
+    PrettyPrintDeclRequest req(decl);
+    auto &eval = decl->getASTContext().evaluator;
+    if (!eval.hasActiveRequest(req))
+      loc = evaluateOrDefault(eval, req, SourceLoc());
   }
 
   auto groupID = diagnostic.getGroupID();
@@ -1479,7 +1611,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
       }
 
       auto expansionDecl =
-          cast<MacroExpansionDecl>(expansionNode.get<Decl *>());
+          cast<MacroExpansionDecl>(cast<Decl *>(expansionNode));
       return expansionDecl->getMacroName().getFullName();
     }
 
@@ -1738,6 +1870,31 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
+}
+
+DiagnosticQueue::DiagnosticQueue(DiagnosticEngine &engine,
+                                 bool emitOnDestruction)
+    : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
+      EmitOnDestruction(emitOnDestruction) {
+  // Open a transaction to avoid emitting any diagnostics for the temporary
+  // engine.
+  QueueEngine.TransactionCount++;
+
+  QueueEngine.setLanguageVersion(engine.languageVersion);
+}
+
+void DiagnosticQueue::forEach(
+    llvm::function_ref<void(const Diagnostic &)> body) const {
+  for (auto &activeDiag : QueueEngine.TentativeDiagnostics)
+    body(activeDiag.Diag);
+}
+
+void DiagnosticQueue::filter(
+    llvm::function_ref<bool(const Diagnostic &)> predicate) {
+  llvm::erase_if(QueueEngine.TentativeDiagnostics,
+                 [&](detail::ActiveDiagnostic &activeDiag) {
+                   return !predicate(activeDiag.Diag);
+                 });
 }
 
 EncodedDiagnosticMessage::EncodedDiagnosticMessage(StringRef S)

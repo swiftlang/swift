@@ -246,7 +246,7 @@ bool GenericSignatureImpl::isEqual(GenericSignature Other) const {
 }
 
 bool GenericSignatureImpl::isCanonical() const {
-  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+  if (isa<ASTContext *>(CanonicalSignatureOrASTContext))
     return true;
   return getCanonicalSignature().getPointer() == this;
 }
@@ -300,12 +300,12 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
 
   // A stored ASTContext indicates that this is the canonical
   // signature.
-  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+  if (isa<ASTContext *>(CanonicalSignatureOrASTContext))
     return CanGenericSignature(this);
 
   // Otherwise, return the stored canonical signature.
   return CanGenericSignature(
-      CanonicalSignatureOrASTContext.get<const GenericSignatureImpl *>());
+      cast<const GenericSignatureImpl *>(CanonicalSignatureOrASTContext));
 }
 
 GenericEnvironment *GenericSignature::getGenericEnvironment() const {
@@ -641,7 +641,7 @@ SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
         return param;
       return PackType::getSingletonPackExpansion(param);
     },
-    MakeAbstractConformanceForGenericType());
+    LookUpConformanceInModule());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(
@@ -1400,33 +1400,13 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
     const ProtocolDecl *proto, GenericSignatureErrors errors) {
   auto &ctx = proto->getASTContext();
 
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inheritedProto : proto->getInheritedProtocols()) {
-    inheritedProtos.push_back(inheritedProto);
-  }
-
+  // Pretend the protocol inherits from Copyable and Escapable.
+  SmallVector<Requirement, 2> requirements;
   for (auto ip : InvertibleProtocolSet::allKnown()) {
     auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-    inheritedProtos.push_back(otherProto);
-  }
-
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  SmallVector<Requirement, 2> requirements;
-
-  for (auto *inheritedProto : inheritedProtos) {
     requirements.emplace_back(RequirementKind::Conformance,
                               proto->getSelfInterfaceType(),
-                              inheritedProto->getDeclaredInterfaceType());
-  }
-
-  for (auto *assocTypeDecl : proto->getAssociatedTypeMembers()) {
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
-      requirements.emplace_back(RequirementKind::Conformance,
-                                assocTypeDecl->getDeclaredInterfaceType(),
-                                otherProto->getDeclaredInterfaceType());
-    }
+                              otherProto->getDeclaredInterfaceType());
   }
 
   // Maintain invariants.
@@ -1436,7 +1416,8 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
                        });
 
   return RequirementSignature(ctx.AllocateCopy(requirements),
-                              ArrayRef<ProtocolTypeAlias>());
+                              ArrayRef<ProtocolTypeAlias>(),
+                              errors);
 }
 
 void RequirementSignature::getRequirementsWithInverses(

@@ -1,0 +1,100 @@
+// RUN: %target-sil-opt %s \
+// RUN:   -early-inline \
+// RUN:   -sil-print-types \
+// RUN:   -enable-experimental-feature Lifetimes | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
+
+import Swift
+import Builtin
+
+struct Wrapper : ~Copyable {
+}
+
+struct NE : ~Escapable {
+}
+
+struct MyBox : ~Copyable {
+}
+
+sil @$s4test7WrapperVACycfC : $@convention(method) (@thin Wrapper.Type) -> @owned Wrapper
+sil @$s4test2NEVyAcA7WrapperVhcfC : $@convention(method) (@guaranteed Wrapper, @thin NE.Type) -> @lifetime(borrow 0) @owned NE
+sil @$s4test5MyBoxVACycfC : $@convention(method) (@thin MyBox.Type) -> @owned MyBox
+sil @$s4test3useyyAA2NEVF : $@convention(thin) (@guaranteed NE) -> ()
+
+sil hidden [ossa] @$s4test5MyBoxV5valueAA2NEVvr : $@yield_once @convention(method) (@guaranteed MyBox) -> @lifetime(borrow 0) @yields @guaranteed NE {
+bb0(%0 : @guaranteed $MyBox):
+  %1 = copy_value %0
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
+  %4 = alloc_box ${ let Wrapper }, let, name "w"
+  %5 = begin_borrow [lexical] [var_decl] %4
+  %6 = project_box %5, 0
+  %7 = metatype $@thin Wrapper.Type
+  %8 = function_ref @$s4test7WrapperVACycfC : $@convention(method) (@thin Wrapper.Type) -> @owned Wrapper
+  %9 = apply %8(%7) : $@convention(method) (@thin Wrapper.Type) -> @owned Wrapper
+  store %9 to [init] %6
+  %11 = metatype $@thin NE.Type
+  %12 = mark_unresolved_non_copyable_value [no_consume_or_assign] %6
+  %13 = load_borrow %12
+  %14 = function_ref @$s4test2NEVyAcA7WrapperVhcfC : $@convention(method) (@guaranteed Wrapper, @thin NE.Type) -> @lifetime(borrow 0) @owned NE
+  %15 = apply %14(%13, %11) : $@convention(method) (@guaranteed Wrapper, @thin NE.Type) -> @lifetime(borrow 0) @owned NE
+  %16 = mark_dependence [nonescaping] %15 on %5
+  end_borrow %13
+  yield %16, resume bb1, unwind bb2
+
+bb1:
+  destroy_value %16
+  end_borrow %5
+  destroy_value %4
+  destroy_value %2
+  %23 = tuple ()
+  return %23
+
+bb2:
+  destroy_value %16
+  end_borrow %5
+  destroy_value %4
+  destroy_value %2
+  unwind
+}
+
+// Reduced SIL for validation-test/SILOptimizer/rdar151568816.swift
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test3fooyyF :
+// CHECK:  [[W:%.*]] = alloc_box ${ let Wrapper }, let, name "w"
+// CHECK:  [[B:%.*]] = begin_borrow [lexical] [var_decl] [[W]] : ${ let Wrapper }
+// CHECK:  [[INITFN:%.*]] = function_ref @$s4test2NEVyAcA7WrapperVhcfC : $@convention(method) (@guaranteed Wrapper, @thin NE.Type) -> @lifetime(borrow 0) @owned NE
+// CHECK:  [[NE:%.*]] = apply [[INITFN]]({{.*}}) : $@convention(method) (@guaranteed Wrapper, @thin NE.Type) -> @lifetime(borrow 0) @owned NE
+// CHECK:  [[MDI:%.*]] = mark_dependence [nonescaping] [[NE]] : $NE on [[B]] : ${ let Wrapper }
+// CHECK-LABEL: } // end sil function '$s4test3fooyyF'
+sil hidden [ossa] @$s4test3fooyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ let MyBox }, let, name "box"
+  %1 = begin_borrow [lexical] [var_decl] %0
+  %2 = project_box %1, 0
+  %3 = metatype $@thin MyBox.Type
+  %4 = function_ref @$s4test5MyBoxVACycfC : $@convention(method) (@thin MyBox.Type) -> @owned MyBox
+  %5 = apply %4(%3) : $@convention(method) (@thin MyBox.Type) -> @owned MyBox
+  store %5 to [init] %2
+  %7 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+  %8 = load_borrow %7
+  %9 = function_ref @$s4test5MyBoxV5valueAA2NEVvr : $@yield_once @convention(method) (@guaranteed MyBox) -> @lifetime(borrow 0) @yields @guaranteed NE
+  (%10, %11) = begin_apply %9(%8) : $@yield_once @convention(method) (@guaranteed MyBox) -> @lifetime(borrow 0) @yields @guaranteed NE
+  %12 = mark_dependence [nonescaping] %10 on %11
+  %13 = mark_dependence [nonescaping] %12 on %1
+  %14 = copy_value %13
+  %15 = move_value [var_decl] %14
+  %17 = begin_borrow %15
+  %18 = function_ref @$s4test3useyyAA2NEVF : $@convention(thin) (@guaranteed NE) -> ()
+  %19 = apply %18(%17) : $@convention(thin) (@guaranteed NE) -> ()
+  end_borrow %17
+  destroy_value %15
+  %22 = end_apply %11 as $()
+  end_borrow %8
+  end_borrow %1
+  destroy_value %0
+  %26 = tuple ()
+  return %26
+}
+

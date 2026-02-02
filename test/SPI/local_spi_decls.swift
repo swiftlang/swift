@@ -51,10 +51,10 @@ func inlinable() -> SPIClass { // expected-error {{class 'SPIClass' cannot be us
   // expected-error@-1 {{stored property 'spiInFrozen' cannot be declared '@_spi' in a '@frozen' struct}}
 
   var spiTypeInFrozen = SPIStruct() // expected-error {{struct 'SPIStruct' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
-  // expected-error@-1 {{cannot use struct 'SPIStruct' here; it is SPI}}
+  // expected-error@-1 {{cannot use struct 'SPIStruct' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
   // expected-error@-2 {{initializer 'init()' cannot be used in a property initializer in a '@frozen' type because it is SPI}}
 
-  private var spiTypeInFrozen1: SPIClass // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
+  private var spiTypeInFrozen1: SPIClass // expected-error {{cannot use class 'SPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 @_spi(S)
@@ -81,8 +81,8 @@ public func genFuncBad<T: SPIProtocol>(_ t: T) {} // expected-error {{cannot use
 @_spi(S) func internalCantBeSPI() {} // expected-error{{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}} {{1-10=}}
 
 public struct PublicStructWithProperties {
-  public var a: SPIClass // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
-  public var b = SPIClass() // expected-error {{cannot use class 'SPIClass' here; it is SPI}}
+  public var a: SPIClass // expected-error {{cannot use class 'SPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
+  public var b = SPIClass() // expected-error {{cannot use class 'SPIClass' in a property declaration marked public or in a '@frozen' or '@usableFromInline' context; it is SPI}}
 }
 
 @_spi(S)
@@ -115,11 +115,20 @@ public func publicFuncWithDefaultValue(_ p: SPIClass = SPIClass()) {} // expecte
 @_spi(S)
 public func spiFuncWithDefaultValue(_ p: SPIClass = SPIClass()) {}
 
+public struct PublicType {
+    public init() { }
+}
+@_spi(S) public func -(_ s1: PublicType, _ s2: PublicType) -> PublicType { s1 }
+
+public let o1 = PublicType()
+public let o2 = PublicType()
+
 @inlinable
 public func inlinablePublic() {
   spiFunc() // expected-error {{global function 'spiFunc()' cannot be used in an '@inlinable' function because it is SPI}}
   let _ = SPIClass() // expected-error {{class 'SPIClass' cannot be used in an '@inlinable' function because it is SPI}}
   // expected-error@-1 {{initializer 'init()' cannot be used in an '@inlinable' function because it is SPI}}
+  let _ = o1 - o2 // expected-error {{operator function '-' cannot be used in an '@inlinable' function because it is SPI}}
 }
 
 @_spi(S)
@@ -127,8 +136,11 @@ public func inlinablePublic() {
 public func inlinableSPI() {
   spiFunc()
   let _ = SPIClass()
+  let _ = o1 - o2
 }
 
 @_spi(S) func internalFunc() {} // expected-error {{internal global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}
 
 @_spi(S) package func packageFunc() {} // expected-error {{package global function cannot be declared '@_spi' because only public and open declarations can be '@_spi'}}
+
+let _ = o1 - o2

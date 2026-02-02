@@ -216,7 +216,9 @@ public:
 
   ReabstractionInfo(CanSILFunctionType substitutedType,
                     SILDeclRef methodDecl,
+                    bool convertIndirectToDirect,
                     SILModule &M) :
+    ConvertIndirectToDirect(convertIndirectToDirect),
     SubstitutedType(substitutedType),
     methodDecl(methodDecl),
     M(&M), isWholeModule(M.isWholeModule()) {}
@@ -342,7 +344,7 @@ public:
   SILFunction *getNonSpecializedFunction() const { return Callee; }
 
   /// Map SIL type into a context of the specialized function.
-  SILType mapTypeIntoContext(SILType type) const;
+  SILType mapTypeIntoEnvironment(SILType type) const;
 
   SILModule &getModule() const { return *M; }
 

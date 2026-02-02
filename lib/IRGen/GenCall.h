@@ -143,9 +143,9 @@ namespace irgen {
   std::pair<llvm::Value *, llvm::Value *>
   getAsyncFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
                           std::pair<bool, bool> values = {true, true});
-  std::pair<llvm::Value *, llvm::Value *>
-  getCoroFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
-                         std::pair<bool, bool> values = {true, true});
+  std::tuple<llvm::Value *, llvm::Value *, llvm::Value *> getCoroFunctionValues(
+      IRGenFunction &IGF, FunctionPointer functionPointer,
+      std::tuple<bool, bool, bool> values = {true, true, true});
   llvm::CallingConv::ID
   expandCallingConv(IRGenModule &IGM, SILFunctionTypeRepresentation convention,
                     bool isAsync, bool isCalleeAllocatedCoro);
@@ -220,11 +220,9 @@ namespace irgen {
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
 
-  llvm::Value *
-  emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
-                                   std::optional<CoroAllocatorKind> kind);
   StackAddress emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
-                                                 llvm::Value *size);
+                                                 llvm::Value *size,
+                                                 llvm::Value *mallocTypeId);
   void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
                                            StackAddress allocation);
   void
@@ -255,7 +253,8 @@ namespace irgen {
                               LinkEntity asyncFunction,
                               unsigned asyncContextIndex);
 
-  StackAddress emitAllocCoroStaticFrame(IRGenFunction &IGF, llvm::Value *size);
+  StackAddress emitAllocCoroStaticFrame(IRGenFunction &IGF, llvm::Value *size,
+                                        llvm::Value *mallocTypeId);
   void emitDeallocCoroStaticFrame(IRGenFunction &IGF, StackAddress frame);
 
   /// Yield the given values from the current continuation.
@@ -277,9 +276,13 @@ namespace irgen {
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        SILType funcResultTypeInContext,
                        CanSILFunctionType fnType, Explosion &result,
-                       Explosion &error);
+                       Explosion &error,
+                       SILType funcErrorTypeInContext);
   void emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
                                     SILType funcResultType, SILType returnResultType);
+
+  void emitAddressResult(IRGenFunction &IGF, Explosion &result,
+                         SILType funcResultType, SILType returnResultType);
 
   Address emitAutoDiffCreateLinearMapContextWithType(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextMetatype);

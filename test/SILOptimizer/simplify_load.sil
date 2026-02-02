@@ -31,6 +31,10 @@ class D : C {
   @_hasStorage var d: Builtin.Int64
 }
 
+struct AO {
+  let a: AnyObject
+}
+
 sil_global hidden [let] @gb : $B
 sil_global hidden [let] @gb2 : $(B, Int64)
 
@@ -541,5 +545,47 @@ bb0:
   %3 = ref_element_addr %2, #D.d
   %4 = load %3
   return %4
+}
+
+// CHECK-LABEL: sil [ossa] @load_of_addr_cast :
+// CHECK:         %1 = load [copy] %0
+// CHECK:         %2 = unchecked_ref_cast %1 : $B to $AnyObject
+// CHECK:         fix_lifetime %2
+// CHECK:         destroy_value %2
+// CHECK:       } // end sil function 'load_of_addr_cast'
+sil [ossa] @load_of_addr_cast : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = unchecked_addr_cast %0 to $*AnyObject
+  %2 = load [copy] %1
+  fix_lifetime %2
+  destroy_value %2
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_non_class_addr_cast1 :
+// CHECK:         %1 = unchecked_addr_cast %0
+// CHECK:       } // end sil function 'dont_remove_non_class_addr_cast1'
+sil [ossa] @dont_remove_non_class_addr_cast1 : $@convention(thin) (@inout AO) -> () {
+bb0(%0 : $*AO):
+  %1 = unchecked_addr_cast %0 to $*AnyObject
+  %2 = load [copy] %1
+  fix_lifetime %2
+  destroy_value %2
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_non_class_addr_cast2 :
+// CHECK:         %1 = unchecked_addr_cast %0
+// CHECK:       } // end sil function 'dont_remove_non_class_addr_cast2'
+sil [ossa] @dont_remove_non_class_addr_cast2 : $@convention(thin) (@inout AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %1 = unchecked_addr_cast %0 to $*AO
+  %2 = load [copy] %1
+  fix_lifetime %2
+  destroy_value %2
+  %6 = tuple ()
+  return %6
 }
 

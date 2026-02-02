@@ -59,6 +59,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
+
 using namespace swift;
 
 void ASTWalker::anchor() {}
@@ -516,7 +517,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         } else if (auto *stmt = expandedNode.dyn_cast<Stmt *>()) {
           alreadyFailed = doIt(stmt) == nullptr;
         } else {
-          auto decl = expandedNode.get<Decl *>();
+          auto decl = cast<Decl *>(expandedNode);
           if (!isa<VarDecl>(decl))
             alreadyFailed = doIt(decl);
         }
@@ -557,7 +558,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (WalkGenerics && visitTrailingRequirements(AFD))
       return true;
 
-    if (AFD->getBody(/*canSynthesize=*/false)) {
+    // If we're not walking macro expansions, avoid walking into a body if it
+    // was expanded from a macro.
+    auto SkipBody = !Walker.shouldWalkMacroArgumentsAndExpansion().second &&
+                    AFD->isBodyMacroExpanded();
+
+    if (!SkipBody && AFD->getBody(/*canSynthesize=*/false)) {
       AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
         AFD->setBody(S, PreservedKind);
@@ -598,24 +604,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                                  Exprs
   //===--------------------------------------------------------------------===//
 
-  // A macro for handling the "semantic expressions" that are common
-  // on sugared expression nodes like string interpolation.  The
-  // semantic expression is set up by type-checking to include all the
-  // other children as sub-expressions, so if it exists, we should
-  // just bypass the rest of the visitation.
-#define HANDLE_SEMANTIC_EXPR(NODE)                         \
-  do {                                                     \
-    if (Expr *_semanticExpr = NODE->getSemanticExpr()) {   \
-      if ((_semanticExpr = doIt(_semanticExpr))) {         \
-        NODE->setSemanticExpr(_semanticExpr);              \
-      } else {                                             \
-        return nullptr;                                    \
-      }                                                    \
-      return NODE;                                         \
-    }                                                      \
-  } while (false)
-
-  Expr *visitErrorExpr(ErrorExpr *E) { return E; }
+  Expr *visitErrorExpr(ErrorExpr *E) {
+    if (auto *origExpr = E->getOriginalExpr()) {
+      auto *newOrigExpr = doIt(origExpr);
+      if (!newOrigExpr)
+        return nullptr;
+      E->setOriginalExpr(newOrigExpr);
+    }
+    return E;
+  }
   Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) {
     if (Expr *baseExpr = E->getBase()) {
       Expr *newBaseExpr = doIt(baseExpr);
@@ -884,23 +881,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
-    if (auto &keyConv = E->getKeyConversion()) {
-      auto kConv = keyConv.Conversion;
-      if (!kConv) {
-        return nullptr;
-      } else if (Expr *E2 = doIt(kConv)) {
-        E->setKeyConversion({keyConv.OrigValue, E2});
+    if (auto keyConv = E->getKeyConversion()) {
+      if (Expr *E2 = doIt(keyConv)) {
+        E->setKeyConversion(cast<ClosureExpr>(E2));
       } else {
         return nullptr;
       }
     }
 
-    if (auto &valueConv = E->getValueConversion()) {
-      auto vConv = valueConv.Conversion;
-      if (!vConv) {
-        return nullptr;
-      } else if (Expr *E2 = doIt(vConv)) {
-        E->setValueConversion({valueConv.OrigValue, E2});
+    if (auto valueConv = E->getValueConversion()) {
+      if (Expr *E2 = doIt(valueConv)) {
+        E->setValueConversion(cast<ClosureExpr>(E2));
       } else {
         return nullptr;
       }
@@ -1258,7 +1249,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
     return E;
   }
 
@@ -1376,6 +1366,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
   Expr *visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
+    if (auto preamble = E->getForExpressionPreamble()) {
+      if (doIt(preamble->ForAccumulatorDecl)) {
+        return nullptr;
+      }
+
+      if (doIt(preamble->ForAccumulatorBinding)) {
+        return nullptr;
+      }
+    }
+
     if (auto *S = doIt(E->getStmt())) {
       E->setStmt(S);
     } else {
@@ -1461,6 +1461,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitTypeValueExpr(TypeValueExpr *E) {
+    if (auto *TR = E->getRepr()) {
+      if (doIt(TR))
+        return nullptr;
+    }
     return E;
   }
 
@@ -1886,6 +1890,11 @@ Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
   return S;
 }
 
+Stmt *Traversal::visitOpaqueStmt(OpaqueStmt *OS) {
+  // We do not want to visit it.
+  return OS;
+}
+
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
     if (auto *SubExpr = Elem.dyn_cast<Expr*>()) {
@@ -1904,7 +1913,7 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    auto *D = Elem.get<Decl*>();
+    auto *D = cast<Decl *>(Elem);
     if (doIt(D))
       return nullptr;
 
@@ -2056,28 +2065,11 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  // The iterator decl is built directly on top of the sequence
-  // expression, so don't visit both.
-  //
-  // If for-in is already type-checked, the type-checked version
-  // of the sequence is going to be visited as part of `iteratorVar`.
-  if (auto IteratorVar = S->getIteratorVar()) {
-    if (doIt(IteratorVar))
+  if (Expr *Sequence = S->getSequence()) {
+    if ((Sequence = doIt(Sequence)))
+      S->setSequence(Sequence);
+    else
       return nullptr;
-
-    if (auto NextCall = S->getNextCall()) {
-      if ((NextCall = doIt(NextCall)))
-        S->setNextCall(NextCall);
-      else
-        return nullptr;
-    }
-  } else {
-    if (Expr *Sequence = S->getParsedSequence()) {
-      if ((Sequence = doIt(Sequence)))
-        S->setParsedSequence(Sequence);
-      else
-        return nullptr;
-    }
   }
 
   if (Expr *Where = S->getWhere()) {
@@ -2087,18 +2079,20 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getConvertElementExpr()) {
-    if ((IteratorNext = doIt(IteratorNext)))
-      S->setConvertElementExpr(IteratorNext);
-    else
-      return nullptr;
-  }
-
   if (Stmt *Body = S->getBody()) {
     if ((Body = doIt(Body)))
       S->setBody(cast<BraceStmt>(Body));
     else
       return nullptr;
+  }
+
+  if (Walker.shouldWalkIntoForEachDesugaredStmt()) {
+    if (Stmt *Desugared = S->getCachedDesugaredStmt()) {
+      if ((Desugared = doIt(Desugared)))
+        S->setDesugaredStmt(cast<BraceStmt>(Desugared));
+      else
+        return nullptr;
+    }
   }
 
   return S;
@@ -2232,6 +2226,8 @@ Pattern *Traversal::visitExprPattern(ExprPattern *P) {
   return nullptr;
 }
 
+Pattern *Traversal::visitOpaquePattern(OpaquePattern *P) { return P; }
+
 Pattern *Traversal::visitBindingPattern(BindingPattern *P) {
   if (Pattern *newSub = doIt(P->getSubPattern())) {
     P->setSubPattern(newSub);
@@ -2254,6 +2250,12 @@ Pattern *Traversal::visitBoolPattern(BoolPattern *P) {
 
 #pragma mark Type representation traversal
 bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
+  if (auto *originalExpr = T->getOriginalExpr()) {
+    auto *newExpr = doIt(originalExpr);
+    if (!newExpr)
+      return true;
+    T->setOriginalExpr(newExpr);
+  }
   return false;
 }
 

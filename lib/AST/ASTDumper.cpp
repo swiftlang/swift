@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -260,8 +260,14 @@ std::string typeUSR(Type type) {
   if (!type)
     return "";
 
+  if (type->is<ModuleType>()) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
   if (type->hasArchetype()) {
-    type = type->mapTypeOutOfContext();
+    type = type->mapTypeOutOfEnvironment();
   }
   if (type->hasLocalArchetype()) {
     type = replaceLocalArchetypesWithExistentials(type);
@@ -279,6 +285,13 @@ std::string typeUSR(Type type) {
 std::string declTypeUSR(const ValueDecl *D) {
   if (!D)
     return "";
+
+  if (isa<ModuleDecl>(D)) {
+    // ASTMangler does not support "module types". This can appear, for
+    // example, on the left-hand side of a `DotSyntaxBaseIgnoredExpr` for a
+    // module-qualified free function call: `Swift.print()`.
+    return "";
+  }
 
   std::string usr;
   llvm::raw_string_ostream os(usr);
@@ -326,8 +339,10 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
-  case ReadImplKind::Read2:
-    return "read2_coroutine";
+  case ReadImplKind::YieldingBorrow:
+    return "yielding_borrow";
+  case ReadImplKind::Borrow:
+    return "borrow";
   }
   llvm_unreachable("bad kind");
 }
@@ -348,8 +363,10 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
-  case WriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case WriteImplKind::YieldingMutate:
+    return "yielding_mutate";
+  case WriteImplKind::Mutate:
+    return "mutate";
   }
   llvm_unreachable("bad kind");
 }
@@ -366,12 +383,14 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
-  case ReadWriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case ReadWriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
     return "inherited_with_didset";
+  case ReadWriteImplKind::Mutate:
+    return "mutate";
   }
   llvm_unreachable("bad kind");
 }
@@ -575,12 +594,23 @@ static StringRef getDumpString(ExternKind kind) {
 }
 static StringRef getDumpString(InlineKind kind) {
   switch (kind) {
+  case InlineKind::AlwaysUnderscored:
+    return "__always";
   case InlineKind::Always:
     return "always";
   case InlineKind::Never:
     return "never";
   }
   llvm_unreachable("unhandled InlineKind");
+}
+static StringRef getDumpString(ExportKind kind) {
+  switch (kind) {
+  case ExportKind::Interface:
+    return "interface";
+  case ExportKind::Implementation:
+    return "implementation";
+  }
+  llvm_unreachable("unhandled ExportKind");
 }
 static StringRef getDumpString(MacroRole role) {
   return getMacroRoleString(role);
@@ -672,12 +702,22 @@ static StringRef getDumpString(StringRef s) {
 static unsigned getDumpString(unsigned value) {
   return value;
 }
-static size_t getDumpString(size_t value) {
-  return value;
-}
-static void *getDumpString(void *value) { return value; }
+static size_t getDumpString(size_t value) { return value; }
 
 static StringRef getDumpString(Identifier ident) { return ident.str(); }
+
+// If you are reading this comment because a compiler error directed you
+// here, it's probably because you have tried to pass a pointer directly
+// into a function like `printField`. Please do not do this -- it makes
+// the output nondeterministic. For the default S-expression output this
+// is not typically an issue (as it is used mainly for debugging), but
+// this is particularly problematic for the JSON format since build
+// systems may want to cache those outputs based on the content hash.
+//
+// Please call `printPointerField` instead. The output format will be
+// the same for the default formatter, but the JSON formatter will
+// replace those pointers with unique deterministic identifiers.
+static void *getDumpString(void *value) = delete;
 
 //===----------------------------------------------------------------------===//
 //  Decl printing.
@@ -805,6 +845,10 @@ namespace {
     virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
                                   Label label) = 0;
 
+    /// Prints the given pointer to an output stream, transforming the pointer
+    /// if necessary to make it safe for the output format.
+    virtual void printPointerToStream(void *pointer, llvm::raw_ostream &OS) = 0;
+
     /// Indicates whether the output format is meant to be parsable. Parsable
     /// output should use structure rather than stringification to convey
     /// detailed information, and generally provides more information than the
@@ -898,6 +942,12 @@ namespace {
       }, label, RangeColor);
     }
 
+    void printPointerToStream(void *pointer, llvm::raw_ostream &OS) override {
+      // The default S-expression format leaves the pointer as-is, since this
+      // is useful when dumping AST nodes in the debugger.
+      OS << pointer;
+    }
+
     bool isParsable() const override { return false; }
   };
 
@@ -906,8 +956,12 @@ namespace {
     llvm::json::OStream OS;
     std::vector<bool> InObjectStack;
 
+    llvm::DenseMap<void *, int> DeterministicPointerIDs;
+    int NextPointerID;
+
   public:
-    JSONWriter(raw_ostream &os, unsigned indent = 0) : OS(os, indent) {}
+    JSONWriter(raw_ostream &os, unsigned indent = 0)
+        : OS(os, indent), NextPointerID(1) {}
 
     void printRecArbitrary(std::function<void(Label)> body,
                            Label label) override {
@@ -1008,6 +1062,21 @@ namespace {
       OS.attributeEnd();
     }
 
+    void printPointerToStream(void *pointer, llvm::raw_ostream &OS) override {
+      // JSON output may be used by build systems that want deterministic
+      // output for caching purposes. Generate a unique ID the first time
+      // we see a new pointer.
+      int pointerID;
+      if (auto it = DeterministicPointerIDs.find(pointer);
+          it != DeterministicPointerIDs.end()) {
+        pointerID = it->second;
+      } else {
+        pointerID = NextPointerID++;
+        DeterministicPointerIDs[pointer] = pointerID;
+      }
+      OS << "replaced-pointer-" << pointerID;
+    }
+
     bool isParsable() const override { return true; }
   };
 
@@ -1078,7 +1147,7 @@ namespace {
       else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
         printRec(SubStmt, Ctx, label);
       else
-        printRec(Elt.get<Decl*>(), label);
+        printRec(cast<Decl *>(Elt), label);
     }
 
     /// Print a statement condition element as a child node.
@@ -1255,13 +1324,19 @@ namespace {
 
     /// Print a substitution map as a child node.
     void printRec(SubstitutionMap map, Label label) {
-      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-      printRec(map, Dumped, label);
+      printRec(map, SubstitutionMap::DumpStyle::Full, label);
     }
 
     /// Print a substitution map as a child node.
-    void printRec(SubstitutionMap map, VisitedConformances &visited,
-                  Label label);
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  Label label) {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(map, style, Dumped, label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                  VisitedConformances &visited, Label label);
 
     /// Print a substitution map as a child node.
     void printRec(const ProtocolConformanceRef &conf,
@@ -1282,7 +1357,10 @@ namespace {
     void printIsolation(const ActorIsolation &isolation) {
       switch (isolation) {
       case ActorIsolation::Unspecified:
+        printFlag(true, "unspecified_isolation", CapturesColor);
+        break;
       case ActorIsolation::NonisolatedUnsafe:
+        printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
 
       case ActorIsolation::Nonisolated:
@@ -1409,7 +1487,11 @@ namespace {
         printFlag(value.isLocalCapture(), "is_local_capture");
         printFlag(value.isDynamicSelfMetadata(), "is_dynamic_self_metadata");
         if (auto *D = value.getDecl()) {
-          printRec(D, Label::always("decl"));
+          // We print the decl ref, not the full decl, to avoid infinite
+          // recursion when a function captures itself (and also because
+          // those decls are already printed elsewhere, so we don't need to
+          // print what could be a very large amount of information twice).
+          printDeclRefField(D, Label::always("decl"));
         }
         if (auto *E = value.getExpr()) {
           printRec(E, Label::always("expr"));
@@ -1479,6 +1561,18 @@ namespace {
                     TerminalColor color = FieldLabelColor) {
       printFieldRaw([&](raw_ostream &OS) { OS << getDumpString(value); },
                     label, color);
+    }
+
+    /// Print a field that is a bare pointer as a short keyword-style value.
+    /// For parsable output formats that need to be deterministic, each
+    /// pointer will be replaced by a unique ID. The same pointer will be
+    /// mapped to the same ID, so such nodes can still be related to each
+    /// other across the tree.
+    void printPointerField(void *value, Label label,
+                           TerminalColor color = FieldLabelColor) {
+      printFieldRaw(
+          [&](raw_ostream &OS) { Writer.printPointerToStream(value, OS); },
+          label, color);
     }
 
     /// Print a field with a long value that will be automatically quoted and
@@ -1654,8 +1748,8 @@ namespace {
 
     template <typename T>
     void printDeclContext(const T *D) {
-      printField(static_cast<void *>(D->getDeclContext()),
-                 Label::always("decl_context"));
+      printPointerField(static_cast<void *>(D->getDeclContext()),
+                        Label::always("decl_context"));
     }
 
     /// Prints a field containing the name or the USR (based on parsability of
@@ -1720,7 +1814,8 @@ namespace {
     /// Prints a type as a field. If writing a parsable output format, the
     /// `PrintOptions` are ignored and the type is written as a USR; otherwise,
     /// the type is stringified using the `PrintOptions`.
-    void printTypeField(Type Ty, Label label, PrintOptions opts = PrintOptions(),
+    void printTypeField(Type Ty, Label label,
+                        const PrintOptions &opts = PrintOptions(),
                         TerminalColor Color = TypeColor) {
       if (Writer.isParsable()) {
         printField(typeUSR(Ty), label, Color);
@@ -1821,10 +1916,8 @@ namespace {
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, Label label) {
-      if (P->isAsyncLet()) {
-        printCommon(P, "async_let ", label);
-      }
       printCommon(P, "pattern_any", label);
+      printFlag(P->isAsyncLet(), "async_let", DeclModifierColor);
       printFoot();
     }
     void visitTypedPattern(TypedPattern *P, Label label) {
@@ -1911,7 +2004,10 @@ namespace {
       printField(P->getValue(), Label::always("value"));
       printFoot();
     }
-
+    void visitOpaquePattern(OpaquePattern *P, Label label) {
+      printCommon(P, "pattern_opaque", label);
+      printFoot();
+    }
   };
 
   /// PrintDecl - Visitor implementation of Decl::print.
@@ -1928,7 +2024,7 @@ namespace {
         printWhereClause(GC->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       } else {
-        const auto ATD = Owner.get<const AssociatedTypeDecl *>();
+        const auto ATD = cast<const AssociatedTypeDecl *>(Owner);
         printWhereClause(ATD->getTrailingWhereClause(),
                          Label::always("where_requirements"));
       }
@@ -2124,9 +2220,9 @@ namespace {
       printFlag(!ED->hasBeenBound(), "unbound");
       if (ED->hasBeenBound()) {
         printTypeField(ED->getExtendedType(), Label::optional("extended_type"));
-      } else {
+      } else if (auto *extTypeRepr = ED->getExtendedTypeRepr()) {
         printNameRaw([&](raw_ostream &OS) {
-          ED->getExtendedTypeRepr()->print(OS);
+          extTypeRepr->print(OS);
         }, Label::optional("extended_type"));
       }
       printCommonPost(ED);
@@ -2500,7 +2596,7 @@ namespace {
             } else if (auto stmt = item.dyn_cast<Stmt *>()) {
               printRec(stmt, &SF.getASTContext(), label);
             } else {
-              auto expr = item.get<Expr *>();
+              auto expr = cast<Expr *>(item);
               printRec(expr, label);
             }
           },
@@ -2689,8 +2785,8 @@ namespace {
                   printHead("pattern_entry", FieldLabelColor, label);
 
                   if (PBD->getInitContext(idx))
-                    printField(PBD->getInitContext(idx),
-                               Label::always("init_context"));
+                    printPointerField(PBD->getInitContext(idx),
+                                      Label::always("init_context"));
 
                   printRec(PBD->getPattern(idx), Label::optional("pattern"));
                   if (PBD->getOriginalInit(idx)) {
@@ -3068,7 +3164,14 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
     printContext(os, getDeclContext());
     os << ".";
     // Print name.
-    getName().printPretty(os);
+    if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+      // If it's an accessor, print the name of the storage and then the
+      // accessor kind.
+      accessor->getStorage()->getName().printPretty(os);
+      os << "." << Decl::getDescriptiveKindName(accessor->getDescriptiveKind());
+    } else {
+      getName().printPretty(os);
+    }
   } else {
     auto moduleName = cast<ModuleDecl>(this)->getRealName();
     os << moduleName;
@@ -3155,6 +3258,8 @@ public:
     printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
   }
 
+  void visitOpaqueStmt(OpaqueStmt *S, Label label) {}
+
   void visitBraceStmt(BraceStmt *S, Label label) {
     printCommon(S, "brace_stmt", label);
     printList(S->getElements(), [&](auto &Elt, Label label) {
@@ -3234,21 +3339,12 @@ public:
     if (S->getWhere()) {
       printRec(S->getWhere(), Label::always("where"));
     }
-    printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
-    if (S->getIteratorVar()) {
-      printRec(S->getIteratorVar(), Label::optional("iterator_var"));
-    }
-    if (S->getNextCall()) {
-      printRec(S->getNextCall(), Label::optional("next_call"));
-    }
-    if (S->getConvertElementExpr()) {
-      printRec(S->getConvertElementExpr(),
-               Label::optional("convert_element_expr"));
-    }
-    if (S->getElementExpr()) {
-      printRec(S->getElementExpr(), Label::optional("element_expr"));
-    }
+    printRec(S->getSequence(), Label::optional("parsed_sequence"));
+
     printRec(S->getBody(), Label::optional("body"));
+
+    printRec(S->getCachedDesugaredStmt(), Label::optional("desugared_loop"));
+
     printFoot();
   }
   void visitBreakStmt(BreakStmt *S, Label label) {
@@ -3378,13 +3474,11 @@ public:
   /// FIXME: This should use ExprWalker to print children.
 
   void printCommon(Expr *E, const char *C, Label label) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-
     printHead(C, ExprColor, label);
 
     printFlag(E->isImplicit(), "implicit", ExprModifierColor);
-    printTypeField(GetTypeOfExpr(E), Label::always("type"), PO, TypeColor);
+    printTypeField(GetTypeOfExpr(E), Label::always("type"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -3411,6 +3505,8 @@ public:
 
   void visitErrorExpr(ErrorExpr *E, Label label) {
     printCommon(E, "error_expr", label);
+    if (auto *origExpr = E->getOriginalExpr())
+      printRec(origExpr, Label::optional("original_expr"));
     printFoot();
   }
 
@@ -3795,12 +3891,6 @@ public:
 
     printFoot();
   }
-  void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
-                                         Label label) {
-    printCommon(E, "unresolvedtype_conversion_expr", label);
-    printRec(E->getSubExpr(), Label::optional("sub_expr"));
-    printFoot();
-  }
   void visitFunctionConversionExpr(FunctionConversionExpr *E, Label label) {
     printCommon(E, "function_conversion_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
@@ -3877,10 +3967,10 @@ public:
     printCommon(E, "collection_upcast_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     if (auto keyConversion = E->getKeyConversion()) {
-      printRec(keyConversion.Conversion, Label::always("key_conversion"));
+      printRec(keyConversion, Label::always("key_conversion"));
     }
     if (auto valueConversion = E->getValueConversion()) {
-      printRec(valueConversion.Conversion, Label::always("value_conversion"));
+      printRec(valueConversion, Label::always("value_conversion"));
     }
     printFoot();
   }
@@ -4038,10 +4128,8 @@ public:
   void visitForceTryExpr(ForceTryExpr *E, Label label) {
     printCommon(E, "force_try_expr", label);
 
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    printTypeField(E->getThrownError(), Label::always("thrown_error"), PO,
-                   TypeColor);
+    printTypeField(E->getThrownError(), Label::always("thrown_error"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -4050,10 +4138,8 @@ public:
   void visitOptionalTryExpr(OptionalTryExpr *E, Label label) {
     printCommon(E, "optional_try_expr", label);
 
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    printTypeField(E->getThrownError(), Label::always("thrown_error"), PO,
-                   TypeColor);
+    printTypeField(E->getThrownError(), Label::always("thrown_error"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
@@ -4146,8 +4232,7 @@ public:
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E, Label label) {
     printCommon(E, "opaque_value_expr", label);
-    printNameRaw([&](raw_ostream &OS) { OS << (void*)E; },
-                 Label::optional("identity"));
+    printPointerField(static_cast<void *>(E), Label::optional("identity"));
     printFoot();
   }
 
@@ -4342,9 +4427,6 @@ public:
     if (ExpTyR && ExpTyR != TyR) {
       printRec(ExpTyR, Label::optional("type_repr_for_expansion"));
     }
-    if (auto *SE = E->getSemanticExpr()) {
-      printRec(SE, Label::always("semantic_expr"));
-    }
     printFoot();
   }
   void visitLazyInitializerExpr(LazyInitializerExpr *E, Label label) {
@@ -4484,6 +4566,12 @@ public:
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E, Label label) {
     printCommon(E, "single_value_stmt_expr", label);
     printDeclContext(E);
+    if (auto preamble = E->getForExpressionPreamble()) {
+      printRec(preamble->ForAccumulatorDecl,
+               Label::optional("for_preamble_accumulator_decl"));
+      printRec(preamble->ForAccumulatorBinding,
+               Label::optional("for_preamble_accumulator_binding"));
+    }
     printRec(E->getStmt(), &E->getDeclContext()->getASTContext(),
              Label::optional("stmt"));
     printFoot();
@@ -4537,10 +4625,8 @@ public:
   void visitTypeValueExpr(TypeValueExpr *E, Label label) {
     printCommon(E, "type_value_expr", label);
 
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-    printTypeField(E->getParamType(), Label::always("param_type"), PO,
-                   TypeColor);
+    printTypeField(E->getParamType(), Label::always("param_type"),
+                   PrintOptions::forDebugging(), TypeColor);
 
     printFoot();
   }
@@ -4603,6 +4689,8 @@ public:
 
   void visitErrorTypeRepr(ErrorTypeRepr *T, Label label) {
     printCommon("type_error", label);
+    if (auto *originalExpr = T->getOriginalExpr())
+      printRec(originalExpr, Label::optional("original_expr"));
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
@@ -4997,6 +5085,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NSApplicationMain, ns_application_main)
   TRIVIAL_ATTR_PRINTER(NSCopying, ns_copying)
   TRIVIAL_ATTR_PRINTER(NSManaged, ns_managed)
+  TRIVIAL_ATTR_PRINTER(NeverEmitIntoClient, never_emit_into_client)
   TRIVIAL_ATTR_PRINTER(NoAllocation, no_allocation)
   TRIVIAL_ATTR_PRINTER(NoDerivative, no_derivative)
   TRIVIAL_ATTR_PRINTER(NoEagerMove, no_eager_move)
@@ -5005,6 +5094,7 @@ public:
   TRIVIAL_ATTR_PRINTER(NoLocks, no_locks)
   TRIVIAL_ATTR_PRINTER(NoMetadata, no_metadata)
   TRIVIAL_ATTR_PRINTER(NoObjCBridging, no_objc_bridging)
+  TRIVIAL_ATTR_PRINTER(NoManualOwnership, no_manual_ownership)
   TRIVIAL_ATTR_PRINTER(NoRuntime, no_runtime)
   TRIVIAL_ATTR_PRINTER(NonEphemeral, non_ephemeral)
   TRIVIAL_ATTR_PRINTER(NonEscapable, non_escapable)
@@ -5015,6 +5105,7 @@ public:
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
+  TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
   TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
@@ -5046,9 +5137,9 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
-  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
+  TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
-  TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
+  TRIVIAL_ATTR_PRINTER(UnsafeSelfDependentResult, unsafe_self_dependent_result)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5121,9 +5212,10 @@ public:
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, Label label) {
     printCommon(Attr, "back_deployed_attr", label);
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->Version.getAsString(); },
-                  Label::always("version"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedVersion().getAsString(); },
+        Label::always("version"));
     printFoot();
   }
   void visitCDeclAttr(CDeclAttr *Attr, Label label) {
@@ -5142,7 +5234,7 @@ public:
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
 
-    printField(
+    printPointerField(
         static_cast<void *>(static_cast<DeclContext *>(Attr->getInitContext())),
         Label::always("init_context"));
 
@@ -5151,12 +5243,8 @@ public:
     } else if (isTypeChecked()) {
       // If the type is null, it might be a macro reference. Try that if we're
       // dumping the fully type-checked AST.
-      auto macroRef =
-          evaluateOrDefault(const_cast<ASTContext *>(Ctx)->evaluator,
-                            ResolveMacroRequest{Attr, DC}, ConcreteDeclRef());
-      if (macroRef) {
+      if (auto macroRef = Attr->getResolvedMacro())
         printDeclRefField(macroRef, Label::always("macro"));
-      }
     }
     if (!Writer.isParsable()) {
       // The type has the semantic information we want for parsable outputs, so
@@ -5237,6 +5325,11 @@ public:
   void visitInlineAttr(InlineAttr *Attr, Label label) {
     printCommon(Attr, "inline_attr", label);
     printField(Attr->getKind(), Label::always("kind"));
+    printFoot();
+  }
+  void visitExportAttr(ExportAttr *Attr, Label label) {
+    printCommon(Attr, "export_attr", label);
+    printField(Attr->exportKind, Label::always("kind"));
     printFoot();
   }
   void visitLifetimeAttr(LifetimeAttr *Attr, Label label) {
@@ -5347,11 +5440,12 @@ public:
   void visitOriginallyDefinedInAttr(OriginallyDefinedInAttr *Attr,
                                     Label label) {
     printCommon(Attr, "originally_defined_in_attr", label);
-    printField(Attr->ManglingModuleName, Label::always("mangling_module"));
-    printField(Attr->LinkerModuleName, Label::always("linker_module"));
-    printField(Attr->Platform, Label::always("platform"));
-    printFieldRaw([&](auto &out) { out << Attr->MovedVersion.getAsString(); },
-                  Label::always("moved_version"));
+    printField(Attr->getManglingModuleName(), Label::always("mangling_module"));
+    printField(Attr->getLinkerModuleName(), Label::always("linker_module"));
+    printField(Attr->getPlatform(), Label::always("platform"));
+    printFieldRaw(
+        [&](auto &out) { out << Attr->getParsedMovedVersion().getAsString(); },
+        Label::always("moved_version"));
     printFoot();
   }
   void visitPrivateImportAttr(PrivateImportAttr *Attr, Label label) {
@@ -5514,6 +5608,31 @@ public:
     if (Attr->hasMessage()) {
       printFieldQuoted(Attr->Message, Label::always("message"));
     }
+    printFoot();
+  }
+                         
+  void visitWarnAttr(WarnAttr *Attr, Label label) {
+    printCommon(Attr, "warn", label);
+    auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
+    printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
+                  Label::always("diagGroupID:"));
+    switch (Attr->DiagnosticBehavior) {
+    case WarningGroupBehavior::None:
+    case WarningGroupBehavior::AsWarning:
+      printFieldRaw([&](raw_ostream &out) { out << "warning"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::AsError:
+      printFieldRaw([&](raw_ostream &out) { out << "error"; },
+                    Label::always("as:"));
+      break;
+    case WarningGroupBehavior::Ignored:
+        printFieldRaw([&](raw_ostream &out) { out << "ignored"; },
+                      Label::always("as:"));
+        break;
+    }
+    if (Attr->Reason)
+      printFieldQuoted(Attr->Reason, Label::always("reason:"));
     printFoot();
   }
 };
@@ -5805,7 +5924,8 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        printRec(conf->getSubstitutionMap(), visited,
+        printRec(conf->getSubstitutionMap(),
+                 SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
         if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
           printList(*condReqs, [&](auto subReq, Label label) {
@@ -5904,7 +6024,7 @@ public:
 
     // A minimal dump doesn't need the details about the conformances, a lot of
     // that info can be inferred from the signature.
-    if (style == SubstitutionMap::DumpStyle::Minimal)
+    if (style != SubstitutionMap::DumpStyle::Full)
       return;
 
     auto conformances = map.getConformances();
@@ -5923,13 +6043,12 @@ public:
   }
 };
 
-void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
-                         Label label) {
+void PrintBase::printRec(SubstitutionMap map, SubstitutionMap::DumpStyle style,
+                         VisitedConformances &visited, Label label) {
   printRecArbitrary(
       [&](Label label) {
         PrintConformance(Writer, MemberLoading)
-            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
-                                  visited, label);
+            .visitSubstitutionMap(map, style, visited, label);
       },
       label);
 }
@@ -6047,8 +6166,6 @@ namespace {
       printFoot();
     }
 
-    TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
-
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
       auto originator = T->getOriginator();
@@ -6057,12 +6174,16 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (originator.is<ErrorExpr *>()) {
+      } else if (isa<ErrorExpr *>(originator)) {
         printFlag("error_expr");
+      } else if (auto *errTy = originator.dyn_cast<ErrorType *>()) {
+        printRec(errTy, Label::always("error_type"));
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));
-      } else if (originator.is<TypeRepr *>()) {
+      } else if (isa<TypeRepr *>(originator)) {
         printFlag("type_repr");
+      } else if (isa<Pattern *>(originator)) {
+        printFlag("pattern");
       } else {
         assert(false && "unknown originator");
       }
@@ -6094,6 +6215,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
+    TRIVIAL_TYPE_PRINTER(BuiltinImplicitActor, builtin_implicit_isolated_actor)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
@@ -6116,6 +6238,13 @@ namespace {
       printCommon("builtin_fixed_array_type", label);
       printRec(T->getSize(), Label::optional("size"));
       printRec(T->getElementType(), Label::optional("element_type"));
+      printFoot();
+    }
+
+    void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                                    Label label) {
+      printCommon("builtin_borrow_type", label);
+      printRec(T->getReferentType(), Label::optional("referent"));
       printFoot();
     }
 
@@ -6302,7 +6431,7 @@ namespace {
                               Label label) {
       printCommon(className, label);
 
-      printField(static_cast<void *>(T), Label::always("address"));
+      printPointerField(static_cast<void *>(T), Label::always("address"));
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         printFieldRaw([&](raw_ostream &OS) {
@@ -6352,7 +6481,9 @@ namespace {
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
-        printRec(T->getSubstitutions(), Label::optional("substitutions"));
+        printRec(T->getSubstitutions(),
+                 SubstitutionMap::DumpStyle::NoConformances,
+                 Label::optional("substitutions"));
       }
 
       printFoot();
@@ -6493,7 +6624,7 @@ namespace {
         case FunctionTypeIsolation::Kind::Erased:
           printFlag("@isolated(any)");
           break;
-        case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
           printFlag("nonisolated(nonsending)");
           break;
         }
@@ -6734,7 +6865,7 @@ void GenericEnvironment::dump(raw_ostream &os) const {
   os << "Generic environment:\n";
   for (auto gp : getGenericParams()) {
     gp->dump(os);
-    mapTypeIntoContext(gp)->dump(os);
+    mapTypeIntoEnvironment(gp)->dump(os);
   }
   os << "Generic parameters:\n";
   for (auto paramTy : getGenericParams())
@@ -6747,7 +6878,7 @@ void GenericEnvironment::dump() const {
 
 StringRef swift::getAccessorKindString(AccessorKind value) {
   switch (value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"
@@ -6803,7 +6934,7 @@ void RequirementRepr::dump() const {
 }
 
 void GenericParamList::dump() const {
-  print(llvm::errs());
+  print(llvm::errs(), PrintOptions::forDebugging());
   llvm::errs() << '\n';
 }
 
@@ -6812,11 +6943,11 @@ void LayoutConstraint::dump() const {
     llvm::errs() << "(null)\n";
     return;
   }
-  getPointer()->print(llvm::errs());
+  getPointer()->print(llvm::errs(), PrintOptions::forDebugging());
 }
 
 void GenericSignature::dump() const {
-  print(llvm::errs());
+  print(llvm::errs(), PrintOptions::forDebugging());
   llvm::errs() << '\n';
 }
 
@@ -6851,7 +6982,7 @@ void InheritedEntry::dump(llvm::raw_ostream &os) const {
     os << '@' << getDumpString(getExplicitSafety()) << ' ';
   if (isSuppressed())
     os << "~";
-  getType().print(os);
+  getType().print(os, PrintOptions::forDebugging());
 }
 
 void InheritedEntry::dump() const { dump(llvm::errs()); }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,7 +13,9 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/Bridging/BasicSwift.h"
 
 using namespace swift;
 
@@ -21,132 +23,36 @@ using namespace swift;
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
 
-BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
-                                                  BridgedStringRef cStr) {
+Identifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
+                                           BridgedStringRef cStr) {
   return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
-BridgedIdentifier
-BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx) {
+Identifier BridgedASTContext__getIdentifier(BridgedASTContext cContext,
+                                            BridgedStringRef cStr) {
+  return cContext.unbridged().getIdentifier(cStr.unbridged());
+}
+
+Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
+                                                 size_t idx) {
   return cContext.unbridged().getDollarIdentifier(idx);
 }
 
-bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
-                                          BridgedFeature feature) {
-  return cContext.unbridged().LangOpts.hasFeature((Feature)feature);
+BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext) {
+  return cContext.unbridged().LangOpts;
 }
 
-unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.EffectiveLanguageVersion[0];
+unsigned BridgedASTContext::getMajorLanguageVersion() const {
+  return unbridged().LangOpts.EffectiveLanguageVersion[0];
 }
 
-bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
-                                                  BridgedStringRef cName) {
-  ASTContext &ctx = cContext.unbridged();
-  auto name = cName.unbridged();
-  if (name.starts_with("$") && ctx.LangOpts.hasFeature(name.drop_front()))
-    return true;
-
-  return ctx.LangOpts.isCustomConditionalCompilationFlagSet(name);
-}
-
-bool BridgedASTContext_langOptsHasFeatureNamed(BridgedASTContext cContext,
-                                               BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts.hasFeature(cName.unbridged());
-}
-
-bool BridgedASTContext_langOptsHasAttributeNamed(BridgedASTContext cContext,
-                                                 BridgedStringRef cName) {
-  return hasAttribute(cContext.unbridged().LangOpts, cName.unbridged());
-}
-
-bool BridgedASTContext_langOptsIsActiveTargetOS(BridgedASTContext cContext,
-                                                BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts.checkPlatformCondition(
-      PlatformConditionKind::OS, cName.unbridged());
-}
-
-bool BridgedASTContext_langOptsIsActiveTargetArchitecture(
-    BridgedASTContext cContext, BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts.checkPlatformCondition(
-      PlatformConditionKind::Arch, cName.unbridged());
-}
-
-bool BridgedASTContext_langOptsIsActiveTargetEnvironment(
-    BridgedASTContext cContext, BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts.checkPlatformCondition(
-      PlatformConditionKind::TargetEnvironment, cName.unbridged());
-}
-
-bool BridgedASTContext_langOptsIsActiveTargetRuntime(BridgedASTContext cContext,
-                                                     BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts.checkPlatformCondition(
-      PlatformConditionKind::Runtime, cName.unbridged());
-}
-
-bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
-                                                     BridgedStringRef cName) {
-  return cContext.unbridged().LangOpts.checkPlatformCondition(
-      PlatformConditionKind::PtrAuth, cName.unbridged());
-}
-
-unsigned
-BridgedASTContext_langOptsTargetPointerBitWidth(BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.Target.isArch64Bit()   ? 64
-         : cContext.unbridged().LangOpts.Target.isArch32Bit() ? 32
-         : cContext.unbridged().LangOpts.Target.isArch16Bit() ? 16
-                                                              : 0;
-}
-
-bool BridgedASTContext_langOptsAttachCommentsToDecls(
-    BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.AttachCommentsToDecls;
-}
-
-BridgedEndianness
-BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.Target.isLittleEndian() ? EndianLittle
-                                                               : EndianBig;
-}
-
-/// Convert an array of numbers into a form we can use in Swift.
-namespace {
-template <typename Arr>
-SwiftInt convertArray(const Arr &array, SwiftInt **cElements) {
-  SwiftInt numElements = array.size();
-  *cElements = (SwiftInt *)malloc(sizeof(SwiftInt) * numElements);
-  for (SwiftInt i = 0; i != numElements; ++i)
-    (*cElements)[i] = array[i];
-  return numElements;
-}
-} // namespace
-
-void deallocateIntBuffer(SwiftInt *_Nullable cComponents) { free(cComponents); }
-
-SwiftInt
-BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
-                                             SwiftInt **cComponents) {
-  auto theVersion = cContext.unbridged().LangOpts.EffectiveLanguageVersion;
-  return convertArray(theVersion, cComponents);
-}
-
-SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
-SwiftInt
-BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
-                                             SwiftInt **cComponents) {
-  auto theVersion = version::Version::getCurrentLanguageVersion();
-  return convertArray(theVersion, cComponents);
-}
-
-SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(
-    BridgedASTContext cContext, SwiftInt *_Nullable *_Nonnull cElements) {
-  return convertArray(cContext.unbridged().LangOpts.getAtomicBitWidthValues(),
-                      cElements);
+BridgedDiagnosticEngine BridgedASTContext::getDiags() const {
+  return &unbridged().Diags;
 }
 
 bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  BridgedStringRef importPath,
-                                 BridgedSourceLoc canImportLoc,
+                                 SourceLoc canImportLoc,
                                  BridgedCanImportVersion versionKind,
                                  const SwiftInt *_Nullable versionComponents,
                                  SwiftInt numVersionComponents) {
@@ -173,13 +79,26 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
 
   ImportPath::Module::Builder builder(cContext.unbridged(),
                                       importPath.unbridged(), /*separator=*/'.',
-                                      canImportLoc.unbridged());
+                                      canImportLoc);
   return cContext.unbridged().canImportModule(
-      builder.get(), canImportLoc.unbridged(), version,
+      builder.get(), canImportLoc, version,
       versionKind == CanImportUnderlyingVersion);
 }
 
-BridgedAvailabilityMacroMap
-BridgedASTContext_getAvailabilityMacroMap(BridgedASTContext cContext) {
-  return &cContext.unbridged().getAvailabilityMacroMap();
+BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
+  return &unbridged().getAvailabilityMacroMap();
+}
+
+void *BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext) {
+  ASTContext &ctx = cContext.unbridged();
+  void *staticBuildConfiguration = ctx.getGlobalCache().StaticBuildConfiguration;
+  if (!staticBuildConfiguration) {
+    staticBuildConfiguration =
+        swift_Basic_createStaticBuildConfiguration(ctx.LangOpts);
+    ctx.addCleanup([staticBuildConfiguration] {
+      swift_Basic_freeStaticBuildConfiguration(staticBuildConfiguration);
+    });
+  }
+
+  return staticBuildConfiguration;
 }

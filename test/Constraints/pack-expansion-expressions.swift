@@ -327,28 +327,28 @@ func test_pack_expansions_with_closures() {
 func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
   struct Data<each T> {
     init(_: repeat each T) {} // expected-note 4 {{'init(_:)' declared here}}
-    init(vals: repeat each T) {}
-    init<each U>(x: Int, _: repeat each T, y: repeat each U) {}
+    init(vals: repeat each T) {} // expected-note {{'init(vals:)' declared here}}
+    init<each U>(x: Int, _: repeat each T, y: repeat each U) {} // expected-note 3 {{'init(x:_:y:)' declared here}}
   }
 
   _ = Data<Int>() // expected-error {{missing argument for parameter #1 in call}}
   _ = Data<Int>(0) // Ok
   _ = Data<Int, String>(42, "") // Ok
-  _ = Data<Int>(42, "") // expected-error {{pack expansion requires that 'Int' and 'Int, String' have the same shape}}
+  _ = Data<Int>(42, "") // expected-error {{extra argument in call}}
   _ = Data<Int, String>((42, ""))
   // expected-error@-1 {{initializer expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{25-26=}} {{32-33=}}
   _ = Data<Int, String, Float>(vals: (42, "", 0))
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
+  // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
   _ = Data<Int, String, Float>((vals: 42, "", 0))
   // expected-error@-1 {{initializer expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{32-33=}} {{48-49=}}
   _ = Data<Int, String, Float>(tuple)
   // expected-error@-1 {{initializer expects 3 separate arguments}}
   _ = Data<Int, String, Float>(x: 42, tuple)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
   _ = Data<Int, String, Float>(x: 42, tuple, y: 1, 2, 3)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Float)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
   _ = Data<Int, String, Float>(x: 42, (42, "", 0), y: 1, 2, 3)
-  // expected-error@-1 {{pack expansion requires that 'Int, String, Float' and '(Int, String, Int)' have the same shape}}
+  // expected-error@-1 {{missing arguments for parameters #2, #2 in call}}
 
   struct Ambiguity<each T> {
     func test(_: repeat each T) -> Int { 42 }
@@ -360,7 +360,7 @@ func test_pack_expansion_specialization(tuple: (Int, String, Float)) {
 }
 
 // rdar://107280056 - "Ambiguous without more context" with opaque return type + variadics
-protocol Q {
+protocol Q<B> {
   associatedtype B
 }
 
@@ -796,5 +796,60 @@ do {
     var hashable: AnyHashable {
       AnyHashable(x)
     }
+  }
+}
+
+func testInvalidDecomposition() {
+  func id<T>(_ x: T) -> T {}
+  let (a, b) = id((repeat each undefined)) // expected-error {{cannot find 'undefined' in scope}}
+}
+
+func testPackToScalarShortFormConstructor() {
+  struct S {
+    init(_ x: Int) {}
+    init<T>(_ x: T) {}
+  }
+
+  // Make sure we diagnose.
+  func foo<each T>(_ xs: repeat each T) {
+    S(repeat each xs) // expected-error {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
+  }
+}
+
+
+func test_dependent_members() {
+  struct Variadic<each T>: Q {
+    typealias B = (repeat (each T)?)
+
+    init(_: repeat each T) {}
+    static func f(_: repeat each T) -> Self {}
+  }
+
+  func test_init<C1, C2>(_ c1: C1, _ c2: C2) -> some Q<(C1?, C2?)> {
+    return Variadic(c1, c2) // Ok
+  }
+
+  func test_static<C1, C2>(_ c1: C1, _ c2: C2) -> some Q<(C1?, C2?)> {
+    return Variadic.f(c1, c2) // Ok
+  }
+}
+
+protocol P2 {
+  associatedtype X
+}
+
+extension P2 {
+  func foo() where X == Bool {}
+  func foo() where X == String {}
+}
+
+do {
+  struct S<each E>: P2 {
+    typealias X = String
+    init(_ fn: () -> (repeat each E)) {}
+  }
+
+  func foo(_ x: Int) {
+    S { x }.foo() // Make sure we can pick the right 'foo' here.
   }
 }

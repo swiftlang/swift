@@ -178,7 +178,9 @@
       "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
+      "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
+      "FloatingPointToString.swift",
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
@@ -205,6 +207,8 @@
   "Span": [
     "MutableRawSpan.swift",
     "MutableSpan.swift",
+    "OutputRawSpan.swift",
+    "OutputSpan.swift",
     "RawSpan.swift",
     "Span.swift"
   ],
@@ -272,7 +276,9 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift"
+    "InlineArray.swift",
+    "_InlineArray.swift",
+    "Exclusivity.swift"
   ],
   "Result": [
     "Result.swift"

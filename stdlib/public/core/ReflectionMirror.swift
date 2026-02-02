@@ -172,6 +172,12 @@ extension Mirror {
     case "e": self.displayStyle = .enum
     case "s": self.displayStyle = .struct
     case "t": self.displayStyle = .tuple
+    case "f":  
+      if #available(SwiftStdlib 6.2, *) {
+        self.displayStyle = .foreignReference
+      } else {
+        self.displayStyle = nil
+      }
     case "\0": self.displayStyle = nil
     default: preconditionFailure("Unknown raw display style '\(rawDisplayStyle)'")
     }
@@ -372,7 +378,11 @@ public func _forEachFieldWithKeyPath<Root>(
            body: UnsafeRawBufferPointer(start: nil, count: 0))
       unsafe component.clone(
         into: &destBuilder.buffer,
-        endOfReferencePrefix: false)
+        endOfReferencePrefix: false,
+
+        // We are just storing offset components and not computed ones.
+        adjustForAlignment: false
+      )
     }
 
     if let name = unsafe field.name {

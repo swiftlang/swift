@@ -8,9 +8,9 @@ func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CInt) {
 
 // CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: unsafe ptr.count)!
-// CHECK-NEXT:     if unsafe ptr2.count != size {
-// CHECK-NEXT:       fatalError("bounds check failure in myFunc: expected \(size) but got \(unsafe ptr2.count)")
+// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
+// CHECK-NEXT:     if ptr2.count != size {
+// CHECK-NEXT:       fatalError("bounds check failure in myFunc: expected \(size) but got \(ptr2.count)")
 // CHECK-NEXT:     }
 // CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, size)
 // CHECK-NEXT: }

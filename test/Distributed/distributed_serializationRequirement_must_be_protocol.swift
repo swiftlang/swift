@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unknown -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -verify-ignore-unknown -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -54,7 +54,7 @@ final class System: DistributedActorSystem {
     fatalError()
   }
 
-  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout System.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout ClassInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res') [with ResultHandler = <<error type>>]}}
+  // expected-note@+1 {{candidate has non-matching type '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout System.InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res' (aka '<Act, Err, Res> (on: Act, target: RemoteCallTarget, invocation: inout ClassInvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res') [with ResultHandler = _]}}
   func remoteCall<Act, Err, Res>(
     on actor: Act,
     target: RemoteCallTarget,

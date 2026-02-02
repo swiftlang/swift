@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-OPT
-// RUN: %target-swift-frontend  -primary-file %s -Onone -disable-availability-checking -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
@@ -23,6 +22,13 @@ public final class C {
 
   init(_ a: InlineArray<256, UInt8>) {
     self.a = a
+  }
+
+  // CHECK-LABEL:    sil @$s4test1CC1iACs5UInt8V_tcfc
+  // CHECK-OPT-NOT:    alloc_stack
+  // CHECK:       } // end sil function '$s4test1CC1iACs5UInt8V_tcfc'
+  public init(i: UInt8) {
+    self.a = .init(repeating: i)
   }
 
   // CHECK-LABEL: sil @$s4test1CC0A9Subscriptys5UInt8VSiF :

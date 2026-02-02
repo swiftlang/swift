@@ -14,6 +14,7 @@ add_swift_host_library(swiftClangImporter STATIC
   ClangImporter.cpp
   ClangImporterRequests.cpp
   ClangIncludePaths.cpp
+  ClangLookup.cpp
   ClangModuleDependencyScanner.cpp
   ClangSourceBufferImporter.cpp
   SwiftDeclSynthesizer.cpp
@@ -24,13 +25,16 @@ add_swift_host_library(swiftClangImporter STATIC
   ImportName.cpp
   ImportType.cpp
   Serializability.cpp
+  SwiftifyDecl.cpp
   SwiftLookupTable.cpp
+
+  LLVM_LINK_COMPONENTS
+    BitstreamReader
 )
 target_link_libraries(swiftClangImporter PRIVATE
   swiftAST
   swiftParse
-  clangTooling
-  LLVMBitstreamReader)
+  clangTooling)
 
 target_link_libraries(swiftClangImporter INTERFACE
   clangDependencyScanning)

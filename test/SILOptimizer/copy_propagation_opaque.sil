@@ -419,6 +419,8 @@ bb0:
 // CHECK-LABEL: sil [ossa] @testBorrowCopy : {{.*}} {
 // CHECK-LABEL: bb0:
 // CHECK:        [[INSTANCE:%[^,]+]] = apply
+// CHECK-NEXT:   begin_borrow
+// CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value [[INSTANCE]] : $T
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
@@ -541,5 +543,7 @@ bb1(%10 : @owned $AnyObject):
 bb2(%14 : @owned $Error):
   destroy_value %7 : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
+  destroy_value [dead_end] %14
+  destroy_value [dead_end] %5
   unreachable
 }

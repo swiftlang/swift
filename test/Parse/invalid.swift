@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 // REQUIRES: swift_swift_parser
 // FIXME: Swift parser is not enabled on Linux CI yet.
 // REQUIRES: OS=macosx
@@ -119,7 +119,7 @@ prefix func %<T>(x: T) -> T { return x } // No error expected - the < is conside
 
 struct Weak<T: class> { // expected-error {{'class' constraint can only appear on protocol declarations}}
   // expected-note@-1 {{did you mean to write an 'AnyObject' constraint?}} {{16-21=AnyObject}}
-  weak let value: T // expected-error {{'weak' must be a mutable variable, because it may change at runtime}} expected-error {{'weak' variable should have optional type 'T?'}} expected-error {{'weak' must not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
+  weak let value: T // expected-error {{'weak' variable should have optional type 'T?'}} expected-error {{'weak' must not be applied to non-class-bound 'T'; consider adding a protocol conformance that has a class bound}}
 }
 
 let x: () = ()

@@ -1,8 +1,8 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature Lifetimes \
 // RUN: -enable-experimental-feature SuppressedAssociatedTypes
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
@@ -249,7 +249,7 @@ struct BuggerView<T: ~Copyable>: ~Escapable, Copyable {}
 
 struct MutableBuggerView<T: ~Copyable>: ~Copyable, ~Escapable {}
 
-@lifetime(mutRef: copy mutRef)
+@_lifetime(mutRef: copy mutRef)
 func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
                    _ ref: BuggerView<NC>,
                    _ intMutRef: borrowing MutableBuggerView<Int>,
@@ -538,5 +538,5 @@ func testYap(_ y: Yapping<NC>) {
 protocol Veggie: ~Copyable {}
 func generalized(_ x: Any.Type) {}
 func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
-  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
+  generalized(t) // expected-error {{argument type 'any Veggie & ~Copyable' does not conform to expected type 'Copyable'}}
 }

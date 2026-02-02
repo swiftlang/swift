@@ -93,8 +93,8 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 ///
 /// A *continuation* is an opaque representation of program state.
 /// To create a continuation in asynchronous code,
-/// call the `withUnsafeContinuation(function:_:)` or
-/// `withUnsafeThrowingContinuation(function:_:)` function.
+/// call the `withCheckedContinuation(isolation:function:_:)` or
+/// `withCheckedThrowingContinuation(isolation:function:_:)` function.
 /// To resume the asynchronous task,
 /// call the `resume(returning:)`,
 /// `resume(throwing:)`,
@@ -162,7 +162,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   public func resume(returning value: sending T) {
-    if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
+    if let c: UnsafeContinuation<T, E> = unsafe canary.takeContinuation() {
       unsafe c.resume(returning: value)
     } else {
       #if !$Embedded
@@ -186,7 +186,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
   /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   public func resume(throwing error: __owned E) {
-    if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
+    if let c: UnsafeContinuation<T, E> = unsafe canary.takeContinuation() {
       unsafe c.resume(throwing: error)
     } else {
       #if !$Embedded

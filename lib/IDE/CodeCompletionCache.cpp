@@ -244,6 +244,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagMessageIndex = read32le(cursor);
     auto filterNameIndex = read32le(cursor);
     auto nameForDiagnosticsIndex = read32le(cursor);
+    auto swiftUSRIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<NullTerminatedStringRef, 4> assocUSRs;
@@ -264,12 +265,13 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto diagMessage = getString(diagMessageIndex);
     auto filterName = getString(filterNameIndex);
     auto nameForDiagnostics = getString(nameForDiagnosticsIndex);
+    auto swiftUSR = getString(swiftUSRIndex);
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, roles, isSystem,
-                                                           hasAsyncAlternative, string, moduleName, briefDocComment,
-            llvm::ArrayRef(assocUSRs).copy(*V.Allocator),
+            kind, associatedKind, opKind, roles, isSystem, hasAsyncAlternative,
+            string, moduleName, briefDocComment,
+            llvm::ArrayRef(assocUSRs).copy(*V.Allocator), swiftUSR,
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
             diagMessage, filterName, nameForDiagnostics);
 
@@ -430,11 +432,12 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(static_cast<uint8_t>(R->hasAsyncAlternative()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
-      LE.write(addString(R->getModuleName()));      // index into strings
-      LE.write(addString(R->getBriefDocComment())); // index into strings
-      LE.write(addString(R->getDiagnosticMessage())); // index into strings
-      LE.write(addString(R->getFilterName())); // index into strings
+      LE.write(addString(R->getModuleName()));         // index into strings
+      LE.write(addString(R->getBriefDocComment()));    // index into strings
+      LE.write(addString(R->getDiagnosticMessage()));  // index into strings
+      LE.write(addString(R->getFilterName()));         // index into strings
       LE.write(addString(R->getNameForDiagnostics())); // index into strings
+      LE.write(addString(R->getSwiftUSR()));           // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {

@@ -81,7 +81,7 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
     return (x, { $0 })
 }
 
-// expected-error @+1 {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}} {{20-21=}}
 @derivative(of: foo,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
@@ -100,14 +100,14 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+1 {{unexpected ',' separator}}
+// expected-error @+1 {{unexpected ',' separator}} {{20-21=}}
 @derivative(of: foo,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
 // TF-1168: missing comma before `wrt:`.
-// expected-error @+2 {{expected ',' separator}}
+// expected-error @+2 {{expected ',' separator}} {{20-20=,}}
 // expected-error @+1 {{expected declaration}}
 @derivative(of: foo wrt: x)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {

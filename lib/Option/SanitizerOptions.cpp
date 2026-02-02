@@ -152,6 +152,11 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
     bool isShared = (kind != SanitizerKind::Fuzzer);
     bool sanitizerSupported = sanitizerRuntimeLibExists(fileName, isShared);
 
+    if (kind == SanitizerKind::MemTagStack)
+      // MemTagStack requires no runtime, so ignore library check above
+      sanitizerSupported =
+          Triple.isOSDarwin() && Triple.getArch() == llvm::Triple::aarch64;
+
     // TSan is explicitly not supported for 32 bits.
     if (kind == SanitizerKind::Thread && !Triple.isArch64Bit())
       sanitizerSupported = false;
@@ -168,12 +173,24 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
   }
 
   // Check that we're one of the known supported targets for sanitizers.
-  if (!(Triple.isOSDarwin() || Triple.isOSLinux() || Triple.isOSWindows() || Triple.isOSWASI())) {
+  if (!(Triple.isOSDarwin() || Triple.isOSLinux() || Triple.isOSWindows() || Triple.isOSWASI() || Triple.isOSFreeBSD())) {
     SmallString<128> b;
     Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
       (A->getOption().getPrefixedName() +
           StringRef(A->getAsString(Args))).toStringRef(b),
       Triple.getTriple());
+  }
+
+  // MemTagStack and ASan can not be enabled concurrently.
+  if ((sanitizerSet & SanitizerKind::MemTagStack)
+        && (sanitizerSet & SanitizerKind::Address)) {
+    SmallString<128> b1;
+    SmallString<128> b2;
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+        (A->getOption().getPrefixedName()
+            + toStringRef(SanitizerKind::Address)).toStringRef(b1),
+        (A->getOption().getPrefixedName()
+            + toStringRef(SanitizerKind::MemTagStack)).toStringRef(b2));
   }
 
   // Address and thread sanitizers can not be enabled concurrently.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-type-layout %s -emit-ir | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -disable-type-layout %s -emit-ir | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize --check-prefix=CHECK-%target-cpu
 
 sil_stage canonical
 

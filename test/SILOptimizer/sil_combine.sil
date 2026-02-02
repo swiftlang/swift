@@ -120,8 +120,6 @@ bb2:
 // CHECK-LABEL: sil @dead_inst_elimination_ignore_unreachable
 // CHECK: bb0
 // CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
 sil @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int64, 24
@@ -592,10 +590,6 @@ bb0(%0 : $Builtin.Int1):
 // CHECK-LABEL: sil @cond_fail_end_scope : $@convention(thin) (@inout Builtin.Int32, Builtin.Int1) -> () {
 // CHECK: cond_fail
 // CHECK-NEXT:   unreachable
-// CHECK:      bb1:
-// CHECK-NEXT:   br bb3
-// CHECK:      bb2:
-// CHECK-NEXT:   br bb3
 // CHECK-LABEL: } // end sil function 'cond_fail_end_scope'
 sil @cond_fail_end_scope : $@convention(thin) (@inout Builtin.Int32, Builtin.Int1) -> () {
 entry(%0 : $*Builtin.Int32, %1 : $Builtin.Int1):
@@ -2328,7 +2322,7 @@ bb3:
 
 // CHECK-LABEL: sil @resilient_enum_case_propagation
 // CHECK: bb0:
-// CHECK:   br bb2
+// CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   return
 sil @resilient_enum_case_propagation : $@convention(thin) () -> Builtin.Int64 {
@@ -2453,7 +2447,6 @@ bb0(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil @builtin_array_opt_index_raw_pointer_to_index_addr
-// CHECK:  [[MT:%.*]] = metatype $@thick Int32.Type
 // CHECK:  [[ONE:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK:  [[PTA1:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int32
 // CHECK:  [[CAST1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
@@ -2463,7 +2456,8 @@ bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CAST2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%0 : $Builtin.Int64)
 // CHECK:  [[IAD2:%.*]] = index_addr [[PTA2]] : $*Int32, [[CAST2]] : $Builtin.Word
 // CHECK:  [[ATP2:%.*]] = address_to_pointer [[IAD2]] : $*Int32 to $Builtin.RawPointer
-// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thick Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
+// CHECK:  [[MT:%.*]] = metatype $@thin Int32.Type
+// CHECK:  builtin "takeArrayFrontToBack"<Int32>([[MT]] : $@thin Int32.Type, [[ATP1]] : $Builtin.RawPointer, [[ATP2]] : $Builtin.RawPointer, [[ONE]] : $Builtin.Word) : $()
 // CHECK: return
 
 sil @builtin_array_opt_index_raw_pointer_to_index_addr : $@convention(thin) (Builtin.Int64, Builtin.RawPointer, Builtin.RawPointer) -> () {
@@ -2870,11 +2864,9 @@ bb0(%0 : $Builtin.NativeObject):
 
 // CHECK-LABEL: sil @test_cmp_xor_canonicalization
 // CHECK:bb0([[ARG:%.*]] : $Builtin.Int1
-// CHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:  [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:  [[EQ:%.*]] = builtin "cmp_eq_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
-// CHECK:  [[NOT:%.*]] = builtin "xor_Int1"([[EQ]] : $Builtin.Int1, [[TRUE]] : $Builtin.Int1)
-// CHECK:  return [[NOT]]
+// CHECK:  [[NE:%.*]] = builtin "cmp_ne_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
+// CHECK:  return [[NE]]
 
 sil @test_cmp_xor_canonicalization : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -4367,4 +4359,64 @@ sil @test_type_value_concrete : $@convention(thin) () -> Int {
 sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
   %val = type_value $Int for -128
   return %val : $Int
+}
+
+// CHECK-LABEL: sil @test_init_borrow_addr_generic : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+// CHECK:         init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_generic'
+sil @test_init_borrow_addr_generic : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+bb0(%0 : $*Builtin.Borrow<T>, %1 : $*T):
+  init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_init_borrow_addr_loadable : $@convention(thin) (@in_guaranteed Int) -> @out Builtin.Borrow<Int> {
+// CHECK-NOT:     init_borrow_addr
+// CHECK:         [[LOADED_INT:%.*]] = load %1 : $*Int
+// CHECK:         [[BORROW:%.*]] = make_borrow [[LOADED_INT]]
+// CHECK:         store [[BORROW]] to %0 : $*Builtin.Borrow<Int>
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_loadable'
+sil @test_init_borrow_addr_loadable : $@convention(thin) (@in_guaranteed Int) -> @out Builtin.Borrow<Int> {
+bb0(%0 : $*Builtin.Borrow<Int>, %1 : $*Int):
+  init_borrow_addr %0 : $*Builtin.Borrow<Int> with %1 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_init_borrow_addr_addressonly : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out Builtin.Borrow<AddressOnlyEnum> {
+// CHECK-NOT:     init_borrow_addr
+// CHECK:         [[BORROW:%.*]] = make_addr_borrow %1 : $*AddressOnlyEnum
+// CHECK:         store [[BORROW]] to %0 : $*Builtin.Borrow<AddressOnlyEnum>
+// CHECK-LABEL: } // end sil function 'test_init_borrow_addr_addressonly'
+sil @test_init_borrow_addr_addressonly : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out Builtin.Borrow<AddressOnlyEnum> {
+bb0(%0 : $*Builtin.Borrow<AddressOnlyEnum>, %1 : $*AddressOnlyEnum):
+  init_borrow_addr %0 : $*Builtin.Borrow<AddressOnlyEnum> with %1 : $*AddressOnlyEnum
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_dereference_borrow : $@convention(thin) (Int) -> Int {
+// CHECK:       bb0([[INT:%.*]] : $Int):
+// CHECK-NEXT:    return [[INT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_dereference_borrow'
+sil @test_dereference_borrow : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %borrow = make_borrow %0 : $Int
+  %int = dereference_borrow %borrow : $Builtin.Borrow<Int>
+  return %int : $Int
+}
+
+// CHECK-LABEL: sil @test_dereference_addr_borrow : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out AddressOnlyEnum {
+// CHECK:       bb0([[DEST_AOE:%.*]] : $*AddressOnlyEnum, [[SRC_AOE:%.*]] : $*AddressOnlyEnum):
+// CHECK-NOT:     dereference_addr_borrow
+// CHECK-NEXT:    copy_addr [[SRC_AOE]] to [init] [[DEST_AOE]]
+// CHECK-LABEL: } // end sil function 'test_dereference_addr_borrow'
+sil @test_dereference_addr_borrow : $@convention(thin) (@in_guaranteed AddressOnlyEnum) -> @out AddressOnlyEnum {
+bb0(%0 : $*AddressOnlyEnum, %1 : $*AddressOnlyEnum):
+  %borrow = make_addr_borrow %1 : $*AddressOnlyEnum
+  %aoe = dereference_addr_borrow %borrow : $Builtin.Borrow<AddressOnlyEnum>
+  copy_addr %aoe to [init] %0
+  %r = tuple ()
+  return %r : $()
 }

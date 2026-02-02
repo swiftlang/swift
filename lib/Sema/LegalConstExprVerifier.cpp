@@ -45,7 +45,8 @@ enum IllegalConstErrorDiagnosis {
   UnsupportedUnaryOperator,
   TypeExpression,
   KeyPath,
-  Closue,
+  Closure,
+  ClosureWithCaptures,
   OpaqueDeclRef,
   OpaqueFuncDeclRef,
   NonConventionCFunc,
@@ -79,8 +80,11 @@ static void diagnoseError(const Expr *errorExpr,
   case KeyPath:
     diags.diagnose(errorLoc, diag::const_unsupported_keypath);
     break;
-  case Closue:
+  case Closure:
     diags.diagnose(errorLoc, diag::const_unsupported_closure);
+    break;
+  case ClosureWithCaptures:
+    diags.diagnose(errorLoc, diag::const_unsupported_closure_with_captures);
     break;
   case OpaqueDeclRef:
     diags.diagnose(errorLoc, diag::const_opaque_decl_ref);
@@ -134,13 +138,231 @@ static bool supportedOperator(const ApplyExpr *operatorApplyExpr) {
   return true;
 }
 
+// Per SE-0492:
+// A constant expression is syntactically one of:
+// - an integer literal using any of standard integer types (Int, UInt,
+//   Int8/16/32/64/128, UInt8/16/32/64/128)
+// - a floating-point literal of type Float or Double
+// - a boolean literal of type Bool
+// - a direct reference to a non-generic function using its name (the function
+//   itself is not generic, and also it must not be defined in a generic
+//   context)
+// - a direct reference to a non-generic metatype using the type name directly
+//   (the type itself is not generic, and also it must not be defined in a
+//   generic context), where the type is non-resilient
+// - a tuple composed of only other constant expressions
+// - an array literal of type InlineArray composed of only other constant
+//   expressions
+static std::optional<std::pair<const Expr *, IllegalConstErrorDiagnosis>>
+checkSupportedWithSectionAttribute(const Expr *expr,
+                                   const DeclContext *declContext) {
+  SmallVector<const Expr *, 4> expressionsToCheck;
+  expressionsToCheck.push_back(expr);
+  while (!expressionsToCheck.empty()) {
+    const Expr *expr = expressionsToCheck.pop_back_val();
+
+    // Tuples composed of constant expressions are allowed
+    if (const TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr)) {
+      for (const Expr *element : tupleExpr->getElements())
+        expressionsToCheck.push_back(element);
+      continue;
+    }
+
+    // Array literals of type InlineArray composed of constant expressions are
+    // allowed
+    if (const ArrayExpr *arrayExpr = dyn_cast<ArrayExpr>(expr)) {
+      auto arrayType = arrayExpr->getType();
+      if (arrayType && arrayType->isInlineArray()) {
+        for (const Expr *element : arrayExpr->getElements())
+          expressionsToCheck.push_back(element);
+        continue;
+      }
+      // Non-InlineArray arrays are not allowed
+      return std::make_pair(expr, TypeNotSupported);
+    }
+    
+    // Coerce expressions to UInt8 are allowed (to support @DebugDescription)
+    if (const CoerceExpr *coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+      auto coerceType = coerceExpr->getType();
+      if (coerceType && coerceType->isUInt8()) {
+        expressionsToCheck.push_back(coerceExpr->getSubExpr());
+        continue;
+      }
+      return std::make_pair(expr, TypeNotSupported);
+    }
+
+    // Operators are not allowed in @section expressions
+    if (isa<BinaryExpr>(expr)) {
+      return std::make_pair(expr, UnsupportedBinaryOperator);
+    }
+    if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr)) {
+      return std::make_pair(expr, UnsupportedUnaryOperator);
+    }
+
+    // Optionals are not allowed
+    if (isa<InjectIntoOptionalExpr>(expr)) {
+      return std::make_pair(expr, TypeNotSupported);
+    }
+
+    // Literal expressions are okay if they are standard types
+    if (const LiteralExpr *literal = dyn_cast<LiteralExpr>(expr)) {
+      auto literalType = literal->getType();
+      if (literalType) {
+        // Allow integer literals of standard integer types
+        if (isIntegerType(literalType))
+          continue;
+        // Allow floating-point literals of Float or Double
+        if (literalType->isFloat() || literalType->isDouble())
+          continue;
+        // Allow boolean literals
+        if (literalType->isBool())
+          continue;
+      }
+      // Other literal types are not supported
+      return std::make_pair(expr, TypeNotSupported);
+    }
+
+    // Keypath expressions not supported in constant expressions
+    if (isa<KeyPathExpr>(expr))
+      return std::make_pair(expr, KeyPath);
+
+    // Closures are allowed if they have no captures
+    if (auto closureExpr = dyn_cast<ClosureExpr>(expr)) {
+      TypeChecker::computeCaptures(const_cast<ClosureExpr *>(closureExpr));
+      if (!closureExpr->getCaptureInfo().isTrivial()) {
+        return std::make_pair(expr, ClosureWithCaptures);
+      }
+      continue;
+    }
+
+    // Function conversions are allowed if the conversion is to '@convention(c)'
+    if (auto functionConvExpr = dyn_cast<FunctionConversionExpr>(expr)) {
+      if (auto targetFnTy =
+              functionConvExpr->getType()->getAs<AnyFunctionType>()) {
+        if (targetFnTy->getExtInfo().getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer) {
+          // Do not check the inner expression -- if it converts to
+          // CFunctionPointer successfully, then it's constant foldable.
+          continue;
+        }
+      }
+      return std::make_pair(expr, Default);
+    }
+
+    // Direct references to non-generic functions are allowed
+    if (const DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr)) {
+      auto decl = declRef->getDecl();
+
+      // Function references are allowed if they are non-generic
+      if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
+        if (!funcDecl->hasGenericParamList() &&
+            !funcDecl->getDeclContext()->isGenericContext()) {
+          continue;
+        }
+        return std::make_pair(expr, OpaqueFuncDeclRef);
+      }
+
+      // Variable references are not allowed
+      return std::make_pair(expr, OpaqueDeclRef);
+    }
+
+    // Allow specific patterns of AutoClosureExpr, which is used in static func
+    // references. E.g. "MyStruct.staticFunc" is:
+    // - autoclosure_expr type="() -> ()"
+    //   - call_expr type="()"
+    //     - dot_syntax_call_expr
+    //       - declref_expr decl="MyStruct.staticFunc"
+    //       - dot_self_expr type="MyStruct.Type"
+    //         - type_expr type="MyStruct.Type"
+    if (auto autoClosureExpr = dyn_cast<AutoClosureExpr>(expr)) {
+      auto subExpr = autoClosureExpr->getUnwrappedCurryThunkExpr();
+      if (auto dotSyntaxCall = dyn_cast<DotSyntaxCallExpr>(subExpr)) {
+        if (auto declRef = dyn_cast<DeclRefExpr>(dotSyntaxCall->getFn())) {
+          if (auto funcDecl = dyn_cast<FuncDecl>(declRef->getDecl())) {
+            // Check if it's a function on a concrete non-generic type
+            if (!funcDecl->hasGenericParamList() &&
+                !funcDecl->getDeclContext()->isGenericContext() &&
+                funcDecl->isStatic()) {
+              if (auto args = dotSyntaxCall->getArgs()) {
+                if (args->size() == 1) {
+                  // Check that the single arg is a DotSelfExpr with only a
+                  // direct concrete TypeExpr inside
+                  if (auto dotSelfExpr =
+                          dyn_cast<DotSelfExpr>(args->get(0).getExpr())) {
+                    if (const TypeExpr *typeExpr =
+                            dyn_cast<TypeExpr>(dotSelfExpr->getSubExpr())) {
+                      auto baseType = typeExpr->getType();
+                      if (baseType && baseType->is<MetatypeType>()) {
+                        auto instanceType =
+                            baseType->getMetatypeInstanceType();
+                        if (auto nominal =
+                                instanceType
+                                    ->getNominalOrBoundGenericNominal()) {
+                          if (!nominal->hasGenericParamList() &&
+                              !nominal->getDeclContext()->isGenericContext() &&
+                              !nominal->isResilient()) {
+                            continue;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return std::make_pair(expr, Default);
+    }
+
+    // Other closure expressions (auto-closures) are not allowed
+    if (isa<AbstractClosureExpr>(expr))
+      return std::make_pair(expr, Default);
+
+    // DotSelfExpr for metatype references (but only a direct TypeExpr inside)
+    if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
+      if (const TypeExpr *typeExpr =
+              dyn_cast<TypeExpr>(dotSelfExpr->getSubExpr())) {
+        auto baseType = typeExpr->getType();
+        if (baseType && baseType->is<MetatypeType>()) {
+          auto instanceType = baseType->getMetatypeInstanceType();
+          if (auto nominal = instanceType->getNominalOrBoundGenericNominal()) {
+            // Allow non-generic, non-resilient types
+            if (!nominal->hasGenericParamList() && !nominal->isResilient()) {
+              continue;
+            }
+          }
+        }
+      }
+      return std::make_pair(expr, TypeExpression);
+    }
+
+    // Look through IdentityExpr, but only after DotSelfExpr, which is also an
+    // IdentityExpr.
+    if (const IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
+      expressionsToCheck.push_back(identityExpr->getSubExpr());
+      continue;
+    }
+
+    // Function calls and constructors are not allowed
+    if (isa<ApplyExpr>(expr))
+      return std::make_pair(expr, Default);
+
+    // Anything else is not allowed
+    return std::make_pair(expr, Default);
+  }
+
+  return std::nullopt;
+}
+
 static std::optional<std::pair<const Expr *, IllegalConstErrorDiagnosis>>
 checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
   SmallVector<const Expr *, 4> expressionsToCheck;
   expressionsToCheck.push_back(expr);
   while (!expressionsToCheck.empty()) {
     const Expr *expr = expressionsToCheck.pop_back_val();
-    // Lookthrough IdentityExpr, Tuple, Array, and InjectIntoOptional
+    // Look through IdentityExpr, Tuple, Array, and InjectIntoOptional
     // expressions.
     if (const IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
       expressionsToCheck.push_back(identityExpr->getSubExpr());
@@ -196,7 +418,7 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
     // Closure expressions are not supported in `@const` expressions
     // TODO: `@const`-evaluable closures
     if (isa<AbstractClosureExpr>(expr))
-      return std::make_pair(expr, Closue);
+      return std::make_pair(expr, Closure);
 
     // Function conversions, as long as the conversion is to a 'convention(c)'
     // then consider the operand sub-expression
@@ -370,10 +592,26 @@ static void verifyConstArguments(const CallExpr *callExpr,
 void swift::diagnoseInvalidConstExpressions(const Expr *expr,
                                             const DeclContext *declContext,
                                             bool isConstInitExpr) {
+  if (declContext->getASTContext().LangOpts.hasFeature(
+          Feature::CompileTimeValuesPreview)) {
+    // No syntactic checking
+    return;
+  }
+
   if (isConstInitExpr) {
-    if (auto error = checkSupportedInConst(expr, declContext))
-      diagnoseError(error->first, error->second,
-                    declContext->getASTContext().Diags);
-  } else if (auto *callExpr = dyn_cast<CallExpr>(expr))
+    if (declContext->getASTContext().LangOpts.hasFeature(
+            Feature::CompileTimeValues)) {
+      // Syntactic checking for preview of compile-time values (@const)
+      if (auto error = checkSupportedInConst(expr, declContext))
+        diagnoseError(error->first, error->second,
+                      declContext->getASTContext().Diags);
+    } else {
+      // Syntactic checking for SE-0492
+      if (auto error = checkSupportedWithSectionAttribute(expr, declContext))
+        diagnoseError(error->first, error->second,
+                      declContext->getASTContext().Diags);
+    }
+  } else if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
     verifyConstArguments(callExpr, declContext);
+  }
 }

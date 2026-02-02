@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #if SWIFT_ENABLE_REFLECTION
 
 #include "llvm/Support/MathExtras.h"
@@ -224,6 +225,13 @@ public:
       stream << ")";
       return;
     }
+
+    case TypeInfoKind::Borrow: {
+      printHeader("borrow");
+      printBasic(TI);
+      stream << ")";
+      return;
+    }
     }
 
     swift_unreachable("Bad TypeInfo kind");
@@ -408,8 +416,7 @@ bool RecordTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
       [](const FieldInfo &lhs, const FieldInfo &rhs) {
         return lhs.TI.getNumExtraInhabitants() < rhs.TI.getNumExtraInhabitants();
       });
-    auto fieldAddress = remote::RemoteAddress(address.getAddressData()
-                                              + mostCapaciousField->Offset);
+    auto fieldAddress = address + mostCapaciousField->Offset;
     return mostCapaciousField->TI.readExtraInhabitantIndex(
       reader, fieldAddress, extraInhabitantIndex);
   }
@@ -1154,11 +1161,17 @@ class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
   std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
+  remote::RemoteAbsolutePointer Shape;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
   unsigned WitnessTableCount;
   bool Invalid;
+
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
+  }
 
   bool isSingleError() const {
     // If we changed representation, it means we added a
@@ -1191,8 +1204,7 @@ class ExistentialTypeInfoBuilder {
       auto *NTD = dyn_cast<NominalTypeRef>(P);
       auto *OP = dyn_cast<ObjCProtocolTypeRef>(P);
       if (!NTD && !OP) {
-        DEBUG_LOG(fprintf(stderr, "Bad protocol: "); P->dump())
-        Invalid = true;
+        markInvalid("bad protocol", P);
         continue;
       }
 
@@ -1204,8 +1216,7 @@ class ExistentialTypeInfoBuilder {
 
       auto FD = TC.getBuilder().getFieldDescriptor(P);
       if (FD == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No field descriptor: "); P->dump())
-        Invalid = true;
+        markInvalid("no field descriptor", P);
         continue;
       }
 
@@ -1224,16 +1235,12 @@ class ExistentialTypeInfoBuilder {
             // layering.
             auto *SuperclassTI = TC.getTypeInfo(Superclass, nullptr);
             if (SuperclassTI == nullptr) {
-              DEBUG_LOG(fprintf(stderr, "No TypeInfo for superclass: ");
-                        Superclass->dump());
-              Invalid = true;
+              markInvalid("no type info for superclass", Superclass);
               continue;
             }
 
             if (!isa<ReferenceTypeInfo>(SuperclassTI)) {
-              DEBUG_LOG(fprintf(stderr, "Superclass not a reference type: ");
-                        SuperclassTI->dump());
-              Invalid = true;
+              markInvalid("superclass not a reference type", Superclass);
               continue;
             }
 
@@ -1252,7 +1259,7 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::Enum:
         case FieldDescriptorKind::MultiPayloadEnum:
         case FieldDescriptorKind::Class:
-          Invalid = true;
+          markInvalid("unexpected field descriptor kind");
           continue;
       }
     }
@@ -1283,8 +1290,7 @@ public:
       if (!isa<NominalTypeRef>(T) &&
           !isa<BoundGenericTypeRef>(T) &&
           !isa<ObjCClassTypeRef>(T)) {
-        DEBUG_LOG(fprintf(stderr, "Bad existential member: "); T->dump())
-        Invalid = true;
+        markInvalid("bad existential member", T);
         return;
       }
 
@@ -1296,8 +1302,7 @@ public:
 
       const auto &FD = TC.getBuilder().getFieldDescriptor(T);
       if (FD == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No field descriptor: "); T->dump())
-        Invalid = true;
+        markInvalid("no field descriptor", T);
         return;
       }
 
@@ -1313,8 +1318,7 @@ public:
         break;
 
       default:
-        DEBUG_LOG(fprintf(stderr, "Bad existential member: "); T->dump())
-        Invalid = true;
+        markInvalid("bad existential member", T);
         return;
       }
     }
@@ -1324,8 +1328,22 @@ public:
     Representation = ExistentialTypeRepresentation::Class;
   }
 
-  void markInvalid() {
-    Invalid = true;
+  void addShape(const ProtocolCompositionTypeRef *Protocol,
+                ExtendedExistentialTypeShapeFlags Flags) {
+    switch (Flags.getSpecialKind()) {
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Class:
+      Representation = ExistentialTypeRepresentation::Class;
+      break;
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Metatype:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::ExplicitLayout:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::None:
+      Representation = ExistentialTypeRepresentation::Opaque;
+      break;
+    }
+
+    if (Protocol)
+      for (auto *Protocol : Protocol->getProtocols())
+        addProtocol(Protocol);
   }
 
   const TypeInfo *build(remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -1336,7 +1354,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG_LOG(fprintf(stderr, "@objc existential with witness tables\n"));
+        TC.setError("@objc existential with witness tables");
         return nullptr;
       }
 
@@ -1373,7 +1391,7 @@ public:
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef(), ExternalTypeInfo);
       if (TI == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No TypeInfo for RawPointer\n"));
+        TC.setError("no TypeInfo for RawPointer");
         return nullptr;
       }
 
@@ -1407,7 +1425,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG_LOG(fprintf(stderr, "@objc existential with witness tables\n"));
+        markInvalid("@objc existential with witness tables");
         return nullptr;
       }
 
@@ -1480,8 +1498,7 @@ void RecordTypeInfoBuilder::addField(
     remote::TypeInfoProvider *ExternalTypeInfo) {
   const TypeInfo *TI = TC.getTypeInfo(TR, ExternalTypeInfo);
   if (TI == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for field type: "); TR->dump());
-    Invalid = true;
+    markInvalid("no TypeInfo for field type", TR);
     return;
   }
 
@@ -1531,7 +1548,7 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
 
   auto BuiltinTI = Builder.getBuiltinTypeDescriptor(TR);
   if (BuiltinTI == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for reference type: "); TR->dump());
+    setError("no TypeInfo for reference type", TR);
     return nullptr;
   }
 
@@ -1563,6 +1580,23 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
   return TI;
 }
 
+void TypeConverter::setError(const char *msg, const TypeRef *TR) {
+  DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
+  LastError = {msg, TR};
+}
+
+std::string TypeConverter::takeLastError() {
+  if (!LastError.first)
+    return {};
+  std::stringstream s;
+  s << LastError.first << ": ";
+  if (LastError.second)
+    LastError.second->dump(s);
+
+  LastError = {nullptr, nullptr};
+  return s.str();
+}
+
 /// Thin functions consist of a function pointer. We do not use
 /// Builtin.RawPointer here, since the extra inhabitants differ.
 const TypeInfo *
@@ -1573,7 +1607,7 @@ TypeConverter::getThinFunctionTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getThinFunctionTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for function type\n"));
+    setError("no TypeInfo for function type");
     return nullptr;
   }
 
@@ -1608,7 +1642,7 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for metatype type\n"));
+    setError("no TypeInfo for metatype type");
     return nullptr;
   }
 
@@ -1627,7 +1661,7 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getRawPointerTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for default actor storage type\n"));
+    setError("no TypeInfo for default actor storage type");
     return nullptr;
   }
 
@@ -1776,6 +1810,11 @@ public:
     return true;
   }
 
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    return true;
+  }
+
   bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
@@ -1829,6 +1868,10 @@ public:
 
   bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return visit(BA->getElementType());
+  }
+
+  bool visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return visit(BA->getReferentType());
   }
 };
 
@@ -1919,6 +1962,11 @@ public:
     return MetatypeRepresentation::Thin;
   }
 
+  MetatypeRepresentation visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    return MetatypeRepresentation::Thin;
+  }
+
   MetatypeRepresentation visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     if (M->wasAbstract())
       return MetatypeRepresentation::Thick;
@@ -1985,7 +2033,11 @@ public:
   }
 
   MetatypeRepresentation visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
-    return visit(BA->getElementType());
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return MetatypeRepresentation::Thin;
   }
 };
 
@@ -1995,6 +2047,11 @@ class EnumTypeInfoBuilder {
   bool BitwiseTakable;
   std::vector<FieldInfo> Cases;
   bool Invalid;
+
+  void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
+    Invalid = true;
+    TC.setError(msg, TR);
+  }
 
   const TypeRef *getCaseTypeRef(FieldTypeInfo Case) {
     // An indirect case is like a payload case with an argument type
@@ -2015,8 +2072,7 @@ class EnumTypeInfoBuilder {
   void addCase(const std::string &Name, const TypeRef *TR,
                const TypeInfo *TI) {
     if (TI == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "No TypeInfo for case type: "); TR->dump());
-      Invalid = true;
+      markInvalid("no type info for case type", TR);
       static TypeInfo emptyTI;
       Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
     } else {
@@ -2045,7 +2101,7 @@ public:
 
     std::vector<FieldTypeInfo> Fields;
     if (!TC.getBuilder().getFieldTypeRefs(TR, FD, ExternalTypeInfo, Fields)) {
-      Invalid = true;
+      markInvalid("cannot not get field types", TR);
       return nullptr;
     }
 
@@ -2060,7 +2116,7 @@ public:
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
         if (CaseTI == nullptr) {
           // We don't have typeinfo; something is very broken.
-          Invalid = true;
+          markInvalid("no type info for single enum case", CaseTR);
           return nullptr;
 	} else if (Case.Indirect) {
 	  // An indirect case is non-empty (it stores a pointer)
@@ -2287,8 +2343,9 @@ class LowerType
     if (auto N = dyn_cast<NominalTypeRef>(TR)) {
       Demangler Dem;
       auto Node = N->getDemangling(Dem);
-      if (Node->getKind() == Node::Kind::Type && Node->getNumChildren() == 1) {
-	auto Alias = Node->getChild(0);
+      if (Node && Node->getKind() == Node::Kind::Type &&
+          Node->getNumChildren() == 1) {
+        auto Alias = Node->getChild(0);
 	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
 	  auto Module = Alias->getChild(0);
 	  auto Name = Alias->getChild(1);
@@ -2337,7 +2394,7 @@ public:
     /// metadata.
     auto descriptor = TC.getBuilder().getBuiltinTypeDescriptor(B);
     if (descriptor == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "No TypeInfo for builtin type: "); B->dump());
+      TC.setError("no TypeInfo for builtin type", B);
       return nullptr;
     }
     return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), *descriptor.get());
@@ -2386,7 +2443,7 @@ public:
 
 
         // If the external provider also fails we're out of luck.
-        DEBUG_LOG(fprintf(stderr, "No TypeInfo for nominal type: "); TR->dump());
+        TC.setError("no TypeInfo for nominal type", TR);
         return nullptr;
       }
     }
@@ -2421,7 +2478,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      DEBUG_LOG(fprintf(stderr, "Invalid field descriptor: "); TR->dump());
+      TC.setError("Invalid field descriptor", TR);
       return nullptr;
     }
 
@@ -2445,12 +2502,12 @@ public:
   }
 
   const TypeInfo *visitPackTypeRef(const PackTypeRef *P) {
-    DEBUG_LOG(fprintf(stderr, "Cannot have pack type here: "); P->dump());
+    TC.setError("cannot have pack type here", P);
     return nullptr;
   }
 
   const TypeInfo *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
-    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    TC.setError("cannot have pack expansion type here", PE);
     return nullptr;
   }
 
@@ -2485,7 +2542,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
-      DEBUG_LOG(fprintf(stderr, "Unknown metatype representation: "); M->dump());
+      TC.setError("unknown metatype representation", M);
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -2504,22 +2561,29 @@ public:
     if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
     } else {
-      DEBUG_LOG(fprintf(stderr, "Invalid existential metatype: "); EM->dump());
+      TC.setError("invalid existential metatype", EM);
       return nullptr;
     }
 
     return builder.buildMetatype(ExternalTypeInfo);
   }
 
+  const TypeInfo *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    ExistentialTypeInfoBuilder builder(TC);
+    builder.addShape(SEET->getProtocol(), SEET->getFlags());
+    return builder.build(ExternalTypeInfo);
+  }
+
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); GTP->dump());
+    TC.setError("unresolved generic TypeRef", GTP);
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); DM->dump());
+    TC.setError("unresolved generic TypeRef", DM);
     return nullptr;
   }
 
@@ -2545,7 +2609,7 @@ public:
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
     if (TI == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "Invalid reference type"));
+      TC.setError("invalid reference type");
       return nullptr;
     }
 
@@ -2591,7 +2655,7 @@ public:
     }
 
     // Anything else -- give up
-    DEBUG_LOG(fprintf(stderr, "Invalid reference type"));
+    TC.setError("invalid reference type");
     return nullptr;
   }
 
@@ -2619,19 +2683,19 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    DEBUG_LOG(fprintf(stderr, "Can't lower opaque TypeRef"));
+    TC.setError("can't lower opaque TypeRef", O);
     return nullptr;
   }
 
   const TypeInfo *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     // TODO: Provide a hook for the client to try to resolve the opaque archetype
     // with additional information?
-    DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
+    TC.setError("can't lower unresolved opaque archetype TypeRef", O);
     return nullptr;
   }
 
   const TypeInfo *visitIntegerTypeRef(const IntegerTypeRef *I) {
-    DEBUG_LOG(fprintf(stderr, "Can't lower integer TypeRef"));
+    TC.setError("can't lower integer TypeRef", I);
     return nullptr;
   }
 
@@ -2641,13 +2705,19 @@ public:
 
     return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
   }
+
+  const TypeInfo *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    llvm_unreachable("not implemented");
+    // auto referentTI = visit(BA->getReferentType());
+    // return TC.makeTypeInfo<BorrowTypeInfo>(referentTI);
+  }
 };
 
 const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
   if (!TR) {
-    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    setError("null TypeRef");
     return nullptr;
   }
 
@@ -2655,19 +2725,27 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
       ExternalTypeInfo ? ExternalTypeInfo->getId() : 0;
   // See if we already computed the result
   auto found = Cache.find({TR, ExternalTypeInfoId});
-  if (found != Cache.end())
+  if (found != Cache.end()) {
+    if (!found->second && ErrorCache)
+      LastError = ErrorCache->lookup({TR, ExternalTypeInfoId});
     return found->second;
+  }
 
   // Detect invalid recursive value types (IRGen should not emit
   // them in the first place, but there might be bugs)
   if (!RecursionCheck.insert(TR).second) {
-    DEBUG_LOG(fprintf(stderr, "TypeRef recursion detected"));
+    setError("TypeRef recursion detected");
     return nullptr;
   }
 
   // Compute the result and cache it
   auto *TI = LowerType(*this, ExternalTypeInfo).visit(TR);
   Cache.insert({{TR, ExternalTypeInfoId}, TI});
+  if (!TI && ErrorCache) {
+    if (!LastError.first)
+      LastError = {"cannot decode or find", TR};
+    ErrorCache->insert({{TR, ExternalTypeInfoId}, LastError});
+  }
 
   RecursionCheck.erase(TR);
 
@@ -2679,7 +2757,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     remote::TypeInfoProvider *ExternalTypeInfo) {
   auto FD = getBuilder().getFieldDescriptor(TR);
   if (FD == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No field descriptor: "); TR->dump());
+    setError("no field descriptor", TR);
     return nullptr;
   }
 
@@ -2691,8 +2769,11 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
     std::vector<FieldTypeInfo> Fields;
-    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo, Fields))
+    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo,
+                                       Fields)) {
+      setError("cannot get fields", TR);
       return nullptr;
+    }
 
     // Start layout from the given instance start offset. This should
     // be the superclass instance size.
@@ -2712,7 +2793,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
-    DEBUG_LOG(fprintf(stderr, "Invalid field descriptor: "); TR->dump());
+    setError("invalid field descriptor", TR);
     return nullptr;
   }
 

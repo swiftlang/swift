@@ -56,19 +56,19 @@ public:
   operator TermInst *() const {
     if (auto *seai = value.dyn_cast<SwitchEnumAddrInst *>())
       return seai;
-    return value.get<SwitchEnumInst *>();
+    return cast<SwitchEnumInst *>(value);
   }
 
   TermInst *operator*() const {
     if (auto *seai = value.dyn_cast<SwitchEnumAddrInst *>())
       return seai;
-    return value.get<SwitchEnumInst *>();
+    return cast<SwitchEnumInst *>(value);
   }
 
   TermInst *operator->() const {
     if (auto *seai = value.dyn_cast<SwitchEnumAddrInst *>())
       return seai;
-    return value.get<SwitchEnumInst *>();
+    return cast<SwitchEnumInst *>(value);
   }
 
   operator bool() const { return bool(value); }
@@ -76,62 +76,62 @@ public:
   SILValue getOperand() {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getOperand();
-    return value.get<SwitchEnumAddrInst *>()->getOperand();
+    return cast<SwitchEnumAddrInst *>(value)->getOperand();
   }
 
   unsigned getNumCases() {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getNumCases();
-    return value.get<SwitchEnumAddrInst *>()->getNumCases();
+    return cast<SwitchEnumAddrInst *>(value)->getNumCases();
   }
 
   std::pair<EnumElementDecl *, SILBasicBlock *> getCase(unsigned i) const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getCase(i);
-    return value.get<SwitchEnumAddrInst *>()->getCase(i);
+    return cast<SwitchEnumAddrInst *>(value)->getCase(i);
   }
 
   SILBasicBlock *getCaseDestination(EnumElementDecl *decl) const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getCaseDestination(decl);
-    return value.get<SwitchEnumAddrInst *>()->getCaseDestination(decl);
+    return cast<SwitchEnumAddrInst *>(value)->getCaseDestination(decl);
   }
 
   ProfileCounter getCaseCount(unsigned i) const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getCaseCount(i);
-    return value.get<SwitchEnumAddrInst *>()->getCaseCount(i);
+    return cast<SwitchEnumAddrInst *>(value)->getCaseCount(i);
   }
 
   ProfileCounter getDefaultCount() const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getDefaultCount();
-    return value.get<SwitchEnumAddrInst *>()->getDefaultCount();
+    return cast<SwitchEnumAddrInst *>(value)->getDefaultCount();
   }
 
   bool hasDefault() const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->hasDefault();
-    return value.get<SwitchEnumAddrInst *>()->hasDefault();
+    return cast<SwitchEnumAddrInst *>(value)->hasDefault();
   }
 
   SILBasicBlock *getDefaultBB() const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getDefaultBB();
-    return value.get<SwitchEnumAddrInst *>()->getDefaultBB();
+    return cast<SwitchEnumAddrInst *>(value)->getDefaultBB();
   }
 
   NullablePtr<SILBasicBlock> getDefaultBBOrNull() const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getDefaultBBOrNull();
-    return value.get<SwitchEnumAddrInst *>()->getDefaultBBOrNull();
+    return cast<SwitchEnumAddrInst *>(value)->getDefaultBBOrNull();
   }
 
   /// If the default refers to exactly one case decl, return it.
   NullablePtr<EnumElementDecl> getUniqueCaseForDefault() const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getUniqueCaseForDefault();
-    return value.get<SwitchEnumAddrInst *>()->getUniqueCaseForDefault();
+    return cast<SwitchEnumAddrInst *>(value)->getUniqueCaseForDefault();
   }
 
   /// If the given block only has one enum element decl matched to it,
@@ -140,7 +140,7 @@ public:
   getUniqueCaseForDestination(SILBasicBlock *BB) const {
     if (auto *sei = value.dyn_cast<SwitchEnumInst *>())
       return sei->getUniqueCaseForDestination(BB);
-    return value.get<SwitchEnumAddrInst *>()->getUniqueCaseForDestination(BB);
+    return cast<SwitchEnumAddrInst *>(value)->getUniqueCaseForDestination(BB);
   }
 };
 

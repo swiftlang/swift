@@ -8,7 +8,7 @@ sil @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
 
 // Write:   store {{.*}} [assign] {{.*}}
 // CHECK: Begin Error in function test_write_reborrow
-// CHECK: SIL verification failed: Load borrow invalidated by a local write
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
 // CHECK: End Error in function test_write_reborrow
 sil [ossa] @test_write_reborrow : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
@@ -30,7 +30,7 @@ bb2(%ldarg : @guaranteed $Klass):
 }
 
 // CHECK: Begin Error in function test_multiple_loadborrows
-// CHECK: SIL verification failed: Load borrow invalidated by a local write
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
 // CHECK: Verifying instruction:
 // CHECK: ->  destroy_addr
 // CHECK: End Error in function test_multiple_loadborrows
@@ -84,7 +84,7 @@ struct MyStruct {
 }
 
 // CHECK: Begin Error in function test_is_unique
-// CHECK: SIL verification failed: Load borrow invalidated by a local write
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
 // CHECK: -> %4 = is_unique %1 : $*ArrayIntBuffer
 // CHECK: End Error in function test_is_unique
 sil [ossa] @test_is_unique : $@convention(thin) (@in MyArray<MyStruct>) -> () {

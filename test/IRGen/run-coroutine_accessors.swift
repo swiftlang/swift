@@ -91,8 +91,6 @@
 // REQUIRES: concurrency_runtime
 
 // TODO: CoroutineAccessors: Enable on WASM.
-// UNSUPPORTED: wasm
-// UNSUPPORTED: OS=wasi
 // UNSUPPORTED: CPU=wasm32
 
 // REQUIRES: swift_feature_CoroutineAccessors
@@ -109,10 +107,10 @@ public protocol ResilientWrapping {
 @available(SwiftStdlib 9999, *)
 extension ResilientWrapping {
   public var wrapped2: Wrapped {
-    read {
+    yielding borrow {
       yield wrapped
     }
-    modify {
+    yielding mutate {
       yield &wrapped
     }
   }
@@ -127,10 +125,10 @@ public struct ResilientBoxtional<T> : ResilientWrapping {
   public typealias Wrapped = T?
 
   public var wrapped : T? {
-    read {
+    yielding borrow {
       yield storage
     }
-    modify {
+    yielding mutate {
       yield &storage
     }
   }
@@ -140,10 +138,10 @@ public struct ResilientBoxtional<T> : ResilientWrapping {
 open class ResilientWrappingClass<Wrapped> {
   public init() {}
   open var wrapped: Wrapped {
-    read {
+    yielding borrow {
       fatalError()
     }
-    modify {
+    yielding mutate {
       fatalError()
     }
   }
@@ -154,10 +152,10 @@ open class ResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingC
   public init(_ impl: X) { self.impl = impl }
   var impl: X
   open override var wrapped: X.Wrapped {
-    read {
+    yielding borrow {
       yield impl.wrapped
     }
-    modify {
+    yielding mutate {
       yield &impl.wrapped
     }
   }
@@ -201,7 +199,7 @@ struct MaybePtrBox<T> {
   }
   var value : T? {
     // Analogous to the implementation of Dictionary's subscript.
-    read {
+    yielding borrow {
       let val: T?
       if isValid() {
         val = ptr.pointee
@@ -210,7 +208,7 @@ struct MaybePtrBox<T> {
       }
       yield val
     }
-    modify {
+    yielding mutate {
       var val: T?
       if isValid() {
         val = ptr.pointee
@@ -232,10 +230,10 @@ struct Boxtional<T> : ResilientWrapping {
   typealias Wrapped = T?
 
   var wrapped : T? {
-    read {
+    yielding borrow {
       yield storage
     }
-    modify {
+    yielding mutate {
       yield &storage
     }
   }
@@ -243,16 +241,16 @@ struct Boxtional<T> : ResilientWrapping {
 
 @available(SwiftStdlib 9999, *)
 class NonresilientResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingClass<X.Wrapped> {
-  init(_ impl: X) { 
+  init(_ impl: X) {
     self.impl = impl
     super.init()
   }
   var impl: X
   override var wrapped: X.Wrapped {
-    read {
+    yielding borrow {
       yield impl.wrapped
     }
-    modify {
+    yielding mutate {
       yield &impl.wrapped
     }
   }
@@ -294,10 +292,10 @@ protocol Wrapping {
 extension MaybePtrBox : Wrapping {
   typealias Wrapped = T?
   var wrapped: T? {
-    read {
+    yielding borrow {
       yield value
     }
-    modify {
+    yielding mutate {
       yield &value
     }
   }
@@ -308,10 +306,10 @@ extension MaybePtrBox : ResilientWrapping {}
 @available(SwiftStdlib 9999, *)
 class WrappingClass<Wrapped> {
   var wrapped: Wrapped {
-    read {
+    yielding borrow {
       fatalError()
     }
-    modify {
+    yielding mutate {
       fatalError()
     }
   }
@@ -322,10 +320,10 @@ class WrappingSubclass<X : Wrapping> : WrappingClass<X.Wrapped> {
   init(_ impl: X) { self.impl = impl }
   var impl: X
   override var wrapped: X.Wrapped {
-    read {
+    yielding borrow {
       yield impl.wrapped
     }
-    modify {
+    yielding mutate {
       yield &impl.wrapped
     }
   }

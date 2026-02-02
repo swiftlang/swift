@@ -282,15 +282,11 @@ protocol P2 {
 }
 
 // CHECK-LABEL: same_types.(file).structuralSameTypeRecursive1@
-// CHECK-NEXT: Generic signature: <T, U>
+// CHECK-NEXT: Generic signature: <T, U where T == <<error type>>, U == <<error type>>>
 
-// expected-error@+2 {{cannot build rewrite system for generic signature; concrete nesting limit exceeded}}
+// expected-error@+2 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
 // expected-note@+1 {{τ_0_0.[P2:Assoc1].[concrete: ((((((((((((((((((((((((((((((((τ_0_0.[P2:Assoc1], τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1), τ_0_1)] => τ_0_0.[P2:Assoc1]}}
-func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U)
-  where T.Assoc1 == Tuple2<T.Assoc1, U>
-  // expected-error@-1 {{'Assoc1' is not a member type of type 'T'}}
-  // expected-error@-2 {{'Assoc1' is not a member type of type 'T'}}
-{ }
+func structuralSameTypeRecursive1<T: P2, U>(_: T, _: U) where T.Assoc1 == Tuple2<T.Assoc1, U> {}
 
 protocol P3 {
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-sil -I %S/Inputs/custom-modules %s -verify > /dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated > /dev/null
 
 // expected-no-diagnostics
 

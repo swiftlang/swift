@@ -147,18 +147,11 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   if (Info.ID == diag::lex_editor_placeholder.ID ||
       Info.ID == diag::oslog_invalid_log_message.ID)
     return;
-
   bool IsNote = (Info.Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
     // Is this possible?
     return;
-
-  if (Info.Kind == DiagnosticKind::Remark) {
-    // FIXME: we may want to handle optimization remarks in sourcekitd.
-    LOG_WARN_FUNC("unhandled optimization remark");
-    return;
-  }
 
   DiagnosticEntryInfo SKInfo;
 
@@ -237,7 +230,6 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
     getLastDiag().Notes.push_back(std::move(SKInfo));
     return;
   }
-
   switch (Info.Kind) {
   case DiagnosticKind::Error:
     SKInfo.Severity = DiagnosticSeverityKind::Error;
@@ -245,8 +237,10 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   case DiagnosticKind::Warning:
     SKInfo.Severity = DiagnosticSeverityKind::Warning;
     break;
-  case DiagnosticKind::Note:
   case DiagnosticKind::Remark:
+    SKInfo.Severity = DiagnosticSeverityKind::Remark;
+    break;
+  case DiagnosticKind::Note:
     llvm_unreachable("already covered");
   }
 
@@ -990,8 +984,8 @@ public:
     }
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit)
       return true;
@@ -1004,9 +998,12 @@ public:
     if (D->isUnavailable())
       return true;
 
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
     auto &SM = D->getASTContext().SourceMgr;
     if (D == D->getASTContext().getOptionalNoneDecl() &&
-        SM.extractText(Range, BufferID) == "nil") {
+        SM.extractText(CharRange, BufferID) == "nil") {
       // If a 'nil' literal occurs in a swift-case statement, it gets replaced
       // by a reference to 'Optional.none' in the AST. We want to continue
       // highlighting 'nil' as a keyword and not as an enum element.
@@ -1015,11 +1012,11 @@ public:
 
     if (CtorTyRef)
       D = CtorTyRef;
-    annotate(D, /*IsRef=*/true, Range);
+    annotate(D, /*IsRef=*/true, CharRange);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
@@ -1030,12 +1027,11 @@ public:
     if (!Range.isValid())
       return;
 
-    // If we are walking into macro expansions, make sure we only report ranges
-    // from the requested buffer, not any buffers of child macro expansions.
-    if (IsWalkingMacroExpansionBuffer &&
-        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+    // Make sure we only report from the requested buffer, not any buffers of
+    // child macro expansions.
+    if (SM.findBufferContainingLoc(Range.getStart()) != BufferID)
       return;
-    }
+
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);

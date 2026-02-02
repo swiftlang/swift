@@ -62,7 +62,7 @@ ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
 ERROR(pound_diagnostic_expected,none,
       "expected '%0' in %select{#warning|#error}1 directive",(StringRef,bool))
-ERROR(pound_diagnostic_expected_parens,none,
+ERROR(pound_diagnostic_expected_parens,PointsToFirstBadToken,
       "%select{#warning|#error}0 directive requires parentheses",(bool))
 ERROR(pound_diagnostic_interpolation,none,
       "string interpolation is not allowed in %select{#warning|#error}0 directives",(bool))
@@ -92,6 +92,17 @@ ERROR(forbidden_interpolated_string,none,
       "%0 cannot be an interpolated string literal", (StringRef))
 ERROR(forbidden_extended_escaping_string,none,
       "%0 cannot be an extended escaping string literal", (StringRef))
+
+ERROR(expected_identifier_in_module_selector,none,
+      "expected module name in module selector", ())
+ERROR(expected_identifier_after_module_selector,none,
+      "expected identifier after module selector", ())
+NOTE(extra_whitespace_module_selector,none,
+     "remove extraneous whitespace after '::'", ())
+ERROR(module_selector_submodule_not_allowed,none,
+      "module selector cannot specify a submodule", ())
+NOTE(replace_module_selector_with_member_lookup,none,
+     "replace '::' with '.'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
@@ -256,10 +267,11 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(expected_getset_in_protocol,none,
-      "expected get or set in a protocol property", ())
 ERROR(expected_getreadset_in_protocol,none,
-      "expected get, read, or set in a protocol property", ())
+      "expected 'get', 'yielding borrow', or 'set' in a protocol property", ())
+ERROR(expected_getreadborrowsetmutate_in_protocol,none,
+      "expected get, 'yielding borrow', borrow, set or mutate in a protocol property", ())
+
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
       "here; use extension instead", (StringRef))
@@ -301,7 +313,11 @@ ERROR(missing_getter,none,
       (unsigned, StringRef))
 ERROR(missing_reading_accessor,none,
       "%select{variable|subscript}0 with %1 must also have "
-      "a getter, addressor, or 'read' accessor",
+      "a getter, addressor, or 'yielding borrow' accessor",
+      (unsigned, StringRef))
+ERROR(missing_borrow_accessor,none,
+      "%select{variable|subscript}0 with %1 must also have "
+      "a 'borrow' accessor",
       (unsigned, StringRef))
 ERROR(observing_accessor_conflicts_with_accessor,none,
       "%select{'willSet'|'didSet'}0 cannot be provided together with %1",
@@ -312,6 +328,11 @@ ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 ERROR(accessor_requires_coroutine_accessors,none,
       "%0 is only valid when experimental feature coroutine accessors is enabled",
+      (StringRef))
+WARNING(old_coroutine_accessor,none,
+      "'%1' is deprecated; please use 'yielding %0' instead", (StringRef, StringRef))
+ERROR(accessor_requires_borrow_and_mutate_accessors,none,
+      "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
       (StringRef))
 
 // Import
@@ -614,6 +635,12 @@ ERROR(sil_operand_has_incorrect_moveonlywrapped,none,
 ERROR(sil_operand_not_ref_storage_address,none,
       "%0 operand of '%1' must have address of %2 type",
       (StringRef, StringRef, ReferenceOwnership))
+ERROR(sil_operand_has_wrong_ownership_kind,none,
+      "operand has ownership kind %0 but ownership kind %1 was expected",
+      (StringRef, StringRef))
+ERROR(sil_operand_has_incompatible_ownership_kind,none,
+      "operand has ownership kind %0 but ownership kind compatible with %1 was expected",
+      (StringRef, StringRef))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_integer_literal_not_well_formed,none,
@@ -1532,6 +1559,9 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_cname,none,
+      "expected C identifier in '%0' attribute", (StringRef))
+
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
@@ -1725,8 +1755,6 @@ ERROR(opened_attribute_expected_rparen,none,
 // pack_element
 ERROR(pack_element_attribute_expected_lparen,none,
       "expected '(' after 'pack_element' attribute", ())
-ERROR(pack_element_attribute_expected_rparen,none,
-      "expected ')' after id value for 'pack_element' attribute", ())
 ERROR(multiple_open_pack_element,none,
       "multiple 'open_pack_element' instructions with same UUID", ())
 ERROR(opened_shape_class_not_pack_param,none,
@@ -1743,6 +1771,13 @@ WARNING(attr_warn_unused_result_removed,none,
         "'warn_unused_result' attribute behavior is now the default", ())
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
+      
+// warn
+WARNING(attr_warn_unknown_diagnostic_group_identifier,none,
+        "the diagnostic group identifier '%0' is unknown", (StringRef))
+
+ERROR(attr_warn_expected_known_behavior,none,
+      "expected diagnostic behavior argument '%0' to be either 'error', 'warning' or 'ignored'", (StringRef))
 
 // _specialize
 ERROR(attr_specialize_missing_colon,none,
@@ -1810,8 +1845,6 @@ ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
       "expected '[' to start the %0", (StringRef))
 ERROR(sil_autodiff_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to complete the %0", (StringRef))
-ERROR(sil_autodiff_expected_index_list,PointsToFirstBadToken,
-      "expected a space-separated list of indices, e.g. '0 1'", ())
 ERROR(sil_autodiff_expected_index_list_label,PointsToFirstBadToken,
       "expected label '%0' in index list", (StringRef))
 ERROR(sil_autodiff_expected_parameter_index,PointsToFirstBadToken,
@@ -2147,7 +2180,7 @@ ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
 
 ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
       PointsToFirstBadToken,
-      "expected identifier, index or self in lifetime dependence specifier",
+      "expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier",
       ())
 
 ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,

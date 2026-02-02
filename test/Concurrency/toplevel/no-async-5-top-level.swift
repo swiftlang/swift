@@ -1,9 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level -swift-version 5 %s -verify
 // RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 5 %s -verify
 
-// Even though enable-experimental-async-top-level is enabled, there are no
-// `await`s made from the top-level, so it is not an async context. `a` is just
-// a normal top-level global variable with no actor isolation.
+// There are no `await`s made from the top-level, so it is not an async context.
+// `a` is just a normal top-level global variable with no actor isolation.
 
 var a = 10
 
@@ -19,7 +17,7 @@ func isolatedSync() { // expected-note 2 {{calls to global function 'isolatedSyn
 }
 
 func nonIsolatedAsync() async {
-    await print(a) // expected-warning {{no 'async' operations occur within 'await' expression}}
+    await print(a) // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
     a = a + 10
 }
 

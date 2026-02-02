@@ -44,7 +44,7 @@ static SILType applyPrimaryArchetypes(IRGenFunction &IGF,
   }
 
   auto substType =
-    IGF.IGM.getGenericEnvironment()->mapTypeIntoContext(type.getASTType())
+    IGF.IGM.getGenericEnvironment()->mapTypeIntoEnvironment(type.getASTType())
       ->getCanonicalType();
   return SILType::getPrimitiveType(substType, type.getCategory());
 }

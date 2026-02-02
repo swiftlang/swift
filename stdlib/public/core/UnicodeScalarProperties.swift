@@ -1250,7 +1250,7 @@ extension Unicode.Scalar.Properties {
     }
 
     // The longest name that Unicode defines is 88 characters long.
-    let largestCount = Int(SWIFT_STDLIB_LARGEST_NAME_COUNT)
+    let largestCount = 88
 
     let name = unsafe String(_uninitializedCapacity: largestCount) { buffer in
       unsafe _swift_stdlib_getScalarName(
@@ -1277,7 +1277,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the "Name_Alias" property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
-    guard let nameAliasPtr = _swift_stdlib_getNameAlias(_scalar.value) else {
+    guard let nameAliasPtr = unsafe _swift_stdlib_getNameAlias(_scalar.value) else {
       return nil
     }
 

@@ -106,9 +106,9 @@ public:
 
           auto eltTy = tuple.getType().getTupleElementType(index);
           assert(eltTy.isAddress() == tuple.getType().isAddress());
-          auto &eltTI = SGF.getTypeLowering(eltTy);
-          (void)eltTI;
-          assert(eltTI.isLoadable() || !SGF.silConv.useLoweredAddresses());
+          auto eltProps = SGF.getTypeProperties(eltTy);
+          (void)eltProps;
+          assert(eltProps.isLoadable() || !SGF.silConv.useLoweredAddresses());
 
           // Project the element.
           visit(eltFormalType, elt);

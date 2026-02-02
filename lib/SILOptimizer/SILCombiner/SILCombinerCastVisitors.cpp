@@ -611,6 +611,12 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
         UBCI->getLoc(), UBCI->getOperand(), UBCI->getType());
   }
 
+  // In ownership converting an unowned bitwise cast to a "real" ownership
+  // forwarding instruction can cause various troubles.
+  // Let's don't go into this business.
+  if (Builder.hasOwnership())
+    return nullptr;
+
   if (!SILType::canRefCast(UBCI->getOperand()->getType(), UBCI->getType(),
                            Builder.getModule()))
     return nullptr;
@@ -623,12 +629,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   // an extra copy in the case that UBCI->getOperand() is Owned.
   auto *refCast = Builder.createUncheckedRefCast(
       UBCI->getLoc(), UBCI->getOperand(), UBCI->getType());
-  if (Builder.hasOwnership()) {
-    // A bitwise cast is always unowned, so we can safely force the reference
-    // cast to forward as unowned and no ownership adjustment is needed.
-    assert(UBCI->getOwnershipKind() == OwnershipKind::Unowned);
-    refCast->setForwardingOwnershipKind(OwnershipKind::Unowned);
-  }
   return refCast;
 }
 

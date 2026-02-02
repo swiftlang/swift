@@ -1,6 +1,6 @@
 // Tests for the Swift frontends `-verify` mode.
 
-// RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s
+// RUN: not %target-typecheck-verify-swift 2>&1 | %FileCheck %s --implicit-check-not error: --implicit-check-not note: --implicit-check-not warning:
 
 // CHECK: [[@LINE+1]]:1: error: unexpected error produced: cannot find 'undefinedFunc' in scope
 undefinedFunc()
@@ -30,6 +30,7 @@ fn(())    // expected-error {{argument passed to call that takes no arguments}} 
 // CHECK: [[@LINE+1]]:81: error: expected no fix-its; actual fix-it seen: {{[{][{]4-6=[}][}]}}
 fn(())    // expected-error {{argument passed to call that takes no arguments}} {{none}}
 
-// CHECK: [[@LINE+2]]:8: error: unexpected error produced: generic type 'Array' specialized with too many type parameters
-// CHECK: note: diagnostic produced elsewhere: generic struct 'Array' declared here
+// CHECK: [[@LINE+1]]:8: error: unexpected error produced: generic type 'Array' specialized with too many type parameters
 let x: Array<Int, Int>
+// CHECK: error: unexpected note produced: generic struct 'Array' declared here
+// CHECK: note: file 'Swift.Array' is not parsed for 'expected' statements. Use '-verify-additional-file Swift.Array' to enable, or '-verify-ignore-unrelated' to ignore diagnostics in this file

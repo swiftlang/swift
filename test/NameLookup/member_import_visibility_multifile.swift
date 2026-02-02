@@ -3,9 +3,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/MemberImportVisibility/members_A.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t -package-name TestPackage %S/Inputs/MemberImportVisibility/members_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 5
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 6
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -verify-ignore-unrelated -swift-version 5
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -verify-ignore-unrelated -swift-version 6
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -verify-ignore-unrelated -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: swift_feature_MemberImportVisibility
 

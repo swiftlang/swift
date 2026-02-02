@@ -62,6 +62,9 @@ internal typealias _CocoaString = AnyObject
   @objc(newTaggedNSStringWithASCIIBytes_:length_:)
   func createTaggedString(bytes: UnsafePointer<UInt8>,
                           count: Int) -> AnyObject?
+  
+  @objc(isNSString__)
+  func getIsNSString() -> Int8
 }
 
 /*
@@ -81,7 +84,7 @@ private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
 
 @_effects(releasenone)
 private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
-  return str.copy(with: nil)
+  return unsafe str.copy(with: nil)
 }
 
 @usableFromInline // @testable
@@ -105,9 +108,15 @@ internal func _stdlib_binary_CFStringGetLength(
   return _NSStringLen(_objc(source))
 }
 
+@_effects(readonly) private func isNSStringImpl(
+  _ str: _StringSelectorHolder
+) -> Bool {
+  return str.getIsNSString() != 0
+}
+
 @_effects(readonly)
 internal func _isNSString(_ str:AnyObject) -> Bool {
-  return _swift_stdlib_isNSString(str) != 0
+  return isNSStringImpl(_objc(str))
 }
 
 @_effects(readonly)
@@ -127,7 +136,7 @@ private func _stdlib_binary_createIndirectTaggedPointerNSString(
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return _NSStringCharactersPtr(_objc(source))
+  return unsafe _NSStringCharactersPtr(_objc(source))
 }
 
 @_effects(releasenone)
@@ -284,7 +293,14 @@ internal func _cocoaHashASCIIBytes(
 internal func _cocoaCStringUsingEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UnsafePointer<UInt8>? {
-  return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
+  return unsafe _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
+}
+
+@_effects(readonly)
+internal func _cocoaLengthOfBytesInEncodingTrampoline(
+  _ string: _CocoaString, _ encoding: UInt
+) -> UInt {
+  return _swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(string, encoding)
 }
 
 @_effects(releasenone)
@@ -373,7 +389,7 @@ private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointe
 @_effects(readonly)
 private func _NSStringUTF8Pointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
   //We don't have a way to ask for UTF8 here currently
-  return _NSStringASCIIPointer(str)
+  return unsafe _NSStringASCIIPointer(str)
 }
 
 @_effects(readonly)
@@ -405,7 +421,7 @@ private func _withCocoaASCIIPointer<R>(
   }
   #endif
   defer { _fixLifetime(str) }
-  if let ptr = _NSStringASCIIPointer(_objc(str)) {
+  if let ptr = unsafe _NSStringASCIIPointer(_objc(str)) {
     return unsafe work(ptr)
   }
   return nil
@@ -430,7 +446,7 @@ private func _withCocoaUTF8Pointer<R>(
   }
   #endif
   defer { _fixLifetime(str) }
-  if let ptr = _NSStringUTF8Pointer(_objc(str)) {
+  if let ptr = unsafe _NSStringUTF8Pointer(_objc(str)) {
     return unsafe work(ptr)
   }
   return nil
@@ -476,7 +492,7 @@ private enum CocoaStringPointer {
 private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
 ) -> CocoaStringPointer {
-  if let ascii = stableCocoaASCIIPointer(cfImmutableValue) {
+  if let ascii = unsafe stableCocoaASCIIPointer(cfImmutableValue) {
     return unsafe .ascii(ascii)
   }
   // We could ask for UTF16 here via _stdlib_binary_CFStringGetCharactersPtr,
@@ -527,7 +543,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
 #endif
 
     let (fastUTF8, isASCII): (Bool, Bool)
-    switch _getCocoaStringPointer(immutableCopy) {
+    switch unsafe _getCocoaStringPointer(immutableCopy) {
     case .ascii(_): (fastUTF8, isASCII) = (true, true)
     case .utf8(_): (fastUTF8, isASCII) = (true, false)
     default:  (fastUTF8, isASCII) = (false, false)
@@ -607,31 +623,28 @@ extension String {
 
     _connectOrphanedFoundationSubclassesIfNeeded()
 
-    // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
-    if _guts.isSmallASCII {
-      let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
-        return unsafe _createCFString(
+    if _guts.isSmall {
+      return _guts.asSmall.withUTF8 { bufPtr in
+        // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
+        if _guts.isSmallASCII, let result = unsafe _createCFString(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
           bufPtr.count,
           kCFStringEncodingUTF8
-        )
-      }
-      if let tagged = maybeTagged { return tagged }
-    }
-
-    if _guts.isSmall {
-        // We can't form a tagged pointer String, so grow to a non-small String,
+        ) {
+          return result
+        }
+        // We can't form a tagged pointer String, so make a non-small String,
         // and bridge that instead. Also avoids CF deleting any BOM that may be
         // present
-        var copy = self
-        // TODO: small capacity minimum is lifted, just need to make native
-        copy._guts.grow(_SmallString.capacity + 1)
-        _internalInvariant(!copy._guts.isSmall)
-        return copy._bridgeToObjectiveCImpl()
+        return unsafe __StringStorage.create(
+          initializingFrom: bufPtr,
+          codeUnitCapacity: bufPtr.count,
+          isASCII: _guts.isSmallASCII)
+      }
     }
     if _guts._object.isImmortal && !_guts._object.largeFastIsConstantCocoa {
       if _guts.isASCII && _guts._object.isFastZeroTerminated {
-        let ptr = unsafe _guts._object.fastUTF8.baseAddress!
+        let ptr = unsafe _guts._object.fastUTF8.baseAddress._unsafelyUnwrappedUnchecked
         let count = _guts.count
         if let indirect = unsafe _stdlib_binary_createIndirectTaggedPointerNSString(
           ptr: ptr, count: count

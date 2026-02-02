@@ -12,6 +12,7 @@
 #ifndef SWIFT_AST_REQUIREMENTMATCH_H
 #define SWIFT_AST_REQUIREMENTMATCH_H
 
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -97,13 +98,17 @@ enum class MatchKind : uint8_t {
 
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
-  
+
   /// The witness did not match because it is an enum case with
   /// associated values.
   EnumCaseWithAssociatedValues,
 
   /// The witness did not match due to _const/non-_const differences.
   CompileTimeLiteralConflict,
+
+  /// The witness did not match because it cannot satisy borrow/mutate
+  /// requirement.
+  BorrowMutateConflict,
 };
 
 // Describes the kind of optional adjustment performed when
@@ -217,10 +222,6 @@ enum class CheckKind : unsigned {
   /// The witness is less accessible than the requirement.
   Access,
 
-  /// The witness is storage whose setter is less accessible than the
-  /// requirement.
-  AccessOfSetter,
-
   /// The witness needs to be @usableFromInline.
   UsableFromInline,
 
@@ -228,7 +229,7 @@ enum class CheckKind : unsigned {
   Availability,
 
   /// The requirement was marked explicitly unavailable.
-  Unavailable,
+  RequirementUnavailable,
 
   /// The witness requires optional adjustments.
   OptionalityConflict,
@@ -237,39 +238,81 @@ enum class CheckKind : unsigned {
   /// requirement.
   ConstructorFailability,
 
-  /// The witness itself is inaccessible.
-  WitnessUnavailable,
-
   /// The witness is a deprecated default implementation provided by the
   /// protocol.
   DefaultWitnessDeprecated,
 };
+
 /// Describes the suitability of the chosen witness for
 /// the requirement.
-struct RequirementCheck {
+class RequirementCheck {
   CheckKind Kind;
 
-  /// The required access scope, if the check failed due to the
-  /// witness being less accessible than the requirement.
-  AccessScope RequiredAccessScope;
+  union {
+    /// Storage for `CheckKind::Access`.
+    struct {
+      AccessScope requiredScope;
+      bool forSetter;
+    } Access;
 
-  /// The required availability, if the check failed due to the
-  /// witness being less available than the requirement.
-  AvailabilityRange RequiredAvailability;
+    /// Storage for `CheckKind::Availability`.
+    struct {
+      AvailabilityConstraint constraint;
+      AvailabilityContext requiredContext;
+    } Availability;
+  };
 
-  RequirementCheck(CheckKind kind)
-      : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-        RequiredAvailability(AvailabilityRange::alwaysAvailable()) {}
+public:
+  RequirementCheck(CheckKind kind) : Kind(kind) {
+    // These kinds have their own constructors.
+    ASSERT(kind != CheckKind::Access);
+    ASSERT(kind != CheckKind::Availability);
+  }
 
-  RequirementCheck(CheckKind kind, AccessScope requiredAccessScope)
-      : Kind(kind), RequiredAccessScope(requiredAccessScope),
-        RequiredAvailability(AvailabilityRange::alwaysAvailable()) {}
+  RequirementCheck(AccessScope requiredAccessScope, bool forSetter)
+      : Kind(CheckKind::Access), Access{requiredAccessScope, forSetter} {}
 
-  RequirementCheck(CheckKind kind, AvailabilityRange requiredAvailability)
-      : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-        RequiredAvailability(requiredAvailability) {}
+  RequirementCheck(AvailabilityConstraint constraint,
+                   AvailabilityContext requiredContext)
+      : Kind(CheckKind::Availability),
+        Availability{constraint, requiredContext} {}
+
+  CheckKind getKind() const { return Kind; }
+
+  /// True if the witness is storage whose setter is less accessible than the
+  /// requirement.
+  bool isForSetterAccess() const {
+    return (Kind == CheckKind::Access) ? Access.forSetter : false;
+  }
+
+  /// True if the witness is less available than the requirement.
+  bool isLessAvailable() const {
+    return (Kind == CheckKind::Availability)
+               ? !Availability.constraint.isUnavailable()
+               : false;
+  }
+
+  /// The required access scope for checks that failed due to the witness being
+  /// less accessible than the requirement.
+  AccessScope getRequiredAccessScope() const {
+    ASSERT(Kind == CheckKind::Access);
+    return Access.requiredScope;
+  }
+
+  /// The availability constraint that would fail if the witness were accessed
+  /// from contexts in which the requirement is available.
+  AvailabilityConstraint getAvailabilityConstraint() const {
+    ASSERT(Kind == CheckKind::Availability);
+    return Availability.constraint;
+  }
+
+  /// The required availability range for checks that failed due to the witness
+  /// being less available than the requirement.
+  AvailabilityContext getRequiredAvailabilityContext() const {
+    ASSERT(Kind == CheckKind::Availability);
+    return Availability.requiredContext;
+  }
 };
-
 
 /// Describes a match between a requirement and a witness.
 struct RequirementMatch {
@@ -371,6 +414,7 @@ struct RequirementMatch {
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
+    case MatchKind::BorrowMutateConflict:
       return false;
     }
 
@@ -408,6 +452,7 @@ struct RequirementMatch {
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
+    case MatchKind::BorrowMutateConflict:
       return false;
     }
 
@@ -444,6 +489,7 @@ struct RequirementMatch {
     case MatchKind::NonObjC:
     case MatchKind::MissingDifferentiableAttr:
     case MatchKind::EnumCaseWithAssociatedValues:
+    case MatchKind::BorrowMutateConflict:
       return false;
     }
 

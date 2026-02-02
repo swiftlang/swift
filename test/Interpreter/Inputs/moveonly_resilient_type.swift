@@ -60,3 +60,19 @@ public struct ResilientCapturesInDeinit: ~Copyable {
         return nextValue
     }
 }
+
+public struct HasDeinit: ~Copyable {
+  public consuming func consume() {}
+  deinit { print("HasDeinit.deinit") }
+}
+
+public protocol Giver {
+  @_owned var thing: HasDeinit { get }
+}
+
+public struct GiverImpl: Giver {
+  public init() {}
+  @_owned public var thing: HasDeinit {
+    get { return HasDeinit() }
+  }
+}

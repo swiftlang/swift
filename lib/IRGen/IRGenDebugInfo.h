@@ -50,9 +50,10 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// instead of dbg.value + op_deref. By default, we now emit dbg.value instead of
 /// dbg.declare for normal variables. This is not true for metadata which
 /// truly are function wide and should be llvm.dbg.declare.
-enum class AddrDbgInstrKind : bool {
+enum class AddrDbgInstrKind : uint8_t {
   DbgDeclare,
   DbgValueDeref,
+  DbgDeclareValue,
 };
 
 /// Helper object that keeps track of the current CompileUnit, File,
@@ -186,11 +187,7 @@ public:
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        GenericTypeParamType *Type);
-
-  /// Emit debug metadata for a (protocol) witness table.
-  void emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
-                        StringRef Name, ProtocolDecl *protocol);
+                        unsigned Depth, unsigned Index, StringRef Name);
 
   /// Emit debug info for the IR function parameter holding the size of one or
   /// more parameter / type packs.

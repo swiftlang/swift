@@ -13,8 +13,8 @@ import RawLayoutCXX
 // CHECK-SAME:  , {{i64|i32}} 4
 // stride
 // CHECK-SAME:  , {{i64|i32}} 4
-// flags: alignment 3, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 
 @_rawLayout(size: 4, alignment: 4)
 struct Lock: ~Copyable { }
@@ -29,8 +29,8 @@ struct PaddedStride {
 // CHECK-SAME:  , {{i64|i32}} 5
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags: alignment 3, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 @_rawLayout(like: PaddedStride)
 struct LikePaddedStride: ~Copyable {}
 
@@ -39,8 +39,8 @@ struct LikePaddedStride: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 8
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags: alignment 3, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 @_rawLayout(likeArrayOf: PaddedStride, count: 1)
 struct LikePaddedStrideArray1: ~Copyable {}
 
@@ -49,9 +49,9 @@ struct LikePaddedStrideArray1: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 16
 // stride
 // CHECK-SAME:  , {{i64|i32}} 16
-// flags: alignment 3, noncopyable, non-bitwise-borrowable, (on 32-bit platforms) not storable inline
-// CHECK-64-SAME:  , <i32 0x1800003>
-// CHECK-32-SAME:  , <i32 0x1820003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies (on 32-bit platforms) not storable inline
+// CHECK-64-SAME:  , <i32 0x3800003>
+// CHECK-32-SAME:  , <i32 0x3820003>
 @_rawLayout(likeArrayOf: PaddedStride, count: 2)
 struct LikePaddedStrideArray2: ~Copyable {}
 
@@ -60,8 +60,8 @@ struct LikePaddedStrideArray2: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 12
 // stride
 // CHECK-SAME:  , {{i64|i32}} 12
-// flags: alignment 3, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 struct Keymaster: ~Copyable {
     let lock1: Lock
     let lock2: Lock
@@ -127,8 +127,8 @@ struct Vector<T, let N: Int>: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 8
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags: alignment 3, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 struct UsesCell: ~Copyable {
     let someCondition: Bool
     let specialInt: Cell<Int32>
@@ -139,8 +139,8 @@ struct UsesCell: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 3
 // stride
 // CHECK-SAME:  , {{i64|i32}} 3
-// flags: alignment 0, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800000>
+// flags: alignment 0, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800000>
 struct BufferOf3Bool: ~Copyable {
     let buffer: SmallVectorOf3<Bool>
 }
@@ -150,8 +150,8 @@ struct BufferOf3Bool: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 48
 // stride
 // CHECK-SAME:  , {{i64|i32}} 48
-// flags: alignment 7, noncopyable, non-bitwise-borrowable, is not inline
-// CHECK-SAME:  , <i32 0x1820007>
+// flags: alignment 7, noncopyable, non-bitwise-borrowable, addressable for dependencies, is not inline
+// CHECK-SAME:  , <i32 0x3820007>
 struct BadBuffer: ~Copyable {
     let buffer: SmallVectorOf3<Int64?>
 }
@@ -161,8 +161,8 @@ struct BadBuffer: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 2
 // stride
 // CHECK-SAME:  , {{i64|i32}} 2
-// flags: alignment 0, noncopyable, non-bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800000>
+// flags: alignment 0, noncopyable, non-bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800000>
 struct UsesVector: ~Copyable {
     let buffer: Vector<UInt8, 2>
 }
@@ -172,8 +172,8 @@ struct UsesVector: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 48
 // stride
 // CHECK-SAME:  , {{i64|i32}} 48
-// flags: alignment 7, noncopyable, non-bitwise-borrowable, is not inline
-// CHECK-SAME:  , <i32 0x1820007>
+// flags: alignment 7, noncopyable, non-bitwise-borrowable, addressable for dependencies, is not inline
+// CHECK-SAME:  , <i32 0x3820007>
 struct BadBuffer2: ~Copyable {
     let buffer: Vector<Int64?, 3>
 }
@@ -207,8 +207,8 @@ struct CellThatMovesAsLike<T>: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 1
 // stride
 // CHECK-SAME:  , {{i64|i32}} 1
-// flags: not copyable, not bitwise takable, not pod, not inline
-// CHECK-SAME:  , <i32 0x930000>
+// flags: not copyable, not bitwise takable, not pod, not inline, addressable for dependencies
+// CHECK-SAME:  , <i32 0x2930000>
 struct ConcreteMoveAsLike: ~Copyable {
   let cell: CellThatMovesAsLike<NonBitwiseTakableCXXType>
 }
@@ -224,8 +224,8 @@ struct ConcreteMoveAsLike: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 4
 // stride
 // CHECK-SAME:  , {{i64|i32}} 4
-// flags: alignment 3, not copyable, not bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, not copyable, not bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 struct ConcreteIntMoveAsLike: ~Copyable {
   let cell: CellThatMovesAsLike<Int32>
 }
@@ -257,8 +257,8 @@ struct SmallVectorOf2MovesAsLike<T: ~Copyable>: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 2
 // stride
 // CHECK-SAME:  , {{i64|i32}} 2
-// flags: not copyable, not bitwise takable, not pod, not inline
-// CHECK-SAME:  , <i32 0x930000>
+// flags: not copyable, not bitwise takable, not pod, not inline, addressable for dependencies
+// CHECK-SAME:  , <i32 0x2930000>
 struct ConcreteSmallVectorMovesAsLike: ~Copyable {
   let vector: SmallVectorOf2MovesAsLike<NonBitwiseTakableCXXType>
 }
@@ -274,8 +274,8 @@ struct ConcreteSmallVectorMovesAsLike: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 8
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags: alignment 3, not copyable, not bitwise-borrowable
-// CHECK-SAME:  , <i32 0x1800003>
+// flags: alignment 3, not copyable, not bitwise-borrowable, addressable for dependencies
+// CHECK-SAME:  , <i32 0x3800003>
 struct ConcreteSmallVectorIntMovesAsLike: ~Copyable {
   let vector: SmallVectorOf2MovesAsLike<Int32>
 }
@@ -307,8 +307,8 @@ struct VectorMovesAsLike<T: ~Copyable, let N: Int>: ~Copyable {}
 // CHECK-SAME:  , {{i64|i32}} 4
 // stride
 // CHECK-SAME:  , {{i64|i32}} 4
-// flags: not copyable, not bitwise takable, not pod, not inline
-// CHECK-SAME:  , <i32 0x930000>
+// flags: not copyable, not bitwise takable, not pod, not inline, addressable for dependencies
+// CHECK-SAME:  , <i32 0x2930000>
 struct ConcreteVectorMovesAsLike: ~Copyable {
   let vector: VectorMovesAsLike<NonBitwiseTakableCXXType, 4>
 }
@@ -324,9 +324,9 @@ struct ConcreteVectorMovesAsLike: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 16
 // stride
 // CHECK-SAME:  , {{i64|i32}} 16
-// flags: alignment 3, not copyable, not bitwise-borrowable, (on 32-bit platforms) not storable inline
-// CHECK-64-SAME:  , <i32 0x1800003>
-// CHECK-32-SAME:  , <i32 0x1820003>
+// flags: alignment 3, not copyable, not bitwise-borrowable, addressable for dependencies, (on 32-bit platforms) not storable inline
+// CHECK-64-SAME:  , <i32 0x3800003>
+// CHECK-32-SAME:  , <i32 0x3820003>
 struct ConcreteVectorIntMovesAsLike: ~Copyable {
   let vector: VectorMovesAsLike<Int32, 4>
 }

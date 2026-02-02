@@ -12,7 +12,7 @@
 
 import Swift
 
-#if !$Embedded
+#if os(WASI) || !$Embedded
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
@@ -95,7 +95,7 @@ extension MainActor {
   /// executor of the MainActor.
   ///
   /// If that is the case, the operation is invoked with an `isolated` version
-  /// of the actor, / allowing synchronous access to actor local state without
+  /// of the actor, allowing synchronous access to actor local state without
   /// hopping through asynchronous boundaries.
   ///
   /// If the current context is not running on the actor's serial executor, or
@@ -107,9 +107,9 @@ extension MainActor {
   /// will hop task execution to the target actor if necessary.
   ///
   /// - Note: This check is performed against the MainActor's serial executor,
-  ///   meaning that / if another actor uses the same serial executor--by using
+  ///   meaning that if another actor uses the same serial executor--by using
   ///   ``MainActor/sharedUnownedExecutor`` as its own
-  ///   ``Actor/unownedExecutor``--this check will succeed , as from a concurrency
+  ///   ``Actor/unownedExecutor``--this check will succeed, as from a concurrency
   ///   safety perspective, the serial executor guarantees mutual exclusion of
   ///   those two actors.
   ///
@@ -162,6 +162,39 @@ extension MainActor {
     try assumeIsolated(operation, file: file, line: line)
   }
 }
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+@_extern(c, "pthread_main_np")
+@usableFromInline
+internal func pthread_main_np() -> CInt
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_silgen_name("swift_task_deinitOnExecutorMainActorBackDeploy")
+public func _deinitOnExecutorMainActorBackDeploy(
+  _ object: __owned AnyObject,
+  _ work: @convention(thin) (__owned AnyObject) -> Void,
+  _ executor: Builtin.Executor,
+  _ flags: Builtin.Word) {
+  if #available(macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4, *) {
+    // On new-enough platforms, use the runtime functionality, which allocates
+    // the task more efficiently.
+    _deinitOnExecutor(object, work, executor, flags)
+  } else if pthread_main_np() == 1 {
+    // Using "main thread" as a proxy for "main actor", immediately destroy
+    // the object.
+    work(consume object)
+  } else {
+    // Steal the local object so that the reference count stays at 1 even when
+    // the object is captured.
+    var stolenObject: AnyObject? = consume object
+    Task.detached { @MainActor in
+      work(stolenObject.take()!)
+    }
+  }
+}
+#endif
+
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-#endif // !$Embedded
+#endif // os(WASI) || !$Embedded

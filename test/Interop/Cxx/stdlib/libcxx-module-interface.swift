@@ -1,4 +1,4 @@
-// Only run this test with older libc++, before the top-level std module got split into multiple top-level modules.
+// Don't run this test with libc++ versions 17-19, when the top-level std module was split into multiple top-level modules.
 // RUN: %empty-directory(%t)
 // RUN: %target-clangxx %S/Inputs/check-libcxx-version.cpp -o %t/check-libcxx-version
 // RUN: %target-codesign %t/check-libcxx-version

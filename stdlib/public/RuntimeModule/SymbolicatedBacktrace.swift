@@ -33,6 +33,7 @@ internal import Musl
 internal import BacktracingImpl.Runtime
 
 /// A symbolicated backtrace
+@available(Backtracing 6.2, *)
 public struct SymbolicatedBacktrace: CustomStringConvertible {
   /// The `Backtrace` from which this was constructed
   public var backtrace: Backtrace
@@ -273,7 +274,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
   }
 
   /// Construct a SymbolicatedBacktrace from a backtrace and a list of images.
-  private init(backtrace: Backtrace, images: ImageMap, frames: [Frame]) {
+  init(backtrace: Backtrace, images: ImageMap, frames: [Frame]) {
     self.backtrace = backtrace
     self.images = images
     self.frames = frames
@@ -466,9 +467,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     for frame in backtrace.frames {
       let address = frame.adjustedProgramCounter
       if let imageNdx = theImages.indexOfImage(at: address) {
-        let relativeAddress = ImageSource.Address(
-          address - theImages[imageNdx].baseAddress
-        )
         let name = theImages[imageNdx].name ?? "<unknown>"
         var symbol: Symbol = Symbol(imageIndex: imageNdx,
                                     imageName: name,
@@ -527,6 +525,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
         if let hit = cache.lookup(path: theImages[imageNdx].path) {
           switch hit {
             case let .elf32Image(image):
+              let relativeAddress = ImageSource.Address(
+                address - theImages[imageNdx].baseAddress
+              ) + image.imageBase
               if let theSymbol = lookupSymbol(image: image,
                                               at: imageNdx,
                                               named: name,
@@ -534,6 +535,9 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                 symbol = theSymbol
               }
             case let .elf64Image(image):
+              let relativeAddress = ImageSource.Address(
+                address - theImages[imageNdx].baseAddress
+              ) + image.imageBase
               if let theSymbol = lookupSymbol(image: image,
                                               at: imageNdx,
                                               named: name,

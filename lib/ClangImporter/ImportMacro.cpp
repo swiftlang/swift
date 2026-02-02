@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -31,6 +32,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/APSIntType.h"
 #include "llvm/ADT/SmallString.h"
@@ -123,6 +125,11 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         return nullptr;
     }
 
+    auto &ctx = DC->getASTContext();
+    auto *constantTyNominal = constantType->getAnyNominal();
+    if (!constantTyNominal)
+      return nullptr;
+
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
       // Determine the value.
       llvm::APSInt value{integer->getValue(), clangTy->isUnsignedIntegerType()};
@@ -138,6 +145,17 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         }
       }
 
+      // Make sure the destination type actually conforms to the builtin literal
+      // protocol or is Bool before attempting to import, otherwise we'll crash
+      // since `createConstant` expects it to.
+      // FIXME: We ought to be careful checking conformance here since it can
+      // result in cycles. Additionally we ought to consider checking for the
+      // non-builtin literal protocol to allow any ExpressibleByIntegerLiteral
+      // type to be supported.
+      if (!isBoolOrBoolEnumType(constantType) &&
+          !ctx.getIntBuiltinInitDecl(constantTyNominal)) {
+        return nullptr;
+      }
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
                                  ConstantConvertKind::None,
@@ -155,6 +173,16 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       if (signTok && signTok->is(clang::tok::minus)) {
         value.changeSign();
       }
+
+      // Make sure the destination type actually conforms to the builtin literal
+      // protocol before attempting to import, otherwise we'll crash since
+      // `createConstant` expects it to.
+      // FIXME: We ought to be careful checking conformance here since it can
+      // result in cycles. Additionally we ought to consider checking for the
+      // non-builtin literal protocol to allow any ExpressibleByFloatLiteral
+      // type to be supported.
+      if (!ctx.getFloatBuiltinInitDecl(constantTyNominal))
+        return nullptr;
 
       return createMacroConstant(Impl, MI, name, DC, constantType,
                                  clang::APValue(value),
@@ -331,12 +359,16 @@ getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
     }
 
   // Macro identifier.
-  // TODO: for some reason when in C++ mode, "hasMacroDefinition" is often
-  // false: rdar://110071334
-  } else if (token.is(clang::tok::identifier) &&
-             token.getIdentifierInfo()->hasMacroDefinition()) {
+  } else if (token.is(clang::tok::identifier)) {
 
     auto rawID = token.getIdentifierInfo();
+
+    // When importing in (Objective-)C++ language mode, sometimes a macro might
+    // have an outdated identifier info, which would cause Clang preprocessor to
+    // assume that it does not have a definition.
+    if (rawID->isOutOfDate())
+      (void)impl.getClangPreprocessor().getLeafModuleMacros(rawID);
+
     auto definition = impl.getClangPreprocessor().getMacroDefinition(rawID);
     if (!definition)
       return std::nullopt;
@@ -369,6 +401,107 @@ getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
   }
 
   return std::nullopt;
+}
+
+namespace {
+ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
+                           swift::DeclContext *DC, const clang::ValueDecl *D,
+                           Identifier alias) {
+  if (!DC->getASTContext().LangOpts.hasFeature(Feature::ImportMacroAliases))
+    return nullptr;
+
+  // Variadic functions cannot be imported into Swift.
+  // FIXME(compnerd) emit a diagnostic for the missing diagnostic.
+  if (const auto *FD = dyn_cast<clang::FunctionDecl>(D))
+    if (FD->isVariadic())
+      return nullptr;
+
+  // Ignore self-referential macros.
+  if (D->getName() == alias.str())
+    return nullptr;
+
+  swift::ValueDecl *VD =
+      dyn_cast_or_null<ValueDecl>(clang.importDecl(D, clang.CurrentVersion));
+  if (VD == nullptr)
+    return nullptr;
+
+  // If the imported decl is named identically, avoid the aliasing.
+  if (VD->getBaseIdentifier().str() == alias.str())
+    return nullptr;
+
+  swift::ASTContext &Ctx = DC->getASTContext();
+  ImportedType Ty =
+      clang.importType(D->getType(), ImportTypeKind::Abstract,
+                       [&clang, &D](Diagnostic &&Diag) {
+                         clang.addImportDiagnostic(D, std::move(Diag),
+                                                   D->getLocation());
+                       }, /*AllowsNSUIntegerAsInt*/true,
+                       Bridgeability::None, { });
+  swift::Type GetterTy = FunctionType::get({}, Ty.getType(), ASTExtInfo{});
+  swift::Type SetterTy =
+      FunctionType::get({AnyFunctionType::Param(Ty.getType())},
+                        Ctx.TheEmptyTupleType, ASTExtInfo{});
+
+  /* Storage */
+  swift::VarDecl *V =
+      new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
+                        SourceLoc(), alias, DC);
+  V->setAccess(swift::AccessLevel::Public);
+  V->setInterfaceType(Ty.getType());
+  V->addAttribute(new (Ctx) TransparentAttr(/*Implicit*/ true));
+  V->addAttribute(new (Ctx) InlineAttr(InlineKind::AlwaysUnderscored));
+
+  /* Accessor */
+  swift::AccessorDecl *G = nullptr;
+  {
+    G = AccessorDecl::createImplicit(Ctx, AccessorKind::Get, V, false, false,
+                                     TypeLoc(), GetterTy, DC);
+    G->setAccess(swift::AccessLevel::Public);
+    G->setInterfaceType(GetterTy);
+    G->setIsTransparent(true);
+    G->setParameters(ParameterList::createEmpty(Ctx));
+
+    DeclRefExpr *DRE =
+        new (Ctx) DeclRefExpr(ConcreteDeclRef(VD), {}, /*Implicit*/true,
+                              AccessSemantics::Ordinary, Ty.getType());
+    ReturnStmt *RS = ReturnStmt::createImplicit(Ctx, DRE);
+
+    G->setBody(BraceStmt::createImplicit(Ctx, {RS}),
+               AbstractFunctionDecl::BodyKind::TypeChecked);
+  }
+
+  swift::AccessorDecl *S = nullptr;
+  if (isa<clang::VarDecl>(D) &&
+      !cast<clang::VarDecl>(D)->getType().isConstQualified()) {
+    S = AccessorDecl::createImplicit(Ctx, AccessorKind::Set, V, false, false,
+                                     TypeLoc(), Ctx.TheEmptyTupleType, DC);
+    S->setAccess(swift::AccessLevel::Public);
+    S->setInterfaceType(SetterTy);
+    S->setIsTransparent(true);
+    S->setParameters(ParameterList::create(Ctx, {
+      ParamDecl::createImplicit(Ctx, Identifier(), Ctx.getIdentifier("newValue"),
+                                Ty.getType(), DC)
+    }));
+
+    DeclRefExpr *LHS =
+        new (Ctx) DeclRefExpr(ConcreteDeclRef(VD), {}, /*Implicit*/true,
+                              AccessSemantics::Ordinary, Ty.getType());
+    DeclRefExpr *RHS =
+        new (Ctx) DeclRefExpr(S->getParameters()->get(0), {}, /*Implicit*/true,
+                              AccessSemantics::Ordinary, Ty.getType());
+    AssignExpr *AE = new (Ctx) AssignExpr(LHS, SourceLoc(), RHS, true);
+    AE->setType(Ctx.TheEmptyTupleType);
+    S->setBody(BraceStmt::createImplicit(Ctx, {AE}),
+               AbstractFunctionDecl::BodyKind::TypeChecked);
+  }
+
+  /* Bind */
+  V->setImplInfo(S ? StorageImplInfo::getMutableComputed()
+                   : StorageImplInfo::getImmutableComputed());
+  V->setAccessors(SourceLoc(), S ? ArrayRef{G,S} : ArrayRef{G}, SourceLoc());
+
+  return V;
+}
 }
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
@@ -509,7 +642,14 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         }
       }
 
-      // FIXME: If the identifier refers to a declaration, alias it?
+      /* Create an alias for any Decl */
+      clang::Sema &S = impl.getClangSema();
+      clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
+                            clang::Sema::LookupAnyName);
+      if (S.LookupName(R, S.TUScope))
+        if (R.getResultKind() == clang::LookupResultKind::Found)
+          if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
+            return importDeclAlias(impl, DC, VD, name);
     }
 
     // TODO(https://github.com/apple/swift/issues/57735): Seems rare to have a single token that is neither a literal nor an identifier, but add diagnosis.
@@ -814,7 +954,8 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   // result.
 
   DeclContext *DC;
-  if (const clang::Module *module = getClangOwningModule(macroNode)) {
+  if (const clang::Module *module =
+          importer::getClangOwningModule(macroNode, getClangASTContext())) {
     // Get the parent module because currently we don't model Clang submodules
     // in Swift.
     DC = getWrapperForModule(module->getTopLevelModule());

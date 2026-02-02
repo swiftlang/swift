@@ -29,7 +29,7 @@ public func f() {
   // CHECK: store ptr %[[S1]], ptr %[[ADDR]]
 }
 
-// CHECK: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s16resilient_struct4SizeVD",
+// CHECK: ![[TY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Size",
 // CHECK: ![[LET_TY:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type,
 // CHECK-SAME:                                baseType: ![[TY:[0-9]+]])
 // CHECK: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[LET_TY]])

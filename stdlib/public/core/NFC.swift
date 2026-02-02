@@ -137,7 +137,7 @@ extension Unicode {
     /// consuming elements from the given source as necessary.
     ///
     /// If the normalizer returns `nil`, the source was exhausted.
-    /// One a source is exhausted, you may:
+    /// Once a source is exhausted, you may:
     ///
     /// - Call `resume` again some time later with a different source
     ///   to continue processing the same logical text stream, or

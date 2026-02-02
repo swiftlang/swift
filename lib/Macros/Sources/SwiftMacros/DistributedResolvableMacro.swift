@@ -26,6 +26,12 @@ public struct DistributedResolvableMacro: ExtensionMacro, PeerMacro {
 
 extension DistributedResolvableMacro {
 
+  static let attributesToCopy: [String] = [
+    "available",
+    "_spi",
+    "_spi_available",
+  ]
+
   /// Introduce the `extension MyDistributedActor` which contains default
   /// implementations of the protocol's requirements.
   public static func expansion(
@@ -46,7 +52,9 @@ extension DistributedResolvableMacro {
     }
 
     let attributes = proto.attributes.filter { attr in
-      attr.as(AttributeSyntax.self)?.attributeName.trimmed.description == "_spi"
+      Self.attributesToCopy.contains(
+        attr.as(AttributeSyntax.self)?.attributeName.trimmed.description ?? ""
+      )
     }
     let accessModifiers = proto.accessControlModifiers
 
@@ -67,7 +75,7 @@ extension DistributedResolvableMacro {
 
     let extensionDecl: DeclSyntax =
       """
-      \(raw: attributes.map({$0.description}).joined(separator: "\n"))
+      \(attributes)
       extension \(proto.name.trimmed) where Self: Distributed._DistributedActorStub {
         \(raw: requirementStubs)
       }
@@ -160,7 +168,7 @@ extension DistributedResolvableMacro {
       guard let ident = attr.attributeName.as(IdentifierTypeSyntax.self) else {
         return false
       }
-      return ident.name.text == "_spi"
+      return Self.attributesToCopy.contains(ident.name.text)
     }
     let accessModifiers = proto.accessControlModifiers
 

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -enable-upcoming-feature GlobalActorIsolatedTypesUsability %s -o /dev/null -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // This test validates the behavior of transfer non sendable around ownership
 // constructs like non copyable types, consuming/borrowing parameters, and inout
@@ -6,6 +7,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //

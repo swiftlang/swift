@@ -24,20 +24,17 @@ class ModuleDecl;
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
-  bool EnableLibraryEvolution;
+  std::vector<ModuleDecl *> ModulesToBindExtensions;
 
   explicit SourceLoader(ASTContext &ctx,
-                        bool enableResilience,
                         DependencyTracker *tracker)
-    : ModuleLoader(tracker), Ctx(ctx),
-      EnableLibraryEvolution(enableResilience) {}
+    : ModuleLoader(tracker), Ctx(ctx) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool enableResilience,
-         DependencyTracker *tracker = nullptr) {
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, enableResilience, tracker)
+      new SourceLoader(ctx, tracker)
     };
   }
 
@@ -97,14 +94,6 @@ public:
   {
     // Parsing populates the Objective-C method tables.
   }
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport) override;
 };
 }
 

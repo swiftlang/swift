@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-interop -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}
@@ -59,8 +59,7 @@ func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T) -> U {
   return t as! U
   // Error bridging can change the identity of class-constrained archetypes.
-  // CHECK: unconditional_checked_cast_addr T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
-  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} : $T to U
   // CHECK: return [[DOWNCAST]] : $U
 }
 
@@ -69,7 +68,7 @@ func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T, u:U.Type) -> Bool {
   return t is U
   // Error bridging can change the identity of class-constrained archetypes.
-  // CHECK: checked_cast_addr_br {{.*}} T in {{%.*}} : $*T to U in {{%.*}} : $*U
+  // CHECK: checked_cast_br T in {{%.*}} : $T to U
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts38opaque_archetype_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
@@ -158,8 +157,7 @@ func opaque_existential_is_class_archetype
 func class_existential_to_class_archetype
 <T:ClassBound>(_ p:ClassBound) -> T {
   return p as! T
-  // CHECK: unconditional_checked_cast_addr any ClassBound in {{%.*}} : $*any ClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
-  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} : $any ClassBound to T
   // CHECK: return [[DOWNCAST]] : $T
 }
 
@@ -167,7 +165,7 @@ func class_existential_to_class_archetype
 func class_existential_is_class_archetype
 <T:ClassBound>(_ p:ClassBound, _: T) -> Bool {
   return p is T
-  // CHECK: checked_cast_addr_br {{.*}} any ClassBound in {{%.*}} : $*any ClassBound to T in {{%.*}} : $*T
+  // CHECK: checked_cast_br any ClassBound in {{%.*}} : $any ClassBound to T
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s13generic_casts40opaque_existential_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F

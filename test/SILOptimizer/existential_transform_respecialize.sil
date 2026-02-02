@@ -44,7 +44,7 @@ sil [noinline] @$s1t9SomeClassC3fooSiyF : $@convention(method) (@guaranteed Some
 // The original "wrapFoo" function prior to existential specialization.
 //
 // This will be replaced with a thunk by existential specialization.
-// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed any SomeProtocol, @guaranteed any SomeProtocol) -> (Int, Int) {
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed any SomeProtocol, @guaranteed any SomeProtocol) -> (Int, Int) {
 sil hidden [noinline] @$s1t7wrapFoo1a1bSi_SitAA12SomeProtocol_p_AaE_ptF : $@convention(thin) (@guaranteed SomeProtocol, @guaranteed SomeProtocol) -> (Int, Int) {
 bb0(%0 : $SomeProtocol, %1 : $SomeProtocol):
   debug_value %0 : $SomeProtocol, let, name "a", argno 1

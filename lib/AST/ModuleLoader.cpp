@@ -240,9 +240,6 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(
     case swift::ModuleDependencyKind::SwiftSource: {
       return result;
     }
-    case swift::ModuleDependencyKind::SwiftPlaceholder: {
-      return result;
-    }
     case swift::ModuleDependencyKind::LastKind:
       llvm_unreachable("Unhandled dependency kind.");
   }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types %s | %FileCheck %s
+// RUN: %target-sil-opt %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -9,15 +9,26 @@ class Klass {
 class SubKlass : Klass {
 }
 
+enum E {
+  case A
+  case B(AnyObject)
+}
+
+
 struct NonTrivialStruct {
   var id:Klass
+}
+
+struct S {
+  var i: Int
+  var e: E
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_ref_cast_test :
 sil [ossa] @unchecked_ref_cast_test : $@convention(thin) <T> (@in T, @owned Klass) -> () {
 bb0(%0 : $*T, %1 : @owned $Klass):
   destroy_addr %0 : $*T
-// CHECK: unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
+// CHECK: unchecked_ref_cast %1 to $Optional<Klass>, forwarding: @unowned
   %3 = unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
   %4 = copy_value %3 : $Optional<Klass>
   destroy_value %1 : $Klass
@@ -37,6 +48,26 @@ bb0(%0 : @owned $Klass):
   return %8 : $()
 }
 // CHECK-LABEL: } // end sil function 'struct_test'
+
+// CHECK-LABEL: sil [ossa] @none_to_owned_struct :
+// CHECK:         %2 = struct $S (%0, %1), forwarding: @owned
+// CHECK-LABEL: } // end sil function 'none_to_owned_struct'
+sil [ossa] @none_to_owned_struct : $@convention(thin) (Int) -> @owned S {
+bb0(%0 : $Int):
+  %1 = enum $E, #E.A!enumelt
+  %2 = struct $S (%0, %1), forwarding: @owned
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @none_to_owned_tuple :
+// CHECK:         %2 = tuple (%0, %1), forwarding: @owned
+// CHECK-LABEL: } // end sil function 'none_to_owned_tuple'
+sil [ossa] @none_to_owned_tuple : $@convention(thin) (Int) -> @owned (Int, E) {
+bb0(%0 : $Int):
+  %1 = enum $E, #E.A!enumelt
+  %2 = tuple (%0, %1), forwarding: @owned
+  return %2
+}
 
 // CHECK-LABEL: sil [ossa] @switch_test : $@convention(thin) () -> () {
 // CHECK: switch_enum {{.*}}, forwarding: @guaranteed

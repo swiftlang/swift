@@ -48,7 +48,7 @@ inline bool requiresOSSACleanup(SILValue v) {
 ///
 /// Precondition: lifetimeBoundary is a superset of ownedValue's current
 /// lifetime (therefore, none of the safety checks done during
-/// CanonicalizeOSSALifetime are needed here).
+/// OSSACanonicalizeOwned are needed here).
 void extendOwnedLifetime(SILValue ownedValue,
                          PrunedLivenessBoundary &lifetimeBoundary,
                          InstructionDeleter &deleter);
@@ -61,7 +61,7 @@ void extendOwnedLifetime(SILValue ownedValue,
 ///
 /// Precondition: guaranteedBoundary is a superset of beginBorrow's current
 /// scope (therefore, none of the safety checks done during
-/// CanonicalizeBorrowScope are needed here).
+/// OSSACanonicalizeGuaranteed are needed here).
 void extendLocalBorrow(BeginBorrowInst *beginBorrow,
                        PrunedLivenessBoundary &guaranteedBoundary,
                        InstructionDeleter &deleter);
@@ -78,11 +78,6 @@ void extendLocalBorrow(BeginBorrowInst *beginBorrow,
 /// Note: This may be called on partially invalid OSSA form, where multiple
 /// newly created phis do not yet have a borrow scope.
 bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
-
-SILValue
-makeGuaranteedValueAvailable(SILValue value, SILInstruction *user,
-                             DeadEndBlocks &deBlocks,
-                             InstModCallbacks callbacks = InstModCallbacks());
 
 /// Compute the liveness boundary for a guaranteed value. Returns true if no
 /// uses are pointer escapes. If pointer escapes are present, the liveness
@@ -373,6 +368,16 @@ void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 
 /// Replaces phis with the unique incoming values if all incoming values are the same.
 void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+/// Complete lifetimes which were cut off by an `unreachable` instruction.
+/// For details see the swift implementation `completeLifetimes(in: Function)`.
+void completeAllLifetimes(SILPassManager *pm, SILFunction *f, bool includeTrivialVars = false);
+
+/// Complete lifetimes of all `values` at `deadEnds` instructions.
+/// Instead of completing the lifetimes at `unreachable` instructions, they are
+/// complete at custom `deadEnd` points.
+/// The `values` must be in dominance order.
+void completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, ArrayRef<SILInstruction *> deadEnds);
 
 bool hasOwnershipOperandsOrResults(SILInstruction *inst);
 

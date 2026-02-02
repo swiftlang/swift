@@ -317,7 +317,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
         ASSERT(type->isEqual(origParam));
         return openedParam;
       },
-      MakeAbstractConformanceForGenericType());
+      LookUpConformanceInModule());
   }
 
   if (genericSig) {
@@ -464,7 +464,7 @@ static bool doesMemberHaveUnfulfillableConstraintsWithExistentialBase(
         [&](SubstitutableType *type) -> Type {
           return existentialSig.SelfType;
         },
-        MakeAbstractConformanceForGenericType());
+        LookUpConformanceInModule());
 
       // Make sure this is valid first.
       if (!existentialSig.OpenedSig->isValidTypeParameter(ty)) {
@@ -677,16 +677,6 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (!typeVar || !genericParam)
     return std::nullopt;
 
-  // Only allow opening the innermost generic parameters.
-  auto genericContext = callee->getAsGenericContext();
-  if (!genericContext || !genericContext->isGeneric())
-    return std::nullopt;
-
-  auto genericSig = callee->getInnermostDeclContext()
-      ->getGenericSignatureOfContext().getCanonicalSignature();
-  if (genericParam->getDepth() < genericSig->getMaxDepth())
-    return std::nullopt;
-
   // The binding could be an existential metatype. Get the instance type for
   // conformance checks and to build an opened existential signature. If the
   // instance type is not an existential type, i.e., the metatype is nested,
@@ -694,6 +684,28 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   const Type existentialTy = bindingTy->getMetatypeInstanceType();
   if (!existentialTy->isExistentialType())
     return std::nullopt;
+
+  if (!canOpenExistentialAt(callee, paramIdx, genericParam, existentialTy))
+    return std::nullopt;
+
+  return std::pair(typeVar, bindingTy);
+}
+
+bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
+                                 GenericTypeParamType *genericParam,
+                                 Type existentialTy) {
+  ASSERT(existentialTy->isExistentialType());
+
+  // Only allow opening the innermost generic parameters.
+  auto genericContext = callee->getAsGenericContext();
+  if (!genericContext || !genericContext->hasGenericParamList())
+    return false;
+
+  auto genericSig = callee->getInnermostDeclContext()
+                        ->getGenericSignatureOfContext()
+                        .getCanonicalSignature();
+  if (genericParam->getDepth() < genericSig->getMaxDepth())
+    return false;
 
   auto &ctx = callee->getASTContext();
 
@@ -715,7 +727,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
     }
 
     if (!containsNonSelfConformance)
-      return std::nullopt;
+      return false;
   }
 
   auto existentialSig = ctx.getOpenedExistentialSignature(existentialTy);
@@ -726,10 +738,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
       callee, existentialSig.OpenedSig, genericParam,
       existentialSig.SelfType->castTo<GenericTypeParamType>(),
       /*skipParamIdx=*/paramIdx);
-  if (referenceInfo.hasNonCovariantRef())
-    return std::nullopt;
-
-  return std::pair(typeVar, bindingTy);
+  return !referenceInfo.hasNonCovariantRef();
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies
@@ -906,7 +915,7 @@ Type swift::typeEraseOpenedExistentialReference(
 
 Type swift::typeEraseOpenedArchetypesFromEnvironment(
     Type type, GenericEnvironment *env) {
-  assert(env->getKind() == GenericEnvironment::Kind::OpenedExistential);
+  ASSERT(env->getKind() == GenericEnvironment::Kind::Existential);
 
   return typeEraseExistentialSelfReferences(
       type,

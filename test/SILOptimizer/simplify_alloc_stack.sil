@@ -10,11 +10,27 @@ public struct S {}
 protocol P {
 }
 
+protocol Q {
+  associatedtype A
+}
+
 public class C2: P {}
 
 public struct T: P {
   let c: C
   let s: S
+
+  struct A {
+    var y: String
+  }
+}
+
+public struct U: Q {
+  let s: String
+
+  struct A {
+    var y: String
+  }
 }
 
 public struct T1: P {
@@ -235,6 +251,24 @@ bb0(%0 : @owned $T):
   return %r
 }
 
+// TODO: we don't support dependent existential archetypes, yet. Once we do, change this test case.
+// CHECK-LABEL: sil [ossa] @dont_replace_dependent_archetype :
+// CHECK:         alloc_stack {{.*}}@opened
+// CHECK:       } // end sil function 'dont_replace_dependent_archetype'
+sil [ossa] @dont_replace_dependent_archetype : $@convention(thin) (@owned U.A) -> () {
+bb0(%0 : @owned $U.A):
+  %1 = metatype $@thick U.Type
+  %2 = init_existential_metatype %1, $@thick Q.Type
+  %3 = open_existential_metatype %2 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309914", Q) Self).Type
+  %4 = alloc_stack $(@opened("82105EE0-DCB0-11E5-865D-C8E0EB309914", Q) Self).A
+  %5 = unchecked_addr_cast %4 to $*U.A
+  store %0 to [init] %5
+  destroy_addr %4
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [ossa] @replace_existential_with_concrete_type1 :
 // CHECK:         [[S:%.*]] = alloc_stack $T
 // CHECK-NOT:     init_existential_addr
@@ -271,6 +305,28 @@ bb0(%0 : $*T, %1 : @owned $T):
   %7 = unchecked_addr_cast %6 to $*T
   store %1 to [init] %7
   unconditional_checked_cast_addr any P in %5 to T in %0
+  %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
+  destroy_addr %8
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @replace_existential_with_concrete_type3 :
+// CHECK:         [[S:%.*]] = alloc_stack $T
+// CHECK-NOT:     init_existential_addr
+// CHECK-NOT:     open_existential_addr
+// CHECK:         debug_value undef : $*any P, let, name "value1"
+// CHECK:         destroy_addr [[S]]
+// CHECK:       } // end sil function 'replace_existential_with_concrete_type3'
+sil_scope 1 { loc "a.swift":1:1 parent @replace_existential_with_concrete_type3 : $@convention(thin) (@owned T) -> () }
+sil_scope 2 { loc "inlined.swift":1:1 parent @$inlined :  $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () inlined_at 1 }
+sil [ossa] @replace_existential_with_concrete_type3 : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %5 = alloc_stack $any P
+  debug_value %5, let, name "value1", loc "inlined.swift":1:1, scope 2
+  %6 = init_existential_addr %5, $T
+  store %0 to [init] %6
   %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
   destroy_addr %8
   dealloc_stack %5
