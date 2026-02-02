@@ -4,7 +4,7 @@ protocol P1 {
   typealias DependentInConcreteConformance = Self
 }
 
-class Base<T> : P1 { // expected-note {{arguments to generic parameter 'T' ('String' and 'Int') are expected to be equal}}
+class Base<T> : P1 {
   typealias DependentClass = T
 
   required init(classInit: ()) {}
@@ -333,7 +333,8 @@ func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}
 // expected-note@-2 {{where 'T' = 'T1'}}
-// expected-note@-3 2 {{where 'T' = 'Base<Int>'}}
+// expected-note@-3 2 {{where 'T' = 'Base<String>'}}
+// expected-note@-4 {{where 'T' = 'Base<Int>'}}
 
 func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}
@@ -450,8 +451,8 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
 
   conformsToBaseIntAndP2(badBase)
-  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
-  // expected-error@-2 {{cannot convert value of type 'Base<String>' to expected argument type 'Base<Int>'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' conform to 'P2'}}
+  // expected-error@-2 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}
 
   conformsToBaseIntAndP2(fakeDerived)
   // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'FakeDerived' inherit from 'Base<Int>'}}

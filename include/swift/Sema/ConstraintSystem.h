@@ -29,6 +29,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/CSTrail.h"
 #include "swift/Sema/Constraint.h"
@@ -6021,6 +6022,10 @@ public:
 
   bool hasDefaultedProtocol() const {
     return Binding.hasDefaultedLiteralProtocol();
+  }
+
+  bool fromSupertype() const {
+    return Binding.Kind == AllowedBindingKind::Subtypes;
   }
 
   bool attempt(ConstraintSystem &cs) const;

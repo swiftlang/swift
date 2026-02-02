@@ -36,16 +36,19 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Sema/CSBindings.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Format.h"
+#include <algorithm>
 #include <cmath>
 #include <random>
 
@@ -5401,6 +5404,17 @@ TypeVarBindingProducer::TypeVarBindingProducer(
 
   for (const auto &binding : bindings.Bindings) {
     addBinding(binding);
+  }
+
+  // `TVO_PrefersSubtypeBinding` type variables prefer bindings to subtypes
+  // and equal bindings. It's important to note that the binding inferred
+  // from a constraint like `Int conv $T` is marked as allowing supertypes
+  // and considered to be "subtype" bindings.
+  if (typeVar->getImpl().prefersSubtypeBinding()) {
+    std::stable_partition(Bindings.begin(), Bindings.end(),
+                          [](const Binding &binding) {
+                            return binding.Kind != AllowedBindingKind::Subtypes;
+                          });
   }
 
   // Infer defaults based on "uncovered" literal protocol requirements.

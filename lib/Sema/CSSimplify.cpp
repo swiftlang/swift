@@ -2471,7 +2471,8 @@ isSubtypeOf(FunctionTypeRepresentation potentialSubRepr,
 static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
                                          FunctionType::ExtInfo einfo2,
                                          ConstraintKind kind,
-                                         ConstraintSystemOptions options) {
+                                         ConstraintSystemOptions options,
+                                         ConstraintLocatorBuilder locator) {
   auto rep1 = einfo1.getRepresentation();
   auto rep2 = einfo2.getRepresentation();
   bool clangTypeMismatch =
@@ -2530,6 +2531,41 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
     if ((rep1 == rep2) && clangTypeMismatch) {
       return false;
     }
+
+    // Narrow the conversion down to closures and declarations
+    // that are going to be further checked by CSApply and SILGen.
+    if (rep1 == FunctionTypeRepresentation::Swift &&
+        rep2 == FunctionTypeRepresentation::CFunctionPointer) {
+      auto target = locator.trySimplifyToExpr();
+      if (!target)
+        return false;
+
+      target = target->getSemanticsProvidingExpr();
+
+      // Assignment is fine as look as the "source" is eligible.
+      if (auto *assignment = dyn_cast<AssignExpr>(target))
+        target = assignment->getSrc()->getSemanticsProvidingExpr();
+
+      // Let closures through because their eligibility depends on captures.
+      if (isa<CaptureListExpr>(target) || isa<ClosureExpr>(target))
+        return true;
+
+      // Could be an eligible function, more checking would be performed
+      // at the later stage.
+      if (isa<DeclRefExpr>(target) || isa<OverloadedDeclRefExpr>(target) ||
+          isa<UnresolvedDotExpr>(target))
+        return true;
+
+      // In all other cases conversion is invalid. For example:
+      // `let _: (@conversion(c) () -> Void)? = true ? { ... } : nil`
+      //
+      // Here ternary has two choices: (() -> ())? (based on closure)
+      // and (@conversion(c) () -> Void)? (based on the contextual type).
+      // The only reasonable deduction is the second one because `nil`
+      // cannot be _converted_ to `@convention(c)` function type.
+      return false;
+    }
+
     return true;
 
   case ConstraintKind::BridgingConversion:
@@ -3295,7 +3331,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   if (!matchFunctionRepresentations(func1->getExtInfo(), func2->getExtInfo(),
-                                    kind, Options)) {
+                                    kind, Options, locator)) {
     return getTypeMatchFailure(locator);
   }
 
