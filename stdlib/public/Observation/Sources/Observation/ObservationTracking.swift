@@ -72,6 +72,7 @@ public struct ObservationTracking: Sendable {
     }
   }
 
+  @available(SwiftStdlib 6.4, *)
   static func _installTracking(
     options: ObservationTracking.Options,
     _ tracking: ObservationTracking,
@@ -108,7 +109,24 @@ public struct ObservationTracking: Sendable {
     willSet: (@Sendable (ObservationTracking) -> Void)? = nil,
     didSet: (@Sendable (ObservationTracking) -> Void)? = nil
   ) {
-    _installTracking(options: [], tracking, willSet: willSet, didSet: didSet, deinit: nil)
+    let values = tracking.list.entries.mapValues { 
+      var id = Id()
+      if let willSet {
+        id.willSet = $0.addWillSetObserver { property in
+          tracking.state.withCriticalRegion { $0.changed = property }
+          willSet(tracking)
+        }
+      }
+      if let didSet {
+        id.didSet = $0.addDidSetObserver { property in
+          tracking.state.withCriticalRegion { $0.changed = property }
+          didSet(tracking)
+        }
+      }
+      return id
+    }
+    
+    tracking.install(values)
   }
 
   @_spi(SwiftUI)
@@ -356,16 +374,18 @@ extension ObservationTracking.Options: SetAlgebra {
   }
 }
 
+@available(SwiftStdlib 6.4, *)
 extension ObservationTracking.Options: Sendable { }
 
+@available(SwiftStdlib 5.9, *)
 struct AccessListResult<T: ~Copyable>: ~Copyable {
   var result: T
   var accessList: ObservationTracking._AccessList?
   var dirty: ObservationRegistrar.Dirty?
 }
 
+@available(SwiftStdlib 5.9, *)
 fileprivate func generateAccessList<T: ~Copyable, Failure: Error>(
-  options: ObservationTracking.Options, 
   _ apply: () throws(Failure) -> T
 ) throws(Failure) -> AccessListResult<T> {
   var accessList: ObservationTracking._AccessList?
@@ -385,9 +405,7 @@ fileprivate func generateAccessList<T: ~Copyable, Failure: Error>(
       _ThreadLocal.value = previous
     }
     let result = try apply()
-    // if options.rawValue.contains(.concurrentMutation) {
-      dirty = ObservationTracking.deactivateAccessList(ptr)
-    // }
+    dirty = ObservationTracking.deactivateAccessList(ptr)
     return result
   }
   return AccessListResult(result: result, accessList: accessList, dirty: dirty)
@@ -399,7 +417,7 @@ public func withObservationTracking<Result: ~Copyable, Failure: Error>(
   _ apply: () throws(Failure) -> Result,
   onChange: @escaping @Sendable (borrowing ObservationTracking.Event) -> Void
 ) throws(Failure) -> Result {
-  let accessListResult = try generateAccessList(options: options, apply)
+  let accessListResult = try generateAccessList(apply)
   let willSet: (@Sendable (ObservationTracking) -> Void)?
   if options.contains(.willSet) {
     willSet = { tracking in
@@ -475,7 +493,7 @@ public func withObservationTracking<T>(
   _ apply: () -> T,
   onChange: @autoclosure () -> @Sendable () -> Void
 ) -> T {
-  let accessListResult = generateAccessList(options: [], apply)
+  let accessListResult = generateAccessList(apply)
   if let accessList = accessListResult.accessList {
     ObservationTracking._installTracking(accessList, onChange: onChange())
   }
@@ -489,7 +507,7 @@ public func withObservationTracking<T>(
   willSet: @escaping @Sendable (ObservationTracking) -> Void,
   didSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
-  let accessListResult = generateAccessList(options: [], apply)
+  let accessListResult = generateAccessList(apply)
   ObservationTracking._installTracking(ObservationTracking(accessListResult.accessList), willSet: willSet, didSet: didSet)
   return accessListResult.result
 }
@@ -500,7 +518,7 @@ public func withObservationTracking<T>(
   _ apply: () -> T,
   willSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
-  let accessListResult = generateAccessList(options: [], apply)
+  let accessListResult = generateAccessList(apply)
   ObservationTracking._installTracking(ObservationTracking(accessListResult.accessList), willSet: willSet, didSet: nil)
   return accessListResult.result
 }
@@ -511,7 +529,7 @@ public func withObservationTracking<T>(
   _ apply: () -> T,
   didSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
-  let accessListResult = generateAccessList(options: [], apply)
+  let accessListResult = generateAccessList(apply)
   ObservationTracking._installTracking(ObservationTracking(accessListResult.accessList), willSet: nil, didSet: didSet)
   return accessListResult.result
 }
