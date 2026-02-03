@@ -1768,6 +1768,51 @@ handleRequestSemanticRefactoring(const RequestDict &Req,
 }
 
 static void
+handleRequestGetObjCSelector(const RequestDict &Req,
+                             SourceKitCancellationToken CancellationToken,
+                             ResponseReceiver Rec) {
+  if (checkVFSNotSupported(Req, Rec))
+    return;
+
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    std::optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    int64_t Offset = 0;
+    if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false)) {
+      return Rec(createErrorRequestInvalid("'key.offset' is required"));
+    }
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+
+    return Lang.getObjCSelector(
+        *PrimaryFilePath, InputBufferName, Offset, Args,
+        CancellationToken,
+        [Rec](const RequestResult<std::string> &Result) {
+          if (Result.isCancelled()) {
+            return Rec(createErrorRequestCancelled());
+          }
+          if (Result.isError()) {
+            return Rec(createErrorRequestFailed(Result.getError()));
+          }
+
+          ResponseBuilder RespBuilder;
+          auto Dict = RespBuilder.getDictionary();
+          Dict.set(KeyText, Result.value());
+          Rec(RespBuilder.createResponse());
+        });
+  });
+}
+
+static void
 handleRequestCollectExpressionType(const RequestDict &Req,
                                    SourceKitCancellationToken CancellationToken,
                                    ResponseReceiver Rec) {
@@ -2278,6 +2323,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestCursorInfo, handleRequestCursorInfo)
   HANDLE_REQUEST(RequestRangeInfo, handleRequestRangeInfo)
   HANDLE_REQUEST(RequestSemanticRefactoring, handleRequestSemanticRefactoring)
+  HANDLE_REQUEST(RequestGetObjCSelector, handleRequestGetObjCSelector)
 
   HANDLE_REQUEST(RequestCollectExpressionType,
                  handleRequestCollectExpressionType)
