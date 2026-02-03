@@ -46,3 +46,6 @@ Added: _$ss24_RuntimeFunctionCountersV07runtimeB5NamesSaySSGvpZMV
 Added: _$ss24_RuntimeFunctionCountersV07runtimebC7OffsetsSPys6UInt16VGvpZMV
 
 // Runtime Symbols
+
+// fatalError() hook
+Added: __swift_willAbort
