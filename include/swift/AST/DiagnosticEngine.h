@@ -400,10 +400,6 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    [[deprecated(
-        "use e.g. limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)")]]
-    InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
-                                                       unsigned majorVersion);
     InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
                                                        LanguageMode mode);
 
@@ -436,8 +432,6 @@ namespace swift {
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    [[deprecated("use e.g. warnUntilLanguageMode(LanguageMode::v6)")]]
-    InFlightDiagnostic &warnUntilLanguageMode(unsigned majorVersion);
     InFlightDiagnostic &warnUntilLanguageMode(LanguageMode mode);
 
     /// Limit the diagnostic behavior to warning if the context is a

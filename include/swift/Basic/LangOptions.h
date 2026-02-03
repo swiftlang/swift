@@ -741,16 +741,6 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
-    /// Whether our effective Swift version is at least 'major'.
-    ///
-    /// This is usually the check you want; for example, when introducing
-    /// a new language feature which is only visible in Swift 5, you would
-    /// check for isLanguageModeAtLeast(5).
-    [[deprecated("use e.g. isLanguageModeAtLeast(LanguageMode::v6)")]]
-    bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
-    }
-
     /// Returns a boolean value indicating whether the language mode is at least
     /// `mode`.
     ///

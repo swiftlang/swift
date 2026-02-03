@@ -467,16 +467,17 @@ InFlightDiagnostic::limitBehaviorIfMorePermissive(DiagnosticBehavior limit) {
 
 InFlightDiagnostic &
 InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
-                                                   unsigned majorVersion) {
-  if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
+                                                   LanguageMode mode) {
+  if (!mode.isEffectiveIn(Engine->languageVersion)) {
     // If the behavior limit is a warning or less, wrap the diagnostic
     // in a message that this will become an error in a later Swift
     // version. We do this before limiting the behavior, because
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
-      if (majorVersion >= version::Version::getFutureMajorLanguageVersion()) {
+      if (mode.isFuture()) {
         wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
+        const auto majorVersion = mode.version().first;
         wrapIn(diag::error_in_swift_lang_mode, majorVersion);
       }
     }
@@ -485,25 +486,13 @@ InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
   }
 
   // Record all of the diagnostics that are going to be emitted.
-  if (majorVersion == 6 && limit != DiagnosticBehavior::Ignore) {
+  if (mode == LanguageMode::v6 && limit != DiagnosticBehavior::Ignore) {
     if (auto stats = Engine->statsReporter) {
       ++stats->getFrontendCounters().NumSwift6Errors;
     }
   }
 
   return *this;
-}
-
-InFlightDiagnostic &
-InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
-                                                   LanguageMode mode) {
-  return limitBehaviorUntilLanguageMode(limit, mode.version().first);
-}
-
-InFlightDiagnostic &
-InFlightDiagnostic::warnUntilLanguageMode(unsigned majorVersion) {
-  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
-                                        majorVersion);
 }
 
 InFlightDiagnostic &
