@@ -88,6 +88,7 @@ GROUP(TemporaryPointers,none,"temporary-pointers")
 GROUP(TrailingClosureMatching,none,"trailing-closure-matching")
 GROUP(UnknownWarningGroup,none,"unknown-warning-group")
 GROUP(WeakMutability,none,"weak-mutability")
+GROUP(StrictExhaustiveSwitches,DefaultIgnoreWarnings,"strict-exhaustive-switches")
 
 GROUP_LINK(PerformanceHints,ExistentialType)
 GROUP_LINK(PerformanceHints,ReturnTypeImplicitCopy)
