@@ -64,27 +64,27 @@ class Foo {
 
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC26officialModifiersInClosureyySS_SStcvg
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC26officialModifiersInClosureyySS_SStcvs
-    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC26officialModifiersInClosureyySS_SStcvM
+    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC26officialModifiersInClosureyySS_SStcvx
     var officialModifiersInClosure: (String, String) -> () = {_,_ in}
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_bcyySS_SSntcvg
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_bcyySS_SSntcvs
-    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_bcyySS_SSntcvM
+    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_bcyySS_SSntcvx
     var officialModifiersInClosure_bc: (borrowing String, consuming String) -> () = {_,_ in}
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_cbyySSn_SStcvg
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_cbyySSn_SStcvs
-    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_cbyySSn_SStcvM
+    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC29officialModifiersInClosure_cbyySSn_SStcvx
     var officialModifiersInClosure_cb: (consuming String, borrowing String) -> () = {_,_ in}
 
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC24legacyModifiersInClosureyySS_SStcvg
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC24legacyModifiersInClosureyySS_SStcvs
-    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC24legacyModifiersInClosureyySS_SStcvM
+    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC24legacyModifiersInClosureyySS_SStcvx
     var legacyModifiersInClosure: (String, String) -> () = {_,_ in}
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_bcyySSh_SSntcvg
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_bcyySSh_SSntcvs
-    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_bcyySSh_SSntcvM
+    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_bcyySSh_SSntcvx
     var legacyModifiersInClosure_bc: (__shared String, __owned String) -> () = {_,_ in}
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_cbyySSn_SShtcvg
     // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_cbyySSn_SShtcvs
-    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_cbyySSn_SShtcvM
+    // CHECK-LABEL: @$s28ownership_specifier_mangling3FooC27legacyModifiersInClosure_cbyySSn_SShtcvx
     var legacyModifiersInClosure_cb: (__owned String, __shared String) -> () = {_,_ in}
 }
