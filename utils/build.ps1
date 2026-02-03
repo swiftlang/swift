@@ -2164,7 +2164,14 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
   }
 
   # If DebugInfo is enabled limit the number of parallel links to avoid OOM.
-  $DebugDefines = if ($DebugInfo) { @{ SWIFT_PARALLEL_LINK_JOBS = "4"; } } else { @{} }
+  $DebugDefines = if ($DebugInfo) {
+    @{
+      SWIFT_PARALLEL_LINK_JOBS = "2";
+      LLVM_PARALLEL_LINK_JOBS = "2";
+    }
+  } else {
+    @{}
+  }
 
   # In the latest versions of VS, STL typically requires a newer version of
   # Clang than released Swift toolchains include. Relax this requirement when
