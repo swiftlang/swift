@@ -7603,6 +7603,13 @@ ERROR(non_exhaustive_switch_unknown_only,none,
       "switch covers known cases, but %0 may have additional unknown values"
       "%select{|, possibly added in future versions}1", (Type, bool))
 
+GROUPED_ERROR(exhaustive_switch_replace_default_with_unknown,StrictExhaustiveSwitches,none,
+      "switch covers known cases, but %0 may have additional unknown values,"
+      "%select{| possibly added in future versions,}1 "
+      "'default' [or 'case _'] will only be executed for unknown values "
+      "[possibly added in future versions]; replace with \"@unknown default\"",
+      (Type, bool))
+
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())

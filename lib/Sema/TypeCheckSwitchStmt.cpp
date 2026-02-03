@@ -1235,9 +1235,18 @@ namespace {
           return 6;
         };
 
-        DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                    subjectType, shouldIncludeFutureVersionComment)
-            .warnUntilLanguageMode(shouldWarnUntilVersion());
+        if (defaultCase) {
+          hasEmittedUnnecessaryDefaultDiagnostic = true;
+          DE.diagnose(startLoc,
+                      diag::exhaustive_switch_replace_default_with_unknown,
+                      subjectType, shouldIncludeFutureVersionComment)
+              .fixItInsert(defaultCase->getStartLoc(), "@unknown ")
+              .warnUntilLanguageMode(shouldWarnUntilVersion());
+        } else {
+          DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                      subjectType, shouldIncludeFutureVersionComment)
+              .warnUntilLanguageMode(shouldWarnUntilVersion());
+        }
 
         mainDiagType.reset();
         break;
