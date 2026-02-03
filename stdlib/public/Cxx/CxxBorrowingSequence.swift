@@ -23,7 +23,7 @@
 // @available(SwiftStdlib 6.3, *)
 public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~Escapable {
   override associatedtype Element: ~Copyable
-  override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
+  override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self, Element>
   associatedtype RawIterator: UnsafeCxxInputIterator
     where RawIterator.Pointee == Element
 
@@ -36,7 +36,7 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
 
 @frozen
 // @available(SwiftStdlib 6.3, *)
-public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
+public struct CxxBorrowingIterator<T, Element>: BorrowingIteratorProtocol, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, Element: ~Copyable, T.Element == Element {
   // public typealias Element = T.Element
   public typealias Element = T.RawIterator.Pointee
 
@@ -72,9 +72,9 @@ public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~C
 extension CxxBorrowingSequence where Element: ~Copyable, Self: ~Copyable {
   @inlinable
   @_lifetime(borrow self)
-  public borrowing func makeBorrowingIterator() -> CxxBorrowingIterator<Self> {
+  public borrowing func makeBorrowingIterator() -> CxxBorrowingIterator<Self, Element> {
     // __beginUnsafe() doesn't perform a copy because this is a borrowing function
-    let iterator = CxxBorrowingIterator<Self>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
+    let iterator = CxxBorrowingIterator<Self, Element>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
     // TODO _cxxOverrideLifetime?
     return unsafe _cxxOverrideLifetime(iterator, borrowing: self)
   }
