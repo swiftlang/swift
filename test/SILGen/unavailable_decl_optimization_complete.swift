@@ -192,6 +192,7 @@ public func unavailableFuncWithNestedType() {
 // CHECK-NO-STRIP-NEXT:   #C.unavailableProperty!getter:
 // CHECK-NO-STRIP-NEXT:   #C.unavailableProperty!setter:
 // CHECK-NO-STRIP-NEXT:   #C.unavailableProperty!modify:
+// CHECK-NO-STRIP-NEXT:   #C.unavailableProperty!yielding_mutate:
 // CHECK-NO-STRIP-NEXT:   #C.init!allocator:
 // CHECK-NO-STRIP-NEXT:   #C.deinit!deallocator:
 // CHECK-NO-STRIP-NEXT: }
@@ -200,6 +201,7 @@ public func unavailableFuncWithNestedType() {
 // CHECK-STRIP-NOT:   #C.unavailableProperty!getter:
 // CHECK-STRIP-NOT:   #C.unavailableProperty!setter:
 // CHECK-STRIP-NOT:   #C.unavailableProperty!modify:
+// CHECK-STRIP-NOT:   #C.unavailableProperty!yielding_mutate:
 // CHECK-STRIP-NOT:   #C.init!allocator:
 // CHECK-STRIP:       #C.deinit!deallocator:
 // CHECK-STRIP:     }

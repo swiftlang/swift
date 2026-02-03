@@ -371,8 +371,8 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$s9protocols14modifyPropertyyyxzAA0C16WithGetterSetterRzlF
 // CHECK:      [[WRITE:%.*]] = begin_access [modify] [unknown] %0 : $*T
-// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!modify
-// CHECK:      ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[WITNESS_FN]]<T>
+// CHECK:      [[WITNESS_FN:%.*]] = witness_method $T, #PropertyWithGetterSetter.b!yielding_mutate
+// CHECK:      ([[ADDR:%.*]], [[TOKEN:%.*]], [[CORO_ALLOC:%.*]]) = begin_apply [[WITNESS_FN]]<T>
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @$s9protocols6modifyyySizF
 // CHECK:      apply [[MODIFY_FN]]([[ADDR]])
 // CHECK:      end_apply [[TOKEN]]
@@ -391,8 +391,8 @@ public func test(_ p: Proto) {
 
 // CHECK-LABEL: sil [ossa] @$s9protocols4testyyAA5Proto_pF : $@convention(thin) (@in_guaranteed any Proto) -> ()
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
-// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}", any Proto) Self, #Proto.val!modify
-// CHECK: ([[BUF:%.*]], [[TOKEN:%.*]]) = begin_apply [[MAT]]
+// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}", any Proto) Self, #Proto.val!yielding_mutate
+// CHECK: ([[BUF:%.*]], [[TOKEN:%.*]], [[CORO_ALLOC:%.*]]) = begin_apply [[MAT]]
 // CHECK: end_apply [[TOKEN]]
 // CHECK: return
 
@@ -417,7 +417,7 @@ public func testSelfReturningSubscript() {
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetterSetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!getter: {{.*}} : @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivgTW
 // CHECK-NEXT:  method #PropertyWithGetterSetter.b!setter: {{.*}} : @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivsTW
-// CHECK-NEXT:  method #PropertyWithGetterSetter.b!modify: {{.*}} : @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivMTW
+// CHECK-NEXT:  method #PropertyWithGetterSetter.b!yielding_mutate: {{.*}} : @$s9protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSivxTW
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetterSetter: PropertyWithGetter module protocols {
