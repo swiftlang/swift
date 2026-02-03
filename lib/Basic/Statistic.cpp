@@ -530,7 +530,9 @@ FrontendStatsTracer::~FrontendStatsTracer()
 }
 
 static int64_t getCurrentTimeInMicroseconds() {
-  return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  return std::chrono::duration_cast<std::chrono::microseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
 }
 
 static const int64_t processStartTimeMicroseconds = getCurrentTimeInMicroseconds();
@@ -550,17 +552,15 @@ void updateProcessWideFrontendCounters(
   }
 #elif defined(_WIN32)
   ULONG64 CycleTime;
-  if (QueryProcessCycleTime(GetCurrentProcess(), &CycleTime)) {
+  if (QueryProcessCycleTime(GetCurrentProcess(), &CycleTime))
     C.NumCyclesExecuted = CycleTime;
-  }
 
   PROCESS_MEMORY_COUNTERS_EX PMC;
   PMC.cb = sizeof(PMC);
   if (GetProcessMemoryInfo(GetCurrentProcess(),
                            reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&PMC),
-                           sizeof(PMC))) {
+                           sizeof(PMC)))
     C.MaxMallocUsage = PMC.PeakWorkingSetSize;
-  }
   return;
 #endif
 
