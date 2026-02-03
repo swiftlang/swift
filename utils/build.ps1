@@ -4147,6 +4147,7 @@ function Build-Installer([Hashtable] $Platform) {
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
+  Copy-File [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "*.pdb") $Stage
   foreach ($Build in $WindowsSDKBuilds) {
     Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Build.Architecture.VSName)\*.msm" $Stage
   }
