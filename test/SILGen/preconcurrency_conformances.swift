@@ -48,8 +48,8 @@ struct IsolatedType<T> : @preconcurrency P {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
-// protocol witness for P.prop.modify in conformance IsolatedType<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1PA2aEP4prop1TQzvMTW : $@yield_once @convention(witness_method: P) <τ_0_0> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedType<τ_0_0>, τ_0_0>
+// protocol witness for P.prop.yielding_mutate in conformance IsolatedType<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1PA2aEP4prop1TQzvxTW : $@yield_once_2 @convention(witness_method: P) <τ_0_0> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedType<τ_0_0>, τ_0_0>
 // CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -91,8 +91,8 @@ extension IsolatedType : @preconcurrency Q {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
-// protocol witness for static Q.data.modify in conformance IsolatedType<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) <τ_0_0> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedType<τ_0_0>>
+// protocol witness for static Q.data.yielding_mutate in conformance IsolatedType<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvxZTW : $@yield_once_2 @convention(witness_method: Q) <τ_0_0> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedType<τ_0_0>>
 // CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
 // CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
 // CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
@@ -134,8 +134,8 @@ class IsolatedMembers<T> : @preconcurrency P {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
-// protocol witness for P.prop.modify in conformance IsolatedMembers<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1PA2aEP4prop1TQzvMTW : $@yield_once @convention(witness_method: P) <τ_0_0> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedMembers<τ_0_0>, τ_0_0>
+// protocol witness for P.prop.yielding_mutate in conformance IsolatedMembers<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1PA2aEP4prop1TQzvxTW : $@yield_once_2 @convention(witness_method: P) <τ_0_0> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedMembers<τ_0_0>, τ_0_0>
 // CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -189,8 +189,8 @@ extension IsolatedMembers : @preconcurrency Q {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
-// protocol witness for static Q.data.modify in conformance IsolatedMembers<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1QA2aEP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) <τ_0_0> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedMembers<τ_0_0>>
+// protocol witness for static Q.data.yielding_mutate in conformance IsolatedMembers<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1QA2aEP4dataSaySiGSgvxZTW : $@yield_once_2 @convention(witness_method: Q) <τ_0_0> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedMembers<τ_0_0>>
 // CHECK: [[SHARED_REF:%.*]] = function_ref @$s27preconcurrency_conformances11GlobalActorV6sharedAA02MyD0Cvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK-NEXT: [[SHARED_PTR:%.*]] = apply [[SHARED_REF]]() : $@convention(thin) () -> Builtin.RawPointer
 // CHECK-NEXT: [[MY_ACTOR_ADDR:%.*]] = pointer_to_address [[SHARED_PTR]] : $Builtin.RawPointer to [strict] $*MyActor
@@ -232,8 +232,8 @@ extension MyActor : @preconcurrency P {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
-// protocol witness for P.prop.modify in conformance MyActor
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1PA2aDP4prop1TQzvMTW : $@yield_once @convention(witness_method: P) @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <MyActor, Int>
+// protocol witness for P.prop.yielding_mutate in conformance MyActor
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1PA2aDP4prop1TQzvxTW : $@yield_once_2 @convention(witness_method: P) @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <MyActor, Int>
 // CHECK: [[SELF_REF:%.*]] = load_borrow %0 : $*MyActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[SELF_REF]] : $MyActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -269,8 +269,8 @@ extension MyActor : @preconcurrency Q {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
-// protocol witness for static Q.data.modify in conformance MyActor
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1QA2aDP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <MyActor>
+// protocol witness for static Q.data.yielding_mutate in conformance MyActor
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1QA2aDP4dataSaySiGSgvxZTW : $@yield_once_2 @convention(witness_method: Q) @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <MyActor>
 // CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -409,8 +409,8 @@ struct IsolatedType<T: Sendable> : @preconcurrency P {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1PA2aEP4prop1TQzvsTW : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : Sendable> (@in τ_0_0, @inout IsolatedType<τ_0_0>) -> ()
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
-// protocol witness for P.prop.modify in conformance IsolatedType<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1PA2aEP4prop1TQzvMTW : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedType<τ_0_0>, τ_0_0>
+// protocol witness for P.prop.yielding_mutate in conformance IsolatedType<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1PA2aEP4prop1TQzvxTW : $@yield_once_2 @convention(witness_method: P) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedType<τ_0_0>, τ_0_0>
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
 // protocol witness for P.fn() in conformance IsolatedType<A>
@@ -434,8 +434,8 @@ extension IsolatedType : @preconcurrency Q {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvsZTW : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Sendable> (@owned Optional<Array<Int>>, @thick IsolatedType<τ_0_0>.Type) -> ()
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
-// protocol witness for static Q.data.modify in conformance IsolatedType<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedType<τ_0_0>>
+// protocol witness for static Q.data.yielding_mutate in conformance IsolatedType<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvxZTW : $@yield_once_2 @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedType<τ_0_0>>
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
 // protocol witness for static Q.staticFn() in conformance IsolatedType<A>
@@ -459,8 +459,8 @@ class IsolatedMembers<T: Sendable> : @preconcurrency P {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1PA2aEP4prop1TQzvsTW : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : Sendable> (@in τ_0_0, @inout IsolatedMembers<τ_0_0>) -> ()
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
-// protocol witness for P.prop.modify in conformance IsolatedMembers<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1PA2aEP4prop1TQzvMTW : $@yield_once @convention(witness_method: P) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedMembers<τ_0_0>, τ_0_0>
+// protocol witness for P.prop.yielding_mutate in conformance IsolatedMembers<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1PA2aEP4prop1TQzvxTW : $@yield_once_2 @convention(witness_method: P) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <IsolatedMembers<τ_0_0>, τ_0_0>
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
 // protocol witness for P.fn() in conformance IsolatedMembers<A>
@@ -484,8 +484,8 @@ extension IsolatedMembers : @preconcurrency Q {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1QA2aEP4dataSaySiGSgvsZTW : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Sendable> (@owned Optional<Array<Int>>, @thick IsolatedMembers<τ_0_0>.Type) -> ()
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
-// protocol witness for static Q.data.modify in conformance IsolatedMembers<A>
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1QA2aEP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedMembers<τ_0_0>>
+// protocol witness for static Q.data.yielding_mutate in conformance IsolatedMembers<A>
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances15IsolatedMembersCyxGAA1QA2aEP4dataSaySiGSgvxZTW : $@yield_once_2 @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Sendable> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedMembers<τ_0_0>>
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
 // protocol witness for static Q.staticFn() in conformance IsolatedMembers<A>
@@ -509,8 +509,8 @@ extension MyActor : @preconcurrency P {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1PA2aDP4prop1TQzvsTW : $@convention(witness_method: P) (@in Int, @inout MyActor) -> ()
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
-// protocol witness for P.prop.modify in conformance MyActor
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1PA2aDP4prop1TQzvMTW : $@yield_once @convention(witness_method: P) @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <MyActor, Int>
+// protocol witness for P.prop.yielding_mutate in conformance MyActor
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1PA2aDP4prop1TQzvxTW : $@yield_once_2 @convention(witness_method: P) @substituted <τ_0_0, τ_0_1> (@inout τ_0_0) -> @yields @inout τ_0_1 for <MyActor, Int>
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
 // protocol witness for P.fn() in conformance MyActor
@@ -534,8 +534,8 @@ extension MyActor : @preconcurrency Q {
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1QA2aDP4dataSaySiGSgvsZTW : $@convention(witness_method: Q) (@owned Optional<Array<Int>>, @thick MyActor.Type) -> ()
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
-// protocol witness for static Q.data.modify in conformance MyActor
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1QA2aDP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <MyActor>
+// protocol witness for static Q.data.yielding_mutate in conformance MyActor
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances7MyActorCAA1QA2aDP4dataSaySiGSgvxZTW : $@yield_once_2 @convention(witness_method: Q) @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <MyActor>
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 
 // https://github.com/apple/swift/issues/74294

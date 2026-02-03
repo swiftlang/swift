@@ -300,18 +300,23 @@ public class SillyC: SillyP {
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivg
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!setter: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivs
 // CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!modify: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivM
+// CHECK-NEXT:   method #ResilientStorage.mutablePropertyWithDefault!yielding_mutate: {{.*}} : @$s19protocol_resilience16ResilientStorageP26mutablePropertyWithDefaultSivx
+// CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   no_default
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvg
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!setter: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvs
 // CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!modify: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvM
+// CHECK-NEXT:   method #ResilientStorage.mutableGenericPropertyWithDefault!yielding_mutate: {{.*}} : @$s19protocol_resilience16ResilientStorageP33mutableGenericPropertyWithDefault1TQzvx
 // CHECK-NEXT:   method #ResilientStorage.subscript!getter: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcig
 // CHECK-NEXT:   method #ResilientStorage.subscript!setter: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcis
 // CHECK-NEXT:   method #ResilientStorage.subscript!modify: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEciM
+// CHECK-NEXT:   method #ResilientStorage.subscript!yielding_mutate: {{.*}} : @$s19protocol_resilience16ResilientStoragePy1TQzAEcix
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!getter: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivg
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!setter: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivs
 // CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!modify: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivM
+// CHECK-NEXT:   method #ResilientStorage.mutatingGetterWithNonMutatingDefault!yielding_mutate: {{.*}} : @$s19protocol_resilience16ResilientStorageP36mutatingGetterWithNonMutatingDefaultSivx
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientOperators {
@@ -328,6 +333,7 @@ public class SillyC: SillyP {
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!getter: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!setter: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvs
 // CHECK-NEXT:   method #ReabstractSelfRefined.callback!modify: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvM
+// CHECK-NEXT:   method #ReabstractSelfRefined.callback!yielding_mutate: {{.*}} : @$s19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvx
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientAssocTypes {
