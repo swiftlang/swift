@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=_Test -import-objc-header %S/Inputs/check_class_for_archiving.h -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
-// RUN: %target-run %t/a.out 2>&1 >/dev/null | %FileCheck `cat %t/prefix-option` %s
+// RUN: %target-run %t/a.out > %t/output.txt 2>%t/stderr.txt
+// RUN: grep "check-prefix=CHECK" %t/output.txt && %FileCheck %s < %t/stderr.txt
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -15,11 +15,6 @@ import Foundation
 // A tricky way to make the FileCheck tests conditional on the OS version.
 if #available(SwiftStdlib 5.5, *) {
   print("-check-prefix=CHECK")
-} else {
-  // Disable the checks for older OSes because of rdar://problem/50504765
-  print("-check-prefix=DONT-CHECK")
-  // Need at least one check, otherwise FileCheck will complain.
-  // DONT-CHECK: {{.}}
 }
 
 class SwiftClass {}
