@@ -946,10 +946,6 @@ def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hac
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
-def enable_operator_designated_types :
-  Flag<["-"], "enable-operator-designated-types">,
-  HelpText<"Enable operator designated types">;
-
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,
   HelpText<"Diagnose invalid ephemeral to non-ephemeral conversions as errors">;
