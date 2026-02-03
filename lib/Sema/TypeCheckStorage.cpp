@@ -3027,11 +3027,6 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     }
   }
 
-  // Non-stable modules have no ABI to keep stable.
-  if (storage->getModuleContext()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient)
-    return false;
-
   // Non-exported storage has no ABI to keep stable.
   if (isExported(storage) == ExportedLevel::None)
     return false;
