@@ -1018,6 +1018,10 @@ namespace swift {
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
 
+    /// Enable various older performance optimizations that have been subsumed
+    /// by subsequent improvements to the solver.
+    bool SolverEnablePerformanceHacks = true;
+
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
 

@@ -2131,6 +2131,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_solver_disable_optimize_operator_defaults))
     Opts.SolverOptimizeOperatorDefaults = Args.hasArg(OPT_solver_enable_optimize_operator_defaults);
 
+  if (Args.hasArg(OPT_solver_enable_performance_hacks) ||
+      Args.hasArg(OPT_solver_disable_performance_hacks))
+    Opts.SolverEnablePerformanceHacks = Args.hasArg(OPT_solver_enable_performance_hacks);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
