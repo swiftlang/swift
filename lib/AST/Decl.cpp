@@ -3722,6 +3722,10 @@ bool AbstractStorageDecl::isResilient() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
+  // Check for an explicit @_extern attribute.
+  if (getAttrs().hasAttribute<ExternAttr>())
+    return false;
+
   // If we're an instance property of a nominal type, query the type.
   if (!isStatic())
     if (auto *nominalDecl = getDeclContext()->getSelfNominalTypeDecl())
