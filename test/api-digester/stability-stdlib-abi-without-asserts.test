@@ -90,6 +90,8 @@ Func AnyCollection.map(_:) has been removed
 Func AnyRandomAccessCollection.map(_:) has been removed
 Func AnySequence.map(_:) has been removed
 Func Collection.map(_:) has been removed
+Func Sequence._filter(_:) has been removed
+Func Sequence.filter(_:) has been removed
 Func Sequence.map(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
