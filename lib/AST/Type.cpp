@@ -4431,6 +4431,9 @@ bool TypeBase::isNoEscape() const {
   if (auto funcTy = dyn_cast<FunctionType>(type))
     return funcTy->isNoEscape();
 
+  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type))
+    return packExpansionTy.getPatternType()->isNoEscape();
+
   if (auto tupleTy = dyn_cast<TupleType>(type)) {
     for (auto eltTy : tupleTy.getElementTypes())
       if (eltTy->isNoEscape())
