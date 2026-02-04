@@ -77,6 +77,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "iOS",
   "visionOS",
   "xrOS",
+  "Firmware",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -540,6 +541,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::XROS:
     addPlatformConditionValue(PlatformConditionKind::OS, "xrOS");
     addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
+    break;
+  case llvm::Triple::Firmware:
+    addPlatformConditionValue(PlatformConditionKind::OS, "Firmware");
     break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)

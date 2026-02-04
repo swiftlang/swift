@@ -558,6 +558,8 @@ static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
     return AvailabilityRange(llvm::VersionTuple(6, 0, 0));
   if (target.isXROS())
     return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
+  if (target.isAppleFirmware())
+    return AvailabilityRange(llvm::VersionTuple(1, 0, 0));
   return AvailabilityRange::alwaysAvailable();
 }
 

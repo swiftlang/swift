@@ -2198,6 +2198,8 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
     return "windows.json";
   else if (Triple.isXROS())
     return "xros.json";
+  else if (Triple.isAppleFirmware())
+    return "firmware.json";
   else {
     llvm::errs() << "Unsupported triple target\n";
     exit(1);
