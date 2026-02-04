@@ -138,8 +138,8 @@ class D {
   var x: Int = 0
 }
 
-//   modify
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17access_marker_gen1DC1xSivM
+//   yielding mutate
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17access_marker_gen1DC1xSivx
 // CHECK:       [[T0:%.*]] = ref_element_addr %0 : $D, #D.x
 // CHECK-NEXT:  [[T1:%.*]] = begin_access [modify] [dynamic] [[T0]] : $*Int
 // CHECK:       yield [[T1]] : $*Int
@@ -150,9 +150,9 @@ func testDispatchedClassInstanceProperty(d: D) {
   modify(&d.x)
 }
 // CHECK-LABEL: sil hidden [ossa] @$s17access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
-// CHECK:     bb0([[D:%.*]] : @guaranteed $D
-// CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!modify
-// CHECK:       begin_apply [[METHOD]]([[D]])
+// CHECK:     bb0([[ARG_D:%.*]] : @guaranteed $D
+// CHECK:       [[METHOD:%.*]] = class_method [[ARG_D]] : $D, #D.x!yielding_mutate
+// CHECK:       begin_apply [[METHOD]]([[ARG_D]])
 // CHECK-NOT:   begin_access
 // CHECK:       end_apply
 
