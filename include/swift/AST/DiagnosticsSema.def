@@ -6182,8 +6182,8 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
-ERROR(async_main_no_concurrency,none,
-      "'_Concurrency' module not imported, required for async main", ())
+ERROR(no_concurrency_module,none,
+      "'_Concurrency' module not imported, required for %0", (StringRef))
 
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",

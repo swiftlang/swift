@@ -4271,6 +4271,12 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                           diag::isolated_attr_bad_convention,
                           isolatedAttr->getIsolationKindName(),
                           conventionAttr->getConventionName());
+        } else if (!ctx.getLoadedModule(ctx.Id_Concurrency) &&
+                   !ctx.SILOpts.ParseStdlib) {
+          // If the Actor protocol isn't available, we have to reject this.
+          diagnoseInvalid(repr, isolatedAttr->getAtLoc(),
+                          diag::no_concurrency_module,
+                          "@isolated(any)");
         } else {
           isolation = FunctionTypeIsolation::forErased();
         }
