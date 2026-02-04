@@ -685,6 +685,12 @@ ConversionBehavior getConversionBehavior(Type type);
 /// to a Double and non-optional value could be injected into an optional.
 bool hasConversions(Type type);
 
+/// Check whether the given type can be used as a binding for the given
+/// type variable.
+///
+/// \returns true if the binding is okay.
+bool checkTypeOfBinding(TypeVariableType *typeVar, Type type);
+
 } // namespace inference
 } // namespace constraints
 } // namespace swift
