@@ -945,6 +945,25 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     offset += length;
   }
 
+  // Check for anonymous closure arguments (e.g. $0, $1) used outside
+  // closures.
+  if (Name.isSimpleName()) {
+    auto tok = Lexer::getTokenAtLocation(Context.SourceMgr, UDRE->getLoc());
+    StringRef nameStr = Name.getBaseIdentifier().str();
+    if (nameStr.starts_with("$") && !tok.isEscapedIdentifier()) {
+      StringRef numStr = nameStr.substr(1);
+      unsigned ArgNo;
+      if (!numStr.getAsInteger(10, ArgNo)) {
+        auto *closure = dyn_cast_or_null<ClosureExpr>(DC);
+        if (!closure) {
+          Context.Diags.diagnose(Loc, diag::anon_closure_arg_not_in_closure)
+              .highlight(UDRE->getSourceRange());
+          return new (Context) ErrorExpr(Loc);
+        }
+      }
+    }
+  }
+
   auto emitBasicError = [&] {
     if (Name.isSimpleName(Context.Id_self)) {
       // `self` gets diagnosed with a different error when it can't be found.
