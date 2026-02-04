@@ -274,3 +274,9 @@ struct TestInoutEscapeInClosure {
     }
   }
 }
+
+func badNoEscapeCaptureFromPack<each T>(_ fn: repeat () -> each T) { // expected-note {{captured here}}
+  takesEscaping { // expected-error {{escaping closure captures non-escaping value}}
+    let _ = (repeat (each fn)())
+  }
+}
