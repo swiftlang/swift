@@ -1671,17 +1671,23 @@ struct PartitionOpBuilder {
         PartitionOp::AssignFresh(id, currentInst));
   }
 
-  void addAssignFresh(ArrayRef<TrackableValue> values) {
-    if (values.empty())
+  /// Assign fresh an entire range of values to the same region.
+  template <typename ValueRangeTy>
+  void addAssignFresh(ValueRangeTy values) {
+    auto iter = values.begin();
+    auto end = values.end();
+    if (iter == end)
       return;
 
-    auto first = values.front();
+    TrackableValue first = *iter;
+    ++iter;
     currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(first.getID(), currentInst));
 
-    for (auto value : values.drop_front()) {
+    while (iter != end) {
       currentInstPartitionOps->emplace_back(PartitionOp::AssignFreshAssign(
-          value.getID(), first.getID(), currentInst));
+          (*iter).getID(), first.getID(), currentInst));
+      ++iter;
     }
   }
 
@@ -1883,13 +1889,26 @@ enum class TranslationSemantics {
   /// instruction does not have any non-Sendable operands, we produce a new
   /// singular region that all of the results are assigned to.
   ///
+  /// IMPORTANT: This semantic only handles direct (SSA) results. It does NOT
+  /// properly handle indirect results, i.e., memory locations that are written
+  /// to by the instruction. For instructions with indirect results, write a
+  /// custom handler using TranslationSemantics::Special that calls
+  /// translateSILMultiAssign with the indirect result operands passed as the
+  /// second parameter. This is necessary because indirect writes must track
+  /// the region of the value being overwritten, not just produce a new region.
+  ///
+  /// Note: It IS safe to use AssignDirect for instructions that produce a new
+  /// SSA address value (like init_existential_addr or ref_element_addr) since
+  /// these create new address references rather than writing to existing
+  /// memory.
+  ///
   /// From a partition op perspective, we emit require partition ops for each
   /// of the operands of the instruction, then merge the operand partition
   /// ops. If we do not have any non-Sendable operands, we then create an
   /// assign fresh op for the first result. If we do, we assign the first
   /// result to that merged region. Regardless of the case, we then assign all
   /// of the rest of the results to the region of the first operand.
-  Assign,
+  AssignDirect,
 
   /// An instruction that getUnderlyingTrackedValue looks through and thus we
   /// look through from a region translation perspective. The result of this
@@ -1958,7 +1977,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   case TranslationSemantics::AssignFresh:
     os << "assign_fresh";
     return os;
-  case TranslationSemantics::Assign:
+  case TranslationSemantics::AssignDirect:
     os << "assign";
     return os;
   case TranslationSemantics::LookThrough:
@@ -2248,6 +2267,19 @@ public:
     llvm::report_fatal_error("all apply instructions should be covered");
   }
 
+  /// Helper for code that does not have indirect results. Meant to allow for
+  /// transition to the one with indirect results.
+  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
+  void
+  translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
+                          const SourceValueRangeTy &sourceValues,
+                          SILIsolationInfo resultIsolationInfoOverride = {},
+                          bool requireSrcValues = true) {
+    return translateSILMultiAssign(directResultValues, ArrayRef<Operand *>(),
+                                   sourceValues, resultIsolationInfoOverride,
+                                   requireSrcValues);
+  }
+
   /// Require all non-sendable sources, merge their regions, and assign the
   /// resulting region to all non-sendable targets, or assign non-sendable
   /// targets to a fresh region if there are no non-sendable sources.
@@ -2257,14 +2289,17 @@ public:
   /// element isolation of disconnected. NOTE: The results will still be in the
   /// region of the non-Sendable arguments so at the region level they will have
   /// the same value.
-  template <typename DirectResultsRangeTy, typename SourceValueRangeTy>
+  template <typename DirectResultsRangeTy, typename IndirectResultsRangeTy,
+            typename SourceValueRangeTy>
   void
   translateSILMultiAssign(const DirectResultsRangeTy &directResultValues,
+                          const IndirectResultsRangeTy &indirectResultAddresses,
                           const SourceValueRangeTy &sourceValues,
                           SILIsolationInfo resultIsolationInfoOverride = {},
                           bool requireSrcValues = true) {
     SmallVector<std::pair<Operand *, TrackableValue>, 8> sourceOperandTVPairs;
     SmallVector<TrackableValue, 8> directResultTVs;
+    SmallVector<std::pair<Operand *, TrackableValue>, 8> indirectResultTVPairs;
 
     // A helper we use to emit an unknown patten error if our merge is
     // invalid. This ensures we guarantee that if we find an actor merge error,
@@ -2339,6 +2374,7 @@ public:
                        sourceOperandTVPairs[i].first);
     }
 
+    // Then process our direct results.
     for (SILValue result : directResultValues) {
       // If we had isolation info explicitly passed in... use our
       // resultIsolationInfoError. Otherwise, we want to infer.
@@ -2362,8 +2398,32 @@ public:
       }
     }
 
+    // Finally, process our indirect results.
+    for (Operand *result : indirectResultAddresses) {
+      // If we had isolation info explicitly passed in... use our
+      // resultIsolationInfoError. Otherwise, we want to infer.
+      if (resultIsolationInfoOverride) {
+        // We only get back result if it is non-Sendable.
+        if (auto nonSendableValue = initializeTrackedValue(
+                result->get(), resultIsolationInfoOverride)) {
+          // If we did not insert, emit an unknown patten error.
+          if (!nonSendableValue->second) {
+            builder.addUnknownPatternError(result->get());
+          }
+          indirectResultTVPairs.emplace_back(result, nonSendableValue->first);
+        }
+      } else {
+        if (auto lookupResult = tryToTrackValue(result->get())) {
+          if (lookupResult->value.isSendable())
+            continue;
+          auto value = lookupResult->value;
+          indirectResultTVPairs.emplace_back(result, value);
+        }
+      }
+    }
+
     // If we do not have any non sendable results, return early.
-    if (directResultTVs.empty()) {
+    if (directResultTVs.empty() && indirectResultTVPairs.empty()) {
       // If we did not have any non-Sendable results and we did have
       // non-Sendable operands and we are supposed to mark value as actor
       // derived, introduce a fake element so we just propagate the actor
@@ -2385,7 +2445,13 @@ public:
     // If we do not have any non-Sendable srcs, then all of our results get one
     // large fresh region.
     if (sourceOperandTVPairs.empty()) {
-      builder.addAssignFresh(directResultTVs);
+      auto transformRange = makeTransformRange(
+          iterator_range(indirectResultTVPairs),
+          [](const std::pair<Operand *, TrackableValue> &pair) {
+            return pair.second;
+          });
+      builder.addAssignFresh(
+          llvm::concat<TrackableValue>(directResultTVs, transformRange));
       return;
     }
 
@@ -2394,6 +2460,10 @@ public:
     // non-Sendable one.
     for (auto result : directResultTVs) {
       builder.addAssignDirectResult(result, sourceOperandTVPairs.front().first);
+    }
+    for (auto result : indirectResultTVPairs) {
+      builder.addAssignIndirectResult(result.first,
+                                      sourceOperandTVPairs.front().first);
     }
   }
 
@@ -2565,10 +2635,11 @@ public:
       return translateSILPartialApplyAsyncLetBegin(pai);
     }
 
-    // See if we have a reabstraction thunk. In such a case, just do an assign.
+    // See if we have a reabstraction thunk. In such a case, just do an assign
+    // of all of the operands to the result of the partial_apply.
     if (auto *calleeFn = pai->getCalleeFunction()) {
       if (calleeFn->isThunk() == IsReabstractionThunk) {
-        return translateSILAssign(pai);
+        return translateSILAssignDirect(pai, pai->getAllOperands());
       }
     }
 
@@ -2577,10 +2648,12 @@ public:
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
-    SmallVector<SILValue, 8> applyResults;
-    getApplyResults(pai, applyResults);
-    translateSILMultiAssign(applyResults,
-                            makeOperandRefRange(pai->getAllOperands()));
+    SmallVector<SILValue, 8> directResults;
+    getApplyResults(pai, directResults);
+    translateSILMultiAssign(
+        directResults,
+        ArrayRef<Operand *>(), // No indirect results for a partial_apply.
+        makeOperandRefRange(pai->getAllOperands()));
   }
 
   void translateCreateAsyncTask(BuiltinInst *bi) {
@@ -2916,19 +2989,44 @@ public:
     }
   }
 
+  /// Perform an assign for dest that is an indirect parameter. It should be a
+  /// parameter of the current inst we are processing.
+  template <typename SourceOperandsTy>
+  void translateSILAssignIndirect(Operand *dest,
+                                  SourceOperandsTy sourceOperands) {
+    return translateSILMultiAssign(
+        ArrayRef<SILValue>(), TinyPtrVector<Operand *>(dest), sourceOperands);
+  }
+
+  /// Perform an assign for dest that is an indirect parameter. It should be a
+  /// parameter of the current inst we are processing.
+  template <>
+  void translateSILAssignIndirect<Operand *>(Operand *dest,
+                                             Operand *srcOperand) {
+    return translateSILMultiAssign(ArrayRef<SILValue>(),
+                                   TinyPtrVector<Operand *>(dest),
+                                   TinyPtrVector<Operand *>(srcOperand));
+  }
+
+  /// Perform an assign for dest that is a direct parameter. It should be a
+  /// parameter of the current inst we are processing.
   template <typename Collection>
-  void translateSILAssign(SILValue dest, Collection collection) {
+  void translateSILAssignDirect(SILValue dest, Collection collection) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(dest), collection);
   }
 
   template <>
-  void translateSILAssign<Operand *>(SILValue dest, Operand *srcOperand) {
-    return translateSILAssign(dest, TinyPtrVector<Operand *>(srcOperand));
+  void translateSILAssignDirect(SILValue dest,
+                                MutableArrayRef<Operand> collection) {
+    auto transform = [](Operand &op) { return &op; };
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(dest),
+                                   makeTransformRange(collection, transform));
   }
-
-  void translateSILAssign(SILInstruction *inst) {
-    return translateSILMultiAssign(inst->getResults(),
-                                   makeOperandRefRange(inst->getAllOperands()));
+  /// Perform an assign for dest that is a direct parameter. It should be a
+  /// parameter of the current inst we are processing.
+  template <>
+  void translateSILAssignDirect<Operand *>(SILValue dest, Operand *srcOperand) {
+    return translateSILAssignDirect(dest, TinyPtrVector<Operand *>(srcOperand));
   }
 
   /// If the passed SILValue is NonSendable, then create a fresh region for it,
@@ -3056,7 +3154,7 @@ public:
       if (destResult.value().value.isNoAlias() &&
           !resultIsolationInfoOverride &&
           !isProjectedFromAggregate(destValue))
-        return translateSILAssign(destValue, src);
+        return translateSILAssignIndirect(dest, src);
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(destValue, src, /*requireOperand*/true,
@@ -3092,7 +3190,7 @@ public:
       // non-Sendable base.
       if (nonSendableTgt.value().value.isNoAlias() &&
           !isProjectedFromAggregate(dest))
-        return translateSILAssign(
+        return translateSILAssignDirect(
             dest, makeOperandRefRange(inst->getElementOperands()));
 
       // Stores to possibly aliased storage must be treated as merges.
@@ -3231,7 +3329,7 @@ public:
         translateSILAssignFresh(result);
       return;
 
-    case TranslationSemantics::Assign:
+    case TranslationSemantics::AssignDirect:
       return translateSILMultiAssign(
           inst->getResults(), makeOperandRefRange(inst->getAllOperands()),
           SILIsolationInfo::getConformanceIsolation(inst));
@@ -3458,12 +3556,12 @@ CONSTANT_TRANSLATION(IntegerLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(FloatLiteralInst, AssignFresh)
 CONSTANT_TRANSLATION(StringLiteralInst, AssignFresh)
 // Metatypes are often, but not always, Sendable, but AnyObject isn't
-CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, Assign)
-CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, Assign)
+CONSTANT_TRANSLATION(ObjCMetatypeToObjectInst, AssignDirect)
+CONSTANT_TRANSLATION(ObjCExistentialMetatypeToObjectInst, AssignDirect)
 CONSTANT_TRANSLATION(MetatypeInst, AssignFresh)
 
 //===---
-// Assign
+// AssignDirect
 //
 
 // These are instructions that we treat as true assigns since we want to
@@ -3471,50 +3569,52 @@ CONSTANT_TRANSLATION(MetatypeInst, AssignFresh)
 // example, a cast would be inappropriate here. This is implemented by
 // propagating the operand's region into the result's region and by
 // requiring all operands.
-CONSTANT_TRANSLATION(LoadWeakInst, Assign)
-CONSTANT_TRANSLATION(StrongCopyUnownedValueInst, Assign)
-CONSTANT_TRANSLATION(ClassMethodInst, Assign)
-CONSTANT_TRANSLATION(ObjCMethodInst, Assign)
-CONSTANT_TRANSLATION(SuperMethodInst, Assign)
-CONSTANT_TRANSLATION(ObjCSuperMethodInst, Assign)
-CONSTANT_TRANSLATION(LoadUnownedInst, Assign)
+CONSTANT_TRANSLATION(LoadWeakInst, AssignDirect)
+CONSTANT_TRANSLATION(StrongCopyUnownedValueInst, AssignDirect)
+CONSTANT_TRANSLATION(ClassMethodInst, AssignDirect)
+CONSTANT_TRANSLATION(ObjCMethodInst, AssignDirect)
+CONSTANT_TRANSLATION(SuperMethodInst, AssignDirect)
+CONSTANT_TRANSLATION(ObjCSuperMethodInst, AssignDirect)
+CONSTANT_TRANSLATION(LoadUnownedInst, AssignDirect)
 
 // These instructions are in between look through and a true assign. We should
 // probably eventually treat them as look through but we haven't done the work
 // yet of validating that everything fits together in terms of
 // getUnderlyingTrackedObject.
-CONSTANT_TRANSLATION(AddressToPointerInst, Assign)
-CONSTANT_TRANSLATION(BaseAddrForOffsetInst, Assign)
-CONSTANT_TRANSLATION(ThunkInst, Assign)
-CONSTANT_TRANSLATION(CopyBlockInst, Assign)
-CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
-CONSTANT_TRANSLATION(IndexAddrInst, Assign)
-CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, Assign)
-CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
-CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
-CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
-CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
-CONSTANT_TRANSLATION(TailAddrInst, Assign)
-CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, Assign)
-CONSTANT_TRANSLATION(ThinToThickFunctionInst, Assign)
-CONSTANT_TRANSLATION(UncheckedAddrCastInst, Assign)
-CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, Assign)
-CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
-CONSTANT_TRANSLATION(MarkDependenceAddrInst, Assign)
-CONSTANT_TRANSLATION(ImplicitActorToOpaqueIsolationCastInst, Assign)
+CONSTANT_TRANSLATION(AddressToPointerInst, AssignDirect)
+CONSTANT_TRANSLATION(BaseAddrForOffsetInst, AssignDirect)
+CONSTANT_TRANSLATION(ThunkInst, AssignDirect)
+CONSTANT_TRANSLATION(CopyBlockInst, AssignDirect)
+CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, AssignDirect)
+CONSTANT_TRANSLATION(IndexAddrInst, AssignDirect)
+CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, AssignDirect)
+CONSTANT_TRANSLATION(InitExistentialAddrInst, AssignDirect)
+CONSTANT_TRANSLATION(InitExistentialRefInst, AssignDirect)
+CONSTANT_TRANSLATION(OpenExistentialBoxInst, AssignDirect)
+CONSTANT_TRANSLATION(OpenExistentialRefInst, AssignDirect)
+CONSTANT_TRANSLATION(TailAddrInst, AssignDirect)
+CONSTANT_TRANSLATION(ThickToObjCMetatypeInst, AssignDirect)
+CONSTANT_TRANSLATION(ThinToThickFunctionInst, AssignDirect)
+CONSTANT_TRANSLATION(UncheckedAddrCastInst, AssignDirect)
+CONSTANT_TRANSLATION(UncheckedOwnershipConversionInst, AssignDirect)
+CONSTANT_TRANSLATION(IndexRawPointerInst, AssignDirect)
+CONSTANT_TRANSLATION(MarkDependenceAddrInst, AssignDirect)
+CONSTANT_TRANSLATION(ImplicitActorToOpaqueIsolationCastInst, AssignDirect)
 
-CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
-CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)
-CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Assign)
-CONSTANT_TRANSLATION(ValueMetatypeInst, Assign)
-CONSTANT_TRANSLATION(ExistentialMetatypeInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialMetatypeInst, AssignDirect)
+CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, AssignDirect)
+CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, AssignDirect)
+CONSTANT_TRANSLATION(ValueMetatypeInst, AssignDirect)
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, AssignDirect)
 
 // These are used by SIL to aggregate values together in a gep like way. We
 // want to look at uses of structs, not the struct uses itself. So just
 // propagate.
-CONSTANT_TRANSLATION(ObjectInst, Assign)
-CONSTANT_TRANSLATION(StructInst, Assign)
-CONSTANT_TRANSLATION(TupleInst, Assign)
+CONSTANT_TRANSLATION(ObjectInst, AssignDirect)
+CONSTANT_TRANSLATION(StructInst, AssignDirect)
+CONSTANT_TRANSLATION(TupleInst, AssignDirect)
+CONSTANT_TRANSLATION(SelectEnumAddrInst, AssignDirect)
+CONSTANT_TRANSLATION(SelectEnumInst, AssignDirect)
 
 //===---
 // Look Through
@@ -3707,8 +3807,8 @@ CONSTANT_TRANSLATION(FunctionExtractIsolationInst, Require)
 // of Sendable, we actually do not have any way to truly test them. These are
 // just hypothetical assignments so we are complete.
 CONSTANT_TRANSLATION(AllocExistentialBoxInst, AssignFresh)
-CONSTANT_TRANSLATION(ProjectExistentialBoxInst, Assign)
-CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, Assign)
+CONSTANT_TRANSLATION(ProjectExistentialBoxInst, AssignDirect)
+CONSTANT_TRANSLATION(OpenExistentialBoxValueInst, AssignDirect)
 CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 
 //===---
@@ -3718,8 +3818,8 @@ CONSTANT_TRANSLATION(DeallocExistentialBoxInst, Ignored)
 CONSTANT_TRANSLATION(DifferentiabilityWitnessFunctionInst, AssignFresh)
 CONSTANT_TRANSLATION(DifferentiableFunctionExtractInst, LookThrough)
 CONSTANT_TRANSLATION(LinearFunctionExtractInst, LookThrough)
-CONSTANT_TRANSLATION(LinearFunctionInst, Assign)
-CONSTANT_TRANSLATION(DifferentiableFunctionInst, Assign)
+CONSTANT_TRANSLATION(LinearFunctionInst, AssignDirect)
+CONSTANT_TRANSLATION(DifferentiableFunctionInst, AssignDirect)
 
 //===---
 // Packs
@@ -3775,7 +3875,7 @@ CONSTANT_TRANSLATION(VectorInst, Asserting)
 
 #define IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(INST)                       \
   TranslationSemantics PartitionOpTranslator::visit##INST(INST *inst) {        \
-    return TranslationSemantics::Assign;                                       \
+    return TranslationSemantics::AssignDirect;                                 \
   }
 
 IGNORE_IF_SENDABLE_RESULT_ASSIGN_OTHERWISE(TupleExtractInst)
@@ -3903,14 +4003,14 @@ PartitionOpTranslator::visitAllocStackInst(AllocStackInst *asi) {
 TranslationSemantics
 PartitionOpTranslator::visitMoveValueInst(MoveValueInst *mvi) {
   if (mvi->isFromVarDecl())
-    return TranslationSemantics::Assign;
+    return TranslationSemantics::AssignDirect;
   return TranslationSemantics::LookThrough;
 }
 
 TranslationSemantics
 PartitionOpTranslator::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   if (bbi->isFromVarDecl())
-    return TranslationSemantics::Assign;
+    return TranslationSemantics::AssignDirect;
   return TranslationSemantics::LookThrough;
 }
 
@@ -3981,7 +4081,7 @@ TranslationSemantics
 PartitionOpTranslator::visitPackElementGetInst(PackElementGetInst *r) {
   if (!SILIsolationInfo::isNonSendable(r))
     return TranslationSemantics::Require;
-  translateSILAssign(SILValue(r), r->getPackOperand());
+  translateSILAssignDirect(SILValue(r), r->getPackOperand());
   return TranslationSemantics::Special;
 }
 
@@ -3990,7 +4090,7 @@ TranslationSemantics PartitionOpTranslator::visitTuplePackElementAddrInst(
   if (!SILIsolationInfo::isNonSendable(r)) {
     translateSILRequire(r->getTuple());
   } else {
-    translateSILAssign(SILValue(r), r->getTupleOperand());
+    translateSILAssignDirect(SILValue(r), r->getTupleOperand());
   }
   return TranslationSemantics::Special;
 }
@@ -4000,7 +4100,7 @@ PartitionOpTranslator::visitTuplePackExtractInst(TuplePackExtractInst *r) {
   if (!SILIsolationInfo::isNonSendable(r)) {
     translateSILRequire(r->getTuple());
   } else {
-    translateSILAssign(SILValue(r), r->getTupleOperand());
+    translateSILAssignDirect(SILValue(r), r->getTupleOperand());
   }
   return TranslationSemantics::Special;
 }
@@ -4075,7 +4175,7 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
   if (!SILIsolationInfo::isNonSendable(ptai)) {
     return TranslationSemantics::Require;
   }
-  return TranslationSemantics::Assign;
+  return TranslationSemantics::AssignDirect;
 }
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
@@ -4089,7 +4189,7 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
   }
 
   assert(!isStaticallyLookThroughInst(ucci) && "Out of sync");
-  return TranslationSemantics::Assign;
+  return TranslationSemantics::AssignDirect;
 }
 
 // RefElementAddrInst is not considered to be a lookThrough since we want to
@@ -4115,7 +4215,7 @@ PartitionOpTranslator::visitRefElementAddrInst(RefElementAddrInst *reai) {
     return TranslationSemantics::Require;
   }
 
-  return TranslationSemantics::Assign;
+  return TranslationSemantics::AssignDirect;
 }
 
 TranslationSemantics
@@ -4137,7 +4237,7 @@ PartitionOpTranslator::visitRefTailAddrInst(RefTailAddrInst *reai) {
 
   // If we have a NonSendable type, treat the address as a separate Element from
   // our base value.
-  return TranslationSemantics::Assign;
+  return TranslationSemantics::AssignDirect;
 }
 
 /// Enum inst is handled specially since if it does not have an argument,
@@ -4145,19 +4245,7 @@ PartitionOpTranslator::visitRefTailAddrInst(RefTailAddrInst *reai) {
 TranslationSemantics PartitionOpTranslator::visitEnumInst(EnumInst *ei) {
   if (ei->getNumOperands() == 0)
     return TranslationSemantics::AssignFresh;
-  return TranslationSemantics::Assign;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitSelectEnumAddrInst(SelectEnumAddrInst *inst) {
-  translateSILSelectEnum(inst);
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitSelectEnumInst(SelectEnumInst *inst) {
-  translateSILSelectEnum(inst);
-  return TranslationSemantics::Special;
+  return TranslationSemantics::AssignDirect;
 }
 
 TranslationSemantics
@@ -4183,7 +4271,7 @@ PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *i
   if (isStaticallyLookThroughInst(ievi))
     return TranslationSemantics::LookThrough;
 
-  return TranslationSemantics::Assign;
+  return TranslationSemantics::AssignDirect;
 }
 
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
