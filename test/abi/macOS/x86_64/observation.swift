@@ -87,3 +87,152 @@ Added: _$s11Observation12ObservationsVyACyxq_GxyYbq_YKYAccfC
 
 // protocol conformance descriptor for Observation.Observations<A, B> : Swift.AsyncSequence in Observation
 Added: _$s11Observation12ObservationsVyxq_GSciAAMc
+
+// static Observation.ObservationTracking.Event.Kind.== infix(Observation.ObservationTracking.Event.Kind, Observation.ObservationTracking.Event.Kind) -> Swift.Bool
+Added: _$s11Observation0A8TrackingV5EventV4KindV2eeoiySbAG_AGtFZ
+
+// static Observation.ObservationTracking.Event.Kind.deinit.getter : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV6deinitAGvgZ
+
+// property descriptor for static Observation.ObservationTracking.Event.Kind.deinit : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV6deinitAGvpZMV
+
+// static Observation.ObservationTracking.Event.Kind.didSet.getter : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV6didSetAGvgZ
+
+// property descriptor for static Observation.ObservationTracking.Event.Kind.didSet : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV6didSetAGvpZMV
+
+// static Observation.ObservationTracking.Event.Kind.initial.getter : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV7initialAGvgZ
+
+// property descriptor for static Observation.ObservationTracking.Event.Kind.initial : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV7initialAGvpZMV
+
+// static Observation.ObservationTracking.Event.Kind.willSet.getter : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV7willSetAGvgZ
+
+// property descriptor for static Observation.ObservationTracking.Event.Kind.willSet : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindV7willSetAGvpZMV
+
+// type metadata accessor for Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindVMa
+
+// nominal type descriptor for Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindVMn
+
+// type metadata for Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4KindVN
+
+// protocol conformance descriptor for Observation.ObservationTracking.Event.Kind : Swift.Equatable in Observation
+Added: _$s11Observation0A8TrackingV5EventV4KindVSQAAMc
+
+// Observation.ObservationTracking.Event.kind.getter : Observation.ObservationTracking.Event.Kind
+Added: _$s11Observation0A8TrackingV5EventV4kindAE4KindVvg
+
+// Observation.ObservationTracking.Event.cancel() -> ()
+Added: _$s11Observation0A8TrackingV5EventV6cancelyyF
+
+// Observation.ObservationTracking.Event.matches<A where A: Observation.Observable>(Swift.PartialKeyPath<A>) -> Swift.Bool
+Added: _$s11Observation0A8TrackingV5EventV7matchesySbs14PartialKeyPathCyxGAA10ObservableRzlF
+
+// type metadata accessor for Observation.ObservationTracking.Event
+Added: _$s11Observation0A8TrackingV5EventVMa
+
+// nominal type descriptor for Observation.ObservationTracking.Event
+Added: _$s11Observation0A8TrackingV5EventVMn
+
+// type metadata for Observation.ObservationTracking.Event
+Added: _$s11Observation0A8TrackingV5EventVN
+
+// Observation.ObservationTracking.Token.cancel() -> ()
+Added: _$s11Observation0A8TrackingV5TokenV6cancelyyF
+
+// type metadata accessor for Observation.ObservationTracking.Token
+Added: _$s11Observation0A8TrackingV5TokenVMa
+
+// nominal type descriptor for Observation.ObservationTracking.Token
+Added: _$s11Observation0A8TrackingV5TokenVMn
+
+// type metadata for Observation.ObservationTracking.Token
+Added: _$s11Observation0A8TrackingV5TokenVN
+
+// Observation.ObservationTracking.Token.deinit
+Added: _$s11Observation0A8TrackingV5TokenVfD
+
+// Observation.ObservationTracking.Options.init(arrayLiteral: Observation.ObservationTracking.Options...) -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV12arrayLiteralA2Ed_tcfC
+
+// Observation.ObservationTracking.Options.intersection(Observation.ObservationTracking.Options) -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV12intersectionyA2EF
+
+// Observation.ObservationTracking.Options.formIntersection(Observation.ObservationTracking.Options) -> ()
+Added: _$s11Observation0A8TrackingV7OptionsV16formIntersectionyyAEF
+
+// Observation.ObservationTracking.Options.symmetricDifference(Observation.ObservationTracking.Options) -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV19symmetricDifferenceyA2EF
+
+// Observation.ObservationTracking.Options.formSymmetricDifference(Observation.ObservationTracking.Options) -> ()
+Added: _$s11Observation0A8TrackingV7OptionsV23formSymmetricDifferenceyyAEF
+
+// static Observation.ObservationTracking.Options.== infix(Observation.ObservationTracking.Options, Observation.ObservationTracking.Options) -> Swift.Bool
+Added: _$s11Observation0A8TrackingV7OptionsV2eeoiySbAE_AEtFZ
+
+// Observation.ObservationTracking.Options.union(Observation.ObservationTracking.Options) -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV5unionyA2EF
+
+// static Observation.ObservationTracking.Options.deinit.getter : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV6deinitAEvgZ
+
+// property descriptor for static Observation.ObservationTracking.Options.deinit : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV6deinitAEvpZMV
+
+// static Observation.ObservationTracking.Options.didSet.getter : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV6didSetAEvgZ
+
+// property descriptor for static Observation.ObservationTracking.Options.didSet : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV6didSetAEvpZMV
+
+// Observation.ObservationTracking.Options.insert(Observation.ObservationTracking.Options) -> (inserted: Swift.Bool, memberAfterInsert: Observation.ObservationTracking.Options)
+Added: _$s11Observation0A8TrackingV7OptionsV6insertySb8inserted_AE17memberAfterInserttAEF
+
+// Observation.ObservationTracking.Options.remove(Observation.ObservationTracking.Options) -> Observation.ObservationTracking.Options?
+Added: _$s11Observation0A8TrackingV7OptionsV6removeyAESgAEF
+
+// Observation.ObservationTracking.Options.update(with: Observation.ObservationTracking.Options) -> Observation.ObservationTracking.Options?
+Added: _$s11Observation0A8TrackingV7OptionsV6update4withAESgAE_tF
+
+// static Observation.ObservationTracking.Options.willSet.getter : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV7willSetAEvgZ
+
+// property descriptor for static Observation.ObservationTracking.Options.willSet : Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsV7willSetAEvpZMV
+
+// Observation.ObservationTracking.Options.contains(Observation.ObservationTracking.Options) -> Swift.Bool
+Added: _$s11Observation0A8TrackingV7OptionsV8containsySbAEF
+
+// Observation.ObservationTracking.Options.formUnion(Observation.ObservationTracking.Options) -> ()
+Added: _$s11Observation0A8TrackingV7OptionsV9formUnionyyAEF
+
+// Observation.ObservationTracking.Options.init() -> Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVAEycfC
+
+// type metadata accessor for Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVMa
+
+// nominal type descriptor for Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVMn
+
+// type metadata for Observation.ObservationTracking.Options
+Added: _$s11Observation0A8TrackingV7OptionsVN
+
+// protocol conformance descriptor for Observation.ObservationTracking.Options : Swift.Equatable in Observation
+Added: _$s11Observation0A8TrackingV7OptionsVSQAAMc
+
+// protocol conformance descriptor for Observation.ObservationTracking.Options : Swift.SetAlgebra in Observation
+Added: _$s11Observation0A8TrackingV7OptionsVs10SetAlgebraAAMc
+
+// protocol conformance descriptor for Observation.ObservationTracking.Options : Swift.ExpressibleByArrayLiteral in Observation
+Added: _$s11Observation0A8TrackingV7OptionsVs25ExpressibleByArrayLiteralAAMc
+
+
