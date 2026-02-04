@@ -937,7 +937,7 @@ namespace swift {
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
     /// The maximum number of scopes we explore before giving up.
-    unsigned SolverScopeThreshold = 1024 * 1024;
+    unsigned SolverScopeThreshold = 256 * 1024;
 
     /// The maximum number of trail steps we take before giving up.
     unsigned SolverTrailThreshold = 64 * 1024 * 1024;
