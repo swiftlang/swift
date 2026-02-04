@@ -1541,6 +1541,9 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
 void DisjunctionChoiceProducer::partitionGenericOperators(
     SmallVectorImpl<unsigned>::iterator first,
     SmallVectorImpl<unsigned>::iterator last) {
+  if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    return;
+
   auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
   if (!isOperatorDisjunction(Disjunction) || !argFnType)
     return;
@@ -1695,7 +1698,9 @@ void DisjunctionChoiceProducer::partitionDisjunction(
 
   // Add existing operator bindings to the main partition first. This often
   // helps the solver find a solution fast.
-  existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
+
   for (auto index : everythingElse)
     taken.insert(Choices[index]);
 
@@ -1751,16 +1756,18 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (isOperatorDisjunction(Disjunction) &&
-      !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
-    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-      if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
-        simdOperators.push_back(index);
-        return true;
-      }
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+    if (isOperatorDisjunction(Disjunction) &&
+        !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
+      forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+        if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
+          simdOperators.push_back(index);
+          return true;
+        }
 
-      return false;
-    });
+        return false;
+      });
+    }
   }
 
   // Gather the remaining options.
@@ -1879,6 +1886,9 @@ bool DisjunctionChoice::isUnaryOperator() const {
 
 void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   assert(ExplicitConversion);
+
+  if (!cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    return;
 
   auto LHS = Choice->getFirstType();
   auto typeVar = LHS->getAs<TypeVariableType>();

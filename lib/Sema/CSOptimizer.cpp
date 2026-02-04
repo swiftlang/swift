@@ -213,7 +213,7 @@ static bool isUnboundDictionaryType(Type type) {
   return false;
 }
 
-static bool isSupportedOperator(Constraint *disjunction) {
+static bool isSupportedOperator(Constraint *disjunction, bool hacks) {
   if (!isOperatorDisjunction(disjunction))
     return false;
 
@@ -224,6 +224,11 @@ static bool isSupportedOperator(Constraint *disjunction) {
   if (name.isArithmeticOperator() || name.isStandardComparisonOperator() ||
       name.isBitwiseOperator() || name.isNilCoalescingOperator()) {
     return true;
+  }
+
+  if (!hacks) {
+    if (name.isStandardInfixLogicalOperator())
+      return true;
   }
 
   // Operators like &<<, &>>, &+, .== etc.
@@ -310,11 +315,11 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
   });
 }
 
-static bool isSupportedDisjunction(Constraint *disjunction) {
+static bool isSupportedDisjunction(Constraint *disjunction, bool hacks) {
   auto choices = disjunction->getNestedConstraints();
 
   if (isOperatorDisjunction(disjunction))
-    return isSupportedOperator(disjunction);
+    return isSupportedOperator(disjunction, hacks);
 
   if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
           getOverloadChoiceDecl(choices.front()))) {
@@ -1340,7 +1345,8 @@ static DisjunctionInfo computeDisjunctionInfo(
     return info.value();
   }
 
-  if (!isSupportedDisjunction(disjunction))
+  bool hacks = cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks;
+  if (!isSupportedDisjunction(disjunction, hacks))
     return DisjunctionInfo();
 
   SmallVector<FunctionType::Param, 8> argsWithLabels;
@@ -1982,14 +1988,16 @@ ConstraintSystem::selectDisjunction() {
     bool isFirstOperator = isOperatorDisjunction(first);
     bool isSecondOperator = isOperatorDisjunction(second);
 
-    // Infix logical operators are usually not overloaded and don't
-    // form disjunctions, but when they do, let's prefer them over
-    // other operators when they have fewer choices because it helps
-    // to split operator chains.
-    if (isFirstOperator && isSecondOperator) {
-      if (isStandardInfixLogicalOperator(first) !=
-          isStandardInfixLogicalOperator(second))
-        return firstActive < secondActive;
+    if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+      // Infix logical operators are usually not overloaded and don't
+      // form disjunctions, but when they do, let's prefer them over
+      // other operators when they have fewer choices because it helps
+      // to split operator chains.
+      if (isFirstOperator && isSecondOperator) {
+        if (isStandardInfixLogicalOperator(first) !=
+            isStandardInfixLogicalOperator(second))
+          return firstActive < secondActive;
+      }
     }
 
     // Not all of the non-operator disjunctions are supported by the
@@ -2011,23 +2019,25 @@ ConstraintSystem::selectDisjunction() {
       if (*firstScore != *secondScore)
         return *firstScore > *secondScore;
 
-      // If the scores are the same and both disjunctions are operators
-      // they could be ranked purely based on whether the candidates
-      // were speculative or not. The one with more context always wins.
-      //
-      // Consider the following situation:
-      //
-      // func test(_: Int) { ... }
-      // func test(_: String) { ... }
-      //
-      // test("a" + "b" + "c")
-      //
-      // In this case we should always prefer ... + "c" over "a" + "b"
-      // because it would fail and prune the other overload if parameter
-      // type (aka contextual type) is `Int`.
-      if (isFirstOperator && isSecondOperator &&
-          firstFavorings.IsSpeculative != secondFavorings.IsSpeculative)
-        return secondFavorings.IsSpeculative;
+      if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+        // If the scores are the same and both disjunctions are operators
+        // they could be ranked purely based on whether the candidates
+        // were speculative or not. The one with more context always wins.
+        //
+        // Consider the following situation:
+        //
+        // func test(_: Int) { ... }
+        // func test(_: String) { ... }
+        //
+        // test("a" + "b" + "c")
+        //
+        // In this case we should always prefer ... + "c" over "a" + "b"
+        // because it would fail and prune the other overload if parameter
+        // type (aka contextual type) is `Int`.
+        if (isFirstOperator && isSecondOperator &&
+            firstFavorings.IsSpeculative != secondFavorings.IsSpeculative)
+          return secondFavorings.IsSpeculative;
+      }
     }
 
     // Use favored choices only if disjunction score is higher

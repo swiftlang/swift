@@ -1002,9 +1002,6 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
-    /// Enable experimental operator designated types feature.
-    bool EnableOperatorDesignatedTypes = false;
-
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
 
@@ -1018,12 +1015,21 @@ namespace swift {
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
 
+    /// Enable various older performance optimizations that have been subsumed
+    /// by subsequent improvements to the solver.
+    bool SolverEnablePerformanceHacks = true;
+
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
 
-    /// Enable experimental optimization to disable contradictory disjunction
+    /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = false;
+
+    /// Enable experimental optimization to skip operators defined in protocol
+    /// extensions if they are a refinement of a protocol requirement that also
+    /// appears in the disjunction.
+    bool SolverOptimizeOperatorDefaults = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

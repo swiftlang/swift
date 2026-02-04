@@ -4037,6 +4037,20 @@ void ConstraintSystem::generateOverloadConstraints(
     ConstraintLocator *locator, bool requiresFix,
     llvm::function_ref<ConstraintFix *(unsigned, const OverloadChoice &)>
         getFix) {
+  SmallVector<ValueDecl *, 1> requirements;
+
+  if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
+    for (auto choice : choices) {
+      if (auto *decl = choice.getDeclOrNull()) {
+        if (decl->isOperator() &&
+            isa<ProtocolDecl>(decl->getDeclContext()) &&
+            !isDeclUnavailable(decl, locator)) {
+          requirements.push_back(decl);
+        }
+      }
+    }
+  }
+
   for (auto index : indices(choices)) {
     auto *fix = getFix(index, choices[index]);
     // If fix is required but it couldn't be determined, this
@@ -4044,9 +4058,26 @@ void ConstraintSystem::generateOverloadConstraints(
     if (requiresFix && !fix)
       continue;
 
-    auto *choice = Constraint::createBindOverload(*this, type, choices[index],
-                                                  useDC, fix, locator);
-    constraints.push_back(choice);
+    const auto &choice = choices[index];
+
+    // Skip protocol extension operators that are refinements of a protocol
+    // requirement operator, because they never participate in a valid
+    // solution.
+    if (getASTContext().TypeCheckerOpts.SolverOptimizeOperatorDefaults) {
+      if (auto *decl = choice.getDeclOrNull()) {
+        if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+          if (llvm::any_of(requirements, [&](ValueDecl *req) {
+            return TypeChecker::isDeclRefinementOf(decl, req);
+          })) {
+            continue;
+          }
+        }
+      }
+    }
+
+    auto *constraint = Constraint::createBindOverload(*this, type, choice,
+                                                      useDC, fix, locator);
+    constraints.push_back(constraint);
   }
 
   if (unsigned seed = getASTContext().TypeCheckerOpts.ShuffleDisjunctionChoicesSeed) {
