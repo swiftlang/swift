@@ -15,6 +15,7 @@ class NonSendableKlass { // expected-complete-note 53{{}}
   // expected-note @-2 {{}}
   var field: NonSendableKlass? = nil
   var boolean: Bool = false
+  var value: Int = 0
 
   init() {}
   init(_ x: NonSendableKlass) {
@@ -2079,5 +2080,342 @@ enum RequireSrcWhenStoringEvenWhenSendable {
       result = type.init()
     }
     useValue(result) // expected-note {{access can happen concurrently}}
+  }
+}
+
+///////////////////////////
+// MARK: Indirect Assign //
+///////////////////////////
+
+extension Optional where Wrapped: ~Copyable {
+  mutating func takeSending() -> sending Self {
+    let result = self
+    self = nil
+    return result // expected-warning {{returning task-isolated 'result' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning task-isolated 'result' risks causing data races since the caller assumes that 'result' can be safely sent to other isolation domains}}
+  }
+}
+
+struct IndirectAssignTests {
+  struct Box {
+    typealias FuncType = () async -> Void
+
+    var value: FuncType?
+
+    mutating func takeFuncType() -> sending FuncType {
+      if let v = value {
+        self.value = nil
+        return v // expected-warning {{sending 'v' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'v' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  protocol TakingProtocol {
+    associatedtype Value
+    mutating func take() -> sending Value
+  }
+
+  struct Box2 : TakingProtocol {
+    var value: NonSendableKlass?
+
+    typealias Value = NonSendableKlass
+    mutating func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct GenericBox<T> {
+    var value: T?
+
+    mutating func take() -> sending T {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{returning task-isolated 'value' as a 'sending' result risks causing data races}}
+        // expected-note @-1 {{returning task-isolated 'value' risks causing data races since the caller assumes that 'value' can be safely sent to other isolation domains}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct Box2GuardLet {
+    var value: NonSendableKlass?
+
+    mutating func take() -> sending NonSendableKlass {
+      guard let value else {
+        preconditionFailure("Consumed twice")
+      }
+      self.value = nil
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct TupleBox {
+    var value: (NonSendableKlass, NonSendableKlass)?
+
+    mutating func take() -> sending (NonSendableKlass, NonSendableKlass) {
+      if let value {
+        self.value = nil
+        // TODO: Need a better error message.
+        return value // expected-warning {{task or actor-isolated value cannot be sent}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+
+    mutating func takeFirst() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value.0 // expected-warning {{sending 'value.0' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value.0' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct NoncopyableBox: ~Copyable {
+    var value: NonSendableKlass?
+
+    mutating func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  // Based on: Box2.take()
+  actor ActorBox {
+    var value: NonSendableKlass?
+
+    func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{'self'-isolated 'value' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  class ClassBox {
+    var value: NonSendableKlass?
+
+    func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  @MainActor
+  struct MainActorBox {
+    var value: NonSendableKlass?
+
+    mutating func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        // TODO: Why are we not erroring on this. We should be.
+        return value // xpected-warning {{sending 'value' risks causing data races}}
+        // xpected-note @-1 {{main actor-isolated 'value' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct Box2Async {
+    var value: NonSendableKlass?
+
+    mutating func take() async -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct NestedOptionalBox {
+    var value: NonSendableKlass??
+
+    mutating func take() -> sending NonSendableKlass {
+      if let value, let innerValue = value {
+        self.value = nil
+        return innerValue // expected-warning {{sending 'innerValue' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'innerValue' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  enum BoxEnum {
+    case empty
+    case full(NonSendableKlass)
+
+    mutating func take() -> sending NonSendableKlass {
+      switch self {
+      case .empty:
+        preconditionFailure("Consumed twice")
+      case .full(let value):
+        self = .empty
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      }
+    }
+  }
+
+  struct ConsumingBox: ~Copyable {
+    var value: NonSendableKlass?
+
+    consuming func take() -> sending NonSendableKlass {
+      if let value {
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  final actor FinalActorBox {
+    var value: NonSendableKlass?
+
+    func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{'self'-isolated 'value' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct ArrayBox {
+    var values: [NonSendableKlass] = []
+
+    mutating func takeFirst() -> sending NonSendableKlass {
+      guard !values.isEmpty else {
+        preconditionFailure("Empty")
+      }
+      let value = values.removeFirst()
+      values = []
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct DictionaryBox {
+    var values: [String: NonSendableKlass] = [:]
+
+    mutating func take(key: String) -> sending NonSendableKlass {
+      guard let value = values.removeValue(forKey: key) else {
+        preconditionFailure("Key not found")
+      }
+      values = [:]
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct MultipleReturnBox {
+    var value1: NonSendableKlass?
+    var value2: NonSendableKlass?
+
+    mutating func takeEither() -> sending NonSendableKlass {
+      if let value1 {
+        self.value1 = nil
+        return value1
+      } else if let value2 {
+        self.value2 = nil
+        return value2
+      } else {
+        preconditionFailure("Both consumed")
+      }
+      // TODO: The warning should be on the user itself.
+    } // expected-warning {{sending 'value2' risks causing data races}}
+    // expected-note @-1 {{task-isolated 'value2' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  }
+
+  struct LazyBox {
+    var _value: NonSendableKlass?
+    var initialized = false
+
+    mutating func getOrCreate() -> sending NonSendableKlass {
+      if !initialized {
+        _value = NonSendableKlass()
+        initialized = true
+      }
+      let result = _value!
+      _value = nil
+      initialized = false
+      return result // expected-warning {{sending 'result' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'result' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct InoutBox {
+    var value: NonSendableKlass?
+  }
+
+  static func takeFromInout(_ box: inout IndirectAssignTests.InoutBox) -> sending NonSendableKlass {
+    if let value = box.value {
+      box.value = nil
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    } else {
+      preconditionFailure("Consumed twice")
+    }
+  }
+
+  struct ExistentialBox {
+    var value: (any Sendable)?
+
+    // This should work since the value is Sendable
+    mutating func take() -> sending (any Sendable) {
+      if let value {
+        self.value = nil
+        return value
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct NonSendableExistentialBox {
+    var value: (any AnyObject)?
+
+    mutating func take() -> sending (any AnyObject) {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
   }
 }
