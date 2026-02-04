@@ -783,13 +783,15 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
 
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxBorrowingSequenceProto =
+      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
   ProtocolDecl *cxxSequenceProto =
       ctx.getProtocol(KnownProtocolKind::CxxSequence);
   ProtocolDecl *cxxConvertibleProto =
       ctx.getProtocol(KnownProtocolKind::CxxConvertibleToCollection);
   // If the Cxx module is missing, or does not include one of the necessary
   // protocols, bail.
-  if (!cxxIteratorProto || !cxxSequenceProto)
+  if (!cxxIteratorProto || !cxxSequenceProto || !cxxBorrowingSequenceProto)
     return;
 
   // Check if present: `func __beginUnsafe() -> RawIterator`
@@ -827,13 +829,38 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   auto pointeeTy = rawIteratorConformance->getTypeWitness(pointeeDecl);
   assert(pointeeTy && "valid conformance must have a Pointee witness");
 
+  // CxxBorrowingSequence conformance
+  // Take the default definition of `BorrowingIterator` from
+  // CxxBorrowingSequence protocol. This type is currently
+  // `CxxBorrowingIterator<Self, Element>`.
+  auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
+      ctx.getIdentifier("BorrowingIterator"));
+  assert(borrowingIteratorDecl &&
+         "CxxBorrowingSequence must have a BorrowingIterator associated type");
+  auto borrowingIteratorNominal =
+      borrowingIteratorDecl->getDefaultDefinitionType()->getAnyNominal();
+
+  // Substitute generic `Self` and `Element` parameters.
+  auto declSelfTy = decl->getDeclaredInterfaceType();
+  auto borrowingIteratorTy = BoundGenericType::get(
+      borrowingIteratorNominal, Type(), {declSelfTy, pointeeTy});
+
+  impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
+                               borrowingIteratorTy);
+  impl.addSynthesizedProtocolAttrs(decl,
+                                   {KnownProtocolKind::CxxBorrowingSequence});
+
+  // TODO if `decl` doesn't conform to RAC, do we want the Iterator typealias?
+  // CxxSequence conformance
   // Take the default definition of `Iterator` from CxxSequence protocol. This
   // type is currently `CxxIterator<Self>`.
   auto iteratorDecl = cxxSequenceProto->getAssociatedType(ctx.Id_Iterator);
   auto iteratorTy = iteratorDecl->getDefaultDefinitionType();
   // Substitute generic `Self` parameter.
   auto cxxSequenceSelfTy = cxxSequenceProto->getSelfInterfaceType();
-  auto declSelfTy = decl->getDeclaredInterfaceType();
   iteratorTy = iteratorTy.subst(
       [&](SubstitutableType *dependentType) {
         if (dependentType->isEqual(cxxSequenceSelfTy))
@@ -841,11 +868,8 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
         return Type(dependentType);
       },
       LookUpConformanceInModule());
-
-  impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
-                               rawIteratorTy);
+
   // Not conforming the type to CxxSequence protocol here:
   // The current implementation of CxxSequence triggers extra copies of the C++
   // collection when creating a CxxIterator instance. It needs a more efficient
@@ -886,7 +910,6 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
         },
         LookUpConformanceInModule());
 
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Index"), indexTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"),
@@ -940,30 +963,9 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   // CxxCollectionConvertible. This enables an overload of Array.init declared
   // in the Cxx module.
   if (!conformedToRAC && cxxConvertibleProto) {
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Element"), pointeeTy);
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::CxxConvertibleToCollection});
   }
-}
-
-static void
-conformToCxxBorrowingSequenceIfNeeded(ClangImporter::Implementation &impl,
-                                      NominalTypeDecl *decl,
-                                      const clang::CXXRecordDecl *clangDecl) {
-  PrettyStackTraceDecl trace("conforming to CxxBorrowingSequence", decl);
-
-  assert(decl);
-  assert(clangDecl);
-  ASTContext &ctx = decl->getASTContext();
-
-  ProtocolDecl *cxxIteratorProto =
-      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  ProtocolDecl *cxxBorrowingSequenceProto =
-      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
-  // If the Cxx module is missing, or does not include one of the necessary
-  // protocols, bail.
-  if (!cxxIteratorProto || !cxxBorrowingSequenceProto)
-    return;
 }
 
 bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
@@ -1403,7 +1405,6 @@ void swift::deriveAutomaticCxxConformances(
   // Automatic conformances: these may be applied to any type that fits the
   // requirements.
   conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
-  conformToCxxBorrowingSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
   conformToCxxConvertibleToBoolIfNeeded(Impl, result, clangDecl);
 
