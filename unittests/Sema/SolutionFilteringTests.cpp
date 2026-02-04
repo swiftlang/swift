@@ -12,6 +12,7 @@
 
 #include "SemaFixture.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace swift::unittest;

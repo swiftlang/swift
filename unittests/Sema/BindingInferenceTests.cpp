@@ -13,6 +13,7 @@
 #include "SemaFixture.h"
 #include "swift/AST/Expr.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
