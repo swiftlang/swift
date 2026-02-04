@@ -5188,6 +5188,17 @@ ERROR(isolated_any_conversion_to_synchronous_func,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
+GROUPED_WARNING(implicit_weak_to_strong_capture,ImplicitStrongCapture,none,
+        "%0 ownership of capture %base1 differs from implicitly-captured "
+        "strong reference in outer scope",
+        (ReferenceOwnership, const VarDecl *))
+NOTE(implicit_weak_to_strong_capture_loc,none,
+     "%base0 implicitly strongly captured here",(const Decl *))
+NOTE(implicit_weak_to_strong_capture_add_capture_list_item,none,
+     "add %base0 as a capture list item to silence",(const Decl *))
+NOTE(implicit_weak_to_strong_capture_assign_to_silence,none,
+     "explicitly assign the capture list item to silence", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------
