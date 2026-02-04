@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -299,5 +300,8 @@ BridgedIntegerTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedStringRef cString, SourceLoc loc,
                                     SourceLoc minusLoc) {
   ASTContext &context = cContext.unbridged();
-  return new (context) IntegerTypeRepr(cString.unbridged(), loc, minusLoc);
+  auto *newLit = new (context) IntegerLiteralExpr(
+      cString.unbridged(), loc,
+      /*implicit*/ true);
+  return new (context) IntegerTypeRepr(newLit);
 }

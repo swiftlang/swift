@@ -1549,7 +1549,10 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
   if (Tok.is(tok::integer_literal)) {
     auto text = copyAndStripUnderscores(Tok.getText());
     auto loc = consumeToken(tok::integer_literal);
-    return makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+    auto intLitExpr = new (Context) IntegerLiteralExpr(text, loc, false);
+    if (minusLoc)
+      intLitExpr->setNegative(minusLoc);
+    return makeParserResult(new (Context) IntegerTypeRepr(intLitExpr));
   }
 
   // Otherwise, attempt to parse a regular type.
