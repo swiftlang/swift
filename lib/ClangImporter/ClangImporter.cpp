@@ -1179,7 +1179,15 @@ ClangImporter::computeClangImporterFileSystem(
   if (fileMapping.redirectedFiles.empty() && fileMapping.overridenFiles.empty())
     return baseFS;
 
+  // Compute and set working directory.
   const auto &importerOpts = ctx.ClangImporterOpts;
+  auto workingDirPos =
+      std::find(importerOpts.ExtraArgs.rbegin(), importerOpts.ExtraArgs.rend(),
+                "-working-directory");
+  if (workingDirPos != importerOpts.ExtraArgs.rend() &&
+      workingDirPos != importerOpts.ExtraArgs.rbegin())
+    baseFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
+
   if (!fileMapping.redirectedFiles.empty()) {
     if (importerOpts.DumpClangDiagnostics) {
       llvm::errs() << "clang importer redirected file mappings:\n";
