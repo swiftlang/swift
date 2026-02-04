@@ -1314,8 +1314,6 @@ ERROR(dollar_identifier_decl,none,
      "cannot declare entity named %0; the '$' prefix is reserved for "
      "implicitly-synthesized declarations", (Identifier))
 
-ERROR(anon_closure_arg_not_in_closure,none,
-      "anonymous closure argument not contained in a closure", ())
 ERROR(anon_closure_arg_in_closure_with_args,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
