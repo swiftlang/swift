@@ -513,6 +513,21 @@ static bool usesFeatureTildeSendable(Decl *decl) {
       });
 }
 
+static bool usesFeatureReparenting(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      return true;
+  }
+
+  InheritedTypes inherited(decl);
+  for (auto const &entry : inherited.getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
+}
+
 UNINTERESTING_FEATURE(AnyAppleOSAvailability)
 UNINTERESTING_FEATURE(StrictAccessControl)
 

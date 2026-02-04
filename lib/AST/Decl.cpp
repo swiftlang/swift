@@ -1910,6 +1910,8 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Preconcurrency);
     if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
       setOption(ProtocolConformanceFlags::Nonisolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Reparented).isValid())
+      setOption(ProtocolConformanceFlags::Reparented);
 
     // Dig out the custom attribute that should be the global actor isolation.
     if (auto customAttr = typeRepr->findCustomAttr()) {
@@ -2257,6 +2259,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
           return kind;
   }
   return std::nullopt;
+}
+
+bool ExtensionDecl::isForReparenting() const {
+  // Must be a protocol extension
+  if (!getExtendedProtocolDecl())
+    return false;
+
+  // Must be at least one @reparented inherited entry.
+  for (auto const& entry : getInherited().getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::hasOnlyCEntryPoint() const {
@@ -5782,6 +5798,16 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
   if (nominal1 && nominal2) {
     if (int result = compare(nominal1, nominal2))
       return result;
+  }
+
+  // Prefer non-reparentable protocols.
+  if (auto *proto1 = dyn_cast<ProtocolDecl>(type1)) {
+    if (auto *proto2 = dyn_cast<ProtocolDecl>(type2)) {
+      auto rp1 = proto1->getAttrs().hasAttribute<ReparentableAttr>();
+      auto rp2 = proto2->getAttrs().hasAttribute<ReparentableAttr>();
+      if (rp1 != rp2)
+        return int(rp1) < int(rp2) ? -1 : +1;
+    }
   }
 
   if (int result = type1->getBaseIdentifier().str().compare(
