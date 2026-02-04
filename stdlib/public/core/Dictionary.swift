@@ -531,13 +531,13 @@ public struct Dictionary<Key: Hashable, Value> {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     init<S: Sequence>(
       _ keysAndValues: __owned S,
       uniquingKeysWith combine: (Value, Value) throws -> Value
-    ) rethrows where S.Element == (Key, Value)
+    ) throws where S.Element == (Key, Value)
   )
+  @usableFromInline
   internal init<S: Sequence>(
     __rethrows_keysAndValues keysAndValues: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -581,13 +581,13 @@ public struct Dictionary<Key: Hashable, Value> {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     init<S: Sequence>(
       grouping values: __owned S,
       by keyForValue: (S.Element) throws -> Key
-    ) rethrows where Value == [S.Element]
+    ) throws where Value == [S.Element]
   )
+  @usableFromInline
   internal init<S: Sequence>(
     __rethrows_grouping values: __owned S,
     by keyForValue: (S.Element) throws -> Key
@@ -960,12 +960,12 @@ extension Dictionary {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     func mapValues<T>(
       _ transform: (Value) throws -> T
-    ) rethrows -> Dictionary<Key, T>
+    ) throws -> Dictionary<Key, T>
   )
+  @usableFromInline
   internal func __rethrows_mapValues<T>(
     _ transform: (Value) throws -> T
   ) throws -> Dictionary<Key, T> {
@@ -1094,13 +1094,13 @@ extension Dictionary {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     mutating func merge<S: Sequence>(
       _ other: __owned S,
       uniquingKeysWith combine: (Value, Value) throws -> Value
-    ) rethrows where S.Element == (Key, Value)
+    ) throws where S.Element == (Key, Value)
   )
+  @usableFromInline
   internal mutating func __rethrows_merge<S: Sequence>(
     _ other: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -1150,13 +1150,13 @@ extension Dictionary {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     mutating func merge(
       _ other: __owned [Key: Value],
       uniquingKeysWith combine: (Value, Value) throws -> Value
-    ) rethrows
+    ) throws
   )
+  @usableFromInline
   internal mutating func __rethrows_merge_dictionary(
     _ other: __owned [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -1208,13 +1208,13 @@ extension Dictionary {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     __consuming func merging<S: Sequence>(
       _ other: __owned S,
       uniquingKeysWith combine: (Value, Value) throws -> Value
-    ) rethrows -> [Key: Value] where S.Element == (Key, Value)
+    ) throws -> [Key: Value] where S.Element == (Key, Value)
   )
+  @usableFromInline
   internal __consuming func __rethrows_merging<S: Sequence>(
     _ other: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
@@ -1268,13 +1268,13 @@ extension Dictionary {
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     __consuming func merging(
       _ other: __owned [Key: Value],
       uniquingKeysWith combine: (Value, Value) throws -> Value
-    ) rethrows -> [Key: Value]
+    ) throws -> [Key: Value]
   )
+  @usableFromInline
   internal __consuming func __rethrows_merging_dictionary(
     _ other: __owned [Key: Value],
     uniquingKeysWith combine: (Value, Value) throws -> Value

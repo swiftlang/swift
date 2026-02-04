@@ -778,12 +778,12 @@ extension _NativeDictionary { // High-level operations
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     func mapValues<T>(
       _ transform: (Value) throws -> T
-    ) rethrows -> _NativeDictionary<Key, T>
+    ) throws -> _NativeDictionary<Key, T>
   )
+  @usableFromInline
   internal func __rethrows_mapValues<T>(
     _ transform: (Value) throws -> T
   ) throws -> _NativeDictionary<Key, T> {
@@ -835,14 +835,14 @@ extension _NativeDictionary { // High-level operations
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     mutating func merge<S: Sequence>(
       _ keysAndValues: __owned S,
       isUnique: Bool,
       uniquingKeysWith combine: (Value, Value) throws -> Value
-    ) rethrows where S.Element == (Key, Value)
+    ) throws where S.Element == (Key, Value)
   )
+  @usableFromInline
   internal mutating func __rethrows_merge<S: Sequence>(
     _ keysAndValues: __owned S,
     isUnique: Bool,
@@ -875,13 +875,13 @@ extension _NativeDictionary { // High-level operations
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     init<S: Sequence>(
       grouping values: __owned S,
       by keyForValue: (S.Element) throws -> Key
-    ) rethrows where Value == [S.Element]
+    ) throws where Value == [S.Element]
   )
+  @usableFromInline
   internal init<S: Sequence>(
     __rethrows_grouping values: __owned S,
     by keyForValue: (S.Element) throws -> Key

@@ -572,21 +572,23 @@ extension __CocoaDictionary {
     return result
   }
 
+#if !$Embedded
   // ABI-only entrypoint for the rethrows version of mapValues, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
   @abi(
     func mapValues<Key: Hashable, Value, T>(
       _ transform: (Value) throws -> T
-    ) rethrows -> _NativeDictionary<Key, T>
+    ) throws -> _NativeDictionary<Key, T>
   )
+  @usableFromInline
   internal func __rethrows_mapValues<Key: Hashable, Value, T>(
     _ transform: (Value) throws -> T
   ) throws -> _NativeDictionary<Key, T> {
     try mapValues(transform)
   }
+#endif
 }
 
 extension __CocoaDictionary {
