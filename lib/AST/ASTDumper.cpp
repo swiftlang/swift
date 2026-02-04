@@ -4998,12 +4998,7 @@ public:
 
   void visitIntegerTypeRepr(IntegerTypeRepr *T, Label label) {
     printCommon("type_integer", label);
-
-    if (T->getMinusLoc()) {
-      printCommon("is_negative", label);
-    }
-
-    printFieldQuoted(T->getValue(), Label::always("value"), IdentifierColor);
+    printRec(T->getValue(), Label::optional("value_expr"));
     printFoot();
   }
 };

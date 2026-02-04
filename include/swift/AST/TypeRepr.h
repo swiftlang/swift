@@ -1652,41 +1652,33 @@ private:
 
 /// A TypeRepr for an integer appearing in a type position.
 class IntegerTypeRepr final : public TypeRepr {
-  StringRef Value;
-  SourceLoc Loc;
-  SourceLoc MinusLoc;
+  Expr *ValueExpr;
 
 public:
-  IntegerTypeRepr(StringRef value, SourceLoc loc, SourceLoc minusLoc)
-    : TypeRepr(TypeReprKind::Integer), Value(value), Loc(loc),
-      MinusLoc(minusLoc) {}
+<<<<<<< Updated upstream
+  IntegerTypeRepr(Expr *valueExpr)
+    : TypeRepr(TypeReprKind::Integer), ValueExpr(valueExpr) {}
+=======
+  IntegerTypeRepr(Expr *valueExpr, std::optional<Identifier> label)
+      : TypeRepr(TypeReprKind::Integer), ValueExpr(valueExpr), Label(label) {}
 
-  StringRef getValue() const {
-    return Value;
-  }
+  IntegerTypeRepr(Expr *valueExpr)
+      : TypeRepr(TypeReprKind::Integer), ValueExpr(valueExpr),
+        Label(std::nullopt) {}
+>>>>>>> Stashed changes
 
-  SourceLoc getLoc() const {
-    return Loc;
-  }
+  Expr *getValue() const { return ValueExpr; }
 
-  SourceLoc getMinusLoc() const {
-    return MinusLoc;
-  }
+  SourceLoc getLoc() const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Integer;
   }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    if (MinusLoc)
-      return MinusLoc;
-
-    return Loc;
-  }
-
-  SourceLoc getEndLocImpl() const { return Loc; }
-  SourceLoc getLocImpl() const { return Loc; }
+  SourceLoc getStartLocImpl() const { return getLoc(); }
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const { return getLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
                  NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;

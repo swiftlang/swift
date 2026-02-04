@@ -8728,6 +8728,9 @@ ERROR(availability_value_generic_type_only_version_newer, none,
 ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
+ERROR(nonliteral_integer_generic_value,none,
+      "generic value must be an integer literal", ())
+
 //===----------------------------------------------------------------------===//
 // MARK: InlineArray
 //===----------------------------------------------------------------------===//

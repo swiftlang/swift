@@ -967,7 +967,15 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
 void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
                                 const PrintOptions &Opts,
                                 NonRecursivePrintOptions nrOpts) const {
-  Printer.printText(getValue());
+  ValueExpr->print(Printer, Opts);
+}
+
+SourceLoc IntegerTypeRepr::getLoc() const {
+  return ValueExpr->getLoc();
+}
+
+SourceLoc IntegerTypeRepr::getEndLocImpl() const {
+  return ValueExpr->getEndLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing
