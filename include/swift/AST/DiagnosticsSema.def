@@ -1820,8 +1820,8 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(consuming_invalid_borrow_mutate_accessor, none,
-      "%0 cannot be declared consuming", (StringRef))
+ERROR(modifier_invalid_borrow_mutate_accessor, none,
+      "%0 cannot be declared %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "

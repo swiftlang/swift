@@ -8848,6 +8848,20 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
     }
   }
+
+  // A 'borrow' can only be paired with 'mutate'
+  if (Borrow) {
+    if (Set || Modify || YieldingMutate || MutableAddress) {
+      P.diagnose(Borrow->getLoc(), diag::borrow_mutate_pair_restrict, "borrow",
+                 "mutate");
+    }
+  }
+  if (Mutate) {
+    if (Get || Read || YieldingBorrow || Address) {
+      P.diagnose(Mutate->getLoc(), diag::borrow_mutate_pair_restrict, "mutate",
+                 "borrow");
+    }
+  }
 }
 
 
