@@ -525,21 +525,21 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT:   #Foo.nativeMethod: {{.*}} :       @$s7dynamic3FooC12nativeMethodyyF
 // CHECK-NEXT:   #Foo.nativeProp!getter: {{.*}} :  @$s7dynamic3FooC10nativePropSivg     // dynamic.Foo.nativeProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!setter: {{.*}} :  @$s7dynamic3FooC10nativePropSivs     // dynamic.Foo.nativeProp.setter : Swift.Int
-// CHECK-NEXT:   #Foo.nativeProp!modify:
+// CHECK-NEXT:   #Foo.nativeProp!yielding_mutate:
 // CHECK-NEXT:   #Foo.subscript!getter: {{.*}} :   @$s7dynamic3FooC6nativeS2i_tcig    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter: {{.*}} :   @$s7dynamic3FooC6nativeS2i_tcis    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!modify:
+// CHECK-NEXT:   #Foo.subscript!yielding_mutate:
 // CHECK-NEXT:   #Foo.subscript!getter: {{.*}} :   @$s7dynamic3FooC10nativeTypeS2i_tcigZ    // static dynamic.Foo.subscript.getter : (nativeType: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter: {{.*}} :   @$s7dynamic3FooC10nativeTypeS2i_tcisZ    // static dynamic.Foo.subscript.setter : (nativeType: Swift.Int) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!modify:
+// CHECK-NEXT:   #Foo.subscript!yielding_mutate:
 // CHECK-NEXT:   #Foo.init!allocator: {{.*}} :   @$s7dynamic3FooC4objcACSi_tcfC
 // CHECK-NEXT:   #Foo.objcMethod: {{.*}} :         @$s7dynamic3FooC10objcMethodyyF
 // CHECK-NEXT:   #Foo.objcProp!getter: {{.*}} :    @$s7dynamic3FooC8objcPropSivg  // dynamic.Foo.objcProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!setter: {{.*}} :    @$s7dynamic3FooC8objcPropSivs  // dynamic.Foo.objcProp.setter : Swift.Int
-// CHECK-NEXT:   #Foo.objcProp!modify:
+// CHECK-NEXT:   #Foo.objcProp!yielding_mutate:
 // CHECK-NEXT:   #Foo.subscript!getter: {{.*}} : @$s7dynamic3FooC4objcSiyXl_tcig // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter: {{.*}} : @$s7dynamic3FooC4objcSiyXl_tcis // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!modify:
+// CHECK-NEXT:   #Foo.subscript!yielding_mutate:
 // CHECK-NEXT:   #Foo.overriddenByDynamic: {{.*}} : @$s7dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
 // CHECK-NEXT: }
