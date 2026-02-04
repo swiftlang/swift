@@ -455,11 +455,15 @@ public:
       return done(/*isSuccess=*/false);
 
     while (auto choice = Producer()) {
-      if (shouldSkip(*choice))
-        continue;
-
+      // Note: we must check if we need to stop before we check if we need to
+      // skip, because shouldStopAt() needs to consider every index. Otherwise,
+      // if the first element of a partition is skipped, we don't stop, even if
+      // we could.
       if (shouldStopAt(*choice))
         break;
+
+      if (shouldSkip(*choice))
+        continue;
 
       if (CS.isDebugMode()) {
         auto &log = getDebugLogger();
