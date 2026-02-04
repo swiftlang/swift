@@ -24,6 +24,9 @@ class NonSendableKlass : NonSendableProtocol {
 class NonSendableKlassSubKlass : NonSendableKlass {
 }
 
+class SendableKlass : @unchecked Sendable {
+}
+
 struct SingleFieldStruct {
   var field: NonSendableKlass
 }
@@ -33,9 +36,31 @@ struct TwoFieldStruct {
   var second: NonSendableKlass
 }
 
+struct MixedFieldStruct {
+  let nsLet: NonSendableKlass
+  let sLet: SendableKlass
+  var nsVar: NonSendableKlass
+  var sVar: SendableKlass
+}
+
+struct SendableStruct : @unchecked Sendable {
+  let nsLet: NonSendableKlass
+}
+
 enum NonSendableEnum {
   case none
   case some(NonSendableKlass)
+}
+
+enum MixedEnum {
+  case none
+  case nonsendable(NonSendableKlass)
+  case sendable(SendableKlass)
+}
+
+enum SendableEnum : @unchecked Sendable {
+  case none
+  case value(NonSendableKlass)
 }
 
 protocol NonSendableProtocol {
@@ -766,6 +791,58 @@ bb0:
 }
 
 
+// Test: NonSendable operand → Sendable let result (should be ignored - no partition ops)
+// CHECK-LABEL: begin running test {{.*}} on test_struct_element_addr_nonsendable_to_sendable_let: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: end running test {{.*}} on test_struct_element_addr_nonsendable_to_sendable_let: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_struct_element_addr_nonsendable_to_sendable_let : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $MixedFieldStruct
+  %1 = struct_element_addr %0 : $*MixedFieldStruct, #MixedFieldStruct.sLet
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// Test: NonSendable operand → Sendable var result (should require the operand)
+// CHECK-LABEL: begin running test {{.*}} on test_struct_element_addr_nonsendable_to_sendable_var: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %1 = struct_element_addr %0 : $*MixedFieldStruct, #MixedFieldStruct.sVar
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = alloc_stack $MixedFieldStruct
+// CHECK-NEXT: require [mutable_base_of_sendable_val] %%1:   %1 = struct_element_addr %0 : $*MixedFieldStruct, #MixedFieldStruct.sVar
+// CHECK-NEXT: end running test {{.*}} on test_struct_element_addr_nonsendable_to_sendable_var: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_struct_element_addr_nonsendable_to_sendable_var : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $MixedFieldStruct
+  %1 = struct_element_addr %0 : $*MixedFieldStruct, #MixedFieldStruct.sVar
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// Test: Sendable operand → NonSendable result (should assign fresh)
+// CHECK-LABEL: begin running test {{.*}} on test_struct_element_addr_sendable_to_nonsendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = struct_element_addr %0 : $*SendableStruct, #SendableStruct.nsLet
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %0 = alloc_stack $SendableStruct
+// CHECK-NEXT: assign_fresh %%0:   %1 = struct_element_addr %0 : $*SendableStruct, #SendableStruct.nsLet
+// CHECK-NEXT: end running test {{.*}} on test_struct_element_addr_sendable_to_nonsendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_struct_element_addr_sendable_to_nonsendable : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $SendableStruct
+  %1 = struct_element_addr %0 : $*SendableStruct, #SendableStruct.nsLet
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}
+
+
 // CHECK-LABEL: begin running test {{.*}} on test_tuple_element_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 // CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
 // CHECK-NEXT:     Rep Value:   %0 = alloc_stack $(NonSendableKlass, NonSendableKlass)
@@ -774,6 +851,43 @@ sil [ossa] @test_tuple_element_addr : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $(NonSendableKlass, NonSendableKlass)
   %1 = tuple_element_addr %0 : $*(NonSendableKlass, NonSendableKlass), 0
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// Test: NonSendable tuple → Sendable element (should require operand)
+// CHECK-LABEL: begin running test {{.*}} on test_tuple_element_addr_nonsendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %1 = tuple_element_addr %0 : $*(NonSendableKlass, SendableKlass), 1
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = alloc_stack $(NonSendableKlass, SendableKlass)
+// CHECK-NEXT: require [mutable_base_of_sendable_val] %%1:   %1 = tuple_element_addr %0 : $*(NonSendableKlass, SendableKlass), 1
+// CHECK-NEXT: end running test {{.*}} on test_tuple_element_addr_nonsendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_tuple_element_addr_nonsendable_to_sendable : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $(NonSendableKlass, SendableKlass)
+  %1 = tuple_element_addr %0 : $*(NonSendableKlass, SendableKlass), 1
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// Test: Sendable tuple → Sendable element (both sendable - lookthrough)
+// CHECK-LABEL: begin running test {{.*}} on test_tuple_element_addr_sendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = tuple_element_addr %0 : $*(SendableKlass, SendableKlass), 0
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %0 = alloc_stack $(SendableKlass, SendableKlass)
+// CHECK-NEXT: end running test {{.*}} on test_tuple_element_addr_sendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_tuple_element_addr_sendable_to_sendable : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $(SendableKlass, SendableKlass)
+  %1 = tuple_element_addr %0 : $*(SendableKlass, SendableKlass), 0
   specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
   dealloc_stack %0
   %r = tuple ()
@@ -2171,6 +2285,42 @@ bb0(%0 : $*NonSendableEnum):
   %r = tuple ()
   return %r : $()
 }
+
+
+// Test: NonSendable enum → Sendable payload (should require operand)
+// CHECK-LABEL: begin running test {{.*}} on test_unchecked_take_enum_data_addr_nonsendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*MixedEnum
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %1 = unchecked_take_enum_data_addr %0 : $*MixedEnum, #MixedEnum.sendable!enumelt
+// CHECK-NEXT: require %%0:   %1 = unchecked_take_enum_data_addr %0 : $*MixedEnum, #MixedEnum.sendable!enumelt
+// CHECK-NEXT: end running test {{.*}} on test_unchecked_take_enum_data_addr_nonsendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unchecked_take_enum_data_addr_nonsendable_to_sendable : $@convention(thin) (@in MixedEnum) -> () {
+bb0(%0 : $*MixedEnum):
+  %payload_addr = unchecked_take_enum_data_addr %0 : $*MixedEnum, #MixedEnum.sendable!enumelt
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_addr %payload_addr
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Sendable enum → NonSendable payload (should assign fresh)
+// CHECK-LABEL: begin running test {{.*}} on test_unchecked_take_enum_data_addr_sendable_to_nonsendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*SendableEnum
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = unchecked_take_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt
+// CHECK-NEXT: assign_fresh %%1:   %1 = unchecked_take_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt
+// CHECK-NEXT: end running test {{.*}} on test_unchecked_take_enum_data_addr_sendable_to_nonsendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unchecked_take_enum_data_addr_sendable_to_nonsendable : $@convention(thin) (@in SendableEnum) -> () {
+bb0(%0 : $*SendableEnum):
+  %payload_addr = unchecked_take_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_addr %payload_addr
+  %r = tuple ()
+  return %r : $()
+}
+
 
 //===----------------------------------------------------------------------===//
 // MARK: Address-Only Existential Operations

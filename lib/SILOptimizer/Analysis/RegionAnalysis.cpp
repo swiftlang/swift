@@ -82,6 +82,10 @@ regionanalysisimpl::getApplyIsolationCrossing(SILInstruction *inst) {
   return {};
 }
 
+//===----------------------------------------------------------------------===//
+//                     MARK: AddressBaseComputingVisitor
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 /// A visitor that walks from uses -> def attempting to determine an object or
@@ -104,11 +108,38 @@ struct AddressBaseComputingVisitor
     : public AccessUseDefChainVisitor<AddressBaseComputingVisitor, SILValue> {
   bool isProjectedFromAggregate = false;
 
+  enum class ImmutablePrefixProjectionPathState {
+    Unknown,
+    KnownImmutable,
+    KnownMutable,
+  };
+
+  // We assume that our values are initially immutable and then conservatively
+  // make them mutable.
+  ImmutablePrefixProjectionPathState immutablePrefixProjectionPathState =
+      ImmutablePrefixProjectionPathState::Unknown;
+
+  void setPrefixProjectionPathState(bool isImmutable) {
+    if (isImmutable) {
+      immutablePrefixProjectionPathState =
+          ImmutablePrefixProjectionPathState::KnownImmutable;
+    } else {
+      immutablePrefixProjectionPathState =
+          ImmutablePrefixProjectionPathState::KnownMutable;
+    }
+  }
+
   SILValue value;
 
+  /// Top level entrypoint.
+  SILValue compute(SILValue initialValue) { return visitAll(initialValue); }
+
+  /// Top level loop. Visited recursively in certain subroutines.
   SILValue visitAll(SILValue sourceAddr) {
-    // If our initial value is Sendable, then it is our "value".
-    if (SILIsolationInfo::isSendable(sourceAddr))
+    // If we have not yet found a value and our value is Sendable, then that is
+    // our value. If we have already found a value, then we are done and are
+    // searching for a base.
+    if (!value && SILIsolationInfo::isSendable(sourceAddr))
       value = sourceAddr;
 
     SILValue result = visit(sourceAddr);
@@ -122,24 +153,74 @@ struct AddressBaseComputingVisitor
     return result;
   }
 
-  SILValue visitBase(SILValue base, AccessStorage::Kind kind) {
-    // If we are passed a project_box, we want to return the box itself. The
-    // reason for this is that the project_box is considered to be non-aliasing
-    // memory. We want to treat it as part of the box which is
-    // aliasing... meaning that we need to merge.
-    if (kind == AccessStorage::Box)
-      return cast<ProjectBoxInst>(base)->getOperand();
+  //===---
+  // MARK: Base Accesses
+  //
+
+  /// Do not look through field.
+  SILValue visitClassAccess(RefElementAddrInst *reai) {
+    // If we do not have a let, we need to unset immutable prefix projection
+    // path.
+    setPrefixProjectionPathState(reai->getField()->isLet());
     return SILValue();
   }
+
+  SILValue visitBoxAccess(ProjectBoxInst *projection) {
+    SILValue box = projection->getOperand();
+    if (auto boxType = box->getType().getAs<SILBoxType>()) {
+      // Our prefix projection path is only immutable if all fields are
+      // immutable.
+      setPrefixProjectionPathState(
+          llvm::all_of(range(boxType->getNumFields()), [&](unsigned index) {
+            return !boxType->isFieldMutable(index);
+          }));
+    }
+    return box;
+  }
+
+  /// If we have an unknown base, do not look through it and set
+  /// hasImmutablePrefixProjectionPath to false so we are conservative.
+  ///
+  /// DISCUSSION: All bases that we handle should be handled by overwriting the
+  /// individual base handling methods (e.x.: visitBoxAccess). See our super
+  /// class.
+  SILValue visitBase(SILValue base, AccessStorage::Kind kind) {
+    setPrefixProjectionPathState(false /*is immutable*/);
+    return SILValue();
+  }
+
+  /// Override AccessUseDefChainVisitor to ignore access markers and find the
+  /// outer access base.
+  ///
+  /// DISCUSSION: We use this as an opportunity to turn off
+  /// hasImmutablePrefixProjectionPath.
+  SILValue visitNestedAccess(BeginAccessInst *access) {
+    if (access->getAccessKind() != SILAccessKind::Read)
+      setPrefixProjectionPathState(false /*is immutable*/);
+    return visitAll(access->getSource());
+  }
+
+  /// Do not look through stack accesses, but also do not override
+  /// hasImmutablePrefixProjectionPath.
+  SILValue visitStackAccess(AllocStackInst *stack) { return SILValue(); }
+
+  //===---
+  // MARK: Non Base Visits
+  //
 
   SILValue visitNonAccess(SILValue value) {
     // For now since it is late in 6.2, work around vector base addr not being
     // treated as a projection.
     if (auto *v = dyn_cast<VectorBaseAddrInst>(value)) {
+      // This just adjusts the pointer... it shouldn't impact immutable prefix
+      // projection path.
       isProjectedFromAggregate = true;
       return v->getOperand();
     }
 
+    // If we have an unknown non-access, then set immutable prefix projection
+    // path to false to be conservative.
+    setPrefixProjectionPathState(false /*is immutable*/);
     return SILValue();
   }
 
@@ -147,18 +228,16 @@ struct AddressBaseComputingVisitor
     llvm_unreachable("Should never hit this");
   }
 
-  // Override AccessUseDefChainVisitor to ignore access markers and find the
-  // outer access base.
-  SILValue visitNestedAccess(BeginAccessInst *access) {
-    return visitAll(access->getSource());
-  }
-
   SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceAddr,
                             AccessStorageCast castType) {
+    // Be conservative and say that this breaks immutable prefix projection
+    // path.
+    setPrefixProjectionPathState(false /*is immutable*/);
+
     // If this is a type case, see if the result of the cast is sendable. In
     // such a case, we do not want to look through this cast.
     if (castType == AccessStorageCast::Type &&
-        !SILIsolationInfo::isNonSendable(cast))
+        SILIsolationInfo::isSendable(cast))
       return SILValue();
 
     // Do not look through begin_borrow [var_decl]. They are start new semantic
@@ -187,8 +266,18 @@ struct AddressBaseComputingVisitor
       // Currently if we load and then project_box from a memory location,
       // we treat that as a projection. This follows the semantics/notes in
       // getAccessProjectionOperand.
-      case ProjectionKind::Box:
-        return cast<ProjectBoxInst>(projInst)->getOperand();
+      case ProjectionKind::Box: {
+        SILValue box = cast<ProjectBoxInst>(projInst)->getOperand();
+        if (auto boxType = box->getType().getAs<SILBoxType>()) {
+          // Our prefix projection path is only immutable if all fields are
+          // immutable.
+          setPrefixProjectionPathState(
+              llvm::all_of(range(boxType->getNumFields()), [&](unsigned index) {
+                return !boxType->isFieldMutable(index);
+              }));
+        }
+        return box;
+      }
       case ProjectionKind::Upcast:
       case ProjectionKind::RefCast:
       case ProjectionKind::BlockStorageCast:
@@ -197,17 +286,18 @@ struct AddressBaseComputingVisitor
       case ProjectionKind::TailElems:
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
+        // NOTE: Preserives immutability prefix path.
+
         // Index is always a merge.
         isProjectedFromAggregate = true;
         break;
       case ProjectionKind::Enum: {
+        // NOTE: Preserves immutability prefix path.
         auto op = cast<UncheckedTakeEnumDataAddrInst>(projInst)->getOperand();
-
-        bool isOperandSendable = !SILIsolationInfo::isNonSendable(op);
 
         // If our operand is Sendable and our field is non-Sendable and we have
         // not stashed a value yet, stash value.
-        if (!value && isOperandSendable &&
+        if (!value && SILIsolationInfo::isSendable(op) &&
             SILIsolationInfo::isNonSendable(projInst)) {
           value = projInst;
         }
@@ -215,36 +305,39 @@ struct AddressBaseComputingVisitor
         break;
       }
       case ProjectionKind::Tuple: {
+        // NOTE: Preserves immutability prefix path.
+
         // These are merges if we have multiple fields.
         auto op = cast<TupleElementAddrInst>(projInst)->getOperand();
-
-        bool isOperandSendable = !SILIsolationInfo::isNonSendable(op);
 
         // If our operand is Sendable and our field is non-Sendable, we need to
         // bail since we want to root the non-Sendable type in the Sendable
         // type.
-        if (!value && isOperandSendable &&
+        if (!value && SILIsolationInfo::isSendable(op) &&
             SILIsolationInfo::isNonSendable(projInst))
           value = projInst;
 
         isProjectedFromAggregate |= op->getType().getNumTupleElements() > 1;
         break;
       }
-      case ProjectionKind::Struct:
-        auto op = cast<StructElementAddrInst>(projInst)->getOperand();
-
-        bool isOperandSendable = !SILIsolationInfo::isNonSendable(op);
+      case ProjectionKind::Struct: {
+        auto *seai = cast<StructElementAddrInst>(projInst);
+        auto op = seai->getOperand();
 
         // If our operand is Sendable and our field is non-Sendable, we need to
         // bail since we want to root the non-Sendable type in the Sendable
         // type.
-        if (!value && isOperandSendable &&
+        if (!value && SILIsolationInfo::isSendable(op) &&
             SILIsolationInfo::isNonSendable(projInst))
           value = projInst;
+
+        // Only preserves immutable projection path if the field is immutable.
+        setPrefixProjectionPathState(seai->getField()->isLet());
 
         // These are merges if we have multiple fields.
         isProjectedFromAggregate |= op->getType().getNumNominalFields() > 1;
         break;
+      }
       }
     }
 
@@ -291,7 +384,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::RefToUnownedInst:
   case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::UnownedCopyValueInst:
   case SILInstructionKind::UnownedToRefInst:
   case SILInstructionKind::UpcastInst:
@@ -302,8 +394,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::RefToUnmanagedInst:
   case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::UncheckedEnumDataInst:
-  case SILInstructionKind::StructElementAddrInst:
-  case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::VectorBaseAddrInst:
     return true;
   case SILInstructionKind::MoveValueInst:
@@ -341,6 +431,9 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
+  case SILInstructionKind::StructElementAddrInst:
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::TupleElementAddrInst:
     return true;
   }
 }
@@ -416,7 +509,7 @@ private:
 static bool isProjectedFromAggregate(SILValue value) {
   assert(value->getType().isAddress());
   AddressBaseComputingVisitor visitor;
-  visitor.visitAll(value);
+  visitor.compute(value);
   return visitor.isProjectedFromAggregate;
 }
 
@@ -664,7 +757,7 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
 
   // Then check our oracle to see if the value is actually sendable. If we have
   // a Sendable value, just return early.
-  if (!SILIsolationInfo::isNonSendable(value)) {
+  if (SILIsolationInfo::isSendable(value)) {
     iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
     return {iter.first->first, iter.first->second};
   }
@@ -986,7 +1079,7 @@ RegionAnalysisValueMap::UnderlyingTrackedValueInfo
 RegionAnalysisValueMap::getUnderlyingTrackedValueHelperAddress(
     SILValue value) const {
   AddressBaseComputingVisitor visitor;
-  SILValue base = visitor.visitAll(value);
+  SILValue base = visitor.compute(value);
   assert(base);
 
   // If we have an object base...
@@ -3289,6 +3382,8 @@ public:
 #define INST(INST, PARENT) TranslationSemantics visit##INST(INST *inst);
 #include "swift/SIL/SILNodes.def"
 
+  TranslationSemantics visitProjection(SingleValueInstruction *projection);
+
   /// Adds requires for all sending inout parameters to make sure that they are
   /// properly updated before the end of the function.
   void addEndOfFunctionChecksForInOutSendingParameters(TermInst *inst) {
@@ -3662,10 +3757,7 @@ CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
 CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
-CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
-CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
 CONSTANT_TRANSLATION(VectorBaseAddrInst, LookThrough)
-CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 CONSTANT_TRANSLATION(MakeBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(DereferenceBorrowInst, LookThrough)
 CONSTANT_TRANSLATION(MakeAddrBorrowInst, LookThrough)
@@ -3924,6 +4016,77 @@ LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertEscapeToNoEscapeInst)
 LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND(ConvertFunctionInst)
 
 #undef LOOKTHROUGH_IF_NONSENDABLE_RESULT_AND_OPERAND
+
+//===---
+// Structured Projections
+//
+
+TranslationSemantics
+PartitionOpTranslator::visitProjection(SingleValueInstruction *proj) {
+  assert(proj->getNumOperands() == 1);
+  bool isOperandNonSendable =
+      SILIsolationInfo::isNonSendable(proj->getOperand(0));
+  bool isResultNonSendable = SILIsolationInfo::isNonSendable(proj);
+
+  // If our operand is non-Sendable...
+  if (isOperandNonSendable) {
+    // And our result is non-Sendable... we are just lookthrough.
+    if (isResultNonSendable) {
+      return TranslationSemantics::LookThrough;
+    }
+
+    // If our result is Sendable, we know that we can ignore this extraction as
+    // long as we can prove that the field containing the Sendable value in the
+    // non-Sendable parent type can never be written to. If it can never be
+    // written to, then it can never be written to concurrently meaning that we
+    // can avoid needing to require our operand and can just ignore this use. If
+    // the field could be written to, then we need to require the operand to
+    // make sure we have not escaped into another isolation domain.
+    AddressBaseComputingVisitor visitor;
+    (void)visitor.compute(proj);
+    if (visitor.immutablePrefixProjectionPathState ==
+        AddressBaseComputingVisitor::ImmutablePrefixProjectionPathState::
+            KnownImmutable)
+      return TranslationSemantics::Ignored;
+
+    // Otherwise, we need to conservatively assume that our operand /could/ be
+    // written to concurrently so we need to perform a sendable mutable base
+    // require. This is different from a normal require since passing ::Require
+    // would normally just require the non-Sendable operand. We want to actually
+    // require our Sendable result so that when we require, we require of
+    // mutable base of sendable value instead.
+    translateSILRequire(proj);
+    return TranslationSemantics::Special;
+  }
+
+  // We always use assign fresh here regardless of whether or not a
+  // type is sendable.
+  //
+  // DISCUSSION: Since the typechecker is lazy, if there is a bug
+  // that causes us to not look up enough type information it is
+  // possible for a type to move from being Sendable to being
+  // non-Sendable. For example, we could call isNonSendableType and
+  // get that the type is non-Sendable, but as a result of calling
+  // that API, the type checker could get more information that the
+  // next time we call isNonSendableType, we will get that the type
+  // is non-Sendable.
+  return TranslationSemantics::AssignFresh;
+}
+
+#ifdef EMIT_PROJECTION
+#error "EMIT_PROJECTION already defined"
+#endif
+
+#define EMIT_PROJECTION(INST)                                                  \
+  TranslationSemantics PartitionOpTranslator::visit##INST(INST *proj) {        \
+    return visitProjection(proj);                                              \
+  }
+
+EMIT_PROJECTION(StructElementAddrInst)
+EMIT_PROJECTION(TupleElementAddrInst)
+EMIT_PROJECTION(UncheckedTakeEnumDataAddrInst)
+
+#undef EMIT_PROJECTION
 
 //===---
 // Custom Handling
