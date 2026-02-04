@@ -11,11 +11,11 @@ extension NSPoint: Pointable {}
 
 extension NSReferencePoint: Pointable {}
 
-// Make sure synthesized modify accessors have shared linkage
+// Make sure synthesized yielding mutate accessors have shared linkage
 // for properties imported from Clang.
 
-// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo7NSPointV1ySfvM
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo7NSPointV1ySfvx
 
-// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo16NSReferencePointC1xSfvM
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo16NSReferencePointC1xSfvx
 
-// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo16NSReferencePointC1ySfvM
+// CHECK-LABEL: sil shared [serialized] [ossa] @$sSo16NSReferencePointC1ySfvx
