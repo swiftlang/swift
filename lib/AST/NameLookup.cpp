@@ -3595,14 +3595,38 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
 
   assert(!PD->wasDeserialized());
+  using TypeOrExt = PointerUnion<const TypeDecl *, const ExtensionDecl *>;
 
   InvertibleProtocolSet inverses;
   bool anyObject = false;
-  for (const auto &found :
-       getDirectlyInheritedNominalTypeDecls(PD, inverses, anyObject)) {
-    auto proto = dyn_cast<ProtocolDecl>(found.Item);
-    if (proto && proto != PD)
-      inherited.insert(proto);
+  auto addFrom = [&](TypeOrExt decl) {
+    for (const auto &found :
+         getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject)) {
+      auto proto = dyn_cast<ProtocolDecl>(found.Item);
+      if (proto && proto != PD)
+        inherited.insert(proto);
+    }
+  };
+
+  // Add from the inheritance clause of the protocol itself.
+  addFrom(PD);
+
+  // Add from extensions of the protocol, as the inherited entries on those
+  // extensions are considered to be inherited by this protocol.
+  //
+  // We don't do this from getDirectlyInheritedNominalTypeDecls, only to avoid
+  // doing a const_cast to access the extensions there.
+  //
+  // We avoid @objc protocols, as they don't support @reparented and can trigger
+  // a request evaluator cycle when visiting its extensions.
+  if (!PD->getAttrs().getAttribute<ObjCAttr>()) {
+    for (auto *ext : PD->getExtensions()) {
+      // Skip extensions in other modules, they're never permitted to reparent.
+      if (ext->getModuleContext() != PD->getModuleContext())
+        continue;
+
+      addFrom(ext);
+    }
   }
 
   // Apply inverses.
@@ -4185,6 +4209,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
     attributes.preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
     attributes.unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
     attributes.nonisolatedLoc = typeRepr->findAttrLoc(TypeAttrKind::Nonisolated);
+    attributes.reparentedLoc = typeRepr->findAttrLoc(TypeAttrKind::Reparented);
 
     // Dig out the custom attribute that should be the global actor isolation.
     if (auto customAttr = typeRepr->findCustomAttr()) {

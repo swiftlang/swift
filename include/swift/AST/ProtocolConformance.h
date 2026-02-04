@@ -445,6 +445,13 @@ public:
   /// conforming type and the protocol.
   bool isRetroactive() const;
 
+  /// Given Q = getProtocol(), does this conformance represent a
+  /// default conformance of Q for any type that conforms to protocol P, where
+  /// P is the extended nominal type of getDeclContext(). In other words,
+  /// P was reparented by the reparentable protocol Q, such that all of Q's
+  /// requirements can be witnessed within an extension of P.
+  bool isReparented() const;
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,
@@ -711,6 +718,11 @@ public:
   /// Whether this is an "unchecked" conformance.
   bool isUnchecked() const {
     return getOptions().contains(ProtocolConformanceFlags::Unchecked);
+  }
+
+  /// Whether this is a @reparented conformance.
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
   }
 
   /// Mark the conformance as unchecked (equivalent to the @unchecked

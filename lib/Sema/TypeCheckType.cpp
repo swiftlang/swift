@@ -3610,6 +3610,47 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     }
   }
 
+  // Check validity of @reparented
+  if (auto attr = claim<ReparentedTypeAttr>(attrs)) {
+    if (ty->hasError())
+      return ty;
+
+    // The protocol declaring it's been reparented can't be @objc
+    if (auto *proto = getDeclContext()->getSelfProtocolDecl()) {
+      if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
+        diagnoseInvalid(repr, attr->getAtLoc(),
+                        diag::typeattr_invalid_for_objc_protocol, attr, proto);
+      }
+    }
+
+    // Only a protocol's extension can declare it's been @reparented.
+    if (!options.is(TypeResolverContext::Inherited) ||
+        !getDeclContext()->getSelfProtocolDecl() ||
+        !isa<ExtensionDecl>(getDeclContext())) {
+      diagnoseInvalid(repr, attr->getAtLoc(),
+                      diag::typeattr_not_protocol_inheritance_clause, attr)
+          .fixItRemove(attr->getSourceRange());
+      ty = ErrorType::get(getASTContext());
+    } else {
+      // The new parent must be just a protocol.
+      if (auto protoTy = ty->getAs<ProtocolType>()) {
+        // That protocol must be declared as @reparentable
+        auto *parent = protoTy->getDecl();
+        if (!parent->getAttrs().hasAttribute<ReparentableAttr>()) {
+          diagnoseInvalid(
+              repr, attr->getAtLoc(),
+              diag::typeattr_reparented_requires_reparentable_protocol, attr,
+              parent);
+          ty = ErrorType::get(getASTContext());
+        }
+      } else {
+        diagnoseInvalid(repr, attr->getAtLoc(), diag::typeattr_not_existential,
+                        attr, ty);
+        ty = ErrorType::get(getASTContext());
+      }
+    }
+  }
+
   // Type aliases inside protocols are not yet resolved in the structural
   // stage of type resolution
   if (ty->is<DependentMemberType>() &&
