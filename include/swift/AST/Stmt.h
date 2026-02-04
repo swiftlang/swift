@@ -1408,6 +1408,9 @@ public:
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
 
+  /// True if this case matches any pattern ('case _:' or 'case(_, _):')
+  bool isCatchAll();
+
   bool hasUnknownAttr() const {
     // Note: This representation doesn't allow for synthesized @unknown cases.
     // However, that's probably sensible; the purpose of @unknown is for

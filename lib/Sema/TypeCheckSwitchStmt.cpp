@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Assertions.h"
@@ -973,6 +974,11 @@ namespace {
       }
     }
 
+    bool hasStrictExhaustiveChecksEnabled() {
+      auto SF = DC->getParentSourceFile();
+      return Context.Diags.isDiagnosticGroupEnabled(SF, DiagGroupID::StrictExhaustiveSwitches);
+    }
+
     void checkExhaustiveness(bool limitedChecking) {
       // If the type of the scrutinee is uninhabited, we're already dead.
       // Allow any well-typed patterns through.
@@ -985,11 +991,14 @@ namespace {
       if (limitedChecking) {
         // Reject switch statements with empty blocks.
         if (Switch->getCases().empty())
-          diagnoseMissingCases(RequiresDefault::EmptySwitchBody, Space());
+          diagnoseMissingCases(RequiresDefault::EmptySwitchBody, Space(),
+                               nullptr /* unknown default */,
+                               nullptr /* default */);
         return;
       }
 
       const CaseStmt *unknownCase = nullptr;
+      const CaseStmt *defaultCase = nullptr;
       SmallVector<Space, 4> spaces;
       auto &DE = Context.Diags;
       for (auto *caseBlock : Switch->getCases()) {
@@ -1006,8 +1015,14 @@ namespace {
             continue;
 
           // Space is trivially covered with a default clause.
-          if (caseItem.isDefault())
+          if (caseItem.isDefault()) {
+            if (!hasStrictExhaustiveChecksEnabled()) {
             return;
+            }
+            assert(defaultCase == nullptr && "multiple default cases");
+            defaultCase = caseBlock;
+            continue;
+          }
 
           Space projection = projectPattern(caseItem.getPattern());
           bool isRedundant = !projection.isEmpty() &&
@@ -1046,7 +1061,7 @@ namespace {
       auto diff = totalSpace.minus(coveredSpace, DC, &minusCount);
       if (!diff) {
         diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
-                             unknownCase);
+                             unknownCase, defaultCase);
         return;
       }
 
@@ -1060,32 +1075,55 @@ namespace {
       // uncovered space is empty because we trust that if the developer went to
       // the trouble of writing @unknown that it was for a good reason, like
       // addressing diagnostics in another build configuration where there are
-      // potentially unknown cases.
+      // potentially unknown cases, like a dependency built with resilience.
       uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
                                    DC, /*&minusCount*/ nullptr);
 
-      if (uncovered.isEmpty())
+      if (uncovered.isEmpty()) {
+        // Here diagnose the case where a catch-all masks the default case
+        if (hasStrictExhaustiveChecksEnabled() && defaultCase) {
+          for (auto *caseBlock : Switch->getCases()) {
+            if (caseBlock->isCatchAll()) {
+              DE.diagnose(caseBlock->getLoc(), diag::default_after_catchall)
+                  .fixItRemoveChars(caseBlock->getStartLoc(),
+                                    caseBlock->getLoc())
+                  .fixItRemoveChars(defaultCase->getStartLoc(),
+                                    defaultCase->getLoc());
+            }
+          }
+        }
+
         return;
+      }
 
       // If the entire space is left uncovered we have two choices: We can
       // decompose the type space and offer them as fixits, or simply offer
       // to insert a `default` clause.
+      //
+      // If a strictly exhaustive switch is requested
+      // (see hasStrictExhaustiveChecksEnabled), a default case will be
+      // suggested to be decomposed into the remaining cases if they are
+      // statically possible to determine.
+      //
+      // As well, if the type space is resilient, the default case may also
+      // be converted to an unknown default to exhaust known and future cases
       if (uncovered.getKind() == SpaceKind::Type) {
         if (Space::canDecompose(uncovered.getType())) {
           SmallVector<Space, 4> spaces;
           Space::decomposeDisjuncts(DC, uncovered.getType(), {}, spaces);
           diagnoseMissingCases(RequiresDefault::No, Space::forDisjunct(spaces),
-                               unknownCase);
-        } else {
+                               unknownCase, defaultCase);
+        } else if (!defaultCase) {
           diagnoseMissingCases(Switch->getCases().empty()
                                  ? RequiresDefault::EmptySwitchBody
                                  : RequiresDefault::UncoveredSwitch,
-                               uncovered, unknownCase);
+                               uncovered, unknownCase, nullptr /*defaultCase*/);
         }
         return;
       }
 
-      diagnoseMissingCases(RequiresDefault::No, uncovered, unknownCase);
+      diagnoseMissingCases(RequiresDefault::No, uncovered, unknownCase,
+                           defaultCase);
     }
     
     enum class RequiresDefault {
@@ -1096,14 +1134,40 @@ namespace {
     };
 
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
-                              const CaseStmt *unknownCase = nullptr) {
+                              const CaseStmt *unknownCase,
+                              const CaseStmt *defaultCase) {
+      assert(!(unknownCase && defaultCase) &&
+             "both @unknown default and default should be caught earlier");
       if (!Switch->getLBraceLoc().isValid()) {
         // There is no '{' in the switch statement, which we already diagnosed
         // in the parser. So there's no real body to speak of and it doesn't
         // make sense to emit diagnostics about missing cases.
         return;
       }
+
+      std::optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
+          diag::non_exhaustive_switch;
+
+      // Decide whether we want an error or a warning.
+      bool downgrade = false;
+
+      // We either replace default with unknown default or known cases
+      // based on resilience and StrictExhaustiveSwitches
+      bool hasEmittedUnnecessaryDefaultDiagnostic = false;
+
       auto &DE = Context.Diags;
+      if (defaultCase) {
+        if (defaultReason != RequiresDefault::No) {
+          // We actually do need the default,
+          // so it does handle the space, do not emit diagnostics
+          return;
+        }
+
+        // Switch actually is exhaustive with known cases,
+        // so don't emit exhaustive diagnostic
+        mainDiagType.reset();
+      }
+
       SourceLoc startLoc = Switch->getStartLoc();
       SourceLoc insertLoc;
       if (unknownCase)
@@ -1114,10 +1178,6 @@ namespace {
       llvm::SmallString<128> buffer;
       llvm::raw_svector_ostream OS(buffer);
 
-      // Decide whether we want an error or a warning.
-      std::optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
-          diag::non_exhaustive_switch;
-      bool downgrade = false;
       if (unknownCase) {
         switch (defaultReason) {
         case RequiresDefault::EmptySwitchBody:
@@ -1155,17 +1215,12 @@ namespace {
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
         auto *theEnum = subjectType->getEnumOrBoundGenericEnum();
-
         if (theEnum) {
           auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
               enumModule->isSystemModule() ||
               theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
-
-        auto diag =
-            DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                        subjectType, shouldIncludeFutureVersionComment);
 
         auto shouldWarnUntilVersion = [&theEnum]() -> unsigned {
           if (theEnum) {
@@ -1180,11 +1235,31 @@ namespace {
           return 6;
         };
 
-        diag.warnUntilLanguageMode(shouldWarnUntilVersion());
+        if (defaultCase) {
+          hasEmittedUnnecessaryDefaultDiagnostic = true;
+          DE.diagnose(startLoc,
+                      diag::exhaustive_switch_replace_default_with_unknown,
+                      subjectType, shouldIncludeFutureVersionComment)
+              .fixItInsert(defaultCase->getStartLoc(), "@unknown ")
+              .warnUntilLanguageMode(shouldWarnUntilVersion());
+        } else {
+          DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                      subjectType, shouldIncludeFutureVersionComment)
+              .warnUntilLanguageMode(shouldWarnUntilVersion());
+        }
 
-        mainDiagType = std::nullopt;
-      }
+        mainDiagType.reset();
         break;
+      }
+      }
+
+      if (defaultCase && !hasEmittedUnnecessaryDefaultDiagnostic) {
+        // Warn that the default case is not needed, remove the
+        // default case and enumerate the cases below
+        hasEmittedUnnecessaryDefaultDiagnostic = true;
+        DE.diagnose(defaultCase->getStartLoc(), diag::decompose_default_case)
+            .fixItRemoveChars(defaultCase->getStartLoc(),
+                              defaultCase->getEndLoc());
       }
 
       switch (defaultReason) {
@@ -1224,9 +1299,7 @@ namespace {
 
       // Add notes to explain what's missing.
       auto processUncoveredSpaces =
-          [&](llvm::function_ref<void(const Space &space,
-                                      bool onlyOneUncoveredSpace)> process) {
-
+          [&](llvm::function_ref<void(const Space &space)> process) {
         // Flatten away all disjunctions.
         SmallVector<Space, 4> flats;
         flatten(uncovered, flats);
@@ -1255,8 +1328,8 @@ namespace {
           flatsToEmit.insert(space);
         }
 
-        // Finally we can iterate over the flat spaces in their original order,
-        // but only emit the interesting ones.
+            // Finally we can iterate over the flat spaces in their original
+            // order, but only emit the interesting ones.
         for (const Space &flat : flats) {
           if (!flatsToEmit.count(&flat))
             continue;
@@ -1264,22 +1337,23 @@ namespace {
           if (flat.getKind() == SpaceKind::UnknownCase) {
             assert(&flat == &flats.back() && "unknown case must be last");
             if (unknownCase) {
-              // This can occur if the /only/ case in the switch is 'unknown'.
-              // In that case we won't do any analysis on the input space, but
-              // will later decompose the space into cases.
+                  // This can occur if the /only/ case in the switch is
+                  // 'unknown'. In that case we won't do any analysis on the
+                  // input space, but will later decompose the space into cases.
               continue;
             }
-            if (!Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity))
+                if (!Context.LangOpts.hasFeature(
+                        Feature::NonfrozenEnumExhaustivity))
               continue;
 
-            // This can occur if the switch is empty and the subject type is an
-            // enum. If decomposing the enum type yields an unknown space that
-            // is not required, don't suggest adding it in the fix-it.
+                // This can occur if the switch is empty and the subject type is
+                // an enum. If decomposing the enum type yields an unknown space
+                // that is not required, don't suggest adding it in the fix-it.
             if (flat.isAllowedButNotRequired())
               continue;
           }
 
-          process(flat, flats.size() == 1);
+              process(flat);
         }
       };
 
@@ -1300,14 +1374,16 @@ namespace {
       SmallString<128> missingSeveralCasesFixIt;
       int diagnosedCases = 0;
 
-      processUncoveredSpaces([&](const Space &space,
-                                 bool onlyOneUncoveredSpace) {
+      processUncoveredSpaces([&](const Space &space) {
         llvm::SmallString<64> fixItBuffer;
         llvm::raw_svector_ostream fixItOS(fixItBuffer);
         if (space.getKind() == SpaceKind::UnknownCase) {
-          fixItOS << "@unknown " << tok::kw_default << ":\n<#fatalError()#>\n";
+          if (!hasEmittedUnnecessaryDefaultDiagnostic) {
+            fixItOS << "@unknown " << tok::kw_default
+                    << ":\n<#fatalError()#>\n";
           DE.diagnose(startLoc, diag::missing_unknown_case)
               .fixItInsert(insertLoc, fixItBuffer.str());
+          }
         } else {
           llvm::SmallString<64> spaceBuffer;
           llvm::raw_svector_ostream spaceOS(spaceBuffer);
