@@ -2234,9 +2234,8 @@ struct IndirectAssignTests {
     mutating func take() -> sending NonSendableKlass {
       if let value {
         self.value = nil
-        // TODO: Why are we not erroring on this. We should be.
-        return value // xpected-warning {{sending 'value' risks causing data races}}
-        // xpected-note @-1 {{main actor-isolated 'value' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{main actor-isolated 'value' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
       } else {
         preconditionFailure("Consumed twice")
       }
