@@ -1,4 +1,4 @@
-# Windows Profiling Tools
+# Profiling the Swift Compiler on Windows
 
 This document describes Windows profiling tools from the angle of **profiling the Swift compiler itself**. The information is mostly general purpose, but specifics relevant to other applications aren't considered.
 
