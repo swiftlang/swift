@@ -5874,33 +5874,6 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 bool canAddExplicitConsume(constraints::Solution &sol,
                            ModuleDecl *module, Expr *expr);
 
-// Count the number of overload sets present
-// in the expression and all of the children.
-class OverloadSetCounter : public ASTWalker {
-  unsigned &NumOverloads;
-
-public:
-  OverloadSetCounter(unsigned &overloads)
-  : NumOverloads(overloads)
-  {}
-
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Arguments;
-  }
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
-      // If we've found function application and it's
-      // function is an overload set, count it.
-      if (isa<OverloadSetRefExpr>(applyExpr->getFn()))
-        ++NumOverloads;
-    }
-
-    // Always recur into the children.
-    return Action::Continue(expr);
-  }
-};
-
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
 bool exprNeedsParensBeforeAddingNilCoalescing(DeclContext *DC,
