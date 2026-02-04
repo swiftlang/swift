@@ -1629,8 +1629,6 @@ public:
       if (substResultTL.getRecursiveProperties()
                        .isAddressableForDependencies()) {
         convention = ResultConvention::GuaranteedAddress;
-      } else if (substResultTL.isTrivial()) {
-        convention = ResultConvention::Unowned;
       } else if (isFormallyReturnedIndirectly(origType, substType,
                                               substResultTLForConvention)) {
         convention = ResultConvention::GuaranteedAddress;

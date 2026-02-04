@@ -334,6 +334,9 @@ WARNING(old_coroutine_accessor,none,
 ERROR(accessor_requires_borrow_and_mutate_accessors,none,
       "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
       (StringRef))
+ERROR(borrow_mutate_pair_restrict,none,
+      "A '%0' accessor can only be defined along with a '%1' accessor",
+      (StringRef, StringRef))
 
 // Import
 ERROR(decl_expected_module_name,none,
