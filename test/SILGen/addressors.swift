@@ -224,7 +224,7 @@ struct D : Subscriptable {
 // SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // SILGEN:   assign [[VALUE]] to [[ACCESS]] : $*Int32
 
-// SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEciM
+// SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEcix
 // SILGEN: bb0([[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   [[SELF_ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF]]
 // SILGEN:   [[T0:%.*]] = function_ref @$s10addressors1DVys5Int32VAEciau
@@ -343,10 +343,10 @@ struct Foo<Base>: FooProtocol {
 // CHECK-LABEL: sil_vtable Base {
 // CHECK-NEXT: #Base.data!getter: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
 // CHECK-NEXT: #Base.data!setter: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!modify: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
+// CHECK-NEXT: #Base.data!yielding_mutate: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvx
 // CHECK-NEXT: #Base.value!getter: (Base) -> () -> Int32 : @$s10addressors4BaseC5values5Int32Vvg
 // CHECK-NEXT: #Base.value!setter: (Base) -> (Int32) -> () : @$s10addressors4BaseC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!modify: (Base) -> () -> () : @$s10addressors4BaseC5values5Int32VvM
+// CHECK-NEXT: #Base.value!yielding_mutate: (Base) -> () -> () : @$s10addressors4BaseC5values5Int32Vvx
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors4BaseCACycfC
 // CHECK-NEXT: #Base.deinit!deallocator: @$s10addressors4BaseCfD
 // CHECK-NEXT: }
@@ -354,10 +354,10 @@ struct Foo<Base>: FooProtocol {
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT: #Base.data!getter: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
 // CHECK-NEXT: #Base.data!setter: (Base) -> (UnsafeMutablePointer<Int32>) -> () : @$s10addressors4BaseC4dataSpys5Int32VGvs
-// CHECK-NEXT: #Base.data!modify: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvM
+// CHECK-NEXT: #Base.data!yielding_mutate: (Base) -> () -> () : @$s10addressors4BaseC4dataSpys5Int32VGvx
 // CHECK-NEXT: #Base.value!getter: (Base) -> () -> Int32 : @$s10addressors3SubC5values5Int32Vvg
 // CHECK-NEXT: #Base.value!setter: (Base) -> (Int32) -> () : @$s10addressors3SubC5values5Int32Vvs
-// CHECK-NEXT: #Base.value!modify: (Base) -> () -> () : @$s10addressors3SubC5values5Int32VvM
+// CHECK-NEXT: #Base.value!yielding_mutate: (Base) -> () -> () : @$s10addressors3SubC5values5Int32Vvx
 // CHECK-NEXT: #Base.init!allocator: (Base.Type) -> () -> Base : @$s10addressors3SubCACycfC
 // CHECK-NEXT: #Sub.deinit!deallocator: @$s10addressors3SubCfD
 // CHECK-NEXT: }
