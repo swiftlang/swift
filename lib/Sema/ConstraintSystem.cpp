@@ -41,6 +41,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -214,37 +215,6 @@ bool ConstraintSystem::hasFreeTypeVariables() {
   });
 }
 
-void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
-  ASSERT(!PreparingOverload);
-
-  TypeVariables.insert(typeVar);
-
-  // Notify the constraint graph.
-  CG.addTypeVariable(typeVar);
-}
-
-void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
-                                               TypeVariableType *typeVar2,
-                                               bool updateWorkList) {
-  assert(typeVar1 == getRepresentative(typeVar1) &&
-         "typeVar1 is not the representative");
-  assert(typeVar2 == getRepresentative(typeVar2) &&
-         "typeVar2 is not the representative");
-  assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-
-  // Always merge 'up' the constraint stack, because it is simpler.
-  if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
-    std::swap(typeVar1, typeVar2);
-
-  CG.mergeNodesPre(typeVar2);
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
-  CG.mergeNodes(typeVar1, typeVar2);
-
-  if (updateWorkList) {
-    addTypeVariableConstraintsToWorkList(typeVar1);
-  }
-}
-
 /// Determine whether the given type variables occurs in the given type.
 bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
                                            Type type,
@@ -259,73 +229,6 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
   }
 
   return occurs;
-}
-
-void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
-                                       bool updateState,
-                                       bool notifyBindingInference) {
-  assert(!type->hasError() &&
-         "Should not be assigning a type involving ErrorType!");
-
-  CG.retractFromInference(typeVar);
-  typeVar->getImpl().assignFixedType(type, getTrail());
-
-  if (!updateState)
-    return;
-
-  if (!type->isTypeVariableOrMember()) {
-    // If this type variable represents a literal, check whether we picked the
-    // default literal type. First, find the corresponding protocol.
-    //
-    // If we have the constraint graph, we can check all type variables in
-    // the equivalence class. This is the More Correct path.
-    // FIXME: Eliminate the less-correct path.
-    auto typeVarRep = getRepresentative(typeVar);
-    for (auto *tv : CG[typeVarRep].getEquivalenceClass()) {
-      auto locator = tv->getImpl().getLocator();
-      if (!(locator && (locator->directlyAt<CollectionExpr>() ||
-                        locator->directlyAt<LiteralExpr>())))
-          continue;
-
-      auto *literalProtocol = TypeChecker::getLiteralProtocol(
-          getASTContext(), castToExpr(locator->getAnchor()));
-      if (!literalProtocol)
-        continue;
-
-      // If the protocol has a default type, check it.
-      if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
-        auto isDefaultType = [&defaultType](Type type) {
-          // Check whether the nominal types match. This makes sure that we
-          // properly handle Array vs. Array<T>.
-          return defaultType->getAnyNominal() == type->getAnyNominal();
-        };
-
-        if (!isDefaultType(type)) {
-          // Treat `std.string` as a default type just like we do
-          // Swift standard library `String`. This helps to disambiguate
-          // operator overloads that use `std.string` vs. a custom C++
-          // type that conforms to `ExpressibleByStringLiteral` as well.
-          bool isCxxDefaultType =
-              literalProtocol->isSpecificProtocol(
-                  KnownProtocolKind::ExpressibleByStringLiteral) &&
-              type->isCxxString();
-
-          increaseScore(SK_NonDefaultLiteral, locator,
-                        isCxxDefaultType ? 1 : 2);
-        }
-      }
-
-      break;
-    }
-  }
-
-  // Notify the constraint graph.
-  CG.bindTypeVariable(typeVar, type);
-
-  addTypeVariableConstraintsToWorkList(typeVar);
-
-  if (notifyBindingInference)
-    CG.introduceToInference(typeVar, type);
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(

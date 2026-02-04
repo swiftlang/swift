@@ -32,6 +32,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>

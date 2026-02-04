@@ -87,6 +87,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckType.cpp
   TypeCheckUnsafe.cpp
   TypeChecker.cpp
+  TypeVariableType.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")

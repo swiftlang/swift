@@ -20,6 +20,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -729,9 +730,9 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
             // Compiler-known marker protocols cannot be extended with members,
             // so do not consider them.
             if (auto p = protocolTy->getAs<ProtocolType>()) {
-              if (ProtocolDecl *decl = p->getDecl())
-                if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
-                  continue;
+              ProtocolDecl *decl = p->getDecl();
+              if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
+                continue;
 
               // During normal type-checking filter inferred protocols based on
               // whether they have the member or not. There is no reason to
