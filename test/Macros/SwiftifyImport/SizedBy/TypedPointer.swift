@@ -1,108 +1,146 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_LifetimeDependence
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -enable-experimental-feature LifetimeDependence -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+
+// RUN: %target-swift-frontend %t/test.swift -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -enable-experimental-feature LifetimeDependence -verify
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature LifetimeDependence 2> %t/expansions.out
+// RUN: %diff %t/expansions.out %t/expansions.expected
+
+//--- test.swift
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
+public func constParam(_ ptr: UnsafePointer<CChar>, _ size: CInt) {}
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
-func constParam(_ ptr: UnsafePointer<CChar>, _ size: CInt) {}
-
-@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
-func mutParam(_ ptr: UnsafeMutablePointer<UInt8>, _ size: CInt) {}
+public func mutParam(_ ptr: UnsafeMutablePointer<UInt8>, _ size: CInt) {}
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size * count"))
-func exprParam(_ ptr: UnsafeMutablePointer<UInt8>, _ size: CInt, _ count: CInt) {}
+public func exprParam(_ ptr: UnsafeMutablePointer<UInt8>, _ size: CInt, _ count: CInt) {}
 
 @_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
-func constReturn(_ size: CInt) -> UnsafePointer<CChar> {}
+public func constReturn(_ size: CInt) -> UnsafePointer<CChar> { return unsafe UnsafePointer(OpaquePointer(bitPattern: 0)!) }
 
 @_SwiftifyImport(.sizedBy(pointer: .return, size: "size"))
-func mutReturn(_ size: CInt) -> UnsafeMutablePointer<UInt8> {}
+public func mutReturn(_ size: CInt) -> UnsafeMutablePointer<UInt8> { return unsafe UnsafeMutablePointer(OpaquePointer(bitPattern: 0)!) }
 
 @_SwiftifyImport(.sizedBy(pointer: .return, size: "size * count"))
-func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutablePointer<UInt8> {}
+public func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutablePointer<UInt8> { return unsafe UnsafeMutablePointer(OpaquePointer(bitPattern: 0)!) }
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"),
                  .nonescaping(pointer: .param(1)))
-func constParamNoreturn(_ ptr: UnsafePointer<CChar>, _ size: CInt) {}
+public func constParamNoreturn(_ ptr: UnsafePointer<CChar>, _ size: CInt) {}
 
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"),
                  .nonescaping(pointer: .param(1)))
-func mutParamNoreturn(_ ptr: UnsafeMutablePointer<UInt8>, _ size: CInt) {}
+public func mutParamNoreturn(_ ptr: UnsafeMutablePointer<UInt8>, _ size: CInt) {}
 
 @_SwiftifyImport(.sizedBy(pointer: .param(2), size: "size"),
                  .sizedBy(pointer: .return, size: "size"),
                  .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy))
-func constReturnDependence(_ size: CInt, _ ptr: UnsafePointer<UInt8>) -> UnsafePointer<CChar> {}
+public func constReturnDependence(_ size: CInt, _ ptr: UnsafePointer<UInt8>) -> UnsafePointer<CChar> { return unsafe UnsafePointer(OpaquePointer(bitPattern: 0)!) }
 
 @_SwiftifyImport(.sizedBy(pointer: .param(2), size: "size"),
                  .sizedBy(pointer: .return, size: "size"),
                  .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy))
-func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> UnsafeMutablePointer<UInt8> {}
+public func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> UnsafeMutablePointer<UInt8> { return unsafe UnsafeMutablePointer(OpaquePointer(bitPattern: 0)!) }
 
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func constParam(_ ptr: UnsafeRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
-// CHECK-NEXT:     return unsafe constParam(ptr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
-// CHECK-NEXT:     let size = CInt(exactly: ptr.count)!
-// CHECK-NEXT:     return unsafe mutParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ count: CInt) {
-// CHECK-NEXT:     let _ptrCount = ptr.count
-// CHECK-NEXT:     if _ptrCount != size * count {
-// CHECK-NEXT:       fatalError("bounds check failure in exprParam: expected \(size * count) but got \(_ptrCount)")
-// CHECK-NEXT:     }
-// CHECK-NEXT:     return unsafe exprParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, count)
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func constReturn(_ size: CInt) -> UnsafeRawBufferPointer {
-// CHECK-NEXT:     return unsafe UnsafeRawBufferPointer(start: unsafe constReturn(size), count: Int(size))
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func mutReturn(_ size: CInt) -> UnsafeMutableRawBufferPointer {
-// CHECK-NEXT:     return unsafe UnsafeMutableRawBufferPointer(start: unsafe mutReturn(size), count: Int(size))
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutableRawBufferPointer {
-// CHECK-NEXT:     return unsafe UnsafeMutableRawBufferPointer(start: unsafe exprReturn(size, count), count: Int(size * count))
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func constParamNoreturn(_ ptr: RawSpan) {
-// CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
-// CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:       return unsafe constParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
-// CHECK-NEXT:     }
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
-// CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
-// CHECK-NEXT:     return unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:       return unsafe mutParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
-// CHECK-NEXT:     }
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
-// CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
-// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:       return unsafe constReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self))
-// CHECK-NEXT:             }, byteCount: Int(size)), copying: ())
-// CHECK-NEXT: }
-
-// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-// CHECK-NEXT: func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
-// CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
-// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:       return unsafe mutReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self))
-// CHECK-NEXT:             }, byteCount: Int(size)), copying: ())
-// CHECK-NEXT: }
+//--- expansions.expected
+@__swiftmacro_4test10constParam15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func constParam(_ ptr: UnsafeRawBufferPointer) {
+    let size = CInt(exactly: ptr.count)!
+    return unsafe constParam(ptr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
+}
+------------------------------
+@__swiftmacro_4test8mutParam15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
+    let size = CInt(exactly: ptr.count)!
+    return unsafe mutParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
+}
+------------------------------
+@__swiftmacro_4test9exprParam15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ count: CInt) {
+    let _ptrCount = ptr.count
+    if _ptrCount != size * count {
+      fatalError("bounds check failure in exprParam: expected \(size * count) but got \(_ptrCount)")
+    }
+    return unsafe exprParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, count)
+}
+------------------------------
+@__swiftmacro_4test11constReturn15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func constReturn(_ size: CInt) -> UnsafeRawBufferPointer {
+    return unsafe UnsafeRawBufferPointer(start: unsafe constReturn(size), count: Int(size))
+}
+------------------------------
+@__swiftmacro_4test9mutReturn15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func mutReturn(_ size: CInt) -> UnsafeMutableRawBufferPointer {
+    return unsafe UnsafeMutableRawBufferPointer(start: unsafe mutReturn(size), count: Int(size))
+}
+------------------------------
+@__swiftmacro_4test10exprReturn15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutableRawBufferPointer {
+    return unsafe UnsafeMutableRawBufferPointer(start: unsafe exprReturn(size, count), count: Int(size * count))
+}
+------------------------------
+@__swiftmacro_4test18constParamNoreturn15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func constParamNoreturn(_ ptr: RawSpan) {
+    let size = CInt(exactly: ptr.byteCount)!
+    return unsafe ptr.withUnsafeBytes { _ptrPtr in
+      return unsafe constParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
+    }
+}
+------------------------------
+@__swiftmacro_4test16mutParamNoreturn15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
+public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
+    let size = CInt(exactly: ptr.byteCount)!
+    return unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
+      return unsafe mutParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
+    }
+}
+------------------------------
+@__swiftmacro_4test21constReturnDependence15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
+public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
+    let size = CInt(exactly: ptr.byteCount)!
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe ptr.withUnsafeBytes { _ptrPtr in
+      return unsafe constReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self))
+            }, byteCount: Int(size)), copying: ())
+}
+------------------------------
+@__swiftmacro_4test19mutReturnDependence15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
+public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
+    let size = CInt(exactly: ptr.byteCount)!
+    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
+      return unsafe mutReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self))
+            }, byteCount: Int(size)), copying: ())
+}
+------------------------------
