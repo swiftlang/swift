@@ -297,7 +297,7 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
       continue;
     }
 
-    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+    if (isIncidentalUse(user) || onlyAffectsRefCount(user) || isa<DeallocPackInst>(user))
       continue;
 
     // Look through mark must check inst.
@@ -325,6 +325,28 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
         diagnose(Context, site.getLoc(), diag::value_captured_transitively);
         continue;
       }
+    }
+
+    // Look through indirect pack references. A function with a pack parameter
+    // will get the address, set the pack, and later get and load the pack. We
+    // want to follow this indirection to diagnose where the pack value is
+    // actually used.
+    if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+      if (isa<TuplePackElementAddrInst>(user) ||
+          isa<PackElementGetInst>(user) || isa<LoadInst>(user)) {
+        for (auto *use : svi->getUses())
+          uselistInsert(use);
+        continue;
+      }
+    }
+
+    // Follow the uses of the pack that is set, to discover get/load
+    // instructions
+    if (auto *packElemSetInst = dyn_cast<PackElementSetInst>(user)) {
+      for (auto *use : packElemSetInst->getPack()->getUses()) {
+        uselistInsert(use);
+      }
+      continue;
     }
 
     // Otherwise, we might have found one of the "real" usages of the capture.
