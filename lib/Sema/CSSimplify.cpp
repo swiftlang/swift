@@ -8975,8 +8975,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   /// Record the given conformance as the result, adding any conditional
   /// requirements if necessary.
   auto recordConformance = [&](ProtocolConformanceRef conformance) {
-    if (isConformanceUnavailable(conformance, loc))
-      increaseScore(SK_Unavailable, locator);
+    if (isConformanceUnavailable(conformance, loc)) {
+      if (conformance.getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        increaseScore(SK_MissingSynthesizableConformance, locator);
+      } else {
+        increaseScore(SK_Unavailable, locator);
+      }
+    }
 
     unsigned numMissing = 0;
     conformance.forEachMissingConformance([&numMissing](auto *missing) {
