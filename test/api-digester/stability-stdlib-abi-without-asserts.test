@@ -836,6 +836,10 @@ Enum _DependenceType is a new API without '@available'
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
 
+Struct CollectionOfOne has added a conformance to an existing protocol Equatable
+Struct CollectionOfOne has added a conformance to an existing protocol Hashable
+Struct Dictionary.Keys has added a conformance to an existing protocol Hashable
+Struct EmptyCollection has added a conformance to an existing protocol Hashable
 Struct EnumeratedSequence has added a conformance to an existing protocol BidirectionalCollection
 Struct EnumeratedSequence has added a conformance to an existing protocol Collection
 Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection

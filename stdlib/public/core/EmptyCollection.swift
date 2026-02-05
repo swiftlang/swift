@@ -175,3 +175,20 @@ extension EmptyCollection: Equatable {
 
 extension EmptyCollection: Sendable { }
 extension EmptyCollection.Iterator: Sendable { }
+
+extension EmptyCollection {
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(0)
+  }
+
+  @_alwaysEmitIntoClient
+  public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension EmptyCollection: Hashable {}
