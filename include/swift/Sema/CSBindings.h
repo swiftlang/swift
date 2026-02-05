@@ -149,10 +149,6 @@ struct PotentialBinding {
 
   bool isTransitive() const { return bool(Originator); }
 
-  bool isTransitiveSupertype() const {
-    return Kind == AllowedBindingKind::Supertypes && isTransitive();
-  }
-
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
   /// a non-default r-value supertype binding with no type variables.
@@ -324,7 +320,9 @@ struct PotentialBindings {
   /// \param literal The constraint to process.
   /// \param isDirect Determines whether this is a direct requirement of the
   /// current type variable or constraint has been transitively inferred.
-  void inferFromLiteral(Constraint *literal, TypeVariableType *transitiveFrom);
+  ///
+  /// \returns true if new literal was added to the set and false otherwise.
+  bool inferFromLiteral(Constraint *literal, TypeVariableType *transitiveFrom);
 
   /// Attempt to infer a new binding and other useful information
   /// (i.e. whether bindings should be delayed) from the given

@@ -1110,7 +1110,7 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void PotentialBindings::inferFromLiteral(Constraint *constraint,
+bool PotentialBindings::inferFromLiteral(Constraint *constraint,
                                          TypeVariableType *transitiveFrom) {
   ASSERT(TypeVar);
 
@@ -1118,7 +1118,7 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint,
 
   for (const auto &literal : Literals) {
     if (literal.getProtocol() == protocol)
-      return;
+      return false;
   }
   
   Type defaultType;
@@ -1136,6 +1136,7 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint,
         SolverTrail::Change::AddedLiteral(TypeVar, constraint, transitiveFrom));
 
   Literals.emplace_back(protocol, constraint, defaultType, transitiveFrom);
+  return true;
 }
 
 bool BindingSet::operator==(const BindingSet &other) {
@@ -2245,7 +2246,19 @@ PotentialBindings::infer(Constraint *constraint) {
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    inferFromLiteral(constraint, /*transitiveFrom=*/nullptr);
+    if (!inferFromLiteral(constraint, /*transitiveFrom=*/nullptr))
+      break;
+
+    if (CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference)) {
+      auto defaultType =
+          TypeChecker::getDefaultType(constraint->getProtocol(), CS.DC);
+      // Create a binding and propagate it up supertype chain. This binding
+      // might not have a type but it doesn't matter since it would be converted
+      // to a LiteralRequirement on the other side.
+      return PotentialBinding(defaultType, AllowedBindingKind::Exact,
+                              constraint);
+    }
+
     break;
   }
 
