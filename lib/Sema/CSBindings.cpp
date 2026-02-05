@@ -919,6 +919,24 @@ void BindingSet::addBinding(PotentialBinding binding) {
       !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
 
+  SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+  binding.BindingType->getTypeVariables(referencedTypeVars);
+
+  // If type variable is not allowed to bind to `lvalue`,
+  // let's check if type of potential binding has any
+  // type variables, which are allowed to bind to `lvalue`,
+  // and postpone such type from consideration.
+  //
+  // This check is done here and not in `checkTypeOfBinding`
+  // because the l-valueness of the variable might change during
+  // solving and that would not be reflected in the graph.
+  if (!TypeVar->getImpl().canBindToLValue()) {
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().canBindToLValue())
+        return;
+    }
+  }
+
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
@@ -992,24 +1010,6 @@ void BindingSet::addBinding(PotentialBinding binding) {
         Bindings.erase(existing);
         break;
       }
-    }
-  }
-
-  SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
-  binding.BindingType->getTypeVariables(referencedTypeVars);
-
-  // If type variable is not allowed to bind to `lvalue`,
-  // let's check if type of potential binding has any
-  // type variables, which are allowed to bind to `lvalue`,
-  // and postpone such type from consideration.
-  //
-  // This check is done here and not in `checkTypeOfBinding`
-  // because the l-valueness of the variable might change during
-  // solving and that would not be reflected in the graph.
-  if (!TypeVar->getImpl().canBindToLValue()) {
-    for (auto *typeVar : referencedTypeVars) {
-      if (typeVar->getImpl().canBindToLValue())
-        return;
     }
   }
 
