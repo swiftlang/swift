@@ -33,6 +33,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -44,6 +45,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -2218,6 +2220,16 @@ namespace {
                                                baseSwiftDecl, baseClangDecl);
     }
 
+    void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) {
+      auto inheritedTypes = D->getInherited();
+      SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
+      auto proto = Impl.SwiftContext.getProtocol(kind);
+      entries.push_back(InheritedEntry(
+          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType())));
+      entries.back().setSuppressed();
+      D->setInherited(Impl.SwiftContext.AllocateCopy(entries));
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -2385,6 +2397,7 @@ namespace {
         }
         result->addAttribute(new (Impl.SwiftContext)
                                  MoveOnlyAttr(/*Implicit=*/true));
+        addSuppressedProtocol(result, KnownProtocolKind::Copyable);
       }
 
       bool isNonEscapable = false;
@@ -2394,6 +2407,7 @@ namespace {
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->addAttribute(new (Impl.SwiftContext)
                                  NonEscapableAttr(/*Implicit=*/true));
+        addSuppressedProtocol(result, KnownProtocolKind::Escapable);
         isNonEscapable = true;
       }
 
