@@ -977,20 +977,25 @@ static void diagnoseMissingRequiredInitializer(
 /// at least once.
 static bool enumerateCurrentPropertiesAndAuxiliaryVars(
     NominalTypeDecl *typeDecl, llvm::function_ref<bool(VarDecl *)> callback) {
+  bool hadErrors = false;
+
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (hadErrors)
+      return;
+
+    if (auto *var = dyn_cast<VarDecl>(member)) {
+      if (!callback(var)) {
+        hadErrors = true;
+        return;
+      }
+    }
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
   for (auto *member :
        typeDecl->getImplementationContext()->getCurrentMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member)) {
-      if (!callback(var))
-        return true;
-    }
-
-    bool hadErrors = false;
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto *auxVar = dyn_cast<VarDecl>(auxDecl)) {
-        hadErrors |= !callback(auxVar);
-      }
-    });
-
+    visitMember(member);
     if (hadErrors)
       return true;
   }
