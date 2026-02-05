@@ -936,6 +936,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
 
+#if 0
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
@@ -1000,6 +1001,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       }
     }
   }
+#endif
 
   SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
   binding.BindingType->getTypeVariables(referencedTypeVars);
@@ -1019,6 +1021,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
+#if 0
   // Since Double and CGFloat are effectively the same type due to an
   // implicit conversion between them, always prefer Double over CGFloat
   // when possible.
@@ -1049,7 +1052,9 @@ void BindingSet::addBinding(PotentialBinding binding) {
       }
     }
   }
+#endif
 
+#if 0
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
@@ -1101,7 +1106,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
     if (!joined.empty())
       return;
   }
-
+#endif
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
 
