@@ -876,6 +876,10 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
             NestedExpected.ExpectedEnd - NestedMatchStart.data();
         assert(NestedMatchEnd > 0);
         PrevMatchEnd = NestedMatch + NestedMatchEnd;
+      } else {
+        // Skip line if this an expected diagnostic with a prefix this invocation ignores,
+        // otherwise its }} will close the expansion.
+        PrevMatchEnd = MatchStart.find("\n", PrevMatchEnd);
       }
 
       size_t NextEnd = MatchStart.find("}}", PrevMatchEnd);
