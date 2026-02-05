@@ -96,8 +96,6 @@ GRAPH_NODE_CHANGE(AddedConstraint)
 GRAPH_NODE_CHANGE(RemovedConstraint)
 GRAPH_NODE_CHANGE(AddedConstraintToInference)
 GRAPH_NODE_CHANGE(RetractedConstraintFromInference)
-GRAPH_NODE_CHANGE(AddedLiteral)
-GRAPH_NODE_CHANGE(RetractedLiteral)
 
 COMMON_BINDING_INFORMATION_ADDITION(DelayedBy, DelayedBy)
 COMMON_BINDING_INFORMATION_RETRACTION(DelayedBy, DelayedBy)
@@ -145,8 +143,10 @@ CHANGE(RecordedKeyPath)
 CHANGE(RetiredConstraint)
 CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
+CHANGE(AddedLiteral)
+CHANGE(RetractedLiteral)
 
-LAST_CHANGE(RetractedBinding)
+LAST_CHANGE(RetractedLiteral)
 
 #undef LOCATOR_CHANGE
 #undef EXPR_CHANGE
