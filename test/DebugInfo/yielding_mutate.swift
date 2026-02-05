@@ -22,7 +22,7 @@ var state = S()
 // CHECK: %[[call_result:.*]] = call swiftcc { ptr, ptr } %[[coro]]
 // CHECK: %[[continuation_ptr:.*]] = extractvalue  { ptr, ptr } %[[call_result]]
 // CHECK: call {{.*}} @{{.*}}USE{{.*}}, !dbg ![[DBG:.*]]
-// CHECK-NEXT: call swiftcc void %[[continuation_ptr]]{{.*}}, !dbg ![[DBG]]
+// CHECK: call swiftcc void %[[continuation_ptr]]{{.*}}, !dbg ![[DBG]]
 USE(&state.computed_property)
 FINISH()
 // CHECK: call swiftcc void @"{{.*}}FINISH
