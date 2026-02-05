@@ -22,6 +22,10 @@ import CxxStdlib
 
 var StdVectorTestSuite = TestSuite("StdVector")
 
+func getNumber(_ x: borrowing NonCopyable) -> Int32 {
+    return x.number
+}
+
 StdVectorTestSuite.test("VectorOfInt.init") {
     let v = Vector()
     expectEqual(v.size(), 0)
@@ -216,10 +220,6 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
     expectEqual(v.size(), 2)
     expectFalse(v.empty())
 
-    func getNumber(_ x: borrowing NonCopyable) -> Int32 {
-        return x.number
-    }
-
     expectEqual(getNumber(v[0]), 1)
     expectEqual(getNumber(v[1]), 2)
 
@@ -228,6 +228,44 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
 
     expectEqual(getNumber(v[0]), 3)
     expectEqual(getNumber(v[1]), 4)
+}
+
+StdVectorTestSuite.test("VectorOfInt conforms to CxxBorrowingSequence") {
+    let v = Vector([2, 3, 1])
+    expectEqual(v.size(), 3)
+    expectFalse(v.empty())
+
+    var iterator : CxxBorrowingIterator<Vector, Int32> = v.makeBorrowingIterator()
+    var counter = 0
+    while true {
+        var span = iterator.nextSpan()
+        if (span.count == 0) { break }
+        for i in 0..<span.count {
+            expectEqual(span[i], v[counter])
+            counter += 1
+        }
+    }
+    expectEqual(counter, v.size())
+}
+
+StdVectorTestSuite.test("VectorOfNonCopyable conforms to CxxBorrowingSequence") {
+    var v1 = Vector([1, 3, 2, 4])
+    var v2 = makeVectorOfNonCopyable(v1)
+    expectEqual(v1.size(), v2.size())
+    expectFalse(v1.empty())
+    expectFalse(v2.empty())
+
+    var iterator = v2.makeBorrowingIterator()
+    var counter = 0
+    while true {
+        var span = iterator.nextSpan()
+        if (span.count == 0) { break }
+        for i in 0..<span.count {
+            expectEqual(getNumber(span[i]), v1[counter])
+            counter += 1
+        }
+    }
+    expectEqual(counter, v1.size())
 }
 
 

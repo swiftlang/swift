@@ -14,8 +14,11 @@ import Cxx
 
 var StdPairTestSuite = TestSuite("StdPair")
 
+func takePair<T: CxxPair & ~Copyable>(_ _: consuming T) { }
+
 StdPairTestSuite.test("StdPairInts.init") {
   let pi = PairInts(first: 1, second: 2)
+  takePair(pi)
   expectEqual(pi.first, 1)
   expectEqual(pi.second, 2)
 }
@@ -60,6 +63,23 @@ StdPairTestSuite.test("StdPair as CxxPair") {
   var pair: any CxxPair<CInt, CInt> = getIntPair()
   changeFirst(&pair)
   expectEqual(pair.first, 123)
+}
+
+StdPairTestSuite.test("StdPair of NonCopyable") {
+  let p1 = NonCopyableFirst(first: NonCopyable(field: 1), second: 2)
+  expectEqual(p1.first.field, 1)
+  expectEqual(p1.second, 2)
+  takePair(p1)
+
+  let p2 = NonCopyableSecond(first: 3, second: NonCopyable(field: 4))
+  expectEqual(p2.first, 3)
+  expectEqual(p2.second.field, 4)
+  takePair(p2)
+
+  let p3 = NonCopyableBoth(first: NonCopyable(field: 5), second: NonCopyable(field: 6))
+  expectEqual(p3.first.field, 5)
+  expectEqual(p3.second.field, 6)
+  takePair(p3)
 }
 
 runAllTests()

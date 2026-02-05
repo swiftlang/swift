@@ -322,13 +322,18 @@ public protocol IteratorProtocol<Element> {
 /// makes no other requirements about element access, so routines that
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
-public protocol Sequence<Element> {
+public protocol Sequence<Element>: BorrowingSequence {
   /// A type representing the sequence's elements.
   associatedtype Element
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
+
+  //  @available(SwiftStdlib 6.3, *)
+  /// A type that provides the sequence's iteration interface and
+  /// encapsulates its iteration state.
+  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = BorrowingIteratorAdapter<Iterator>
 
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility

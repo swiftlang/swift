@@ -43,10 +43,11 @@ struct NonCopyable {
 using VectorOfNonCopyable = std::vector<NonCopyable>;
 using VectorOfPointer = std::vector<NonCopyable *>;
 
-inline VectorOfNonCopyable makeVectorOfNonCopyable() {
+inline VectorOfNonCopyable makeVectorOfNonCopyable(Vector init = {1, 2}) {
   VectorOfNonCopyable vec;
-  vec.emplace_back(1);
-  vec.emplace_back(2);
+  for (int i : init) {
+    vec.emplace_back(i);
+  }
   return vec;
 }
 

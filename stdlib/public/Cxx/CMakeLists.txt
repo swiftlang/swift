@@ -15,6 +15,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
+    CxxBorrowingSequence.swift
     CxxVector.swift
     CxxSpan.swift
     UnsafeCxxIterators.swift
@@ -24,10 +25,13 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     -enable-experimental-feature BuiltinModule
     -enable-experimental-feature AllowUnsafeAttribute
     -enable-experimental-feature Lifetimes
+    -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
     -strict-memory-safety
     # This module should not pull in the C++ standard library, so we disable it explicitly.
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).
     -Xcc -nostdinc++
+    # Temporarily disable availability checking during BorrowingSequence development
+    -Xfrontend -disable-availability-checking
 
     DEPLOYMENT_VERSION_OSX ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX}
     DEPLOYMENT_VERSION_IOS ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_IOS}
