@@ -681,8 +681,9 @@ void BindingSet::inferTransitiveSupertypeBindings() {
       if (!seenLiterals.insert(protocol).second)
         continue;
 
-      literal.setDirectRequirement(false);
-      Literals.push_back(literal);
+      Literals.push_back(literal.isDirectRequirement()
+                             ? literal.asTransitive(entry.first)
+                             : literal);
     }
 
     // TODO: We shouldn't need this in the future.
@@ -1109,9 +1110,9 @@ void BindingSet::coalesceIntegerAndFloatLiteralRequirements() {
   }
 }
 
-void PotentialBindings::inferFromLiteral(Constraint *constraint) {
+void PotentialBindings::inferFromLiteral(Constraint *constraint,
+                                         TypeVariableType *transitiveFrom) {
   ASSERT(TypeVar);
-  ASSERT(isDirectRequirement(CS, TypeVar, constraint));
 
   auto *protocol = constraint->getProtocol();
 
@@ -1131,9 +1132,10 @@ void PotentialBindings::inferFromLiteral(Constraint *constraint) {
   // from `Change::undo`, that's necessary because we only record
   // a constraint.
   if (CS.solverState && !CS.solverState->Trail.isUndoActive())
-    CS.recordChange(SolverTrail::Change::AddedLiteral(TypeVar, constraint));
+    CS.recordChange(
+        SolverTrail::Change::AddedLiteral(TypeVar, constraint, transitiveFrom));
 
-  Literals.emplace_back(protocol, constraint, defaultType, /*isDirect=*/true);
+  Literals.emplace_back(protocol, constraint, defaultType, transitiveFrom);
 }
 
 bool BindingSet::operator==(const BindingSet &other) {
@@ -1161,7 +1163,7 @@ bool BindingSet::operator==(const BindingSet &other) {
 
     if (x.Source != y.Source ||
         x.DefaultType.getPointer() != y.DefaultType.getPointer() ||
-        x.IsDirectRequirement != y.IsDirectRequirement) {
+        x.isDirectRequirement() != y.isDirectRequirement()) {
       return false;
     }
   }
@@ -2243,7 +2245,7 @@ PotentialBindings::infer(Constraint *constraint) {
     if (!isDirectRequirement(CS, TypeVar, constraint))
       break;
 
-    inferFromLiteral(constraint);
+    inferFromLiteral(constraint, /*transitiveFrom=*/nullptr);
     break;
   }
 
@@ -2393,8 +2395,10 @@ void PotentialBindings::retract(Constraint *constraint) {
                       [&](const LiteralRequirement &literal) {
                         if (literal.getSource() == constraint) {
                           if (CS.solverState) {
-                            CS.recordChange(SolverTrail::Change::RetractedLiteral(
-                                TypeVar, constraint));
+                            CS.recordChange(
+                                SolverTrail::Change::RetractedLiteral(
+                                    TypeVar, constraint,
+                                    literal.TransitiveFrom));
                           }
                           return true;
                         }

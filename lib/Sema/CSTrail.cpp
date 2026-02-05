@@ -350,6 +350,32 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::AddedLiteral(TypeVariableType *typeVar,
+                                  Constraint *constraint,
+                                  TypeVariableType *transitiveFrom) {
+  Change result;
+  result.Kind = ChangeKind::AddedLiteral;
+  result.Literal.TypeVar = typeVar;
+  result.Literal.Constraint = constraint;
+  result.Literal.TransitiveFrom = transitiveFrom;
+
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::RetractedLiteral(TypeVariableType *typeVar,
+                                      Constraint *constraint,
+                                      TypeVariableType *transitiveFrom) {
+  Change result;
+  result.Kind = ChangeKind::RetractedLiteral;
+  result.Literal.TypeVar = typeVar;
+  result.Literal.Constraint = constraint;
+  result.Literal.TransitiveFrom = transitiveFrom;
+
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -585,20 +611,21 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     break;
 
   case ChangeKind::AddedLiteral: {
-    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    auto &bindings = cg[Literal.TypeVar].getPotentialBindings();
     bindings.Literals.erase(
         llvm::remove_if(bindings.Literals,
                         [&](const LiteralRequirement &literal) {
-                          return literal.getSource() ==
-                                 TheConstraint.Constraint;
+                          return literal.Source == Literal.Constraint &&
+                                 literal.TransitiveFrom ==
+                                     Literal.TransitiveFrom;
                         }),
         bindings.Literals.end());
     break;
   }
 
   case ChangeKind::RetractedLiteral:
-    cg[TheConstraint.TypeVar].getPotentialBindings().inferFromLiteral(
-        TheConstraint.Constraint);
+    cg[Literal.TypeVar].getPotentialBindings().inferFromLiteral(
+        Literal.Constraint, Literal.TransitiveFrom);
     break;
 
   case ChangeKind::AddedBinding: {
@@ -859,6 +886,32 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << " with type ";
     Binding.BindingType->print(out, PO);
     out << " and kind " << Options << ")\n";
+    break;
+
+  case ChangeKind::AddedLiteral:
+    out << "(AddedLiteral ";
+    Literal.TypeVar->print(out, PO);
+    out << " protocol ";
+    Literal.Constraint->getProtocol()->print(out, PO);
+    if (Literal.TransitiveFrom) {
+      out << " (originator = ";
+      Literal.TransitiveFrom->print(out, PO);
+      out << ")";
+    }
+    out << ")\n";
+    break;
+
+  case ChangeKind::RetractedLiteral:
+    out << "(RetractedLiteral ";
+    Literal.TypeVar->print(out, PO);
+    out << " protocol ";
+    Literal.Constraint->getProtocol()->print(out, PO);
+    if (Literal.TransitiveFrom) {
+      out << " (originator = ";
+      Literal.TransitiveFrom->print(out, PO);
+      out << ")";
+    }
+    out << ")\n";
     break;
   }
 }

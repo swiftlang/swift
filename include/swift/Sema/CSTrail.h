@@ -150,6 +150,12 @@ public:
         TypeVariableType *Originator;
       } Binding;
 
+      struct {
+        TypeVariableType *TypeVar;
+        Constraint *Constraint;
+        TypeVariableType *TransitiveFrom;
+      } Literal;
+
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
       PackExpansionType *TheExpansion;
@@ -265,6 +271,19 @@ public:
     /// bindings.
     static Change RetractedBinding(TypeVariableType *typeVar,
                                    inference::PotentialBinding binding);
+
+    /// Create a change that added a literal conformance requirement to the
+    /// type variable's potential bindings. This could be caused by direct
+    /// or transitive inference.
+    static Change AddedLiteral(TypeVariableType *typeVar,
+                               Constraint *constraint,
+                               TypeVariableType *transitiveFrom);
+
+    /// Create a change that removed a literal conformance requirement from
+    /// the type variable's potential bindings.
+    static Change RetractedLiteral(TypeVariableType *typeVar,
+                                   Constraint *constraint,
+                                   TypeVariableType *transitiveFrom);
 
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
