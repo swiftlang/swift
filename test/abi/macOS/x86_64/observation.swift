@@ -235,4 +235,8 @@ Added: _$s11Observation0A8TrackingV7OptionsVs10SetAlgebraAAMc
 // protocol conformance descriptor for Observation.ObservationTracking.Options : Swift.ExpressibleByArrayLiteral in Observation
 Added: _$s11Observation0A8TrackingV7OptionsVs25ExpressibleByArrayLiteralAAMc
 
+// Observation.withContinuousObservation(options: Observation.ObservationTracking.Options, apply: @isolated(any) @Sendable (Observation.ObservationTracking.Event) -> ()) -> Observation.ObservationTracking.Token
+Added: _$s11Observation014withContinuousA07options5applyAA0A8TrackingV5TokenVAF7OptionsV_yAF5EventVYbYActF
 
+// Observation.withObservationTracking<A, B where B: Swift.Error, A: ~Swift.Copyable>(options: Observation.ObservationTracking.Options, _: () throws(B) -> A, onChange: @Sendable (Observation.ObservationTracking.Event) -> ()) throws(B) -> A
+Added: _$s11Observation04withA8Tracking7options_8onChangexAA0aC0V7OptionsV_xyq_YKXEyAF5EventVYbctq_YKs5ErrorR_Ri_zr0_lF
