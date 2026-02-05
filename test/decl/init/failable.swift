@@ -176,14 +176,14 @@ struct SomeStruct {
 
   init(delegationBad1: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
     try? self.init(nonFailable: ())
-    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
     // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
     // expected-note@-3 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
   }
 
   init(delegationBad2: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
     try? self.init(failableIUO: ())
-    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
     // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
     // expected-note@-3 {{force potentially-failing result with 'try!'}}{{5-9=try!}}
   }
@@ -196,14 +196,14 @@ struct SomeStruct {
 
   init(delegationBad4: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
     try! try? self.init(throws: ())
-    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
     // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
     // expected-note@-3 {{force potentially-failing result with 'try!'}}{{10-14=try!}}
   }
 
   init(delegationBad5: Void) { // expected-note {{propagate the failure with 'init?'}}{{7-7=?}}
     try try? self.init(throws: ())
-    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+    // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{5-8=}}
     // expected-error@-2 {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
     // expected-note@-3 {{force potentially-failing result with 'try!'}}{{9-13=try!}}
   }

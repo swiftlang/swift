@@ -97,8 +97,8 @@ func asyncTest() async {
   let _ = await invoke(fn: normalTask) // ok
 
   let _ = await asyncRethrows(fn: normalTask)
-  let _ = try! await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
-  let _ = try? await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
+  let _ = try! await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}{{11-15=}}
+  let _ = try? await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}{{11-15=}}
 
   let _ = try! await asyncRethrows(fn: throwingTask)
   let _ = try? await asyncRethrows(fn: throwingTask)

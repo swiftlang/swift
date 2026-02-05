@@ -1863,7 +1863,7 @@ func testIndirectAndDirectSendingResultsWithGlobalActor() async {
 // using result in the throwing task group. Make sure we do not crash.
 func testFunctionIsNotEmpty(input: SendableKlass) async throws {
   var result: [SendableKlass] = []
-  try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+  try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
     taskGroup.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
       result.append(input) // expected-note {{closure captures reference to mutable var 'result' which remains modifiable by code in the current task}}
     }

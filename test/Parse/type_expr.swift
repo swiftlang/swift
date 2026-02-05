@@ -502,7 +502,7 @@ func complexSequence() {
   //   (try_expr
   //     (type_expr typerepr='P1 & P2 throws -> P3 & P1')))
   _ = try P1 & P2 throws -> P3 & P1
-  // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning @-1 {{no calls to throwing functions occur within 'try' expression}}{{7-10=}}
   // expected-error @-2 {{single argument function types require parentheses}} {{11-11=(}} {{18-18=)}}
   // expected-error @-3 {{expected member name or initializer call after type name}}
   // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}

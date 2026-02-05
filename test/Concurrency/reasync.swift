@@ -60,10 +60,10 @@ func callReasyncRethrowsFunction() async throws {
   await reasyncRethrowsFunction { }
   // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}{{3-9=}}
   try reasyncRethrowsFunction { }
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
   try await reasyncRethrowsFunction { }
   // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}{{7-13=}}
-  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
 
   reasyncRethrowsFunction { await asyncFunction() }
   // expected-error@-1:3 {{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
@@ -71,12 +71,12 @@ func callReasyncRethrowsFunction() async throws {
 
   await reasyncRethrowsFunction { await asyncFunction() }
   try reasyncRethrowsFunction { await asyncFunction() }
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
   // expected-error@-2:3 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   // expected-note@-3:7 {{call is 'async'}}
 
   try await reasyncRethrowsFunction { await asyncFunction() }
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
 
   reasyncRethrowsFunction { throw HorseError.colic }
   // expected-error@-1 {{call can throw but is not marked with 'try'}}

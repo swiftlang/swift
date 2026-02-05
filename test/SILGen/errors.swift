@@ -983,7 +983,7 @@ func testOptionalTryMultiple() {
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK: } // end sil function '$s6errors25testOptionalTryNeverFailsyyF'
 func testOptionalTryNeverFails() {
-  _ = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+  _ = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6errors28testOptionalTryNeverFailsVaryyF
@@ -1000,7 +1000,7 @@ func testOptionalTryNeverFails() {
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: } // end sil function '$s6errors28testOptionalTryNeverFailsVaryyF'
 func testOptionalTryNeverFailsVar() {
-  var unit: ()? = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{variable 'unit' was never used; consider replacing with '_' or removing it}}
+  var unit: ()? = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{19-23=}} expected-warning {{variable 'unit' was never used; consider replacing with '_' or removing it}}
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6errors36testOptionalTryNeverFailsAddressOnly{{.*}}F
@@ -1017,7 +1017,7 @@ func testOptionalTryNeverFailsVar() {
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK-NEXT: } // end sil function '$s6errors36testOptionalTryNeverFailsAddressOnlyyyxlF'
 func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
-  _ = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+  _ = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s6errors39testOptionalTryNeverFailsAddressOnlyVar{{.*}}F
@@ -1034,7 +1034,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK: } // end sil function '$s6errors13OtherErrorSubCACycfC'
 func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
-  var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
+  var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{14-18=}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
 class SomeErrorClass : Error { }

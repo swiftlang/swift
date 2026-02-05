@@ -73,7 +73,7 @@ func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
 
   _ = try dp.local() // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   // the below warning is expected because we don't apply the "implicitly throwing" to the not-callable func
-  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}{{7-10=}}
 
   _ = try await dp.dist() // implicit async throws
   _ = try await dp.dist(string: "") // implicit async throws
@@ -224,7 +224,7 @@ func test_watchingDA(da: DA_TerminationWatchingDA) async throws {
 func test_watchingDA<WDA: TerminationWatchingDA>(da: WDA) async throws {
   try await da.terminated(da: "the terminated func is not distributed")
   // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
-  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
 
   let __secretlyKnownToBeLocal = da
   await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
@@ -237,7 +237,7 @@ func test_watchingDA_erased(da: DA_TerminationWatchingDA) async throws {
   let wda: any TerminationWatchingDA = da
   try await wda.terminated(da: "the terminated func is not distributed")
   // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
-  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
 
   let __secretlyKnownToBeLocal = wda
   await __secretlyKnownToBeLocal.terminated(da: "local calls are okey!") // OK
@@ -249,7 +249,7 @@ func test_watchingDA_erased(da: DA_TerminationWatchingDA) async throws {
 func test_watchingDA_any(da: any TerminationWatchingDA) async throws {
   try await da.terminated(da: "the terminated func is not distributed")
   // expected-error@-1{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
-  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
 }
 
 // ==== ------------------------------------------------------------------------
