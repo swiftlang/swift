@@ -943,8 +943,74 @@ void BindingSet::addBinding(PotentialBinding binding) {
   if (Bindings.count(binding))
     return;
 
-  if (!isViable(binding))
+  if (binding.isTransitive() &&
+      !checkTypeOfBinding(TypeVar, binding.BindingType))
     return;
+
+  // Prevent against checking against the same opened nominal type
+  // over and over again. Doing so means redundant work in the best
+  // case. In the worst case, we'll produce lots of duplicate solutions
+  // for this constraint system, which is problematic for overload
+  // resolution.
+  if (auto *NTD = binding.BindingType->getAnyNominal()) {
+    for (auto existing = Bindings.begin(); existing != Bindings.end();
+         ++existing) {
+      auto existingType = existing->BindingType;
+
+      auto *existingNTD = existingType->getAnyNominal();
+      if (!existingNTD || NTD != existingNTD)
+        continue;
+
+      // What is going on in this method needs to be thoroughly re-evaluated!
+      //
+      // This logic aims to skip dropping bindings if
+      // collection type has conversions i.e. in situations like:
+      //
+      // [$T1] conv $T2
+      // $T2 conv [(Int, String)]
+      // $T2.Element equal $T5.Element
+      //
+      // `$T1` could be bound to `(i: Int, v: String)` after
+      // `$T2` is bound to `[(Int, String)]` which is is a problem
+      // because it means that `$T2` was attempted to early
+      // before the solver had a chance to discover all viable
+      // bindings.
+      //
+      // Let's say existing binding is `[(Int, String)]` and
+      // relation is "exact", in this case there is no point
+      // tracking `[$T1]` because upcasts are only allowed for
+      // subtype and other conversions.
+      if (existing->Kind != AllowedBindingKind::Exact) {
+        if (existingType->isKnownStdlibCollectionType() &&
+            hasProperSubtypes(existingType)) {
+          continue;
+        }
+      }
+
+      // If new type has a type variable it shouldn't
+      // be considered viable.
+      if (binding.BindingType->hasTypeVariable())
+        return;
+
+      // If new type doesn't have any type variables,
+      // but existing binding does, let's replace existing
+      // binding with new one.
+      if (existingType->hasTypeVariable()) {
+        // First, let's remove all of the adjacent type
+        // variables associated with this binding.
+        {
+          SmallPtrSet<TypeVariableType *, 4> referencedVars;
+          existingType->getTypeVariables(referencedVars);
+          for (auto *var : referencedVars)
+            AdjacentVars.erase(var);
+        }
+
+        // And now let's remove the binding itself.
+        Bindings.erase(existing);
+        break;
+      }
+    }
+  }
 
   SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
   binding.BindingType->getTypeVariables(referencedTypeVars);
@@ -1581,82 +1647,6 @@ bool swift::constraints::inference::checkTypeOfBinding(
   }
 
   // Okay, allow the binding.
-  return true;
-}
-
-bool BindingSet::isViable(PotentialBinding &binding) {
-  // Prevent against checking against the same opened nominal type
-  // over and over again. Doing so means redundant work in the best
-  // case. In the worst case, we'll produce lots of duplicate solutions
-  // for this constraint system, which is problematic for overload
-  // resolution.
-  auto type = binding.BindingType;
-
-  if (binding.isTransitive() && !checkTypeOfBinding(TypeVar, type))
-    return false;
-
-  auto *NTD = type->getAnyNominal();
-  if (!NTD)
-    return true;
-
-  for (auto existing = Bindings.begin(); existing != Bindings.end();
-       ++existing) {
-    auto existingType = existing->BindingType;
-
-    auto *existingNTD = existingType->getAnyNominal();
-    if (!existingNTD || NTD != existingNTD)
-      continue;
-
-    // What is going on in this method needs to be thoroughly re-evaluated!
-    //
-    // This logic aims to skip dropping bindings if
-    // collection type has conversions i.e. in situations like:
-    //
-    // [$T1] conv $T2
-    // $T2 conv [(Int, String)]
-    // $T2.Element equal $T5.Element
-    //
-    // `$T1` could be bound to `(i: Int, v: String)` after
-    // `$T2` is bound to `[(Int, String)]` which is is a problem
-    // because it means that `$T2` was attempted to early
-    // before the solver had a chance to discover all viable
-    // bindings.
-    //
-    // Let's say existing binding is `[(Int, String)]` and
-    // relation is "exact", in this case there is no point
-    // tracking `[$T1]` because upcasts are only allowed for
-    // subtype and other conversions.
-    if (existing->Kind != AllowedBindingKind::Exact) {
-      if (existingType->isKnownStdlibCollectionType() &&
-          hasProperSubtypes(existingType)) {
-        continue;
-      }
-    }
-
-    // If new type has a type variable it shouldn't
-    // be considered  viable.
-    if (type->hasTypeVariable())
-      return false;
-
-    // If new type doesn't have any type variables,
-    // but existing binding does, let's replace existing
-    // binding with new one.
-    if (existingType->hasTypeVariable()) {
-      // First, let's remove all of the adjacent type
-      // variables associated with this binding.
-      {
-        SmallPtrSet<TypeVariableType *, 4> referencedVars;
-        existingType->getTypeVariables(referencedVars);
-        for (auto *var : referencedVars)
-          AdjacentVars.erase(var);
-      }
-
-      // And now let's remove the binding itself.
-      Bindings.erase(existing);
-      break;
-    }
-  }
-
   return true;
 }
 
