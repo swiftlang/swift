@@ -4659,11 +4659,11 @@ private:
                          diag::effect_marker_on_single_value_stmt,
                          "try", SVE->getStmt()->getKind())
         .highlight(E->getTryLoc())
-        .fixItRemoveChars(E->getTryLoc(), E->getSubExpr()->getStartLoc());
+        .fixItRemove(E->getTrySourceRange());
       return;
     }
     Ctx.Diags.diagnose(E->getTryLoc(), diag::no_throw_in_try)
-        .fixItRemoveChars(E->getTryLoc(), E->getSubExpr()->getStartLoc());
+        .fixItRemove(E->getTrySourceRange());
   }
 
   void diagnoseRedundantAwait(AwaitExpr *E) const {

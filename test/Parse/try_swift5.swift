@@ -278,7 +278,7 @@ func bar(_ a: F<Dummy>, _ b: F<Dummy>) {
 func nonThrowingFunc() -> Int? { return nil }
 
 func testRedundantTryFixit() {
-  _ = try nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
-  _ = try! nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
-  _ = try? nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-12=}}
+  _ = try nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-10=}}
+  _ = try! nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
+  _ = try? nonThrowingFunc() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
 }
