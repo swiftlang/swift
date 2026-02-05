@@ -396,7 +396,7 @@ namespace constraints {
 namespace inference {
 class BindingSet {
   using BindingScore =
-      std::tuple<bool, bool, bool, bool, bool, bool, unsigned char, int>;
+      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
 
   ConstraintSystem &CS;
 
@@ -421,10 +421,7 @@ public:
 
   /// The set of transitive protocol requirements inferred through
   /// subtype/conversion/equivalence relations with other type variables.
-  llvm::SmallPtrSet<Constraint *, 4> TransitiveProtocols;
-
-  uint8_t HasTransitiveProtocols : 1;
-  uint8_t HasImmediateBinding : 1;
+  std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
   BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
              const PotentialBindings &info);
@@ -577,12 +574,6 @@ public:
   /// score.
   LiteralBindingKind getLiteralForScore() const;
 
-  /// Whether this type variable can be bound right away, because it is
-  /// known to be a subtype of a type with no proper subtypes.
-  bool hasImmediateBinding() const {
-    return HasImmediateBinding;
-  }
-
   /// Check if this binding is favored over a disjunction e.g.
   /// if it has only concrete types or would resolve a closure.
   bool favoredOverDisjunction(Constraint *disjunction) const;
@@ -610,6 +601,11 @@ public:
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements();
 
+  /// Try to coalesce integer and floating point literal protocols
+  /// if they appear together because the only possible default type that
+  /// could satisfy both requirements is `Double`.
+  void coalesceIntegerAndFloatLiteralRequirements();
+
   /// Check whether the given binding set covers any of the literal protocols
   /// associated with this type variable. The idea is that if a type variable
   /// has a binding like Int and also it has a conformance requirement to
@@ -625,14 +621,6 @@ public:
 
   /// Handle diagnostics of unresolved member chains.
   void finalizeUnresolvedMemberChainResult();
-
-  /// Try to coalesce integer and floating point literal protocols
-  /// if they appear together because the only possible default type that
-  /// could satisfy both requirements is `Double`.
-  void coalesceIntegerAndFloatLiteralRequirements();
-
-  /// If we have an exact or subtype binding, drop everything else.
-  void simplifyImmediateBinding();
 
   static BindingScore formBindingScore(const BindingSet &b);
 
