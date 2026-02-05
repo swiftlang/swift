@@ -210,29 +210,27 @@ static void enumerateStoredPropertiesAndMissing(
         _addStoredProperty(var);
     }
   };
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      addStoredProperty(var);
+
+    member->visitAuxiliaryDecls(visitMember);
+
+    if (auto missing = dyn_cast<MissingMemberDecl>(member))
+      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+        addMissing(missing);
+  };
 
   // If we have a distributed actor, find the id and actorSystem
   // properties. We always want them first, and in a specific
   // order.
   if (auto idVar = decl->getDistributedActorIDProperty())
-    addStoredProperty(idVar);
+    visitMember(idVar);
   if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
-    addStoredProperty(actorSystemVar);
-
-  for (auto *member : implDecl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member)) {
-      addStoredProperty(var);
-    }
-
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        addStoredProperty(auxVar);
-    });
-
-    if (auto missing = dyn_cast<MissingMemberDecl>(member))
-      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-        addMissing(missing);
-  }
+    visitMember(actorSystemVar);
+  for (auto *member : implDecl->getMembers())
+    visitMember(member);
 }
 
 static bool isInSourceFile(IterableDeclContext *idc) {
@@ -345,15 +343,16 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
     }
   };
 
-  for (auto *member : decl->getMembers()) {
+  std::function<void(Decl *)> visitMember;
+  visitMember = [&](Decl *member) {
     if (auto *var = dyn_cast<VarDecl>(member))
       maybeAddProperty(var);
 
-    member->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      if (auto auxVar = dyn_cast<VarDecl>(auxDecl))
-        maybeAddProperty(auxVar);
-    });
-  }
+    member->visitAuxiliaryDecls(visitMember);
+  };
+
+  for (auto *member : decl->getMembers())
+    visitMember(member);
 
   return decl->getASTContext().AllocateCopy(results);
 }
