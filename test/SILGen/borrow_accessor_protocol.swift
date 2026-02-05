@@ -17,6 +17,7 @@ public struct NonTrivial {
 // Protocol requirements witnessed via borrow/mutate accessors
 public struct S1 : P {
   var _id: NonTrivial
+  var _k: Klass
 
   public var id: NonTrivial {
     borrow {
@@ -142,6 +143,28 @@ public struct S5 : P {
   public var id: NonTrivial
 }
 
+public protocol Q {
+  var id: FrozenNonTrivial { borrow mutate }
+}
+
+@frozen
+public struct FrozenNonTrivial {
+  public var k: Klass
+}
+
+public struct S6 : Q {
+  var _id: FrozenNonTrivial
+
+  public var id: FrozenNonTrivial {
+    borrow {
+      return _id
+    }
+    mutate {
+      return &_id
+    }
+  }
+}
+
 // CHECK: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S5) -> @guaranteed NonTrivial {
 // CHECK: bb0([[REG0:%.*]] : $*S5):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
@@ -164,6 +187,13 @@ public struct S5 : P {
 // CHECK-EVO: bb0([[REG0:%.*]] : $*S5):
 // CHECK-EVO:   [[REG1:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@in_guaranteed S5) -> @guaranteed_address NonTrivial
 // CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S5) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   return [[REG2]]
+// CHECK-EVO: }
+
+// CHECK-EVO: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S6VAA1QA2aDP2idAA16FrozenNonTrivialVvbTW : $@convention(witness_method: Q) (@in_guaranteed S6) -> @guaranteed FrozenNonTrivial {
+// CHECK-EVO: bb0([[REG0:%.*]] : $*S6):
+// CHECK-EVO:   [[REG1:%.*]] = function_ref @$s24borrow_accessor_protocol2S6V2idAA16FrozenNonTrivialVvb : $@convention(method) (@in_guaranteed S6) -> @guaranteed FrozenNonTrivial
+// CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S6) -> @guaranteed FrozenNonTrivial
 // CHECK-EVO:   return [[REG2]]
 // CHECK-EVO: }
 

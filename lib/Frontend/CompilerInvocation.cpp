@@ -2089,12 +2089,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
         SWIFT_ONONE_SUPPORT);
   }
 
-  Opts.EnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_enable_operator_designated_types);
-
-  // Always enable operator designated types for the standard library.
-  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
-
   Opts.PrintFullConvention |=
       Args.hasArg(OPT_experimental_print_full_convention);
 
@@ -2126,6 +2120,14 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_solver_enable_prune_disjunctions) ||
       Args.hasArg(OPT_solver_disable_prune_disjunctions))
     Opts.SolverPruneDisjunctions = Args.hasArg(OPT_solver_enable_prune_disjunctions);
+
+  if (Args.hasArg(OPT_solver_enable_optimize_operator_defaults) ||
+      Args.hasArg(OPT_solver_disable_optimize_operator_defaults))
+    Opts.SolverOptimizeOperatorDefaults = Args.hasArg(OPT_solver_enable_optimize_operator_defaults);
+
+  if (Args.hasArg(OPT_solver_enable_performance_hacks) ||
+      Args.hasArg(OPT_solver_disable_performance_hacks))
+    Opts.SolverEnablePerformanceHacks = Args.hasArg(OPT_solver_enable_performance_hacks);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
@@ -2789,15 +2791,26 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.WarningGroupControlRules.emplace_back(
           WarningGroupBehavior::AsWarning);
       break;
-    case OPT_Werror:
-      Opts.WarningGroupControlRules.emplace_back(
-          WarningGroupBehavior::AsError, getDiagGroupIDByName(arg->getValue()));
+    case OPT_Werror: {
+      auto groupID = getDiagGroupIDByName(arg->getValue());
+      if (groupID && *groupID != DiagGroupID::no_group) {
+        Opts.WarningGroupControlRules.emplace_back(
+            WarningGroupBehavior::AsError, *groupID);
+      } else {
+        Opts.UnknownWarningGroups.push_back(arg->getValue());
+      }
       break;
-    case OPT_Wwarning:
-      Opts.WarningGroupControlRules.emplace_back(
-          WarningGroupBehavior::AsWarning,
-          getDiagGroupIDByName(arg->getValue()));
+    }
+    case OPT_Wwarning: {
+      auto groupID = getDiagGroupIDByName(arg->getValue());
+      if (groupID && *groupID != DiagGroupID::no_group) {
+        Opts.WarningGroupControlRules.emplace_back(
+            WarningGroupBehavior::AsWarning, *groupID);
+      } else {
+        Opts.UnknownWarningGroups.push_back(arg->getValue());
+      }
       break;
+    }
     default:
       llvm_unreachable("unhandled warning as error option");
     };
@@ -2902,6 +2915,12 @@ static void configureDiagnosticEngine(
 void CompilerInvocation::setUpDiagnosticEngine(DiagnosticEngine &diags) {
   configureDiagnosticEngine(DiagnosticOpts, LangOpts.EffectiveLanguageVersion,
                             FrontendOpts.MainExecutablePath, diags);
+
+  // Once configured, immediately diagnose any unknown warning groups that were
+  // encountered while parsing the diagnostic options.
+  for (const auto &unknownGroup : DiagnosticOpts.UnknownWarningGroups) {
+    diags.diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
+  }
 }
 
 /// Parse -enforce-exclusivity=... options

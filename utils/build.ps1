@@ -2164,7 +2164,14 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
   }
 
   # If DebugInfo is enabled limit the number of parallel links to avoid OOM.
-  $DebugDefines = if ($DebugInfo) { @{ SWIFT_PARALLEL_LINK_JOBS = "4"; } } else { @{} }
+  $DebugDefines = if ($DebugInfo) {
+    @{
+      SWIFT_PARALLEL_LINK_JOBS = "2";
+      LLVM_PARALLEL_LINK_JOBS = "2";
+    }
+  } else {
+    @{}
+  }
 
   # In the latest versions of VS, STL typically requires a newer version of
   # Clang than released Swift toolchains include. Relax this requirement when
@@ -3198,6 +3205,12 @@ function Test-XCTest {
 }
 
 function Build-Testing([Hashtable] $Platform) {
+  $SwiftFlags = if ($Platform.OS -eq [OS]::Windows) {
+    @();
+  } else {
+    @("-I$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)\usr\include");
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-testing `
     -Bin (Get-ProjectBinaryCache $Platform Testing) `
@@ -3208,6 +3221,7 @@ function Build-Testing([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";
       SwiftTesting_INSTALL_NESTED_SUBDIR = "YES";
     }

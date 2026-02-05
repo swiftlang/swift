@@ -43,6 +43,9 @@ enum class ProtocolConformanceFlags {
   /// stored separately.
   GlobalActorIsolated = 0x20,
 
+  /// Represents a @reparented refinement relationship
+  Reparented = 0x40,
+
   // Note: whenever you add a bit here, update
   // NumProtocolConformanceOptions below.
 };
@@ -145,7 +148,7 @@ inline ProtocolConformanceOptions operator|(
 }
 
 enum : unsigned {
-  NumProtocolConformanceOptions = 6
+  NumProtocolConformanceOptions = 7
 };
 
 } // end namespace swift

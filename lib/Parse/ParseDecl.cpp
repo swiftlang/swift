@@ -8848,6 +8848,20 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
     }
   }
+
+  // A 'borrow' can only be paired with 'mutate'
+  if (Borrow) {
+    if (Set || Modify || YieldingMutate || MutableAddress) {
+      P.diagnose(Borrow->getLoc(), diag::borrow_mutate_pair_restrict, "borrow",
+                 "mutate");
+    }
+  }
+  if (Mutate) {
+    if (Get || Read || YieldingBorrow || Address) {
+      P.diagnose(Mutate->getLoc(), diag::borrow_mutate_pair_restrict, "mutate",
+                 "borrow");
+    }
+  }
 }
 
 
@@ -10542,46 +10556,15 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                  diag::operator_decl_expected_precedencegroup,
                                  DeclNameFlag::ModuleSelectorUnsupported);
 
-    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
-      // Designated types have been removed; consume the list (mainly for source
-      // compatibility with old swiftinterfaces) and emit a warning.
-
-      // These SourceLocs point to the ends of the designated type list. If
-      // `typesEndLoc` never becomes valid, we didn't find any designated types.
-      SourceLoc typesStartLoc = Tok.getLoc();
-      SourceLoc typesEndLoc;
-
-      if (isPrefix || isPostfix) {
-        // These have no precedence group, so we already parsed the first entry
-        // in the designated types list. Retroactively include it in the range.
-        typesStartLoc = colonLoc;
-        typesEndLoc = groupLoc.getEndLoc();
-      }
-
-      while (Tok.isNot(tok::eof)) {
-        if (!consumeIf(tok::comma, typesEndLoc)) {
-          break;
-        }
-
-        if (Tok.isNot(tok::eof)) {
-          typesEndLoc = consumeToken();
-        }
-      }
-
-      if (typesEndLoc.isValid())
-        diagnose(typesStartLoc, diag::operator_decl_remove_designated_types)
-            .fixItRemove({typesStartLoc, typesEndLoc});
-    } else {
-      if (isPrefix || isPostfix) {
-        // If we have nothing after the colon, then just remove the colon.
-        auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
-        diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, endLoc});
-      }
-      // Nothing to complete here, simply consume the token.
-      if (Tok.is(tok::code_complete))
-        consumeToken();
+    if (isPrefix || isPostfix) {
+      // If we have nothing after the colon, then just remove the colon.
+      auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
+      diagnose(colonLoc, diag::precedencegroup_not_infix)
+          .fixItRemove({colonLoc, endLoc});
     }
+    // Nothing to complete here, simply consume the token.
+    if (Tok.is(tok::code_complete))
+      consumeToken();
   }
 
   // Diagnose deprecated operator body syntax `operator + { ... }`.

@@ -787,9 +787,7 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
     auto resultMV = emitRawProjectedLValue(regularLoc, std::move(lvalue));
     SILValue result = resultMV.getValue();
     if (resultMV.getType().isAddress() &&
-        (F.getConventions().hasGuaranteedResult() ||
-         F.getConventions().funcTy->getSingleResult().getConvention() ==
-             ResultConvention::Unowned)) {
+        F.getConventions().hasGuaranteedResult()) {
       result = emitLoadBorrowFromGuaranteedAddress(resultMV);
     }
     directResults.push_back(result);
@@ -829,9 +827,7 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
   SILValue result = resultMV->getValue();
   SILType selfType = F.getSelfArgument()->getType();
 
-  if (F.getConventions().hasGuaranteedResult() ||
-      F.getConventions().funcTy->getSingleResult().getConvention() ==
-          ResultConvention::Unowned) {
+  if (F.getConventions().hasGuaranteedResult()) {
     // If we are returning the result of borrow accessor, strip the
     // unnecessary copy_value + mark_unresolved_non_copyable_value
     // instructions.

@@ -300,6 +300,20 @@ static bool isProtocolNode(Demangle::NodePointer Node) {
   assert(0 && "unknown node kind");
 }
 
+static bool isGenericParamType(Demangle::NodePointer Node) {
+  if (!Node)
+    return false;
+  switch (Node->getKind()) {
+  case Demangle::Node::Kind::Type:
+    return isGenericParamType(Node->getChild(0));
+  case Demangle::Node::Kind::DependentGenericParamType:
+    return true;
+  default:
+    return false;
+  }
+  assert(0 && "unknown node kind");
+}
+
 bool swift::Demangle::isProtocol(llvm::StringRef mangledName) {
   Demangle::Demangler Dem;
   return isProtocolNode(Dem.demangleType(dropSwiftManglingPrefix(mangledName)));
@@ -2912,6 +2926,16 @@ NodePointer Demangler::popProtocolConformance() {
   return Conf;
 }
 
+NodePointer Demangler::popAssociatedConformanceWitnessAccessorSubject() {
+  if (auto type = popNode(Node::Kind::Type)) {
+    if (isGenericParamType(type))
+      return type;
+
+    pushNode(type);
+  }
+  return popAssocTypePath();
+}
+
 NodePointer Demangler::demangleThunkOrSpecialization() {
   switch (char c = nextChar()) {
     // Thunks that are from a thunk inst. We take the TT namespace.
@@ -3087,19 +3111,19 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
 
     case 'n': {
       NodePointer requirementTy = popProtocol();
-      NodePointer conformingType = popAssocTypePath();
+      NodePointer subject = popAssociatedConformanceWitnessAccessorSubject();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(Node::Kind::AssociatedConformanceDescriptor,
-                                protoTy, conformingType, requirementTy);
+                                protoTy, subject, requirementTy);
     }
 
     case 'N': {
       NodePointer requirementTy = popProtocol();
-      auto assocTypePath = popAssocTypePath();
+      NodePointer subject = popAssociatedConformanceWitnessAccessorSubject();
       NodePointer protoTy = popNode(Node::Kind::Type);
       return createWithChildren(
                             Node::Kind::DefaultAssociatedConformanceAccessor,
-                            protoTy, assocTypePath, requirementTy);
+                            protoTy, subject, requirementTy);
     }
 
     case 'b': {

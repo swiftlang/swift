@@ -1703,6 +1703,8 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(closure_bad_param,none,
       "%select{|trailing }1closure passed to parameter of type %0 that does not "
       "accept a closure", (Type, bool))
+ERROR(anon_closure_arg_not_in_closure,none,
+      "anonymous closure argument not contained in a closure", ())
 GROUPED_WARNING(unlabeled_trailing_closure_deprecated,
         TrailingClosureMatching,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
@@ -1802,6 +1804,10 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "%0 requires a function with one argument", (DeclAttribute))
 
+ERROR(attribute_requires_experimental_feature,none,
+      "'%0' is an experimental feature; use '-enable-experimental-feature %1'",
+      (DeclAttribute, StringRef))
+
 ERROR(nominal_type_not_attribute,none,
       "%kind0 cannot be used as an attribute", (const ValueDecl *))
 
@@ -1818,8 +1824,8 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(consuming_invalid_borrow_mutate_accessor, none,
-      "%0 cannot be declared consuming", (StringRef))
+ERROR(modifier_invalid_borrow_mutate_accessor, none,
+      "%0 cannot be declared %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
@@ -2803,7 +2809,7 @@ ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (Type))
 ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause",
+      "extension of protocol %0 cannot declare inheritance relationship",
       (Identifier))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
@@ -5182,6 +5188,17 @@ ERROR(isolated_any_conversion_to_synchronous_func,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
+GROUPED_WARNING(implicit_weak_to_strong_capture,ImplicitStrongCapture,none,
+        "%0 ownership of capture %base1 differs from implicitly-captured "
+        "strong reference in outer scope",
+        (ReferenceOwnership, const VarDecl *))
+NOTE(implicit_weak_to_strong_capture_loc,none,
+     "%base0 implicitly strongly captured here",(const Decl *))
+NOTE(implicit_weak_to_strong_capture_add_capture_list_item,none,
+     "add %base0 as a capture list item to silence",(const Decl *))
+NOTE(implicit_weak_to_strong_capture_assign_to_silence,none,
+     "explicitly assign the capture list item to silence", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------
@@ -6072,9 +6089,18 @@ ERROR(typeattr_not_inheritance_clause,none,
 ERROR(typeattr_not_extension_inheritance_clause,none,
       "%0 only applies in inheritance clauses in extensions",
       (const TypeAttribute *))
+ERROR(typeattr_not_protocol_inheritance_clause,none,
+      "%0 only applies in inheritance clause of a protocol extension",
+      (const TypeAttribute *))
 ERROR(typeattr_not_existential,none,
       "%0 cannot apply to non-protocol type %1",
       (const TypeAttribute *, Type))
+ERROR(typeattr_reparented_requires_reparentable_protocol,none,
+      "%0 cannot apply to %1 unless it is declared to be '@reparentable'",
+      (const TypeAttribute *, const TypeDecl *))
+ERROR(typeattr_invalid_for_objc_protocol,none,
+      "@objc protocol %1 cannot be %0",
+      (const TypeAttribute *, const TypeDecl *))
 
 WARNING(unchecked_conformance_not_special,none,
       "'@unchecked' conformance to %0 has no meaning", (Type))
@@ -6182,8 +6208,8 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
-ERROR(async_main_no_concurrency,none,
-      "'_Concurrency' module not imported, required for async main", ())
+ERROR(no_concurrency_module,none,
+      "'_Concurrency' module not imported, required for %0", (StringRef))
 
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",

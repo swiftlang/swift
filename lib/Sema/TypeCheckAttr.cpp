@@ -405,6 +405,7 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
+  void visitReparentableAttr(ReparentableAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -738,13 +739,23 @@ void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
 
   auto *accessor = dyn_cast<AccessorDecl>(FD);
-  if (accessor &&
-      (accessor->isBorrowAccessor() || accessor->isMutateAccessor())) {
-    if (attrModifier == SelfAccessKind::Consuming ||
-        attrModifier == SelfAccessKind::LegacyConsuming) {
-      diagnoseAndRemoveAttr(
-          attr, diag::consuming_invalid_borrow_mutate_accessor,
-          getAccessorNameForDiagnostic(accessor, /*article*/ true));
+  if (accessor) {
+    if (accessor->isBorrowAccessor() || accessor->isMutateAccessor()) {
+      if (attrModifier == SelfAccessKind::Consuming ||
+          attrModifier == SelfAccessKind::LegacyConsuming) {
+        diagnoseAndRemoveAttr(
+            attr, diag::modifier_invalid_borrow_mutate_accessor,
+            getAccessorNameForDiagnostic(accessor, /*article*/ true),
+            "consuming");
+      }
+    }
+    if (accessor->isMutateAccessor()) {
+      if (attrModifier == SelfAccessKind::Borrowing) {
+        diagnoseAndRemoveAttr(
+            attr, diag::modifier_invalid_borrow_mutate_accessor,
+            getAccessorNameForDiagnostic(accessor, /*article*/ true),
+            "borrowing");
+      }
     }
   }
 }
@@ -3125,7 +3136,7 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
     if (!concurrencyModule) {
       context.Diags.diagnose(mainFunction->getAsyncLoc(),
-                             diag::async_main_no_concurrency);
+                             diag::no_concurrency_module, "async main");
       auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
       ASTNode stmts[] = {result};
       auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc(),
@@ -3482,6 +3493,14 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
   diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitReparentableAttr(ReparentableAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Reparenting)) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attribute_requires_experimental_feature, attr,
+                       "Reparenting");
+  }
 }
 
 /// Ensure that the requirements provided by the @_specialize attribute

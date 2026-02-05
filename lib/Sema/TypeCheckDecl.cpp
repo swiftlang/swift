@@ -1602,16 +1602,7 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
     auto loc = IOD->getPrecedenceGroupLoc();
     auto groups = TypeChecker::lookupPrecedenceGroup(dc, name, loc);
 
-    if (groups.hasResults() ||
-        !ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes)
-      return groups.getSingleOrDiagnose(loc);
-
-    // We didn't find the named precedence group and designated types are
-    // enabled, so we will assume that it was actually a designated type. Warn
-    // and fall through as though `PrecedenceGroupName` had never been set.
-    ctx.Diags.diagnose(IOD->getColonLoc(),
-                       diag::operator_decl_remove_designated_types)
-        .fixItRemove({IOD->getColonLoc(), loc});
+    return groups.getSingleOrDiagnose(loc);
   }
 
   auto groups = TypeChecker::lookupPrecedenceGroup(

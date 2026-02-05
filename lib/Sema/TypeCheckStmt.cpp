@@ -1123,19 +1123,18 @@ public:
 
     auto *accessor = TheFunc->getAccessorDecl();
     auto *exprToCheck = RS->getResult();
-    InOutExpr *inout = nullptr;
 
     if (accessor && accessor->isMutateAccessor()) {
+      auto *unsafeExpr = dyn_cast<UnsafeExpr>(exprToCheck);
       // Check that the returned expression is a &.
-      if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
+      if (isa<InOutExpr>(exprToCheck) ||
+          (unsafeExpr && isa<InOutExpr>(unsafeExpr->getSubExpr()))) {
         ResultTy = InOutType::get(ResultTy);
       } else {
         getASTContext()
             .Diags
             .diagnose(exprToCheck->getLoc(), diag::missing_address_of_return)
             .highlight(exprToCheck->getSourceRange());
-        inout = new (getASTContext()) InOutExpr(
-            exprToCheck->getStartLoc(), exprToCheck, Type(), /*implicit*/ true);
       }
     }
     using namespace constraints;

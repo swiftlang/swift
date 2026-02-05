@@ -622,12 +622,6 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     ASSERT(inserted);
   }
 
-  llvm::SmallDenseSet<Type> seenDefaults;
-  for (auto *constraint : Defaults) {
-    bool inserted = seenDefaults.insert(constraint->getSecondType()).second;
-    ASSERT(inserted);
-  }
-
   for (const auto &entry : Info.SupertypeOf) {
     auto &node = CS.getConstraintGraph()[entry.first];
     if (!node.hasBindingSet())
@@ -665,17 +659,6 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       literal.setDirectRequirement(false);
       Literals.push_back(literal);
-    }
-
-    // Infer transitive defaults.
-    for (auto *def : bindings.Defaults) {
-      if (def->getKind() == ConstraintKind::FallbackType)
-        continue;
-
-      if (!seenDefaults.insert(def->getSecondType()).second)
-        continue;
-
-      addDefault(def);
     }
 
     // TODO: We shouldn't need this in the future.
@@ -732,6 +715,22 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
               if (ProtocolDecl *decl = p->getDecl())
                 if (decl->getKnownProtocolKind() && decl->isMarkerProtocol())
                   continue;
+
+              // During normal type-checking filter inferred protocols based on
+              // whether they have the member or not. There is no reason to
+              // attempt unrelated protocols and adding them as bindings affects
+              // type variable selection as well. They can be attempted during
+              // diagnostics mode in case the member is misspelled or
+              // inaccessible.
+              if (!CS.shouldAttemptFixes()) {
+                auto memberRef =
+                    castToExpr<UnresolvedMemberExpr>(locator->getAnchor());
+
+                auto &results = CS.lookupMember(
+                    protocolTy, memberRef->getName(), memberRef->getLoc());
+                if (results.empty())
+                  continue;
+              }
             }
 
             addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
@@ -2181,6 +2180,12 @@ void PotentialBindings::infer(Constraint *constraint) {
 
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
+    // Conformances are applicable only to the types they are
+    // placed on. They could be transferred to supertypes
+    // but that happens separately.
+    if (!isDirectRequirement(CS, TypeVar, constraint))
+      break;
+
     if (constraint->getSecondType()->is<ProtocolType>())
       recordProtocol(constraint);
     break;
