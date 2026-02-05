@@ -6459,17 +6459,11 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
         return Action::Continue(E);
 
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
-        SourceLoc diagnosticLoc = func->getLoc();
-        if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // FIXME: Remove the diagnosticLoc once the source locations of the
-          // objc method declarations are imported correctly.
-          diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
-              ND->getLocation());
-        }
-
         Ctx.Diags.diagnose(CE->getLoc(),
                            diag::warn_unannotated_cxx_func_returning_frt, func);
 
+        SourceLoc diagnosticLoc = func->getLoc();
+        ASSERT(diagnosticLoc.isValid());
         Ctx.Diags.diagnose(diagnosticLoc,
                            diag::note_unannotated_cxx_func_returning_frt, func);
       }
