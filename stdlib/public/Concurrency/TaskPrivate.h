@@ -63,7 +63,7 @@ class ActiveTaskStatus;
 /// done on behalf of a child task.
 void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
 
-/// dellocate task-local memory on behalf of a specific task,
+/// deallocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
 /// done on behalf of a child task.
 void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
