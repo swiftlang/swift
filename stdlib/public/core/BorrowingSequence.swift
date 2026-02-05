@@ -207,6 +207,8 @@ extension MutableRawSpan: BorrowingSequence {
 
 @available(SwiftStdlib 6.3, *)
 extension Array: BorrowingSequence {
+  public typealias BorrowingIterator = Span<Element>
+  
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<Element> {
     self.span

@@ -330,6 +330,11 @@ public protocol Sequence<Element> {
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
+  @available(SwiftStdlib 6.3, *)
+  associatedtype BorrowingIterator:
+    BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
+    = BorrowingIteratorAdapter<Iterator>
+  
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility
   // guarantees of Swift 3, but it cannot due to a bug.
