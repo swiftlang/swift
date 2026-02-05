@@ -5987,29 +5987,35 @@ static void addAttributesForActorIsolation(ValueDecl *value,
                                            ActorIsolation isolation) {
   ASTContext &ctx = value->getASTContext();
   switch (isolation) {
-  case ActorIsolation::CallerIsolationInheriting:
-    value->addAttribute(new (ctx) NonisolatedAttr(
+  case ActorIsolation::CallerIsolationInheriting: {
+    auto attr = new (ctx) NonisolatedAttr(
         /*atLoc=*/{}, /*range=*/{}, NonIsolatedModifier::NonSending,
-        /*implicit=*/true));
-    break;
+        /*implicit=*/true);
+    if (attr->canAppearOnDecl(value))
+      value->addAttribute(attr);
+  } break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
-    value->addAttribute(NonisolatedAttr::createImplicit(
+    auto attr = NonisolatedAttr::createImplicit(
         ctx, isolation == ActorIsolation::NonisolatedUnsafe
                  ? NonIsolatedModifier::Unsafe
-                 : NonIsolatedModifier::None));
+                 : NonIsolatedModifier::None);
+    if (attr->canAppearOnDecl(value))
+      value->addAttribute(attr);
     break;
   }
   case ActorIsolation::GlobalActor: {
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
     auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ value,
                                    /*implicit=*/true);
-    value->addAttribute(attr);
+    if (attr->canAppearOnDecl(value))
+      value->addAttribute(attr);
 
     if (isolation.preconcurrency() &&
         !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
       auto preconcurrency = new (ctx) PreconcurrencyAttr(/*isImplicit*/ true);
-      value->addAttribute(preconcurrency);
+      if (preconcurrency->canAppearOnDecl(value))
+        value->addAttribute(preconcurrency);
     }
     break;
   }
@@ -6328,7 +6334,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
     auto preconcurrency =
         new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
-    value->addAttribute(preconcurrency);
+    if (preconcurrency->canAppearOnDecl(value))
+      value->addAttribute(preconcurrency);
   }
 
   // Check if we inferred CallerIsolationInheriting from our isolation attr, but
@@ -6343,8 +6350,10 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // Replace `nonisolated` with `nonisolated(nonsending)`
     if (!nonisolated || !nonisolated->isNonSending()) {
       value->getAttrs().removeAttribute(nonisolated);
-      value->addAttribute(NonisolatedAttr::createImplicit(
-          ctx, NonIsolatedModifier::NonSending));
+      auto attr =
+          NonisolatedAttr::createImplicit(ctx, NonIsolatedModifier::NonSending);
+      if (attr->canAppearOnDecl(value))
+        value->addAttribute(attr);
     }
   }
 

@@ -3779,7 +3779,10 @@ public:
   };
 
   /// Add a constructed DeclAttribute to this list.
-  void add(DeclAttribute *Attr) {
+  void add(DeclAttribute *Attr, const Decl *D = nullptr) {
+    if (D) {
+      ASSERT(Attr->canAppearOnDecl(D));
+    }
     Attr->Next = DeclAttrs;
     DeclAttrs = Attr;
   }

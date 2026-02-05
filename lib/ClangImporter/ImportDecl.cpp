@@ -514,9 +514,12 @@ void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     // This is unfortunately not an error because some test use mock protocols.
     // If those tests were updated, we could assert that
     // ctx.getProtocol(kind) != nulltpr which would be nice.
-    if (auto proto = ctx.getProtocol(kind))
-      nominal->addAttribute(
-        new (ctx) SynthesizedProtocolAttr(proto, this, isUnchecked, isSuppressed));
+    if (auto proto = ctx.getProtocol(kind)) {
+      auto synthAttr = new (ctx)
+          SynthesizedProtocolAttr(proto, this, isUnchecked, isSuppressed);
+      if (synthAttr->canAppearOnDecl(nominal))
+        nominal->addAttribute(synthAttr);
+    }
   }
 }
 
@@ -4148,9 +4151,11 @@ namespace {
             // Currently, addressable parameters and opaque values are at odds.
             if (!dc->getDeclaredInterfaceType()->hasReferenceSemantics() &&
                 !importedName.importAsMember() &&
-                !Impl.SwiftContext.SILOpts.EnableSILOpaqueValues)
-              func->addAttribute(new (Impl.SwiftContext)
-                                     AddressableSelfAttr(true));
+                !Impl.SwiftContext.SILOpts.EnableSILOpaqueValues) {
+              auto funcAttr = new (Impl.SwiftContext) AddressableSelfAttr(true);
+              if (funcAttr->canAppearOnDecl(func))
+                func->addAttribute(funcAttr);
+            }
           } else {
             func->setStatic();
             func->setImportAsStaticMember();
@@ -4169,10 +4174,13 @@ namespace {
       Impl.recordImplicitUnwrapForDecl(result,
                                        resultType.isImplicitlyUnwrapped());
 
-      if (dc->getSelfClassDecl())
+      if (dc->getSelfClassDecl()) {
         // FIXME: only if the class itself is not marked final
-        result->addAttribute(new (Impl.SwiftContext)
-                                 FinalAttr(/*IsImplicit=*/true));
+        auto resultAttr =
+            new (Impl.SwiftContext) FinalAttr(/*IsImplicit=*/true);
+        if (resultAttr->canAppearOnDecl(result))
+          result->addAttribute(resultAttr);
+      }
 
       finishFuncDecl(decl, result);
 
@@ -8973,8 +8981,11 @@ void ClangImporter::Implementation::importNontrivialAttribute(
     for (auto decl : topLevelDecls) {
       SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
                                             decl->getAttrs().end());
-      for (auto attr : attrs)
-        MappedDecl->addAttribute(cached ? attr->clone(SwiftContext) : attr);
+      for (auto attr : attrs) {
+        auto attrToAdd = cached ? attr->clone(SwiftContext) : attr;
+        if (attrToAdd->canAppearOnDecl(MappedDecl))
+          MappedDecl->addAttribute(attrToAdd);
+      }
     }
     break;
   }
@@ -9429,7 +9440,8 @@ void ClangImporter::Implementation::importAttributes(
     if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
       auto Message = unavailable->getMessage();
       auto attr = AvailableAttr::createUniversallyUnavailable(C, Message);
-      MappedDecl->addAttribute(attr);
+      if (attr->canAppearOnDecl(MappedDecl))
+        MappedDecl->addAttribute(attr);
       AnyUnavailable = true;
       continue;
     }
@@ -9442,7 +9454,8 @@ void ClangImporter::Implementation::importAttributes(
     if (auto unavailable_annot = dyn_cast<clang::AnnotateAttr>(*AI))
       if (unavailable_annot->getAnnotation() == "swift1_unavailable") {
         auto attr = AvailableAttr::createUnavailableInSwift(C, "", "");
-        MappedDecl->addAttribute(attr);
+        if (attr->canAppearOnDecl(MappedDecl))
+          MappedDecl->addAttribute(attr);
         AnyUnavailable = true;
         continue;
       }
@@ -9455,7 +9468,8 @@ void ClangImporter::Implementation::importAttributes(
     if (auto deprecated = dyn_cast<clang::DeprecatedAttr>(*AI)) {
       auto Message = deprecated->getMessage();
       auto attr = AvailableAttr::createUniversallyDeprecated(C, Message, "");
-      MappedDecl->addAttribute(attr);
+      if (attr->canAppearOnDecl(MappedDecl))
+        MappedDecl->addAttribute(attr);
       continue;
     }
 
@@ -9478,7 +9492,8 @@ void ClangImporter::Implementation::importAttributes(
 
         auto attr = AvailableAttr::createUnavailableInSwift(
             C, avail->getMessage(), swiftReplacement);
-        MappedDecl->addAttribute(attr);
+        if (attr->canAppearOnDecl(MappedDecl))
+          MappedDecl->addAttribute(attr);
         AnyUnavailable = true;
         continue;
       }
@@ -9565,7 +9580,8 @@ void ClangImporter::Implementation::importAttributes(
           SourceRange(), obsoleted, SourceRange(),
           /*Implicit=*/false, EnableClangSPI && IsSPI);
 
-      MappedDecl->addAttribute(AvAttr);
+      if (AvAttr->canAppearOnDecl(MappedDecl))
+        MappedDecl->addAttribute(AvAttr);
     }
 
     // __attribute__((availability(domain:)))
@@ -9592,7 +9608,8 @@ void ClangImporter::Implementation::importAttributes(
             /*Deprecated=*/{}, SourceRange(), /*Obsoleted=*/{}, SourceRange(),
             /*Implicit=*/false, /*IsSPI=*/false);
 
-        MappedDecl->addAttribute(avAttr);
+        if (avAttr->canAppearOnDecl(MappedDecl))
+          MappedDecl->addAttribute(avAttr);
       }
     }
 
@@ -9604,10 +9621,12 @@ void ClangImporter::Implementation::importAttributes(
     if (method->isDirectMethod() && !AnyUnavailable) {
       assert(isa<AbstractFunctionDecl>(MappedDecl) &&
              "objc_direct declarations are expected to be an AbstractFunctionDecl");
-      MappedDecl->addAttribute(new (C) FinalAttr(/*IsImplicit=*/true));
+      auto attr = new (C) FinalAttr(/*isImplicit=*/true);
+      if (attr->canAppearOnDecl(MappedDecl))
+        MappedDecl->addAttribute(attr);
       if (auto accessorDecl = dyn_cast<AccessorDecl>(MappedDecl)) {
-        auto attr = new (C) FinalAttr(/*isImplicit=*/true);
-        accessorDecl->getStorage()->addAttribute(attr);
+        if (attr->canAppearOnDecl(accessorDecl->getStorage()))
+          accessorDecl->getStorage()->addAttribute(attr);
       }
     }
   }
@@ -9620,7 +9639,8 @@ void ClangImporter::Implementation::importAttributes(
     // Ban NSInvocation.
     if (ID->getName() == "NSInvocation") {
       auto attr = AvailableAttr::createUniversallyUnavailable(C, "");
-      MappedDecl->addAttribute(attr);
+      if (attr->canAppearOnDecl(MappedDecl))
+        MappedDecl->addAttribute(attr);
       return;
     }
 
@@ -9629,7 +9649,8 @@ void ClangImporter::Implementation::importAttributes(
         isa<ClassDecl>(MappedDecl)) {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
-        MappedDecl->addAttribute(attr);
+        if (attr->canAppearOnDecl(MappedDecl))
+          MappedDecl->addAttribute(attr);
       }
     }
 
@@ -9637,7 +9658,8 @@ void ClangImporter::Implementation::importAttributes(
     if (ID->getName() == "XCTestCase") {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
-        MappedDecl->addAttribute(attr);
+        if (attr->canAppearOnDecl(MappedDecl))
+          MappedDecl->addAttribute(attr);
       }
     }
   }
@@ -9654,7 +9676,8 @@ void ClangImporter::Implementation::importAttributes(
         if (isCFTypeDecl(t->getDecl())) {
           auto attr = AvailableAttr::createUniversallyUnavailable(
               C, "Core Foundation objects are automatically memory managed");
-          MappedDecl->addAttribute(attr);
+          if (attr->canAppearOnDecl(MappedDecl))
+            MappedDecl->addAttribute(attr);
           return;
         }
       }
@@ -9667,7 +9690,9 @@ void ClangImporter::Implementation::importAttributes(
     if (isPrintLikeMethod(MD->getName(), MD->getDeclContext())) {
       // Use a non-implicit attribute so it shows up in the generated
       // interface.
-      MD->addAttribute(new (C) WarnUnqualifiedAccessAttr(/*implicit*/ false));
+      auto attr = new (C) WarnUnqualifiedAccessAttr(/*implicit*/ false);
+      if (attr->canAppearOnDecl(MD))
+        MD->addAttribute(attr);
     }
   }
 
@@ -9685,17 +9710,24 @@ void ClangImporter::Implementation::importAttributes(
       // async function, eagerly load the result type and check.
       if (MD->hasAsync())
         hasVoidReturnType = MD->getResultInterfaceType()->isVoid();
-      if (!hasVoidReturnType)
-        MD->addAttribute(new (C) DiscardableResultAttr(/*implicit*/ true));
+      if (!hasVoidReturnType) {
+        auto attr = new (C) DiscardableResultAttr(/*implicit*/ true);
+        if (attr->canAppearOnDecl(MD))
+          MD->addAttribute(attr);
+      }
     }
   }
   // Map __attribute__((const)).
   if (ClangDecl->hasAttr<clang::ConstAttr>()) {
-    MappedDecl->addAttribute(new (C) EffectsAttr(EffectsKind::ReadNone));
+    auto attr = new (C) EffectsAttr(EffectsKind::ReadNone);
+    if (attr->canAppearOnDecl(MappedDecl))
+      MappedDecl->addAttribute(attr);
   }
   // Map __attribute__((pure)).
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
-    MappedDecl->addAttribute(new (C) EffectsAttr(EffectsKind::ReadOnly));
+    auto attr = new (C) EffectsAttr(EffectsKind::ReadOnly);
+    if (attr->canAppearOnDecl(MappedDecl))
+      MappedDecl->addAttribute(attr);
   }
 }
 

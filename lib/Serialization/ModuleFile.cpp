@@ -612,11 +612,17 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       auto *ID = ImportDecl::create(Ctx, FileContext, SourceLoc(), Kind,
                                     SourceLoc(), importPath.get());
       ID->setModule(M);
-      if (Dep.isExported())
-        ID->addAttribute(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
-      if (Dep.isImplementationOnly())
-        ID->addAttribute(new (Ctx)
-                             ImplementationOnlyAttr(/*IsImplicit=*/false));
+      if (Dep.isExported()) {
+        auto expAttr = new (Ctx) ExportedAttr(/*IsImplicit=*/false);
+        if (expAttr->canAppearOnDecl(ID))
+          ID->addAttribute(expAttr);
+      }
+      if (Dep.isImplementationOnly()) {
+        auto implOnlyAttr =
+            new (Ctx) ImplementationOnlyAttr(/*IsImplicit=*/false);
+        if (implOnlyAttr->canAppearOnDecl(ID))
+          ID->addAttribute(implOnlyAttr);
+      }
 
       ImportDecls.push_back(ID);
     }
