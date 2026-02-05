@@ -205,6 +205,9 @@ static bool isTransferrable(const PotentialBinding &binding,
                              : AllowedBindingKind::Subtypes)))
     return false;
 
+  if (binding.hasDefaultedLiteralProtocol())
+    return true;
+
   if (binding.BindingType->isPlaceholder())
     return false;
 
@@ -221,6 +224,12 @@ static void forEachTransferable(
     if (isTransferrable(binding, direction))
       callback(binding);
   });
+
+  llvm::for_each(bindings.Literals, [&](const auto &literal) {
+    callback({literal.hasDefaultType() ? literal.getDefaultType() : Type(),
+              AllowedBindingKind::Exact, literal.getSource(),
+              literal.TransitiveFrom});
+  });
 }
 
 /// Collect all of the subtypes of the given constraint graph node that
@@ -235,15 +244,16 @@ static void collectBindingProducingSubtypesOf(
     return;
   }
 
-  for (const auto &binding : node.getPotentialBindings().Bindings) {
-    if (binding.isTransitiveSupertype())
-      subtypes.insert(binding.Originator);
-  }
+  forEachTransferable(node.getPotentialBindings(), ChainDirection::Supertypes,
+                      [&subtypes](const auto &binding) {
+                        if (binding.isTransitive())
+                          subtypes.insert(binding.Originator);
+                      });
 }
 
 void ConstraintGraphNode::updateTypeVariableAssociations(Constraint *constraint,
                                                          bool retraction) {
-  if (constraint->getKind() != ConstraintKind::Subtype)
+  if (!(constraint->getKind() == ConstraintKind::Subtype))
     return;
 
   auto retractTransitiveBindings = [&](TypeVariableType *from,
@@ -632,10 +642,19 @@ void ConstraintGraphNode::introduceTransitive(
     PotentialBinding binding, std::optional<ChainDirection> propagateTo) {
   ASSERT(binding.isTransitive());
 
-  if (ConstraintSystem::typeVarOccursInType(TypeVar, binding.BindingType))
-    return;
+  auto &bindings = getPotentialBindings();
+  if (binding.hasDefaultedLiteralProtocol()) {
+    // If the new literal wasn't added, there is nothing to propagate
+    // because it should be already there.
+    if (!bindings.inferFromLiteral(binding.getSource(),
+                                   /*transitiveFrom=*/binding.Originator))
+      return;
+  } else {
+    if (ConstraintSystem::typeVarOccursInType(TypeVar, binding.BindingType))
+      return;
 
-  getPotentialBindings().addPotentialBinding(binding);
+    bindings.addPotentialBinding(binding);
+  }
 
   if (propagateTo) {
     notifyAll(CG, *this, *propagateTo, [&binding](auto &member) {
@@ -759,7 +778,7 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *repr,
   if (supportsTransitiveInference()) {
     forEachTransferable(nonRepNode.Potential, ChainDirection::Supertypes,
                         [&](const auto &binding) {
-                          if (binding.isTransitiveSupertype())
+                          if (binding.isTransitive())
                             (*this)[repr].introduceTransitive(
                                 binding, ChainDirection::Supertypes);
                         });
