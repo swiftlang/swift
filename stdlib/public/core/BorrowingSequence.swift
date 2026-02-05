@@ -79,7 +79,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
   mutating func skip(by maximumOffset: Int) -> Int
 }
 
-//@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.3, *)
 extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(&self)
@@ -104,6 +104,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 
 /// A type that provides sequential, borrowing access to its elements.
 @available(SwiftStdlib 6.3, *)
+@reparentable
 public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element: ~Copyable
