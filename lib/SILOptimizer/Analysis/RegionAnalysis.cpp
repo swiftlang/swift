@@ -2385,7 +2385,7 @@ public:
     // invalid. This ensures we guarantee that if we find an actor merge error,
     // the compiler halts. Importantly this lets our users know 100% that if the
     // compiler exits successfully, actor merge errors could not have happened.
-    std::optional<SILDynamicMergedIsolationInfo> mergedInfo;
+    SILDynamicMergedIsolationInfo mergedInfo;
     if (resultIsolationInfoOverride) {
       mergedInfo = SILDynamicMergedIsolationInfo(resultIsolationInfoOverride);
     } else {
@@ -2423,7 +2423,7 @@ public:
         auto originalMergedInfo = mergedInfo;
         (void)originalMergedInfo;
         if (mergedInfo)
-          mergedInfo = mergedInfo->merge(value.getIsolationRegionInfo());
+          mergedInfo = mergedInfo.merge(value.getIsolationRegionInfo());
 
         // If we fail to merge, then we have an incompatibility in between some
         // of our arguments (consider isolated to different actors) or with the

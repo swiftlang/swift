@@ -145,15 +145,15 @@ protocol P {
         actor A : P {
   func foo(x : () -> ()) -> () {}
 
-  func bar(x : () -> ()) -> () {}
+  func bar(x : () -> ()) -> () {} // expected-tns-warning {{pattern that the region-based isolation checker does not understand how to check}}
   // expected-warning@-1 {{non-Sendable parameter type '() -> ()' cannot be sent from caller of protocol requirement 'bar(x:)' into actor-isolated implementation}}
 
   func foo2<T>(x : T) -> () {}
 
-  func bar2<T>(x : T) -> () {}
+  func bar2<T>(x : T) -> () {} // expected-tns-warning {{pattern that the region-based isolation checker does not understand how to check}}
   // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar2(x:)' into actor-isolated implementation}}
 
-  func bar3<T: Equatable>(x : T) -> () {}
+  func bar3<T: Equatable>(x : T) -> () {} // expected-tns-warning {{pattern that the region-based isolation checker does not understand how to check}}
   // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar3(x:)' into actor-isolated implementation}}
 }
 
@@ -297,10 +297,10 @@ final class NonSendable {
     // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
     // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
-    _ = await x
+    _ = await x // expected-tns-warning {{pattern that the region-based isolation checker does not understand how to check}}
     // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
 
-    _ = await self.x
+    _ = await self.x // expected-tns-warning {{pattern that the region-based isolation checker does not understand how to check}}
       // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   }
 
