@@ -58,6 +58,11 @@ using string = const char *;
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues();
 
+// Wrapper around SWIFT_DEBUG_CONCURRENCY_ALWAYS_USE_STEALERS that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyAlwaysUseStealers();
+
+
 // Wrapper around SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS that the
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
