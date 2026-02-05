@@ -940,7 +940,8 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 }
 
 static std::optional<bool> subsumeBinding(const PotentialBinding &binding,
-                                          const PotentialBinding &existing) {
+                                          const PotentialBinding &existing,
+                                          bool isClosureParameterType) {
   auto existingType = existing.BindingType;
   auto result = isLikelyExactMatch(binding.BindingType, existingType);
   if (result.has_value() && *result) {
@@ -992,6 +993,21 @@ static std::optional<bool> subsumeBinding(const PotentialBinding &binding,
     }
   }
 
+  if (!isClosureParameterType) {
+    // Since Double and CGFloat are effectively the same type due to an
+    // implicit conversion between them, always prefer Double over CGFloat
+    // when possible.
+    //
+    // Note: This optimization can't be performed for closure parameters
+    //       because their type could be converted only at the point of
+    //       use in the closure body.
+    if (binding.BindingType->isCGFloat() && existing.BindingType->isDouble())
+      return false;
+
+    if (binding.BindingType->isDouble() && existing.BindingType->isCGFloat())
+      return true;
+  }
+
   return std::nullopt;
 }
 
@@ -1021,6 +1037,8 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
+  bool isClosureParameterType = TypeVar->getImpl().isClosureParameterType();
+
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
@@ -1028,7 +1046,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
   // resolution.
   for (auto existing = Bindings.begin(); existing != Bindings.end();
        ++existing) {
-    auto result = subsumeBinding(binding, *existing);
+    auto result = subsumeBinding(binding, *existing, isClosureParameterType);
     if (result == std::nullopt) {
       // Record a new binding, unless it subsumed by something else.
       continue;
@@ -1047,44 +1065,13 @@ void BindingSet::addBinding(PotentialBinding binding) {
       }
 
       // Remove the existing binding.
-      Bindings.erase(existing);
+      existing = Bindings.erase(existing);
 
       // Fall through to add a new binding.
       break;
     } else {
       // Drop the new binding.
       return;
-    }
-  }
-
-  // Since Double and CGFloat are effectively the same type due to an
-  // implicit conversion between them, always prefer Double over CGFloat
-  // when possible.
-  //
-  // Note: This optimization can't be performed for closure parameters
-  //       because their type could be converted only at the point of
-  //       use in the closure body.
-  if (!TypeVar->getImpl().isClosureParameterType()) {
-    auto type = binding.BindingType;
-
-    if (type->isCGFloat() &&
-        llvm::any_of(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isDouble();
-        }))
-      return;
-
-    if (type->isDouble()) {
-      auto inferredCGFloat =
-          llvm::find_if(Bindings, [](const PotentialBinding &binding) {
-            return binding.BindingType->isCGFloat();
-          });
-
-      if (inferredCGFloat != Bindings.end()) {
-        auto newBinding = inferredCGFloat->withType(type);
-        (void)Bindings.erase(inferredCGFloat);
-        Bindings.insert(newBinding);
-        return;
-      }
     }
   }
 
