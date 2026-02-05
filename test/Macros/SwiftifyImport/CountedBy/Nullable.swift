@@ -41,15 +41,10 @@ public func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: ptr?.count ?? 0)!
-    return { () in
-        return if ptr == nil {
-            unsafe myFunc2(nil, len)
-          } else {
-            unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-              return unsafe myFunc2(_ptrPtr.baseAddress, len)
-            }
-          }
-    }()
+    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    return unsafe myFunc2(_ptrPtr?.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_4test7myFunc315_SwiftifyImportfMp_.swift
@@ -59,31 +54,13 @@ public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
 public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let len2 = CInt(exactly: ptr2?.count ?? 0)!
-    return { () in
-        return if ptr2 == nil {
-            { () in
-                return if ptr == nil {
-                        unsafe myFunc3(nil, len, nil, len2)
-                      } else {
-                        unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-                          return unsafe myFunc3(_ptrPtr.baseAddress, len, nil, len2)
-                        }
-                      }
-            }()
-          } else {
-            unsafe ptr2!.withUnsafeMutableBufferPointer { _ptr2Ptr in
-              return { () in
-                  return if ptr == nil {
-                          unsafe myFunc3(nil, len, _ptr2Ptr.baseAddress, len2)
-                        } else {
-                          unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-                            return unsafe myFunc3(_ptrPtr.baseAddress, len, _ptr2Ptr.baseAddress, len2)
-                          }
-                        }
-              }()
-            }
-          }
-    }()
+    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    return unsafe myFunc3(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
 }
 ------------------------------
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
@@ -92,16 +69,11 @@ public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<C
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc4(_ ptr: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: ptr?.count ?? 0)!
+    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
     return unsafe _swiftifyOverrideLifetime({ () in
-      let _resultValue = { () in
-              return if ptr == nil {
-                  unsafe myFunc4(nil, len)
-                } else {
-                  unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-                    return unsafe myFunc4(_ptrPtr.baseAddress, len)
-                  }
-                }
-          }()
+      let _resultValue = unsafe myFunc4(_ptrPtr?.baseAddress, len)
       if unsafe _resultValue == nil {
         return nil
       } else {

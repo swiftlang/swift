@@ -106,9 +106,10 @@ public func exprReturn(_ size: CInt, _ count: CInt) -> UnsafeMutableRawBufferPoi
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func constParamNoreturn(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe ptr.withUnsafeBytes { _ptrPtr in
-      return unsafe constParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
     }
+    return unsafe constParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
 }
 ------------------------------
 @__swiftmacro_4test16mutParamNoreturn15_SwiftifyImportfMp_.swift
@@ -117,9 +118,10 @@ public func constParamNoreturn(_ ptr: RawSpan) {
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
-      return unsafe mutParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
+    let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
+        unsafe $0
     }
+    return unsafe mutParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
 }
 ------------------------------
 @__swiftmacro_4test21constReturnDependence15_SwiftifyImportfMp_.swift
@@ -128,9 +130,10 @@ public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
 public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe ptr.withUnsafeBytes { _ptrPtr in
-      return unsafe constReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self))
-            }, byteCount: Int(size)), copying: ())
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe constReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)), byteCount: Int(size)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test19mutReturnDependence15_SwiftifyImportfMp_.swift
@@ -139,8 +142,9 @@ public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
-      return unsafe mutReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self))
-            }, byteCount: Int(size)), copying: ())
+    let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe mutReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)), byteCount: Int(size)), copying: ())
 }
 ------------------------------

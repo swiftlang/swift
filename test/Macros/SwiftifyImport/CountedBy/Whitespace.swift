@@ -21,32 +21,14 @@ public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: Unsa
 public func myFunc(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let len2 = CInt(exactly: ptr2?.count ?? 0)!
+    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
     return unsafe _swiftifyOverrideLifetime({ () in
-      let _resultValue = { () in
-              return if ptr2 == nil {
-                  { () in
-                      return if ptr == nil {
-                              unsafe myFunc(nil, len, nil, len2)
-                            } else {
-                              unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-                                return unsafe myFunc(_ptrPtr.baseAddress, len, nil, len2)
-                              }
-                            }
-                  }()
-                } else {
-                  unsafe ptr2!.withUnsafeMutableBufferPointer { _ptr2Ptr in
-                    return { () in
-                        return if ptr == nil {
-                                unsafe myFunc(nil, len, _ptr2Ptr.baseAddress, len2)
-                              } else {
-                                unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-                                  return unsafe myFunc(_ptrPtr.baseAddress, len, _ptr2Ptr.baseAddress, len2)
-                                }
-                              }
-                    }()
-                  }
-                }
-          }()
+      let _resultValue = unsafe myFunc(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
       if unsafe _resultValue == nil {
         return nil
       } else {

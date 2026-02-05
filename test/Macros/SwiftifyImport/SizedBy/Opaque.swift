@@ -66,9 +66,10 @@ public func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func nonnullSpan(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe ptr.withUnsafeBytes { _ptrPtr in
-      return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
     }
+    return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
 }
 ------------------------------
 @__swiftmacro_4test12nullableSpan15_SwiftifyImportfMp_.swift
@@ -77,15 +78,10 @@ public func nonnullSpan(_ ptr: RawSpan) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func nullableSpan(_ ptr: RawSpan?) {
     let size = CInt(exactly: ptr?.byteCount ?? 0)!
-    return { () in
-        return if ptr == nil {
-            unsafe nullableSpan(nil, size)
-          } else {
-            unsafe ptr!.withUnsafeBytes { _ptrPtr in
-              return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), size)
-            }
-          }
-    }()
+    let _ptrPtr = unsafe ptr?.withUnsafeBytes {
+        unsafe $0
+    }
+    return unsafe nullableSpan(OpaquePointer(_ptrPtr?.baseAddress), size)
 }
 ------------------------------
 @__swiftmacro_4test15impNullableSpan15_SwiftifyImportfMp_.swift
@@ -94,8 +90,9 @@ public func nullableSpan(_ ptr: RawSpan?) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func impNullableSpan(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe ptr.withUnsafeBytes { _ptrPtr in
-      return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
     }
+    return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
 }
 ------------------------------

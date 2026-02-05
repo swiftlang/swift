@@ -20,8 +20,9 @@ public func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt) -> CInt {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc(_ ptr: RawSpan) -> CInt {
     let size = CInt(exactly: ptr.byteCount)!
-    return unsafe ptr.withUnsafeBytes { _ptrPtr in
-      return unsafe myFunc(_ptrPtr.baseAddress!, size)
+    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+        unsafe $0
     }
+    return unsafe myFunc(_ptrPtr.baseAddress!, size)
 }
 ------------------------------

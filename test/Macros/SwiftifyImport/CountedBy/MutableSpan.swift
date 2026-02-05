@@ -19,8 +19,9 @@ public func myFunc(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt) {
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc(_ ptr: inout MutableSpan<CInt>) {
     let len = CInt(exactly: ptr.count)!
-    return unsafe ptr.withUnsafeMutableBufferPointer { _ptrPtr in
-      return unsafe myFunc(_ptrPtr.baseAddress!, len)
+    let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe myFunc(_ptrPtr.baseAddress!, len)
 }
 ------------------------------

@@ -61,9 +61,10 @@ public func nonEscaping(_ len: CInt) -> UnsafeRawBufferPointer {
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
     let len1 = CInt(exactly: p.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe p.withUnsafeBytes { _pPtr in
-      return unsafe lifetimeDependentCopy(_pPtr.baseAddress!, len1, len2)
-            }, byteCount: Int(len2)), copying: ())
+    let _pPtr = unsafe p.withUnsafeBytes {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe lifetimeDependentCopy(_pPtr.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test23lifetimeDependentBorrow15_SwiftifyImportfMp_.swift
@@ -81,9 +82,10 @@ public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len
 @_alwaysEmitIntoClient @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
 public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe p.withUnsafeMutableBytes { _pPtr in
-      return unsafe lifetimeDependentCopyMut(_pPtr.baseAddress!, len1, len2)
-            }, byteCount: Int(len2)), copying: ())
+    let _pPtr = unsafe p.withUnsafeMutableBytes {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe lifetimeDependentCopyMut(_pPtr.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test26lifetimeDependentBorrowMut15_SwiftifyImportfMp_.swift

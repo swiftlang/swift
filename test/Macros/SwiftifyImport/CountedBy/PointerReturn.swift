@@ -52,9 +52,10 @@ public func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
     let len1 = CInt(exactly: p.count)!
-    return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe p.withUnsafeBufferPointer { _pPtr in
-      return unsafe lifetimeDependentCopy(_pPtr.baseAddress!, len1, len2)
-            }, count: Int(len2)), copying: ())
+    let _pPtr = unsafe p.withUnsafeBufferPointer {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentCopy(_pPtr.baseAddress!, len1, len2), count: Int(len2)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test23lifetimeDependentBorrow15_SwiftifyImportfMp_.swift

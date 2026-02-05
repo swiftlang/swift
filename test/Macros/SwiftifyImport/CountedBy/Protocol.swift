@@ -56,9 +56,10 @@ extension SpanProtocol {
 @_alwaysEmitIntoClient @_disfavoredOverload public
       func foo(_ ptr: Span<CInt>) {
         let len = CInt(exactly: ptr.count)!
-        return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-          return unsafe foo(_ptrPtr.baseAddress!, len)
+        let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+            unsafe $0
         }
+        return unsafe foo(_ptrPtr.baseAddress!, len)
     }
     /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(borrow self) @_disfavoredOverload public
@@ -75,9 +76,10 @@ extension MixedProtocol {
       /// Some doc comment
       func foo(_ ptr: Span<CInt>) {
         let len = CInt(exactly: ptr.count)!
-        return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-          return unsafe foo(_ptrPtr.baseAddress!, len)
+        let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+            unsafe $0
         }
+        return unsafe foo(_ptrPtr.baseAddress!, len)
     }
     /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload public

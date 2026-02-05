@@ -32,9 +32,10 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func foo(_ p: Span<Int32>, _ x: UnsafeMutablePointer<no_module_record_t>!) {
     let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeBufferPointer { _pPtr in
-      return unsafe foo(len, _pPtr.baseAddress!, x)
+    let _pPtr = unsafe p.withUnsafeBufferPointer {
+        unsafe $0
     }
+    return unsafe foo(len, _pPtr.baseAddress!, x)
 }
 ------------------------------
 
