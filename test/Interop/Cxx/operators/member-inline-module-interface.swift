@@ -252,12 +252,12 @@
 // CHECK: struct AllStar {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
-// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int>
+// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int{{(32|64)?}}>
 // CHECK-NEXT:   static func * (lhs: AllStar, rhs: AllStar) -> AllStar
 // CHECK-NEXT:   @available(*, unavailable, message: "use * instead")
 // CHECK-NEXT:   func __operatorStar(_ rhs: AllStar) -> AllStar
-// CHECK-NEXT:   var L: Int
-// CHECK-NEXT:   var pointee: Int { mutating get set }
+// CHECK-NEXT:   var L: Int{{(32|64)?}}
+// CHECK-NEXT:   var pointee: Int{{(32|64)?}} { mutating get set }
 // CHECK-NEXT: }
 
 // CHECK: struct AmbiguousOperatorStar {
