@@ -1588,7 +1588,7 @@ func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> Funct
 
 func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, leadingTrivia: Trivia,
                                args arguments: [ExprSyntax], spanAvailability: String?,
-                               typeMappings: [String: String]?) throws -> DeclSyntax {
+                               typeMappings: [String: String]?, parentNode: Syntax?) throws -> DeclSyntax {
   let origFuncComponents = try deconstructFunction(declaration)
   let (funcComponents, rewriter) = renameParameterNamesIfNeeded(origFuncComponents)
 
@@ -1691,11 +1691,21 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
         .with(\.leadingTrivia, trivia))
   }
   if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
+    var modifiers = funcComponents.modifiers
+    if parentNode?.as(ClassDeclSyntax.self) != nil { // convenience inits are forbidden in structs
+      let alreadyConvenienceInit = modifiers.contains(where: { mod in
+        mod.name.text == "convenience"
+      })
+      if !alreadyConvenienceInit {
+        modifiers.append(DeclModifierSyntax(name: TokenSyntax(stringLiteral: "convenience")))
+      }
+    }
     return DeclSyntax(
       origInitDecl
         .with(\.signature, newSignature)
         .with(\.body, body)
         .with(\.attributes, AttributeListSyntax(attributes))
+        .with(\.modifiers, modifiers)
         .with(\.leadingTrivia, trivia))
   }
   throw DiagnosticError(
@@ -1730,7 +1740,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         try constructOverloadFunction(
           forDecl: declaration, leadingTrivia: node.leadingTrivia, args: args,
           spanAvailability: spanAvailability,
-          typeMappings: typeMappings)]
+          typeMappings: typeMappings, parentNode: context.lexicalContext.first)]
     } catch let error as DiagnosticError {
       context.diagnose(
         Diagnostic(
@@ -1828,12 +1838,13 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
         let result = try constructOverloadFunction(
           forDecl: method, leadingTrivia: Trivia(), args: args,
           spanAvailability: spanAvailability,
-          typeMappings: typeMappings)
-        guard let newMethod = result.as(FunctionDeclSyntax.self)?
-          .with(\.modifiers, method.modifiers
-              + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))])) else {
+          typeMappings: typeMappings, parentNode: context.lexicalContext.first)
+        guard let resultFunc = result.as(FunctionDeclSyntax.self) else {
           throw RuntimeError("expected FunctionDeclSyntax but got \(result.kind) for \(method.description)")
         }
+        let newMethod = resultFunc
+          .with(\.modifiers, resultFunc.modifiers
+              + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))]))
         return MemberBlockItemSyntax(decl: newMethod)
       }
 

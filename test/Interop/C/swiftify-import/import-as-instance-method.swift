@@ -325,7 +325,7 @@ public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! 
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public /*not inherited*/ init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
+public /*not inherited*/ convenience init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
     let len = Int32(exactly: p.count)!
     unsafe self.init(countC: len, pointerC: p.baseAddress!)
 }
