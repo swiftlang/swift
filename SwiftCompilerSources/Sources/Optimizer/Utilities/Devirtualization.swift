@@ -17,6 +17,12 @@ import SIL
 /// This may be a no-op if the destroy doesn't call any deinitializers.
 /// Returns true if all deinitializers could be devirtualized.
 func devirtualizeDeinits(of destroy: DestroyValueInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+  if destroy.isDeadEnd {
+    // It doesn't make sense to de-virtualize `destroy_value [dead_end]` because such operations
+    // are no-ops anyway. This is especially important for Embedded Swift, because introducing
+    // calls to generic deinit functions after the mandatory pipeline can result in IRGen crashes.
+    return true
+  }
   return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
 }
 
