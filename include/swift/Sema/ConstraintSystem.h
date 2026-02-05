@@ -1964,6 +1964,10 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
+
+  /// When set, bindings from subtypes are going to be propagated
+  /// up to their supertypes as they become available.
+  EnableTransitiveInference = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2460,7 +2464,7 @@ public:
   /// removed.
   llvm::DenseMap<Expr *, unsigned> InputExprSimulatedDepths;
 
-private:
+public:
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -2545,6 +2549,7 @@ private:
     SmallVector<Constraint *, 4> activeConstraints;
   };
 
+private:
   class CacheExprTypes : public ASTWalker {
     Expr *RootExpr;
     ConstraintSystem &CS;
