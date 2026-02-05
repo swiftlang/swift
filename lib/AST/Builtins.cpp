@@ -1395,15 +1395,18 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 
 static ValueDecl *getAutoDiffApplyDerivativeFunction(
     ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
-    unsigned arity, bool throws, Type thrownType) {
+    unsigned arity, bool throws) {
   assert(arity >= 1);
   // JVP:
-  //   <...T...(arity), R> (@differentiable(_forward) (...T) throws -> R, ...T)
-  //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
+  //   <...T...(arity), R, E: Error> (@differentiable(_forward) (...T) throws(E) -> R, ...T)
+  //       throws(E) -> (R, (...T.TangentVector) -> R.TangentVector)
   // VJP:
-  //   <...T...(arity), R> (@differentiable(reverse) (...T) throws -> R, ...T)
-  //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
-  unsigned numGenericParams = 1 + arity;
+  //   <...T...(arity), R, E: Error> (@differentiable(reverse) (...T) throws(E) -> R, ...T)
+  //       throws(E) -> (R, (R.TangentVector) -> ...T.TangentVector)
+  unsigned numGenericParams =
+    1 + /* result */
+    arity + /* params */
+    (throws ? 1 : 0);
   BuiltinFunctionBuilder builder(Context, numGenericParams);
   // Get the `Differentiable` protocol.
   auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
@@ -1416,6 +1419,13 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     builder.addConformanceRequirement(T, diffableProto);
     fnParamGens.push_back(T);
   }
+
+  decltype(fnResultGen) fnThrownTypeGen;
+  if (throws) {
+    fnThrownTypeGen = makeGenericParam(arity + 1);
+    builder.addConformanceRequirement(fnThrownTypeGen, KnownProtocolKind::Error);
+  }
+
   // Generator for the first argument, i.e. the `@differentiable` function.
   BuiltinFunctionBuilder::LambdaGenerator firstArgGen{
       // Generator for the function type at the argument position, i.e. the
@@ -1426,7 +1436,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
                 // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
                 .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
                 .withNoEscape()
-                .withThrows(throws, thrownType)
+                .withThrows(throws, throws? fnThrownTypeGen.build(builder) : Type())
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
@@ -1452,9 +1462,11 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   builder.addParameter(firstArgGen);
   for (auto argGen : fnParamGens)
     builder.addParameter(argGen);
-  if (throws)
-    builder.setRethrows();
   builder.setResult(resultGen);
+  if (throws) {
+    builder.setThrows();
+    builder.setThrownError(fnThrownTypeGen);
+  }
   return builder.build(Id);
 }
 
@@ -2966,9 +2978,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyDerivativeConfig(
             OperationName, kind, arity, throws))
       return nullptr;
-    // TODO: Support somehow typed throws
-    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
-                                              throws, /*thrownType=*/Type());
+    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity, throws);
   }
   if (OperationName.starts_with("applyTranspose_")) {
     unsigned arity;
