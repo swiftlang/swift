@@ -329,6 +329,7 @@
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
+  (font-lock-mode 1)                   ;; Enable syntax highlighting
   (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
                                        ;;   customize the mode with a hook.
 
