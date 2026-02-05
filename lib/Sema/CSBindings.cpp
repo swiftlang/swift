@@ -622,12 +622,6 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     ASSERT(inserted);
   }
 
-  llvm::SmallDenseSet<Type> seenDefaults;
-  for (auto *constraint : Defaults) {
-    bool inserted = seenDefaults.insert(constraint->getSecondType()).second;
-    ASSERT(inserted);
-  }
-
   for (const auto &entry : Info.SupertypeOf) {
     auto &node = CS.getConstraintGraph()[entry.first];
     if (!node.hasBindingSet())
@@ -665,17 +659,6 @@ void BindingSet::inferTransitiveSupertypeBindings() {
 
       literal.setDirectRequirement(false);
       Literals.push_back(literal);
-    }
-
-    // Infer transitive defaults.
-    for (auto *def : bindings.Defaults) {
-      if (def->getKind() == ConstraintKind::FallbackType)
-        continue;
-
-      if (!seenDefaults.insert(def->getSecondType()).second)
-        continue;
-
-      addDefault(def);
     }
 
     // TODO: We shouldn't need this in the future.
