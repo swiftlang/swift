@@ -481,8 +481,27 @@ UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
 UNINTERESTING_FEATURE(ImmutableWeakCaptures)
-// Ignore borrow and mutate accessors until it is used in the standard library.
-UNINTERESTING_FEATURE(BorrowAndMutateAccessors)
+
+static bool usesFeatureBorrowAndMutateAccessors(Decl *decl) {
+  auto accessorDeclUsesFeatureBorrowAndMutateAccessors =
+      [](AccessorDecl *accessor) {
+        return requiresFeatureBorrowAndMutateAccessors(
+            accessor->getAccessorKind());
+      };
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(),
+                        accessorDeclUsesFeatureBorrowAndMutateAccessors);
+  }
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    return accessorDeclUsesFeatureBorrowAndMutateAccessors(accessor);
+  }
+  default:
+    return false;
+  }
+}
 
 static bool usesFeatureInlineAlways(Decl *decl) {
   if (auto *inlineAttr = decl->getAttrs().getAttribute<InlineAttr>()) {
