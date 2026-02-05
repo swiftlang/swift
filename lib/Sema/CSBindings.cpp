@@ -933,31 +933,42 @@ void BindingSet::addBinding(PotentialBinding binding) {
       if (!existingNTD || NTD != existingNTD)
         continue;
 
-      // What is going on in this method needs to be thoroughly re-evaluated!
+      // A binding can subsume another binding. Suppose we have two
+      // constraints:
+      // - X conv $T0
+      // - $T0 conv Y
       //
-      // This logic aims to skip dropping bindings if
-      // collection type has conversions i.e. in situations like:
+      // This gives us two potential bindings:
+      // - (subtypes of) X
+      // - (supertypes of) Y
       //
-      // [$T1] conv $T2
-      // $T2 conv [(Int, String)]
-      // $T2.Element equal $T5.Element
+      // If X and Y are a match except that X has type variables and
+      // Y does not, we replace the subtype binding type with Y, and
+      // drop the supertype binding:
+      // - (subtypes of) Y
       //
-      // `$T1` could be bound to `(i: Int, v: String)` after
-      // `$T2` is bound to `[(Int, String)]` which is is a problem
-      // because it means that `$T2` was attempted to early
-      // before the solver had a chance to discover all viable
-      // bindings.
+      // Two more combinations are supported. Suppose as above that
+      // X is concrete and Y has type variables.
       //
-      // Let's say existing binding is `[(Int, String)]` and
-      // relation is "exact", in this case there is no point
-      // tracking `[$T1]` because upcasts are only allowed for
-      // subtype and other conversions.
-      if (existing->Kind != AllowedBindingKind::Exact) {
-        if (existingType->isKnownStdlibCollectionType() &&
-            hasConversions(existingType)) {
-          continue;
-        }
-      }
+      // Then:
+      // - (exact / subtypes of / supertypes of) X
+      // - (exact) Y
+      // becomes:
+      // - (exact) Y
+      //
+      // And finally:
+      // - (supertypes of) X
+      // - (supertypes of) Y
+      // becomes:
+      // - (supertypes of) Y
+      //
+      // This is unsound, but without it we get ambiguous solutions
+      // and performance problems in a couple of instances where we
+      // end up considering bindings like Int? vs $T0?, where $T0
+      // is subsequently bound to Int.
+      if (!(binding.Kind == AllowedBindingKind::Exact ||
+            existing->Kind == AllowedBindingKind::Supertypes))
+        continue;
 
       // If new type has a type variable it shouldn't
       // be considered viable.
