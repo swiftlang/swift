@@ -24,6 +24,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -44,7 +45,6 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 #define JOIN2(X,Y) X##Y
 STATISTIC(NumSolutionAttempts, "# of solution attempts");
-STATISTIC(TotalNumTypeVariables, "# of type variables created");
 
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(Overall##Name, Description);
@@ -56,22 +56,6 @@ STATISTIC(TotalNumTypeVariables, "# of type variables created");
   STATISTIC(Largest##Name, Description);
 #include "swift/Sema/ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
-
-TypeVariableType *ConstraintSystem::createTypeVariable(
-                                     ConstraintLocator *locator,
-                                     unsigned options,
-                                     PreparedOverloadBuilder *preparedOverload) {
-  ++TotalNumTypeVariables;
-  auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
-                                     locator, options);
-  if (preparedOverload) {
-    ASSERT(PreparingOverload);
-    preparedOverload->addedTypeVariable(tv);
-  } else {
-    addTypeVariable(tv);
-  }
-  return tv;
-}
 
 Solution ConstraintSystem::finalize() {
   assert(solverState);
