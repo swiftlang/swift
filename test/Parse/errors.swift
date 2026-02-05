@@ -81,16 +81,16 @@ func testAutoclosures() throws {
   takesAutoclosure(genNoError())
 
   try takesAutoclosure(genError()) // expected-error {{call can throw, but it is executed in a non-throwing autoclosure}}
-  try takesAutoclosure(genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
+  try takesAutoclosure(genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{3-7=}}
 
   takesAutoclosure(try genError()) // expected-error {{call can throw, but it is executed in a non-throwing autoclosure}}
-  takesAutoclosure(try genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{20-23=}}
+  takesAutoclosure(try genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{20-24=}}
 
   takesThrowingAutoclosure(try genError())
-  takesThrowingAutoclosure(try genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{28-31=}}
+  takesThrowingAutoclosure(try genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{28-32=}}
 
   try takesThrowingAutoclosure(genError())
-  try takesThrowingAutoclosure(genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{3-6=}}
+  try takesThrowingAutoclosure(genNoError()) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{3-7=}}
 
   takesThrowingAutoclosure(genError()) // expected-error {{call can throw but is not marked with 'try'}}
                                        // expected-note@-1 {{did you mean to use 'try'?}} {{28-28=try }}

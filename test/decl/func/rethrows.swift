@@ -573,7 +573,7 @@ func <| <A, B> (f: (A) throws -> B, a: A) rethrows -> B {
   return try f(a)
 }
 func |> <A, B> (a: A, f: (A) -> B) -> B {
-  return try f(a) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{10-13=}}
+  return try f(a) // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{10-14=}}
 }
 
 struct Box<A> {

@@ -204,9 +204,9 @@ func testTryOnThen() throws -> Int {
   case 1:
     then try throwingFn() // okay
   default:
-    try then() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{5-8=}}
-    try then{} // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{5-8=}}
-    try then {} // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{5-8=}}
+    try then() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
+    try then{} // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
+    try then {} // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
 
     try then throwingFn()
     // expected-error@-1 {{'try' must be placed on the produced expression}} {{5-9=}} {{14-14=try }}
@@ -214,5 +214,5 @@ func testTryOnThen() throws -> Int {
 }
 
 func testReturnTryThen(_ then: Int) -> Int {
-  return try then // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{10-13=}}
+  return try then // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{10-14=}}
 }

@@ -66,7 +66,7 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   _ = [i].self as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   _ = (try [i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{8-11=}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{8-12=}}
 
   // These are wrong, but make sure we don't warn about the value cast always succeeding.
   _  = [i: i] as! [String: Any]

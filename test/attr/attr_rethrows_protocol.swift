@@ -85,7 +85,7 @@ func closureAndRethrowing<R: RethrowingProtocol>(_ r: R, _ closure: () throws ->
 }
 
 closureAndRethrowing(NonThrows()) { }
-try closureAndRethrowing(NonThrows()) { } // expected-warning{{no calls to throwing functions occur within 'try' expression}}{{1-4=}}
+try closureAndRethrowing(NonThrows()) { } // expected-warning{{no calls to throwing functions occur within 'try' expression}}{{1-5=}}
 try closureAndRethrowing(Throws()) { }
 try closureAndRethrowing(NonThrows()) { () throws -> Void in }
 

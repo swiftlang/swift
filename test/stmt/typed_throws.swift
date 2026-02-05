@@ -146,7 +146,7 @@ func doSomethingWithoutThrowing() { }
 
 func testDoCatchWithoutThrowing() {
   do {
-    try doSomethingWithoutThrowing() // expected-warning{{no calls to throwing functions occur within 'try' expression}}{{5-8=}}
+    try doSomethingWithoutThrowing() // expected-warning{{no calls to throwing functions occur within 'try' expression}}{{5-9=}}
   } catch HomeworkError.forgot { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
   } catch {
   }
@@ -356,7 +356,7 @@ func testSequenceExpr() async throws(Never) {
   _ = try! getInt() + (getInt(), 0).0
 
   _ = try try! getInt() + getInt()
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{7-10=}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
 
   _ = await try! getIntAsync() + getIntAsync()
   // expected-warning@-1 {{'try' must precede 'await'}}
@@ -366,7 +366,7 @@ func testSequenceExpr() async throws(Never) {
   // expected-warning@-2{{no unsafe operations occur within 'unsafe' expression}}
   _ = try unsafe await try! getIntAsync() + getIntAsync()
   // expected-warning@-1 {{'try' must precede 'await'}}
-  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}{{7-10=}}
+  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}{{7-11=}}
   // expected-warning@-3{{no unsafe operations occur within 'unsafe' expression}}
   try _ = (try! getInt()) + getInt()
   // expected-error@-1:29 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
