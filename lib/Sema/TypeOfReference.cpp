@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace constraints;

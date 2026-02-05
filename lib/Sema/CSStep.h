@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CSSTEP_H
 
 #include "swift/AST/Types.h"
+#include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
