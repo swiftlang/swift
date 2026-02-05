@@ -3780,6 +3780,10 @@ namespace {
       switch (cxxOperatorKind) {
       case clang::OverloadedOperatorKind::OO_None:
         llvm_unreachable("should only be handling operators at this point");
+      case clang::OverloadedOperatorKind::OO_Call:
+      case clang::OverloadedOperatorKind::OO_Subscript:
+        break;
+
       case clang::OverloadedOperatorKind::OO_PlusPlus:
         if (clangFunc->getMinRequiredArguments() != 0)
           // Do not allow post-increment to be used from Swift
@@ -3793,16 +3797,20 @@ namespace {
         break;
 
       case clang::OverloadedOperatorKind::OO_Star:
-        if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
-            method && method->getRefQualifier() == clang::RQ_RValue)
-          // TODO: we shouldn't have to handle this case. We only mark it as
-          // unavailable for now to preserve old behavior, where r-value-this
-          // operator * overloads are always unavailable.
-          Impl.markUnavailable(func, "use .pointee property");
-        break;
-      case clang::OverloadedOperatorKind::OO_Call:
-      case clang::OverloadedOperatorKind::OO_Subscript:
-        break;
+        if (clangFunc->param_empty()) {
+          // Dereference operator, T operator*()
+          if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
+              method && method->getRefQualifier() == clang::RQ_RValue)
+            // TODO: we shouldn't have to handle this case. We only mark it as
+            // unavailable for now to preserve old behavior, where r-value-this
+            // operator * overloads are always unavailable.
+            Impl.markUnavailable(func, "use .pointee property");
+          break;
+        }
+
+        // Multiply operator, T operator*(R rhs) or T operator*(L lhs, R rhs)
+        // which we handle like most other operators
+        LLVM_FALLTHROUGH;
       default:
         auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
         Impl.addAlternateDecl(func, opFuncDecl);
