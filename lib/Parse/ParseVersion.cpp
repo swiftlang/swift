@@ -192,7 +192,7 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
     return std::nullopt;
   }
 
-  splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
+  splitVersionComponents(SplitComponents, VersionString, Loc, false);
 
   uint64_t ComponentNumber;
   bool isValidVersion = true;
