@@ -62,9 +62,10 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 @available(iOS 2.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe span(_pPtr.baseAddress!, len)
+    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
 //--- watchos-expansions.expected
@@ -83,9 +84,10 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 @available(watchOS 2.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe span(_pPtr.baseAddress!, len)
+    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
 //--- xros-expansions.expected
@@ -104,9 +106,10 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 @available(visionOS 1.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe span(_pPtr.baseAddress!, len)
+    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
 //--- tvos-expansions.expected
@@ -123,9 +126,10 @@ public func span(_ p: inout MutableSpan<Int32>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe span(_pPtr.baseAddress!, len)
+    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
 //--- other-expansions.expected
@@ -142,9 +146,10 @@ public func span(_ p: inout MutableSpan<Int32>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    return unsafe p.withUnsafeMutableBufferPointer { _pPtr in
-      return unsafe span(_pPtr.baseAddress!, len)
+    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
 //--- test.swift
