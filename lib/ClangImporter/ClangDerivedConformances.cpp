@@ -255,6 +255,25 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl, Type distanceTy) {
   return dyn_cast_or_null<FuncDecl>(result);
 }
 
+static FuncDecl *getNonMutatingDereferenceOperator(NominalTypeDecl *decl) {
+  auto isValid = [&](ValueDecl *starOperator) -> bool {
+    auto starOp = dyn_cast<FuncDecl>(starOperator);
+    if (!starOp || starOp->isMutating())
+      return false;
+    auto params = starOp->getParameters();
+    if (params->size() != 0)
+      return false;
+    auto returnTy = starOp->getResultInterfaceType();
+    if (!returnTy->getAnyPointerElementType())
+      return false;
+    return true;
+  };
+
+  ValueDecl *result = lookupOperator(
+      decl, decl->getASTContext().getIdentifier("__operatorStar"), isValid);
+  return dyn_cast_or_null<FuncDecl>(result);
+}
+
 static clang::FunctionDecl *
 instantiateTemplatedOperator(ClangImporter::Implementation &impl,
                              const clang::CXXRecordDecl *classDecl,
@@ -554,6 +573,7 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   // conformance to UnsafeCxxMutableInputIterator but is not necessary for
   // UnsafeCxxInputIterator.
   bool pointeeSettable = pointee->isSettable(nullptr);
+  Type pointeeTy = pointee->getTypeInContext();
 
   auto *successor = impl.lookupAndImportSuccessor(decl);
   if (!successor || successor->isMutating())
@@ -587,8 +607,28 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   if (!equalEqual)
     return;
 
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"),
-                               pointee->getTypeInContext());
+  // Look for __operatorStar(), which must be non-mutating and return a
+  // reference. This makes sure we use the const operator* overload.
+  auto operatorStar = getNonMutatingDereferenceOperator(decl);
+  Type operatorStarReturnTy = pointeeTy;
+  if (operatorStar) {
+    assert(!operatorStar->isMutating() &&
+           "this __operatorStar can't be mutating");
+    operatorStarReturnTy = operatorStar->getResultInterfaceType();
+    assert(operatorStarReturnTy &&
+           "__operatorStar doesn't have a return type?");
+    assert(
+        (!operatorStarReturnTy->getAnyPointerElementType() &&
+         operatorStarReturnTy->getCanonicalType() ==
+             pointee->getTypeInContext()->getCanonicalType()) ||
+        (operatorStarReturnTy->getAnyPointerElementType()->getCanonicalType() ==
+         pointee->getTypeInContext()->getCanonicalType()) &&
+            "incompatible Pointee and DereferenceResult associated types");
+  }
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"), pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("DereferenceResult"),
+                               operatorStarReturnTy);
+
   if (pointeeSettable)
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxMutableInputIterator});
@@ -850,8 +890,27 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                                rawIteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
                                borrowingIteratorTy);
-  impl.addSynthesizedProtocolAttrs(decl,
-                                   {KnownProtocolKind::CxxBorrowingSequence});
+
+  auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
+      ctx.getIdentifier("DereferenceResult"));
+  assert(
+      dereferenceResultDecl &&
+      "UnsafeCxxInputIterator must have a DereferenceResult associated type");
+  auto dereferenceResultTy =
+      rawIteratorConformance->getTypeWitness(dereferenceResultDecl);
+  assert(dereferenceResultTy &&
+         "valid conformance must have a Pointee witness");
+
+  if (dereferenceResultTy->getAnyPointerElementType()) {
+    // Only conform to CxxBorrowingSequence if `__operatorStar` returns
+    // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee
+    assert(
+        (dereferenceResultTy->getAnyPointerElementType()->getCanonicalType() ==
+         pointeeTy->getCanonicalType()) &&
+        "incompatible Pointee and DereferenceResult associated types");
+    impl.addSynthesizedProtocolAttrs(decl,
+                                     {KnownProtocolKind::CxxBorrowingSequence});
+  }
 
   // TODO if `decl` doesn't conform to RAC, do we want the Iterator typealias?
   // CxxSequence conformance

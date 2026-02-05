@@ -19,13 +19,12 @@
 /// `end()` which return input iterators into the C++ sequence. The iterator
 /// types must conform to `UnsafeCxxInputIterator`.
 
-// TODO CxxSequence : CxxBorrowingSequence just like Sequence: BorrowingSequence?
 // @available(SwiftStdlib 6.3, *)
 public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~Escapable {
   override associatedtype Element: ~Copyable
   override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self, Element>
   associatedtype RawIterator: UnsafeCxxInputIterator
-    where RawIterator.Pointee == Element
+    where RawIterator.Pointee == Element, RawIterator.DereferenceResult == UnsafePointer<Element>
 
   /// Do not implement this function manually in Swift.
   func __beginUnsafe() -> RawIterator
