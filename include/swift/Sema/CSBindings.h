@@ -506,14 +506,6 @@ public:
     });
   }
 
-  /// Check if this binding is viable for inclusion in the set.
-  ///
-  /// \param binding The binding to validate.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires extra
-  /// checking.
-  bool isViable(PotentialBinding &binding);
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
