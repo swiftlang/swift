@@ -273,7 +273,7 @@ struct TupleImpl : ReflectionMirrorImpl {
   intptr_t childOffset(intptr_t i) override {
     auto *Tuple = static_cast<const TupleTypeMetadata *>(type);
 
-    if (i < 0 || (size_t)i > Tuple->NumElements)
+    if (i < 0 || (size_t)i >= Tuple->NumElements)
       swift::crash("Swift mirror subscript bounds check failure");
 
     // Get the nth element.
@@ -285,7 +285,7 @@ struct TupleImpl : ReflectionMirrorImpl {
                                 void (**outFreeFunc)(const char *)) override {
     auto *Tuple = static_cast<const TupleTypeMetadata *>(type);
 
-    if (i < 0 || (size_t)i > Tuple->NumElements)
+    if (i < 0 || (size_t)i >= Tuple->NumElements)
       swift::crash("Swift mirror subscript bounds check failure");
 
     // Determine whether there is a label.
@@ -492,7 +492,7 @@ struct StructImpl : ReflectionMirrorImpl {
   intptr_t childOffset(intptr_t i) override {
     auto *Struct = static_cast<const StructMetadata *>(type);
 
-    if (i < 0 || (size_t)i > Struct->getDescription()->NumFields)
+    if (i < 0 || (size_t)i >= Struct->getDescription()->NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
 
     // Load the offset from its respective vector.
@@ -725,7 +725,7 @@ struct ClassImpl : ReflectionMirrorImpl {
     auto *Clazz = static_cast<const ClassMetadata*>(type);
     auto description = Clazz->getDescription();
 
-    if (i < 0 || (size_t)i > description->NumFields)
+    if (i < 0 || (size_t)i >= description->NumFields)
       swift::crash("Swift mirror subscript bounds check failure");
 
     // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
