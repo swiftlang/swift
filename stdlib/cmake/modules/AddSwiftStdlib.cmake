@@ -1765,6 +1765,7 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [IS_OSLOG]
 #     [ONLY_SWIFTMODULE]
 #     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
@@ -1875,6 +1876,9 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
+# IS_OSLOG
+#   Treat the library as OSLog library.
+#
 # ONLY_SWIFTMODULE
 #   Do not build either static or shared, build just the .swiftmodule.
 #
@@ -1964,6 +1968,7 @@ function(add_swift_target_library name)
         IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
+        IS_OSLOG
         IS_SWIFT_ONLY
         NOSWIFTRT
         ONLY_SWIFTMODULE
@@ -2135,6 +2140,10 @@ function(add_swift_target_library name)
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if (SWIFTLIB_IS_OSLOG)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-assert-config;-Xfrontend;DisableReplacement")
   endif()
 
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
