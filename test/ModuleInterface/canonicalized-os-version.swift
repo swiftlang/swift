@@ -8,7 +8,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Modules/Simple.swiftmodule/arm64-apple-macos.swiftinterface) -module-name Simple 
 
 // Next, build transitive dependencies in zippered mode.
-// RUN: %target-swift-frontend -module-name input %t/input.swift -target arm64-apple-macosx50.1 -target-variant arm64-apple-ios50.1-macabi -I%t/Modules -scan-dependencies -module-cache-path %t/module-cache-path -o %t/deps.json 2>&1 | Filecheck  --allow-empty --implicit-check-not warning: --implicit-check-not error: %s
+// RUN: %target-swift-frontend -module-name input %t/input.swift -target arm64-apple-macosx50.1 -target-variant arm64-apple-ios50.1-macabi -I%t/Modules -scan-dependencies -module-cache-path %t/module-cache-path -o %t/deps.json 2>&1 | %FileCheck  --allow-empty --implicit-check-not warning: --implicit-check-not error: %s
 // RUN: %validate-json %t/deps.json | %FileCheck %s --check-prefix=DEPS
 
 DEPS-NOT:   "arm64-apple-macos16.4"
