@@ -9,6 +9,7 @@ func foo() {
 
 // Checks that, due to default check delay, a modification will be ignored and fast completion will still activate.
 // UNSUPPORTED: OS=windows-msvc
+// TODO: Try to make this test work on Windows when reenabling it.
 
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)

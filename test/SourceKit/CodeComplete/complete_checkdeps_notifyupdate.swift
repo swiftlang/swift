@@ -6,6 +6,7 @@ func foo() {
 }
 
 // UNSUPPORTED: OS=windows-msvc
+// TODO: Try to make this test work on Windows when reenabling it.
 // REQUIRES: rdar74150023
 
 // RUN: %empty-directory(%t/Frameworks)
