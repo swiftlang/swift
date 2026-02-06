@@ -242,6 +242,7 @@ SINGLETON_TYPE(UnsafeValueBuffer, BuiltinUnsafeValueBuffer)
 SINGLETON_TYPE(DefaultActorStorage, BuiltinDefaultActorStorage)
 SINGLETON_TYPE(NonDefaultDistributedActorStorage, BuiltinNonDefaultDistributedActorStorage)
 SINGLETON_TYPE(SILToken, SILToken)
+SINGLETON_TYPE(WasmExternRef, BuiltinWasmExternRef)
 #undef SINGLETON_TYPE
 #endif
 
