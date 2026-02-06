@@ -21,6 +21,7 @@
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
 
 // Given a possibly-Optional type, return the direct superclass of the
 // (underlying) type wrapped in the same number of optional levels as
@@ -389,7 +390,7 @@ bool TypeVarBindingProducer::computeNext() {
 
       for (auto supertype : enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
-        if (inference::checkTypeOfBinding(TypeVar, supertype)) {
+        if (checkTypeOfBinding(TypeVar, supertype)) {
           // A key path type cannot be bound to type-erased key path variants.
           if (TypeVar->getImpl().isKeyPathType() &&
               isTypeErasedKeyPathType(supertype))
