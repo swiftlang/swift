@@ -60,6 +60,7 @@ add_swift_host_library(swiftBasic STATIC
   JSONSerialization.cpp
   LangOptions.cpp
   LangOptionsBridging.cpp
+  LanguageMode.cpp
   LoadDynamicLibrary.cpp
   Located.cpp
   Mangler.cpp

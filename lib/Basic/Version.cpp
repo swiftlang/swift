@@ -189,7 +189,7 @@ std::optional<Version> Version::getEffectiveLanguageVersion() const {
     // Allow the future language mode version in asserts compilers *only* so
     // that we can start testing changes planned for after the current latest
     // language mode. Note that it'll not be listed in
-    // `Version::getValidEffectiveVersions()`.
+    // `LanguageMode::allSupportedModes()`.
 #ifdef NDEBUG
     LLVM_FALLTHROUGH;
 #else

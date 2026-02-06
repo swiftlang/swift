@@ -2045,7 +2045,7 @@ bool PreCheckTarget::canSimplifyDiscardAssignmentExpr(
 bool PreCheckTarget::correctInterpolationIfStrange(
     InterpolatedStringLiteralExpr *ISLE) {
   // These expressions are valid in Swift 5+.
-  if (getASTContext().isLanguageModeAtLeast(5))
+  if (getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
     return true;
 
   /// Diagnoses appendInterpolation(...) calls with multiple
@@ -2732,7 +2732,7 @@ void PreCheckTarget::resolveKeyPathExpr(KeyPathExpr *KPE) {
 Expr *PreCheckTarget::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   // If constructor call is expected to produce an optional let's not attempt
   // this optimization because literal initializers aren't failable.
-  if (!getASTContext().isLanguageModeAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     if (!ExprStack.empty()) {
       auto *parent = ExprStack.back();
       if (isa<BindOptionalExpr>(parent) || isa<ForceValueExpr>(parent))

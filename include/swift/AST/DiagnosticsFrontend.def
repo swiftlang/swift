@@ -40,8 +40,9 @@ ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
 WARNING(warning_upcoming_feature_on_by_default, none,
-        "upcoming feature '%0' is already enabled as of Swift version %1",
-        (StringRef, unsigned))
+        "upcoming feature '%0' already enabled as of the Swift %1 "
+        "language mode",
+        (StringRef, StringRef))
 
 GROUPED_WARNING(unrecognized_feature, UnrecognizedStrictLanguageFeatures, none,
                 "'%0' is not a recognized "
@@ -405,7 +406,7 @@ WARNING(module_interface_scoped_import_unsupported,none,
         "scoped imports are not yet supported in module interfaces",
         ())
 WARNING(warn_unsupported_module_interface_swift_version,none,
-        "module interfaces are only supported with Swift language version 5 "
+        "module interfaces are only supported with the Swift 5 language mode "
         "or later (currently using -swift-version %0)",
         (StringRef))
 WARNING(warn_unsupported_module_interface_library_evolution,none,
