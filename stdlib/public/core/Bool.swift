@@ -204,11 +204,10 @@ extension Bool: LosslessStringConvertible {
   /// `"false"`, the result is `nil`. This initializer is case sensitive.
   ///
   /// - Parameter description: A string representation of the Boolean value.
-  @inlinable
   public init?(_ description: String) {
-    if description == "true" {
+    if description.compareUnicodeScalars("true") {
       self = true
-    } else if description == "false" {
+    } else if description.compareUnicodeScalars("false") {
       self = false
     } else {
       return nil
