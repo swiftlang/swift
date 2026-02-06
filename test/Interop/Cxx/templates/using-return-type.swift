@@ -7,9 +7,12 @@
 
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}main.swift \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}CxxHeader.h \
 // RUN:   -suppress-notes \
 // RUN:   -cxx-interoperability-mode=default
+//
+// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module CxxModule {

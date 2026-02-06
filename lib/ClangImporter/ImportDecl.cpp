@@ -2568,7 +2568,9 @@ namespace {
         if (nd->getDeclName().isIdentifier())
           allMemberNames.insert(nd->getName());
 
-        if (!shouldEagerlyImportClangRecordMember(nd))
+        if (Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCxxMembersLazily) &&
+            !shouldEagerlyImportClangRecordMember(nd))
           continue;
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
@@ -4581,9 +4583,14 @@ namespace {
       // happen before we import the name of the method, as the name is affected
       // by safety/unsafety of the return type. The safety detection logic
       // (`IsSafeUseOfCxxDecl`) relies on the class being instantiated.
+      //
+      // This behavior is currently gated on ImportCxxMembersLazily to provide
+      // an easy off-ramp in case of qualification issues.
       if (auto *returnedTmpl =
               dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
                   desugarIfElaborated(decl->getReturnType())->getAsTagDecl());
+          Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportCxxMembersLazily) &&
           returnedTmpl && !returnedTmpl->getDefinition()) {
         Impl.getClangSema().InstantiateClassTemplateSpecialization(
             decl->getLocation(),

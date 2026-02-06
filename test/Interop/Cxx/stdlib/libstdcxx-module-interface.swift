@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t > %t/interface.swift
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t -enable-experimental-feature ImportCxxMembersLazily > %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-STD < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-SIZE-T < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-TO-STRING < %t/interface.swift
@@ -9,6 +9,10 @@
 
 // This test is specific to libstdc++ and only runs on platforms where libstdc++ is used.
 // REQUIRES: OS=linux-gnu
+//
+// The RHS of basic_string's typealias value_type depends on how eagerly/lazily
+// we import type members
+// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 // CHECK-STD: enum std {
 // CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection {
