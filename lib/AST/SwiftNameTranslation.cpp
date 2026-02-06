@@ -206,7 +206,25 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
     return "init";
 
   if (VD->isOperator()) {
-    std::string name = ("operator" + VD->getBaseIdentifier().str()).str();
+    auto funcDecl = cast<FuncDecl>(VD);
+    // Swift allows custom operator spelling, but C++ doesn't. Make sure the
+    // operator we are emitting is valid in C++.
+    StringRef swiftSpelling = funcDecl->getBaseIdentifier().str();
+    bool swiftUnaryOperator = funcDecl->isUnaryOperator();
+    bool swiftBinaryOperator = funcDecl->isBinaryOperator();
+
+    bool isValidCxxOperator = llvm::StringSwitch<bool>(swiftSpelling)
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+      .Case(Spelling,                                                          \
+            (Unary && swiftUnaryOperator || Binary && swiftBinaryOperator))
+#include "clang/Basic/OperatorKinds.def"
+#undef OVERLOADED_OPERATOR
+      .Default(false);
+
+    if (!isValidCxxOperator)
+      return StringRef();
+
+    std::string name = ("operator" + swiftSpelling).str();
     return ctx.getIdentifier(name).str();
   }
 
