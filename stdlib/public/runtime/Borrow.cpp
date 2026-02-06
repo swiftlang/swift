@@ -16,6 +16,10 @@
 namespace swift {
 
 BorrowRepresentation swift_getBorrowRepresentation(const Metadata *referent) {
+  if (referent->getValueWitnesses()->getSize() > 4 * sizeof(uintptr_t)) {
+    return BorrowRepresentation::Pointer;
+  }
+
   if (!referent->getValueWitnesses()->isBitwiseBorrowable() ||
       referent->getValueWitnesses()->isAddressableForDependencies()) {
     return BorrowRepresentation::Pointer;

@@ -243,6 +243,13 @@ llvm::Value *FixedTypeInfo::getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
       getBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakableAndBorrowable);
 }
+llvm::Value *FixedTypeInfo::getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const {
+
+  bool isAFD = T.isAddressableForDeps(IGF.IGM.getSILModule(),
+                                      TypeExpansionContext::minimal());
+  
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty, isAFD);
+}
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
 }
@@ -1365,6 +1372,9 @@ namespace {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
