@@ -17,6 +17,7 @@
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
 
+// Unsupported due to expectCrash() not working
 // UNSUPPORTED: OS=wasip1
 
 import MultiModuleStruct1
