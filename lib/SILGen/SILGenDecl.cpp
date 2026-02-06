@@ -1766,6 +1766,12 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     return initialization->finishUninitialized(*this);
   }
 
+  // For noncopyable types bound to wildcard patterns, discard the result.
+  if (isa<AnyPattern>(PBD->getPattern(idx)->getSemanticsProvidingPattern(/*lookThroughOpaque*/ true)) && initExpr->getType()->isNoncopyable()) {
+    emitIgnoredExpr(initExpr);
+    return;
+  }
+
   // In case of a borrowing binding, we do not want the scope to be limited to
   // this function.
   if (initialization.get()->isBorrow()) {
