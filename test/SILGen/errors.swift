@@ -729,18 +729,21 @@ func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
   try b.firstStructure.support()
 }
 // CHECK-LABEL: sil hidden [ossa] @$s6errors21supportFirstStructure{{.*}}F : $@convention(thin) <B where B : Buildable> (@inout B) -> @error any Error {
-// CHECK: [[MODIFY:%.*]] = witness_method $B, #Buildable.firstStructure!modify :
-// CHECK: ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]<B>([[BASE:%[0-9]*]])
+// CHECK: [[MODIFY:%.*]] = witness_method $B, #Buildable.firstStructure!yielding_mutate :
+// CHECK: ([[T1:%.*]], [[TOKEN:%.*]], [[CORO_ALLOC:%.*]]) = begin_apply [[MODIFY]]<B>([[BASE:%[0-9]*]])
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support :
 // CHECK: try_apply [[SUPPORT]]<B.Structure>([[T1]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
 // CHECK: end_apply [[TOKEN]]
+// CHECK: dealloc_stack [[CORO_ALLOC]]
 // CHECK: return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : @owned $any Error):
-// CHECK: abort_apply [[TOKEN]]
-// CHECK: throw [[ERROR]]
+// CHECK-NEXT: end_apply [[TOKEN]]
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: end_access
+// CHECK-NEXT: throw [[ERROR]]
 
 // CHECK: } // end sil function '$s6errors21supportFirstStructure{{.*}}F'
 
@@ -751,23 +754,29 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK-LABEL: sil hidden [ossa] @$s6errors16supportStructure_4nameyxz_SStKAA9BuildableRzlF : $@convention(thin) <B where B : Buildable> (@inout B, @guaranteed String) -> @error any Error {
 // CHECK: bb0({{.*}}, [[INDEX:%.*]] : @guaranteed $String):
 // CHECK:   [[INDEX_COPY:%.*]] = copy_value [[INDEX]] : $String
-// CHECK:   [[BORROWED_INDEX_COPY:%.*]] = begin_borrow [[INDEX_COPY]]
-// CHECK:   [[MODIFY:%.*]] = witness_method $B, #Buildable.subscript!modify :
-// CHECK:   ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]<B>([[BORROWED_INDEX_COPY]], [[BASE:%[0-9]*]])
-// CHECK:   [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support :
-// CHECK:   try_apply [[SUPPORT]]<B.Structure>([[T1]]) : $@convention(witness_method: Supportable) <τ_0_0 where τ_0_0 : Supportable> (@inout τ_0_0) -> @error any Error, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK-NEXT:   begin_access
+// CHECK-NEXT:   [[BORROWED_INDEX_COPY:%.*]] = begin_borrow [[INDEX_COPY]]
+// CHECK-NEXT:   [[MODIFY:%.*]] = witness_method $B, #Buildable.subscript!yielding_mutate :
+// CHECK-NEXT:   ([[T1:%.*]], [[TOKEN:%.*]], [[CORO_ALLOC:%.*]]) = begin_apply [[MODIFY]]<B>([[BORROWED_INDEX_COPY]], [[BASE:%[0-9]*]])
+// CHECK-NEXT:   [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support :
+// CHECK-NEXT:   try_apply [[SUPPORT]]<B.Structure>([[T1]]) : $@convention(witness_method: Supportable) <τ_0_0 where τ_0_0 : Supportable> (@inout τ_0_0) -> @error any Error, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
-// CHECK:   end_apply [[TOKEN]]
-// CHECK:   end_borrow [[BORROWED_INDEX_COPY]]
-// CHECK:   destroy_value [[INDEX_COPY]] : $String
-// CHECK:   return
+// CHECK-NEXT:   end_apply [[TOKEN]]
+// CHECK-NEXT:   end_borrow [[BORROWED_INDEX_COPY]]
+// CHECK-NEXT:   end_access
+// CHECK-NEXT:   dealloc_stack
+// CHECK-NEXT:   destroy_value [[INDEX_COPY]] : $String
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
 
 // CHECK: [[BB_ERROR]]([[ERROR:%.*]] : @owned $any Error):
-// CHECK:   abort_apply [[TOKEN]]
-// CHECK:   end_borrow [[BORROWED_INDEX_COPY]]
-// CHECK:   destroy_value [[INDEX_COPY]] : $String
-// CHECK:   throw [[ERROR]]
+// CHECK-NEXT:   end_apply [[TOKEN]]
+// CHECK-NEXT:   dealloc_stack
+// CHECK-NEXT:   end_borrow [[BORROWED_INDEX_COPY]]
+// CHECK-NEXT:   end_access
+// CHECK-NEXT:   destroy_value [[INDEX_COPY]] : $String
+// CHECK-NEXT:   throw [[ERROR]]
 
 // CHECK: } // end sil function '$s6errors16supportStructure{{.*}}F'
 

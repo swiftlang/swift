@@ -130,7 +130,7 @@ public class PublicClass {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivg
   // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC11internalVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivs
-  // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC11internalVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
+  // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC11internalVarSivx : $@yield_once_2 @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
   // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivM
   var internalVar = 1
 
@@ -185,14 +185,17 @@ extension PublicClass {
 // CHECK-SKIP-NOT:        #PublicClass.internalVar!getter
 // CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!setter
 // CHECK-SKIP-NOT:        #PublicClass.internalVar!setter
-// CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!modify
-// CHECK-SKIP-NOT:        #PublicClass.internalVar!modify
+// CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!yielding_mutate
+// CHECK-SKIP-NOT:        #PublicClass.internalVar!yielding_mutate
 // CHECK-NEXT:            #PublicClass.publicVar!getter
 // CHECK-NEXT:            #PublicClass.publicVar!setter
 // CHECK-NEXT:            #PublicClass.publicVar!modify
+// CHECK-NEXT:            #PublicClass.publicVar!yielding_mutate
 // CHECK-NEXT:            #PublicClass.publicWrappedVar!getter
 // CHECK-NEXT:            #PublicClass.publicWrappedVar!setter
 // CHECK-NEXT:            #PublicClass.publicWrappedVar!modify
+// CHECK-NEXT:            #PublicClass.publicWrappedVar!yielding_mutate
+// CHECK-NEXT:            #PublicClass._publicWrappedVar!yielding_mutateXXX
 // CHECK-NO-SKIP-NEXT:    #PublicClass.internalMethod
 // CHECK-SKIP-NOT:        #PublicClass.internalMethod
 // CHECK-NO-SKIP-NEXT:    #PublicClass.init!allocator

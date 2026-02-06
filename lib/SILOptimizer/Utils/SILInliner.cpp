@@ -22,6 +22,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -31,18 +32,33 @@
 using namespace swift;
 
 bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
+  // yield_once2 coroutines will never be called with abort_apply.
+  // https://github.com/swiftlang/swift-evolution/blob/main/proposals/
+  //   0474-yielding-accessors.md#
+  //     unwinding-the-accessor-when-an-error-is-thrown-in-the-caller
+  bool hasNoUnwind = BA->isCalleeAllocated();
   // Don't inline if we have multiple resumption sites (i.e. end_apply or
   // abort_apply instructions).  The current implementation clones a single
   // copy of the end_apply and abort_apply paths, so it can't handle values
   // that might be live in the caller across different resumption sites.  To
   // handle this in general, we'd need to separately clone the resume/unwind
   // paths into each end/abort.
-  bool hasEndApply = false, hasAbortApply = false;
+  unsigned hasEndApply = 0, hasAbortApply = false;
+  bool haveSeenEndApplyInUnwindBlock = false;
+  bool haveSeenOnlyVoidEndApplyResult = true;
   for (auto *use : BA->getEndApplyUses()) {
     auto *user = use->getUser();
-    if (isa<EndApplyInst>(user)) {
-      if (hasEndApply) return false;
-      hasEndApply = true;
+    if (auto *endApply = dyn_cast<EndApplyInst>(user)) {
+      haveSeenOnlyVoidEndApplyResult &= endApply->getType().isVoid();
+      if (hasEndApply  && !hasNoUnwind) return false;
+      // We allow inlining if there are two end_applies and no abort_apply for
+      // yield_once2 coroutines -- we just treat the second end_apply as if it
+      // were the abort_apply in the inlining code.
+      if (hasEndApply > 1) return false;
+      if (isa<UnwindInst>(endApply->getParent()->getTerminator())) {
+        haveSeenEndApplyInUnwindBlock = true;
+      }
+      hasEndApply++;
     } else if (isa<AbortApplyInst>(user)) {
       if (hasAbortApply) return false;
       hasAbortApply = true;
@@ -50,6 +66,14 @@ bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
       assert(isa<EndBorrowInst>(user));
     }
   }
+  // If we have two end_applies the other/second one needs to be in the unwind
+  // block.
+  // We don't handle non-void end_apply instructions either in the two end_apply
+  // case.
+  if (hasEndApply == 2 &&
+      (!haveSeenEndApplyInUnwindBlock ||
+       !haveSeenOnlyVoidEndApplyResult))
+    return false;
 
   // Don't inline a coroutine with multiple yields.  The current
   // implementation doesn't clone code from the caller, so it can't handle
@@ -60,11 +84,18 @@ bool SILInliner::canInlineBeginApply(BeginApplyInst *BA) {
   // values alive across it.
   bool hasYield = false;
   for (auto &B : *BA->getReferencedFunctionOrNull()) {
-    if (isa<YieldInst>(B.getTerminator())) {
+    if (auto *yield = dyn_cast<YieldInst>(B.getTerminator())) {
       if (hasYield) return false;
       hasYield = true;
+      if (hasEndApply == 2) {
+        // Can currently only clone a single basic block in the inliner.
+        if (!isa<ReturnInst>(yield->getResumeBB()->getTerminator())) {
+          return false;
+        }
+      }
     }
   }
+
   // Note that zero yields is fine; it just means the begin_apply is
   // basically noreturn.
 
@@ -98,12 +129,18 @@ class BeginApplySite {
   SILBuilder *Builder;
   BeginApplyInst *BeginApply;
   bool HasYield = false;
-
+public:
   EndApplyInst *EndApply = nullptr;
   SILBasicBlock *EndApplyBB = nullptr;
   SILBasicBlock *EndApplyReturnBB = nullptr;
 
-  AbortApplyInst *AbortApply = nullptr;
+  // Can be either an AbortApply or another EndApply in case of a yield_once2
+  // coroutine (which does not support an abort_apply).
+  // https://github.com/swiftlang/swift-evolution/blob/main/proposals/
+  //   0474-yielding-accessors.md#
+  //     unwinding-the-accessor-when-an-error-is-thrown-in-the-caller
+
+  SILInstruction *AbortApply = nullptr;
   SILBasicBlock *AbortApplyBB = nullptr;
   SILBasicBlock *AbortApplyReturnBB = nullptr;
 
@@ -130,8 +167,23 @@ public:
     SmallVector<AbortApplyInst *, 1> abortApplyInsts;
     BeginApply->getCoroutineEndPoints(endApplyInsts, abortApplyInsts,
                                       &EndBorrows);
+    bool seenEndApply = false;
+
+    // Order it so that the end_apply in the unwind block ends up as the
+    // `AbortApply` variable.
+    if (endApplyInsts.size() == 2 &&
+        isa<UnwindInst>(endApplyInsts[1]->getParent()->getTerminator())) {
+      std::swap(endApplyInsts[0], endApplyInsts[1]);
+    }
+
     while (!endApplyInsts.empty()) {
       auto *endApply = endApplyInsts.pop_back_val();
+      if (seenEndApply) {
+        collectAbortApply(endApply);
+        endBorrowInsertPts.push_back(&*std::next(endApply->getIterator()));
+        continue;
+      }
+      seenEndApply = true;
       collectEndApply(endApply);
       endBorrowInsertPts.push_back(&*std::next(endApply->getIterator()));
     }
@@ -181,7 +233,9 @@ public:
     EndApplyBB = EndApply->getParent();
     EndApplyReturnBB = EndApplyBB->split(SILBasicBlock::iterator(EndApply));
   }
-  void collectAbortApply(AbortApplyInst *Abort) {
+  void collectAbortApply(SILInstruction *Abort) {
+    assert(isa<AbortApplyInst>(Abort) ||
+           isa<EndApplyInst>(Abort));
     assert(!AbortApply);
     AbortApply = Abort;
     AbortApplyBB = AbortApply->getParent();
@@ -193,6 +247,8 @@ public:
   /// \return false to use the normal inlining logic
   bool processTerminator(
       TermInst *terminator, SILBasicBlock *returnToBB,
+      SILBasicBlock *&SecondEndApplyContinuation,
+      SILBasicBlock *&ResumeBBToClone,
       llvm::function_ref<SILBasicBlock *(SILBasicBlock *)> remapBlock,
       llvm::function_ref<SILValue(SILValue)> getMappedValue) {
     // A yield branches to the begin_apply return block passing the yielded
@@ -228,9 +284,13 @@ public:
       Builder->createBranch(Loc, returnToBB);
 
       // Add branches at the resumption sites to the resume/unwind block.
+      bool isTwoEndApply = AbortApply != nullptr &&
+        isa<EndApplyInst>(AbortApply);
       if (EndApply) {
         SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
         auto resumeBB = remapBlock(yield->getResumeBB());
+        if (isTwoEndApply)
+          ResumeBBToClone = resumeBB;
         for (auto *bbi : guaranteedYields) {
           Builder->createEndBorrow(EndApply->getLoc(), bbi);
         }
@@ -242,23 +302,35 @@ public:
         for (auto *bbi : guaranteedYields) {
           Builder->createEndBorrow(EndApply->getLoc(), bbi);
         }
+        if (isTwoEndApply)
+          SecondEndApplyContinuation = unwindBB;
         Builder->createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
     }
-
     // 'return' and 'unwind' instructions turn into branches to the
     // end_apply/abort_apply return blocks, respectively.  If those blocks
     // are null, it's because there weren't any of the corresponding
     // instructions in the caller.  That means this entire path is
     // unreachable.
     if (isa<ReturnInst>(terminator) || isa<UnwindInst>(terminator)) {
+      bool isTwoEndApply = AbortApply != nullptr &&
+        isa<EndApplyInst>(AbortApply);
       ReturnInst *retInst = dyn_cast<ReturnInst>(terminator);
       auto *returnBB = retInst ? EndApplyReturnBB : AbortApplyReturnBB;
       if (retInst && EndApply)
         EndApply->replaceAllUsesWith(getMappedValue(retInst->getOperand()));
       if (returnBB) {
-        Builder->createBranch(Loc, returnBB);
+        if (isTwoEndApply) {
+          if (isa<ReturnInst>(terminator)) {
+            Builder->createBranch(Loc, returnBB);
+          } else {
+            assert(SecondEndApplyContinuation);
+            Builder->createUnreachable(Loc);
+          }
+        } else {
+          Builder->createBranch(Loc, returnBB);
+        }
       } else {
         Builder->createUnreachable(Loc);
       }
@@ -371,6 +443,9 @@ class SILInlineCloner
   // Block in the original caller serving as the successor of the inlined
   // control path.
   SILBasicBlock *ReturnToBB = nullptr;
+
+  SILBasicBlock *SecondEndApplyContinuation = nullptr;
+  SILBasicBlock *ResumeBBToClone = nullptr;
 
 public:
   SILInlineCloner(SILFunction *CalleeFunction, FullApplySite Apply,
@@ -693,6 +768,32 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   //
   // Once all calls in a function are inlined, unconditional branches are
   // eliminated by mergeBlocks.
+  //
+
+  if (SecondEndApplyContinuation) {
+    // Split off the dead unwind block body.
+    SecondEndApplyContinuation->split(SecondEndApplyContinuation->begin());
+
+    // Clone the callee's yield's resume BB here.
+    BasicBlockCloner cloner(ResumeBBToClone, /*pass manager*/nullptr);
+    cloner.cloneBlock();
+    auto *clonedResumeBB = cloner.getNewBB();
+    auto *oldTerm = clonedResumeBB->getTerminator();
+    // And jump there from the unwind block beginning.
+    {
+      SavedInsertionPointRAII savedIP(getBuilder(),
+                                      SecondEndApplyContinuation,
+                                      SecondEndApplyContinuation->begin());
+      getBuilder().createBranch(Loc, clonedResumeBB);
+    }
+    // Branch back to the end_apply on the unwind path in the caller.
+    {
+      SavedInsertionPointRAII savedIP(getBuilder(), oldTerm);
+      getBuilder()
+        .createBranch(Loc, BeginApply->AbortApplyReturnBB);
+      oldTerm->eraseFromParent();
+    }
+  }
 }
 
 void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
@@ -700,7 +801,7 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   // Coroutine terminators need special handling.
   if (BeginApply) {
     if (BeginApply->processTerminator(
-            Terminator, ReturnToBB,
+            Terminator, ReturnToBB, SecondEndApplyContinuation, ResumeBBToClone,
             [=](SILBasicBlock *Block) -> SILBasicBlock * {
               return this->remapBasicBlock(Block);
             },
