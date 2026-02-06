@@ -95,15 +95,16 @@ static ConflictReason canPossiblyConvertTo(
       // Toll-free bridging CF -> ObjC.
       if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
           rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        return canPossiblyConvertTo(getBridgedObjCClass(lhsDecl), rhsDecl);
+        lhsDecl = getBridgedObjCClass(lhsDecl);
 
       // Toll-free bridging ObjC -> CF.
       } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
                  rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        return canPossiblyConvertTo(lhsDecl, getBridgedObjCClass(rhsDecl));
+        rhsDecl = getBridgedObjCClass(rhsDecl);
+      }
 
-      // Subclassing relationships.
-      } else if (!rhsDecl->isSuperclassOf(lhsDecl))
+      // Check for a subclassing relationship.
+      if (!rhsDecl->isSuperclassOf(lhsDecl))
         return ConflictFlag::Class;
 
       break;
