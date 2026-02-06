@@ -672,14 +672,19 @@ protected:
     if (!builder.supports(ctx.Id_buildArray))
       return failTransform(forEachStmt);
 
+    auto &ctx = dc->getASTContext();
+    bool isBorrowing = ctx.LangOpts.hasFeature(Feature::BorrowingForLoop);
+
     // For-each statements require the Sequence protocol. If we don't have
     // it (which generally means the standard library isn't loaded), fall
     // out of the result-builder path entirely to let normal type checking
     // take care of this.
     auto sequenceProto = TypeChecker::getProtocol(
-        dc->getASTContext(), forEachStmt->getForLoc(),
-        forEachStmt->getAwaitLoc().isValid() ? KnownProtocolKind::AsyncSequence
-                                             : KnownProtocolKind::Sequence);
+        ctx, forEachStmt->getForLoc(),
+        forEachStmt->getAwaitLoc().isValid()
+            ? KnownProtocolKind::AsyncSequence
+            : (isBorrowing ? KnownProtocolKind::BorrowingSequence
+                           : KnownProtocolKind::Sequence));
     if (!sequenceProto)
       return failTransform(forEachStmt);
 

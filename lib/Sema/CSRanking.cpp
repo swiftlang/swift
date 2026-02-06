@@ -1130,11 +1130,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor().dyn_cast<Expr *>()) {
-      // FIXME: Hack to maintain ranking behavior for 'makeIterator' and 'next'
-      // in a 'for' loop. See the comment in `simplifyForEachElementConstraint`.
-      if (locator->isLastElement<LocatorPathElt::ImplicitForEachCompatMember>())
-        return 2;
-
       auto weight = cs.getExprDepth(anchor);
       if (weight)
         return *weight + 1;
