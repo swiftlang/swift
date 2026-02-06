@@ -3529,7 +3529,8 @@ private:
 
   Expr *buildNextSpanCall(DeclRefExpr *makeIteratorVarRef) {
     // For borrowing: call nextSpan(maximumCount: Int.max)
-    auto nextSpanId = ctx.getIdentifier("nextSpan");
+    // FIXME: change this to nextSpan once the protocol lands.
+    auto nextSpanId = ctx.getIdentifier("_nextSpan");
     auto *nextSpanRef = new (ctx) UnresolvedDotExpr(
         makeIteratorVarRef, stmt->getForLoc(), DeclNameRef(nextSpanId),
         DeclNameLoc(stmt->getForLoc()), /*implicit=*/true);
