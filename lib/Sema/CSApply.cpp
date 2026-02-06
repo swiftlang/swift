@@ -7705,6 +7705,23 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
+    // If we have a ClosureExpr, then we can safely propagate the lifetime
+    // dependence info to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (!toEI.getLifetimeDependencies().empty() &&
+        fromEI.getLifetimeDependencies().empty()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withLifetimeDependencies(toEI.getLifetimeDependencies()));
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating 'lifetime dependence info' might have satisfied the
+        // entire conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
     // If we have a ClosureExpr, then we can safely propagate the 'no escape'
     // bit to the closure without invalidating prior analysis.
     fromEI = fromFunc->getExtInfo();
