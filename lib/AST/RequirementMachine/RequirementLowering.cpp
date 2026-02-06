@@ -1122,8 +1122,17 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     if (auto trailing = proto->getTrailingWhereClause())
       return { ", ", trailing->getRequirements().back().getSourceRange().End };
 
+    auto const &inheritedTys = proto->getInherited();
+
     // Inheritance clause.
-    return { " where ", proto->getInherited().getEndLoc() };
+    if (!inheritedTys.empty())
+      return { " where ", inheritedTys.getEndLoc() };
+
+    // Otherwise, there's no nice way to find the end of the protocol's name or
+    // the opening '{', so just give a close approximation.
+    SourceLoc Loc = proto->getNameLoc();
+    Loc = Loc.getAdvancedLocOrInvalid(proto->getName().str().size());
+    return { " where ",  Loc};
   };
 
   // Retrieve the set of requirements that a given associated type declaration
