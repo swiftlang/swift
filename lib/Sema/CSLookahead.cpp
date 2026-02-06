@@ -230,8 +230,6 @@ static void pruneDisjunctionImpl(
             llvm::errs() << " category";
           if (reason.contains(ConflictFlag::Exact))
             llvm::errs() << " exact";
-          if (reason.contains(ConflictFlag::Nominal))
-            llvm::errs() << " nominal";
           if (reason.contains(ConflictFlag::Class))
             llvm::errs() << " class";
           if (reason.contains(ConflictFlag::Structural))

@@ -62,16 +62,15 @@ bool hasConversions(Type type);
 enum ConflictFlag : unsigned {
   Category = 1 << 0,
   Exact = 1 << 1,
-  Nominal = 1 << 2,
-  Class = 1 << 3,
-  Structural = 1 << 4,
-  Array = 1 << 5,
-  Dictionary = 1 << 6,
-  Set = 1 << 7,
-  Optional = 1 << 8,
-  Double = 1 << 9,
-  Conformance = 1 << 10,
-  Mutability = 1 << 11
+  Class = 1 << 2,
+  Structural = 1 << 3,
+  Array = 1 << 4,
+  Dictionary = 1 << 5,
+  Set = 1 << 6,
+  Optional = 1 << 7,
+  Double = 1 << 8,
+  Conformance = 1 << 9,
+  Mutability = 1 << 10
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 

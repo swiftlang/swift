@@ -30,12 +30,18 @@ using namespace swift;
 using namespace constraints;
 
 std::optional<bool>
-swift::constraints::isLikelyExactMatch(Type first, Type second) {
-  if (auto *firstDecl = first->getAnyNominal()) {
-    // FIXME: Make this more precise.
-    auto *secondDecl = second->getAnyNominal();
-    return firstDecl == secondDecl;
+swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
+  if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
+      !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+    return lhs->isEqual(rhs);
   }
+
+  if (auto *lhsDecl = lhs->getAnyNominal()) {
+    // FIXME: Make this more precise.
+    auto *rhsDecl = rhs->getAnyNominal();
+    return lhsDecl == rhsDecl;
+  }
+
   // FIXME: Handle other type kinds.
   return std::nullopt;
 }
@@ -139,15 +145,9 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
   if (lhsKind == rhsKind) {
     switch (lhsKind) {
     case ConversionBehavior::None: {
-      if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
-          !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
-        if (!lhs->isEqual(rhs))
-          return ConflictFlag::Exact;
-      }
-
       auto result = isLikelyExactMatch(lhs, rhs);
       if (result.has_value() && !*result)
-        return ConflictFlag::Nominal;
+        return ConflictFlag::Exact;
 
       break;
     }
