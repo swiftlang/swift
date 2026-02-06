@@ -187,13 +187,13 @@ func passesInOut(i: Int) {
 }
 
 func takesOptional<T: P>(_ value: T?) { }
-// expected-note@-1{{required by global function 'takesOptional' where 'T' = 'any P'}}
 
 func passesToOptional(p: any P, pOpt: (any P)?) {
   // CHECK: open_existential_expr {{.*}} location={{.*}}:[[@LINE+1]]:{{[0-9]+}} range=
   takesOptional(p) // okay
-  takesOptional(pOpt) // expected-error{{type 'any P' cannot conform to 'P'}}
-  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+  takesOptional(pOpt) // expected-error{{value of optional type '(any P)?' must be unwrapped to a value of type 'any P'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 }
 
 
