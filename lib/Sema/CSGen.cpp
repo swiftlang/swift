@@ -4047,12 +4047,6 @@ static bool generateForEachStmtConstraints(ConstraintSystem &cs,
   auto seqExprTarget =
       SyntacticElementTarget(sequenceExpr, dc, contextInfo, false);
 
-  // Pretend the sequence expression still has a depth that matches when it
-  // was previously within a 'makeIterator()' call.
-  // FIXME: Remove this
-  if (!cs.getASTContext().isAtLeastFutureMajorLanguageMode())
-    cs.InputExprSimulatedDepths[sequenceExpr] = 2;
-
   if (cs.generateConstraints(seqExprTarget))
     return true;
 
