@@ -38,6 +38,7 @@ public protocol Executor: AnyObject, Sendable {
 
   #if os(WASI) || !$Embedded
   /// `true` if this is the main executor.
+  @_weakLinked
   @available(StdlibDeploymentTarget 6.3, *)
   var isMainExecutor: Bool { get }
   #endif // os(WASI) || !$Embedded
@@ -49,6 +50,7 @@ public protocol Executor: AnyObject, Sendable {
   /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
+  @_weakLinked
   @available(StdlibDeploymentTarget 6.3, *)
   var asSchedulingExecutor: (any SchedulingExecutor)? { get }
   #endif
