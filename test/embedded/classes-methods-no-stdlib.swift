@@ -40,7 +40,7 @@ public func test(x: MyClass) {
 }
 
 
-// EXIST: @"$e4main10MySubClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr getelementptr inbounds (<{ ptr, ptr, ptr, ptr, ptr, ptr, ptr }>, ptr @"$e4main7MyClassCMf", i32 0, i32 1), ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @"$e4main10MySubClassCACycfC" }>
+// EXIST: @"$e4main10MySubClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr getelementptr inbounds ({{.*}}, ptr @"$e4main7MyClassCMf", i32 0, i32 1), ptr @"$e4main10MySubClassCfD", ptr null, ptr @"$e4main10MySubClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @"$e4main10MySubClassCACycfC" }>
 // EXIST: @"$e4main7MyClassCMf" = {{.*}} <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfD", ptr null, ptr @"$e4main7MyClassC3fooyyF", ptr @"$e4main7MyClassC3baryyF", ptr @swift_deletedMethodError }>
 
 // EXIST: @"$e4main10MySubClassCN" = {{.*}}alias{{.*}} ptr @"$e4main10MySubClassCMf", i32 0, i32 1)

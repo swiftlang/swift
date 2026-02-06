@@ -5647,7 +5647,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
                                     vtable);
   builder.layoutEmbedded(classTy);
-  bool canBeConstant = builder.canBeConstant();
+  bool canBeConstant = true;
 
   StringRef section{};
   auto var = IGM.defineTypeMetadata(classTy, /*isPattern*/ false, canBeConstant,
