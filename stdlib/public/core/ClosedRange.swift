@@ -135,7 +135,8 @@ extension ClosedRange: RangeExpression {
   }
 }
 
-extension ClosedRange: Sequence
+// FIXME: Explicit BorrowingSequence conformance is a source break
+extension ClosedRange: Sequence, BorrowingSequence
 where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<ClosedRange<Bound>>

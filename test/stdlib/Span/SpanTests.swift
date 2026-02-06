@@ -650,3 +650,125 @@ suite.test("Span Sendability")
   let span = Span(_unsafeElements: buffer)
   send(span)
 }
+
+@available(SwiftStdlib 6.3, *)
+extension BorrowingSequence where Self: ~Copyable & ~Escapable {
+  func reduce<T: ~Copyable>(
+    _ initial: consuming T,
+    _ nextPartialResult: @escaping (consuming T, borrowing Element) -> T
+  ) -> T {
+    var borrowIterator = makeBorrowingIterator()
+    var result = initial
+    while true {
+      let span = borrowIterator.nextSpan(maximumCount: .max)
+      if span.isEmpty { break }
+      for i in span.indices {
+        result = nextPartialResult(result, span[i])
+      }
+    }
+    return result
+  }
+  
+  func reduce<T: ~Copyable>(
+    into initial: consuming T,
+    _ nextPartialResult: (inout T, borrowing Element) -> Void
+  ) -> T {
+    var borrowIterator = makeBorrowingIterator()
+    var result = initial
+    while true {
+      let span = borrowIterator.nextSpan(maximumCount: .max)
+      if span.isEmpty { break }
+      for i in span.indices {
+        nextPartialResult(&result, span[i])
+      }
+    }
+    return result
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: Copyable {
+  func collectViaBorrowing() -> [Element] {
+    var borrowIterator = makeBorrowingIterator()
+    var result: [Element] = []
+    while true {
+      let span = borrowIterator.nextSpan(maximumCount: .max)
+      if span.isEmpty { break }
+      for i in span.indices {
+        result.append(span[i])
+      }
+    }
+    return result
+  }
+}
+
+struct NoncopyableInt: ~Copyable {
+  var value: Int
+}
+
+extension NoncopyableInt: Equatable {
+  static func ==(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
+    lhs.value == rhs.value
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension BorrowingSequence where Self: ~Escapable & ~Copyable, Element: Equatable {
+  func elementsEqual<S: BorrowingSequence<Element>>(
+    _ rhs: borrowing S
+  ) -> Bool
+    where S: ~Escapable & ~Copyable
+  {
+    var iter1 = makeBorrowingIterator()
+    var iter2 = rhs.makeBorrowingIterator()
+    while true {
+      var el1 = iter1.nextSpan(maximumCount: .max)
+
+      if el1.isEmpty {
+        // LHS is empty - sequences are equal iff RHS is also empty
+        let el2 = iter2.nextSpan(maximumCount: 1)
+        return el2.isEmpty
+      }
+
+      while el1.count > 0 {
+        let el2 = iter2.nextSpan(maximumCount: el1.count)
+        if el2.isEmpty { return false }
+        for i in 0..<el2.count {
+          if el1[i] != el2[i] { return false }
+        }
+        el1 = el1.extracting(droppingFirst: el2.count)
+      }
+    }
+  }
+}
+
+suite.test("BORROWING")
+.require(.stdlib_6_3).code {
+  guard #available(SwiftStdlib 6.3, *) else {
+    expectTrue(false)
+    return
+  }
+
+  let array = [1, 2, 3, 4, 5, 6, 7, 8]
+  let arrayCollected = array.collectViaBorrowing()
+  expectEqual(array, arrayCollected)
+  expectNotEqual([1, 2, 3, 4, 5, 6, 7, 8, 9], arrayCollected)
+  expectNotEqual([1, 2, 3, 4, 5, 6, 7], arrayCollected)
+
+  let span = array.span
+  let spanCollected = span.collectViaBorrowing()
+  expectTrue(span.elementsEqual(spanCollected))
+  expectEqual(array.reduce(0, +), span.reduce(0, +))
+  expectEqual(array.reduce(into: 0, +=), span.reduce(into: 0, +=))
+
+  let inline: [8 of Int] = [1, 2, 3, 4, 5, 6, 7, 8]
+  let inlineCollected = inline.collectViaBorrowing()
+  expectTrue(inline.elementsEqual(inlineCollected))
+  
+  let ncInline: [8 of NoncopyableInt] = InlineArray(NoncopyableInt.init(value:))
+  let buf = UnsafeMutableBufferPointer<NoncopyableInt>.allocate(capacity: 8)
+  for i in 0..<8 {
+    buf.initializeElement(at: i, to: NoncopyableInt(value: i))
+  }
+//  expectTrue(buf.elementsEqual(ncInline))
+}
