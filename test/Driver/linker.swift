@@ -1,5 +1,6 @@
 // Must be able to run xcrun-return-self.sh
-// REQUIRES: shell
+// UNSUPPORTED: OS=windows-msvc
+// TODO: Try to make this test work on Windows when reenabling it.
 // REQUIRES: rdar65281056
 // FIXME: When this is turned on, please move the test from linker-library-with-space.swift
 // to this file and remove that file.
