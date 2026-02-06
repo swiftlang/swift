@@ -11,9 +11,9 @@
 
 import _Concurrency
 
-/// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
+/// An asynchronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
 ///
-/// `Observations` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
+/// `Observations` conforms to `AsyncSequence`, providing a intuitive and safe mechanism to track changes to
 /// types that are marked as `@Observable` by using Swift Concurrency to indicate transactional boundaries
 /// starting from the willSet of the first mutation to the next suspension point of the safe access.
 @available(SwiftStdlib 6.2, *)
