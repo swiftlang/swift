@@ -38,6 +38,9 @@ struct Main {
     if let value = readLine(), let b4 = Bool(value) {
       print(b4)
     }
+
+    let bi: StaticBigInt = 17
+    print(bi.debugDescription)
   }
 }
 
