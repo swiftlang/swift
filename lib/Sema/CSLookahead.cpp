@@ -63,6 +63,10 @@ static bool shouldBeConservativeWithProto(ProtocolDecl *proto) {
   return false;
 }
 
+static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
+  return classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
+}
+
 static ConflictReason canPossiblyConvertTo(
     ConstraintSystem &cs,
     Type lhs, Type rhs,
@@ -87,7 +91,19 @@ static ConflictReason canPossiblyConvertTo(
     case inference::ConversionBehavior::Class: {
       auto *lhsDecl = lhs->getClassOrBoundGenericClass();
       auto *rhsDecl = rhs->getClassOrBoundGenericClass();
-      if (!rhsDecl->isSuperclassOf(lhsDecl))
+
+      // Toll-free bridging CF -> ObjC.
+      if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+          rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
+        return canPossiblyConvertTo(getBridgedObjCClass(lhsDecl), rhsDecl);
+
+      // Toll-free bridging ObjC -> CF.
+      } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
+                 rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        return canPossiblyConvertTo(lhsDecl, getBridgedObjCClass(rhsDecl));
+
+      // Subclassing relationships.
+      } else if (!rhsDecl->isSuperclassOf(lhsDecl))
         return ConflictFlag::Class;
 
       break;
