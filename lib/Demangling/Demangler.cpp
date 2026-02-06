@@ -2951,7 +2951,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       NodePointer implType = popNode(Node::Kind::Type);
       auto node = createWithChildren(c == 'z'
                                   ? Node::Kind::ObjCAsyncCompletionHandlerImpl
-                                  : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
+                                  : Node::Kind::CheckedObjCAsyncCompletionHandlerImpl,
                                 implType, resultType, flagMode);
       if (sig)
         addChild(node, sig);

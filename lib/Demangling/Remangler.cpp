@@ -1008,11 +1008,14 @@ ManglingError Remangler::mangleCoroutineContinuationPrototype(Node *node,
 }
 
 ManglingError
-Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node,
-                                                          unsigned depth) {
-  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+Remangler::mangleCheckedObjCAsyncCompletionHandlerImpl(Node *node,
+                                                       unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  if (node->getNumChildren() == 4)
+    RETURN_IF_ERROR(mangleChildNode(node, 3, depth + 1));
   Buffer << "TZ";
-  return ManglingError::Success;
+  return mangleChildNode(node, 2, depth + 1);
 }
 
 ManglingError Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node,
