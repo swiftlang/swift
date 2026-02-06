@@ -17,6 +17,8 @@ struct S6: ~Copyable {
   deinit
 }
 
+class C {}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
 sil_global [let] @g3 : $Int32
@@ -229,6 +231,27 @@ bb2:
   br bb3
 bb3:
   return %1 : $Int32
+}
+
+sil [ossa] @generic_no_return : $@convention(thin) <T> () -> @out T {
+bb0(%0 : $*T):
+  unreachable
+}
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @specialize_no_return :
+// CHECK:          destroy_value [dead_end] %0
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'specialize_no_return'
+sil [ossa] [no_allocation] @specialize_no_return : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $Never
+  %4 = function_ref @generic_no_return : $@convention(thin) <T> () -> @out T
+  apply %4<Never>(%1) : $@convention(thin) <T> () -> @out T
+  apply undef<Never>(%1) : $@convention(thin) <T> () -> @out T
+  dealloc_stack %1
+  destroy_value %0
+  %19 = tuple ()
+  return %19
 }
 
 sil @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
