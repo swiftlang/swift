@@ -8,8 +8,8 @@
 // CHECK-NEXT:   struct ForwardDeclared<T> {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   struct Decl<CInt> {
-// CHECK-NEXT:     init()
 // CHECK-NEXT:     init(fwd: NS1.ForwardDeclared<CInt>)
+// CHECK-NEXT:     init()
 // CHECK-NEXT:     typealias MyInt = Int32
 // CHECK-NEXT:     var fwd: NS1.ForwardDeclared<CInt>
 // CHECK-NEXT:     static var intValue: NS1.Decl<CInt>.MyInt { get }
