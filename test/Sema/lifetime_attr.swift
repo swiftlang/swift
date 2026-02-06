@@ -17,7 +17,12 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
 
-@_lifetime(2) // expected-error{{invalid parameter index specified '2'}}
+@_lifetime(copy 0) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func invalidAttrOnExistingParamIndex(_ ne: NE) -> NE {
+  ne
+}
+
+@_lifetime(2) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
   ne
 }

@@ -19,7 +19,7 @@ func transfer(_ ne: NE) -> NE {
 }
 
 @_lifetime(copy ne)
-func applyAnnotatedTransfer(ne: NE, @_lifetime(0) transfer: (NE) -> NE) -> NE { // expected-error{{'@_lifetime' attribute cannot be applied to this declaration}}
+func applyAnnotatedTransfer(ne: NE, @_lifetime(copy ne) transfer: (_ ne: NE) -> NE) -> NE { // expected-error{{'@_lifetime' attribute cannot be applied to this declaration}}
   transfer(ne)
 }
 
@@ -61,7 +61,9 @@ typealias InvalidAttrOnNonExistingParamType = @_lifetime(copy nonexisting) (_ ne
 
 typealias InvalidAttrOnNonExistingSelfType = @_lifetime(copy self) (_ ne: NE) -> NE // expected-error{{invalid lifetime dependence specifier on non-existent self}}
 
-typealias InvalidAttrOnNonExistingParamIndexType = @_lifetime(2) (_ ne: NE) -> NE // expected-error{{invalid parameter index specified '2'}}
+typealias InvalidAttrOnExistingParamIndexType = @_lifetime(0) (_ ne: NE) -> NE // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+
+typealias InvalidAttrOnNonExistingParamIndexType = @_lifetime(2) (_ ne: NE) -> NE // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 
 typealias InvalidDuplicateLifetimeDependenceType = @_lifetime(copy ne, borrow ne) (_ ne: borrowing NE) -> NE // expected-error{{duplicate lifetime dependence specifier}}
 
