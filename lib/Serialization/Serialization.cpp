@@ -2780,7 +2780,7 @@ void Serializer::writeLifetimeDependencies(
     LifetimeDependenceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, info.getTargetIndex(),
         info.getParamIndicesLength(), info.isImmortal(),
-        info.hasInheritLifetimeParamIndices(),
+        info.isFromAnnotation(), info.hasInheritLifetimeParamIndices(),
         info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();

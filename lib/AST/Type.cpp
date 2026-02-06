@@ -4218,6 +4218,14 @@ CanType ProtocolCompositionType::getMinimalCanonicalType() const {
   return result.subst(existentialSig.Generalization)->getCanonicalType();
 }
 
+bool AnyFunctionType::hasExplicitLifetimeDependencies() const {
+  return hasLifetimeDependencies() &&
+         llvm::any_of(getLifetimeDependencies(),
+                      [](const LifetimeDependenceInfo &dep) {
+                        return dep.isFromAnnotation();
+                      });
+}
+
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:

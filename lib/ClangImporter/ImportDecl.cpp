@@ -2104,7 +2104,8 @@ namespace {
       }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, resultIndex,
-                                              /*isImmortal*/ true);
+                                              /*isImmortal*/ true,
+                                              /*isFromAnnotation*/ true);
       lifetimeDependencies.push_back(immortalLifetime);
       Impl.SwiftContext.evaluator.cacheOutput(
         LifetimeDependenceInfoRequest{fd},
@@ -4230,7 +4231,7 @@ namespace {
         lifetimeDependencies.push_back(LifetimeDependenceInfo(
             nullptr, IndexSubset::get(Impl.SwiftContext, dependenciesOfRet),
             returnIdx,
-            /*isImmortal*/ false));
+            /*isImmortal*/ false, /*isFromAnnotation*/ true));
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
@@ -4299,7 +4300,8 @@ namespace {
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
-                                              /*isImmortal*/ true);
+                                              /*isImmortal*/ true,
+                                              /*isFromAnnotation*/ true);
       if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
         lifetimeDependencies.push_back(immortalLifetime);
         Impl.SwiftContext.evaluator.cacheOutput(
@@ -4387,8 +4389,11 @@ namespace {
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
       for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(inheritedDepVec.any() ? IndexSubset::get(Impl.SwiftContext,
-                                   inheritedDepVec): nullptr, nullptr, idx, /*isImmortal=*/false));
+        lifetimeDependencies.push_back(LifetimeDependenceInfo(
+            inheritedDepVec.any()
+                ? IndexSubset::get(Impl.SwiftContext, inheritedDepVec)
+                : nullptr,
+            nullptr, idx, /*isImmortal=*/false, /*isFromAnnotation=*/true));
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
@@ -4403,7 +4408,7 @@ namespace {
                                    scopedLifetimeParamIndicesForReturn)
                 : nullptr,
             returnIdx,
-            /*isImmortal*/ false));
+            /*isImmortal*/ false, /*isFromAnnotation*/ true));
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
         if (ctordecl->isDefaultConstructor() &&

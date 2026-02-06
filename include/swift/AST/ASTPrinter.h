@@ -368,7 +368,9 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
-  void printLifetimeDependence(
+  /// Print lifetimeDependence as a SIL lifetime attribute, attached to a
+  /// parameter or result of a function.
+  void printSILLifetimeDependence(
       std::optional<LifetimeDependenceInfo> lifetimeDependence) {
     if (!lifetimeDependence.has_value()) {
       return;
@@ -380,9 +382,14 @@ public:
       ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
     if (auto lifetimeDependence =
             getLifetimeDependenceFor(lifetimeDependencies, index)) {
-      printLifetimeDependence(*lifetimeDependence);
+      printSILLifetimeDependence(*lifetimeDependence);
     }
   }
+
+  /// Print lifetimeDependence as a Swift lifetime attribute.
+  void
+  printSwiftLifetimeDependence(LifetimeDependenceInfo const &lifetimeDependence,
+                               ArrayRef<AnyFunctionType::Param> params);
 
 private:
   virtual void anchor();
