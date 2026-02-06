@@ -3158,6 +3158,11 @@ public:
       llvm_unreachable("Unsolved result when generating constraints!");
 
     case SolutionKind::Solved:
+      if (shouldPreserveMemberLookupSuccess(baseTy)) {
+        recordSuccessfulConstraint(Constraint::createMember(*this,
+           ConstraintKind::ValueMember, baseTy, memberTy, name, useDC,
+           functionRefInfo, getConstraintLocator(locator)));
+      }
       break;
 
     case SolutionKind::Error:
@@ -3246,6 +3251,32 @@ public:
                                     rememberChoice);
 
     addUnsolvedConstraint(constraint);
+  }
+
+  bool shouldPreserveMemberLookupSuccess(Type baseTy) {
+    Type sup = baseTy->getSuperclass();
+    if (sup)
+      return true;
+    return false;
+  }
+
+  llvm::DenseMap<ConstraintLocator *, SmallVector<Constraint*, 2>> savedSolvedConstraints;
+
+  void recordSuccessfulConstraint(Constraint* c) {
+    if (savedSolvedConstraints.contains(c->getLocator()))
+      savedSolvedConstraints[c->getLocator()].emplace_back(c);
+    else
+      savedSolvedConstraints[c->getLocator()] = {c};
+  }
+
+  std::optional<Constraint*> findConstraintKindAt(ConstraintLocator *locator, ConstraintKind kind) {
+    if (savedSolvedConstraints.contains(locator)) {
+      for(auto c : savedSolvedConstraints[locator]) {
+        if (c->getKind() == kind)
+          return c;
+      }
+    }
+    return std::nullopt;
   }
 
   /// Whether we should record the failure of a constraint.
