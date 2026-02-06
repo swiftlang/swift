@@ -318,9 +318,7 @@ static void collectClangModuleHeaderIncludes(
     }
 
     if (!containingSearchDirPath.empty()) {
-      llvm::SmallString<128> prefixToRemove =
-          llvm::formatv("{0}/", containingSearchDirPath);
-      llvm::sys::path::replace_path_prefix(textualInclude, prefixToRemove, "");
+      llvm::sys::path::replace_path_prefix(textualInclude, containingSearchDirPath, "");
     } else {
       // If we cannot find find the module map on the search path,
       // fallback to including the header using the provided path relative
@@ -452,7 +450,13 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
 
     for (auto searchDir = clangHeaderSearchInfo.search_dir_begin();
          searchDir != clangHeaderSearchInfo.search_dir_end(); ++searchDir) {
-      includeDirs.insert(normalizePath(searchDir->getName()));
+      // Ensure search directories end in / so that we don't prefix match
+      // against a folder that starts with the same substring.
+      auto path = normalizePath(searchDir->getName());
+      if (!path.ends_with("/"))
+          path.append("/");
+
+      includeDirs.insert(path);
     }
 
     const clang::Module *foundationModule = clangHeaderSearchInfo.lookupModule(
