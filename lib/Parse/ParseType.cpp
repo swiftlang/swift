@@ -1551,11 +1551,15 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
       return makeParserError();
     }
 
-    if (auto intValueExpr = dyn_cast<IntegerLiteralExpr>(genericValueExpr.get()))
-      return makeParserResult(new (Context) IntegerTypeRepr(intValueExpr));
-    else {
-      diagnose(Tok, diag::expected_integer_generic_value);
-      return makeParserError();
+    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+      return makeParserResult(new (Context) IntegerTypeRepr(genericValueExpr.get()));
+    } else {
+      if (auto intValueExpr = dyn_cast<IntegerLiteralExpr>(genericValueExpr.get()))
+        return makeParserResult(new (Context) IntegerTypeRepr(intValueExpr));
+      else {
+        diagnose(Tok, diag::expected_integer_generic_value);
+        return makeParserError();
+      }
     }
   }
 }

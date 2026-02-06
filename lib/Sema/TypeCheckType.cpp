@@ -24,6 +24,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "LiteralExpressionFolding.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -5681,7 +5682,32 @@ TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
 
   SmallString<10> constantValueText;
   bool isNegative = false;
-  if (auto litExp = dyn_cast<IntegerLiteralExpr>(repr->getValue())) {
+  // If using LiteralExpressions, attempt to type-check and constant-fold
+  // the value expression to an integer value (`IntegerLiteralExpr`)
+  auto valueExpr = repr->getValue();
+  if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions)) {
+    // Attempt to type-check the generic value expression
+    auto typeCheckSuccess = TypeChecker::typeCheckExpression(
+        valueExpr, dc,
+        /*contextualInfo=*/
+        {getASTContext().getIntType(), CTP_IntGenericParam});
+
+    if (typeCheckSuccess) {
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(valueExpr))
+        valueExpr = TypeChecker::foldSequence(seqExpr, dc);
+
+      if (auto foldedExpr = dyn_cast<IntegerLiteralExpr>(
+              foldLiteralExpression(valueExpr, &getASTContext()))) {
+        foldedExpr->getValue().toString(constantValueText, 10, true);
+        isNegative = foldedExpr->isNegative();
+      } else {
+        return failedToResolveValue(
+            diag::nonliteral_integer_expr_generic_value);
+      }
+    } else {
+      return failedToResolveValue(diag::nonliteral_integer_expr_generic_value);
+    }
+  } else if (auto litExp = dyn_cast<IntegerLiteralExpr>(repr->getValue())) {
     litExp->getRawValue().toString(constantValueText, 10, true);
     isNegative = litExp->isNegative();
   } else

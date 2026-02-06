@@ -300,6 +300,7 @@ BridgedIntegerTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedStringRef cString, SourceLoc loc,
                                     SourceLoc minusLoc) {
   ASTContext &context = cContext.unbridged();
+  // TODO: Arbitrary expressions
   auto *newLit = new (context) IntegerLiteralExpr(
       cString.unbridged(), loc,
       /*implicit*/ true);
