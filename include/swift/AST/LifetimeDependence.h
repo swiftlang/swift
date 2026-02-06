@@ -31,8 +31,10 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class AnyFunctionType;
 class FunctionTypeRepr;
 class LifetimeDependentTypeRepr;
+class LifetimeTypeAttr;
 class SILParameterInfo;
 class SILResultInfo;
 
@@ -190,23 +192,28 @@ public:
 class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
-  llvm::PointerIntPair<IndexSubset *, 1, bool>
-    addressableParamIndicesAndImmortal;
+  // The outer bool is the "isFromAnnotation" bit. The inner one is the
+  // "isImmortal" bit.
+  llvm::PointerIntPair<llvm::PointerIntPair<IndexSubset *, 1, bool>, 1, bool>
+      addressableParamIndicesAndImmortalAndFromAnnotation;
   IndexSubset *conditionallyAddressableParamIndices;
 
   unsigned targetIndex;
 
 public:
+  /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
                          unsigned targetIndex, bool isImmortal,
-                         // set during SIL type lowering
-                         IndexSubset *addressableParamIndices = nullptr,
-                         IndexSubset *conditionallyAddressableParamIndices = nullptr)
+                         bool isFromAnnotation,
+                         IndexSubset *addressableParamIndices,
+                         IndexSubset *conditionallyAddressableParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
-        addressableParamIndicesAndImmortal(addressableParamIndices, isImmortal),
-        conditionallyAddressableParamIndices(conditionallyAddressableParamIndices),
+        addressableParamIndicesAndImmortalAndFromAnnotation(
+            {addressableParamIndices, isImmortal}, isFromAnnotation),
+        conditionallyAddressableParamIndices(
+            conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
     ASSERT(this->isImmortal() || inheritLifetimeParamIndices ||
            scopeLifetimeParamIndices);
@@ -238,6 +245,18 @@ public:
     }
   }
 
+  /// Partially-initialized dependence info, with addressable & conditionally
+  /// addressable parameter indices unset for now.
+  LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
+                         IndexSubset *scopeLifetimeParamIndices,
+                         unsigned targetIndex, bool isImmortal,
+                         bool isFromAnnotation)
+      : LifetimeDependenceInfo(inheritLifetimeParamIndices,
+                               scopeLifetimeParamIndices, targetIndex,
+                               isImmortal, isFromAnnotation,
+                               // set during SIL type lowering
+                               nullptr, nullptr) {}
+
   operator bool() const { return !empty(); }
 
   bool empty() const {
@@ -245,7 +264,18 @@ public:
            scopeLifetimeParamIndices == nullptr;
   }
 
-  bool isImmortal() const { return addressableParamIndicesAndImmortal.getInt(); }
+  bool isImmortal() const {
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
+        .getInt();
+  }
+
+  /// Whether this lifetime dependence corresponds to a @lifetime annotation in
+  /// the source program (Swift or SIL). Such dependencies are likely to differ
+  /// from the default (inferred) ones, so they must be included when printing a
+  /// Swift function's type.
+  bool isFromAnnotation() const {
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getInt();
+  }
 
   unsigned getTargetIndex() const { return targetIndex; }
 
@@ -256,7 +286,8 @@ public:
     return scopeLifetimeParamIndices != nullptr;
   }
   bool hasAddressableParamIndices() const {
-    return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
+               .getPointer() != nullptr;
   }
 
   unsigned getParamIndicesLength() const {
@@ -282,7 +313,8 @@ public:
   /// not only on the value, but the memory location of a particular instance
   /// of the value.
   IndexSubset *getAddressableIndices() const {
-    return addressableParamIndicesAndImmortal.getPointer();
+    return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
+        .getPointer();
   }
   /// Return the set of parameters which may have addressable dependencies
   /// depending on the type of the parameter.
@@ -307,6 +339,12 @@ public:
       && scopeLifetimeParamIndices->contains(index);
   }
 
+  /// Get a string representation of this LifetimeDependenceInfo suitable for
+  /// printing in SIL. The target is not included, since this is determined by
+  /// the position of the attribute in SIL.
+  ///
+  /// For printing function type lifetimes in Swift, see
+  /// ASTPrinter::printSwiftLifetimeDependence.
   std::string getString() const;
   void Profile(llvm::FoldingSetNodeID &ID) const;
   void getConcatenatedData(SmallVectorImpl<bool> &concatenatedData) const;
@@ -320,6 +358,12 @@ public:
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   getFromSIL(FunctionTypeRepr *funcRepr, ArrayRef<SILParameterInfo> params,
              ArrayRef<SILResultInfo> results, DeclContext *dc);
+
+  /// Builds LifetimeDependenceInfo from a function type.
+  static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  getFromAST(FunctionTypeRepr *funcRepr, AnyFunctionType *funcType,
+             ArrayRef<LifetimeTypeAttr *> lifetimeAttributes, DeclContext *dc,
+             GenericEnvironment *env);
 
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->isImmortal() == other.isImmortal() &&

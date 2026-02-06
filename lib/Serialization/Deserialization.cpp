@@ -9588,12 +9588,13 @@ ModuleFile::maybeReadLifetimeDependence() {
   unsigned targetIndex;
   unsigned paramIndicesLength;
   bool isImmortal;
+  bool isFromAnnotation;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
-      scratch, targetIndex, paramIndicesLength, isImmortal,
+      scratch, targetIndex, paramIndicesLength, isImmortal, isFromAnnotation,
       hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices,
       hasAddressableParamIndices, lifetimeDependenceData);
 
@@ -9629,8 +9630,9 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal,
+      targetIndex, isImmortal, isFromAnnotation,
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
-          : nullptr);
+          : nullptr,
+      nullptr);
 }
