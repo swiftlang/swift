@@ -233,7 +233,8 @@ struct EscapableNonTrivialSelf {
   @_lifetime(self)
   func noParamLifetime_NEResult() -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(borrow self)' instead}}
   func noParamCopy_NEResult() -> NEImmortal { NEImmortal() }
 
   @_lifetime(borrow self)
@@ -246,7 +247,8 @@ struct EscapableNonTrivialSelf {
   @_lifetime(self)
   mutating func mutating_noParamLifetime_NEResult() -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(&self)' instead}}
   mutating func mutating_noParamCopy_NEResult() -> NEImmortal { NEImmortal() }
 
   @_lifetime(&self)
@@ -257,7 +259,8 @@ struct EscapableNonTrivialSelf {
   @_lifetime(self)
   func oneParamLifetime_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(borrow self)' instead}}
   func oneParamCopy_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
   @_lifetime(borrow self)
@@ -269,7 +272,8 @@ struct EscapableNonTrivialSelf {
   @_lifetime(self)
   mutating func mutating_oneParamLifetime_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(&self)' instead}}
   mutating func mutating_oneParamCopy_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
   @_lifetime(&self)
@@ -283,7 +287,8 @@ struct EscapableTrivialSelf {
   @_lifetime(self) // OK
   func noParamLifetime_NEResult() -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(borrow self)' instead}}
   func noParamCopy_NEResult() -> NEImmortal { NEImmortal() }
 
   @_lifetime(borrow self) // OK
@@ -295,7 +300,8 @@ struct EscapableTrivialSelf {
   @_lifetime(self) // OK
   mutating func mutatingMethodNoParamLifetime_NEResult() -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(&self)' instead}}
   mutating func mutatingMethodNoParamCopy_NEResult() -> NEImmortal { NEImmortal() }
 
   @_lifetime(&self)
@@ -307,7 +313,8 @@ struct EscapableTrivialSelf {
   @_lifetime(self)
   func oneParamLifetime_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(borrow self)' instead}}
   func oneParamCopy_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
   @_lifetime(borrow self)
@@ -319,7 +326,8 @@ struct EscapableTrivialSelf {
   @_lifetime(self)
   mutating func mutating_oneParamLifetime_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
-  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&self)' instead}}
+  @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                        // expected-note@-1{{use '@_lifetime(&self)' instead}}
   mutating func mutating_oneParamCopy_NEResult(_: Int) -> NEImmortal { NEImmortal() }
 
   @_lifetime(&self)
@@ -841,7 +849,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
 
 // Invalid keyword for the dependence kind.
 //
-@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
+@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func f_inout_bad_keyword(a: inout MutableRawSpan) {}
 
 // Don't allow a useless borrow dependency on an inout param--it is misleading.

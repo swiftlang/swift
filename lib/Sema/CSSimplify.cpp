@@ -41,6 +41,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -2186,10 +2187,10 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::FallbackType:
@@ -2550,10 +2551,10 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
@@ -2940,6 +2941,52 @@ matchFunctionThrowing(ConstraintSystem &cs,
   }
 }
 
+ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionSendability(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    ConstraintSystem::TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *constraint = Constraint::create(*this, kind, func1, func2,
+                                            getConstraintLocator(locator));
+      addUnsolvedConstraint(constraint);
+      return getTypeMatchSuccess();
+    }
+    return getTypeMatchAmbiguous();
+  };
+
+  // First check to see if we have any sendable dependent function types, if
+  // any of them still have unresolved type variables we need to wait until
+  // they're fully resolved.
+  auto dep1 = func1->getSendableDependentType();
+  if (dep1) {
+    dep1 = simplifyType(dep1);
+    if (dep1->hasTypeVariable())
+      return formUnsolved();
+  }
+  auto dep2 = func2->getSendableDependentType();
+  if (dep2) {
+    dep2 = simplifyType(dep2);
+    if (dep2->hasTypeVariable())
+      return formUnsolved();
+  }
+
+  // Sendability is given by either the sendability of the dependent type if
+  // present, otherwise it's given by the function itself.
+  auto func1Sendable = dep1 ? dep1->isSendableType() : func1->isSendable();
+  auto func2Sendable = dep2 ? dep2->isSendableType() : func2->isSendable();
+
+  if (func1Sendable != func2Sendable) {
+    // A @Sendable function can be a subtype of a non-@Sendable function.
+    if (kind < ConstraintKind::Subtype || func2Sendable) {
+      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
+        return getTypeMatchFailure(locator);
+    }
+  }
+  return getTypeMatchSuccess();
+}
+
 static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void) locator.getLocatorParts(path);
@@ -3127,6 +3174,12 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
+  // If the locator is for a @Sendable match, that's all we want to do.
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::FunctionSendability>())
+      return matchFunctionSendability(func1, func2, kind, flags, locator);
+  }
+
   // Match the 'throws' effect.
   TypeMatchResult throwsResult =
       matchFunctionThrowing(*this, func1, func2, kind, flags, locator);
@@ -3159,14 +3212,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
-  // A @Sendable function can be a subtype of a non-@Sendable function.
-  if (func1->isSendable() != func2->isSendable()) {
-    // Cannot add '@Sendable'.
-    if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
-        return getTypeMatchFailure(locator);
-    }
-  }
+  // Match @Sendable.
+  auto sendableResult = matchFunctionSendability(
+      func1, func2, kind, TMF_GenerateConstraints,
+      locator.withPathElement(ConstraintLocator::FunctionSendability));
+  if (sendableResult.isFailure())
+    return sendableResult;
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
@@ -3283,10 +3334,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::FallbackType:
@@ -6320,19 +6371,6 @@ bool ConstraintSystem::repairFailures(
     if (isFixedRequirement(reqLoc, rhs))
       return true;
 
-    // If this is a requirement on sequence of for-in statement where one
-    // of the sides is a completely resolved dependent member, skip it
-    // since the issue is with the conformance to `Sequence`, otherwise
-    // dependent member would have been substituted.
-    if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
-      if (UDE->isImplicit() &&
-          getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence) {
-        if ((lhs->is<DependentMemberType>() && !lhs->hasTypeVariable()) ||
-            (rhs->is<DependentMemberType>() && !rhs->hasTypeVariable()))
-          return true;
-      }
-    }
-
     if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path)) {
       recordFixedRequirement(reqLoc, rhs);
       conversionsOrFixes.push_back(fix);
@@ -7361,10 +7399,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::LiteralConformsTo:
+    case ConstraintKind::ForEachElement:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueMember:
-    case ConstraintKind::ValueWitness:
     case ConstraintKind::OneWayEqual:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
@@ -7488,6 +7526,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return getTypeMatchFailure(locator);
 
     // BuiltinGenericType subclasses
+    case TypeKind::BuiltinBorrow:
     case TypeKind::BuiltinFixedArray: {
       auto *fixed1 = cast<BuiltinGenericType>(desugar1);
       auto *fixed2 = cast<BuiltinGenericType>(desugar2);
@@ -9005,16 +9044,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   case ConstraintKind::NonisolatedConformsTo:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo: {
-    // If existential type is used as a for-in sequence, let's open it
-    // and check whether underlying type conforms to `Sequence`.
-    if (type->isExistentialType()) {
-      if (auto elt = loc->getLastElementAs<LocatorPathElt::ContextualType>()) {
-        if (elt->getPurpose() == CTP_ForEachSequence) {
-          type = openAnyExistentialType(type, loc).first;
-        }
-      }
-    }
-
     // Check whether this type conforms to the protocol.
     auto conformance = lookupConformance(type, protocol);
     if (conformance) {
@@ -9822,6 +9851,184 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   llvm_unreachable("Unhandled CheckedCastKind in switch.");
 }
 
+Type ConstraintSystem::lookupDependentMember(
+    Type base, AssociatedTypeDecl *assocTy, bool openExistential,
+    ConstraintLocatorBuilder locator, ProtocolConformanceRef *conformanceOut) {
+  /// TODO: This should become the basis for a new "type witness" constraint to
+  /// replace the use of DependentMemberType in the constraint system.
+
+  ASSERT(!base->isTypeVariableOrMember() && "Must simplify first");
+
+  GenericEnvironment *openedEnv = nullptr;
+  if (openExistential && base->isExistentialType()) {
+    auto openedTy = ExistentialArchetypeType::get(base->getCanonicalType());
+    openedEnv = openedTy->getGenericEnvironment();
+    base = openedTy;
+  }
+
+  // Add a conformance constraint since this handles things like conditional
+  // constraints and unavailable conformances.
+  auto *proto = assocTy->getProtocol();
+  addConstraint(ConstraintKind::ConformsTo, base,
+                proto->getDeclaredInterfaceType(), locator);
+
+  // Then lookup the conformance to dig out the witness. If it's missing, we'll
+  // have recorded a fix in the ConformsTo constraint so can bail.
+  auto conformance = lookupConformance(base, proto);
+  if (conformanceOut)
+    *conformanceOut = conformance;
+  if (!conformance) {
+    // Increase SK_Hole just to ensure the solution is marked invalid.
+    increaseScore(SK_Hole, locator);
+    return Type();
+  }
+
+  auto result = conformance.getTypeWitness(assocTy);
+  if (result->hasError()) {
+    // If the type witness is invalid we'll have emitted an error, record a
+    // fix to ensure the solution is marked invalid.
+    auto *loc = getConstraintLocator(locator);
+    recordFix(IgnoreInvalidASTNode::create(*this, loc));
+    return Type();
+  }
+
+  // If we opened an archetype, erase the result.
+  if (openedEnv)
+    result = typeEraseOpenedArchetypesFromEnvironment(result, openedEnv);
+
+  return result;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyForEachElementConstraint(
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  /// TODO: Once we have a "type witness" constraint to express a
+  /// DependentMemberType, we ought to see if this constraint can be removed
+  /// and expressed in terms of member types instead.
+
+  Type seqTy = getFixedTypeRecursive(first, flags, /*wantRValue=*/true);
+  if (seqTy->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+          Constraint::create(*this, ConstraintKind::ForEachElement, first,
+                             second, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  }
+
+  if (seqTy->isPlaceholder()) {
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  auto anchor = locator.getAnchor();
+  auto &ctx = getASTContext();
+
+  // We can retrieve the corresponding sequence protocol from the contextual
+  // type set.
+  auto contextualTy = getContextualTypeInfo(anchor)->getType();
+  auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
+  auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
+
+  auto *contextualLoc = getConstraintLocator(
+      anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
+
+  // To lookup the corresponding element type we first need to lookup the
+  // type witness for Iterator, opening an existential if needed.
+  //
+  // We can't directly use `Sequence.Element` since that may be not be
+  // representable through the erased Iterator type, e.g for:
+  //
+  // protocol Q: Sequence where Self.Element: P {}
+  //
+  // The erased element type is `any P`, but `makeIterator` can only produce
+  // `any IteratorProtocol`, so the actual element type is `Any`.
+  auto *iteratorAssocTy = seqProto->getAssociatedType(
+      isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+  ProtocolConformanceRef seqConf;
+  auto iterTy =
+      lookupDependentMember(seqTy, iteratorAssocTy,
+                            /*openExistential*/ true, contextualLoc, &seqConf);
+  if (!iterTy) {
+    // Already recorded fix.
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  // Now we have the Iterator type, do the same lookup for Element, opening
+  // an existential if needed.
+  auto *iterProto =
+      ctx.getProtocol(isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+                              : KnownProtocolKind::IteratorProtocol);
+  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
+  ProtocolConformanceRef iterConf;
+  auto eltTy =
+      lookupDependentMember(iterTy, eltAssocTy,
+                            /*openExistential*/ true, contextualLoc, &iterConf);
+  if (!eltTy) {
+    // Already recorded fix.
+    recordTypeVariablesAsHoles(second);
+    return SolutionKind::Solved;
+  }
+
+  // Source compatibility hack: Bind an overload for 'makeIterator'/'next' to
+  // preserve ranking behavior for cases where e.g a default Collection
+  // 'makeIterator' is compared against a concrete 'makeIterator'
+  // implementation.
+  if (!ctx.isAtLeastFutureMajorLanguageMode()) {
+    auto bindOverload = [&](OverloadChoice choice, ConstraintLocator *loc) {
+      auto overloadTy = getTypeOfMemberReference(choice, DC, loc,
+                                                 /*preparedOverload*/ nullptr);
+      auto overload = SelectedOverload{choice,
+                                       overloadTy.openedType,
+                                       overloadTy.adjustedOpenedType,
+                                       overloadTy.referenceType,
+                                       overloadTy.adjustedReferenceType,
+                                       overloadTy.adjustedOpenedType};
+      recordResolvedOverload(loc, overload);
+    };
+
+    auto *iterFn = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
+                           : ctx.getSequenceMakeIterator();
+    ConcreteDeclRef iterWitness;
+    if (iterFn) {
+      iterWitness = seqConf.getWitnessByName(iterFn->getName());
+    }
+    if (iterWitness) {
+      auto choice =
+          OverloadChoice::getDecl(seqConf.getType(), iterWitness.getDecl(),
+                                  FunctionRefInfo::singleBaseNameApply());
+      auto *loc = getConstraintLocator(
+          contextualLoc, {LocatorPathElt::ImplicitForEachCompatMember()});
+      bindOverload(choice, loc);
+    }
+    auto *nextFn = TypeChecker::getForEachIteratorNextFunction(
+        DC, anchor.getStartLoc(), isAsync);
+    ConcreteDeclRef nextWitness;
+    if (nextFn) {
+      nextWitness = iterConf.getWitnessByName(nextFn->getName());
+    }
+    if (nextWitness) {
+      auto choice =
+          OverloadChoice::getDecl(iterConf.getType(), nextWitness.getDecl(),
+                                  FunctionRefInfo::singleBaseNameApply());
+      auto *loc = getConstraintLocator(
+          contextualLoc, {LocatorPathElt::ImplicitForEachCompatMember(),
+                          LocatorPathElt::ImplicitForEachCompatMember()});
+      bindOverload(choice, loc);
+    }
+  }
+
+  // Desugar the element type if necessary, since types like
+  // `Iter<Seq>.Element` aren't helpful.
+  eltTy = eltTy->getDesugaredType();
+
+  addConstraint(ConstraintKind::Conversion, eltTy, second, locator);
+  return SolutionKind::Solved;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyOptionalObjectConstraint(
                                            Type first, Type second,
@@ -10325,7 +10532,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // If this is true, we're using type construction syntax (Foo()) rather
   // than an explicit call to `init` (Foo.init()).
   bool isImplicitInit = false;
-  TypeBase *favoredType = nullptr;
   if (memberName.isSimpleName(DeclBaseName::createConstructor())) {
     SmallVector<LocatorPathElt, 2> parts;
     if (auto anchor = memberLocator->getAnchor()) {
@@ -10333,19 +10539,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (!path.empty())
         if (path.back().getKind() == ConstraintLocator::ConstructorMember)
           isImplicitInit = true;
-
-      if (performanceHacksEnabled()) {
-        if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
-          if (auto *argExpr = applyExpr->getArgs()->getUnlabeledUnaryExpr()) {
-            favoredType = getFavoredType(argExpr);
-
-            if (!favoredType) {
-              optimizeConstraints(argExpr);
-              favoredType = getFavoredType(argExpr);
-            }
-          }
-        }
-      }
     }
   }
 
@@ -10383,55 +10576,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
-  // Delay solving member constraint for unapplied methods
-  // where the base type has a conditional Sendable conformance
-  auto shouldDelayDueToPartiallyResolvedBaseType =
-      [&](Type baseTy, ValueDecl *decl,
-          FunctionRefInfo functionRefInfo) -> bool {
-    if (!Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures))
-      return false;
-
-    if (!Context.getProtocol(KnownProtocolKind::Sendable))
-      return false;
-
-    auto shouldCheckSendabilityOfBase = [&]() {
-      if (!isa_and_nonnull<FuncDecl>(decl))
-        return Type();
-
-      if (!decl->isInstanceMember() &&
-          !decl->getDeclContext()->getSelfProtocolDecl())
-        return Type();
-
-      auto hasAppliedSelf =
-          decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseTy, decl);
-      auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-      if (numApplies >= decl->getNumCurryLevels())
-        return Type();
-
-      return decl->isInstanceMember() ? baseTy->getMetatypeInstanceType()
-                                      : baseTy;
-    };
-
-    Type baseTyToCheck = shouldCheckSendabilityOfBase();
-    if (!baseTyToCheck)
-      return false;
-
-    auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-    auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
-
-    return llvm::any_of(baseConformance.getConditionalRequirements(),
-                        [&](const auto &req) {
-                          if (req.getKind() != RequirementKind::Conformance)
-                            return false;
-
-                          return (req.getFirstType()->hasTypeVariable() &&
-                                  (req.getProtocolDecl()->isSpecificProtocol(
-                                       KnownProtocolKind::Sendable) ||
-                                   req.getProtocolDecl()->isSpecificProtocol(
-                                       KnownProtocolKind::SendableMetatype)));
-                        });
-  };
-
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -10457,12 +10601,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // we are going to see.
     auto baseTy = candidate.getBaseType();
     const auto baseObjTy = baseTy->getRValueType();
-
-    // If we need to delay, update the status but record the member.
-    if (shouldDelayDueToPartiallyResolvedBaseType(
-            baseObjTy, decl, candidate.getFunctionRefInfo())) {
-      result.OverallResult = MemberLookupResult::Unsolved;
-    }
 
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
@@ -10507,32 +10645,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       // Otherwise, we can access all instance members.
       hasInstanceMembers = true;
       hasInstanceMethods = true;
-    }
-
-    // If the invocation's argument expression has a favored type,
-    // use that information to determine whether a specific overload for
-    // the candidate should be favored.
-    if (performanceHacksEnabled()) {
-      if (isa<ConstructorDecl>(decl) && favoredType &&
-          result.FavoredChoice == ~0U) {
-        auto *ctor = cast<ConstructorDecl>(decl);
-
-        // Only try and favor monomorphic unary initializers.
-        if (!ctor->isGenericContext()) {
-          if (!ctor->getMethodInterfaceType()->hasError()) {
-            // The constructor might have an error type because we don't skip
-            // invalid decls for code completion
-            auto args = ctor->getMethodInterfaceType()
-                            ->castTo<FunctionType>()
-                            ->getParams();
-            if (args.size() == 1 && !args[0].hasLabel() &&
-                args[0].getPlainType()->isEqual(favoredType)) {
-              if (!isDeclUnavailable(decl, memberLocator))
-                result.FavoredChoice = result.ViableCandidates.size();
-            }
-          }
-        }
-      }
     }
 
     const auto isUnsupportedExistentialMemberAccess = [&] {
@@ -11391,76 +11503,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         markMemberTypeAsPotentialHole(memberTy);
         return SolutionKind::Solved;
       }
-    } else if ((kind == ConstraintKind::ValueMember ||
-                kind == ConstraintKind::ValueWitness) &&
+    } else if (kind == ConstraintKind::ValueMember &&
                baseObjTy->getMetatypeInstanceType()->isPlaceholder()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
       markMemberTypeAsPotentialHole(memberTy);
       return SolutionKind::Solved;
-    }
-  }
-
-  // Special handling of injected references to `makeIterator` and `next`
-  // in for-in loops.
-  if (auto *expr = getAsExpr(locator->getAnchor())) {
-    // `next()` could be wrapped in `await` expression.
-    auto memberRef =
-        getAsExpr<UnresolvedDotExpr>(expr->getSemanticsProvidingExpr());
-
-    if (memberRef && memberRef->isImplicit() &&
-        locator->isLastElement<LocatorPathElt::Member>()) {
-      auto &ctx = getASTContext();
-
-      // Cannot simplify this constraint yet since we don't know whether
-      // the base type is going to be existential or not.
-      if (baseObjTy->isTypeVariableOrMember())
-        return formUnsolved();
-
-      // Check whether the given dot expression is a reference
-      // to the given name with the given set of argument labels
-      // (aka compound name).
-      auto isRefTo = [&](UnresolvedDotExpr *UDE, Identifier name,
-                         ArrayRef<StringRef> labels) {
-        auto refName = UDE->getName().getFullName();
-        return refName.isCompoundName(name, labels);
-      };
-
-      auto *baseExpr = memberRef->getBase();
-      // Handle `makeIterator` reference.
-      if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-          isRefTo(memberRef, ctx.Id_makeIterator, /*lables=*/{})) {
-        auto *sequenceProto = cast<ProtocolDecl>(
-            getContextualType(baseExpr, /*forConstraint=*/false)
-                ->getAnyNominal());
-        bool isAsync = sequenceProto->getKnownProtocolKind() ==
-                       KnownProtocolKind::AsyncSequence;
-
-        auto *makeIterator = isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                                     : ctx.getSequenceMakeIterator();
-
-        return simplifyValueWitnessConstraint(
-            ConstraintKind::ValueWitness, baseTy, makeIterator, memberTy, useDC,
-            FunctionRefInfo::singleBaseNameApply(), flags, locator);
-      }
-
-      // Handle `next` reference.
-      if (getContextualTypePurpose(baseExpr) == CTP_ForEachSequence &&
-          (isRefTo(memberRef, ctx.Id_next, /*labels=*/{}) ||
-           isRefTo(memberRef, ctx.Id_next, /*labels=*/{ "isolation" }))) {
-        auto *iteratorProto = cast<ProtocolDecl>(
-            getContextualType(baseExpr, /*forConstraint=*/false)
-                ->getAnyNominal());
-        bool isAsync = iteratorProto->getKnownProtocolKind() ==
-                       KnownProtocolKind::AsyncIteratorProtocol;
-
-        auto loc = locator->getAnchor().getStartLoc();
-        auto *next = TypeChecker::getForEachIteratorNextFunction(DC, loc, isAsync);
-
-        return simplifyValueWitnessConstraint(
-            ConstraintKind::ValueWitness, baseTy, next, memberTy, useDC,
-            FunctionRefInfo::singleBaseNameApply(), flags, locator);
-      }
     }
   }
 
@@ -11488,7 +11536,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     generateOverloadConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
-        result.getFavoredIndex(), /*requiresFix=*/false,
+        /*requiresFix=*/false,
         [&](unsigned, const OverloadChoice &choice) {
           return fixMemberRef(*this, baseTy, member, choice, locator);
         });
@@ -11514,7 +11562,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                          result.ViableCandidates);
 
       generateOverloadConstraints(
-          candidates, memberTy, outerAlternatives, useDC, locator, std::nullopt,
+          candidates, memberTy, outerAlternatives, useDC, locator,
           /*requiresFix=*/!treatAsViable,
           [&](unsigned, const OverloadChoice &) {
             return treatAsViable ? nullptr
@@ -11529,7 +11577,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // and disable them by default, they'd get picked up in the "salvage" mode.
     generateOverloadConstraints(
         candidates, memberTy, result.UnviableCandidates, useDC, locator,
-        /*favoredChoice=*/std::nullopt, /*requiresFix=*/true,
+        /*requiresFix=*/true,
         [&](unsigned idx, const OverloadChoice &choice) {
           return fixMemberRef(*this, baseTy, member, choice, locator,
                               result.UnviableReasons[idx]);
@@ -11636,25 +11684,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto *anchorExpr = getAsExpr(locator->getAnchor());
       if (anchorExpr) {
-        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchorExpr)) {
-          // The issue is related to a missing `Sequence` protocol
-          // conformance if either `makeIterator` or `next` are missing.
-          if (UDE->isImplicit()) {
-            // Missing `makeIterator` since the base is sequence expression.
-            if (getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence)
-              return success();
-
-            // Missing `next` where the base is result of `makeIterator`.
-            if (auto *base = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-              if (auto var = dyn_cast_or_null<VarDecl>(base->getDecl())) {
-                if (var->getNameStr().contains("$generator") &&
-                    (UDE->getName().getBaseIdentifier() == Context.Id_next))
-                  return success();
-              }
-            }
-          }
-        }
-
         // Increasing the impact for missing member in any argument position
         // which may be less likely than other potential mistakes
         if (getArgumentLocator(anchorExpr))
@@ -11865,82 +11894,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     return fixMissingMember(origBaseTy, memberTy, locator);
   }
   return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyValueWitnessConstraint(
-    ConstraintKind kind, Type baseType, ValueDecl *requirement, Type memberType,
-    DeclContext *useDC, FunctionRefInfo functionRefInfo,
-    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-  // We'd need to record original base type because it might be a type
-  // variable representing another missing member.
-  auto origBaseType = baseType;
-
-  auto formUnsolved = [&] {
-    // If requested, generate a constraint.
-    if (flags.contains(TMF_GenerateConstraints)) {
-      auto *witnessConstraint = Constraint::createValueWitness(
-          *this, kind, origBaseType, memberType, requirement, useDC,
-          functionRefInfo, getConstraintLocator(locator));
-
-      addUnsolvedConstraint(witnessConstraint);
-      return SolutionKind::Solved;
-    }
-
-    return SolutionKind::Unsolved;
-  };
-
-  auto fail = [&] {
-    // The constraint failed, so mark the member type as a "hole".
-    // We cannot do anything further here.
-    if (!shouldAttemptFixes())
-      return SolutionKind::Error;
-
-    recordAnyTypeVarAsPotentialHole(memberType);
-
-    return SolutionKind::Solved;
-  };
-
-  // Resolve the base type, if we can. If we can't resolve the base type,
-  // then we can't solve this constraint.
-  Type baseObjectType = getFixedTypeRecursive(
-      baseType, flags, /*wantRValue=*/true);
-  if (baseObjectType->isTypeVariableOrMember()) {
-    return formUnsolved();
-  }
-
-  // If base type is an existential, let's open it before checking
-  // conformance.
-  if (baseObjectType->isExistentialType()) {
-    baseObjectType =
-        ExistentialArchetypeType::get(baseObjectType->getCanonicalType());
-  }
-
-  // Check conformance to the protocol. If it doesn't conform, this constraint
-  // fails. Don't attempt to fix it.
-  // FIXME: Look in the constraint system to see if we've resolved the
-  // conformance already?
-  auto proto = requirement->getDeclContext()->getSelfProtocolDecl();
-  assert(proto && "Value witness constraint for a non-requirement");
-  auto conformance = lookupConformance(baseObjectType, proto);
-  if (!conformance)
-    return fail();
-
-  // Reference the requirement.
-  Type resolvedBaseType = simplifyType(baseType, flags);
-  if (resolvedBaseType->isTypeVariableOrMember())
-    return formUnsolved();
-
-  auto witness =
-      conformance.getWitnessByName(requirement->getName());
-  if (!witness)
-    return fail();
-
-  auto choice = OverloadChoice::getDecl(
-      resolvedBaseType, witness.getDecl(), functionRefInfo);
-  addBindOverloadConstraint(memberType, choice, getConstraintLocator(locator),
-                            useDC);
-  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyDefaultableConstraint(
@@ -13459,18 +13412,20 @@ retry_after_fail:
           return true;
         }
 
-        // If types of arguments/parameters and result lined up exactly,
-        // let's favor this overload choice.
-        //
-        // Note this check ignores `ExtInfo` on purpose and only compares
-        // types, if there are overloads that differ only in effects then
-        // all of them are going to be considered and filtered as part of
-        // "favored" group after forming a valid partial solution.
-        if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
-          if (FunctionType::equalParams(argFnType->getParams(),
-                                        choiceFnType->getParams()) &&
-              argFnType->getResult()->isEqual(choiceFnType->getResult()))
-            constraint->setFavored();
+        if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          // If types of arguments/parameters and result lined up exactly,
+          // let's favor this overload choice.
+          //
+          // Note this check ignores `ExtInfo` on purpose and only compares
+          // types, if there are overloads that differ only in effects then
+          // all of them are going to be considered and filtered as part of
+          // "favored" group after forming a valid partial solution.
+          if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
+            if (FunctionType::equalParams(argFnType->getParams(),
+                                          choiceFnType->getParams()) &&
+                argFnType->getResult()->isEqual(choiceFnType->getResult()))
+              constraint->setFavored();
+          }
         }
 
         // Account for any optional unwrapping/binding
@@ -16328,6 +16283,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(first, second, subflags, locator);
+
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
@@ -16370,7 +16328,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
@@ -16675,7 +16632,7 @@ void ConstraintSystem::addApplicationConstraint(
 
 void ConstraintSystem::addContextualConversionConstraint(
     Expr *expr, Type conversionType, ContextualTypePurpose purpose,
-    ConstraintLocator *locator) {
+    ConstraintLocator *locator, bool shouldOpenOpaqueType) {
   if (conversionType.isNull())
     return;
 
@@ -16735,9 +16692,11 @@ void ConstraintSystem::addContextualConversionConstraint(
 
   // Add the constraint.
   // FIXME: This is the wrong place to be opening the opaque type.
-  auto openedType = openOpaqueType(conversionType, purpose, locator,
-                                   /*ownerDecl=*/nullptr);
-  addConstraint(constraintKind, getType(expr), openedType, locator,
+  if (shouldOpenOpaqueType) {
+    conversionType = openOpaqueType(conversionType, purpose, locator,
+                                    /*ownerDecl=*/nullptr);
+  }
+  addConstraint(constraintKind, getType(expr), conversionType, locator,
                 /*isFavored*/ true);
 }
 
@@ -16965,6 +16924,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return result;
   }
 
+  case ConstraintKind::ForEachElement:
+    return simplifyForEachElementConstraint(
+        constraint.getFirstType(), constraint.getSecondType(),
+        /*flags*/ std::nullopt, constraint.getLocator());
+
   case ConstraintKind::OptionalObject:
     return simplifyOptionalObjectConstraint(
         constraint.getFirstType(), constraint.getSecondType(),
@@ -16977,13 +16941,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getSecondType(), constraint.getDeclContext(),
         constraint.getFunctionRefInfo(),
         /*outerAlternatives=*/{},
-        /*flags*/ std::nullopt, constraint.getLocator());
-
-  case ConstraintKind::ValueWitness:
-    return simplifyValueWitnessConstraint(
-        constraint.getKind(), constraint.getFirstType(),
-        constraint.getRequirement(), constraint.getSecondType(),
-        constraint.getDeclContext(), constraint.getFunctionRefInfo(),
         /*flags*/ std::nullopt, constraint.getLocator());
 
   case ConstraintKind::Defaultable:

@@ -233,7 +233,7 @@ bb3:
 //   We need to delete the dealloc_stacks in bb3 because the stack is in
 //   an incoherent state entering bb3. The allocation and deallocation in
 //   the loop is required, however.
-// CHECK-LABEL: sil [ossa] @test_merge_alloc_dead_end_loop
+// CHECK-LABEL: sil @test_merge_alloc_dead_end_loop
 // CHECK:         integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:    [[A:%.*]] = alloc_stack $Int
 // CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
@@ -253,7 +253,7 @@ bb3:
 // CHECK-NEXT:    br bb4
 
 // CHECK-LABEL: // end sil function 'test_merge_alloc_dead_end_loop'
-sil [ossa] @test_merge_alloc_dead_end_loop : $@convention(thin) (Builtin.Int1) -> () {
+sil @test_merge_alloc_dead_end_loop : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%cond: $Builtin.Int1):
   specify_test "stack_nesting_fixup"
   integer_literal $Builtin.Int32, 1

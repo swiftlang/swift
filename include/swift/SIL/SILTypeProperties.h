@@ -196,9 +196,9 @@ public:
   }
 
   static constexpr SILTypeProperties forTrivialOpaque() {
-    return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-            IsNotTypeExpansionSensitive, HasRawPointer, IsNotLexical,
-            HasNoPack, IsAddressableForDependencies};
+    return {IsTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
+            IsNotTypeExpansionSensitive, HasRawPointer, IsLexical,
+            HasNoPack, IsAddressableForDependencies, HasRawLayout};
   }
 
   static constexpr SILTypeProperties forRawPointer() {

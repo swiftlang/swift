@@ -165,15 +165,35 @@ void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
 
 }
 
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::AccessNoteDeclName, QuotingType::Single)
-LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::ObjCSelector, QuotingType::Single)
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::AccessNote)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotesFile)
+
+// Not using macro to avoid dllimport/dllexport issues on Windows.
+template <> struct llvm::yaml::ScalarTraits<swift::AccessNoteDeclName> {
+  static void output(const swift::AccessNoteDeclName &Value, void *ctx,
+                     raw_ostream &Out);
+  static StringRef input(StringRef Scalar, void *ctxt,
+                         swift::AccessNoteDeclName &Value);
+  static QuotingType mustQuote(StringRef);
+};
+
+// Not using macro to avoid dllimport/dllexport issues on Windows.
+template <> struct llvm::yaml::ScalarTraits<swift::ObjCSelector> {
+  static void output(const swift::ObjCSelector &Value, void *ctx,
+                     raw_ostream &Out);
+  static StringRef input(StringRef Scalar, void *ctxt,
+                         swift::ObjCSelector &Value);
+  static QuotingType mustQuote(StringRef);
+};
 
 // Not using macro to avoid validation issues.
 template <> struct llvm::yaml::MappingTraits<swift::AccessNote> {
   static void mapping(IO &IO, swift::AccessNote &Obj);
   static std::string validate(IO &IO, swift::AccessNote &Obj);
+};
+
+// Not using macro to avoid dllimport/dllexport issues on Windows.
+template <> struct llvm::yaml::MappingTraits<swift::AccessNotesFile> {
+  static void mapping(IO &IO, swift::AccessNotesFile &Obj);
 };
 
 namespace swift {
@@ -237,6 +257,10 @@ input(StringRef str, void *ctxPtr, AccessNoteDeclName &name) {
   return name.empty() ? "invalid declaration name" : "";
 }
 
+QuotingType ScalarTraits<AccessNoteDeclName>::mustQuote(StringRef) {
+  return QuotingType::Single;
+}
+
 void ScalarTraits<ObjCSelector>::output(const ObjCSelector &selector,
                                         void *ctxPtr, raw_ostream &os) {
   os << selector;
@@ -252,6 +276,10 @@ StringRef ScalarTraits<ObjCSelector>::input(StringRef str, void *ctxPtr,
   }
 
   return "invalid selector";
+}
+
+QuotingType ScalarTraits<ObjCSelector>::mustQuote(StringRef) {
+  return QuotingType::Single;
 }
 
 void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {

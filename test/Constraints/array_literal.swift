@@ -425,3 +425,16 @@ do {
     let _: [(String, String)] = f { return Array(v) } + v // Ok
   }
 }
+
+// Make sure that sbutyping works with empty literals.
+do {
+  class A {}
+
+  class B: A {}
+
+  func takesSequence<S>(_: S, _: S) where S: Sequence, S.Element: Sequence, S.Element.Element == A.Type {}
+
+  func test() {
+    takesSequence([[B.self]], [])
+  }
+}

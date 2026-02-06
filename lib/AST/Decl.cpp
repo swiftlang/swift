@@ -1910,6 +1910,8 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Preconcurrency);
     if (typeRepr->findAttrLoc(TypeAttrKind::Nonisolated).isValid())
       setOption(ProtocolConformanceFlags::Nonisolated);
+    if (typeRepr->findAttrLoc(TypeAttrKind::Reparented).isValid())
+      setOption(ProtocolConformanceFlags::Reparented);
 
     // Dig out the custom attribute that should be the global actor isolation.
     if (auto customAttr = typeRepr->findCustomAttr()) {
@@ -2257,6 +2259,20 @@ ExtensionDecl::isAddingConformanceToInvertible() const {
           return kind;
   }
   return std::nullopt;
+}
+
+bool ExtensionDecl::isForReparenting() const {
+  // Must be a protocol extension
+  if (!getExtendedProtocolDecl())
+    return false;
+
+  // Must be at least one @reparented inherited entry.
+  for (auto const& entry : getInherited().getEntries()) {
+    if (entry.isReparented())
+      return true;
+  }
+
+  return false;
 }
 
 bool Decl::hasOnlyCEntryPoint() const {
@@ -2810,8 +2826,7 @@ ExportedLevel VarDecl::isLayoutExposedToClients() const {
     return ExportedLevel::None;
 
   auto M = getDeclContext()->getParentModule();
-  if (getASTContext().LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
-      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
     // Non-resilient module expose layouts by default.
     return ExportedLevel::ImplicitlyExported;
   } else {
@@ -3314,10 +3329,8 @@ static AccessStrategy getOpaqueReadAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingBorrow, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
-
-  if (storage->getParsedAccessor(AccessorKind::Borrow)) {
+  if (storage->requiresOpaqueBorrowAccessor())
     return AccessStrategy::getAccessor(AccessorKind::Borrow, dispatch);
-  }
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -3325,6 +3338,8 @@ static AccessStrategy
 getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
   if (storage->hasInitAccessor() && !storage->getAccessor(AccessorKind::Set))
     return AccessStrategy::getAccessor(AccessorKind::Init, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
@@ -3475,8 +3490,11 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
     return requiresOpaqueModifyCoroutine();
   case AccessorKind::YieldingMutate:
     return requiresOpaqueYieldingMutateCoroutine();
-
-  // Other accessors are never part of the opaque-accessors set.
+  case AccessorKind::Borrow:
+    return requiresOpaqueBorrowAccessor();
+  case AccessorKind::Mutate:
+    return requiresOpaqueMutateAccessor();
+    // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
@@ -3489,6 +3507,9 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
   if (!supportsMutation()) {
     return false;
   }
+  if (getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
   return true;
 }
 
@@ -3498,11 +3519,8 @@ bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
     return requiresCorrespondingUnderscoredCoroutineAccessor(
         AccessorKind::YieldingBorrow);
 
-  // If a borrow accessor is present, we don't need a read coroutine.
-  if (getParsedAccessor(AccessorKind::Borrow)) {
-    return false;
-  }
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::YieldingBorrow ||
+         getOpaqueReadOwnership() == OpaqueReadOwnership::OwnedOrBorrowed;
 }
 
 bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
@@ -3510,11 +3528,28 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
   if (!ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
     return false;
 
+  // If a `_read` accessor is explicitly present and the CoroutineAccessors
+  // feature is enabled, we need to synthesize a `yielding borrow`.
+  // This is because we assume that with introduction of the feature we can
+  // call it.
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+  if (getParsedAccessor(AccessorKind::Read) &&
+      this->getModuleContext()->getResilienceStrategy() ==
+        ResilienceStrategy::Resilient &&
+      isExported(this) != ExportedLevel::None) {
+    return true;
+  }
+  
   // If a borrow accessor is present, we don't need a read coroutine.
   if (getParsedAccessor(AccessorKind::Borrow)) {
     return false;
   }
-  return getOpaqueReadOwnership() != OpaqueReadOwnership::Owned;
+
+  return getOpaqueReadOwnership() !=  OpaqueReadOwnership::Owned;
+}
+
+bool AbstractStorageDecl::requiresOpaqueBorrowAccessor() const {
+  return getOpaqueReadOwnership() == OpaqueReadOwnership::Borrow;
 }
 
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
@@ -3533,6 +3568,10 @@ bool AbstractStorageDecl::requiresOpaqueYieldingMutateCoroutine() const {
       RequiresOpaqueModifyCoroutineRequest{
           const_cast<AbstractStorageDecl *>(this), /*isUnderscored=*/false},
       false);
+}
+
+bool AbstractStorageDecl::requiresOpaqueMutateAccessor() const {
+  return getParsedAccessor(AccessorKind::Mutate) != nullptr;
 }
 
 AccessorDecl *
@@ -3642,6 +3681,12 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
 
   if (requiresOpaqueYieldingMutateCoroutine())
     visit(AccessorKind::YieldingMutate);
+
+  if (requiresOpaqueBorrowAccessor())
+    visit(AccessorKind::Borrow);
+
+  if (requiresOpaqueMutateAccessor())
+    visit(AccessorKind::Mutate);
 }
 
 void AbstractStorageDecl::visitOpaqueAccessors(
@@ -5753,6 +5798,16 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
   if (nominal1 && nominal2) {
     if (int result = compare(nominal1, nominal2))
       return result;
+  }
+
+  // Prefer non-reparentable protocols.
+  if (auto *proto1 = dyn_cast<ProtocolDecl>(type1)) {
+    if (auto *proto2 = dyn_cast<ProtocolDecl>(type2)) {
+      auto rp1 = proto1->getAttrs().hasAttribute<ReparentableAttr>();
+      auto rp2 = proto2->getAttrs().hasAttribute<ReparentableAttr>();
+      if (rp1 != rp2)
+        return int(rp1) < int(rp2) ? -1 : +1;
+    }
   }
 
   if (int result = type1->getBaseIdentifier().str().compare(
@@ -8478,16 +8533,12 @@ static bool isMemberwiseInitExcludedVar(const VarDecl *VD,
   auto &ctx = VD->getASTContext();
 
   // For property wrappers, the property must be at least internal. This
-  // predates 'ExcludePrivateFromMemberwiseInit'.
+  // predates SE-0502.
   if (VD->hasAttachedPropertyWrapper()) {
     minAccess.emplace(AccessLevel::Internal);
-  } else {
+  } else if (initKind == MemberwiseInitKind::Compatibility) {
     // We don't exclude private VarDecls for the compatibility overload.
-    if (initKind == MemberwiseInitKind::Compatibility)
-      return false;
-    // Must have the feature enabled.
-    if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
-      return false;
+    return false;
   }
 
   if (!minAccess) {
@@ -12455,10 +12506,21 @@ void swift::simple_display(llvm::raw_ostream &out, const GenericParamList *GPL) 
 
 StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
+  #define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return #KEYWORD;
 #define ACCESSOR(ID, KEYWORD)
 #include "swift/AST/AccessorKinds.def"
+
+    // Transitional terminology.  Let's use this for a little
+    // while to ease the transition.  (Both forms are parsed
+    // correctly, this just changes what gets written into
+    // .swiftinterface files.)
+    case AccessorKind::YieldingBorrow: return "read";
+    case AccessorKind::YieldingMutate: return "modify";
+    // TODO: Switch to the final terminology before shipping...
+    // case AccessorKind::YieldingBorrow: return "yielding borrow";
+    // case AccessorKind::YieldingMutate: return "yielding mutate";
   }
   llvm_unreachable("bad accessor kind");
 }

@@ -277,6 +277,8 @@ void SILFunction::init(
   this->UseStackForPackMetadata = DoUseStackForPackMetadata;
   this->HasUnsafeNonEscapableResult = false;
   this->IsPerformanceConstraint = false;
+  this->NeedBreakInfiniteLoops = false;
+  this->NeedCompleteLifetimes = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -443,7 +445,6 @@ bool SILFunction::hasForeignBody() const {
 }
 
 void SILFunction::setAsmName(StringRef value) {
-  ASSERT((AsmName.empty() || value == AsmName) && "Cannot change asmname");
   AsmName = value;
 
   if (!value.empty()) {

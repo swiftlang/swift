@@ -45,4 +45,14 @@ inline bool takesOptionalInt(std::optional<int> arg) { return (bool)arg; }
 inline bool takesOptionalString(std::optional<std::string> arg) { return (bool)arg; }
 inline bool takesOptionalHasDeletedCopyCtor(std::optional<HasDeletedCopyCtor> arg) { return (bool)arg; }
 
+struct DerivedFromOptional : std::optional<std::string> {
+  using std::optional<std::string>::optional;
+};
+
+struct ReturnsOptionalString {
+  ReturnsOptionalString() {}
+  std::optional<std::string> getStr() const { return "foo"; }
+  DerivedFromOptional getStrDerived() const { return "foo"; }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_OPTIONAL_H

@@ -50,10 +50,10 @@ var iybr: Int {
   yielding borrow { // expected-disabled-error{{accessor_requires_coroutine_accessors}}
     fatalError()
   }
-  read { // expected-warning{{old_coroutine_accessor}}
-         // expected-error@-1{{duplicate_accessor}}
-         // expected-note@-5{{previous_accessor}}
-         // expected-disabled-error@-3{{accessor_requires_coroutine_accessors}}
+  read { // expected-enabled-warning{{old_coroutine_accessor}}
+         // expected-enabled-error@-1{{duplicate_accessor}}
+         // expected-enabled-note@-5{{previous_accessor}}
+         // expected-disabled-error@-3{{expected_accessor_kw}}
     fatalError()
   }
 }
@@ -93,10 +93,10 @@ var igr: Int {
   get {
     1
   }
-  read { // expected-warning{{old_coroutine_accessor}}
-         // expected-error@-1{{variable cannot provide both a 'yielding borrow' accessor and a getter}}
-         // expected-note@-5{{previous_accessor}}
-         // expected-disabled-error@-3{{'yielding borrow' accessor is only valid when experimental feature coroutine accessors is enabled}}
+  read { // expected-enabled-warning{{old_coroutine_accessor}}
+         // expected-enabled-error@-1{{variable cannot provide both a 'yielding borrow' accessor and a getter}}
+         // expected-enabled-note@-5{{previous_accessor}}
+         // expected-disabled-error@-3{{expected_accessor_kw}}
     yield _i
   }
 }

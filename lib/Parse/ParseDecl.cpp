@@ -2545,7 +2545,7 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
 }
 
 static std::optional<LifetimeDescriptor>
-parseLifetimeDescriptor(Parser &P,
+parseLifetimeDescriptor(Parser &P, bool allowIndices,
                         ParsedLifetimeDependenceKind lifetimeDependenceKind =
                             ParsedLifetimeDependenceKind::Default) {
   auto token = P.Tok;
@@ -2577,6 +2577,13 @@ parseLifetimeDescriptor(Parser &P,
   case tok::integer_literal: {
     SourceLoc loc;
     unsigned index;
+    if (!allowIndices) {
+      P.diagnose(
+          token,
+          diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+          /* allow indices */ false);
+      return std::nullopt;
+    }
     if (P.parseUnsignedInteger(
             index, loc, diag::expected_param_index_lifetime_dependence)) {
       return std::nullopt;
@@ -2590,7 +2597,8 @@ parseLifetimeDescriptor(Parser &P,
   default: {
     P.diagnose(
         token,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        allowIndices);
     return std::nullopt;
   }
   }
@@ -2601,7 +2609,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(StringRef attrName,
                                                           SourceLoc loc) {
   ParserStatus status;
 
-  auto lifetimeEntry = parseLifetimeEntry(loc);
+  auto lifetimeEntry = parseLifetimeEntry(loc, /*allowIndices=*/false);
   if (lifetimeEntry.isNull()) {
     status.setIsParseError();
     return status;
@@ -5076,6 +5084,22 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
+  case TypeAttrKind::Lifetime: {
+    const auto entryResult = parseLifetimeEntry(AtLoc, /*allowIndices=*/false);
+    if (entryResult.isNull()) {
+      return makeParserError();
+    }
+
+    auto *entry = entryResult.get();
+
+    if (!justChecking) {
+      result = new (Context) LifetimeTypeAttr(
+          AtLoc, attrLoc, SourceRange(entry->getStartLoc(), entry->getEndLoc()),
+          entryResult.get());
+    }
+    return makeParserSuccess();
+  }
+
   case TypeAttrKind::Convention: {
     ConventionTypeAttr *convention = nullptr;
     if (parseConventionAttributeInternal(AtLoc, attrLoc, convention,
@@ -5148,7 +5172,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   llvm_unreachable("bad attribute kind");
 }
 
-ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
+ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc,
+                                                       bool allowIndices) {
   ParserStatus status;
 
   auto getLifetimeDependenceKind =
@@ -5182,7 +5207,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   std::optional<LifetimeDescriptor> targetDescriptor;
   if (Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
       peekToken().is(tok::colon)) {
-    targetDescriptor = parseLifetimeDescriptor(*this);
+    targetDescriptor = parseLifetimeDescriptor(*this, allowIndices);
     if (!targetDescriptor) {
       status.setIsParseError();
       return status;
@@ -5207,8 +5232,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
           consumeToken();
         }
 
-        auto sourceDescriptor =
-            parseLifetimeDescriptor(*this, lifetimeDependenceKind);
+        auto sourceDescriptor = parseLifetimeDescriptor(*this, allowIndices,
+                                                        lifetimeDependenceKind);
         if (!sourceDescriptor) {
           invalidSourceDescriptor = true;
           listStatus.setIsParseError();
@@ -5225,7 +5250,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   if (!foundParamId) {
     diagnose(
         Tok,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        /* allow indices */ isInSILMode());
     status.setIsParseError();
     return status;
   }
@@ -5567,7 +5593,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'
-      auto result = P.parseLifetimeEntry(loc);
+      auto result = P.parseLifetimeEntry(loc, /*allowIndices=*/true);
       if (result.isNull()) {
         status |= result;
         continue;
@@ -7984,6 +8010,8 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DistributedGet:
   case AccessorKind::Set:
   case AccessorKind::YieldingBorrow:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return true;
 
   case AccessorKind::Address:
@@ -7997,11 +8025,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
 
   case AccessorKind::Init:
     return forSIL;
-
-  // TODO: Add support for borrow/mutate constraints in protocols
-  case AccessorKind::Borrow:
-  case AccessorKind::Mutate:
-    return false;
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -8086,31 +8109,41 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
   }
 #define ACCESSOR_KEYWORD(KEYWORD)
 
-// Support the old `read` and `modify` spellings used before SE-0474 was
-// finalized.  Include a warning guiding people to the final spellings.
-// The complicated condition here is to try to deal gracefully with
-// existing code that has a function called `read` or `modify` that
-// takes a closure and invokes it from within a default getter.
-#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)              \
-  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
-    if (!P.Context.LangOpts.hasFeature(Feature::FEATURE)) {                    \
-      if (featureUnavailable)                                                  \
-        *featureUnavailable = true;                                            \
-      if (isFirstAccessor) {                                                   \
-        Status.setIsParseError();                                              \
-        return Status;                                                         \
-      }                                                                        \
-    }                                                                          \
-    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,                   \
-               #YIELDING_KEYWORD, #KEYWORD);                                   \
-    Kind = AccessorKind::ID;                                                   \
-  }
+#define YIELDING_ACCESSOR(ID, KEYWORD, YIELDING_KEYWORD, FEATURE)
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
   }
 #include "swift/AST/AccessorKinds.def"
 
+  // Support the old `read` and `modify` spellings used before SE-0474 was
+  // finalized:
+  // * Support them in interface files, to avoid breaking .swiftinterface
+  //   while we transition to the new spellings.  (The compiler continued
+  //   to write `read`/`modify` to interfaces while we transitioned.)
+  // * Support them in Swift code ONLY IF the user has explicitly opted
+  //   into the CoroutineAccessors flag.
+  // TODO: After CoroutineAccessors gets turned on by default, we should
+  // ONLY accept these in interface files.
+  // TODO: Someday in the future (after 2026), we can stop accepting these
+  // entirely.  Accepting them in interface files is a temporary
+  // compatibility bridge to avoid immediate breakage during the switch
+  // to the new terminology.
+  else if (P.Tok.getRawText() == "read"
+	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
+	       "borrow", "read");
+    Kind = AccessorKind::YieldingBorrow;
+  }
+  else if (P.Tok.getRawText() == "modify"
+	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
+    P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
+	       "mutate", "modify");
+    Kind = AccessorKind::YieldingMutate;
+  }
+  // Support `yielding borrow` and `yielding mutate`
   else if (P.Tok.getRawText() == "yielding") {
     // If there's a "yielding" token, see if this is
     // "yielding mutate" or "yielding borrow"
@@ -8249,7 +8282,8 @@ bool Parser::parseAccessorAfterIntroducer(
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
-    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension)) {
+    if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InExtension) &&
+        !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
                                             /*underscored*/ false));
@@ -8408,7 +8442,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      diagnose(Loc, diag::expected_getreadset_in_protocol);
+      auto diag = diag::expected_getreadset_in_protocol;
+      if (Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
+        diag = diag::expected_getreadborrowsetmutate_in_protocol;
+      }
+      diagnose(Loc, diag);
       continue;
     }
 
@@ -8834,6 +8872,20 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                  diag::init_accessor_is_not_in_the_primary_declaration);
     } else if (!DC->isTypeContext() || isa<SubscriptDecl>(storage)) {
       P.diagnose(Init->getLoc(), diag::init_accessor_is_not_on_property);
+    }
+  }
+
+  // A 'borrow' can only be paired with 'mutate'
+  if (Borrow) {
+    if (Set || Modify || YieldingMutate || MutableAddress) {
+      P.diagnose(Borrow->getLoc(), diag::borrow_mutate_pair_restrict, "borrow",
+                 "mutate");
+    }
+  }
+  if (Mutate) {
+    if (Get || Read || YieldingBorrow || Address) {
+      P.diagnose(Mutate->getLoc(), diag::borrow_mutate_pair_restrict, "mutate",
+                 "borrow");
     }
   }
 }
@@ -10530,46 +10582,15 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
                                  diag::operator_decl_expected_precedencegroup,
                                  DeclNameFlag::ModuleSelectorUnsupported);
 
-    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
-      // Designated types have been removed; consume the list (mainly for source
-      // compatibility with old swiftinterfaces) and emit a warning.
-
-      // These SourceLocs point to the ends of the designated type list. If
-      // `typesEndLoc` never becomes valid, we didn't find any designated types.
-      SourceLoc typesStartLoc = Tok.getLoc();
-      SourceLoc typesEndLoc;
-
-      if (isPrefix || isPostfix) {
-        // These have no precedence group, so we already parsed the first entry
-        // in the designated types list. Retroactively include it in the range.
-        typesStartLoc = colonLoc;
-        typesEndLoc = groupLoc.getEndLoc();
-      }
-
-      while (Tok.isNot(tok::eof)) {
-        if (!consumeIf(tok::comma, typesEndLoc)) {
-          break;
-        }
-
-        if (Tok.isNot(tok::eof)) {
-          typesEndLoc = consumeToken();
-        }
-      }
-
-      if (typesEndLoc.isValid())
-        diagnose(typesStartLoc, diag::operator_decl_remove_designated_types)
-            .fixItRemove({typesStartLoc, typesEndLoc});
-    } else {
-      if (isPrefix || isPostfix) {
-        // If we have nothing after the colon, then just remove the colon.
-        auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
-        diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, endLoc});
-      }
-      // Nothing to complete here, simply consume the token.
-      if (Tok.is(tok::code_complete))
-        consumeToken();
+    if (isPrefix || isPostfix) {
+      // If we have nothing after the colon, then just remove the colon.
+      auto endLoc = groupLoc.isValid() ? groupLoc.getEndLoc() : colonLoc;
+      diagnose(colonLoc, diag::precedencegroup_not_infix)
+          .fixItRemove({colonLoc, endLoc});
     }
+    // Nothing to complete here, simply consume the token.
+    if (Tok.is(tok::code_complete))
+      consumeToken();
   }
 
   // Diagnose deprecated operator body syntax `operator + { ... }`.

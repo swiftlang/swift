@@ -2288,6 +2288,7 @@ sil [ossa] @testUnreachable1NoDestroy : $@convention(thin) <T> () -> () {
 bb0:
     %instance = apply undef<T>() : $@convention(thin) <τ> () -> @out τ
     apply undef<T>(%instance) : $@convention(thin) <τ> (@in_guaranteed τ) -> ()
+    destroy_value [dead_end] %instance
     unreachable
 }
 

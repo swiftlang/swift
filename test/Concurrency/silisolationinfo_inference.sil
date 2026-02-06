@@ -1898,3 +1898,115 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_sendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var MyActor }
+// CHECK: IsSendable: no
+// CHECK: end running test 1 of 1 on var_box_with_sendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @var_box_with_sendable_type_is_nonsendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ var MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var MyActor }                 // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on var_box_with_sendable_type_is_nonsendable_isolationinfo: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @var_box_with_sendable_type_is_nonsendable_isolationinfo : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ var MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_sendable_type_is_sendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let MyActor }
+// CHECK: IsSendable: yes
+// CHECK: end running test 1 of 1 on let_box_with_sendable_type_is_sendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @let_box_with_sendable_type_is_sendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ let MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let MyActor }                 // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on let_box_with_sendable_type_is_sendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @let_box_with_sendable_type_is_sendable_isolationinfo_inference : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ let MyActor }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var NonSendableKlass }
+// CHECK: IsSendable: no
+// CHECK: end running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @var_box_with_nonsendable_type_is_nonsendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ var NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ var NonSendableKlass }        // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @var_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ var NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let NonSendableKlass }
+// CHECK: IsSendable: no
+// CHECK: end running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable: sil_isolation_info_is_sendable with: @trace[0]
+sil [ossa] @let_box_with_nonsendable_type_is_nonsendable : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_is_sendable @trace[0]"
+  %0 = alloc_box ${ let NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %0 = alloc_box ${ let NonSendableKlass }        // user: %1
+// CHECK: Isolation: unknown
+// CHECK: end running test 1 of 1 on let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @let_box_with_nonsendable_type_is_nonsendable_isolationinfo_inference : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_isolation_info_inference @trace[0]"
+  %0 = alloc_box ${ let NonSendableKlass }
+  debug_value [trace] %0
+  destroy_value %0
+  %9999 = tuple ()
+  return %9999 : $()
+}

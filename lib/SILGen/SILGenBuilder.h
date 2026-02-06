@@ -569,6 +569,9 @@ public:
     return ManagedValue::forBorrowedRValue(
         createImplicitActorToOpaqueIsolationCast(loc, mv.getUnmanagedValue()));
   }
+
+  using SILBuilder::createUncheckedOwnership;
+  ManagedValue createUncheckedOwnership(SILLocation loc, ManagedValue base);
 };
 
 } // namespace Lowering

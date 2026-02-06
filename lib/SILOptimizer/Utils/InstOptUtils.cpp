@@ -46,6 +46,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
+#include <fstream>
 #include <optional>
 
 using namespace swift;
@@ -2571,4 +2572,63 @@ bool swift::isDestructorSideEffectFree(SILInstruction *mayRelease,
   }
 
   return false;
+}
+
+// cond_fail removal based on cond_fail message and containing function name.
+//
+// The standard library uses _precondition calls which have a message argument.
+//
+// Allow disabling the generated cond_fail by these message arguments.
+//
+// For example:
+//
+//  _precondition(source >= (0 as T), "Negative value is not representable")
+// results in a cond_fail "Negative value is not representable".
+//
+// This commit allows for specifying a file that contains these messages on each
+// line.
+//
+// /path/to/disable_cond_fails:
+//
+// ```
+// Negative value is not representable
+// Array index is out of range
+// ```
+//
+// The optimizer will remove these cond_fails if the swift frontend is invoked
+// with -Xllvm -cond-fail-config-file=/path/to/disable_cond_fails.
+//
+// Additionally, also interpret the lines as function names and check whether
+// the current cond_fail is contained in a listed function when considering
+// whether to remove it.
+static llvm::cl::opt<std::string> CondFailConfigFile(
+    "cond-fail-config-file", llvm::cl::init(""),
+    llvm::cl::desc("read the cond_fail message strings to elimimate from file"));
+
+static std::set<std::string> CondFailsToRemove;
+
+bool swift::shouldRemoveCondFail(StringRef withMessage, StringRef functionName) {
+  if (CondFailConfigFile.empty())
+    return false;
+
+  std::fstream fs(CondFailConfigFile);
+  if (!fs) {
+    llvm::errs() << "cannot cond_fail disablement config file\n";
+    exit(1);
+  }
+  if (CondFailsToRemove.empty()) {
+    std::string line;
+    while (std::getline(fs, line)) {
+      CondFailsToRemove.insert(line);
+    }
+    fs.close();
+  }
+  // Check whether the cond_fail's containing function was listed in the config
+  // file.
+  if (CondFailsToRemove.find(functionName.str()) !=
+      CondFailsToRemove.end())
+    return true;
+
+  // Check whether the cond_fail's message was listed in the config file.
+  return CondFailsToRemove.find(withMessage.str()) != CondFailsToRemove.end();
 }

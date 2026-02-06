@@ -41,7 +41,8 @@ namespace swift {
 
   /// Emit diagnostics for syntactic restrictions on a given expression.
   void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
-                                       bool isExprStmt, bool isConstInitExpr);
+                                       bool isExprStmt, bool isConstInitExpr,
+                                       bool inForEachPreamble);
 
   /// Emit diagnostics for a given statement.
   void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -134,11 +135,6 @@ namespace swift {
   /// function, we emit a diagnostic suggesting the async call.
   void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
   void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
-
-  /// Detect and diagnose a missing `try` in `for-in` loop sequence
-  /// expression in async context (denoted with `await` keyword).
-  bool diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
-                                             ForEachStmt *forEach);
 
   /// Determine if any of the performance hint diagnostics are enabled.
   bool performanceHintDiagnosticsEnabled(ASTContext &ctx, SourceFile *sf);

@@ -113,6 +113,11 @@ def block_list_file
     Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
     HelpText<"The path to a blocklist configuration file">;
 
+def const_gather_protocols_file
+  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
@@ -273,10 +278,6 @@ def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
 
-def const_gather_protocols_file
-  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
-
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
 
@@ -430,6 +431,12 @@ def debug_constraints_on_line : Separate<["-"], "debug-constraints-on-line">,
   MetaVarName<"<line>">;
 def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
   Alias<debug_constraints_on_line>;
+
+def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=">,
+  HelpText<"Random seed for shuffling disjunctions. For debugging solver performance">;
+
+def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
+  HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading (obsolete)">;
@@ -768,9 +775,9 @@ def disable_deserialization_safety :
   Flag<["-"], "disable-deserialization-safety">,
   HelpText<"Don't avoid reading potentially unsafe decls in swiftmodules">;
 
-def force_workaround_broken_modules :
-  Flag<["-"], "experimental-force-workaround-broken-modules">,
-  HelpText<"Attempt unsafe recovery for imported modules with broken modularization">;
+def disable_workaround_broken_modules :
+  Flag<["-"], "disable-workaround-broken-modules">,
+  HelpText<"Disable recovery for imported modules with broken modularization">;
 
 def enable_experimental_string_processing :
   Flag<["-"], "enable-experimental-string-processing">,
@@ -916,15 +923,28 @@ def solver_disable_prepared_overloads : Flag<["-"], "solver-disable-prepared-ove
 def solver_enable_prepared_overloads : Flag<["-"], "solver-enable-prepared-overloads">,
   HelpText<"Enable experimental prepared overloads optimization">;
 
+def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjunctions">,
+  HelpText<"Disable experimental disjunction pruning algorithm for lookahead in the solver">;
+
+def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
+  HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
+
+def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
+  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
+  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
+  HelpText<"Disable various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
+def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
+  HelpText<"Enble various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
-
-def enable_constraint_solver_performance_hacks : Flag<["-"], "enable-constraint-solver-performance-hacks">,
-  HelpText<"Enable all the old hacks in the constraint solver">;
-
-def enable_operator_designated_types :
-  Flag<["-"], "enable-operator-designated-types">,
-  HelpText<"Enable operator designated types">;
 
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,
@@ -1541,20 +1561,6 @@ def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
-
-def enable_ossa_complete_lifetimes :
-  Flag<["-"], "enable-ossa-complete-lifetimes">,
-  HelpText<"Require linear OSSA lifetimes after SILGen">;
-def disable_ossa_complete_lifetimes :
-  Flag<["-"], "disable-ossa-complete-lifetimes">,
-  HelpText<"Do not require linear OSSA lifetimes after SILGen">;
-
-def enable_ossa_verify_complete :
-  Flag<["-"], "enable-ossa-verify-complete">,
-  HelpText<"Verify linear OSSA lifetimes after SILGen">;
-def disable_ossa_verify_complete :
-  Flag<["-"], "disable-ossa-verify-complete">,
-  HelpText<"Do not verify linear OSSA lifetimes after SILGen">;
 
 def platform_c_calling_convention :
     Separate<["-"], "experimental-platform-c-calling-convention">,

@@ -89,3 +89,30 @@ public struct RigidArray : ~Copyable {
   }
 }
 
+// Function types
+
+@inlinable
+@_lifetime(copy ne0)
+public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inview: consuming AnotherView, _ io: inout AnotherView) -> AnotherView, ne0: consuming AnotherView, ne1: inout AnotherView) -> AnotherView {
+    let ne2 = f(ne0, &ne1)
+    return ne2
+}
+
+@inlinable
+public func takeCopierUnannotated(f: (consuming AnotherView) -> AnotherView) {}
+
+public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((AnotherView) -> AnotherView, _ ne0: consuming AnotherView, _ ne1: inout AnotherView) -> AnotherView
+
+@inlinable
+public func takeExplicitNestedType(f: ExplicitNestedType) {}
+
+
+@inlinable
+public func returnableCopier(_ aView: AnotherView) -> AnotherView {
+  return aView
+}
+
+@inlinable
+public func returnCopier() -> @_lifetime(copy a) (_ a: AnotherView) -> AnotherView {
+  return returnableCopier
+}

@@ -478,6 +478,9 @@ private:
   /// within a module by the MandatoryOptimizations pass.
   unsigned IsPerformanceConstraint : 1;
 
+  unsigned NeedBreakInfiniteLoops : 1;
+  unsigned NeedCompleteLifetimes : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -787,6 +790,8 @@ public:
   bool isCalleeAllocatedCoroutine() const {
     return LoweredType->isCalleeAllocatedCoroutine();
   }
+
+  bool isCoroutine() const { return LoweredType->isCoroutine(); }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -1104,6 +1109,31 @@ public:
 
   void setIsPerformanceConstraint(bool flag = true) {
     IsPerformanceConstraint = flag;
+  }
+
+  /// True if the current pass has deleted any basic blocks.
+  /// In case a deleted block was an exit blocks of a loop the remaining loop might
+  /// have become an infinite loop.
+  bool needBreakInfiniteLoops() const { return NeedBreakInfiniteLoops; }
+
+  /// If `flag` is true, notifies that a pass has deleted a basic block which
+  /// might end up in an infinite loop. A pass can set the notification to `false`
+  /// again if a basic block has been deleted but the pass knows that this cannot
+  /// cause any infinite loops.
+  void setNeedBreakInfiniteLoops(bool flag = true) {
+    NeedBreakInfiniteLoops = flag;
+  }
+
+  /// True if the pass has inserted an `unreachable` instruction.
+  /// In such a case, lifetimes which have reached over this point are cut off.
+  bool needCompleteLifetimes() const { return NeedCompleteLifetimes; }
+
+  /// If `flag` is true, notifies that a pass has inserted an `unreachable`
+  /// instruction which might have cut off any lifetimes. A pass can set the
+  /// notification to `false` again if an `unreachable` was inserted but the
+  /// pass knows that this didn't cut off any lifetimes.
+  void setNeedCompleteLifetimes(bool flag = true) {
+    NeedCompleteLifetimes = flag;
   }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
@@ -1534,6 +1564,8 @@ public:
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
     assert(BB->getParent() == this);
+    if (hasOwnership())
+      setNeedBreakInfiniteLoops();
     BlockList.erase(BB);
   }
 

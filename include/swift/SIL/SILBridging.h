@@ -198,6 +198,7 @@ struct BridgedLifetimeDependenceInfo {
   swift::IndexSubset *_Nullable conditionallyAddressableParamIndices;
   SwiftUInt targetIndex;
   bool immortal;
+  bool fromAnnotation;
 
   BRIDGED_INLINE BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info);
 
@@ -731,6 +732,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandArray getTypeDependentOperands() const;
   BRIDGED_INLINE void setOperand(SwiftInt index, BridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  BRIDGED_INLINE void setLocation(BridgedLocation loc) const;
   BRIDGED_INLINE BridgedMemoryBehavior getMemBehavior() const;
   BRIDGED_INLINE bool mayRelease() const;
   BRIDGED_INLINE bool mayHaveSideEffects() const;
@@ -1322,9 +1324,10 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndBorrow(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCopyAddr(BridgedValue from, BridgedValue to,
                                           bool takeSource, bool initializeDest) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestroyValue(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestroyValue(BridgedValue op, bool isDeadEnd) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestroyAddr(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndLifetime(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createExtendLifetime(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugValue(BridgedValue src,
                                                                          BridgedSILDebugVariable var) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugStep() const;
@@ -1441,6 +1444,9 @@ struct BridgedBuilder{
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertFunction(BridgedValue originalFunction, BridgedType resultType, bool withoutActuallyEscaping) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const;
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMakeBorrow(BridgedValue referent) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMakeAddrBorrow(BridgedValue referent) const;
 
   SWIFT_IMPORT_UNSAFE void destroyCapturedArgs(BridgedInstruction partialApply) const;
 };

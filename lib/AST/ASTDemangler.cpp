@@ -1233,6 +1233,10 @@ Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
                                     element->getCanonicalType());
 }
 
+Type ASTBuilder::createBuiltinBorrowType(Type referent) {
+  return BuiltinBorrowType::get(referent->getCanonicalType());
+}
+
 GenericSignature
 ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
                                    ArrayRef<BuiltRequirement> requirements) {

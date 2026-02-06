@@ -85,33 +85,6 @@ none(%2 : @guaranteed $FakeOptional<C>):
   return %retval : $()
 }
 
-// There is an introducer but no enclosing def if the guaranteed value
-// is produced from a an unreachable loop.
-
-// CHECK-LABEL: enclosing_def_unreachable: find_enclosing_defs with: %phiCycle
-// CHECK: } // end sil function 'enclosing_def_unreachable'
-// CHECK: Enclosing Defs:
-// CHECK-NEXT: enclosing_def_unreachable: find_enclosing_defs with: %phiCycle
-
-// CHECK-LABEL: enclosing_def_unreachable: enclosing_values with: %phiCycle
-// CHECK: } // end sil function 'enclosing_def_unreachable'
-// CHECK: Enclosing values for:   %2 = borrowed %1 : $C from ()
-// CHECK-NEXT: enclosing_def_unreachable: enclosing_values with: %phiCycle
-sil [ossa] @enclosing_def_unreachable : $@convention(thin) () ->() {
-entry:
-  br exit
-
-unreachable_loop(%1 : @guaranteed $C):
-  %phiCycle = borrowed %1 from ()
-  specify_test "find_enclosing_defs %phiCycle"
-  specify_test "enclosing_values %phiCycle"
-  br unreachable_loop(%phiCycle : $C)
-
-exit:
-  %retval = tuple ()
-  return %retval : $()
-}
-
 // All data flow paths through phis and aggregates originate from the
 // same borrow scope. This is the same as finding the introducer.
 
@@ -245,24 +218,27 @@ bb3(%9 : @guaranteed $C):
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: enclosing_def_cycle: enclosing_values with: %forward
 sil [ossa] @enclosing_def_cycle : $@convention(thin) (@guaranteed C) -> () {
-entry(%0 : @guaranteed $C):
+bb0(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
   %aggregate1 = struct $PairC(%borrow : $C, %borrow : $C)
   %first1 = struct_extract %aggregate1 : $PairC, #PairC.first
-  br bb2(%borrow : $C, %first1 : $C)
+  br bb1(%borrow : $C, %first1 : $C)
 
-bb2(%5 : @guaranteed $C, %6 : @guaranteed $C):
+bb1(%5 : @guaranteed $C, %6 : @guaranteed $C):
   %forward = borrowed %6 from (%0, %borrow)
   %reborrow_outer = borrowed %5 from (%0)
   specify_test "find_enclosing_defs %forward"
   specify_test "enclosing_values %forward"
   %aggregate2 = struct $PairC(%reborrow_outer : $C, %forward : $C)
   %first2 = struct_extract %aggregate2 : $PairC, #PairC.first
-  br bb2(%reborrow_outer : $C, %first2 : $C)
+  cond_br undef, bb2, bb3
 
-exit:
-  %retval = tuple ()
-  return %retval : $()
+bb2:
+  br bb1(%reborrow_outer : $C, %first2 : $C)
+
+bb3:
+  end_borrow %borrow
+  unreachable
 }
 
 // CHECK-LABEL: enclosing_def_example: enclosing_values with: %0

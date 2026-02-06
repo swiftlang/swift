@@ -59,6 +59,10 @@ private:
     return false;
   }
 
+  bool shouldWalkIntoForEachDesugaredStmt() override {
+    return SEWalker.shouldWalkIntoForEachDesugaredStmt();
+  }
+
   MacroWalking getMacroWalkingBehavior() const override {
     return SEWalker.getMacroWalkingBehavior();
   }
@@ -270,29 +274,31 @@ ASTWalker::PostWalkAction SemaAnnotator::walkToDeclPostProper(Decl *D) {
 
 ASTWalker::PreWalkResult<Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
-  if (TraverseChildren) {
-    if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
-      // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
-      // walk into the body.
-      if (auto *FD = DeferS->getTempDecl()) {
-        auto *Body = FD->getBody();
-        if (!Body)
-          return Action::Stop();
+  if (!TraverseChildren)
+    return Action::SkipNode(S);
 
-        auto *RetS = Body->walk(*this);
-        if (!RetS)
-          return Action::Stop();
-        assert(RetS == Body);
-      }
-      bool Continue = SEWalker.walkToStmtPost(DeferS);
-      if (!Continue)
+  if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
+    // walk into the body.
+    if (auto *FD = DeferS->getTempDecl()) {
+      auto *Body = FD->getBody();
+      if (!Body)
         return Action::Stop();
 
-      // Already walked children.
-      return Action::SkipNode(DeferS);
+      auto *RetS = Body->walk(*this);
+      if (!RetS)
+        return Action::Stop();
+      assert(RetS == Body);
     }
+    bool Continue = SEWalker.walkToStmtPost(DeferS);
+    if (!Continue)
+      return Action::Stop();
+
+    // Already walked children.
+    return Action::SkipNode(DeferS);
   }
-  return Action::VisitNodeIf(TraverseChildren, S);
+
+  return Action::Continue(S);
 }
 
 ASTWalker::PostWalkResult<Stmt *> SemaAnnotator::walkToStmtPost(Stmt *S) {

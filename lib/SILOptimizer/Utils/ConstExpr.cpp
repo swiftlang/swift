@@ -455,6 +455,9 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       break;
     case BuiltinValueKind::AssertConf:
       return SymbolicValue::getInteger(evaluator.getAssertConfig(), 32);
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
+      return getUnknown(evaluator, SILValue(inst),
+                        UnknownReason::Loop);
     }
   }
 

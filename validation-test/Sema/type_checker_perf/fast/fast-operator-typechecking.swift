@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -swift-version 5 -solver-scope-threshold=1000
 
 // rdar://problem/32998180
 func checksum(value: UInt16) -> UInt16 {

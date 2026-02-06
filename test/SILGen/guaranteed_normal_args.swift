@@ -170,27 +170,21 @@ struct ReabstractionThunkTest : Protocol {
 // result.
 extension FakeDictionary {
   // CHECK-LABEL: sil hidden [ossa] @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
-  // CHECK:   [[X:%.*]] = alloc_stack [lexical] [var_decl] $(Key, Value), let, name "x"
   // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt
-  // CHECK:   [[INDUCTION_VAR_0:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 0
-  // CHECK:   [[INDUCTION_VAR_1:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 1
+  // CHECK:   [[X:%.*]] = alloc_stack [lexical] [var_decl] $(Key, Value), let, name "x"
   // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
   // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
-  // CHECK:   copy_addr [take] [[INDUCTION_VAR_0]] to [init] [[X_0]]
-  // CHECK:   copy_addr [take] [[INDUCTION_VAR_1]] to [init] [[X_1]]
-  // CHECK:   [[X_0:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 0
-  // CHECK:   [[X_1:%.*]] = tuple_element_addr [[X]] : $*(Key, Value), 1
-  // CHECK:   [[TMP_X:%.*]] = alloc_stack $(Key, Value)
-  // CHECK:   [[TMP_X_0:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 0
-  // CHECK:   [[TMP_X_1:%.*]] = tuple_element_addr [[TMP_X]] : $*(Key, Value), 1
+  // CHECK:   [[XX:%.*]] = alloc_stack $(Key, Value)
+  // CHECK:   [[XX_0:%.*]] = tuple_element_addr [[XX]] : $*(Key, Value), 0
+  // CHECK:   [[XX_1:%.*]] = tuple_element_addr [[XX]] : $*(Key, Value), 1
   // CHECK:   [[TMP_0:%.*]] = alloc_stack $Key
   // CHECK:   copy_addr [[X_0]] to [init] [[TMP_0]]
-  // CHECK:   copy_addr [take] [[TMP_0]] to [init] [[TMP_X_0]]
+  // CHECK:   copy_addr [take] [[TMP_0]] to [init] [[XX_0]]
   // CHECK:   [[TMP_1:%.*]] = alloc_stack $Value
   // CHECK:   copy_addr [[X_1]] to [init] [[TMP_1]]
-  // CHECK:   copy_addr [take] [[TMP_1]] to [init] [[TMP_X_1]]
+  // CHECK:   copy_addr [take] [[TMP_1]] to [init] [[XX_1]]
   // CHECK:   [[FUNC:%.*]] = function_ref @$ss9FakeArrayV6appendyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout FakeArray<τ_0_0>) -> ()
-  // CHECK:   apply [[FUNC]]<(Key, Value)>([[TMP_X]],
+  // CHECK:   apply [[FUNC]]<(Key, Value)>([[XX]],
   // CHECK: } // end sil function '$ss14FakeDictionaryV20makeSureToCopyTuplesyyF'
   func makeSureToCopyTuples() {
     var result = FakeArray<Element>(k: Klass())

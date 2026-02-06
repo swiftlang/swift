@@ -126,6 +126,7 @@ bb5(%0cC : @owned $C):
 
 bb6:
   %34 = builtin "int_trap"() : $()
+  destroy_value [dead_end] %0
   unreachable
 
 bb7:

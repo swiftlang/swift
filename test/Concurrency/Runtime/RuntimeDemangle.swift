@@ -7,6 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: runtime_module
 
 import Swift
 import Runtime

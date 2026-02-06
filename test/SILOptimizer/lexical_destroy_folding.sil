@@ -618,6 +618,8 @@ entry:
   cond_br undef, left, right
 
 left:
+  end_borrow %lifetime
+  destroy_value [dead_end] %instance
   unreachable
 
 right:
@@ -646,6 +648,7 @@ entry(%instance : @owned $C):
   cond_br undef, left, right
 
 left:
+  end_borrow %lifetime
   apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
   unreachable
 
@@ -797,30 +800,6 @@ exit:
   apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
   end_borrow %lifetime : $C
   destroy_value %instance : $C
-  %retval = tuple ()
-  return %retval : $()
-}
-
-// Don't fold if the borrow scope begins in an unreachable-from-entry block.
-//
-// CHECK-LABEL: sil [ossa] @nofold_deadblock : $@convention(thin) () -> () {
-// CHECK-NOT: move_value [lexical]
-// CHECK-LABEL: } // end sil function 'nofold_deadblock'
-sil [ossa] @nofold_deadblock : $@convention(thin) () -> () {
-entry:
-  br exit
-dead:
-  %get_owned = function_ref @get_owned : $@convention(thin) () -> @owned C
-  %instance = apply %get_owned() : $@convention(thin) () -> @owned C
-  %lifetime = begin_borrow [lexical] %instance : $C
-  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
-  %copy = copy_value %lifetime : $C
-  apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
-  end_borrow %lifetime : $C
-  destroy_value %instance : $C
-  br exit
-
-exit:
   %retval = tuple ()
   return %retval : $()
 }

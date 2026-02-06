@@ -127,8 +127,7 @@ func testNoncopyableSendableStructWithEscapingMainActorAsync() {
   let x = NoncopyableStructSendable()
   let _ = {
     escapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -253,8 +252,7 @@ func testNoncopyableSendableStructWithEscapingMainActorAsyncNormalCapture() {
   let x = NoncopyableStructSendable()
   let _ = { [x] in
     escapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -264,8 +262,7 @@ func testMutableNoncopyableSendableStructWithEscapingMainActorAsyncNormalCapture
   x = NoncopyableStructSendable()
   let _ = { [x] in
     escapingAsyncUse { @MainActor in
-      useValue(x) // expected-error {{sending 'x' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      useValue(x)
     }
   }
 }
@@ -941,7 +938,7 @@ class ConcreteDelegateNonsendable: DelegateProtocolNonsendable {
 // Test: Nested weak captures with protocols
 func testNestedProtocolWeakCapturesSendable<T: ProtocolSendable, U: ProtocolSendable>(_ outer: T, _ inner: U) {
   let _ = { [weak outer] in
-    let _ = { [weak outer, weak inner] in
+    let _ = { [weak outer, weak inner = inner] in
       escapingAsyncUse { @MainActor in
         if let o = outer { useValue(o) }
         if let i = inner { useValue(i) }
@@ -952,7 +949,7 @@ func testNestedProtocolWeakCapturesSendable<T: ProtocolSendable, U: ProtocolSend
 
 func testNestedProtocolWeakCapturesNonsendable<T: ProtocolNonsendable, U: ProtocolNonsendable>(_ outer: T, _ inner: U) {
   let _ = { [weak outer] in
-    let _ = { [weak outer, weak inner] in
+    let _ = { [weak outer, weak inner = inner] in
       escapingAsyncUse { @MainActor in
         if let o = outer { // expected-error {{sending 'outer' risks causing data races}}
           // expected-note @-1 {{task-isolated 'outer' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
@@ -1241,6 +1238,127 @@ func testMutableGenericNonsendableWithNonescapingMainActorAsync<T : ~Copyable>(
     nonescapingAsyncUse { @MainActor in
       useValue(x) // expected-error {{sending 'x' risks causing data races}}
       // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+  }
+}
+
+/////////////////////////////////////////////////
+// MARK: Generic Noncopyable Sendable Let Tests //
+/////////////////////////////////////////////////
+
+// These tests verify that generic noncopyable Sendable types in let bindings
+// work correctly. The key insight is that noncopyable types must be boxed when
+// captured, and immutable boxes with Sendable contents are treated as Sendable.
+
+func testGenericNoncopyableSendableLetWithEscapingMainActorAsync<T: ~Copyable & Sendable>(
+  _ value: consuming T) {
+  let x = value
+  let _ = {
+    escapingAsyncUse { @MainActor in
+      useValue(x) // OK: let binding + Sendable contents = Sendable box
+    }
+  }
+}
+
+func testGenericNoncopyableSendableLetWithNonescapingMainActorAsync<T: ~Copyable & Sendable>(
+  _ value: consuming T) {
+  let x = value
+  let _ = {
+    nonescapingAsyncUse { @MainActor in
+      useValue(x) // OK: let binding + Sendable contents = Sendable box
+    }
+  }
+}
+
+// Test generic noncopyable Sendable in capture list
+func testGenericNoncopyableSendableCaptureListWithEscapingMainActorAsync<T: ~Copyable & Sendable>(
+  _ value: consuming T) {
+  let x = value
+  let _ = { [x] in
+    escapingAsyncUse { @MainActor in
+      useValue(x) // OK: capture list creates let box + Sendable contents
+    }
+  }
+}
+
+// Verify that generic noncopyable non-Sendable still errors (negative test)
+func testGenericNoncopyableNonsendableLetWithEscapingMainActorAsync<T: ~Copyable>(
+  _ value: consuming T) {
+  let x = value
+  let _ = {
+    escapingAsyncUse { @MainActor in
+      useValue(x) // expected-error {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+  }
+}
+
+///////////////////////////////////////////////
+// MARK: Nested Closure with Let Box Tests   //
+///////////////////////////////////////////////
+
+// These tests verify that noncopyable Sendable types work correctly in deeply
+// nested closure scenarios.
+
+func testNestedClosuresNoncopyableSendable() {
+  let x = NoncopyableStructSendable()
+  let _ = {
+    let _ = {
+      escapingAsyncUse { @MainActor in
+        useValue(x) // OK: let box with Sendable contents
+      }
+    }
+  }
+}
+
+func testNestedClosuresNoncopyableSendableWithCaptureList() {
+  let x = NoncopyableStructSendable()
+  let _ = { [x] in
+    let _ = {
+      escapingAsyncUse { @MainActor in
+        useValue(x) // OK: let box with Sendable contents
+      }
+    }
+  }
+}
+
+func testDeeplyNestedClosuresNoncopyableSendable() {
+  let x = NoncopyableStructSendable()
+  let _ = {
+    let _ = {
+      let _ = {
+        escapingAsyncUse { @MainActor in
+          useValue(x) // OK: let box with Sendable contents
+        }
+      }
+    }
+  }
+}
+
+// Verify nested closure with noncopyable non-Sendable still errors
+func testNestedClosuresNoncopyableNonsendable() {
+  let x = NoncopyableStructNonsendable()
+  let _ = {
+    let _ = {
+      escapingAsyncUse { @MainActor in
+        useValue(x) // expected-error {{sending 'x' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      }
+    }
+  }
+}
+
+// Test nested closures with mixed Sendable/non-Sendable captures
+func testNestedClosuresMixedSendability() {
+  let sendable = NoncopyableStructSendable()
+  let nonsendable = NoncopyableStructNonsendable()
+  let _ = {
+    let _ = {
+      escapingAsyncUse { @MainActor in
+        useValue(sendable) // OK
+        useValue(nonsendable) // expected-error {{sending 'nonsendable' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'nonsendable' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      }
     }
   }
 }

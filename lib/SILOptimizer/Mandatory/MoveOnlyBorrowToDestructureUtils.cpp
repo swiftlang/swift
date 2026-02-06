@@ -944,7 +944,8 @@ AvailableValues Implementation::computeAvailableValues(SILBasicBlock *block) {
       // earlier value required. Instead, we do a final loop afterwards using
       // the interval map to update each available value.
       auto loc = getSafeLoc(predBlock->getTerminator());
-      SILBuilderWithScope builder(predBlock->getTerminator());
+      SILBuilderWithScope builder(predBlock->getTerminator(),
+                                  &interface.createdDestructures);
 
       while (smallestOffsetSize->first.size < iterOffsetSize.size) {
         // Before we destructure ourselves, erase our entire value from the
@@ -966,11 +967,21 @@ AvailableValues Implementation::computeAvailableValues(SILBasicBlock *block) {
             loc, predAvailableValues[i], [&](unsigned index, SILValue value) {
               // Now, wire up our new value to its span in the interval map.
               TypeSubElementCount childSize(value);
-              typeSpanToValue.insert(childOffsetIterator, childSize, value);
+              typeSpanToValue.insert(childOffsetIterator,
+                                     childOffsetIterator + childSize, value);
 
               // Update childOffsetIterator so it points at our next child.
               childOffsetIterator += childSize;
             });
+
+        {
+          // Update iterOffsetSize based on the current state of
+          // typeSpanToValue.
+          auto iter = typeSpanToValue.find(i);
+          assert(iter != typeSpanToValue.end());
+          auto iterValue = iter.value();
+          iterOffsetSize = TypeOffsetSizePair(iterValue, getRootValue());
+        }
       }
     }
 

@@ -21,8 +21,8 @@ fileprivate let ValueBufferSize = unsafe 3 * MemoryLayout<UnsafeRawPointer>.stri
 fileprivate let TrackingFlag: UInt = 0x20
 fileprivate let ActionMask: UInt = 0x1
 
-fileprivate typealias AccessPointer = UnsafeMutablePointer<Access>
-@unsafe fileprivate struct Access {
+typealias AccessPointer = UnsafeMutablePointer<Access>
+@unsafe struct Access {
 
   enum Action: UInt {
     case read
@@ -79,12 +79,21 @@ fileprivate typealias AccessPointer = UnsafeMutablePointer<Access>
     while let nextPtr = unsafe cursor {
       if unsafe nextPtr.pointee.location == location {
         if unsafe nextPtr.pointee.action == .modify || action == .modify {
+          #if !$Embedded
           unsafe _swift_reportExclusivityConflict(
             nextPtr.pointee.action.rawValue,
             nextPtr.pointee.pc,
             action.rawValue,
             pc,
             location)
+          #else
+          unsafe _embeddedReportExclusivityViolation(
+            oldAction: nextPtr.pointee.action,
+            oldPC: nextPtr.pointee.pc,
+            newAction: action,
+            newPC: pc,
+            pointer: location)
+          #endif
         }
       }
       unsafe cursor = nextPtr.pointee.next
@@ -174,12 +183,14 @@ internal func swift_beginAccess(
   // eliminate the check when it's true.
   precondition(unsafe MemoryLayout<Access>.size <= ValueBufferSize)
 
+  #if !$Embedded
   // If exclusivity checking is disabled, mark this access as untracked by
   // putting nil into the access buffer's pointer field, and return.
   if _swift_disableExclusivityChecking {
     unsafe Access.from(rawPointer: buffer)?.pointee.location = nil
     return
   }
+  #endif
 
   guard let action = Access.Action(rawValue: flags & ActionMask) else {
     invalidFlags(flags)
@@ -223,6 +234,7 @@ internal func _swift_exclusivityAccessSetNext(
   unsafe access?.pointee.next = next
 }
 
+#if INTERNAL_CHECKS_ENABLED
 @c(swift_dumpTrackedAccesses)
 @usableFromInline
 @unsafe
@@ -238,6 +250,7 @@ internal func swift_dumpTrackedAccesses() {
     unsafe _swift_stdlib_fputs_stderr("        No Accesses.\n")
   }
 }
+#endif
 
 /// Starting from `access`, find the access that is the parent node of `child`.
 /// If `child` is `nil`, find the last access in the list.
@@ -279,10 +292,16 @@ fileprivate func reportExclusivityError(
   prefix.withUTF8Buffer { prefixBuffer in
     var message = message
     message.withUTF8 { messageBuffer in
+      #if !$Embedded
       unsafe _swift_stdlib_reportFatalError(
           prefixBuffer.baseAddress!, CInt(prefixBuffer.count),
           messageBuffer.baseAddress!, CInt(messageBuffer.count),
           0)
+      #else
+      unsafe _embeddedReportFatalError(
+          prefix: prefix,
+          message: messageBuffer)
+      #endif
     }
   }
   Builtin.int_trap()

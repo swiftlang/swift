@@ -138,6 +138,7 @@ bb0(%0 : @owned $String, %1 : $Int):
   cond_br undef, bb1, bb2
 bb1:
   destroy_value %3 : $S
+  destroy_value [dead_end] %2
   unreachable
 bb2:
   (%4, %5) = destructure_struct %3 : $S

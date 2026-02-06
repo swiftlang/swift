@@ -84,6 +84,13 @@ let _ = classWithSuccessorAvailable.successor();
 let classWithSuccessorUnavailable = ClassWithSuccessorUnavailable()
 let _ = classWithSuccessorUnavailable.successor(); // expected-error {{'successor()' is unavailable in Swift}}
 
+let allStar = AllStar() // expected-note {{change 'let' to 'var' to make it mutable}}
+let _ = allStar.pointee // expected-error {{cannot use mutating getter on immutable value}}
+var mutAllStar = AllStar()
+let _ = mutAllStar.pointee
+var _: AllStar  = mutAllStar * allStar
+var _: AllStar = allStar * mutAllStar
+
 var classWithOperatorStarAvailable = ClassWithOperatorStarAvailable()
 let _ = classWithOperatorStarAvailable.pointee
 let derivedClassWithOperatorStarAvailable = DerivedClassWithOperatorStarAvailable()
@@ -104,3 +111,5 @@ let classWithDefaultTemplatedOperatorStar = ClassWithDefaultTemplatedOperatorSta
 let _ = classWithDefaultTemplatedOperatorStar.pointee  // expected-error {{has no member 'pointee'}}
 // ^this could work in theory, but is niche (https://github.com/swiftlang/swift/issues/86478)
 // Same for templated operator++.
+
+let _ = HasOperatorReturningAuto().pointee // expected-error {{value of type 'HasOperatorReturningAuto' has no member 'pointee'}}

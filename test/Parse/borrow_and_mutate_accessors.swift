@@ -40,12 +40,12 @@ struct Wrapper {
     }
   }
   var k5: Klass {
-    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor, getter, addressor or 'yielding borrow' accessor}}
+    mutate { // expected-error{{variable with a 'mutate' accessor must also have a 'borrow' accessor}}
       return &_otherK
     }
   }
   var k6: Klass {
-    borrow {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
       return _otherK
     }
     mutate { // expected-error{{variable cannot provide both a 'mutate' accessor and a setter}}
@@ -59,7 +59,7 @@ struct Wrapper {
     }
   }
   var k7: Klass {
-    borrow {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
       return _otherK
     }
     mutate { // expected-note{{mutate accessor defined here}}
@@ -73,6 +73,38 @@ struct Wrapper {
       return _otherK
     }
     mutate async throws { // expected-error{{'mutate' accessor cannot have specifier 'async'}} expected-error{{'mutate' accessor cannot have specifier 'throws'}}
+      return &_otherK
+    }
+  }
+  var k9: Klass {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
+      return _otherK
+    }
+    _modify {
+      yield &_otherK
+    }
+  }
+  var k10: Klass {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
+      return _otherK
+    }
+    yielding mutate {
+      yield &_otherK
+    }
+  }
+  var k11: Klass {
+    borrow { // expected-error{{A 'borrow' accessor can only be defined along with a 'mutate' accessor}}
+      return _otherK
+    }
+    set {
+      _otherK = newValue
+    }
+  }
+  var k12: Klass {
+    get {
+      return _otherK
+    }
+    mutate { // expected-error{{A 'mutate' accessor can only be defined along with a 'borrow' accessor}}
       return &_otherK
     }
   }

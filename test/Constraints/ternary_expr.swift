@@ -92,3 +92,19 @@ struct ShellTask {
 let delegate = Delegate(shellTasks: [])
 _ = delegate.shellTasks[safe: 0]?.commandLine.compactMap({ $0.asString.hasPrefix("") ? $0 : nil }).count ?? 0
 // expected-error@-1 {{value of type 'String' has no member 'asString'}}
+
+// A test-case for a problem where ternary didn't get a correct binding due to a bug in `determineLiteralCoverage`
+// which results in the solver preferring an overload of `??` that returns an optional.
+do {
+  struct Data {
+    init(value: Int) {}
+  }
+
+  func test(_n: Int?) {
+    let n = _n.flatMap {
+      ($0 != -1) ? $0 : 0
+    } ?? 0
+
+    _ = Data(value: n) // Ok
+  }
+}

@@ -17,7 +17,12 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
 
-@_lifetime(2) // expected-error{{invalid parameter index specified '2'}}
+@_lifetime(copy 0) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func invalidAttrOnExistingParamIndex(_ ne: NE) -> NE {
+  ne
+}
+
+@_lifetime(2) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
   ne
 }
@@ -104,17 +109,20 @@ func inoutLifetimeDependence(_ ne: inout NE) -> NE {
   ne
 }
 
-@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&k)' instead}}
+@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(&k)' instead}}
 func dependOnEscapable(_ k: inout Klass) -> NE {
   NE()
 }
 
-@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(borrow k)' instead}}
+@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(borrow k)' instead}}
 func dependOnEscapable(_ k: borrowing Klass) -> NE { 
   NE()
 }
 
-@_lifetime(copy k) // expected-error{{invalid lifetime dependence on an Escapable value with consuming ownership}}
+@_lifetime(copy k) // expected-error{{cannot copy the lifetime of an Escapable type}}
+                   // expected-note@-1{{use '@_lifetime(borrow k)' instead}}
 func dependOnEscapable(_ k: consuming Klass) -> NE { 
   NE()
 }

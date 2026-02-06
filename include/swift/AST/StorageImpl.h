@@ -40,8 +40,11 @@ enum class OpaqueReadOwnership : uint8_t {
   /// An opaque read produces an owned value.
   Owned,
 
+  /// An opaque read produces a borrowed value with teardown.
+  YieldingBorrow,
+
   /// An opaque read produces a borrowed value.
-  Borrowed,
+  Borrow,
 
   /// An opaque read can be either owned or borrowed, depending on the
   /// preference of the caller.

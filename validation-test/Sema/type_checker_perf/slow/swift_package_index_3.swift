@@ -1,5 +1,7 @@
-// RUN: %target-typecheck-verify-swift %s -solver-scope-threshold=50000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000
 // REQUIRES: tools-release,no_asan
+
+// Valid expression, type checks with default limits but slow
 
 extension String {
   func replacingOccurrences(of: String, with: String) -> String { return "" }

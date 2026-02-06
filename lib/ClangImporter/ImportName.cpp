@@ -38,6 +38,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/OperatorKinds.h"
@@ -58,10 +59,6 @@ STATISTIC(ImportNameNumCacheMisses, "# of times the import name cache was missed
 
 using namespace swift;
 using namespace importer;
-
-// Commonly-used Clang classes.
-using clang::CompilerInstance;
-using clang::CompilerInvocation;
 
 Identifier importer::getOperatorName(ASTContext &ctx,
                                      clang::OverloadedOperatorKind op) {
@@ -1505,7 +1502,7 @@ static StringRef renameUnsafeMethod(ASTContext &ctx,
                                     const clang::NamedDecl *decl,
                                     StringRef name) {
   if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl}), {})) {
+      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
     return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
   }
 
@@ -1955,6 +1952,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (!functionDecl)
       return ImportedName();
 
+    // We do not import && qualified operators yet.
+    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
+      if (method->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
+        return ImportedName();
+    }
+
     switch (op) {
     case clang::OverloadedOperatorKind::OO_Plus:
     case clang::OverloadedOperatorKind::OO_Minus:
@@ -2298,28 +2301,48 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> newName;
   // Check if we need to rename the C++ method to disambiguate it.
   if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
+    bool shouldAddMutable = false;
+    bool shouldAddConsuming = false;
     if (!method->isConst() && !method->isOverloadedOperator() && !method->isStatic()) {
       // See if any other methods within the same struct have the same name, but
       // differ in constness.
       auto otherDecls = dc->lookup(method->getDeclName());
-      bool shouldRename = false;
       for (auto otherDecl : otherDecls) {
         if (otherDecl == D)
           continue;
         if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
           // TODO: what if the other method is also non-const?
           if (otherMethod->isConst()) {
-            shouldRename = true;
+            shouldAddMutable = true;
             break;
           }
         }
       }
-
-      if (shouldRename) {
-        newName = baseName;
-        newName += "Mutating";
-        baseName = newName;
+    }
+    if (method->getRefQualifier() == clang::RefQualifierKind::RQ_RValue &&
+        !method->isOverloadedOperator()) {
+      // See if any other methods within the same struct have the same name, but
+      // differ in ref qualifier.
+      auto otherDecls = dc->lookup(method->getDeclName());
+      for (auto otherDecl : otherDecls) {
+        if (otherDecl == D)
+          continue;
+        if (auto otherMethod = dyn_cast<clang::CXXMethodDecl>(otherDecl)) {
+          if (otherMethod->getRefQualifier() ==
+              clang::RefQualifierKind::RQ_LValue) {
+            shouldAddConsuming = true;
+            break;
+          }
+        }
       }
+    }
+    if (shouldAddMutable || shouldAddConsuming) {
+      newName = baseName;
+      if (shouldAddMutable)
+        newName += "Mutating";
+      if (shouldAddConsuming)
+        newName += "Consuming";
+      baseName = newName;
     }
     if (method->isImplicit() &&
         baseName.starts_with("__synthesizedVirtualCall_")) {

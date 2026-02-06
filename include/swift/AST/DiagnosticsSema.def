@@ -1017,18 +1017,18 @@ ERROR(cxx_stdlib_kind_mismatch,none,
       (Identifier, StringRef, StringRef))
 
 ERROR(modularization_issue_decl_moved,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "%1 was expected to be in %2, but now a candidate is found only in %3",
-      (bool, DeclName, const ModuleDecl*, const ModuleDecl*))
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "'%1' was expected to be in %2, but now a candidate is found only in %3",
+      (bool, StringRef, const ModuleDecl*, const ModuleDecl*))
 ERROR(modularization_issue_decl_type_changed,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "the declaration kind of '%1' %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and now a candidate is found only in %4}5",
-      (bool, DeclName, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
+      (bool, StringRef, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "%1 is not found, it was expected to be in %2",
-      (bool, DeclName, const ModuleDecl*))
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "'%1' is not found, it was expected to be in %2",
+      (bool, StringRef, const ModuleDecl*))
 
 NOTE(modularization_issue_note_expected,none,
      "the %select{declaration|type}0 was expected to be found in module %1 at '%2'",
@@ -1066,9 +1066,9 @@ NOTE(modularization_issue_layering_found_local,none,
      "the local module %1 for a reference from the distributed module %0",
      (const ModuleDecl*, const ModuleDecl*))
 NOTE(modularization_issue_related_modules,none,
-     "the %select{declaration|type}0 %1 moved between related modules; "
+     "the %select{declaration|type}0 '%1' moved between related modules; "
      "clang preprocessor macros may affect headers shared between these modules",
-     (bool, DeclName))
+     (bool, StringRef))
 NOTE(interface_block_listed_broken,none,
      "textual interface for %0 is blocklisted as broken; "
      "interface verification errors are downgraded to warnings", (StringRef))
@@ -1081,8 +1081,7 @@ NOTE(modularization_issue_side_effect_type_error,none,
      (DeclName))
 
 NOTE(modularization_issue_worked_around,none,
-     "attempting forced recovery enabled by "
-     "-experimental-force-workaround-broken-modules",
+     "attempting to recover from the previous modularization issue",
      ())
 
 ERROR(modularization_issue_conformance_xref_error,none,
@@ -1272,8 +1271,9 @@ ERROR(module_not_compiled_with_library_evolution,none,
       (Identifier, Identifier))
 GROUPED_WARNING(implementation_only_requires_library_evolution,
         ImplementationOnlyDeprecated,none,
-        "using '@_implementationOnly' without enabling library evolution "
-        "for %0 may lead to instability during execution",
+        "safely use '@_implementationOnly' without library evolution "
+        "by setting '-enable-experimental-feature CheckImplementationOnly' "
+        "for %0",
         (Identifier))
 GROUPED_WARNING(implementation_only_deprecated,
         ImplementationOnlyDeprecated,none,
@@ -1703,6 +1703,8 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(closure_bad_param,none,
       "%select{|trailing }1closure passed to parameter of type %0 that does not "
       "accept a closure", (Type, bool))
+ERROR(anon_closure_arg_not_in_closure,none,
+      "anonymous closure argument not contained in a closure", ())
 GROUPED_WARNING(unlabeled_trailing_closure_deprecated,
         TrailingClosureMatching,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
@@ -1802,6 +1804,10 @@ ERROR(attribute_requires_operator_identifier,none,
 ERROR(attribute_requires_single_argument,none,
       "%0 requires a function with one argument", (DeclAttribute))
 
+ERROR(attribute_requires_experimental_feature,none,
+      "'%0' is an experimental feature; use '-enable-experimental-feature %1'",
+      (DeclAttribute, StringRef))
+
 ERROR(nominal_type_not_attribute,none,
       "%kind0 cannot be used as an attribute", (const ValueDecl *))
 
@@ -1818,11 +1824,8 @@ ERROR(functions_mutating_and_not,none,
 ERROR(static_functions_not_mutating,none,
       "static functions must not be declared mutating", ())
 
-ERROR(consuming_invalid_borrow_mutate_accessor, none,
-      "%0 cannot be declared consuming", (StringRef))
-
-ERROR(ownership_modifier_unsupported_borrow_mutate_accessor, none,
-      "%0 ownership modifier is not yet supported on %1", (StringRef, StringRef))
+ERROR(modifier_invalid_borrow_mutate_accessor, none,
+      "%0 cannot be declared %1", (StringRef, StringRef))
 
 ERROR(readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,none,
       "%0 cannot be %1 when "
@@ -2806,7 +2809,7 @@ ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (Type))
 ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause",
+      "extension of protocol %0 cannot declare inheritance relationship",
       (Identifier))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
@@ -3101,18 +3104,6 @@ ERROR(witness_not_as_sendable,none,
 NOTE(less_sendable_reqt_here,none,
      "expected sendability to match requirement here",
      ())
-WARNING(witness_not_accessible_strict_check_warn,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
-ERROR(witness_not_accessible_strict_check,none,
-      "%select{initializer %1|method %1|%select{|setter for }2property %1"
-      "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
-      "type because it matches a requirement in protocol %5",
-      (RequirementKind, const ValueDecl *, bool, AccessLevel, AccessLevel,
-       const ProtocolDecl *))
 ERROR(witness_not_accessible_type,none,
       "%select{initializer %1|method %1|%select{|setter for }2property %1"
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
@@ -3323,6 +3314,11 @@ NOTE(protocol_witness_mutation_modifier_conflict,none,
      (SelfAccessKind))
 NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
+
+ERROR(protocol_witness_borrow_mutate_conflict, none,
+      "candidate is not a stored property or a computed property with %0 accessor, but protocol requires it",
+      (StringRef))
+
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
 NOTE(protocol_witness_rethrows_by_conformance_conflict,none,
@@ -5192,6 +5188,17 @@ ERROR(isolated_any_conversion_to_synchronous_func,none,
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
 
+GROUPED_WARNING(implicit_weak_to_strong_capture,ImplicitStrongCapture,none,
+        "%0 ownership of capture %base1 differs from implicitly-captured "
+        "strong reference in outer scope",
+        (ReferenceOwnership, const VarDecl *))
+NOTE(implicit_weak_to_strong_capture_loc,none,
+     "%base0 implicitly strongly captured here",(const Decl *))
+NOTE(implicit_weak_to_strong_capture_add_capture_list_item,none,
+     "add %base0 as a capture list item to silence",(const Decl *))
+NOTE(implicit_weak_to_strong_capture_assign_to_silence,none,
+     "explicitly assign the capture list item to silence", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Statements
 //------------------------------------------------------------------------------
@@ -6082,9 +6089,18 @@ ERROR(typeattr_not_inheritance_clause,none,
 ERROR(typeattr_not_extension_inheritance_clause,none,
       "%0 only applies in inheritance clauses in extensions",
       (const TypeAttribute *))
+ERROR(typeattr_not_protocol_inheritance_clause,none,
+      "%0 only applies in inheritance clause of a protocol extension",
+      (const TypeAttribute *))
 ERROR(typeattr_not_existential,none,
       "%0 cannot apply to non-protocol type %1",
       (const TypeAttribute *, Type))
+ERROR(typeattr_reparented_requires_reparentable_protocol,none,
+      "%0 cannot apply to %1 unless it is declared to be '@reparentable'",
+      (const TypeAttribute *, const TypeDecl *))
+ERROR(typeattr_invalid_for_objc_protocol,none,
+      "@objc protocol %1 cannot be %0",
+      (const TypeAttribute *, const TypeDecl *))
 
 WARNING(unchecked_conformance_not_special,none,
       "'@unchecked' conformance to %0 has no meaning", (Type))
@@ -6192,8 +6208,8 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
-ERROR(async_main_no_concurrency,none,
-      "'_Concurrency' module not imported, required for async main", ())
+ERROR(no_concurrency_module,none,
+      "'_Concurrency' module not imported, required for %0", (StringRef))
 
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
@@ -8207,6 +8223,10 @@ NOTE(macro_expand_circular_reference_unnamed_through, none,
 ERROR(accessor_macro_not_single_var, none,
       "accessor macro %0 can only apply to a single variable", (DeclName))
 
+WARNING(macro_on_import_not_loadable, none,
+        "could not load macro '%0'; this may cause errors down the line",
+        (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
@@ -8470,9 +8490,7 @@ ERROR(lifetime_dependence_function_type, none,
 ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
-      "cannot copy the lifetime of an Escapable type, use "
-      "'@_lifetime(%0%1)' instead",
-      (StringRef, StringRef))
+      "cannot copy the lifetime of an Escapable type", ())
 ERROR(lifetime_dependence_parsed_borrow_with_ownership, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
@@ -8491,6 +8509,10 @@ ERROR(lifetime_parameter_requires_inout, none,
       "lifetime-dependent parameter '%0' must be 'inout'", (StringRef))
 ERROR(lifetime_target_requires_nonescapable, none,
       "invalid lifetime dependence on an Escapable %0", (StringRef))
+NOTE(lifetime_escapable_source_requires_escapable_note, none,
+     "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
+ERROR(lifetime_dependence_unknown_type, none,
+      "lifetime dependence checking failed due to unknown %0 type", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements

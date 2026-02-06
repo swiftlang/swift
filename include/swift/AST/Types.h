@@ -443,14 +443,15 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasThrownError : 1,
-    HasLifetimeDependencies : 1
+    HasLifetimeDependencies : 1,
+    HasSendableDependence : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -1519,7 +1520,12 @@ public:
   ///
   /// \param dropGlobalActor Whether to drop a global actor from a function
   /// type.
-  Type stripConcurrency(bool recurse, bool dropGlobalActor);
+  /// \param dropIsolation Whether to drop the isolation from a function type.
+  /// This should almost always be `false` except to one use in ASTMangler to
+  /// maintain old behavior where setting `dropGlobalActor` to `true` dropped
+  /// isolation for `@preconcurrency` declarations.
+  Type stripConcurrency(bool recurse, bool dropGlobalActor,
+                        bool dropIsolation = false);
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
@@ -1825,7 +1831,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinGenericType, BuiltinType)
 /// value may be copied, moved, or destroyed.
 class BuiltinFixedArrayType : public BuiltinGenericType,
                               public llvm::FoldingSetNode {
-  friend class ASTContext;
+  friend ASTContext;
   
   CanType Size;
   CanType ElementType;
@@ -1881,6 +1887,47 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFixedArrayType, BuiltinGenericType)
+
+/// BuiltinBorrowType - The builtin type representing a reified borrow of
+/// another value.
+class BuiltinBorrowType : public BuiltinGenericType,
+                          public llvm::FoldingSetNode
+{
+  friend ASTContext;
+
+  CanType Referent;
+
+  BuiltinBorrowType(CanType Referent, RecursiveTypeProperties properties)
+    : BuiltinGenericType(TypeKind::BuiltinBorrow,
+                         Referent->getASTContext(),
+                         properties),
+      Referent(Referent)
+  {}
+
+  friend BuiltinGenericType;
+  /// Get the generic arguments as a substitution map.
+  SubstitutionMap buildSubstitutions() const;
+  
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinBorrow;
+  }
+  
+  static CanTypeWrapper<BuiltinBorrowType>
+  get(CanType Referent);
+
+  /// Get the type of the referenced borrow.
+  CanType getReferentType() const { return Referent; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getReferentType());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanType Referent) {
+    ID.AddPointer(Referent.getPointer());
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBorrowType, BuiltinGenericType)
 
 /// BuiltinRawPointerType - The builtin raw (and dangling) pointer type.  This
 /// pointer is completely unmanaged and is equivalent to i8* in LLVM IR.
@@ -3664,6 +3711,8 @@ protected:
       assert(!Bits.AnyFunctionType.HasThrownError || Info->isThrowing());
       Bits.AnyFunctionType.HasLifetimeDependencies =
           !Info.value().getLifetimeDependencies().empty();
+      Bits.AnyFunctionType.HasSendableDependence =
+          !Info->getSendableDependentType().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3676,6 +3725,7 @@ protected:
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
+      Bits.AnyFunctionType.HasSendableDependence = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3732,15 +3782,28 @@ public:
     return Bits.AnyFunctionType.HasThrownError;
   }
 
+  bool hasSendableDependentType() const {
+    return Bits.AnyFunctionType.HasSendableDependence;
+  }
+
   bool hasLifetimeDependencies() const {
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
+
+  /// Type has lifetime dependencies derived from explicit @_lifetime
+  /// attributes.
+  bool hasExplicitLifetimeDependencies() const;
 
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
   Type getGlobalActor() const;
   Type getThrownError() const;
+
+  /// A dependent type that determines whether the function is @Sendable. This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getSendableDependentType() const;
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
 
@@ -3794,7 +3857,7 @@ public:
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
                    getGlobalActor(), getThrownError(),
-                   getLifetimeDependencies());
+                   getSendableDependentType(), getLifetimeDependencies());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -4043,7 +4106,7 @@ class FunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return hasGlobalActor() + hasThrownError();
+    return hasGlobalActor() + hasThrownError() + hasSendableDependentType();
   }
 
   size_t numTrailingObjects(OverloadToken<size_t>) const {
@@ -4083,6 +4146,15 @@ public:
     if (!hasThrownError())
       return Type();
     return getTrailingObjects<Type>()[hasGlobalActor()];
+  }
+
+  /// A dependent type that determines whether the function is @Sendable. This
+  /// is only used within the constraint system, and will contain type
+  /// variables if present.
+  Type getSendableDependentType() const {
+    if (!hasSendableDependentType())
+      return Type();
+    return getTrailingObjects<Type>()[hasGlobalActor() + hasThrownError()];
   }
 
   inline size_t getNumLifetimeDependencies() const {
@@ -5045,6 +5117,10 @@ public:
            getConvention() == ResultConvention::GuaranteedAddress;
   }
 
+  bool isGuaranteedAddressResult() const {
+    return getConvention() == ResultConvention::GuaranteedAddress;
+  }
+
   /// Transform this SILResultInfo by applying the user-provided
   /// function to its type.
   ///
@@ -5148,15 +5224,17 @@ enum class SILCoroutineKind : uint8_t {
   /// results and may not have yield results.
   None,
 
-  /// This function is a yield-once coroutine (used by e.g. accessors).
-  /// It must not have normal results and may have arbitrary yield results.
+  /// This function is a yield-once coroutine (used by legacy
+  /// `_read` and `_modify` accessors).
+  /// It must not have normal results and may have arbitrary
+  /// yield results.
   YieldOnce,
 
-  /// This function is a yield-once coroutine (used by read and modify
-  /// accessors).  It has the following differences from YieldOnce:
-  /// - it does not observe errors thrown by its caller (unless the feature
-  /// CoroutineAccessorsUnwindOnCallerError is enabled)
-  /// - it uses the callee-allocated ABI
+  /// This function is a yield-once coroutine (used by `yielding borrow`
+  /// and `yielding mutate` accessors).
+  /// Unlike YieldOnce, the second half of the coroutine is _always_
+  /// run, even if an error is thrown within the access scope.
+  /// It also uses a more efficient callee-allocated ABI.
   YieldOnce2,
 
   /// This function is a yield-many coroutine (used by e.g. generators).
@@ -5497,6 +5575,13 @@ public:
       return false;
     }
     return getResults()[0].isAddressResult(loweredAddresses);
+  }
+
+  bool hasGuaranteedAddressResult() const {
+    if (getNumResults() != 1) {
+      return false;
+    }
+    return getResults()[0].isGuaranteedAddressResult();
   }
 
   struct IndirectFormalResultFilter {

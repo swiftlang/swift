@@ -171,13 +171,15 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 //                       BridgedLifetimeDependenceInfo
 //===----------------------------------------------------------------------===//
 
-BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
+BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(
+    swift::LifetimeDependenceInfo info)
     : inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
       addressableParamIndices(info.getAddressableIndices()),
       conditionallyAddressableParamIndices(
-        info.getConditionallyAddressableIndices()),
-      targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
+          info.getConditionallyAddressableIndices()),
+      targetIndex(info.getTargetIndex()), immortal(info.isImmortal()),
+      fromAnnotation(info.isFromAnnotation()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
   return lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>().size();
@@ -1155,6 +1157,10 @@ void BridgedInstruction::setOperand(SwiftInt index, BridgedValue value) const {
 
 BridgedLocation BridgedInstruction::getLocation() const {
   return unbridged()->getDebugLocation();
+}
+
+void BridgedInstruction::setLocation(BridgedLocation loc) const {
+  return unbridged()->setDebugLocation(loc.getLoc());
 }
 
 BridgedMemoryBehavior BridgedInstruction::getMemBehavior() const {
@@ -2611,8 +2617,9 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
       swift::IsTake_t(takeSource), swift::IsInitialization_t(initializeDest))};
 }
 
-BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue())};
+BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+                                         swift::IsDeadEnd_t(isDeadEnd))};
 }
 
 BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
@@ -2621,6 +2628,10 @@ BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
 
 BridgedInstruction BridgedBuilder::createEndLifetime(BridgedValue op) const {
   return {unbridged().createEndLifetime(regularLoc(), op.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createExtendLifetime(BridgedValue op) const {
+  return {unbridged().createExtendLifetime(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDebugValue(BridgedValue op,
@@ -2948,6 +2959,14 @@ return {unbridged().createConvertFunction(regularLoc(), originalFunction.getSILV
 
 BridgedInstruction BridgedBuilder::createConvertEscapeToNoEscape(BridgedValue originalFunction, BridgedType resultType, bool isLifetimeGuaranteed) const {
   return {unbridged().createConvertEscapeToNoEscape(regularLoc(), originalFunction.getSILValue(), resultType.unbridged(), isLifetimeGuaranteed)};
+}
+
+BridgedInstruction BridgedBuilder::createMakeBorrow(BridgedValue referent) const {
+  return {unbridged().createMakeBorrow(regularLoc(), referent.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createMakeAddrBorrow(BridgedValue referent) const {
+  return {unbridged().createMakeAddrBorrow(regularLoc(), referent.getSILValue())};
 }
 
 //===----------------------------------------------------------------------===//

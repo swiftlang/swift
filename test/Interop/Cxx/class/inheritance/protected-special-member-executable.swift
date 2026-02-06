@@ -2,9 +2,9 @@
 //
 // REQUIRES: executable_test
 //
-// REQUIRES: OS=macosx
-// Fails on Linux:   https://github.com/swiftlang/swift/issues/86426
-// Fails on Windows：https://github.com/swiftlang/swift/issues/67288
+// REQUIRES: rdar168302720
+// Fails on Windows：  https://github.com/swiftlang/swift/issues/67288
+// Fails on non-macOS: https://github.com/swiftlang/swift/issues/86426
 
 import StdlibUnittest
 import ProtectedSpecialMember

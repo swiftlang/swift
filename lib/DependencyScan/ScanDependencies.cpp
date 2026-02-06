@@ -913,7 +913,6 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
             create_set(clangDeps->buildCommandLine),
-            create_clone(clangDeps->CASFileSystemRootID.c_str()),
             create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())};
       }

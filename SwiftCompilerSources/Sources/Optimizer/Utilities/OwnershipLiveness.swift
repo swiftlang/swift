@@ -477,6 +477,8 @@ extension OwnershipUseVisitor {
       return dependentUse(of: operand, dependentValue: mdi)
     case let bfi as BorrowedFromInst where !bfi.borrowedPhi.isReborrow:
       return dependentUse(of: operand, dependentValue: bfi)
+    case let mbi as MakeBorrowInst:
+      return dependentUse(of: operand, dependentValue: mbi)
     default:
       return borrowingUse(of: operand,
                           by: BorrowingInstruction(operand.instruction)!)

@@ -84,6 +84,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::OneWayEqual:
   case ConstraintKind::UnresolvedMemberChainBase:
@@ -103,7 +104,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
-  case ConstraintKind::ValueWitness:
     llvm_unreachable("Wrong constructor for member constraint");
 
   case ConstraintKind::Defaultable:
@@ -167,11 +167,11 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::BindOverload:
@@ -216,30 +216,6 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
   assert(getFunctionRefInfo() == functionRefInfo);
   assert(member && "Member constraint has no member");
-  assert(useDC && "Member constraint has no use DC");
-
-  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
-  *getTrailingObjects<DeclContext *>() = useDC;
-}
-
-Constraint::Constraint(ConstraintKind kind, Type first, Type second,
-                       ValueDecl *requirement, DeclContext *useDC,
-                       FunctionRefInfo functionRefInfo,
-                       ConstraintLocator *locator,
-                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
-    : Kind(kind), NumTypeVariables(typeVars.size()),
-      HasFix(false), HasDeclContext(true), HasRestriction(false),
-      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
-      RememberChoice(false), IsFavored(false), IsIsolated(false),
-      Locator(locator) {
-  Member.First = first;
-  Member.Second = second;
-  Member.Member.Ref = requirement;
-  TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
-
-  assert(kind == ConstraintKind::ValueWitness);
-  assert(getFunctionRefInfo() == functionRefInfo);
-  assert(requirement && "Value witness constraint has no requirement");
   assert(useDC && "Member constraint has no use DC");
 
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
@@ -463,6 +439,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
+  case ConstraintKind::ForEachElement:
+    Out << " for each element ";
+    break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
@@ -519,14 +498,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::UnresolvedValueMember:
     Out << "[(implicit) ." << getMember() << ": value] == ";
     break;
-
-  case ConstraintKind::ValueWitness: {
-    auto requirement = getRequirement();
-    auto selfNominal = requirement->getDeclContext()->getSelfNominalTypeDecl();
-    Out << "[." << selfNominal->getName() << "::" << requirement->getName()
-        << ": witness] == ";
-    break;
-  }
 
   case ConstraintKind::Defaultable:
     Out << " can default to ";
@@ -704,10 +675,10 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Subtype:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueMember:
-  case ConstraintKind::ValueWitness:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::ForEachElement:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
   case ConstraintKind::SubclassOf:
@@ -745,17 +716,6 @@ gatherReferencedTypeVars(Constraint *constraint,
                     constraint->getTypeVariables().end());
     break;
   }
-}
-
-unsigned Constraint::countResolvedArgumentTypes(ConstraintSystem &cs) const {
-  auto *argumentFuncType = cs.getAppliedDisjunctionArgumentFunction(this);
-  if (!argumentFuncType)
-    return 0;
-
-  return llvm::count_if(argumentFuncType->getParams(), [&](const AnyFunctionType::Param arg) {
-    auto argType = cs.getFixedTypeRecursive(arg.getPlainType(), /*wantRValue=*/true);
-    return !argType->isTypeVariableOrMember();
-  });
 }
 
 bool Constraint::isExplicitConversion() const {
@@ -866,30 +826,6 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, useDC,
-                              functionRefInfo, locator, typeVars);
-}
-
-Constraint *Constraint::createValueWitness(
-    ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-    ValueDecl *requirement, DeclContext *useDC,
-    FunctionRefInfo functionRefInfo, ConstraintLocator *locator) {
-  assert(kind == ConstraintKind::ValueWitness);
-
-  // Collect type variables.
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
-  if (first->hasTypeVariable())
-    first->getTypeVariables(typeVars);
-  if (second->hasTypeVariable())
-    second->getTypeVariables(typeVars);
-
-  // Create the constraint.
-  auto size =
-    totalSizeToAlloc<TypeVariableType *, ConstraintFix *, DeclContext *,
-                     ContextualTypeInfo, OverloadChoice>(
-      typeVars.size(), /*hasFix=*/0, /*hasDeclContext=*/1,
-      /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
-  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(kind, first, second, requirement, useDC,
                               functionRefInfo, locator, typeVars);
 }
 

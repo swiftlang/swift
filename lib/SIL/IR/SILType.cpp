@@ -779,6 +779,9 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
                                     Lowering::TypeConverter &typeConverter,
                                     TypeExpansionContext expansion) {
   SILParameterInfo paramInfo = getParameters()[paramIdx];
+  if (paramIdx == getSelfParameterIndex() && hasGuaranteedAddressResult()) {
+    return getSelfParameter().isFormalIndirect();
+  }
   for (auto &depInfo : getLifetimeDependencies()) {
     auto *addressableIndices = depInfo.getAddressableIndices();
     if (addressableIndices && addressableIndices->contains(paramIdx)) {
@@ -1255,6 +1258,12 @@ bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
     hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
   auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
+}
+
+bool SILType::isAddressableForDeps(SILModule &M,
+                                   TypeExpansionContext context) const {
+  auto properties = M.Types.getTypeProperties(*this, context);
   return properties.isAddressableForDependencies();
 }
 

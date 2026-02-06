@@ -1725,7 +1725,7 @@ public:
   llvm::ConstantInt *getInt32(uint32_t value);
   llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
-  llvm::Constant *getBool(bool condition);
+  llvm::ConstantInt *getBool(bool condition);
 
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);

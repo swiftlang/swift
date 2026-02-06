@@ -193,6 +193,7 @@ extension Span where Element: ~Copyable {
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
+  @_transparent
   public var span: Span<Element> {
     @lifetime(borrow self)
     borrowing get {
@@ -241,6 +242,7 @@ extension MutableSpan where Element: ~Copyable {
   public var count: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   public typealias Index = Int
@@ -255,10 +257,12 @@ extension MutableSpan where Element: ~Copyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan where Element: BitwiseCopyable {
 
-  /// Construct a RawSpan over the memory represented by this span
+  /// Construct a raw span over the memory represented by this span.
   ///
   /// - Returns: a RawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+  @_transparent
+  @unsafe
   public var bytes: RawSpan {
     @lifetime(borrow self)
     borrowing get {
@@ -266,7 +270,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     }
   }
 
-  /// Construct a MutableRawSpan over the memory represented by this span
+  /// Construct a mutable raw span over the memory represented by this span.
   ///
   /// Mutating `self` through this property is unsafe because
   /// it is possible to mutate a byte so as to produce an invalid
@@ -274,6 +278,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ///
   /// - Returns: a MutableRawSpan over the memory represented by this span
   @_alwaysEmitIntoClient
+  @_transparent
   @unsafe
   public var mutableBytes: MutableRawSpan {
     @lifetime(&self)
@@ -377,6 +382,7 @@ extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -385,6 +391,7 @@ extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBufferPointer<
     E: Error, Result: ~Copyable
@@ -392,7 +399,7 @@ extension MutableSpan where Element: ~Copyable {
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: _pointer, count: _count
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe bytes.withMemoryRebound(to: Element.self) {
       buffer throws(E) -> Result in
@@ -407,6 +414,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -415,6 +423,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result

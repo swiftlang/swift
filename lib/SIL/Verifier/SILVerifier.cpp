@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTSynthesis.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -41,7 +40,6 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -56,7 +54,6 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -254,6 +251,30 @@ void swift::verificationFailure(
       f->getModule().print(out);
     }
   }
+
+  // We abort by default because we want to always crash in
+  // the debugger.
+  if (AbortOnFailure)
+    abort();
+  else
+    exit(1);
+}
+
+void swift::verificationFailure(
+    const Twine &complaint, const SILWitnessTable *wtable,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext) {
+  llvm::raw_ostream &out = llvm::dbgs();
+  SILPrintContext ctx(out);
+
+  if (ContinueOnFailure) {
+    out << "Begin Error in witness table ";
+    wtable->getConformance()->printName(out);
+    out << "\n";
+  }
+
+  out << "SIL verification failed: " << complaint << "\n";
+  if (extraContext)
+    extraContext(ctx);
 
   // We abort by default because we want to always crash in
   // the debugger.
@@ -1034,6 +1055,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   CalleeCache *calleeCache;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
+  InstructionIndices instIndices;
 
   bool SingleFunction = true;
   bool checkLinearLifetime = false;
@@ -1043,7 +1065,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
 public:
   class VerifierErrorEmitter {
     std::optional<std::variant<const SILInstruction *, const SILArgument *,
-                               const SILFunction *>>
+                               const SILFunction *, const SILWitnessTable *>>
         value;
 
   public:
@@ -1079,6 +1101,15 @@ public:
                "constructs at the same time?!");
         getEmitter().value = arg;
       }
+
+      VerifierErrorEmitterGuard(SILVerifier *verifier, const SILWitnessTable *wtable)
+          : verifier(verifier) {
+        assert(!bool(getEmitter().value) &&
+               "Cannot emit errors for two different "
+               "constructs at the same time?!");
+        getEmitter().value = wtable;
+      }
+
       ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
     };
 
@@ -1104,6 +1135,11 @@ public:
                                    extraContext);
       }
 
+      if (std::holds_alternative<const SILWitnessTable *>(v)) {
+        return verificationFailure(complaint, std::get<const SILWitnessTable *>(v),
+                                   extraContext);
+      }
+
       llvm::report_fatal_error("Unhandled case?!");
     }
   };
@@ -1113,9 +1149,6 @@ public:
 private:
   VerifierErrorEmitter ErrorEmitter;
   std::unique_ptr<DominanceInfo> Dominance;
-
-  // Used for dominance checking within a basic block.
-  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
 
   /// TODO: LifetimeCompletion: Remove.
   std::shared_ptr<DeadEndBlocks> DEBlocks;
@@ -1386,35 +1419,24 @@ public:
     return match;
   }
 
-  static unsigned numInstsInFunction(const SILFunction &F) {
-    unsigned numInsts = 0;
-    for (auto &BB : F) {
-      numInsts += std::distance(BB.begin(), BB.end());
-    }
-    return numInsts;
-  }
-
   SILVerifier(const SILFunction &F, CalleeCache *calleeCache,
               bool SingleFunction, bool checkLinearLifetime)
       : M(F.getModule().getSwiftModule()), F(F),
         calleeCache(calleeCache),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
+        instIndices(const_cast<SILFunction *>(&F)),
         SingleFunction(SingleFunction),
         checkLinearLifetime(checkLinearLifetime),
-        Dominance(nullptr),
-        InstNumbers(numInstsInFunction(F)) {
+        Dominance(nullptr) {
     if (F.isExternalDeclaration())
       return;
 
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
-    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
-      for (auto &I : BB)
-        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
@@ -1438,7 +1460,10 @@ public:
     if (aBlock != bBlock)
       return Dominance->properlyDominates(aBlock, bBlock);
 
-    return InstNumbers[a] < InstNumbers[b];
+    // Note that it might happen that for absurdly large basic blocks, the instruction
+    // indices are "maxed out". In this case we cannot compute the before-after
+    // relation efficiently and we conservatively return true.
+    return a != b && instIndices.get(a) <= instIndices.get(b);
   }
 
   void visitSILPhiArgument(SILPhiArgument *arg) {
@@ -1545,7 +1570,7 @@ public:
               "Once ownership is gone, all values should have none ownership");
       return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get());
+    SILValue(V).verifyOwnership(DEBlocks.get(), &instIndices);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -2377,9 +2402,9 @@ public:
             "operand of abort_apply must be a begin_apply");
     auto *mvi = getAsResultOf<BeginApplyInst>(AI->getOperand());
     auto *bai = cast<BeginApplyInst>(mvi->getParent());
-    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine() ||
-                AI->getFunction()->getASTContext().LangOpts.hasFeature(
-                    Feature::CoroutineAccessorsUnwindOnCallerError),
+    // `abort_apply` is valid for legacy `_read`/`_modify` accessors
+    // It is never valid for `yielding borrow`/`yielding mutate`
+    require(!bai->getSubstCalleeType()->isCalleeAllocatedCoroutine(),
             "abort_apply of callee-allocated yield-once coroutine!?");
   }
 
@@ -5583,14 +5608,17 @@ public:
     requireSameType(functionResultType, instResultType,
                     "return value type does not match return type of function");
 
-    // If the result type is an address, ensure it's base address is from a
-    // function argument.
+    // If the result type is an address, ensure its base address is from a
+    // function argument or Builtin.Borrow.
     if (F.getModule().getStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = getAccessBase(RI->getOperand());
-      require(!base->getType().isAddress() || isa<SILFunctionArgument>(base) ||
-                  isa<ApplyInst>(base) &&
-                      cast<ApplyInst>(base)->hasAddressResult(),
+      require(!base->getType().isAddress()
+               || isa<SILFunctionArgument>(base)
+               || isa<DereferenceAddrBorrowInst>(base)
+               || isa<DereferenceBorrowAddrInst>(base)
+               || (isa<ApplyInst>(base)
+                   && cast<ApplyInst>(base)->hasAddressResult()),
               "unidentified address return");
     }
   }
@@ -7021,6 +7049,56 @@ public:
             "move only wrappedness.");
   }
 
+  void checkMakeBorrowInst(MakeBorrowInst *mb) {
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getOperand()->getType().getASTType(),
+            "output should be a Builtin.Borrow of the input");
+  }
+
+  void checkDereferenceBorrowInst(DereferenceBorrowInst *mb) {
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
+  void checkMakeAddrBorrowInst(MakeAddrBorrowInst *mb) {
+    require(mb->getOperand()->getType().isAddress(), "input should be address");
+    require(mb->getType().isObject(), "output should be object");
+    require(mb->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getOperand()->getType().getASTType(),
+            "output should be a Builtin.Borrow of the input");
+  }
+
+  void checkDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *mb) {
+    // TODO: Only allow this operation on types with address borrow
+    // representation.
+    require(mb->getOperand()->getType().isObject(), "input should be object");
+    require(mb->getType().isAddress(), "output should be address");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
+  void checkInitBorrowAddrInst(InitBorrowAddrInst *mb) {
+    require(mb->getDest()->getType().isAddress(), "dest should be address");
+    require(mb->getReferent()->getType().isAddress(), "referent should be address");
+    require(mb->getDest()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getReferent()->getType().getASTType(),
+            "dest should be a Builtin.Borrow of the referent");
+  }
+
+  void checkDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *mb) {
+    require(mb->getOperand()->getType().isAddress(), "input should be address");
+    require(mb->getType().isAddress(), "output should be address");
+    require(mb->getOperand()->getType().castTo<BuiltinBorrowType>()->getReferentType()
+              == mb->getType().getASTType(),
+            "input should be a Builtin.Borrow of the output");
+  }
+
   void verifyEpilogBlocks(SILFunction *F) {
     VerifierErrorEmitterGuard guard(this, F);
     bool FoundReturnBlock = false;
@@ -7424,7 +7502,7 @@ public:
   }
 
   void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA || !F.getModule().getOptions().OSSAVerifyComplete) {
+    if (!isCompleteOSSA) {
       DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
@@ -7750,10 +7828,11 @@ void SILWitnessTable::verify(const SILModule &mod) const {
         entry.getMethodWitness().Requirement.print(os);
       }
 
-      SILVerifier(*witnessFunction, /*calleeCache=*/nullptr,
-                  /*SingleFunction=*/true,
-                  /*checkLinearLifetime=*/false)
-          .requireABICompatibleFunctionTypes(
+      SILVerifier verifier(*witnessFunction, /*calleeCache=*/nullptr,
+                           /*SingleFunction=*/true,
+                           /*checkLinearLifetime=*/false);
+      SILVerifier::VerifierErrorEmitterGuard guard(&verifier, this);
+      verifier.requireABICompatibleFunctionTypes(
               witnessFunction->getLoweredFunctionType(),
               baseInfo.getSILType().castTo<SILFunctionType>(),
               "witness table entry for " + baseName + " must be ABI-compatible",

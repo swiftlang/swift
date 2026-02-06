@@ -402,20 +402,18 @@ extension ASTGenVisitor {
     case .`init`:
       return .Init
     case .read:
-      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .read
+      return .yielding_borrow
     case .modify:
-      precondition(ctx.langOpts.hasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .modify
+      return .yielding_mutate
     case .borrow:
       if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
-        return .read // AKA `yielding borrow`
+        return .yielding_borrow
       }
       precondition(ctx.langOpts.hasFeature(.BorrowAndMutateAccessors), "(compiler bug) 'borrow' accessor should only be parsed with 'BorrowAndMutateAccessors' feature")
       return .borrow
     case .mutate:
       if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
-        return .modify // AKA `yielding mutate`
+        return .yielding_mutate
       }
       precondition(ctx.langOpts.hasFeature(.BorrowAndMutateAccessors), "(compiler bug) 'mutate' accessor should only be parsed with 'BorrowAndMutateAccessors' feature")
       return .mutate

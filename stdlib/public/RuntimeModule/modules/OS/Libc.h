@@ -22,6 +22,10 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#ifdef _WIN32
+#include <io.h>
+#endif
+
 // .. Swift affordances ........................................................
 
 #ifdef __cplusplus
@@ -33,7 +37,21 @@ namespace backtrace {
 /* open() is usually declared as a variadic function; these don't import into
    Swift. */
 static inline int _swift_open(const char *filename, int oflag, int mode) {
+  #ifdef _WIN32
+  int pmode = 0;
+  if (mode & 0222)
+    pmode |= _S_IWRITE;
+  if (mode & 0444)
+    pmode |= _S_IREAD;
+  int fd;
+  errno_t err = _sopen_s(&fd, filename, oflag, _SH_DENYNO, pmode);
+  if (err != 0) {
+    return -1;
+  }
+  return fd;
+  #else
   return open(filename, oflag, mode);
+  #endif
 }
 
 /* errno is typically not going to be easily accessible (it's often a macro),

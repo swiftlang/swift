@@ -268,6 +268,13 @@ private func registerSILClasses() {
   register(MergeIsolationRegionInst.self)
   register(IgnoredUseInst.self)
   register(ImplicitActorToOpaqueIsolationCastInst.self)
+
+  register(MakeBorrowInst.self)
+  register(DereferenceBorrowInst.self)
+  register(MakeAddrBorrowInst.self)
+  register(DereferenceAddrBorrowInst.self)
+  register(InitBorrowAddrInst.self)
+  register(DereferenceBorrowAddrInst.self)
 }
 
 private func registerUtilities() {

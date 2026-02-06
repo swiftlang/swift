@@ -89,7 +89,7 @@ private:
 #if defined(_MSC_VER)
   [[msvc::no_unique_address]]
 #elif defined(__clang__)
-  [[clang::no_unique_address]]
+  [[no_unique_address]]
 #endif
   SlabAllocatorConfiguration configuration;
 

@@ -84,7 +84,7 @@ split_embedded_sources(
   EMBEDDED EnumeratedSequence.swift
   EMBEDDED Equatable.swift
   EMBEDDED ErrorType.swift
-    NORMAL Exclusivity.swift
+  EMBEDDED Exclusivity.swift
   EMBEDDED ExistentialCollection.swift
   EMBEDDED Filter.swift
   EMBEDDED FlatMap.swift
@@ -114,7 +114,6 @@ split_embedded_sources(
   EMBEDDED ManagedBuffer.swift
   EMBEDDED Map.swift
   EMBEDDED MemoryLayout.swift
-  EMBEDDED MigrationSupport.swift
   EMBEDDED Mirror.swift
     NORMAL Mirrors.swift
   EMBEDDED Misc.swift
@@ -246,6 +245,7 @@ split_embedded_sources(
   EMBEDDED WriteBackMutableSlice.swift
   EMBEDDED Zip.swift
   EMBEDDED _InlineArray.swift
+  EMBEDDED MigrationSupport.swift # TODO: Out of order due to a solver issue
     NORMAL "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
   )
 

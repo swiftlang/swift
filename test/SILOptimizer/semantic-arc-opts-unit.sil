@@ -37,5 +37,6 @@ failure(%error : @owned $any Error):
   destroy_value %error : $any Error
   end_apply %token as $()
   destroy_value [dead_end] %o_copy : $Outer
+  destroy_value [dead_end] %i_copy
   unreachable
 }

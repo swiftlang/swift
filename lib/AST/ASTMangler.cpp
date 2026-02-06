@@ -43,7 +43,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -54,11 +53,9 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1469,6 +1466,11 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendType(bfa->getElementType(), sig, forDecl);
       return appendOperator("BV");
     }
+    case TypeKind::BuiltinBorrow: {
+      auto bfa = cast<BuiltinBorrowType>(tybase);
+      appendType(bfa->getReferentType(), sig, forDecl);
+      return appendOperator("BW");
+    }
     
     case TypeKind::SILToken:
       return appendOperator("Bt");
@@ -2667,6 +2669,9 @@ namespace {
     }
     VarDecl *visitAnyPattern(AnyPattern *P) {
       return nullptr;
+    }
+    VarDecl *visitOpaquePattern(OpaquePattern *P) {
+      return visit(P->getSubPattern());
     }
 
     // Refutable patterns shouldn't ever come up.
@@ -4232,8 +4237,12 @@ CanType ASTMangler::getDeclTypeForMangling(
   // If this declaration predates concurrency, adjust its type to not
   // contain type features that were not available pre-concurrency. This
   // cannot alter the ABI in any way.
+  //
+  // `dropIsolation` is set here as a workaround because `dropGlobalActor`
+  // used to call `withoutIsolation` unconditionally before.
   if (decl->preconcurrency()) {
-    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
+    ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true,
+                              /*dropIsolation=*/true);
   }
 
   // Map any local archetypes out of context.

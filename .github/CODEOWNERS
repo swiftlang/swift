@@ -303,7 +303,7 @@
 /utils/gyb_stdlib_support.py                                  @swiftlang/standard-librarians
 /utils/gyb.py                                                 @swiftlang/standard-librarians
 /utils/sourcekit_fuzzer/                                      @hamishknight @rintaro
-/utils/swift-xcodegen/                                        @hamishknight
+/utils/swift-dev-utils/                                       @hamishknight
 /utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal @edymtt
 /utils/swift_build_support/products/earlyswiftsyntax.py       @hamishknight @rintaro
 /utils/swift_build_support/products/skstresstester.py         @hamishknight @rintaro

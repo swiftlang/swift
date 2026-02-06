@@ -249,6 +249,17 @@
 // CHECK:   var pointee: Int32 { get }
 // CHECK: }
 
+// CHECK: struct AllStar {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int{{(32|64)?}}>
+// CHECK-NEXT:   static func * (lhs: AllStar, rhs: AllStar) -> AllStar
+// CHECK-NEXT:   @available(*, unavailable, message: "use * instead")
+// CHECK-NEXT:   func __operatorStar(_ rhs: AllStar) -> AllStar
+// CHECK-NEXT:   var L: Int{{(32|64)?}}
+// CHECK-NEXT:   var pointee: Int{{(32|64)?}} { mutating get set }
+// CHECK-NEXT: }
+
 // CHECK: struct AmbiguousOperatorStar {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
@@ -263,8 +274,6 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
-// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
-// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT:   var value: Int32
@@ -326,3 +335,8 @@
 // CHECK: struct HasStaticOperatorCallWithUnimportableCxxType {
 // CHECK-NEXT:  init()
 // CHECK-NEXT: }
+
+// CHECK: struct HasOperatorReturningAuto {
+// CHECK-NEXT:  init()
+// CHECK-NEXT: }
+

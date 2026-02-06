@@ -102,25 +102,18 @@ bb0:
   return %23 : $Builtin.Int64
 }
 
-// Fold casts. (This test assumes that DCE does not run, otherwise the unreachable blocks will get removed.)
-sil [ossa] @fold_trunc : $@convention(thin) () -> Builtin.Int64 {
+sil [ossa] @fold_trunc : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Int128, 22
  %2 = builtin "trunc_Int128_Int64"(%0 : $Builtin.Int128) : $Builtin.Int64
- br bb4(%2 : $Builtin.Int64)
-
-bb1:
+ fix_lifetime %2
  %3 = integer_literal $Builtin.Int8, 23
  %5 = builtin "sext_Int8_Int64"(%3 : $Builtin.Int8) : $Builtin.Int64
- br bb4(%5 : $Builtin.Int64)
-
-bb2:
+ fix_lifetime %5
  %6 = integer_literal $Builtin.Int8, 24
  %8 = builtin "zext_Int8_Int64"(%6 : $Builtin.Int8) : $Builtin.Int64
- br bb4(%8 : $Builtin.Int64)
-
-bb4(%100 : $Builtin.Int64):
- return %100 : $Builtin.Int64
+ fix_lifetime %8
+ return undef : $()
 // CHECK-LABEL: sil [ossa] @fold_trunc
 // CHECK-NOT: integer_literal $Builtin.Int128, 22
 // CHECK: integer_literal $Builtin.Int64, 22
@@ -1091,7 +1084,7 @@ bb0(%0 : $*Error, %1 : $*E1):
 // CHECK-LABEL: sil [ossa] @always_fail_protocolmeta_to_concretemeta_checkedcastbr : $@convention(thin) (@thin (any P).Type) -> Builtin.Int1 {
 // CHECK: bb0(
 // CHECK-NEXT: metatype
-// CHECK-NEXT: br bb2
+// CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'always_fail_protocolmeta_to_concretemeta_checkedcastbr'
 sil [ossa] @always_fail_protocolmeta_to_concretemeta_checkedcastbr : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
 bb0(%0 : $@thin P.Protocol):

@@ -39,6 +39,9 @@ struct ConformanceAttributes {
   /// The global actor type to which this conformance is isolated.
   TypeExpr *globalActorType = nullptr;
 
+  /// The location of the "reparented" attribute, if present.
+  SourceLoc reparentedLoc;
+
   /// Merge other conformance attributes into this set.
   ConformanceAttributes &
   operator |=(const ConformanceAttributes &other) {
@@ -54,6 +57,8 @@ struct ConformanceAttributes {
       globalActorAtLoc = other.globalActorAtLoc;
       globalActorType = other.globalActorType;
     }
+    if (other.reparentedLoc.isValid())
+      reparentedLoc = other.reparentedLoc;
     return *this;
   }
 };

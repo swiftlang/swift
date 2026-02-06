@@ -1629,8 +1629,6 @@ public:
       if (substResultTL.getRecursiveProperties()
                        .isAddressableForDependencies()) {
         convention = ResultConvention::GuaranteedAddress;
-      } else if (substResultTL.isTrivial()) {
-        convention = ResultConvention::Unowned;
       } else if (isFormallyReturnedIndirectly(origType, substType,
                                               substResultTLForConvention)) {
         convention = ResultConvention::GuaranteedAddress;
@@ -1709,6 +1707,34 @@ public:
     }
   }
 };
+
+/// Query whether the original type is thrown indirectly for the purpose
+/// of reabstraction given complete lowering information about its
+/// substitution.
+bool isFormallyThrownIndirectly(TypeConverter &TC,
+                                AbstractionPattern origType,
+                                CanType substType,
+                                const TypeLowering &substTL) {
+  // If the substituted type is returned indirectly, so must the
+  // unsubstituted type.
+  if ((origType.isTypeParameter()
+       && !origType.isConcreteType()
+       && !origType.requiresClass())
+      || substTL.isAddressOnly()) {
+    return true;
+
+  // If the substitution didn't change the type, then a negative
+  // response to the above is determinative as well.
+  } else if (origType.getType() == substType &&
+             !origType.getType()->hasTypeParameter()) {
+    return false;
+
+  // Otherwise, query specifically for the original type.
+  } else {
+    return SILType::isFormallyThrownIndirectly(
+        origType.getType(), TC, origType.getGenericSignature());
+  }
+}
 
 static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
                                                  const clang::Type *clangTy,
@@ -2864,8 +2890,8 @@ static CanSILFunctionType getSILFunctionType(
     auto &errorTLConv = TC.getTypeLowering(origErrorType, errorType,
                                            TypeExpansionContext::minimal());
 
-    bool isFormallyIndirectError =
-        origErrorType.isTypeParameter() || errorTLConv.isAddressOnly();
+    bool isFormallyIndirectError = isFormallyThrownIndirectly(
+        TC, origErrorType, errorType, errorTLConv);
 
     errorResult = SILResultInfo(errorTLConv.getLoweredType().getASTType(),
                                 isFormallyIndirectError
@@ -2931,8 +2957,10 @@ static CanSILFunctionType getSILFunctionType(
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
       if (formalDeps.isImmortal()) {
-        return LifetimeDependenceInfo(nullptr, nullptr,
-                                      target, /*immortal*/ true);
+        return LifetimeDependenceInfo(
+            nullptr, nullptr, target,
+            /*immortal*/ true,
+            /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
       
       auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
@@ -2966,8 +2994,10 @@ static CanSILFunctionType getSILFunctionType(
       // entirely (such as if they were of `()` type), then there is effectively
       // no dependency, leaving behind an immortal value.
       if (!inheritIndicesSet && !scopeIndicesSet) {
-        return LifetimeDependenceInfo(nullptr, nullptr, target,
-                                      /*immortal*/ true);
+        return LifetimeDependenceInfo(
+            nullptr, nullptr, target,
+            /*immortal*/ true,
+            /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
       
       SmallBitVector addressableDeps = scopeIndicesSet
@@ -2983,12 +3013,11 @@ static CanSILFunctionType getSILFunctionType(
       IndexSubset *condAddressableSet = condAddressableDeps.any()
         ? IndexSubset::get(TC.Context, condAddressableDeps)
         : nullptr;
-      
-      return LifetimeDependenceInfo(inheritIndicesSet,
-                                    scopeIndicesSet,
-                                    target, /*immortal*/ false,
-                                    addressableSet,
-                                    condAddressableSet);
+
+      return LifetimeDependenceInfo(
+          inheritIndicesSet, scopeIndicesSet, target, /*immortal*/ false,
+          /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
+          condAddressableSet);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {

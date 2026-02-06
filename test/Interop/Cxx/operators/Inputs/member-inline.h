@@ -431,6 +431,24 @@ public:
   int operator*() const { return value; }
 };
 
+class AllStar {
+private:
+  long L = 111;
+
+public:
+  // The unary variant (i.e., dereference) should be accessible
+  // via the synthesized .pointee member
+  long &operator*() { return L; }
+
+  // The binary variant (i.e., multiply) should be accessible
+  // via the synthesized static func *(lhs, rhs) operator
+  AllStar operator*(const AllStar &rhs) const {
+    AllStar a;
+    a.L = this->L * rhs.L;
+    return a;
+  }
+};
+
 struct AmbiguousOperatorStar {
 private:
   int value = 567;
@@ -588,6 +606,15 @@ struct ClassWithTemplatedOperatorStar {
 
 struct ClassWithDefaultTemplatedOperatorStar {
   template <typename T = int> T operator*() const { return 42; }
+};
+
+struct HasOperatorReturningAuto {
+  auto operator*() const {
+    struct Inner {
+      int x = 123;
+    };
+    return Inner();
+  }
 };
 
 #endif

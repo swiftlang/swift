@@ -562,6 +562,10 @@ SILFunction *ClosureCloner::constructClonedFunction(
   ClosureCloner cloner(funcBuilder, origF, serializedKind, clonedName,
                        promotableIndices, resilienceExpansion);
   cloner.populateCloned();
+
+  // The cloner may clone `unreachable` instructions. However, cloning a
+  // whole function  does not introduce any incomplete lifetimes.
+  cloner.getCloned()->setNeedCompleteLifetimes(false);
   return cloner.getCloned();
 }
 

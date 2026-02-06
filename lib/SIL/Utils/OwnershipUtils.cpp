@@ -433,7 +433,13 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
-// TODO: refactor this with SSAPrunedLiveness::computeLiveness.
+// TODO: Replace all calls to this with SSAPrunedLiveness::computeLiveness()
+// after extending that utility to handle unowned values and extending
+// PrunedLiveRange::recursivelyUpdateForDef to handle
+// OperandOwnership::ForwardingUnowned.
+//
+// findPointerEscape normally considers unowned values to be an escape, but the
+// RAUW utility relies on them being handled here.
 bool swift::findUsesOfSimpleValue(SILValue value,
                                   SmallVectorImpl<Operand *> *usePoints) {
   for (auto *use : value->getUses()) {
@@ -451,6 +457,17 @@ bool swift::findUsesOfSimpleValue(SILValue value,
         return false;
       }
       break;
+    case OperandOwnership::ForwardingUnowned: {
+      auto *forwardInst = dyn_cast<SingleValueInstruction>(use->getUser());
+      if (forwardInst) {
+        // only handle a single use so we don't need a visited set.
+        auto *use = forwardInst->getSingleUse();
+        if (use && use->get()->getOwnershipKind() == OwnershipKind::Unowned) {
+          return findUsesOfSimpleValue(forwardInst, usePoints);
+        }
+      }
+      return false;
+    }
     default:
       break;
     }
@@ -609,6 +626,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
     return;
+  case Kind::MakeBorrow:
+    os << "MakeBorrow";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -641,6 +661,7 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::MakeBorrow:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
     return op->getUser()->hasUsesOfAnyResult();
@@ -749,6 +770,10 @@ bool BorrowingOperand::visitScopeEndingUses(
     }
     return true;
   }
+  case BorrowingOperandKind::MakeBorrow: {
+    // TODO: Conservatively bail out for now.
+    return true;
+  }
   // These are instantaneous borrow scopes so there aren't any special end
   // scope instructions.
   case BorrowingOperandKind::Apply:
@@ -802,6 +827,7 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
     return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::MakeBorrow:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BorrowedFrom: {
@@ -862,6 +888,7 @@ SILValue BorrowingOperand::getDependentUserResult() const {
     return SILValue();
   }
   case BorrowingOperandKind::Invalid:
+  case BorrowingOperandKind::MakeBorrow:
   case BorrowingOperandKind::BeginBorrow:
   case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
@@ -899,6 +926,9 @@ void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   case BorrowedValueKind::BeginApplyToken:
     os << "BeginApply";
     return;
+  case BorrowedValueKind::DereferenceBorrow:
+    os << "DereferenceBorrow";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -930,6 +960,7 @@ bool BorrowedValue::visitLocalScopeEndingUses(
     llvm_unreachable("Should only call this with a local scope");
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
   case BorrowedValueKind::BeginApplyToken:
     for (auto *use : lookThroughBorrowedFromUser(value)->getUses()) {
@@ -1690,7 +1721,8 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
     BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
                               visitGuaranteedForwardingPhiBaseValuePair) {
   assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
-         borrow.kind == BorrowedValueKind::LoadBorrow);
+         borrow.kind == BorrowedValueKind::LoadBorrow ||
+         borrow.kind == BorrowedValueKind::DereferenceBorrow);
   // A GuaranteedForwardingPhi can have different base values on different
   // control flow paths.
   // For that reason, worklist stores (GuaranteedForwardingPhi operand, base
@@ -1837,6 +1869,7 @@ public:
             cast<BeginBorrowInst>(value)->getOperand(), visitor);
 
       case BorrowedValueKind::LoadBorrow:
+      case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::SILFunctionArgument:
       case BorrowedValueKind::BeginApplyToken:
         // There is no enclosing def on this path.
@@ -2056,6 +2089,7 @@ protected:
       break;
     }
     case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::DereferenceBorrow:
     case BorrowedValueKind::SILFunctionArgument:
     case BorrowedValueKind::BeginApplyToken:
       // There is no enclosing def on this path.

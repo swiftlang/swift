@@ -208,13 +208,15 @@ static void checkInheritanceClause(
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
 
-    // Protocol extensions cannot have inheritance clauses.
+    // Protocol extensions can only have an inheritance clause
+    // consisting of @reparented entries.
     if (auto proto = ext->getExtendedProtocolDecl()) {
-      if (!inheritedClause.empty()) {
-        ext->diagnose(diag::extension_protocol_inheritance,
-                 proto->getName())
-          .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                                 inheritedClause.back().getSourceRange().End));
+      for (auto const &entry : inheritedClause) {
+        if (entry.isReparented())
+          continue;
+
+        ext->diagnose(diag::extension_protocol_inheritance, proto->getName())
+            .highlight(entry.getSourceRange());
         return;
       }
     }
@@ -1476,6 +1478,10 @@ buildDefaultInitializerString(DeclContext *dc, Pattern *pattern) {
   case PatternKind::Binding:
     return buildDefaultInitializerString(
         dc, cast<BindingPattern>(pattern)->getSubPattern());
+
+  case PatternKind::Opaque:
+    return buildDefaultInitializerString(
+        dc, cast<OpaquePattern>(pattern)->getSubPattern());
   }
 
   llvm_unreachable("Unhandled PatternKind in switch.");
@@ -3433,6 +3439,8 @@ public:
     if (!PD->getPrimaryAssociatedTypeNames().empty())
       (void) PD->getPrimaryAssociatedTypes();
 
+    checkInheritanceClause(PD);
+
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member references another declaration whose generic signature
@@ -3444,8 +3452,6 @@ public:
       visit(Member);
 
     checkAccessControl(PD);
-
-    checkInheritanceClause(PD);
 
     checkProtocolRefinementRequirements(PD);
 
@@ -3477,6 +3483,14 @@ public:
     }
 
     checkExplicitAvailability(PD);
+
+    // For reparented protocols, we need to check that the derived protocol's
+    // default witnesses are enough to satisfy the new base's requirements.
+    //
+    // To support -parse-stdlib test cases, we synthesize special protocols like
+    // Copyable that will appear as if deserialized, so skip checking those.
+    if (PD->getParentSourceFile())
+      TypeChecker::checkConformancesInContext(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {

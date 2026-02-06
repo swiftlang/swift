@@ -135,9 +135,11 @@ extension MutableRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
   @_alwaysEmitIntoClient
-  public var byteCount: Int { _count }
+  @_semantics("fixed_storage.get_count")
+  public var byteCount: Int { _assumeNonNegative(_count) }
 
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { byteCount == 0 }
 
   @_alwaysEmitIntoClient
@@ -151,6 +153,7 @@ extension MutableRawSpan {
 extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
+  @_transparent
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -158,6 +161,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
@@ -185,6 +189,7 @@ extension MutableRawSpan {
 
   public var bytes: RawSpan {
     @_alwaysEmitIntoClient
+    @_transparent
     @lifetime(borrow self)
     borrowing get {
       return RawSpan(_mutableRawSpan: self)

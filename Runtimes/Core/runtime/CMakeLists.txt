@@ -2,16 +2,17 @@ configure_file("CMakeConfig.h.in"
   "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
   ESCAPE_QUOTES @ONLY)
 
-add_library(swiftRuntimeCMakeConfig INTERFACE)
-target_include_directories(swiftRuntimeCMakeConfig INTERFACE
+add_library(swiftRuntimeCoreCMakeConfig INTERFACE)
+target_include_directories(swiftRuntimeCoreCMakeConfig INTERFACE
   $<$<COMPILE_LANGUAGE:C,CXX,Swift>:$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>>)
 
-add_library(swiftRuntime OBJECT
+add_library(swiftRuntimeCore OBJECT
     "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
     AnyHashableSupport.cpp
     Array.cpp
     AutoDiffSupport.cpp
     Bincompat.cpp
+    Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
     CrashReporter.cpp
@@ -59,7 +60,7 @@ add_library(swiftRuntime OBJECT
     Win32.cpp)
 
 if(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER)
-  target_sources(swiftRuntime PRIVATE
+  target_sources(swiftRuntimeCore PRIVATE
     Leaks.mm)
 endif()
 
@@ -82,7 +83,7 @@ endif()
 
 # TODO: Probably worth considering putting half of these in a RuntimeConfig.h.in
 #       file rather than pushing them through macro flags.
-target_compile_definitions(swiftRuntime
+target_compile_definitions(swiftRuntimeCore
   PRIVATE
     -DSWIFT_RUNTIME
     -DSWIFT_TARGET_LIBRARY_NAME=swiftRuntimeCore
@@ -104,40 +105,40 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>
     $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)
 
-target_include_directories(swiftRuntime PRIVATE
+target_include_directories(swiftRuntimeCore PRIVATE
   "${PROJECT_BINARY_DIR}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}")
 
-target_link_libraries(swiftRuntime PRIVATE
+target_link_libraries(swiftRuntimeCore PRIVATE
   $<$<PLATFORM_ID:Windows>:User32>
   $<$<PLATFORM_ID:Windows>:ShLwApi>
   swiftShims
   swiftDemangling)
 
 # FIXME: Refactor so that we're not pulling sources from the compiler files
-target_sources(swiftRuntime PRIVATE
+target_sources(swiftRuntimeCore PRIVATE
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/ThreadSanitizer.cpp")
 
 # FIXME: Private.h uses `Demangler.h` and `TypeLookupError.h` from the compiler
 #        headers. We should split out the parts that are needed by the runtime
 #        to avoid pulling in headers from the compiler.
-target_include_directories(swiftRuntime PRIVATE
+target_include_directories(swiftRuntimeCore PRIVATE
   "${SwiftCore_SWIFTC_SOURCE_DIR}/include")
 
 if(SwiftCore_ENABLE_BACKTRACING)
-  target_sources(swiftRuntime PRIVATE
+  target_sources(swiftRuntimeCore PRIVATE
     Backtrace.cpp
     BacktraceUtils.cpp
     CrashHandlerMacOS.cpp
     CrashHandlerLinux.cpp)
 endif()
 
-target_sources(swiftRuntime PRIVATE
+target_sources(swiftRuntimeCore PRIVATE
   ErrorObject.mm
   SwiftObject.mm)
 
 if(SwiftCore_ENABLE_OBJC_INTEROP)
-  target_sources(swiftRuntime PRIVATE
+  target_sources(swiftRuntimeCore PRIVATE
     SwiftValue.mm
     ReflectionMirrorObjC.mm
     ObjCRuntimeGetImageNameFromClass.mm)
@@ -147,12 +148,12 @@ install(FILES
   "${PROJECT_BINARY_DIR}/include/swift/Runtime/CMakeConfig.h"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/swift/Runtime"
   COMPONENT SwiftCore_development)
-install(TARGETS swiftRuntimeCMakeConfig
+install(TARGETS swiftRuntimeCoreCMakeConfig
   EXPORT SwiftCoreTargets
   COMPONENT SwiftCore_development)
 
 if(NOT BUILD_SHARED_LIBS)
-  install(TARGETS swiftRuntime
+  install(TARGETS swiftRuntimeCore
     EXPORT SwiftCoreTargets
     COMPONENT SwiftCore_runtime)
 endif()

@@ -49,6 +49,10 @@ getApplyIsolationCrossing(SILInstruction *inst);
 // the computation.
 class PartitionOpTranslator;
 
+//===----------------------------------------------------------------------===//
+//                         MARK: BlockPartitionState
+//===----------------------------------------------------------------------===//
+
 class BlockPartitionState {
   friend RegionAnalysisFunctionInfo;
 
@@ -101,8 +105,8 @@ private:
   /// Recomputes the exit partition from the entry partition, and returns
   /// whether this changed the exit partition.
   ///
-  /// NOTE: This method ignored errors that arise. We process separately later
-  /// to discover if an error occured.
+  /// NOTE: This method ignores errors that arise. We process separately later
+  /// to discover if an error occurred.
   bool recomputeExitFromEntry(PartitionOpTranslator &translator);
 };
 
@@ -150,6 +154,14 @@ public:
   }
 
   bool isNonSendable() const { return !isSendable(); }
+
+  /// Return a copy of this trackable state with the id being \p newID instead
+  /// of whatever is stored in this state.
+  TrackableValueState getWithNewID(unsigned newID) const {
+    auto newVal = *this;
+    newVal.id = newID;
+    return newVal;
+  }
 
   SILIsolationInfo getIsolationRegionInfo() const {
     if (!regionInfo) {
@@ -330,7 +342,7 @@ private:
     SILValue value;
 
     /// The actual base value that we found if we were looking for an address
-    /// equivilance class and had a non-Sendable base. If we have an object or
+    /// equivalence class and had a non-Sendable base. If we have an object or
     /// we do not have a separate base, this is SILValue().
     SILValue base;
 
@@ -408,6 +420,12 @@ public:
   /// exists. Returns nullptr otherwise.
   SILInstruction *maybeGetActorIntroducingInst(Element trackableValueID) const;
 
+  /// Given the value of use \p op that is mapped to memory that will be
+  /// overwritten, produce a new TrackableValue that represents the value that
+  /// was in that memory.
+  TrackableValue
+  getRepresentativeValueForValueFromOverwrittenMemory(Operand *op) const;
+
   SILIsolationInfo getIsolationRegion(Element trackableValueID) const;
   SILIsolationInfo getIsolationRegion(SILValue trackableValueID) const;
 
@@ -440,6 +458,7 @@ private:
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
+
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   Element lookupValueID(SILValue value);
 

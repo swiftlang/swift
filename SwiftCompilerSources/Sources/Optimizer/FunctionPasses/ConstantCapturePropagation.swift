@@ -198,6 +198,7 @@ private func cloneArgument(_ argumentOp: Operand,
     Builder.insertCleanupAtFunctionExits(of: targetFunction, context) { builder in
       builder.emitDestroy(of: clonedArg)
     }
+    completeLifetime(of: clonedArg, context)
   }
 
 }

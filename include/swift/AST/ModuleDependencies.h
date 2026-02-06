@@ -548,9 +548,6 @@ public:
   /// The file dependencies
   const std::vector<std::string> fileDependencies;
 
-  /// CASID for the Root of CASFS. Empty if CAS is not used.
-  std::string CASFileSystemRootID;
-
   /// CASID for the Root of ClangIncludeTree. Empty if not used.
   std::string CASClangIncludeTreeRootID;
 
@@ -562,7 +559,6 @@ public:
                                ArrayRef<std::string> buildCommandLine,
                                ArrayRef<std::string> fileDependencies,
                                ArrayRef<LinkLibrary> linkLibraries,
-                               StringRef CASFileSystemRootID,
                                StringRef clangIncludeTreeRoot,
                                StringRef moduleCacheKey, bool IsSystem)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::Clang,
@@ -571,7 +567,6 @@ public:
         pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
         moduleMapFile(moduleMapFile), contextHash(contextHash),
         buildCommandLine(buildCommandLine), fileDependencies(fileDependencies),
-        CASFileSystemRootID(CASFileSystemRootID),
         CASClangIncludeTreeRootID(clangIncludeTreeRoot), IsSystem(IsSystem) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -679,12 +674,12 @@ public:
       StringRef pcmOutputPath, StringRef mappedPCMPath, StringRef moduleMapFile,
       StringRef contextHash, ArrayRef<std::string> nonPathCommandLine,
       ArrayRef<std::string> fileDependencies,
-      ArrayRef<LinkLibrary> linkLibraries, StringRef CASFileSystemRootID,
-      StringRef clangIncludeTreeRoot, StringRef moduleCacheKey, bool IsSystem) {
+      ArrayRef<LinkLibrary> linkLibraries, StringRef clangIncludeTreeRoot,
+      StringRef moduleCacheKey, bool IsSystem) {
     return ModuleDependencyInfo(std::make_unique<ClangModuleDependencyStorage>(
         pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
         nonPathCommandLine, fileDependencies, linkLibraries,
-        CASFileSystemRootID, clangIncludeTreeRoot, moduleCacheKey, IsSystem));
+        clangIncludeTreeRoot, moduleCacheKey, IsSystem));
   }
 
   /// Retrieve the module-level imports.
@@ -884,9 +879,6 @@ public:
     else if (isSwiftSourceModule())
       cast<SwiftSourceModuleDependenciesStorage>(storage.get())
           ->textualModuleDetails.CASFileSystemRootID = rootID;
-    else if (isClangModule())
-      cast<ClangModuleDependencyStorage>(storage.get())->CASFileSystemRootID =
-          rootID;
     else
       llvm_unreachable("Unexpected module dependency kind");
   }
@@ -1081,6 +1073,9 @@ private:
   /// A map from Clang module name to all visible modules to a client
   /// of a by-name import of this Clang module
   llvm::StringMap<std::vector<std::string>> clangModulesVisibleFromNamedLookup;
+  /// A set of module identifiers for which a scanning action failed
+  /// to discover a Swift module dependency
+  llvm::StringSet<> negativeSwiftDependencyCache;
   /// Set containing all of the Clang modules that have already been seen.
   llvm::DenseSet<clang::tooling::dependencies::ModuleID> alreadySeenClangModules;
   /// Name of the module under scan
@@ -1115,12 +1110,14 @@ public:
   /// Whether we have cached dependency information for the given module.
   bool hasDependency(StringRef moduleName,
                      std::optional<ModuleDependencyKind> kind) const;
-  /// Whether we have cached dependency information for the given module Name.
-  bool hasDependency(StringRef moduleName) const;
-  /// Whether we have cached dependency information for the given Swift module.
-  bool hasSwiftDependency(StringRef moduleName) const;
   /// Whether we have cached dependency information for the given Clang module.
   bool hasClangDependency(StringRef moduleName) const;
+
+  /// Whether we have cached dependency information for the given Swift module,
+  /// or have previously failed a lookup of a Swift dependency for the
+  /// given identifier.
+  bool hasQueriedSwiftDependency(StringRef moduleName) const;
+
   /// Report the number of recorded Clang dependencies
   int numberOfClangDependencies() const;
   /// Report the number of recorded Swift dependencies
@@ -1253,6 +1250,8 @@ public:
   void
   setVisibleClangModulesFromLookup(ModuleDependencyID clangModuleID,
                                    const std::vector<std::string> &moduleNames);
+  /// Add an identifier to the set of failed Swift module queries
+  void recordFailedSwiftDependencyLookup(StringRef moduleIdentifier);
 
   StringRef getMainModuleName() const { return mainScanModuleName; }
 

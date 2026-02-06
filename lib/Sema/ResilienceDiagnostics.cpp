@@ -90,14 +90,11 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
         auto storage = accessor->getStorage();
         if (accessor->getFormalAccess() < storage->getFormalAccess()) {
           auto diagID = diag::resilience_decl_unavailable;
-          if (Context.LangOpts.hasFeature(Feature::StrictAccessControl))
-            Context.Diags.diagnose(loc, diagID, D, accessor->getFormalAccess(),
-                                   fragileKind.getSelector());
-          else
-            Context.Diags
-                .diagnose(loc, diagID, D, accessor->getFormalAccess(),
-                          fragileKind.getSelector())
-                .limitBehavior(DiagnosticBehavior::Warning);
+          Context.Diags
+              .diagnose(loc, diagID, D, accessor->getFormalAccess(),
+                        fragileKind.getSelector())
+              .warnUntilFutureLanguageModeIf(
+                  !Context.LangOpts.hasFeature(Feature::StrictAccessControl));
           Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
         }
       }
@@ -194,7 +191,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
   auto originKind =
       getDisallowedOriginKind(D, where, ignoredDowngradeToWarning);
-  if (where.canReferenceOrigin(originKind))
+  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
   // As an exception, if the import of the module that defines the desugared
@@ -216,7 +214,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6);
+        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .limitBehaviorIfMorePermissive(commonBehavior);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -224,7 +223,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilLanguageModeIf(warnPreSwift6, 6);
+        .warnUntilLanguageModeIf(warnPreSwift6, 6)
+        .limitBehaviorIfMorePermissive(commonBehavior);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
@@ -269,7 +269,13 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
   switch (*reason) {
   case ExportabilityReason::ExtensionWithPublicMembers:
   case ExportabilityReason::ExtensionWithConditionalConformances:
-    return true;
+    // Allow public members in extensions of implicitly exported types.
+    // Extensions cannot define stored variables avoiding the memory layout
+    // concerns and we don't print swiftinterfaces in non-library-evolution
+    // mode.
+    // We should be able to always allow this if it's correctly guarded
+    // at generating module interfaces and generated headers.
+    return where.getExportedLevel() == ExportedLevel::Exported;
   case ExportabilityReason::Inheritance:
   case ExportabilityReason::ImplicitlyPublicInheritance:
     return isa<ProtocolDecl>(D);
@@ -323,7 +329,8 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
         }
       });
 
-  if (where.canReferenceOrigin(originKind))
+  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
   auto fragileKind = where.getFragileFunctionKind();
@@ -384,21 +391,16 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        static_cast<unsigned>(*reason),
                        definingModule->getName(),
                        static_cast<unsigned>(originKind))
-        .limitBehavior(limit);
+        .limitBehavior(limit.merge(commonBehavior));
 
     D->diagnose(diag::kind_declared_here, D->getDescriptiveKind());
   } else {
-    // Only implicitly imported decls should be reported as a warning,
-    // and only for language versions below Swift 6.
-    assert(downgradeToWarning == DowngradeToWarning::No ||
-           originKind == DisallowedOriginKind::MissingImport &&
-           "Only implicitly imported decls should be reported as a warning.");
-
     ctx.Diags.diagnose(loc, diag::inlinable_decl_ref_from_hidden_module, D,
                        fragileKind.getSelector(), definingModule->getName(),
                        static_cast<unsigned>(originKind))
         .warnUntilLanguageModeIf(downgradeToWarning == DowngradeToWarning::Yes,
-                                 6);
+                                 6)
+        .limitBehaviorIfMorePermissive(commonBehavior);
 
     if (originKind == DisallowedOriginKind::MissingImport &&
         downgradeToWarning == DowngradeToWarning::Yes)
@@ -470,7 +472,8 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
       });
 
   auto originKind = getDisallowedOriginKind(ext, where);
-  if (where.canReferenceOrigin(originKind))
+  auto commonBehavior = where.behaviorForReferenceToOrigin(originKind);
+  if (commonBehavior == DiagnosticBehavior::Ignore)
     return false;
 
   auto reason = where.getExportabilityReason();
@@ -486,8 +489,9 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
           (warnIfConformanceUnavailablePreSwift6 &&
            originKind != DisallowedOriginKind::SPIOnly &&
            originKind != DisallowedOriginKind::NonPublicImport) ||
-              originKind == DisallowedOriginKind::MissingImport,
-          6);
+          originKind == DisallowedOriginKind::MissingImport,
+          6)
+      .limitBehaviorIfMorePermissive(commonBehavior);
 
   if (!ctx.LangOpts.hasFeature(Feature::StrictAccessControl) &&
       originKind == DisallowedOriginKind::MissingImport &&

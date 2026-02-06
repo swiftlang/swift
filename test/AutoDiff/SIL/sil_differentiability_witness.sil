@@ -18,6 +18,9 @@
 
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
 
+
+// UNSUPPORTED: OS=wasip1
+
 sil_stage raw
 
 import Builtin

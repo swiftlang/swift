@@ -1158,7 +1158,8 @@ public:
 
   /// Common utility to parse swift @lifetime decl attribute and SIL @lifetime
   /// type modifier.
-  ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc);
+  ParserResult<LifetimeEntry> parseLifetimeEntry(SourceLoc loc,
+                                                 bool allowIndices);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,

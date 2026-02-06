@@ -22,57 +22,6 @@ struct PairC {
   var second: C
 }
 
-// CHECK-LABEL: testSelfLoop: ssa_liveness
-// CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
-// CHECK: bb1: LiveOut
-// CHECK: bb2: LiveWithin
-// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
-// CHECK: last user:   br bb1([[V]] : $C)
-// CHECK-NOT: dead def
-sil [ossa] @testSelfLoop : $@convention(thin) (@guaranteed C) -> () {
-bb0(%0 : @guaranteed $C):
-  br bb3
-
-bb1(%1 : @owned $C):
-  destroy_value %1 : $C
-  %2 = copy_value %0 : $C
-  specify_test "ssa_liveness @trace[0]"
-  debug_value [trace] %2 : $C
-  br bb2
-
-bb2:
-  br bb1(%2 : $C)
-
-bb3:
-  %99 = tuple()
-  return %99 : $()
-}
-
-// CHECK-LABEL: testSelfKill: ssa_liveness
-// CHECK:SSA lifetime analysis:   [[V:%.*]] = move_value %1 : $C
-// CHECK: bb1: LiveOut
-// CHECK: bb2: LiveWithin
-// CHECK: lifetime-ending user:   br bb1([[V]] : $C)
-// CHECK: last user:   br bb1([[V]] : $C)
-// CHECK-NOT: dead def
-sil [ossa] @testSelfKill : $@convention(thin) () -> () {
-bb0:
-  br bb3
-
-bb1(%1 : @owned $C):
-  %2 = move_value %1 : $C
-  specify_test "ssa_liveness @trace[0]"
-  debug_value [trace] %2 : $C
-  br bb2
-
-bb2:
-  br bb1(%2 : $C)
-
-bb3:
-  %99 = tuple()
-  return %99 : $()
-}
-
 // Test a live range that is extended through reborrows,
 // considering them new defs.
 // (e.g. BorrowedValue::visitTransitiveLifetimeEndingUses)

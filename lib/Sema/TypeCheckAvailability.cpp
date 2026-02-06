@@ -236,9 +236,11 @@ bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
 }
 
-bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
+DiagnosticBehavior
+ExportContext::behaviorForReferenceToOrigin(DisallowedOriginKind originKind)
+const {
   if (originKind == DisallowedOriginKind::None)
-    return true;
+    return DiagnosticBehavior::Ignore;
 
   // Exportability checks for non-library-evolution mode have less restrictions
   // than the library-evolution ones. Implicitly always emit into client code
@@ -253,7 +255,7 @@ bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
     case DisallowedOriginKind::SPIOnly:
     case DisallowedOriginKind::SPIImported:
     case DisallowedOriginKind::SPILocal:
-      return true;
+      return DiagnosticBehavior::Ignore;
     case DisallowedOriginKind::MissingImport:
     case DisallowedOriginKind::InternalBridgingHeaderImport:
     case DisallowedOriginKind::ImplementationOnly:
@@ -263,7 +265,16 @@ bool ExportContext::canReferenceOrigin(DisallowedOriginKind originKind) const {
     }
   }
 
-  return false;
+  // Exportability checking for non-library-evolution was introduced late,
+  // downgrade errors to warnings by default.
+  auto &ctx = DC->getASTContext();
+  if (getExportedLevel() == ExportedLevel::ImplicitlyExported &&
+      originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
+      !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+      !ctx.isLanguageModeAtLeast(7))
+    return DiagnosticBehavior::Warning;
+
+  return DiagnosticBehavior::Error;
 }
 
 std::optional<ExportabilityReason>
@@ -3062,10 +3073,12 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     diagnoseIfDeprecated(R, Where, D, call);
 
   // A reference to a compatibility memberwise initializer should be diagnosed
-  // as if it were deprecated.
-  if (auto *init = dyn_cast<ConstructorDecl>(D)) {
-    if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility)
-      TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(init, R.Start);
+  // as if it were deprecated if DeprecateCompatMemberwiseInit is enabled.
+  if (ctx.LangOpts.hasFeature(Feature::DeprecateCompatMemberwiseInit)) {
+    if (auto *init = dyn_cast<ConstructorDecl>(D)) {
+      if (init->isMemberwiseInitializer() == MemberwiseInitKind::Compatibility)
+        TypeChecker::diagnoseCompatMemberwiseInitIfNeeded(init, R.Start);
+    }
   }
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol)

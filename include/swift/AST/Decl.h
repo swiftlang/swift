@@ -1936,6 +1936,9 @@ public:
   bool isNonisolated() const {
     return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
   }
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
+  }
 
   TypeExpr *getGlobalActorIsolationType() const {
     return globalActorIsolationType;
@@ -2251,6 +2254,8 @@ public:
   /// conformed to otherwise.
   std::optional<InvertibleProtocolKind>
   isAddingConformanceToInvertible() const;
+
+  bool isForReparenting() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -6305,7 +6310,8 @@ public:
 
   /// Does this storage require a 'get' accessor in its opaque-accessors set?
   bool requiresOpaqueGetter() const {
-    return getOpaqueReadOwnership() != OpaqueReadOwnership::Borrowed;
+    return getOpaqueReadOwnership() != OpaqueReadOwnership::YieldingBorrow &&
+           getOpaqueReadOwnership() != OpaqueReadOwnership::Borrow;
   }
 
   /// Does this storage require a '_read' accessor in its opaque-accessors set?
@@ -6313,6 +6319,9 @@ public:
 
   /// Does this storage require a 'read' accessor in its opaque-accessors set?
   bool requiresOpaqueYieldingBorrowCoroutine() const;
+
+  /// Does this storage require a 'borrow' accessor in its opaque-accessors set?
+  bool requiresOpaqueBorrowAccessor() const;
 
   /// Does this storage require a 'set' accessor in its opaque-accessors set?
   bool requiresOpaqueSetter() const;
@@ -6329,6 +6338,9 @@ public:
   /// ABI stability?
   bool requiresCorrespondingUnderscoredCoroutineAccessor(
       AccessorKind kind, AccessorDecl const *decl = nullptr) const;
+
+  /// Does this storage require a 'mutate' accessor in its opaque-accessors set?
+  bool requiresOpaqueMutateAccessor() const;
 
   /// Does this storage have any explicit observers (willSet or didSet) attached
   /// to it?

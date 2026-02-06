@@ -22,7 +22,6 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -358,6 +357,9 @@ class Remangler : public RemanglerBase {
   ManglingError mangleFunctionSignature(Node *FuncType, unsigned depth) {
     return mangleChildNodesReversed(FuncType, depth);
   }
+
+  ManglingError mangleAttachedMacro(Node *node, unsigned depth,
+                                    StringRef mangledChar);
 
   ManglingError mangleGenericSpecializationNode(Node *node,
                                                 char specKind,
@@ -903,6 +905,12 @@ ManglingError Remangler::mangleBoundGenericFunction(Node *node,
 ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "BV";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBuiltinBorrow(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "BW";
   return ManglingError::Success;
 }
 
@@ -3243,15 +3251,22 @@ ManglingError Remangler::mangleFreestandingMacroExpansion(
   return mangleChildNode(node, 2, depth + 1);
 }
 
+ManglingError Remangler::mangleAttachedMacro(Node *node, unsigned depth,
+                                             StringRef mangledChar) {
+  unsigned idx = 0;
+  while (idx + 1 < node->getNumChildren()) {
+    RETURN_IF_ERROR(mangleChildNode(node, idx, depth));
+    idx += 1;
+  }
+  Buffer << "fM" << mangledChar;
+  return mangleChildNode(node, idx, depth);
+}
+
 #define FREESTANDING_MACRO_ROLE(Name, Description)
 #define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)    \
 ManglingError Remangler::mangle##Name##AttachedMacroExpansion( \
     Node *node, unsigned depth) {                              \
-  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));        \
-  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));        \
-  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));        \
-  Buffer << "fM" MangledChar;                                  \
-  return mangleChildNode(node, 3, depth + 1);                  \
+  return mangleAttachedMacro(node, depth + 1, MangledChar);    \
 }
 #include "swift/Basic/MacroRoles.def"
 

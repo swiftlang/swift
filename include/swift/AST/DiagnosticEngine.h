@@ -367,6 +367,12 @@ namespace swift {
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
 
+    /// Prevent the diagnostic from behaving more severely than \p limit or the
+    /// previously set limit. Use to compose conditions to downgrade a
+    /// diagnostic in succession.
+    InFlightDiagnostic
+    &limitBehaviorIfMorePermissive(DiagnosticBehavior limit);
+
     /// Conditionally prevent the diagnostic from behaving more severely than \p
     /// limit. If the condition is false, no limit is imposed.
     InFlightDiagnostic &limitBehaviorIf(bool shouldLimit,

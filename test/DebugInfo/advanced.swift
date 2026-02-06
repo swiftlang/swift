@@ -63,7 +63,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/advanced.swift", directory: "{{.*}}")
 // CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}}
-// CHECK-DAG: !DISubprogram(name: "main", {{.*}}file: ![[MAINFILE]],
+// CHECK-DAG: !DISubprogram(name: "{{(__)?}}main{{(_argc_argv)?}}", {{.*}}file: ![[MAINFILE]],
 
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = !DISubroutineType(types: ![[PARAMTYPES:[0-9]+]])

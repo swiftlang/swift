@@ -205,6 +205,9 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
 
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {

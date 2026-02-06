@@ -32,13 +32,13 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 
-// CHECK:      struct InheritsProtectedMove {
+// CHECK:      struct InheritsProtectedMove : ~Copyable {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func getFromBase() -> Int32
 // CHECK-NEXT:   mutating func setFromBase(_ x: Int32)
 // CHECK-NEXT: }
 
-// CHECK:      struct ProtectedCopyWithMove {
+// CHECK:      struct ProtectedCopyWithMove : ~Copyable {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   var fromBase: Int32
 // CHECK-NEXT: }

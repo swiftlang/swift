@@ -442,49 +442,6 @@ broadenSingleElementStores(StoreInst *storeInst,
 //                            Simple ARC Peepholes
 //===----------------------------------------------------------------------===//
 
-/// "dead" copies are removed in OSSA, but this may shorten object lifetimes,
-/// changing program semantics in unexpected ways by releasing weak references
-/// and running deinitializers early. This copy may be the only thing keeping a
-/// variable's reference alive. But just because the copy's current SSA value
-/// contains no other uses does not mean that there aren't other uses that still
-/// correspond to the original variable whose lifetime is protected by this
-/// copy. The only way to guarantee the lifetime of a variable is to use a
-/// borrow scope--copy/destroy is insufficient by itself.
-///
-/// FIXME: This removes debug_value instructions aggressively as part of
-/// SILGenCleanup. Instead, debug_values should be canonicalized before copy
-/// elimination so that we never see the pattern:
-///   %b = begin_borrow
-///   %c = copy %b
-///   end_borrow %b
-///   debug_value %c
-///
-/// FIXME: Technically this should be guarded by a compiler flag like
-/// -enable-copy-propagation until SILGen protects scoped variables by
-/// borrow scopes.
-static SILBasicBlock::iterator
-eliminateSimpleCopies(CopyValueInst *cvi, CanonicalizeInstruction &pass) {
-  auto next = std::next(cvi->getIterator());
-
-  // Eliminate copies that only have destroy_value uses.
-  SmallVector<DestroyValueInst *, 8> destroys;
-  for (Operand *use : cvi->getUses()) {
-    if (auto *dvi = dyn_cast<DestroyValueInst>(use->getUser())) {
-      destroys.push_back(dvi);
-      continue;
-    }
-    if (!pass.preserveDebugInfo && isa<DebugValueInst>(use->getUser())) {
-      continue;
-    }
-    return next;
-  }
-
-  while (!destroys.empty()) {
-    next = killInstruction(destroys.pop_back_val(), next, pass);
-  }
-  return killInstAndIncidentalUses(cvi, next, pass);
-}
-
 /// Unlike dead copy elimination, dead borrows can be safely removed because the
 /// semantics of a borrow scope
 static SILBasicBlock::iterator
@@ -598,9 +555,6 @@ CanonicalizeInstruction::canonicalize(SILInstruction *inst) {
   if (auto *storeInst = dyn_cast<StoreInst>(inst)) {
     return broadenSingleElementStores(storeInst, *this);
   }
-
-  if (auto *cvi = dyn_cast<CopyValueInst>(inst))
-    return eliminateSimpleCopies(cvi, *this);
 
   if (auto *bbi = dyn_cast<BeginBorrowInst>(inst))
     return eliminateSimpleBorrows(bbi, *this);

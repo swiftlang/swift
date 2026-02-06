@@ -541,6 +541,7 @@ extension SerialExecutor where Self: Equatable {
 /// The idea here is that some executors may work by running a loop
 /// that processes events of some sort; we want a way to enter that loop,
 /// and we would also like a way to trigger the loop to exit.
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol RunLoopExecutor: Executor {
   /// Run the executor's run loop.
@@ -572,6 +573,7 @@ public protocol RunLoopExecutor: Executor {
   func stop()
 }
 
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 extension RunLoopExecutor {
 
@@ -584,6 +586,7 @@ extension RunLoopExecutor {
 
 /// The main executor must conform to these two protocols; we have to
 /// make this a protocol for compatibility with Embedded Swift.
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 }
@@ -591,6 +594,7 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 
 /// An ExecutorFactory is used to create the default main and task
 /// executors.
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol ExecutorFactory {
   #if os(WASI) || !$Embedded
@@ -607,6 +611,7 @@ public protocol ExecutorFactory {
 @available(StdlibDeploymentTarget 6.3, *)
 typealias DefaultExecutorFactory = PlatformExecutorFactory
 
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
@@ -634,6 +639,7 @@ extension MainActor {
   ///
   /// Attempting to set this after the first `enqueue` on the main
   /// executor is a fatal error.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public static var executor: any MainExecutor {
     // It would be good if there was a Swift way to do this
@@ -659,6 +665,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// Attempting to set this after the first `enqueue` on the global
   /// executor is a fatal error.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public static var defaultExecutor: any TaskExecutor {
     // It would be good if there was a Swift way to do this
@@ -688,7 +695,7 @@ extension Task where Success == Never, Failure == Never {
   ///  If none of these exist, returns the default executor.
   @available(StdlibDeploymentTarget 6.3, *)
   @_unavailableInEmbedded
-  public static var currentExecutor: any Executor {
+  static var currentExecutor: any Executor {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor() {
       return activeExecutor
     } else if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
@@ -701,7 +708,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Get the preferred executor for the current `Task`, if any.
   @available(StdlibDeploymentTarget 6.3, *)
-  public static var preferredExecutor: (any TaskExecutor)? {
+  static var preferredExecutor: (any TaskExecutor)? {
     if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
       return taskExecutor
     }
@@ -714,7 +721,7 @@ extension Task where Success == Never, Failure == Never {
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulingExecutor`.
   @available(StdlibDeploymentTarget 6.3, *)
-  public static var currentSchedulingExecutor: (any SchedulingExecutor)? {
+  static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
        let scheduling = activeExecutor.asSchedulingExecutor {
       return scheduling
@@ -790,7 +797,7 @@ public struct UnownedSerialExecutor: Sendable {
 
   /// Automatically opt-in to complex equality semantics if the Executor
   /// implements `Equatable`.
-  @available(SwiftStdlib 6.2, *)
+  @available(SwiftStdlib 6.3, *)
   @inlinable
   public init<E: SerialExecutor>(_ executor: __shared E) {
     if executor._isComplexEquality {

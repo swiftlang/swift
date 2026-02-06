@@ -15,9 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "GenKeyPath.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExtInfo.h"
@@ -29,19 +27,16 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeExpansionContext.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -58,7 +53,6 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Constant.h"
@@ -73,12 +67,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
-#include "llvm/Support/SaveAndRestore.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
 #include "Explosion.h"
 #include "GenArchetype.h"
+#include "GenBorrow.h"
 #include "GenBuiltin.h"
 #include "GenCall.h"
 #include "GenCast.h"
@@ -91,6 +85,7 @@
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenIntegerLiteral.h"
+#include "GenKeyPath.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
@@ -1037,7 +1032,8 @@ public:
 
     // Mark variables in async functions that don't generate a shadow copy for
     // lifetime extension, so they get spilled into the async context.
-    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+    if (!IGM.IRGen.Opts.shouldOptimize() &&
+        (CurSILFn->isAsync() || CurSILFn->isCoroutine()))
       if (isa<llvm::AllocaInst>(Storage)) {
         if (emitLifetimeExtendingUse(Storage))
           if (ValueVariables.insert(Storage).second)
@@ -1057,7 +1053,8 @@ public:
 
     // Mark variables in async functions for lifetime extension, so they get
     // spilled into the async context.
-    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync()) {
+    if (!IGM.IRGen.Opts.shouldOptimize() &&
+        (CurSILFn->isAsync() || CurSILFn->isCoroutine())) {
       if (emitLifetimeExtendingUse(shadow)) {
         if (ValueVariables.insert(shadow).second)
           ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
@@ -1093,7 +1090,8 @@ public:
 
       // Mark variables in async functions for lifetime extension, so they get
       // spilled into the async context.
-      if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+      if (!IGM.IRGen.Opts.shouldOptimize() &&
+          (CurSILFn->isAsync() || CurSILFn->isCoroutine()))
         if (vals.begin() != vals.end()) {
           auto Value = vals.front();
           if (isa<llvm::Instruction>(Value) || isa<llvm::Argument>(Value))
@@ -1214,6 +1212,7 @@ public:
   bool shouldUseDispatchThunk(SILDeclRef method);
 
   void visitSILBasicBlock(SILBasicBlock *BB);
+  void setupDebugLocationFor(SILInstruction &I, bool IsInCleanupBlock);
   void emitErrorResultVar(CanSILFunctionType FnTy,
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
@@ -1565,6 +1564,13 @@ public:
   void visitHasSymbolInst(HasSymbolInst *i);
 
   void visitTypeValueInst(TypeValueInst *i);
+
+  void visitMakeBorrowInst(MakeBorrowInst *i);
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *i);
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *i);
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *i);
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *i);
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i);
 
   void visitWeakCopyValueInst(swift::WeakCopyValueInst *i);
   void visitUnownedCopyValueInst(swift::UnownedCopyValueInst *i);
@@ -2795,6 +2801,55 @@ void IRGenSILFunction::estimateStackSize() {
   }
 }
 
+void IRGenSILFunction::setupDebugLocationFor(SILInstruction &I,
+                                             const bool IsInCleanupBlock) {
+  // Choose the debug location to use when lowering `I`.
+  // If `I` contains a non CleanupLocation location, use that location.
+  //
+  // CleanupLocations point to the declaration of the object being destroyed
+  // (for diagnostic purposes); using it would create jumps in the line table.
+  // The jumps are avoided by:
+  // * If `I` has a cleanup location but is followed by non-cleanup locations,
+  // keep the location used in the previous instruction.
+  // * Otherwise (all subsequent instructions have CleanupLocations), use the
+  // location at the end of the BB, which matches the end-of-scope location.
+  const SILDebugScope *DS = I.getDebugScope();
+  SILLocation ILoc = I.getLoc();
+  const bool IsCleanupInstruction = ILoc.is<CleanupLocation>();
+
+  if (!IsInCleanupBlock && IsCleanupInstruction) {
+    // Reuse the last location, unless there is none.
+    if (Builder.getCurrentDebugLocation() == llvm::DebugLoc())
+      IGM.DebugInfo->setCurrentLoc(Builder, DS,
+                                   RegularLocation::getAutoGeneratedLocation());
+    return;
+  }
+
+  if (IsInCleanupBlock) {
+    auto *BB = I.getParent();
+    assert(BB->getTerminator());
+    ILoc = BB->getTerminator()->getLoc();
+    DS = BB->getTerminator()->getDebugScope();
+  }
+
+  if (DS)
+    IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
+}
+
+/// Find the first instruction `I` such that `I` and all subsequent instructions
+/// in `BB` have a CleanupLocation (or are a TerminatorInst). The terminator
+/// instruction is always included.
+static SILInstruction *findFirstCleanupBlockInstruction(SILBasicBlock &BB) {
+  SILInstruction *I = BB.getTerminator();
+  for (SILInstruction *Prev = I->getPreviousInstruction(); Prev;
+       Prev = Prev->getPreviousInstruction()) {
+    if (!Prev->getLoc().is<CleanupLocation>())
+      return I;
+    I = Prev;
+  }
+  return I;
+}
+
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -2807,67 +2862,15 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   DominanceScope dominance(*this, InEntryBlock ? DominancePoint::universal()
                                                : DominancePoint(BB));
 
-  // Generate the body.
-  bool InCleanupBlock = false;
-  bool KeepCurrentLocation = false;
+  SILInstruction *const CleanupBlockStartInst =
+      findFirstCleanupBlockInstruction(*BB);
+  bool IsInCleanupBlock = false;
 
   for (auto &I : *BB) {
+    IsInCleanupBlock = (&I == CleanupBlockStartInst);
+
     if (IGM.DebugInfo) {
-      // Set the debug info location for I, if applicable.
-      auto DS = I.getDebugScope();
-      SILLocation ILoc = I.getLoc();
-      // Handle cleanup locations.
-      if (ILoc.is<CleanupLocation>()) {
-        // Cleanup locations point to the decl of the value that is
-        // being destroyed (for diagnostic generation). As far as
-        // the linetable is concerned, cleanups at the end of a
-        // lexical scope should point to the cleanup location, which
-        // is the location of the last instruction in the basic block.
-        if (!InCleanupBlock) {
-          InCleanupBlock = true;
-          // Scan ahead to see if this is the final cleanup block in
-          // this basic block.
-          auto It = I.getIterator();
-          do ++It; while (It != BB->end() &&
-                          It->getLoc().is<CleanupLocation>());
-          // We are still in the middle of a basic block?
-          if (It != BB->end() && !isa<TermInst>(It))
-            KeepCurrentLocation = true;
-        }
-
-        // Assign the cleanup location to this instruction.
-        if (!KeepCurrentLocation) {
-          assert(BB->getTerminator());
-          ILoc = BB->getTerminator()->getLoc();
-          DS = BB->getTerminator()->getDebugScope();
-        }
-      } else if (InCleanupBlock) {
-        KeepCurrentLocation = false;
-        InCleanupBlock = false;
-      }
-
-      // Until SILDebugScopes are properly serialized, bare functions
-      // are allowed to not have a scope.
-      if (!DS) {
-        if (CurSILFn->isBare())
-          DS = CurSILFn->getDebugScope();
-        assert(maybeScopeless(I) && "instruction has location, but no scope");
-      }
-
-      // Set the builder's debug location.
-      if (DS && !KeepCurrentLocation)
-        IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-      else {
-        // Reuse the last scope for an easier-to-read line table.
-        auto Prev = --I.getIterator();
-        if (Prev != BB->end())
-          DS = Prev->getDebugScope();
-
-        // Use an artificial (line 0) location, to indicate we'd like to
-        // reuse the last debug loc.
-        IGM.DebugInfo->setCurrentLoc(
-            Builder, DS, RegularLocation::getAutoGeneratedLocation());
-      }
+      setupDebugLocationFor(I, IsInCleanupBlock);
       if (isa<TermInst>(&I))
         emitDebugVariableRangeExtension(BB);
     }
@@ -4435,24 +4438,21 @@ void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
 }
 
 void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
-  // LLVM's retcon lowering is a bit imcompatible with Swift
-  // model. Essentially it assumes that unwind destination is kind of terminal -
-  // it cannot return back to caller and must somehow terminate the process /
-  // thread. Therefore we are always use normal LLVM coroutine termination.
-  // However, for yield_once coroutines we need also specify undef results on
-  // unwind path. Eventually, we'd get rid of these crazy phis...
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->setCurrentLoc(Builder, getDebugScope(),
+                                 RegularLocation::getAutoGeneratedLocation());
+  // LLVM's retcon lowering assumes the unwind destination cannot return back to
+  // caller and must terminate the process, which is incompatible with the Swift
+  // model. To avoid this, use the normal LLVM coroutine termination.
 
-  // If the coroutine exit block already exists, just branch to it.
-  auto *coroEndBB = getCoroutineExitBlock();
-  auto *unwindBB = Builder.GetInsertBlock();
-
-  // If the coroutine exit block already exists, just branch to it.
-  if (coroEndBB) {
+  // If the coroutine exit block already exists, branch to it.
+  if (auto *coroEndBB = getCoroutineExitBlock()) {
+    auto *unwindBB = Builder.GetInsertBlock();
     Builder.CreateBr(coroEndBB);
 
     if (!isAsync()) {
-      // If there are any result values we need to add undefs for all values
-      // coming from unwind block
+      // For yield_once coroutines, it's also necessary to specify undef results
+      // on the unwind path. TODO: get rid of these phis.
       for (auto &phi : coroutineResults)
         cast<llvm::PHINode>(phi)->addIncoming(llvm::UndefValue::get(phi->getType()),
                                               unwindBB);
@@ -4462,7 +4462,7 @@ void IRGenFunction::emitCoroutineOrAsyncExit(bool isUnwind) {
   }
 
   // Otherwise, create it and branch to it.
-  coroEndBB = createBasicBlock("coro.end");
+  llvm::BasicBlock *coroEndBB = createBasicBlock("coro.end");
   setCoroutineExitBlock(coroEndBB);
   Builder.CreateBr(coroEndBB);
   Builder.emitBlock(coroEndBB);
@@ -6264,6 +6264,64 @@ void IRGenSILFunction::visitUnownedCopyValueInst(
     swift::UnownedCopyValueInst *i) {
   llvm::report_fatal_error(
       "unowned_copy_value not lowered by AddressLowering!?");
+}
+
+void IRGenSILFunction::visitMakeBorrowInst(MakeBorrowInst *i) {
+  auto borrowTy = i->getType();
+  Explosion borrow;
+  Explosion referent = getLoweredExplosion(i->getOperand());
+  
+  emitMakeBorrow(*this, borrowTy, referent, borrow);
+
+  setLoweredExplosion(i, borrow);
+}
+
+void IRGenSILFunction::visitMakeAddrBorrowInst(MakeAddrBorrowInst *i) {
+  auto borrowTy = i->getType();
+  Explosion borrow;
+  Address referent = getLoweredAddress(i->getOperand());
+  
+  emitMakeBorrowFromAddress(*this, borrowTy, referent, borrow);
+
+  setLoweredExplosion(i, borrow);
+}
+
+void IRGenSILFunction::visitInitBorrowAddrInst(InitBorrowAddrInst *i) {
+  auto borrowTy = i->getDest()->getType();
+  Address destBorrow = getLoweredAddress(i->getDest());
+  Address srcReferent = getLoweredAddress(i->getReferent());
+
+  emitInitBorrowAtAddress(*this, borrowTy, destBorrow, srcReferent);
+}
+
+void IRGenSILFunction::visitDereferenceBorrowInst(DereferenceBorrowInst *i) {
+  auto borrowTy = i->getOperand()->getType();
+  Explosion referent;
+  Explosion borrow = getLoweredExplosion(i->getOperand());
+
+  emitDereferenceBorrow(*this, borrowTy, borrow, referent);
+
+  setLoweredExplosion(i, referent);
+}
+
+void
+IRGenSILFunction::visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *i) {
+  auto borrowTy = i->getOperand()->getType();
+  Explosion borrow = getLoweredExplosion(i->getOperand());
+
+  Address referent = emitDereferenceBorrowToAddress(*this, borrowTy, borrow);
+
+  setLoweredAddress(i, referent);
+}
+
+void
+IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
+  auto borrowTy = i->getOperand()->getType();
+  Address borrow = getLoweredAddress(i->getOperand());
+
+  Address referent = emitDereferenceBorrowAtAddress(*this, borrowTy, borrow);
+
+  setLoweredAddress(i, referent);
 }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \

@@ -1,11 +1,12 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=5000
 // REQUIRES: tools-release,no_asan
-// REQUIRES: rdar36854536
 
 class Color {
   init(hue: Double, saturation: Double, brightness: Double, alpha: Double) {}
   init(red: Double, green: Double, blue: Double, alpha: Double) {}
 }
+
+// Invalid expression: Argument label mismatch in Color.init()
 
 // expected-error@+1 {{reasonable time}}
 let _: [Color] = [

@@ -32,6 +32,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -295,8 +296,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
     // Passing a static member reference as an argument needs to be downgraded
     // to a warning until future major mode to maintain source compatibility for
     // code with non-Sendable metatypes.
-    if (!cs.getASTContext().isLanguageModeAtLeast(
-            version::Version::getFutureMajorLanguageVersion())) {
+    if (!cs.getASTContext().isAtLeastFutureMajorLanguageMode()) {
       auto *argLoc = cs.getConstraintLocator(locator);
       if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
         if (auto overload = cs.findSelectedOverloadFor(

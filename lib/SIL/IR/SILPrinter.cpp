@@ -16,6 +16,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -764,10 +765,16 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(SILDeclRef)
   SIMPLE_PRINTER(APInt)
   SIMPLE_PRINTER(ValueOwnershipKind)
-  SIMPLE_PRINTER(UUID)
   SIMPLE_PRINTER(GenericSignature)
   SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
+
+  SILPrinter &operator<<(UUID value) {
+    llvm::SmallString<UUID::StringBufferSize> str;
+    ASTPrinter::getUUIDStringForPrinting(value, str);
+    PrintState.OS << str;
+    return *this;
+  }
 
   SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
@@ -1936,6 +1943,30 @@ public:
 
     // "Bytes" are always output in a hexadecimal form.
     *this << '"' << llvm::toHex(SLI->getValue()) << '"';
+  }
+
+  void visitMakeBorrowInst(MakeBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
+  void visitInitBorrowAddrInst(InitBorrowAddrInst *I) {
+    *this << getIDAndType(I->getDest()) << " with " << getIDAndType(I->getReferent());
   }
 
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {

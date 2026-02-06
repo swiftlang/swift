@@ -4,9 +4,6 @@
 
 // REQUIRES: swift_feature_BuiltinModule
 
-// wasm currently disables aggressive reg2mem
-// UNSUPPORTED: CPU=wasm32
-
 import Builtin
 import Swift
 

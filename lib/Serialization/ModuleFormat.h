@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 979; // inferred_immutable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 984; // @_lifetime attribute isFromAnnotation flag
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -194,7 +194,8 @@ using FileHashField = BCVBR<16>;
 // the module version.
 enum class OpaqueReadOwnership : uint8_t {
   Owned,
-  Borrowed,
+  YieldingBorrow,
+  Borrow,
   OwnedOrBorrowed,
 };
 using OpaqueReadOwnershipField = BCFixed<2>;
@@ -1310,6 +1311,11 @@ namespace decls_block {
     TypeIDField  // element type
   );
 
+  TYPE_LAYOUT(BuiltinBorrowTypeLayout,
+    BUILTIN_BORROW_TYPE,
+    TypeIDField // referent type
+  );
+
   TYPE_LAYOUT(TypeAliasTypeLayout,
     NAME_ALIAS_TYPE,
     DeclIDField,           // typealias decl
@@ -2360,6 +2366,7 @@ namespace decls_block {
                      BCVBR<4>,           // targetIndex
                      BCVBR<4>,           // paramIndicesLength
                      BCFixed<1>,         // isImmortal
+                     BCFixed<1>,         // isFromAnnotation
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
                      BCFixed<1>,         // hasAddressableParamIndices

@@ -18,16 +18,27 @@
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void * _Nonnull _swift_stdlib_threadLocalStorageGet(void);
 
+#if !defined(__swift_embedded__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-void * _Nullable _swift_getExclusivityTLSImpl();
+void * _Nullable _swift_getExclusivityTLSImpl(void);
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setExclusivityTLSImpl(void * _Nullable newValue);
+#endif
 
-#if defined(__APPLE__) && __arm64__
+#if defined(__swift_embedded__)
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void * _Nullable _swift_getExclusivityTLS(void);
 
-// Use a fast path on Apple ARM64, where we have a dedicated TLS key and fast
-// access to read/write it.
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _swift_setExclusivityTLS(void * _Nullable newValue);
+
+#elif defined(TARGET_OS_MAC) && TARGET_OS_MAC && !TARGET_OS_SIMULATOR && __arm64__
+
+// Use a fast path on Darwin ARM64, where we have a dedicated TLS key and fast
+// access to read/write it. Note: for historical reasons, TARGET_OS_MAC includes
+// the various OSX-derived Darwin OSes as well. TARGET_OS_OSX is the one that's
+// only macOS.
 
 #ifndef __PTK_FRAMEWORK_SWIFT_KEY7
 # define __PTK_FRAMEWORK_SWIFT_KEY7 107
@@ -35,14 +46,14 @@ void _swift_setExclusivityTLSImpl(void * _Nullable newValue);
 
 #define SWIFT_RUNTIME_EXCLUSIVITY_KEY __PTK_FRAMEWORK_SWIFT_KEY7
 
-static inline void * _Nullable * _Nonnull _swift_getExclusivityTLSPointer() {
+static inline void * _Nullable * _Nonnull _swift_getExclusivityTLSPointer(void) {
   unsigned long tsd;
   __asm__ ("mrs %0, TPIDRRO_EL0" : "=r" (tsd));
   void **base = (void **)tsd;
   return &base[SWIFT_RUNTIME_EXCLUSIVITY_KEY];
 }
 
-static inline void * _Nullable _swift_getExclusivityTLS() {
+static inline void * _Nullable _swift_getExclusivityTLS(void) {
   return *_swift_getExclusivityTLSPointer();
 }
 
@@ -52,7 +63,7 @@ static inline void _swift_setExclusivityTLS(void * _Nullable newValue) {
 
 #else
 
-static inline void * _Nullable _swift_getExclusivityTLS() {
+static inline void * _Nullable _swift_getExclusivityTLS(void) {
   return _swift_getExclusivityTLSImpl();
 }
 

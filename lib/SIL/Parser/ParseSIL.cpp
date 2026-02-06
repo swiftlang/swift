@@ -3454,6 +3454,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   REFCOUNTING_INSTRUCTION(Name##Release)                                       \
   UNARY_INSTRUCTION(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
+    UNARY_INSTRUCTION(MakeBorrow)
+    UNARY_INSTRUCTION(DereferenceBorrow)
+    UNARY_INSTRUCTION(MakeAddrBorrow)
+    UNARY_INSTRUCTION(DereferenceAddrBorrow)
+    UNARY_INSTRUCTION(DereferenceBorrowAddr)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -5681,6 +5686,26 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                         MethodTy);
       break;
     }
+    case SILInstructionKind::InitBorrowAddrInst: {
+      SILValue dest, referent;
+      Identifier withToken;
+      SourceLoc destLoc, referentLoc, withLoc;
+
+      if (parseTypedValueRef(dest, destLoc, B)
+          || parseSILIdentifier(withToken, withLoc, diag::expected_tok_in_sil_instr,
+                                "with")
+          || parseTypedValueRef(referent, referentLoc, B)) {
+        return true;
+      }
+
+      if (withToken.str() != "with") {
+        P.diagnose(withLoc, diag::expected_tok_in_sil_instr, "with");
+        return true;
+      }
+
+      ResultVal = B.createInitBorrowAddr(InstLoc, dest, referent);
+      break;
+    }
     case SILInstructionKind::CopyAddrInst: {
       bool IsTake = false, IsInit = false;
       UnresolvedValueName SrcLName;
@@ -7535,6 +7560,10 @@ bool SILParserState::parseDeclSIL(Parser &P) {
         if (M.hasUnresolvedLocalArchetypeDefinitions())
           llvm_unreachable(
               "All forward definitions of local archetypes should be resolved");
+        // We expect the parsed SIL to comply with the no-infinite loops rule.
+        FunctionState.F->setNeedBreakInfiniteLoops(false);
+        // We expect the parsed SIL to have complete lifetimes.
+        FunctionState.F->setNeedCompleteLifetimes(false);
       }
     }
 

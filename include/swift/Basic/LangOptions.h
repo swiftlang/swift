@@ -455,7 +455,7 @@ namespace swift {
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
-    bool ForceWorkaroundBrokenModules = false;
+    bool EnableWorkaroundBrokenModules = true;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -749,6 +749,14 @@ namespace swift {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
+    /// Whether the "next major" language mode is being used. This isn't a real
+    /// language mode, it only exists to signal clients that expect to be
+    /// included in the next language mode when it becomes available.
+    bool isAtLeastFutureMajorLanguageMode() const {
+      using namespace version;
+      return isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion());
+    }
+
     /// Sets the "_hasAtomicBitWidth" conditional.
     void setHasAtomicBitWidth(llvm::Triple triple);
 
@@ -982,16 +990,17 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
+    /// If non-zero, randomly shuffle disjunctions using this seed. For debugging.
+    unsigned ShuffleDisjunctionSeed = 0;
+
+    /// If non-zero, randomly shuffle disjunction choices using this seed. For
+    /// debugging
+    unsigned ShuffleDisjunctionChoicesSeed = 0;
+
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
-
-    /// Enable experimental operator designated types feature.
-    bool EnableOperatorDesignatedTypes = false;
-
-    /// Enable old constraint system performance hacks.
-    bool EnableConstraintSolverPerformanceHacks = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
@@ -1006,8 +1015,21 @@ namespace swift {
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
 
+    /// Enable various older performance optimizations that have been subsumed
+    /// by subsequent improvements to the solver.
+    bool SolverEnablePerformanceHacks = true;
+
     /// Enable the experimental "prepared overloads" optimization.
     bool SolverEnablePreparedOverloads = true;
+
+    /// Enable experimental optimization to skip contradictory disjunction
+    /// choices.
+    bool SolverPruneDisjunctions = false;
+
+    /// Enable experimental optimization to skip operators defined in protocol
+    /// extensions if they are a refinement of a protocol requirement that also
+    /// appears in the disjunction.
+    bool SolverOptimizeOperatorDefaults = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

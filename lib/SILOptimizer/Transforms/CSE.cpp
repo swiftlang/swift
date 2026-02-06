@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
@@ -51,6 +52,11 @@ STATISTIC(NumOpenExtRemoved,
 
 STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
+
+llvm::cl::opt<bool>
+PrintCSEInternals("print-cse-internals", llvm::cl::init(false),
+                  llvm::cl::desc("Print internal CSE log messages"));
+
 
 using namespace swift;
 
@@ -581,7 +587,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   };
   bool isEqual =
       LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
-#ifndef NDEBUG
+
   if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
     llvm::dbgs() << "LHS: ";
     LHSI->dump();
@@ -589,9 +595,9 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
     RHSI->dump();
     llvm::dbgs() << "In function:\n";
     LHSI->getFunction()->dump();
-    llvm_unreachable("Mismatched isEqual and getHashValue() function in CSE\n");
+    ABORT("Mismatched isEqual and getHashValue() function in CSE\n");
   }
-#endif
+
   return isEqual;
 }
 
@@ -1063,6 +1069,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
                               << *AvailInst << '\n');
 
+      if (PrintCSEInternals) {
+        llvm::dbgs() << "CSE " << *Inst << "with " << *AvailInst;
+      }
+
       auto *AI = dyn_cast<ApplyInst>(Inst);
       if (AI && isLazyPropertyGetter(AI)) {
         // We do the actual transformation for lazy property getters later. It
@@ -1500,6 +1510,10 @@ class SILCSE : public SILFunctionTransform {
       // Cleanup the dead blocks from the inlined lazy property getters.
       removeUnreachableBlocks(*Fn);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      if (Fn->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), Fn);
+      if (Fn->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), Fn);
     } else if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
     }

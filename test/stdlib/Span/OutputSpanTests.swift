@@ -19,7 +19,6 @@ import StdlibUnittest
 var suite = TestSuite("OutputSpan Tests")
 defer { runAllTests() }
 
-@available(SwiftStdlib 6.2, *)
 struct Allocation<T>: ~Copyable {
   let allocation: UnsafeMutableBufferPointer<T>
   var count: Int? = nil
@@ -261,6 +260,27 @@ suite.test("InlineArray initialization throws")
   }
 }
 
+suite.test("OutputSpan.withUnsafeMutableBufferPointer")
+.require(.stdlib_6_2).code {
+  let c = 10
+  var a = Allocation(of: c, [Int].self)
+  a.initialize {
+    $0.withUnsafeMutableBufferPointer {
+      expectEqual($0.count, c)
+      for i in $0.indices {
+        $0.initializeElement(at: i, to: .init(repeating: i, count: i))
+        $1 += 1
+      }
+    }
+  }
+  a.withSpan {
+    expectEqual($0.count, c)
+    for i in $0.indices {
+      expectEqual($0[i], Array(repeating: i, count: i))
+    }
+  }
+}
+
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
@@ -333,7 +353,6 @@ suite.test("Array initialization throws")
   }
 }
 
-
 suite.test("Array initialization overflow")
 .skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
@@ -343,6 +362,17 @@ suite.test("Array initialization overflow")
     span in
     span.append(1)
     span.append(2)
+  }
+  expectUnreachable("Array initializer should have trapped.")
+}
+
+suite.test("Array initialization underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  _ = Array<Int>(capacity: -1) {
+    $0.removeAll()
   }
   expectUnreachable("Array initializer should have trapped.")
 }
@@ -413,7 +443,19 @@ suite.test("Array append overflow")
     span.append(1)
     span.append(2)
   }
-  expectUnreachable("Array initializer should have trapped.")
+  expectUnreachable("Array.append should have trapped.")
+}
+
+suite.test("Array append underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  var a: [Int] = []
+  a.append(addingCapacity: -1) {
+    $0.removeAll()
+  }
+  expectUnreachable("Array.append should have trapped.")
 }
 
 suite.test("ContiguousArray initialization")
@@ -473,6 +515,17 @@ suite.test("ContiguousArray initialization overflow")
     span in
     span.append(1)
     span.append(2)
+  }
+  expectUnreachable("ContiguousArray initializer should have trapped.")
+}
+
+suite.test("ContiguousArray initialization underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  _ = ContiguousArray<Int>(capacity: -1) {
+    $0.removeAll()
   }
   expectUnreachable("ContiguousArray initializer should have trapped.")
 }
@@ -543,5 +596,17 @@ suite.test("ContiguousArray append overflow")
     span.append(1)
     span.append(2)
   }
-  expectUnreachable("ContiguousArray initializer should have trapped.")
+  expectUnreachable("ContiguousArray append should have trapped.")
+}
+
+suite.test("ContiguousArray.append underflow")
+.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.stdlib_6_2).code {
+
+  expectCrashLater()
+  var a: [Int] = [1, 2, 3]
+  a.append(addingCapacity: -1) {
+    $0.removeAll()
+  }
+  expectUnreachable("ContiguousArray.append should have trapped.")
 }

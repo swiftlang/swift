@@ -5,14 +5,14 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 
 // Check that initializing a Double with an integer literal doesn't result in unresolved symbols
 @inline(never)
 func testLiteral() -> Double {
   return Double(1)
-} 
+}
 
 @main
 struct Main {

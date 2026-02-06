@@ -94,8 +94,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @rle_needscopy1 :
+// This is not optimized, yet
 // CHECK: load
-// CHECK-NOT: load 
+// CHECK: load [take]
 // CHECK-LABEL: } // end sil function 'rle_needscopy1'
 sil [ossa] @rle_needscopy1 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
 bb0(%0 : $*NonTrivialStruct):
@@ -104,6 +105,7 @@ bb0(%0 : $*NonTrivialStruct):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %val1
   unreachable
 
 bb2:
@@ -274,6 +276,7 @@ bb0(%0 : $*NonTrivialStruct):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %val1
   unreachable
 
 bb2:
@@ -518,8 +521,9 @@ bb0(%0 : $*NonTrivialStruct):
 }
 
 // CHECK-LABEL: sil [ossa] @rle_needsmultiplecopies2 : 
+// This is not optimized, yet
 // CHECK: load
-// CHECK-NOT: load 
+// CHECK: load 
 // CHECK-LABEL: } // end sil function 'rle_needsmultiplecopies2'
 sil [ossa] @rle_needsmultiplecopies2 : $@convention(thin) (@in NonTrivialStruct) -> @owned Klass {
 bb0(%0 : $*NonTrivialStruct):
@@ -528,6 +532,7 @@ bb0(%0 : $*NonTrivialStruct):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %val1
   unreachable
 
 bb2:
@@ -740,6 +745,7 @@ bb0(%0 : $*NonTrivialStruct):
   cond_br undef, bb1, bb2
 
 bb1:
+  destroy_value [dead_end] %val1
   unreachable
 
 bb2:

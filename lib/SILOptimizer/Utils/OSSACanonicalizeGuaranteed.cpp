@@ -140,6 +140,7 @@ SILValue OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(SILValue def) {
         return def;
 
       case BorrowedValueKind::LoadBorrow:
+      case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::Phi:
       case BorrowedValueKind::BeginApplyToken:
         break;
@@ -167,6 +168,7 @@ bool OSSACanonicalizeGuaranteed::computeBorrowLiveness() {
     // For efficiency, function arguments skip liveness.
     return true;
   case BorrowedValueKind::LoadBorrow:
+  case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
     // TODO: Canonicalize load_borrow scope and phi once consolidateBorrowScope
     // can handle persistentCopies.

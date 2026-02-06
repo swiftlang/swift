@@ -110,6 +110,10 @@ public:
     return emitLoadOfIsBitwiseTakable(IGF, T);
   }
 
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseBorrowable(IGF, T);
+  }
+
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     return emitLoadOfIsInline(IGF, T);

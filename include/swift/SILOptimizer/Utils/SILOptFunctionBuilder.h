@@ -60,11 +60,11 @@ public:
     return transform.getIRGenModule();
   }
 
-private:
   SILPassManager &getPassManager() const {
     return *transform.getPassManager();
   }
 
+private:
   void notifyAddFunction(SILFunction *f) {
     auto &pm = getPassManager();
     pm.notifyOfNewFunction(f, &transform);

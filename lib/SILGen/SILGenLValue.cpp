@@ -26,9 +26,11 @@
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -332,6 +334,8 @@ public:
                               LValueOptions options);
   LValue visitPackElementExpr(PackElementExpr *e, SGFAccessKind accessKind,
                               LValueOptions options);
+  LValue visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
+                        LValueOptions options);
 
   // Nodes that make up components of lvalue paths
   
@@ -1121,7 +1125,6 @@ namespace {
                 base.getType().getObjectType(),
                 SGF.getASTContext().AllocateCopy(conformances));
       } else {
-        assert(getSubstFormalType()->isBridgeableObjectType());
         ref = SGF.B.createInitExistentialRef(
                 loc,
                 base.getType().getObjectType(),
@@ -3358,6 +3361,79 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   LValue lv;
   lv.add<ValueComponent>(rv, std::nullopt, typeData, /*isRValue=*/true);
   return lv;
+}
+
+LValue SILGenLValue::visitApplyExpr(ApplyExpr *e, SGFAccessKind accessKind,
+                                    LValueOptions options) {
+  // Some builtins serve to produce borrowable values as special cases.
+  auto builtin = e->getFn()->getReferencedDecl();
+  ASSERT(builtin && builtin.getDecl()->getModuleContext()->isBuiltinModule()
+         && "not a builtin call");
+  auto &builtinInfo = SGF.SGM.M
+    .getBuiltinInfo(builtin.getDecl()->getBaseIdentifier());
+
+  switch (builtinInfo.ID) {
+  case BuiltinValueKind::DereferenceBorrow: {
+    // The `Builtin.Borrow` argument is evaluated as a +0 rvalue.
+    auto borrowExpr = e->getArgs()->getExpr(0);
+
+    // If the `Builtin.Borrow` is address-only in its current form, then try to
+    // get its addressable representation. The projected address of the
+    // borrowed value may be the same as the `Builtin.Borrow` in cases where
+    // `Builtin.Borrow` uses the inline representation, so a temporary copy may
+    // unnecessarily limit its lifetime.
+    auto borrowValue = ManagedValue();
+    if (SGF.getLoweredType(borrowExpr->getType()).isAddressOnly(SGF.F)) {
+      borrowValue = SGF.tryEmitAddressableParameterAsAddress(borrowExpr,
+                                                       ValueOwnership::Shared);
+    }
+    if (!borrowValue) {
+      borrowValue = SGF.emitRValue(e->getArgs()->getExpr(0),
+                                   SGFContext::AllowGuaranteedPlusZero)
+        .getAsSingleValue(SGF, e);
+    }
+    
+    ManagedValue deref;
+    // Project the borrow of the value from there.
+    if (borrowValue.getType().isAddress()) {
+      // If `Builtin.Borrow` is address-only, then the referent must be.
+      deref = ManagedValue::forBorrowedAddressRValue(
+                 SGF.B.createDereferenceBorrowAddr(e, borrowValue.getValue()));
+    } else {
+      auto loweredReferentTy = SGF.getLoweredType(e->getType());
+
+      bool addressReferent;
+
+      if (loweredReferentTy.isAddressableForDeps(SGF.F)) {
+        addressReferent = true;
+      } else {
+        addressReferent = SGF.useLoweredAddresses()
+          && loweredReferentTy.isAddressOnly(SGF.F);
+      }
+
+      if (addressReferent) {
+        deref = ManagedValue::forBorrowedAddressRValue(
+                 SGF.B.createDereferenceAddrBorrow(e, borrowValue.getValue()));
+      } else {
+        deref = SGF.emitManagedBorrowedRValueWithCleanup(
+            SGF.B.createDereferenceBorrow(e, borrowValue.getValue()));
+        // TODO: For borrow accessors, we form the proper borrow scope during
+        // SILGenCleanup. Leave the returned result unchecked until that
+        // cleanup occurs.
+        deref = SGF.B.createUncheckedOwnership(e, deref);
+      }
+    }
+
+    auto typeData = getValueTypeData(accessKind, getSubstFormalRValueType(e),
+                                     deref.getValue());
+    LValue lv;
+    lv.add<ValueComponent>(deref, std::nullopt, typeData, /*isRValue*/ true);
+    return lv;
+  }
+
+  default:
+    llvm_unreachable("not an lvalue builtin");
+  }
 }
 
 LValue SILGenLValue::visitExpr(Expr *e, SGFAccessKind accessKind,

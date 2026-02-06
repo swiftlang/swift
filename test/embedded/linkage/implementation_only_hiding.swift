@@ -35,8 +35,8 @@
 // REQUIRES: swift_feature_Embedded
 
 //--- Library.swift
-@_implementationOnly import CDependency // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Library' may lead to instability during execution}}
-@_implementationOnly import SwiftDependency // expected-warning {{using '@_implementationOnly' without enabling library evolution for 'Library' may lead to instability during execution}}
+@_implementationOnly import CDependency // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'Library'}}
+@_implementationOnly import SwiftDependency // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'Library'}}
 
 @export(interface)
 public func test() {

@@ -581,6 +581,11 @@ public:
     return Element.getIsBitwiseTakable(IGF,
                                        getElementSILType(IGF.IGM, T));
   }
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF,
+                                      SILType T) const override {
+    return Element.getIsBitwiseBorrowable(IGF,
+                                          getElementSILType(IGF.IGM, T));
+  }
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     auto startBB = IGF.Builder.GetInsertBlock();

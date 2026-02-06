@@ -14,7 +14,7 @@ bb0(%0 : $*GenWrapper<T>):
 }
 
 // CHECK: Begin Error in function test_address_of_temp
-// CHECK: SIL verification failed: unidentified address return: !base->getType().isAddress() || isa<SILFunctionArgument>(base) || isa<ApplyInst>(base) && cast<ApplyInst>(base)->hasAddressResult()
+// CHECK: SIL verification failed: unidentified address return:
 // CHECK: Verifying instruction:
 // CHECK:      %4 = apply %3<T>(%1) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK: ->   return %4 : $*T

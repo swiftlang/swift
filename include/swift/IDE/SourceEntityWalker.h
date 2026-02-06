@@ -198,6 +198,8 @@ public:
 
   virtual bool shouldWalkIntoGenericParams() { return true; }
 
+  virtual bool shouldWalkIntoForEachDesugaredStmt() { return false; }
+
   /// Only walk the arguments of a macro, to represent the source as written.
   virtual MacroWalking getMacroWalkingBehavior() const {
     return MacroWalking::Arguments;

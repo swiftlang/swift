@@ -427,6 +427,8 @@ private struct SpecializationInfo {
         defer { cloner.deinitialize() }
 
         cloneAndSpecializeFunctionBody(using: &cloner)
+        // Cloning a whole function, even if it contains an `unreachable`, doesn't require lifetime completion.
+        specializedContext.setNeedCompleteLifetimes(to: false)
       })
 
     context.notifyNewFunction(function: specializedFunction, derivedFrom: callee)
@@ -694,6 +696,7 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
     Builder.insertCleanupAtFunctionExits(of: valueToDestroy.parentFunction, context) { builder in
       builder.createDestroyValue(operand: valueToDestroy)
     }
+    completeLifetime(of: valueToDestroy, context)
   }
 }
 

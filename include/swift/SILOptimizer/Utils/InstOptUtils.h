@@ -618,6 +618,8 @@ SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
 bool isDestructorSideEffectFree(SILInstruction *mayRelease,
                                 DestructorAnalysis *DA);
 
+bool shouldRemoveCondFail(StringRef withMessage, StringRef functionName);
+
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H

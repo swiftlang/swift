@@ -1482,6 +1482,10 @@ namespace {
         auto *PP = cast<ParenPattern>(item);
         return projectPattern(PP->getSubPattern());
       }
+      case PatternKind::Opaque: {
+        auto *opaque = cast<OpaquePattern>(item);
+        return projectPattern(opaque->getSubPattern());
+      }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         const Identifier name = OSP->getElementDecl()->getBaseIdentifier();

@@ -1567,6 +1567,10 @@ ManglingError Remangler::mangleBuiltinFixedArray(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
 }
 
+ManglingError Remangler::mangleBuiltinBorrow(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnexpectedBuiltinType, node);
+}
+
 ManglingError Remangler::mangleBuiltinTypeName(Node *node, unsigned depth) {
   Buffer << 'B';
   StringRef text = node->getText();

@@ -2231,3 +2231,34 @@ bb3:
   return %9
 }
 
+// CHECK-LABEL: sil [ossa] @begin_borrow_with_dead_end_exit :
+// CHECK:         %1 = begin_borrow %0
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       bb5:
+// CHECK-NEXT:    end_borrow %1
+// CHECK-LABEL: } // end sil function 'begin_borrow_with_dead_end_exit'
+sil [ossa] @begin_borrow_with_dead_end_exit : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  br bb1
+
+bb1:
+  %2 = begin_borrow %0
+  fix_lifetime %2
+  end_borrow %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_value [dead_end] %0
+  unreachable
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb1
+
+bb5:
+  return %0
+}
+

@@ -455,12 +455,26 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   return false;
 }
 
-// Addressable parameters cannot be dropped because the address may
-// escape. They also can't be promoted to direct convention, so there
-// is no danger in preserving them.
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
+  // The `self` parameter of a borrow accessor with an indirect return
+  // cannot be promoted, since the returned address might point into the
+  // parameter.
+  //
+  // TODO: It may be possible to promote `self` and the result if and only
+  // if both the parameter and result do or do not get promoted in unison.
+  if (substType->getNumResults() == 1
+      && substType->getSingleResult().getConvention()
+           == ResultConvention::GuaranteedAddress
+      && substType->getSelfParameterIndex() == paramIdx) {
+    return false;
+  }
+  
+  // Addressable parameters cannot be dropped because the address may
+  // escape. They also can't be promoted to direct convention, so there
+  // is no danger in preserving them.
   return !substType->isAddressable(paramIdx, caller);
+
 }
 
 // If there is no read from an indirect argument, this argument has to be

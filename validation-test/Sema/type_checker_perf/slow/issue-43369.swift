@@ -1,7 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=5
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000
 // REQUIRES: tools-release,no_asan
 
-// Hits the default memory threshold
+// Invalid expression, because there is no (A, Int) overload of /
+
 // https://github.com/apple/swift/issues/43369
 
 struct A {}

@@ -3,7 +3,7 @@
 // RUN:     -enable-callee-allocated-coro-abi               \
 // RUN:     -enable-library-evolution                       \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NORMAL,CHECK-%target-abi-stability
+// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi-stability
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types                      \
 // RUN:     %s                                                                 \
@@ -11,7 +11,7 @@
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND,CHECK-%target-abi-stability
+// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi-stability
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError
@@ -19,7 +19,7 @@
 // A read requirement may be satisfied by
 // - a stored property
 // - a _read accessor
-// - a read accessor
+// - a yielding borrow accessor
 // - a get accessor
 // - an unsafeAddress accessor
 
@@ -80,7 +80,7 @@ public protocol P1 : ~Copyable {
 }
 @available(SwiftStdlib 9999, *)
 public protocol P2 : ~Copyable {
-  var urs: U { read set }
+  var urs: U { yielding borrow set }
 }
 @available(SwiftStdlib 6.0, *)
 public protocol P3 : ~Copyable {
@@ -107,7 +107,7 @@ public protocol P3 : ~Copyable {
 // CHECK:         end_apply [[TOKEN]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements2P3P2urAA1UVvy'
-  var ur: U { read }
+  var ur: U { yielding borrow }
 }
 
 @frozen
@@ -190,8 +190,7 @@ public struct ImplAStored : ~Copyable & P1 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       bb2:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -241,8 +240,7 @@ public struct ImplBStored : ~Copyable & P2 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -331,8 +329,7 @@ public struct ImplCStored : ~Copyable & P3 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -436,8 +433,7 @@ public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -523,8 +519,7 @@ public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -626,8 +621,7 @@ public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -637,10 +631,10 @@ public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
 struct ImplACoroutineAccessors : ~Copyable & P1 {
   var _i: U
   var ubgs: U {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -732,8 +726,7 @@ struct ImplACoroutineAccessors : ~Copyable & P1 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -745,10 +738,10 @@ struct ImplACoroutineAccessors : ~Copyable & P1 {
 public struct ImplBCoroutineAccessors : ~Copyable & P2 {
   var _i: U
   public var urs: U {
-    read {
+    yielding borrow {
       yield _i
     }
-    modify {
+    yielding mutate {
       yield &_i
     }
   }
@@ -789,8 +782,7 @@ public struct ImplBCoroutineAccessors : ~Copyable & P2 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -802,7 +794,7 @@ public struct ImplBCoroutineAccessors : ~Copyable & P2 {
 public struct ImplCCoroutineAccessors : ~Copyable & P3 {
   var _i: U
   public var ur: U {
-    read {
+    yielding borrow {
       yield _i
     }
   }
@@ -894,8 +886,7 @@ public struct ImplCCoroutineAccessors : ~Copyable & P3 {
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         end_borrow [[SELF]]
 // CHECK:         unwind
@@ -994,8 +985,7 @@ public struct ImplAGetSet : P1 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplAGetSetVAA2P1A2aDP4ubgsAA1UVvyTW'
@@ -1058,8 +1048,7 @@ public struct ImplBGetSet : P2 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvyTW'
@@ -1155,8 +1144,7 @@ public struct ImplCGetSet : P3 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements11ImplCGetSetVAA2P3A2aDP2urAA1UVvyTW'
@@ -1264,8 +1252,7 @@ public struct ImplAUnsafeAddressors : P1 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplAUnsafeAddressorsVAA2P1A2aDP4ubgsAA1UVvyTW'
@@ -1334,8 +1321,7 @@ public struct ImplBUnsafeAddressors : P2 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvyTW'
@@ -1446,8 +1432,7 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return
 // CHECK:       [[FAILURE]]:
-// CHECK-NORMAL:  end_apply [[TOKEN]]
-// CHECK-UNWIND:  abort_apply [[TOKEN]]
+// CHECK:         end_apply [[TOKEN]]
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         unwind
 // CHECK-LABEL: } // end sil function '$s17read_requirements21ImplCUnsafeAddressorsVAA2P3A2aDP2urAA1UVvyTW'

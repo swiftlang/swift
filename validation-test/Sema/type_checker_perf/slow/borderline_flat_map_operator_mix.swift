@@ -1,6 +1,8 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000
 
 // REQUIRES: no_asan
+
+// Valid expression, type checks with default limits but slow
 
 struct S {
     var t: Double

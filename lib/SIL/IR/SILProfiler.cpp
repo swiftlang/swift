@@ -353,7 +353,8 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
       mapRegion(US->getBody());
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      mapRegion(WS->getBody());
+      if (!WS->getParentForEach())
+        mapRegion(WS->getBody());
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       mapRegion(RWS->getBody());
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
@@ -764,13 +765,19 @@ struct PGOMapping : public ASTWalker {
       setExecutionCount(guardBody, guardCount);
       setExecutionCount(GS, subtract(parentCount, guardCount));
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      setKnownExecutionCount(WS->getBody());
+      if (!WS->getParentForEach())
+        setKnownExecutionCount(WS->getBody());
       setExecutionCount(WS, parentCount);
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       setKnownExecutionCount(RWS->getBody());
       setExecutionCount(RWS, parentCount);
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
-      setKnownExecutionCount(FES->getBody());
+      // The counter for the for loop needs to be associated with the desugared
+      // while statement since that's where the condition is checked.
+      auto loopCount = loadExecutionCount(FES->getBody());
+      if (auto *continueTarget = FES->getContinueTarget())
+        setExecutionCount(continueTarget->getBody(), loopCount);
+
       setExecutionCount(FES, parentCount);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       setKnownExecutionCount(CS);
@@ -1406,7 +1413,8 @@ public:
 
       if (auto *E = getConditionNode(WS->getCond()))
         assignCounter(E, getCurrentCounter());
-      assignKnownCounter(WS->getBody());
+      if (!WS->getParentForEach())
+        assignKnownCounter(WS->getBody());
 
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       // The counter for the while statement itself tracks the number of jumps

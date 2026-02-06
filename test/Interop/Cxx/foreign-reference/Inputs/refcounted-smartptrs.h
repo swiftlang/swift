@@ -5,10 +5,19 @@
 
 class RefCountedBase {
 public:
+  SWIFT_RETURNS_RETAINED
   RefCountedBase() : _refCount(1) { printf("created\n"); }
 
+  static RefCountedBase * _Nonnull forSmartPtr() {
+    auto p = new RefCountedBase();
+    p->_refCount = 0;
+    return p;
+  }
+
+  int method() const { return 42; }
+
 protected:
-  virtual ~RefCountedBase() { printf("destroyed"); }
+  virtual ~RefCountedBase() { printf("destroyed\n"); }
 
 private:
 
@@ -18,8 +27,6 @@ private:
   RefCountedBase &operator=(RefCountedBase &&) = delete;
 
   int _refCount;
-
-  int method() const { return 42; }
 
   friend void retainSharedFRT(RefCountedBase *_Nonnull);
   friend void releaseSharedFRT(RefCountedBase *_Nonnull);
@@ -109,6 +116,15 @@ using RefOfBase = Ref<RefCountedBase>;
 using PtrOfBase = Ptr<RefCountedBase>;
 using DerivedRefOfBase = DerivedRef<RefCountedBase>;
 
+inline void bridgedFunction(RefOfBase ptr) {}
+inline void bridgedFunction2(PtrOfBase ptr) {}
+inline RefOfBase bridgedFunction3() {
+  return RefOfBase(RefCountedBase::forSmartPtr());
+}
+inline PtrOfBase bridgedFunction4() {
+  return PtrOfBase(RefCountedBase::forSmartPtr());
+}
+
 namespace errors { // expected-note * {{'errors' declared here}}
 struct __attribute__((
     swift_attr("@_refCountedPtr(Nullability: \"Nullable\")"))) MissingToRawPtr {};
@@ -130,6 +146,26 @@ struct SWIFT_REFCOUNTED_PTR(.getPtr) WrongConversionSignature {
 
 class SWIFT_REFCOUNTED_PTR(.getPtr) PrivateConversionFunction {
   // expected-note@-1 * {{cannot find function '.getPtr' specified in '_toRawPointer' parameter of SWIFT_REFCOUNTED_PTR 'PrivateConversionFunction'}}
+  RefCountedBase *_Nonnull getPtr();
+};
+
+struct SWIFT_REFCOUNTED_PTR(.getPtr) NoSuitableCtor {
+  // expected-note@-1 * {{cannot find constructor to create smart pointer from a raw pointer to a shared reference 'NoSuitableCtor'}}
+  RefCountedBase *_Nonnull getPtr();
+};
+
+struct RefCounted : RefCountedBase {};
+
+struct SWIFT_REFCOUNTED_PTR(.getPtr) AmbiguousCtors {
+  // expected-note@-1 * {{there are multiple constructors to create smart pointer from a raw pointer to a shared reference 'AmbiguousCtors'}}
+  AmbiguousCtors(RefCountedBase* _Nullable);
+  AmbiguousCtors(RefCounted* _Nullable);
+  RefCountedBase *_Nonnull getPtr();
+};
+
+struct SWIFT_REFCOUNTED_PTR(.getPtr) MismatchingPointerTypes {
+  // expected-note@-1 * {{the constructor's parameter to create smart pointer from a raw pointer does not match the return type of the raw pointer accessor in 'MismatchingPointerTypes'}}
+  MismatchingPointerTypes(RefCounted* _Nullable);
   RefCountedBase *_Nonnull getPtr();
 };
 } // namespace errors

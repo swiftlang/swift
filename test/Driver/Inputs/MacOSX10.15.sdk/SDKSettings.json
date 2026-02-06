@@ -1,0 +1,33 @@
+{
+  "CanonicalName": "macosx10.15",
+  "Version": "10.15",
+  "IsBaseSDK": "YES",
+  "DisplayName": "macOS 10.15",
+  "MinimalDisplayName": "10.15",
+  "SupportedTargets": {
+    "macosx": {
+      "Archs": ["x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "macosx", "LLVMTargetTripleEnvironment": "",
+      "BuildVersionPlatformID": "1",
+      "DefaultDeploymentTarget": "10.15",
+      "MinimumDeploymentTarget": "10.6", "MaximumDeploymentTarget": "10.15.99",
+      "ValidDeploymentTargets": ["10.6", "10.7", "10.8", "10.9", "10.10", "10.11", "10.12", "10.13", "10.14", "10.15"]
+    },
+    "iosmac": {
+      "Archs": ["x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "macabi",
+      "BuildVersionPlatformID": "6",
+      "DefaultDeploymentTarget": "13.1",
+      "MinimumDeploymentTarget": "13.1", "MaximumDeploymentTarget": "13.2.99",
+      "ValidDeploymentTargets": ["13.1", "13.2"]
+    }
+  },
+  "VersionMap": {
+    "macOS_iOSMac": {"10.15": "13.1", "10.15.1": "13.2"},
+    "iOSMac_macOS": {"13.1": "10.15", "13.2": "10.15.1"}
+  },
+  "DefaultDeploymentTarget": "10.15",
+  "MaximumDeploymentTarget": "10.15.99",
+  "Comments": [
+    "This is actually the macOS 10.15.1 SDK from Xcode 11.2. The Version value wasn't updated until Xcode 11.4 when the",
+    "macOS SDK was updated to 10.15.4."
+  ]
+}

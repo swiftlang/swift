@@ -130,11 +130,19 @@ void PartitionOpError::InOutSendingParametersInSameRegionError::print(
 void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   constexpr static char extraSpaceLiteral[10] = "     ";
   switch (opKind) {
-  case PartitionOpKind::Assign: {
-    os << "assign ";
+  case PartitionOpKind::AssignDirect: {
+    os << "assign_direct ";
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << getOpArg1() << " = %%" << getOpArg2();
+    break;
+  }
+  case PartitionOpKind::AssignIndirect: {
+    os << "assign_indirect ";
+    if (extraSpace)
+      os << extraSpaceLiteral;
+    os << "%%" << getOpArg1() << " = %%" << getOpArg2()
+       << ". Overwritten Value: " << getOpArg3();
     break;
   }
   case PartitionOpKind::AssignFresh:

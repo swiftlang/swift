@@ -66,23 +66,6 @@ bb1(%phi : @guaranteed $FakeOptional<C>):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
-// CHECK:       bb1([[A:%.*]] : @guaranteed $C):
-// CHECK-NEXT:    [[B:%.*]] = borrowed [[A]] : $C from ()
-// CHECK:       } // end sil function 'introducer_unreachable'
-sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
-bb0:
-  specify_test "update_borrowed_from"
-  br bb2
-
-bb1(%phiCycle : @guaranteed $C):
-  br bb1(%phiCycle : $C)
-
-bb2:
-  %retval = tuple ()
-  return %retval : $()
-}
-
 // %reborrow introduces multiple borrow scopes. But it should only appear
 // in the list once.
 
@@ -290,26 +273,6 @@ bb2(%8 : @reborrow $PairC, %9 : @guaranteed $C):
   destroy_value %0 : $PairC
   %99 = tuple()
   return %99 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @unreachable_block :
-// CHECK:       bb1([[A1:%.*]] : @reborrow $C):
-// CHECK-NEXT:    = borrowed [[A1]] : $C from ()
-// CHECK:       bb2([[A2:%.*]] : @reborrow $C):
-// CHECK-NEXT:    = borrowed [[A2]] : $C from (%0 : $C)
-// CHECK:       } // end sil function 'unreachable_block'
-sil [ossa] @unreachable_block : $@convention(thin) (@owned C) -> @owned C {
-bb0(%0 : @owned $C):
-  specify_test "update_borrowed_from"
-  %1 = begin_borrow %0 : $C
-  br bb2(%1 : $C)
-
-bb1(%3 : @guaranteed $C):
-  br bb2(%3 : $C)
-
-bb2(%5 : @guaranteed $C):
-  end_borrow %5 : $C
-  return %0 : $C
 }
 
 class Klass {}

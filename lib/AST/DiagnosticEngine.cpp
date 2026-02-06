@@ -459,6 +459,13 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
+InFlightDiagnostic::limitBehaviorIfMorePermissive(DiagnosticBehavior limit) {
+  auto prev = getDiag().getBehaviorLimit();
+  getDiag().setBehaviorLimit(prev.merge(limit));
+  return *this;
+}
+
+InFlightDiagnostic &
 InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
                                                    unsigned majorVersion) {
   if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {

@@ -109,6 +109,10 @@ public:
     }
     entity->setCustomBits((entity->getCustomBits() & ~clearMask) | (value << startBit));
   }
+
+  bool fits(unsigned value) const {
+    return value < (1u << (endBit - startBit));
+  }
 };
 
 /// A set which knows its size.

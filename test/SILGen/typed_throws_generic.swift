@@ -261,9 +261,14 @@ func forcedMap<T, U>(_ source: [T]) -> [U] {
 }
 
 // Witness thunks
+struct WrappedError<E: Error>: Error {
+  let wrapped: E
+}
+
 protocol P {
   associatedtype E: Error
   func f() throws(E)
+  func g() throws(WrappedError<E>)
 }
 
 struct Res<Success, Failure: Error>: P {
@@ -280,6 +285,9 @@ struct Res<Success, Failure: Error>: P {
   // CHECK: [[ERROR_BB]]:
   // CHECK: throw_addr
   func f() throws(Failure) { }
+
+  // CHECK: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic3ResVyxq_GAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@in_guaranteed Res<τ_0_0, τ_0_1>) -> @error_indirect WrappedError<τ_0_1>
+  func g() throws(WrappedError<Failure>) { }
 }
 
 struct TypedRes<Success>: P {
@@ -296,6 +304,9 @@ struct TypedRes<Success>: P {
   // CHECK-NEXT: store [[ERROR]] to [trivial] %0 : $*MyError
   // CHECK-NEXT: throw_addr
   func f() throws(MyError) { }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic8TypedResVyxGAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed TypedRes<τ_0_0>) -> @error_indirect WrappedError<MyError>
+  func g() throws(WrappedError<MyError>) { }
 }
 
 struct UntypedRes<Success>: P {
@@ -312,6 +323,9 @@ struct UntypedRes<Success>: P {
   // CHECK-NEXT: store [[ERROR]] to [init] %0 : $*any Error
   // CHECK-NEXT: throw_addr
   func f() throws { }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic10UntypedResVyxGAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed UntypedRes<τ_0_0>) -> @error_indirect WrappedError<any Error> {
+  func g() throws(WrappedError<any Error>) { }
 }
 
 struct InfallibleRes<Success>: P {
@@ -321,6 +335,9 @@ struct InfallibleRes<Success>: P {
   // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic13InfallibleResV1fyyF : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>) -> ()
   // CHECK: = apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>)
   func f() { }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1gyyAA12WrappedErrorVy1EQzGYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect WrappedError<Never> {
+  func g() throws(WrappedError<Never>) { }
 }
 
 // Protocol with a default implementation of its function with a

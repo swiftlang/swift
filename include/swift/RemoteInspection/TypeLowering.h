@@ -118,6 +118,7 @@ enum class TypeInfoKind : unsigned {
   Invalid,
   Enum,
   Array,
+  Borrow,
 };
 
 class TypeInfo {

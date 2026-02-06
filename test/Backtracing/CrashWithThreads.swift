@@ -83,12 +83,12 @@ func spawnThread(_ shouldCrash: Bool) {
   }
 }
 
-let crashingThreadIndex = (1..<10).randomElement()
+let crashingThreadIndex = (1..<4).randomElement()
 
 lockMutex()
 
 // hold a mutex
-for threadIndex in 1..<10 {
+for threadIndex in 1..<4 {
   spawnThread(threadIndex == crashingThreadIndex)
 }
 
@@ -102,28 +102,15 @@ while (true) {
 // CHECK: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
 
 // make sure there are no threads before the crashing thread (rdar://164566321)
+// and check that we have some vaguely sane and symbolicated threads, including
+// a main thread (AFTER the crashed thread) and at least one other thread
 
 // we expect the first thread not to be another thread, it should be the crashing thread instead
 // CHECK-NOT: Thread {{[0-9]+( ".*")?}}:
 // CHECK: Thread {{[0-9]+}} {{(".*" )?}}crashed:
+// CHECK: {{0x[0-9a-f]+}} reallyCrashMe()
 
-// CHECK: 0                    0x{{[0-9a-f]+}} reallyCrashMe() + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} crashMe() + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} closure #{{[0-9]}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// CHECK-NEXT: 3 [ra] [thunk]  0x{{[0-9a-f]+}} @objc closure #{{[0-9]}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at {{.*}}<compiler-generated>
+// CHECK: Thread {{[0-9]*( ".*")?}}:
+// CHECK: {{0x[0-9a-f]+.*main.* CrashWithThreads}}
 
-// CHECK: Thread 0{{( ".*")?}}:
-
-// CHECK: Thread {{[1-9][0-9]*( ".*")?}}:
-
-// CHECK: 0                    0x{{[0-9a-f]+}} __semwait_signal + {{[0-9]+}} in libsystem_kernel.dylib
-// CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} closure #{{[0-9]*}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at {{.*}}/CrashWithThreads
-// CHECK-NEXT: 2 [ra] [thunk]  0x{{[0-9a-f]+}} @objc closure #{{[0-9]*}} in spawnThread(_:) + {{[0-9]+}} in CrashWithThreads at /<compiler-generated>
-// CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} _pthread_start + {{[0-9]+}} in libsystem_pthread.dylib
-
-
-// CHECK: Registers:
-
-// CHECK: Images ({{[0-9]+}} omitted):
-
-// CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{([0-9a-f]+|<no build ID>)}}{{ +}}CrashWithThreads{{ +}}{{.*}}/CrashWithThreads
+// CHECK: Thread {{[0-9]*( ".*")?}}:

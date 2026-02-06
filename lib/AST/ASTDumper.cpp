@@ -1357,7 +1357,10 @@ namespace {
     void printIsolation(const ActorIsolation &isolation) {
       switch (isolation) {
       case ActorIsolation::Unspecified:
+        printFlag(true, "unspecified_isolation", CapturesColor);
+        break;
       case ActorIsolation::NonisolatedUnsafe:
+        printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
 
       case ActorIsolation::Nonisolated:
@@ -2001,7 +2004,10 @@ namespace {
       printField(P->getValue(), Label::always("value"));
       printFoot();
     }
-
+    void visitOpaquePattern(OpaquePattern *P, Label label) {
+      printCommon(P, "pattern_opaque", label);
+      printFoot();
+    }
   };
 
   /// PrintDecl - Visitor implementation of Decl::print.
@@ -3252,6 +3258,8 @@ public:
     printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
   }
 
+  void visitOpaqueStmt(OpaqueStmt *S, Label label) {}
+
   void visitBraceStmt(BraceStmt *S, Label label) {
     printCommon(S, "brace_stmt", label);
     printList(S->getElements(), [&](auto &Elt, Label label) {
@@ -3331,21 +3339,12 @@ public:
     if (S->getWhere()) {
       printRec(S->getWhere(), Label::always("where"));
     }
-    printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
-    if (S->getIteratorVar()) {
-      printRec(S->getIteratorVar(), Label::optional("iterator_var"));
-    }
-    if (S->getNextCall()) {
-      printRec(S->getNextCall(), Label::optional("next_call"));
-    }
-    if (S->getConvertElementExpr()) {
-      printRec(S->getConvertElementExpr(),
-               Label::optional("convert_element_expr"));
-    }
-    if (S->getElementExpr()) {
-      printRec(S->getElementExpr(), Label::optional("element_expr"));
-    }
+    printRec(S->getSequence(), Label::optional("parsed_sequence"));
+
     printRec(S->getBody(), Label::optional("body"));
+
+    printRec(S->getCachedDesugaredStmt(), Label::optional("desugared_loop"));
+
     printFoot();
   }
   void visitBreakStmt(BreakStmt *S, Label label) {
@@ -5118,6 +5117,7 @@ public:
                        requires_stored_property_inits)
   TRIVIAL_ATTR_PRINTER(ResultBuilder, result_builder)
   TRIVIAL_ATTR_PRINTER(Rethrows, rethrows)
+  TRIVIAL_ATTR_PRINTER(Reparentable, reparentable)
   TRIVIAL_ATTR_PRINTER(Safe, safe)
   TRIVIAL_ATTR_PRINTER(SPIOnly, spi_only)
   TRIVIAL_ATTR_PRINTER(Sendable, sendable)
@@ -6239,6 +6239,13 @@ namespace {
       printCommon("builtin_fixed_array_type", label);
       printRec(T->getSize(), Label::optional("size"));
       printRec(T->getElementType(), Label::optional("element_type"));
+      printFoot();
+    }
+
+    void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                                    Label label) {
+      printCommon("builtin_borrow_type", label);
+      printRec(T->getReferentType(), Label::optional("referent"));
       printFoot();
     }
 

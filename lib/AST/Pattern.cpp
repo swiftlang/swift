@@ -50,6 +50,8 @@ DescriptivePatternKind Pattern::getDescriptiveKind() const {
     TRIVIAL_PATTERN_KIND(OptionalSome);
     TRIVIAL_PATTERN_KIND(Bool);
     TRIVIAL_PATTERN_KIND(Expr);
+  case PatternKind::Opaque:
+    return cast<OpaquePattern>(this)->getSubPattern()->getDescriptiveKind();
 
   case PatternKind::Binding:
     switch (cast<BindingPattern>(this)->getIntroducer()) {
@@ -259,6 +261,9 @@ void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
     fn(cast<NamedPattern>(this)->getDecl());
     return;
 
+  case PatternKind::Opaque:
+    return;
+
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Binding:
@@ -311,6 +316,9 @@ void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
     return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
   case PatternKind::Binding:
     return cast<BindingPattern>(this)->getSubPattern()->forEachNode(f);
+
+  case PatternKind::Opaque:
+    return;
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getElements())
@@ -410,12 +418,19 @@ static bool isIrrefutableExprPattern(const ExprPattern *EP) {
   }
 }
 
-bool Pattern::isSingleRefutablePattern() const {
-  // If this is an always matching 'is' pattern, then it isn't refutable.
-  if (auto *is = dyn_cast<IsPattern>(this))
-    if (is->getCastKind() == CheckedCastKind::Coercion ||
-        is->getCastKind() == CheckedCastKind::BridgingCoercion)
-      return false;
+bool Pattern::isSingleRefutablePattern(bool allowIsPatternCoercion) const {
+  if (allowIsPatternCoercion) {
+    // If this is an always matching 'is' pattern, then it isn't refutable.
+    // FIXME: This behavior is currently broken since the 'coercion' is
+    // implemented using a runtime cast which cannot properly handle things like
+    // function type subtyping. We ought to properly implement coercion handling
+    // such that it matches what we do for expressions.
+    // https://github.com/swiftlang/swift/issues/86705
+    if (auto *is = dyn_cast<IsPattern>(this))
+      if (is->getCastKind() == CheckedCastKind::Coercion ||
+          is->getCastKind() == CheckedCastKind::BridgingCoercion)
+        return false;
+  }
 
   // If this is an ExprPattern that isn't resolved yet, do some simple
   // syntactic checks.
@@ -438,12 +453,18 @@ bool Pattern::isSingleRefutablePattern() const {
 }
 
 /// Return true if this pattern (or a subpattern) is refutable.
-bool Pattern::isRefutablePattern() const {
+bool Pattern::isRefutablePattern(bool allowIsPatternCoercion) const {
   bool foundRefutablePattern = false;
   const_cast<Pattern *>(this)->forEachNode([&](Pattern *Node) {
     if (foundRefutablePattern)
       return;
-    foundRefutablePattern = Node->isSingleRefutablePattern();
+    if (auto *opaque = dyn_cast<OpaquePattern>(Node)) {
+      foundRefutablePattern =
+          opaque->getSubPattern()->isRefutablePattern(allowIsPatternCoercion);
+    } else {
+      foundRefutablePattern =
+          Node->isSingleRefutablePattern(allowIsPatternCoercion);
+    }
   });
 
   return foundRefutablePattern;
@@ -798,6 +819,7 @@ Pattern::getOwnership(
     USE_SUBPATTERN(Paren)
     USE_SUBPATTERN(Typed)
     USE_SUBPATTERN(Binding)
+    USE_SUBPATTERN(Opaque)
 #undef USE_SUBPATTERN
     void visitTuplePattern(TuplePattern *p) {
       for (auto &element : p->getElements()) {

@@ -87,40 +87,11 @@ bb3:
   return %6 : $()
 }
 
-// For now until the proper unreachable pruning code is committed for
-// SILCombine, we should not dce dead instructions in unreachable code.
-
-// CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// CHECK: bb0
-// CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
-// CHECK-LABEL: } // end sil function 'dead_inst_elimination_ignore_unreachable'
-sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int64, 24
-  br bb2
-
-bb1:
-  %1 = integer_literal $Builtin.Int64, 48
-  br bb2
-
-bb2:
-  %2 = tuple()
-  return %2 : $()
-}
-
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil [ossa] @exit : $@convention(thin) () -> Never {
-bb0:
-  br bb1
-
-bb1:
-  br bb1
-}
+sil [ossa] @exit : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
 // CHECK: store
@@ -1366,4 +1337,154 @@ bb0(%0 : $Pair<x, y>):
   %3 = type_value $Int for y
   %4 = tuple (%2, %3)
   return %4
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_block : {{.*}} {
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value
+// CHECK-LABEL: } // end sil function 'dead_end_block'
+sil [ossa] @dead_end_block : $@convention(thin) (Builtin.RawPointer) -> @owned B {
+bb0(%0 : $Builtin.RawPointer):
+  %4 = raw_pointer_to_ref %0 to $E
+  %5 = copy_value %4
+  %6 = upcast %5 to $B
+  fix_lifetime %6
+  destroy_value %6
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %14 = raw_pointer_to_ref %0 to $E
+  %15 = copy_value %14
+  %16 = upcast %15 to $B
+  return %16
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// rdar168620481: bailout on uwnowed phis
+/////////////////////////////////////////////////////////////////////////////
+
+class Element {
+  @_hasStorage var skip: Optional<Unmanaged<Element>>
+  @_hasStorage var after: Optional<Element>
+}
+
+// The old value:
+//     %24 = unmanaged_to_ref %23 to $Element
+// cannot be replaced by
+//     %16 = copy_value %15
+// because %24 is used by phi node
+//     br bb2(%20, %24)
+//
+// Previously asserted in OwnershipLifetimeExtender::createPlusZeroCopy.
+// CHECK-LABEL: sil [ossa] @testUnownedPhi : {{.*}} {
+// CHECK:  unmanaged_to_ref %{{.*}} to $Element
+// CHECK-LABEL: } // end sil function 'testUnownedPhi'
+sil [ossa] @testUnownedPhi : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
+bb0(%0 : $Optional<Unmanaged<Element>>):
+  br bb1(%0)
+
+bb1(%2 : $Optional<Unmanaged<Element>>):
+  %3 = unchecked_enum_data %2, #Optional.some!enumelt
+  %4 = struct_extract %3, #Unmanaged._value
+  %5 = unmanaged_to_ref %4 to $Element
+  br bb2(%3, %5)
+
+
+bb2(%7 : $Unmanaged<Element>, %8 : @unowned $Element):
+  %9 = unchecked_ownership_conversion %8, @unowned to @guaranteed
+  %10 = ref_element_addr %9, #Element.after
+  %11 = load [copy] %10
+  %12 = begin_borrow [lexical] %11
+  switch_enum %12, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb6
+
+bb3(%14 : @guaranteed $Element):
+  %15 = unchecked_enum_data %12, #Optional.some!enumelt
+  %16 = copy_value %15
+  end_borrow %12
+  destroy_value %11
+  %19 = ref_to_unmanaged %16 to $@sil_unmanaged Element
+  %20 = struct $Unmanaged<Element> (%19)
+  destroy_value %16
+  end_borrow %9
+  %23 = struct_extract %20, #Unmanaged._value
+  %24 = unmanaged_to_ref %23 to $Element
+  cond_br undef, bb5, bb4
+
+bb4:
+  %26 = unchecked_ownership_conversion %24, @unowned to @guaranteed
+  %27 = ref_element_addr %26, #Element.skip
+  %28 = load [trivial] %27
+  end_borrow %26
+  br bb1(%28)
+
+bb5:
+  br bb2(%20, %24)
+
+bb6:
+  end_borrow %12
+  destroy_value %11
+  end_borrow %9
+  %35 = tuple ()
+  return %35
+}
+
+// The old value:
+//     %24 = unmanaged_to_ref %23 to $Element
+// cannot be replaced by
+//     %15 = unchecked_ownership_conversion %8, @unowned to @guaranteed
+// because %24 is used by phi node
+//     br bb2(%20, %24)
+//
+// Previously asserted in OwnershipLifetimeExtender::borrowCopyOverGuaranteedUsers.
+// CHECK-LABEL: sil [ossa] @testReplaceUnownedPhiWithGuaranteed : {{.*}} {
+// CHECK: unmanaged_to_ref %{{.*}} to $Element
+// CHECK-LABEL: } // end sil function 'testReplaceUnownedPhiWithGuaranteed'
+sil [ossa] @testReplaceUnownedPhiWithGuaranteed : $@convention(thin) (Optional<Unmanaged<Element>>) -> () {
+bb0(%0 : $Optional<Unmanaged<Element>>):
+  br bb1(%0)
+
+bb1(%2 : $Optional<Unmanaged<Element>>):
+  %3 = unchecked_enum_data %2, #Optional.some!enumelt
+  %4 = struct_extract %3, #Unmanaged._value
+  %5 = unmanaged_to_ref %4 to $Element
+  br bb2(%3, %5)
+
+
+bb2(%7 : $Unmanaged<Element>, %8 : @unowned $Element):
+  %9 = unchecked_ownership_conversion %8, @unowned to @guaranteed
+  %10 = ref_element_addr %9, #Element.after
+  %11 = load [copy] %10
+  %12 = begin_borrow [lexical] %11
+  switch_enum %12, case #Optional.some!enumelt: bb3, case #Optional.none!enumelt: bb6
+
+bb3(%14 : @guaranteed $Element):
+  %15 = unchecked_enum_data %12, #Optional.some!enumelt
+  %19 = ref_to_unmanaged %15 to $@sil_unmanaged Element
+  end_borrow %12
+  destroy_value %11
+  %20 = struct $Unmanaged<Element> (%19)
+  end_borrow %9
+  //%23 = struct_extract %20, #Unmanaged._value
+  %24 = unmanaged_to_ref %19 to $Element
+  cond_br undef, bb5, bb4
+
+bb4:
+  %26 = unchecked_ownership_conversion %24, @unowned to @guaranteed
+  %27 = ref_element_addr %26, #Element.skip
+  %28 = load [trivial] %27
+  end_borrow %26
+  br bb1(%28)
+
+bb5:
+  br bb2(%20, %24)
+
+bb6:
+  end_borrow %12
+  destroy_value %11
+  end_borrow %9
+  %35 = tuple ()
+  return %35
 }

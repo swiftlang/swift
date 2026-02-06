@@ -321,11 +321,6 @@ std::optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
     Root = swiftSourceStorage->textualModuleDetails.CASFileSystemRootID;
     break;
   }
-  case swift::ModuleDependencyKind::Clang: {
-    auto clangModuleStorage = cast<ClangModuleDependencyStorage>(storage.get());
-    Root = clangModuleStorage->CASFileSystemRootID;
-    break;
-  }
   default:
     return std::nullopt;
   }
@@ -518,11 +513,10 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
     : Alloc(), Saver(Alloc) {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::FullTree,
+      clang::tooling::dependencies::ScanningOutputFormat::Full,
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr,
       // ScanningOptimizations::Default excludes the current working
       // directory optimization. Clang needs to communicate with
       // the build system to handle the optimization safely.
@@ -656,7 +650,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
       Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
       // consistent with the non-CAS case.
@@ -732,8 +725,6 @@ ModuleDependenciesCache::findSwiftDependency(StringRef moduleName) const {
     return found;
   if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
     return found;
-  if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftSource))
-    return found;
   return std::nullopt;
 }
 
@@ -754,19 +745,13 @@ bool ModuleDependenciesCache::hasDependency(
   return findDependency(moduleName, kind).has_value();
 }
 
-bool ModuleDependenciesCache::hasDependency(StringRef moduleName) const {
-  for (auto kind = ModuleDependencyKind::FirstKind;
-       kind != ModuleDependencyKind::LastKind; ++kind)
-    if (findDependency(moduleName, kind).has_value())
-      return true;
-  return false;
-}
-
-bool ModuleDependenciesCache::hasSwiftDependency(StringRef moduleName) const {
-  return findSwiftDependency(moduleName).has_value();
-}
 bool ModuleDependenciesCache::hasClangDependency(StringRef moduleName) const {
   return findDependency(moduleName, ModuleDependencyKind::Clang).has_value();
+}
+
+bool ModuleDependenciesCache::hasQueriedSwiftDependency(StringRef moduleName) const {
+  auto recordedDep = findSwiftDependency(moduleName).has_value();
+  return recordedDep || negativeSwiftDependencyCache.contains(moduleName);
 }
 
 int ModuleDependenciesCache::numberOfClangDependencies() const {
@@ -776,7 +761,6 @@ int ModuleDependenciesCache::numberOfSwiftDependencies() const {
   return ModuleDependenciesMap.at(ModuleDependencyKind::SwiftInterface).size() +
          ModuleDependenciesMap.at(ModuleDependencyKind::SwiftBinary).size();
 }
-
 void ModuleDependenciesCache::recordDependency(
     StringRef moduleName, ModuleDependencyInfo dependency) {
   auto dependenciesKind = dependency.getKind();
@@ -794,18 +778,16 @@ void ModuleDependenciesCache::recordClangDependencies(
 
 void ModuleDependenciesCache::recordClangDependency(
     const clang::tooling::dependencies::ModuleDeps &dependency,
-    DiagnosticEngine &diags,
-    BridgeClangDependencyCallback bridgeClangModule) {
-  auto depID =
-      ModuleDependencyID{dependency.ID.ModuleName, ModuleDependencyKind::Clang};
-  if (!hasDependency(depID)) {
+    DiagnosticEngine &diags, BridgeClangDependencyCallback bridgeClangModule) {
+  if (!hasClangDependency(dependency.ID.ModuleName)) {
     recordDependency(dependency.ID.ModuleName, bridgeClangModule(dependency));
     addSeenClangModule(dependency.ID);
     return;
   }
 
-  auto priorClangModuleDetails =
-      findKnownDependency(depID).getAsClangModule();
+  auto depID =
+      ModuleDependencyID{dependency.ID.ModuleName, ModuleDependencyKind::Clang};
+  auto priorClangModuleDetails = findKnownDependency(depID).getAsClangModule();
   DEBUG_ASSERT(priorClangModuleDetails);
   auto priorContextHash = priorClangModuleDetails->contextHash;
   auto newContextHash = dependency.ID.ContextHash;
@@ -957,6 +939,11 @@ ModuleDependencyIDCollectionView ModuleDependenciesCache::getAllDependencies(
       moduleInfo.getSwiftOverlayDependencies(),
       moduleInfo.getCrossImportOverlayDependencies(),
       moduleInfo.getImportedClangDependencies());
+}
+
+void ModuleDependenciesCache::recordFailedSwiftDependencyLookup(
+    StringRef moduleIdentifier) {
+  negativeSwiftDependencyCache.insert(moduleIdentifier);
 }
 
 llvm::StringSet<> ModuleDependenciesCache::getAllVisibleClangModules(

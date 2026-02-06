@@ -29,7 +29,9 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -772,8 +774,10 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     // If we have an instruction that is an end_borrow, ignore it. This
     // happens when passing a guaranteed argument through generic code paths
     // to no return functions.
-    if (isa<EndBorrowInst>(currInst))
+    if (isa<EndBorrowInst>(currInst) || isa<EndAccessInst>(currInst) ||
+        isa<EndLifetimeInst>(currInst) || isa<ExtendLifetimeInst>(currInst)) {
       return false;
+    }
 
     // If we have an ignored use whose operand is our no return call, ignore it.
     if (auto *i = dyn_cast<IgnoredUseInst>(currInst)) {
@@ -1183,6 +1187,11 @@ static void performNoReturnFunctionProcessing(SILFunction &Fn,
   if (Changed) {
     removeUnreachableBlocks(Fn);
     T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (Fn.needBreakInfiniteLoops())
+      breakInfiniteLoops(T->getPassManager(), &Fn);
+    if (Fn.needCompleteLifetimes())
+      completeAllLifetimes(T->getPassManager(), &Fn);
   }
 }
 
@@ -1264,6 +1273,11 @@ class DiagnoseUnreachable : public SILFunctionTransform {
   void run() override {
     diagnoseUnreachable(*getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    if (getFunction()->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), getFunction());
+    if (getFunction()->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), getFunction());
   }
   };
 } // end anonymous namespace

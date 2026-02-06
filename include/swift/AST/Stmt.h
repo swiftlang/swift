@@ -41,6 +41,7 @@ class Decl;
 class DeclContext;
 class Evaluator;
 class Expr;
+class ForEachStmt;
 class FuncDecl;
 class AbstractFunctionDecl;
 class Pattern;
@@ -166,6 +167,22 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
+};
+
+/// OpaqueStmt - created to serve as an indirection to a ForEachStmt's body
+/// to avoid visiting it twice in the ASTWalker after having desugared the loop.
+/// This ensures we only visit the body once, and this OpaqueStmt will only be
+/// visited to emit the underlying statement in SILGen.
+class OpaqueStmt final : public Stmt {
+public:
+  OpaqueStmt() : Stmt(StmtKind::Opaque, true /*always implicit*/) {}
+
+  SourceLoc getStartLoc() const { return SourceLoc(); }
+  SourceLoc getEndLoc() const { return SourceLoc(); }
+
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Opaque;
+  }
 };
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
@@ -940,7 +957,8 @@ class WhileStmt : public LabeledConditionalStmt {
   SourceLoc WhileLoc;
   StmtCondition Cond;
   Stmt *Body;
-  
+  ForEachStmt *ParentForEach = nullptr;
+
 public:
   WhileStmt(LabeledStmtInfo LabelInfo, SourceLoc WhileLoc, StmtCondition Cond,
             Stmt *Body, std::optional<bool> implicit = std::nullopt)
@@ -949,16 +967,24 @@ public:
                                LabelInfo, Cond),
         WhileLoc(WhileLoc), Body(Body) {}
 
-  SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(WhileLoc); }
+  SourceLoc getStartLoc() const {
+    auto loc = getLabelLocOrKeywordLoc(WhileLoc);
+    return loc ? loc : Body->getStartLoc();
+  }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
   SourceLoc getWhileLoc() const { return WhileLoc; }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
-  
+
+  /// For a \c while statement that is synthesized as the semantic statement for
+  /// a \c for loop, the parent loop.
+  ForEachStmt *getParentForEach() const { return ParentForEach; }
+  void setParentForEach(ForEachStmt *FES) { ParentForEach = FES; }
+
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::While; }
 };
-  
+
 /// RepeatWhileStmt - repeat/while statement. After type-checking, the
 /// condition is of type Builtin.Int1.
 class RepeatWhileStmt : public LabeledStmt {
@@ -1007,49 +1033,32 @@ class ForEachStmt : public LabeledStmt {
   SourceLoc WhereLoc;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
+  DeclContext *DC = nullptr;
 
   // Set by Sema:
-  ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  Type sequenceType;
-  PatternBindingDecl *iteratorVar = nullptr;
-  Expr *nextCall = nullptr;
-  OpaqueValueExpr *elementExpr = nullptr;
-  Expr *convertElementExpr = nullptr;
+  llvm::PointerIntPair<BraceStmt *, 1, bool> desugaredStmtAndComputed;
+  OpaqueValueExpr *opaqueSequence = nullptr;
+  OpaqueValueExpr *opaqueWhere = nullptr;
+  OpaqueStmt *opaqueBodyStmt = nullptr;
+  // Used to map Continue and Break targets to a desugared ForEachStmt's
+  // corresponding WhileStmt.
+  WhileStmt *continueTarget = nullptr;
+  WhileStmt *breakTarget = nullptr;
+
+  friend class DesugarForEachStmtRequest;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc,
               SourceLoc AwaitLoc, SourceLoc UnsafeLoc, Pattern *Pat,
-              SourceLoc InLoc, Expr *Sequence,
-              SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
+              SourceLoc InLoc, Expr *Sequence, SourceLoc WhereLoc,
+              Expr *WhereExpr, BraceStmt *Body, DeclContext *DC,
               std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
-        ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), UnsafeLoc(UnsafeLoc),
-        Pat(nullptr), InLoc(InLoc), Sequence(Sequence), WhereLoc(WhereLoc),
-        WhereExpr(WhereExpr), Body(Body) {
+        ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc),
+        UnsafeLoc(UnsafeLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
+        WhereLoc(WhereLoc), WhereExpr(WhereExpr), Body(Body), DC(DC) {
     setPattern(Pat);
-  }
-
-  void setIteratorVar(PatternBindingDecl *var) { iteratorVar = var; }
-  PatternBindingDecl *getIteratorVar() const { return iteratorVar; }
-
-  void setNextCall(Expr *next) { nextCall = next; }
-  Expr *getNextCall() const { return nextCall; }
-
-  void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
-  OpaqueValueExpr *getElementExpr() const { return elementExpr; }
-
-  void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
-  Expr *getConvertElementExpr() const { return convertElementExpr; }
-
-  void setSequenceConformance(Type type,
-                              ProtocolConformanceRef conformance) {
-    sequenceType = type;
-    sequenceConformance = conformance;
-  }
-  Type getSequenceType() const { return sequenceType; }
-  ProtocolConformanceRef getSequenceConformance() const {
-    return sequenceConformance;
   }
 
   /// getForLoc - Retrieve the location of the 'for' keyword.
@@ -1077,12 +1086,18 @@ public:
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this
   /// expression to extract a range, use \c getRangeInit().
-  Expr *getParsedSequence() const { return Sequence; }
-  void setParsedSequence(Expr *S) { Sequence = S; }
+  Expr *getSequence() const { return Sequence; }
+  void setSequence(Expr *S) { Sequence = S; }
 
-  /// Type-checked version of the sequence or nullptr if this statement
-  /// yet to be type-checked.
-  Expr *getTypeCheckedSequence() const;
+  /// The opaque expression used to represent the sequence expression in the
+  /// desugared `while` loop.
+  OpaqueValueExpr *getOpaqueSequenceExpr() const { return opaqueSequence; }
+  void setOpaqueSequenceExpr(OpaqueValueExpr *E) { opaqueSequence = E; }
+
+  /// The opaque expression used to represent the `where` expression in the
+  /// desugared `while` loop.
+  OpaqueValueExpr *getOpaqueWhereExpr() const { return opaqueWhere; }
+  void setOpaqueWhereExpr(OpaqueValueExpr *E) { opaqueWhere = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
@@ -1090,7 +1105,49 @@ public:
   
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(ForLoc); }
   SourceLoc getEndLoc() const { return Body->getEndLoc(); }
-  
+
+  DeclContext *getDeclContext() const { return DC; }
+  void setDeclContext(DeclContext *newDC) { DC = newDC; }
+
+  /// Returns the semantic WhileStmt that will be emitted by SILGen.
+  ///
+  /// The sequence expression, pattern, and where clause are all referenced in
+  /// this semantic statement using opaque AST nodes.
+  ///
+  /// We keep ForEachStmt itself in the type-checked AST since diagnostic
+  /// passes like effects checking rely on being able to reason about the `try`
+  /// and `await` keywords on the pattern, which is not representable with a
+  /// `while` loop. Semantic functionality also generally relies on being able
+  /// to map things between the source text and type-checked AST.
+  BraceStmt *getDesugaredStmt();
+
+  /// Returns the semantic WhileStmt that will be emitted by SILGen, or
+  /// \c nullptr if it has not been computed yet. This should only be used by
+  /// the ASTWalker, ASTDumper, and the evalutator itself.
+  BraceStmt *getCachedDesugaredStmt() const {
+    return desugaredStmtAndComputed.getPointer();
+  }
+
+  void setDesugaredStmt(BraceStmt *newStmt) {
+    desugaredStmtAndComputed.setPointer(newStmt);
+  }
+
+  /// getOpaqueBodyStmt - Retrieve the Opaque statement wrapping the
+  /// ForEachStmt's body in the desugared statement to avoid duplicate
+  /// traversal.
+  OpaqueStmt *getOpaqueBodyStmt() { return opaqueBodyStmt; }
+  void setOpaqueBodyStmt(OpaqueStmt *newStmt) { opaqueBodyStmt = newStmt; }
+
+  /// getContinueTarget - Retrieve the WhileStmt Continue target once
+  /// the ForEachStmt has been desugared.
+  WhileStmt *getContinueTarget() { return continueTarget; }
+  void setContinueTarget(WhileStmt *target) { continueTarget = target; }
+
+  /// getBreakTarget - Retrieve the WhileStmt Break target once
+  /// the ForEachStmt has been desugared.
+  WhileStmt *getBreakTarget() { return breakTarget; }
+  void setBreakTarget(WhileStmt *target) { breakTarget = target; }
+
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
   }

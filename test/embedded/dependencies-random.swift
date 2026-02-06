@@ -35,10 +35,9 @@ __memory_base
 __stack_chk_fail
 __stack_chk_guard
 __stack_pointer
+__table_base
 arc4random_buf
 free
-memmove
-memset
 posix_memalign
 putchar
 //--- test.swift

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -swift-version 5 -solver-scope-threshold=1000
 
 func method(_ arg: String, body: () -> [String]) {}
 

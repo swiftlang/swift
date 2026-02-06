@@ -25,7 +25,9 @@
 #include "swift/SIL/AddressUseKind.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
@@ -113,17 +115,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
   // When we exit, set the result to be invalidated so we can't use this again.
   SWIFT_DEFER { didInvalidate = true; };
 
-  StackList<Operand *> worklist(projectedAddress->getFunction());
-  SmallPtrSet<Operand *, 32> visitedOperands;
-
-  auto addToWorklist = [&](Operand *use) {
-    if (visitedOperands.insert(use).second)
-      worklist.push_back(use);
-  };
-
-  for (auto *use : projectedAddress->getUses()) {
-    addToWorklist(use);
-  }
+  OperandWorklist worklist(projectedAddress->getFunction());
+  worklist.pushResultOperandsIfNotVisited(projectedAddress);
 
   // Record all uses that aren't transitively followed. These are either
   // instantaneous uses of the address, or cause a pointer escape.
@@ -140,15 +133,15 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
     if (visitation == TransitiveUseVisitation::OnlyUser)
       return;
 
-    for (auto *use : svi->getUses())
-      addToWorklist(use);
+    worklist.pushResultOperandsIfNotVisited(svi);
   };
 
   while (!worklist.empty()) {
     if (result == AddressUseKind::Unknown)
       return AddressUseKind::Unknown;
 
-    auto *op = worklist.pop_back_val();
+    auto *op = worklist.pop();
+    assert(op);
 
     // Skip type dependent operands.
     if (op->isTypeDependent())
@@ -167,9 +160,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         // a point escape.
         recordEscape(op);
         for (auto succBlockArgList : ti->getSuccessorBlockArgumentLists()) {
-          auto *succ = succBlockArgList[op->getOperandNumber()];
-          for (auto *use : succ->getUses())
-            addToWorklist(use);
+          worklist.pushResultOperandsIfNotVisited(
+              succBlockArgList[op->getOperandNumber()]);
         }
         continue;
 
@@ -230,7 +222,10 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
         isa<MergeIsolationRegionInst>(user) ||
-        isa<EndCOWMutationAddrInst>(user)) {
+        isa<EndCOWMutationAddrInst>(user) ||
+        isa<MakeBorrowInst>(user) || isa<DereferenceBorrowInst>(user) ||
+        isa<MakeAddrBorrowInst>(user) || isa<DereferenceAddrBorrowInst>(user) ||
+        isa<InitBorrowAddrInst>(user) || isa<DereferenceBorrowAddrInst>(user)) {
       callVisitUse(op);
       continue;
     }

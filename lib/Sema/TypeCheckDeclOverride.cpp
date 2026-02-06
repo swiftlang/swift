@@ -1709,6 +1709,7 @@ namespace  {
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(ResultBuilder)
+    UNINTERESTING_ATTR(Reparentable)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
@@ -2315,6 +2316,13 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
     // Objective-C protocols
     if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
 
+    // Associated types defined within reparentable protocols Q
+    // are not overridden by one defined in any reparented ones P, i.e.,
+    // if P was reparented by Q, then P's associated type serves as the anchor.
+    // We skip processing any protocols further inherited by the reparentable.
+    if (inheritedProto->getAttrs().hasAttribute<ReparentableAttr>())
+      return TypeWalker::Action::SkipNode;
+
     // Look for associated types with the same name.
     bool foundAny = false;
     if (auto found = inheritedProto->getAssociatedType(assocType->getName())) {
@@ -2414,10 +2422,12 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
       case AccessorKind::YieldingBorrow:
+      case AccessorKind::Borrow:
         break;
 
       case AccessorKind::Modify:
       case AccessorKind::YieldingMutate:
+      case AccessorKind::Mutate:
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

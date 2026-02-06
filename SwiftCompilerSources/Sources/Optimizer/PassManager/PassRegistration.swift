@@ -19,6 +19,7 @@ public func initializeSwiftModules() {
   registerAST()
   registerSIL()
   registerSwiftAnalyses()
+  registerOptimizerUtilities()
   registerSwiftPasses()
   registerOptimizerTests()
 }
@@ -117,6 +118,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
   registerForSILCombine(BuiltinInst.self,          { run(BuiltinInst.self, $0) })
+  registerForSILCombine(CondFailInst.self,         { run(CondFailInst.self, $0) })
   registerForSILCombine(ExplicitCopyAddrInst.self, { run(ExplicitCopyAddrInst.self, $0) })
   registerForSILCombine(ExplicitCopyValueInst.self,{ run(ExplicitCopyValueInst.self, $0) })
   registerForSILCombine(FixLifetimeInst.self,      { run(FixLifetimeInst.self, $0) })
@@ -146,9 +148,17 @@ private func registerSwiftPasses() {
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })
   registerForSILCombine(TryApplyInst.self,          { run(TryApplyInst.self, $0) })
   registerForSILCombine(EndCOWMutationAddrInst.self, { run(EndCOWMutationAddrInst.self, $0) })
+  registerForSILCombine(InitBorrowAddrInst.self,    { run(InitBorrowAddrInst.self, $0) })
+  registerForSILCombine(DereferenceBorrowInst.self, { run(DereferenceBorrowInst.self, $0) })
+  registerForSILCombine(DereferenceAddrBorrowInst.self, { run(DereferenceAddrBorrowInst.self, $0) })
 }
 
 private func registerSwiftAnalyses() {
   AliasAnalysis.register()
   CalleeAnalysis.register()
+}
+
+private func registerOptimizerUtilities() {
+  registerControlFlowUtils()
+  registerLifetimeCompletion()
 }

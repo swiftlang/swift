@@ -4,7 +4,7 @@
 // RUN:     -experimental-skip-non-inlinable-function-bodies \
 // RUN:     -enable-library-evolution                        \
 // RUN:     -enable-experimental-feature CoroutineAccessors  \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-NOUNWIND
+// RUN: | %FileCheck %s
 
 // RUN: %target-swift-emit-silgen                                              \
 // RUN:     %s                                                                 \
@@ -13,7 +13,7 @@
 // RUN:     -enable-library-evolution                                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors                    \
 // RUN:     -enable-experimental-feature CoroutineAccessorsUnwindOnCallerError \
-// RUN: | %FileCheck %s --check-prefixes=CHECK,CHECK-UNWIND
+// RUN: | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_CoroutineAccessorsUnwindOnCallerError

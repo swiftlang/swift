@@ -5709,6 +5709,108 @@ Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
 
+## `Builtin.Borrow` support
+
+The `Builtin.Borrow` type is the primitive building block for forming first-
+class borrowed accesses to other values. Some Swift values never have
+a fixed memory address, but address-only values are always fixed in memory, and
+some loadable types have dependencies that take the address of an in-memory
+representation. As such, `Builtin.Borrow<T>` may have one of two
+representations, depending on the properties of `T`:
+
+- `Builtin.Borrow<T>` may contain a bitwise copy of the representation of
+  the referenced `T`.
+- `Builtin.Borrow<T>` may contain the address of the referenced `T` in memory.
+
+The layout of `Builtin.Borrow<T>` for any specific concrete type `T` is always
+the same, so when the layout of `T` is fully known, `Builtin.Borrow<T>` is
+always loadable even if that `T` is not. On the other hand, for a `T` with
+unknown layout, `Builtin.Borrow<T>` will also have unknown layout and be
+treated as address-only. This leaves three cases for SIL to represent:
+
+- Both `T` and `Builtin.Borrow<T>` are loadable. Values of `Builtin.Borrow<T>`
+  are created by `make_borrow`, and the referenced value is dereferenced with
+  `dereference_borrow`.
+- `T` is address-only, or has address-dependent references, but
+  `Builtin.Borrow<T>` is loadable. Values of `Builtin.Borrow<T>` are created
+  by `make_addr_borrow`, and the address of the referenced value is retrieved
+  with `dereference_addr_borrow`.
+- `T` and `Builtin.Borrow<T>` are both address-only. Memory locations of type
+  `Builtin.Borrow<T>` are initialized using `init_borrow_addr`, and the address
+  of the referenced value is retrieved with `dereference_borrow_addr`.
+
+### make_borrow
+
+```none
+sil-instruction ::= 'make_borrow' sil-value
+
+%borrow: $Builtin.Borrow<T> = make_borrow %target: $T
+```
+
+Returns a `Builtin.Borrow` value referencing the given value.
+
+The result `%borrow` has a lifetime dependency on borrowing `%target`.
+
+### dereference_borrow
+
+```none
+sil-instruction ::= 'dereference_borrow' sil-value
+
+%target: $T = dereference_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the value referenced by a `Builtin.Borrow`. The result `%target` is
+a borrow of the original value, scoped by the lifetime of `%borrow`.
+
+### make_addr_borrow
+
+```none
+sil-instruction ::= 'make_addr_borrow' sil-value
+
+%borrow: $Builtin.Borrow<T> = make_addr_borrow %target: $*T
+```
+
+Returns a `Builtin.Borrow` value referencing the value at the given memory
+location.
+
+The result `%borrow` has a lifetime dependency on the borrow stored
+at the memory location `%target`.
+
+### dereference_addr_borrow
+
+```none
+sil-instruction ::= 'dereference_addr_borrow' sil-value
+
+%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the address of the value referenced by a `Builtin.Borrow`.
+
+### init_borrow_addr
+
+```none
+sil-instruction ::= 'init_borrow_addr' sil-value 'with' sil-value
+
+init_borrow_addr %borrow : $*Builtin.Borrow<T> with $target : $*T
+```
+
+Initializes a `Builtin.Borrow` in memory to reference a target value in
+memory.
+
+The value stored to `%borrow` has a lifetime dependency on the borrow stored
+at the memory location `%target`.
+
+### dereference_addr_borrow
+
+```none
+sil-instruction ::= 'dereference_addr_borrow' sil-value
+
+%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the address of the value referenced by a `Builtin.Borrow` in memory.
+
+
 ## Miscellaneous instructions
 
 ### ignored_use

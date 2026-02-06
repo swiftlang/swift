@@ -831,3 +831,26 @@ bb0:
   %retval = tuple ()
   return %retval
 }
+
+// CHECK-LABEL: sil [ossa] @dead_end_only_store_lexical :
+// CHECK-NOT:     alloc_stack
+// CHECK:         %1 = move_value [lexical] %0
+// CHECK:         destroy_value [dead_end] %1
+// CHECK-LABEL: } // end sil function 'dead_end_only_store_lexical'
+sil [ossa] @dead_end_only_store_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack [lexical] $C
+  store %0 to [init] %1
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dead_end_only_store_non_lexical :
+// CHECK-NOT:     alloc_stack
+// CHECK:         destroy_value [dead_end] %0
+// CHECK-LABEL: } // end sil function 'dead_end_only_store_non_lexical'
+sil [ossa] @dead_end_only_store_non_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $C
+  store %0 to [init] %1
+  unreachable
+}

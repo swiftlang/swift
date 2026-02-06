@@ -2175,6 +2175,7 @@ public:
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances,
                            ValueOwnershipKind forwardingOwnershipKind) {
+    ASSERT(FormalConcreteType->isBridgeableObjectType());
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), forwardingOwnershipKind));
@@ -2662,6 +2663,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   UnreachableInst *createUnreachable(SILLocation Loc) {
+    if (F->hasOwnership()) {
+      // Notify the current pass that lifetimes may have been cut off at the
+      // `unreachable` which must be completed again.
+      F->setNeedCompleteLifetimes();
+    }
     return insertTerminator(new (getModule())
                                 UnreachableInst(getSILDebugLocation(Loc)));
   }
@@ -3178,6 +3184,57 @@ public:
   HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
     return insert(new (getModule()) HasSymbolInst(
         getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Borrows
+  //===--------------------------------------------------------------------===//
+
+  MakeBorrowInst *createMakeBorrow(SILLocation Loc, SILValue referent) {
+    auto borrowTy = BuiltinBorrowType::get(referent->getType().getASTType());
+    return insert(new (getModule()) MakeBorrowInst(
+      getSILDebugLocation(Loc), referent,
+      SILType::getPrimitiveObjectType(borrowTy->getCanonicalType())));
+  }
+
+  DereferenceBorrowInst *createDereferenceBorrow(SILLocation Loc, SILValue borrow) {
+    auto referentTy = borrow->getType().castTo<BuiltinBorrowType>()
+      ->getReferentType();
+    return insert(new (getModule()) DereferenceBorrowInst(
+      getSILDebugLocation(Loc), borrow,
+      SILType::getPrimitiveObjectType(referentTy)));
+  }
+
+  MakeAddrBorrowInst *createMakeAddrBorrow(SILLocation Loc, SILValue referent) {
+    auto borrowTy = BuiltinBorrowType::get(referent->getType().getASTType());
+    return insert(new (getModule()) MakeAddrBorrowInst(
+      getSILDebugLocation(Loc), referent,
+      SILType::getPrimitiveObjectType(borrowTy->getCanonicalType())));
+  }
+
+  DereferenceAddrBorrowInst *createDereferenceAddrBorrow(SILLocation Loc,
+                                                         SILValue borrow) {
+    auto referentTy = borrow->getType().castTo<BuiltinBorrowType>()
+      ->getReferentType();
+    return insert(new (getModule()) DereferenceAddrBorrowInst(
+      getSILDebugLocation(Loc), borrow,
+      SILType::getPrimitiveAddressType(referentTy)));
+  }
+
+  InitBorrowAddrInst *createInitBorrowAddr(SILLocation Loc,
+                                           SILValue dest,
+                                           SILValue referent) {
+    return insert(new (getModule()) InitBorrowAddrInst(
+      getSILDebugLocation(Loc), dest, referent));
+  }
+
+  DereferenceBorrowAddrInst *createDereferenceBorrowAddr(SILLocation Loc,
+                                                         SILValue borrow) {
+    auto referentTy = borrow->getType().castTo<BuiltinBorrowType>()
+      ->getReferentType();
+    return insert(new (getModule()) DereferenceBorrowAddrInst(
+      getSILDebugLocation(Loc), borrow,
+      SILType::getPrimitiveAddressType(referentTy)));
   }
 
   //===--------------------------------------------------------------------===//

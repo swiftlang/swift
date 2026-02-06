@@ -12,13 +12,13 @@
 // FIXME: We still have a lot of duplicate Swift lookups,
 // to be resolved in upcoming https://github.com/swiftlang/swift/pull/86091
 //
-// CHECK-INITIAL: remark: Number of Swift module queries: '9'
+// CHECK-INITIAL: remark: Number of Swift module queries: '3'
 // CHECK-INITIAL: remark: Number of named Clang module queries: '2'
 // CHECK-INITIAL: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '2'
 // CHECK-INITIAL: remark: Number of recorded Swift module dependencies: '1'
 // CHECK-INITIAL: remark: Number of recorded Clang module dependencies: '3'
 
-// CHECK-REUSE: remark: Number of Swift module queries: '12'
+// CHECK-REUSE: remark: Number of Swift module queries: '2'
 // CHECK-REUSE: remark: Number of named Clang module queries: '0'
 // CHECK-REUSE: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '0'
 // CHECK-REUSE: remark: Number of recorded Swift module dependencies: '1'

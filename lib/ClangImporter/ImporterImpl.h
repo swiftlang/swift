@@ -1179,6 +1179,14 @@ public:
                                   /*UseCanonicalDecl*/ UseCanonicalDecl);
   }
 
+  Decl *lookupImportedDecl(const clang::NamedDecl *decl) {
+    auto Known = importDeclCached(
+        cast<clang::NamedDecl>(decl->getCanonicalDecl()), CurrentVersion, true);
+    if (Known.has_value())
+      return Known.value();
+    return nullptr;
+  }
+
   /// Import the given Clang declaration into Swift.  Use this function
   /// outside of the importer implementation, when importing a decl requested by
   /// Swift code.
@@ -1851,7 +1859,6 @@ public:
   void addOptionSetTypealiases(NominalTypeDecl *nominal);
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
-  void swiftifyProtocol(NominalTypeDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

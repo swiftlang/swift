@@ -23,6 +23,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Concurrency.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticGroups.h"
@@ -1063,8 +1064,23 @@ bool swift::diagnoseNonSendableTypes(
   if (auto *expansion = type->getAs<PackExpansionType>())
     type = PackType::get(ctx, {expansion});
 
+  // Check each element of a tuple individually because this check could be
+  // used recursively during conformance lookup and passing tuples to
+  // recursive calls to \c lookupConformance defeats circularity checking
+  // in the request because \c ImplicitKnownProtocolConformanceRequest
+  // operates on nominal types.
+  if (auto *tuple = type->getAs<TupleType>()) {
+    bool anyMissing = false;
+    for (Type elementTy : tuple->getElementTypes()) {
+      anyMissing |= diagnoseNonSendableTypes(
+          elementTy, fromContext, inDerivedConformance, loc, diagnose);
+    }
+    return anyMissing;
+  }
+
   // FIXME: More detail for unavailable conformances.
-  auto conformance = lookupConformance(type, proto, /*allowMissing=*/true);
+  auto conformance =
+      lookupConformance(type->getCanonicalType(), proto, /*allowMissing=*/true);
   if (conformance.isInvalid() || conformance.hasUnavailableConformance()) {
     return diagnoseSingleNonSendableType(
         type, fromContext, inDerivedConformance, loc, diagnose);
@@ -5968,6 +5984,21 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
   }
 }
 
+/// If `@preconcurrency` attribute can be used on this declaration, apply it.
+static void markAsPreconcurrencyIfApplicable(ValueDecl *value) {
+  // If there is one already, nothing more to do.
+  if (value->getAttrs().hasAttribute<PreconcurrencyAttr>())
+    return;
+
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Preconcurrency,
+                                               value))
+    return;
+
+  auto *preconcurrency =
+      new (value->getASTContext()) PreconcurrencyAttr(/*IsImplicit=*/true);
+  value->addAttribute(preconcurrency);
+}
+
 static void addAttributesForActorIsolation(ValueDecl *value,
                                            ActorIsolation isolation) {
   ASTContext &ctx = value->getASTContext();
@@ -5991,11 +6022,9 @@ static void addAttributesForActorIsolation(ValueDecl *value,
                                    /*implicit=*/true);
     value->addAttribute(attr);
 
-    if (isolation.preconcurrency() &&
-        !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-      auto preconcurrency = new (ctx) PreconcurrencyAttr(/*isImplicit*/ true);
-      value->addAttribute(preconcurrency);
-    }
+    if (isolation.preconcurrency())
+      markAsPreconcurrencyIfApplicable(value);
+
     break;
   }
     case ActorIsolation::Erased:
@@ -6309,11 +6338,9 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
 
   auto isolationFromAttr = getIsolationFromAttributes(value);
   ASTContext &ctx = value->getASTContext();
-  if (isolationFromAttr && isolationFromAttr->preconcurrency() &&
-      !value->getAttrs().hasAttribute<PreconcurrencyAttr>()) {
-    auto preconcurrency =
-        new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
-    value->addAttribute(preconcurrency);
+
+  if (isolationFromAttr && isolationFromAttr->preconcurrency()) {
+    markAsPreconcurrencyIfApplicable(value);
   }
 
   // Check if we inferred CallerIsolationInheriting from our isolation attr, but
@@ -6339,12 +6366,12 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
     if (mainIsolation) {
-      if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
-        if (!areTypesEqual(isolationFromAttr->getGlobalActor(),
-                           mainIsolation->getGlobalActor())) {
-          fd->getASTContext().Diags.diagnose(
-              fd->getLoc(), diag::main_function_must_be_mainActor);
-        }
+      // If an explicit attribute is anything other than `@MainActor`, complain.
+      if (isolationFromAttr &&
+          !(isolationFromAttr->isGlobalActor() &&
+            areTypesEqual(isolationFromAttr->getGlobalActor(),
+                          mainIsolation->getGlobalActor()))) {
+        fd->diagnose(diag::main_function_must_be_mainActor);
       }
       return {
         *mainIsolation,
@@ -6652,6 +6679,18 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // default.
     addAttributesForActorIsolation(value, defaultIsolation.isolation);
   }
+
+  // In `@MainActor` by default mode, let's inject the attributes when the
+  // isolation was inferred. This would make sure that the declaration is
+  // going to retain the isolation when printed in swift interface file and
+  // serialized.
+  if (value->getModuleContext() == ctx.MainModule &&
+      getDefaultIsolationForContext(value->getDeclContext()) ==
+          DefaultIsolation::MainActor &&
+      defaultIsolation.isolation.isMainActor()) {
+    addAttributesForActorIsolation(value, defaultIsolation.isolation);
+  }
+
   return defaultIsolation;
 }
 

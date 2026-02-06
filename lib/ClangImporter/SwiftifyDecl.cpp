@@ -19,9 +19,13 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Import.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Defer.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -357,10 +361,17 @@ static const clang::Decl *getTemplateInstantiation(const clang::Decl *D) {
 }
 
 static clang::Module *getOwningModule(const clang::Decl *ClangDecl) {
+  std::optional<clang::Module *> M;
   if (const auto *Instance = getTemplateInstantiation(ClangDecl)) {
-    return Instance->getOwningModule();
+    M = importer::getClangSubmoduleForDecl(Instance, true);
+  } else {
+    M = importer::getClangSubmoduleForDecl(ClangDecl, true);
   }
-  return ClangDecl->getOwningModule();
+  if (M) {
+    // the inner value can be null, so flatten it
+    return M.value();
+  }
+  return nullptr;
 }
 
 struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
@@ -671,6 +682,29 @@ static bool shouldSkipModule(ModuleDecl *M) {
   return false;
 }
 
+static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
+                                       StringRef MacroName,
+                                       Decl *MappedDecl) {
+  ExternalMacroDefinitionRequest request{
+      &SwiftContext, SwiftContext.getIdentifier("SwiftMacros"),
+      SwiftContext.getIdentifier(MacroName)};
+  auto externalDef =
+      evaluateOrDefault(SwiftContext.evaluator, request,
+                        ExternalMacroDefinition::error("failed request"));
+  if (externalDef.isError()) {
+    auto &diags = SwiftContext.Diags;
+    auto didSuppressWarnings = diags.getSuppressWarnings();
+    // We are highly likely parsing a textual interface, where warnings are
+    // silenced. Make sure this warning gets emitted anyways.
+    diags.setSuppressWarnings(false);
+    SWIFT_DEFER { diags.setSuppressWarnings(didSuppressWarnings); };
+    diags.diagnose(MappedDecl, diag::macro_on_import_not_loadable, MacroName);
+    return true;
+  }
+
+  return false;
+}
+
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
@@ -716,6 +750,9 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     out << ")";
   }
 
+  if (diagnoseMissingMacroPlugin(SwiftContext, "_SwiftifyImport", MappedDecl))
+    return;
+
   DLOG("Attaching safe interop macro: " << MacroString << "\n");
   if (clang::RawComment *raw =
           getClangASTContext().getRawCommentForDeclNoCache(ClangDecl)) {
@@ -734,56 +771,5 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   } else {
     importNontrivialAttribute(MappedDecl, MacroString);
   }
-}
-
-void ClangImporter::Implementation::swiftifyProtocol(
-    NominalTypeDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
-    return;
-  if (!isa<ProtocolDecl, ClassDecl>(MappedDecl))
-    return;
-
-  MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(
-      getKnownSingleDecl(SwiftContext, "_SwiftifyImportProtocol"));
-  if (!SwiftifyImportDecl) {
-    DLOG("_SwiftifyImportProtocol macro not found\n");
-    return;
-  }
-
-  DLOG_SCOPE("Checking '" << MappedDecl->getName()
-              << "' protocol for methods with bounds and lifetime info\n");
-
-  if (shouldSkipModule(MappedDecl->getParentModule()))
-    return;
-
-  llvm::SmallString<128> MacroString;
-  {
-    llvm::raw_svector_ostream out(MacroString);
-    out << "@_SwiftifyImportProtocol(";
-
-    bool hasBoundsAttributes = false;
-    llvm::StringMap<std::string> typeMapping;
-    SwiftifyProtocolInfoPrinter printer(*this, getClangASTContext(),
-                                        SwiftContext, out, *SwiftifyImportDecl,
-                                        typeMapping);
-    for (Decl *SwiftMember :
-         cast<IterableDeclContext>(MappedDecl)->getAllMembers()) {
-      FuncDecl *SwiftDecl = dyn_cast<FuncDecl>(SwiftMember);
-      if (!SwiftDecl)
-        continue;
-      hasBoundsAttributes |= printer.printMethod(SwiftDecl);
-    }
-
-    if (!hasBoundsAttributes) {
-      DLOG("No relevant bounds or lifetime info found\n");
-      return;
-    }
-    printer.printAvailability();
-    printer.printTypeMapping();
-    out << ")";
-  }
-
-  DLOG("Attaching safe interop macro: " << MacroString << "\n");
-  importNontrivialAttribute(MappedDecl, MacroString);
 }
 

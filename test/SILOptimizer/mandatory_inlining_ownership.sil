@@ -655,6 +655,26 @@ bb0(%0 : $Int):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @lexical_partial_apply :
+// CHECK:         %1 = move_value [lexical] %0
+// CHECK:       } // end sil function 'lexical_partial_apply'
+sil [ossa] @lexical_partial_apply : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = function_ref @closure : $@convention(thin) (@guaranteed String) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@guaranteed String) -> ()
+  %3 = move_value [lexical] %2
+  %4 = apply %3() : $@callee_guaranteed () -> ()
+  destroy_value %3
+  %6 = tuple ()
+  return %6
+}
+
+sil [transparent] [ossa] @closure : $@convention(thin) (@guaranteed String) -> () {
+bb0(%0 : @guaranteed $String):
+  %1 = tuple ()
+  return %1
+}
+
 sil_vtable C2 {
   #C2.i!modify: (C2) -> () -> () : @devirt_callee
 }
