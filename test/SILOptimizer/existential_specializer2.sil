@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt %s -existential-specializer -mandatory-performance-optimizations -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+
+class C {}
+
+public protocol P {}
+
+public struct S : P {
+  var o: AnyObject
+}
+
+// Just check that we generate valid SIL
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @doesnt_return :
+// CHECK:       } // end sil function 'doesnt_return'
+sil [ossa] @doesnt_return : $@convention(thin) (@in P, @inout P, @owned C) -> Never {
+bb0(%0 : $*P, %1 : $*P, %2 : @owned $C):
+  copy_addr %0 to [init] %1
+  destroy_addr %0
+  destroy_value [dead_end] %2
+  unreachable
+}
+
+// Just check that we generate valid SIL
+// CHECK-LABEL: sil [ossa] @specialize_no_return_function :
+// CHECK-LABEL: } // end sil function 'specialize_no_return_function'
+sil [ossa] @specialize_no_return_function : $@convention(thin) (@owned S, @inout P, @owned C) -> () {
+bb0(%0 : @owned $S, %1 : $*P, %2 : @owned $C):
+  %4 = alloc_stack $P
+  %5 = init_existential_addr %4, $S
+  store %0 to [init] %5
+  %7 = function_ref @doesnt_return : $@convention(thin) (@in P, @inout P, @owned C) -> Never
+  %8 = apply %7(%4, %1, %2) : $@convention(thin) (@in P, @inout P, @owned C) -> Never
+  dealloc_stack %4 : $*P
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_witness_table S: P module test {}
+
