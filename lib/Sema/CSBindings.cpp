@@ -912,16 +912,6 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
   }
 }
 
-static bool isLikelyExactMatch(Type first, Type second) {
-  if (auto *firstDecl = first->getAnyNominal()) {
-    // FIXME: Make this more precise.
-    auto *secondDecl = second->getAnyNominal();
-    return firstDecl == secondDecl;
-  }
-  // FIXME: Handle other type kinds.
-  return false;
-}
-
 /// Decide if the new binding subsumes the existing binding, or vice versa.
 ///
 /// Return value:
@@ -933,7 +923,8 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
                                           const PotentialBinding &existing,
                                           bool isClosureParameterType) {
   auto existingType = existing.BindingType;
-  if (isLikelyExactMatch(binding.BindingType, existingType)) {
+  auto result = isLikelyExactMatch(binding.BindingType, existingType);
+  if (result.has_value() && *result) {
     // A binding can subsume another binding. Suppose we have two
     // constraints:
     // - X conv $T0

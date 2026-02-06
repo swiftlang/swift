@@ -11,17 +11,29 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements various utilities for reasoning about the Swift
-// subtyping relation.
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_SEMA_SUBTYPING_H
 #define SWIFT_SEMA_SUBTYPING_H
 
+#include "swift/Basic/OptionSet.h"
+
 namespace swift {
 
+class GenericSignature;
 class Type;
 
 namespace constraints {
+
+class ConstraintSystem;
+
+/// Checks if two types can unify if we record a bind constraint between them.
+///
+/// Returns:
+/// - true if there is some indication that the bind may succeed.
+/// - false if the bind will definitely fail.
+/// - std::nullopt if unknown.
+std::optional<bool> isLikelyExactMatch(Type first, Type second);
 
 enum class ConversionBehavior : unsigned {
   None,
@@ -45,6 +57,40 @@ ConversionBehavior getConversionBehavior(Type type);
 /// function is going to return true because CGFloat could be converted
 /// to a Double and non-optional value could be injected into an optional.
 bool hasConversions(Type type);
+
+enum ConflictFlag : unsigned {
+  Category = 1 << 0,
+  Exact = 1 << 1,
+  Nominal = 1 << 2,
+  Class = 1 << 3,
+  Structural = 1 << 4,
+  Array = 1 << 5,
+  Dictionary = 1 << 6,
+  Set = 1 << 7,
+  Optional = 1 << 8,
+  Double = 1 << 9,
+  Conformance = 1 << 10,
+  Mutability = 1 << 11
+};
+using ConflictReason = OptionSet<ConflictFlag>;
+
+/// Check whether lhs, as a type with type variables or unopened type
+/// parameters, might be a subtype of rhs, which again is a type with
+/// type variables or unopened type parameters.
+///
+/// The type parameters are interpreted with respect to sig, whereas
+/// type variables are just assumed opaque.
+///
+/// The answer is conservative, so we err on the side of saying that
+/// a convesion _can_ happen. We only return a non-empty ConflictReason
+/// if the conversion will definitely fail.
+///
+/// Even if the types do not contain type variables or type parameters,
+/// this does not give a completely accurate answer, yet.
+ConflictReason canPossiblyConvertTo(
+    ConstraintSystem &cs,
+    Type lhs, Type rhs,
+    GenericSignature sig);
 
 }  // end namespace constraints
 

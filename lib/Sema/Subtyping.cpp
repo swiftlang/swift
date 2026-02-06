@@ -16,13 +16,29 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/Subtyping.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/ConstraintSystem.h"
 
+#define DEBUG_TYPE "Subtyping"
+#include "llvm/Support/Debug.h"
+
 using namespace swift;
 using namespace constraints;
+
+std::optional<bool>
+swift::constraints::isLikelyExactMatch(Type first, Type second) {
+  if (auto *firstDecl = first->getAnyNominal()) {
+    // FIXME: Make this more precise.
+    auto *secondDecl = second->getAnyNominal();
+    return firstDecl == secondDecl;
+  }
+  // FIXME: Handle other type kinds.
+  return std::nullopt;
+}
 
 ConversionBehavior
 swift::constraints::getConversionBehavior(Type type) {
@@ -96,4 +112,229 @@ bool swift::constraints::hasConversions(Type type) {
   case ConversionBehavior::Unknown:
     return true;
   }
+}
+
+static bool shouldBeConservativeWithProto(ProtocolDecl *proto) {
+  if (proto->isMarkerProtocol())
+    return true;
+
+  if (proto->isObjC())
+    return true;
+
+  return false;
+}
+
+static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
+  return classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
+}
+
+ConflictReason swift::constraints::canPossiblyConvertTo(
+    ConstraintSystem &cs,
+    Type lhs, Type rhs,
+    GenericSignature sig) {
+  auto lhsKind = getConversionBehavior(lhs);
+  auto rhsKind = getConversionBehavior(rhs);
+
+  // Conversion between two types with the same conversion behavior.
+  if (lhsKind == rhsKind) {
+    switch (lhsKind) {
+    case ConversionBehavior::None: {
+      if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
+          !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
+        if (!lhs->isEqual(rhs))
+          return ConflictFlag::Exact;
+      }
+
+      auto result = isLikelyExactMatch(lhs, rhs);
+      if (result.has_value() && !*result)
+        return ConflictFlag::Nominal;
+
+      break;
+    }
+
+    case ConversionBehavior::Class: {
+      auto *lhsDecl = lhs->getClassOrBoundGenericClass();
+      auto *rhsDecl = rhs->getClassOrBoundGenericClass();
+
+      // Toll-free bridging CF -> ObjC.
+      if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+          rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
+        lhsDecl = getBridgedObjCClass(lhsDecl);
+
+      // Toll-free bridging ObjC -> CF.
+      } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
+                 rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        rhsDecl = getBridgedObjCClass(rhsDecl);
+      }
+
+      // Check for a subclassing relationship.
+      if (!rhsDecl->isSuperclassOf(lhsDecl))
+        return ConflictFlag::Class;
+
+      break;
+    }
+
+    case ConversionBehavior::Double:
+      // There are only two types with this behavior, and they convert
+      // to each other.
+      break;
+
+    case ConversionBehavior::AnyHashable:
+      // AnyHashable converts to AnyHashable.
+      break;
+
+    case ConversionBehavior::Pointer:
+      // FIXME: Implement
+      break;
+
+    case ConversionBehavior::Array: {
+      auto subResult = canPossiblyConvertTo(
+          cs,
+          lhs->getArrayElementType(),
+          rhs->getArrayElementType(), sig);
+      if (subResult)
+        return subResult | ConflictFlag::Array;
+
+      break;
+    }
+    case ConversionBehavior::Dictionary: {
+      // FIXME: Implement
+      break;
+    }
+    case ConversionBehavior::Set: {
+      // FIXME: Implement
+      break;
+    }
+    case ConversionBehavior::Optional: {
+      // Optional-to-optional conversion.
+      auto argObjectType = lhs->getOptionalObjectType();
+      auto objectType = rhs->getOptionalObjectType();
+      auto optionalToOptional = canPossiblyConvertTo(
+          cs, argObjectType, objectType, sig);
+
+      if (optionalToOptional)
+        return optionalToOptional | ConflictFlag::Optional;
+      break;
+    }
+    case ConversionBehavior::Structural:
+      if (lhs->getCanonicalType()->getKind()
+          != rhs->getCanonicalType()->getKind())
+        return ConflictFlag::Structural;
+      break;
+    case ConversionBehavior::Unknown:
+      break;
+    }
+
+  // Handle case where the kinds don't match, and we're not converting
+  // from an unknown type.
+  } else if (lhsKind != ConversionBehavior::Unknown) {
+    switch (rhsKind) {
+    case ConversionBehavior::Class: {
+      // Archetypes can convert to classes.
+      if (lhs->is<ArchetypeType>()) {
+        auto superclassType = lhs->getSuperclass();
+        if (!superclassType)
+          return ConflictFlag::Class;
+
+        return canPossiblyConvertTo(cs, superclassType, rhs, sig);
+      }
+
+      // Protocol metatypes can convert to instances of the Protocol class
+      // on Objective-C interop platforms.
+      if (lhs->is<MetatypeType>())
+        break;
+
+      // Nothing else converts to a class except for existentials
+      // (which are 'ConversionBehavior::Unknown').
+      return ConflictFlag::Category;
+    }
+
+    case ConversionBehavior::AnyHashable:
+      // FIXME: Check if lhs definitely not Hashable
+      break;
+
+    case ConversionBehavior::Pointer:
+      // FIXME: Array, String, InOutType convert to pointers
+      break;
+
+    case ConversionBehavior::Optional: {
+      // We have a non-optional on the left. Try value-to-optional.
+      auto objectType = rhs->getOptionalObjectType();
+      auto valueToOptional = canPossiblyConvertTo(
+          cs, lhs, objectType, sig);
+      if (valueToOptional)
+        return valueToOptional | ConflictFlag::Optional;
+
+      break;
+    }
+
+    case ConversionBehavior::None:
+    case ConversionBehavior::Double:
+    case ConversionBehavior::Array:
+    case ConversionBehavior::Dictionary:
+    case ConversionBehavior::Set:
+    case ConversionBehavior::Structural:
+      return ConflictFlag::Category;
+
+    case ConversionBehavior::Unknown:
+      break;
+    }
+  }
+
+  if (sig) {
+    // If '$LHS conv $RHS' and '$LHS conforms P', does it follow
+    // that '$RHS conforms P'?
+    auto isConformanceTransitiveOnLHS = [lhsKind, lhs]() -> bool {
+      // FIXME: String converts to UnsafePointer<UInt8> which
+      // can satisfy a conformance to P that String does not
+      // satisfy. Encode this more thoroughly.
+      if (lhsKind == ConversionBehavior::None)
+        return !lhs->isString();
+
+      return false;
+    };
+
+    if (rhs->isTypeParameter() &&
+        isConformanceTransitiveOnLHS()) {
+      bool failed = llvm::any_of(
+          sig->getRequiredProtocols(rhs),
+          [&](ProtocolDecl *proto) {
+            if (shouldBeConservativeWithProto(proto))
+              return false;
+            return !lookupConformance(lhs, proto);
+          });
+      if (failed)
+        return ConflictFlag::Conformance;
+    }
+
+    // If '$LHS conv $RHS' and '$RHS conforms P', does it follow
+    // that '$LHS conforms P'?
+    auto isConformanceTransitiveOnRHS = [rhsKind]() -> bool {
+      if (rhsKind == ConversionBehavior::None ||
+          rhsKind == ConversionBehavior::Array ||
+          rhsKind == ConversionBehavior::Dictionary ||
+          rhsKind == ConversionBehavior::Set)
+        return true;
+
+      return false;
+    };
+
+    if (lhs->isTypeParameter() &&
+        isConformanceTransitiveOnRHS()) {
+      bool failed = llvm::any_of(
+          sig->getRequiredProtocols(lhs),
+          [&](ProtocolDecl *proto) {
+            if (shouldBeConservativeWithProto(proto))
+              return false;
+            return !lookupConformance(rhs, proto);
+          });
+      if (failed)
+        return ConflictFlag::Conformance;
+    }
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "unknown conversion:\n";
+             lhs->dump(llvm::dbgs());
+             rhs->dump(llvm::dbgs()));
+  return std::nullopt;
 }
