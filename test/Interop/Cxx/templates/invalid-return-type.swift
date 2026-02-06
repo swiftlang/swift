@@ -1,8 +1,21 @@
 // RUN: split-file %s %t
 // RUN: %target-clang -c -o /dev/null -Xclang -verify -I %t/Inputs %t/cxx.cpp
-// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}CxxHeader.h %t%{fs-sep}ok.swift
-// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}CxxHeader.h %t%{fs-sep}err.swift -verify-additional-prefix err-
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxModule -I %t/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %t/Inputs/CxxHeader.h
+// RUN: %target-swift-frontend -typecheck -verify \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
+// RUN:   -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs \
+// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}CxxHeader.h \
+// RUN:   %t%{fs-sep}ok.swift
+// RUN: %target-swift-frontend -typecheck -verify \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
+// RUN:   -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs \
+// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}CxxHeader.h \
+// RUN:   %t%{fs-sep}err.swift -verify-additional-prefix err-
+// RUN: %target-swift-ide-test -print-module -source-filename=x \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
+// RUN:   -cxx-interoperability-mode=default -I %t/Inputs \
+// RUN:   -module-to-print=CxxModule | %FileCheck %t/Inputs/CxxHeader.h
+//
+// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module CxxModule {

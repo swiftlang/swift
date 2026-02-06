@@ -1,11 +1,27 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
+//
+// Validate usability of type.h in C++ with clang
 // RUN: %target-clang -c -o /dev/null -Xclang -verify -I %t/Inputs %t/ok.cpp
 // RUN: %target-clang -c -o /dev/null -Xclang -verify=cxx-instantiation -I %t/Inputs %t/err.cpp
-// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}type.h %t%{fs-sep}ok.swift
-// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}type.h %t%{fs-sep}err.swift -verify-additional-prefix swift-
+//
+// Compare usability of type.h in Swift with swift-frontend
+// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
+// RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}type.h \
+// RUN:   %t%{fs-sep}ok.swift
+// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
+// RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}type.h \
+// RUN:   %t%{fs-sep}err.swift -verify-additional-prefix swift-
+//
+// Check module interface of type.h
+// RUN: %target-swift-ide-test -print-module -source-filename=x \
+// RUN:   -cxx-interoperability-mode=default -I %t/Inputs \
+// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
+// RUN:   -module-to-print=Type | %FileCheck %s
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=Type -I %t/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
+// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 //--- Inputs/module.modulemap
 module Type {
