@@ -51,22 +51,30 @@ struct DisjunctionInfo {
   /// is attempted.
   llvm::TinyPtrVector<Constraint *> FavoredChoices;
 
+  /// The number of choices that were favored, but with a lower score. This is
+  /// used for ranking.
+  unsigned LessFavoredChoices : 31;
+
   /// Whether the decisions were based on speculative information
   /// i.e. literal argument candidates or initializer type inference.
-  bool IsSpeculative;
+  bool IsSpeculative : 1;
 
   DisjunctionInfo() = default;
   DisjunctionInfo(std::optional<unsigned> score,
-                  ArrayRef<Constraint *> favoredChoices, bool speculative)
+                  ArrayRef<Constraint *> favoredChoices,
+                  unsigned lessFavoredChoices,
+                  bool speculative)
       : Score(score), FavoredChoices(favoredChoices),
+        LessFavoredChoices(lessFavoredChoices),
         IsSpeculative(speculative) {}
 
-  static DisjunctionInfo none() { return {std::nullopt, {}, false}; }
+  static DisjunctionInfo none() { return DisjunctionInfo(); }
 };
 
 class DisjunctionInfoBuilder {
   std::optional<unsigned> Score;
   SmallVector<Constraint *, 2> FavoredChoices;
+  unsigned LessFavoredChoices;
   bool IsSpeculative;
 
 public:
@@ -77,7 +85,7 @@ public:
                          ArrayRef<Constraint *> favoredChoices)
       : Score(score),
         FavoredChoices(favoredChoices.begin(), favoredChoices.end()),
-        IsSpeculative(false) {}
+        LessFavoredChoices(0), IsSpeculative(false) {}
 
   void setFavoredChoices(ArrayRef<Constraint *> choices) {
     FavoredChoices.clear();
@@ -88,9 +96,13 @@ public:
     FavoredChoices.push_back(constraint);
   }
 
+  void addLessFavoredChoice() {
+    ++LessFavoredChoices;
+  }
+
   void setSpeculative(bool value = true) { IsSpeculative = value; }
 
-  DisjunctionInfo build() { return {Score, FavoredChoices, IsSpeculative}; }
+  DisjunctionInfo build() { return {Score, FavoredChoices, LessFavoredChoices, IsSpeculative}; }
 };
 
 static DeclContext *getDisjunctionDC(Constraint *disjunction) {
@@ -1809,13 +1821,15 @@ static DisjunctionInfo computeDisjunctionInfo(
                         !anyNonSpeculativeResultTypes(resultTypes));
 
   DisjunctionInfoBuilder info(/*score=*/bestScore);
-
   info.setSpeculative(isSpeculative);
 
   for (const auto &choice : favoredChoices) {
     if (choice.second == bestScore)
       info.addFavoredChoice(choice.first);
+    else if (choice.second > 0)
+      info.addLessFavoredChoice();
   }
+
 
   return info.build();
 }
@@ -1938,6 +1952,10 @@ ConstraintSystem::selectDisjunction() {
         log << " speculative";
       }
 
+      if (info.LessFavoredChoices > 0) {
+        log << " less=" << info.LessFavoredChoices;
+      }
+
       if (info.Score.has_value()) {
         log << " score=" << info.Score.value_or(0);
       } else {
@@ -2044,20 +2062,17 @@ ConstraintSystem::selectDisjunction() {
     // Use favored choices only if disjunction score is higher
     // than zero. This means that we can maintain favoring
     // choices without impacting selection decisions.
-    unsigned numFirstFavored =
-        firstScore.value_or(0) ? firstFavorings.FavoredChoices.size() : 0;
-    unsigned numSecondFavored =
-        secondScore.value_or(0) ? secondFavorings.FavoredChoices.size() : 0;
+    unsigned firstFavored = firstScore.value_or(0) ? firstFavorings.FavoredChoices.size() : 0;
+    unsigned secondFavored = secondScore.value_or(0) ? secondFavorings.FavoredChoices.size() : 0;
 
-    if (numFirstFavored == numSecondFavored) {
-      if (firstActive != secondActive)
-        return firstActive < secondActive;
-    }
+    auto firstTuple = std::make_tuple(firstFavored ? firstFavored : firstActive,
+                                      firstFavorings.LessFavoredChoices,
+                                      firstActive);
+    auto secondTuple = std::make_tuple(secondFavored ? secondFavored : secondActive,
+                                       secondFavorings.LessFavoredChoices,
+                                       secondActive);
 
-    numFirstFavored = numFirstFavored ? numFirstFavored : firstActive;
-    numSecondFavored = numSecondFavored ? numSecondFavored : secondActive;
-
-    return numFirstFavored < numSecondFavored;
+    return firstTuple < secondTuple;
   };
 
   // Debugging code to verify that the above predicate actually defines
