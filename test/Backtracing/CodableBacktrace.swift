@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -target %target-cpu-macos15.0 -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library -Onone -o %t/CodableBacktrace
-// RUN: %target-codesign %t/CodableBacktrace
-// RUN: %target-run %t/CodableBacktrace | %FileCheck %s
+// RUN: %target-build-swift %s -target %target-cpu-macos15.0 -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library -Onone -o %t/CodableBacktrace.exe
+// RUN: %target-codesign %t/CodableBacktrace.exe
+// RUN: %target-run %t/CodableBacktrace.exe | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: backtracing
