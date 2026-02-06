@@ -400,6 +400,25 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
   return true;
 }
 
+// When an unowned value is replaced with 'newValue', does the fixup require
+// finding all uses of the original unowned value?
+static bool doesUnownedFixupRequireUses(SILValue newValue) {
+  switch (newValue->getOwnershipKind()) {
+  case OwnershipKind::None:
+    return false;
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid for values");
+  case OwnershipKind::Unowned:
+    return false;
+  case OwnershipKind::Guaranteed: {
+    return !isa<SILFunctionArgument>(newValue);
+  }
+  case OwnershipKind::Owned: {
+    return true;
+  }
+  }
+}
+
 // Determine whether it is valid to replace \p oldValue with \p newValue and
 // extend the lifetime of \p oldValue to cover the new uses.
 static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
@@ -407,6 +426,20 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   // Owned or unowned use points.
   SmallVector<Operand *, 8> ownedUsePoints;
   switch (oldValue->getOwnershipKind()) {
+  case OwnershipKind::None:
+    break;
+  case OwnershipKind::Any:
+    llvm_unreachable("Invalid for values");
+  case OwnershipKind::Unowned: {
+    if (doesUnownedFixupRequireUses(newValue)) {
+      // Check that a copy can be extended across all unowned uses.
+      // Required by OwnershipRAUWPrepare::prepareUnowned for either
+      // borrowCopyOverGuaranteedUses or createPlusZeroCopy.
+      if (!findUsesOfSimpleValue(oldValue, &ownedUsePoints))
+        return false;
+    }
+    break;
+  }
   case OwnershipKind::Guaranteed: {
     // Check that the old lifetime can be extended and record the necessary
     // book-keeping in the OwnershipFixupContext.
@@ -428,21 +461,11 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
     return OwnershipRAUWHelper::hasValidRAUWOwnership(
         oldValue, newValue, context.guaranteedUsePoints);
   }
-  case OwnershipKind::Unowned: {
-    if (newValue->getOwnershipKind() == OwnershipKind::Owned) {
-      // Check that a copy can be extended across all unowned uses.
-      // Required by OwnershipRAUWPrepare::prepareUnowned.
-      if (!findUsesOfSimpleValue(oldValue, &ownedUsePoints))
-        return false;
-    }
-    // Ignore the uses of lexical unowned values when the new value is unowned
-    // or guaranteed.
-    break;
-  }
-  default: {
+  case OwnershipKind::Owned: {
     // If newValue is lexical, find the uses of oldValue so that it can be
     // determined whether the replacement would illegally extend the lifetime
-    // of newValue.
+    // of newValue. Only relevant when oldValue is Owned because the code above
+    // already checks for uses when oldValue is unowned or guaranteed.
     if (newValue->isLexical() &&
         !findUsesOfSimpleValue(oldValue, &ownedUsePoints)) {
       return false;
