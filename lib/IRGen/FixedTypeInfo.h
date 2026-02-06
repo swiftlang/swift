@@ -104,6 +104,7 @@ public:
   llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
 

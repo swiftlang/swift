@@ -43,8 +43,9 @@ class BorrowByPointerTypeInfo final
 public:
   BorrowByPointerTypeInfo(IRGenModule &IGM)
     : PODSingleScalarTypeInfo(IGM.PtrTy, IGM.getPointerSize(),
-                       IGM.TargetInfo.PointerSpareBits,
-                       IGM.getPointerAlignment())
+          SpareBitVector::getConstant(IGM.getPointerSize().getValueInBits(),
+                                      false),
+          IGM.getPointerAlignment())
   {
     setSubclassKind((unsigned)BorrowTypeInfoSubclassKind::BorrowByPointer);
   }
@@ -56,6 +57,43 @@ public:
   static bool classof(const TypeInfo *t) {
     return t->getSubclassKind()
       == (unsigned)BorrowTypeInfoSubclassKind::BorrowByPointer;
+  }
+
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return true;
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return 1;
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                     unsigned index) const override {
+    assert(index == 0);
+    return APInt(bits, 0);
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address src,
+                                       SILType T,
+                                       bool isOutlined) const override {
+    // Copied from BridgeObjectTypeInfo.
+    src = IGF.Builder.CreateElementBitCast(src, IGF.IGM.IntPtrTy);
+    auto val = IGF.Builder.CreateLoad(src);
+    auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
+    auto isNonzero = IGF.Builder.CreateICmpNE(val, zero);
+    // We either have extra inhabitant 0 or no extra inhabitant (-1).
+    // Conveniently, this is just a sext i1 -> i32 away.
+    return IGF.Builder.CreateSExt(isNonzero, IGF.IGM.Int32Ty);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
+    // Copied from BridgeObjectTypeInfo.
+    // There's only one extra inhabitant, 0.
+    dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.IntPtrTy);
+    IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0),dest);
   }
 };
 
@@ -156,6 +194,36 @@ public:
     ReferentTI.unpackFromEnumPayload(IGF, payload, target, offset);
   }
 
+  bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
+    return ReferentTI.mayHaveExtraInhabitants(IGM);
+  }
+
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return ReferentTI.getFixedExtraInhabitantCount(IGM);
+  }
+
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
+                                     unsigned index) const override {
+    return ReferentTI.getFixedExtraInhabitantValue(IGM, bits, index);
+  }
+
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address src,
+                                       SILType T,
+                                       bool isOutlined) const override {
+    return ReferentTI.getExtraInhabitantIndex(IGF, src, T, isOutlined);
+  }
+
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
+    return ReferentTI.storeExtraInhabitant(IGF, index, dest, T, isOutlined);
+  }
+
+  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    return ReferentTI.getFixedExtraInhabitantMask(IGM);
+  }
+  
   TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
                                         bool useStructLayouts) const override {
     return ReferentTI.buildTypeLayoutEntry(IGM, T, useStructLayouts);
@@ -215,26 +283,21 @@ public:
     // 'Builtin.Borrow' is always trivial to destroy, thus it's a nop.
   }
 
-  llvm::Value *getBitwiseBorrowable(IRGenFunction &IGF, SILType T) const {
-    auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
-    auto referentTy = SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
-    auto &referentTI = IGF.IGM.getTypeInfo(referentTy);
-    // let bitwiseBorrowable = (!T.isBitwiseTakable || T.isBitwiseBorrowable)
-    //                          && !T.isAddressableForDependencies
-    // if bitwiseBorrowable {
-    //   return T.getEnumTagSinglePayload(...)
-    // } else {
-    //   return RawPointer.getEnumTagSinglePayload(...)
-    // }
-
-    auto isBitwiseTakable = referentTI.getIsBitwiseTakable(IGF, referentTy);
-    auto notValue = IGF.Builder.CreateNot(isBitwiseTakable);
+  llvm::Value *getIsValueRepresentation(IRGenFunction &IGF,
+                                        SILType referentTy,
+                                        const TypeInfo &referentTI) const {
     auto isBitwiseBorrowable = referentTI.getIsBitwiseBorrowable(IGF, referentTy);
-    auto orValue = IGF.Builder.CreateOr(notValue, isBitwiseBorrowable);
-    auto cmp = IGF.Builder.CreateICmpEQ(orValue, IGF.IGM.getBool(true));
-    // auto isAddressableForDeps = referentTI.getIsAddressableForDependencies(IGF,
-    //                                                                   referent);
-    return cmp;
+    auto isAddressableForDependencies = referentTI.getIsAddressableForDependencies(IGF, referentTy);
+    auto size = referentTI.getSize(IGF, referentTy);
+
+    auto isSmall = IGF.Builder.CreateICmpULE(size,
+       llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
+                              IGF.IGM.getPointerSize().getValue() * 4));
+
+    llvm::Value *v = IGF.Builder.CreateNot(isAddressableForDependencies);
+    v = IGF.Builder.CreateAnd(v, isBitwiseBorrowable);
+    v = IGF.Builder.CreateAnd(v, isSmall);
+    return v;
   }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -243,19 +306,20 @@ public:
                                        bool isOutlined) const override {
     auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
     auto referentTy = SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
-    auto &referentTI = IGF.IGM.getTypeInfo(referentTy);
 
-    auto isBitwiseBorrowable = getBitwiseBorrowable(IGF, T);
-    auto isBitwiseBorrowableBB = IGF.createBasicBlock("is_bitwise_borrowable");
-    auto notBitwiseBorrowableBB = IGF.createBasicBlock("not_bitwise_borrowable");
+    auto &referentTI = IGF.getTypeInfo(referentTy);
+
+    auto isValueRep = getIsValueRepresentation(IGF, referentTy, referentTI);
+    auto isValueRepBB = IGF.createBasicBlock("is_value_representation");
+    auto isAddrRepBB = IGF.createBasicBlock("is_address_representation");
+    
     auto doneBB = IGF.createBasicBlock("done");
 
-    IGF.Builder.CreateCondBr(isBitwiseBorrowable, isBitwiseBorrowableBB,
-                             notBitwiseBorrowableBB);
+    IGF.Builder.CreateCondBr(isValueRep, isValueRepBB, isAddrRepBB);
 
-    // Is bitwise borrowable, meaning we can use the referent's TypeInfo to grab
-    // this value.
-    IGF.Builder.emitBlock(isBitwiseBorrowableBB);
+    // We can use the referent's TypeInfo to emit the tag in value
+    // representation.
+    IGF.Builder.emitBlock(isValueRepBB);
 
     auto inlineResult = referentTI.getEnumTagSinglePayload(IGF, numEmptyCases,
                                                            enumAddr,
@@ -265,13 +329,12 @@ public:
     // Calling the referent's getEnumTagSinglePayload may have introduced new
     // blocks. Get the current one that contains the result and save it for the
     // phi node later.
-    auto isBitwiseBorrowablePhiBB = IGF.Builder.GetInsertBlock();
+    auto valueRepPhiBB = IGF.Builder.GetInsertBlock();
 
     IGF.Builder.CreateBr(doneBB);
 
-    // Not bitwise borrowable, meaning we need to grab the value from
-    // RawPointer's TypeInfo.
-    IGF.Builder.emitBlock(notBitwiseBorrowableBB);
+    // In pointer representation, we take on RawPointer's extra inhabitant. 
+    IGF.Builder.emitBlock(isAddrRepBB);
 
     auto pointerTy = SILType::getPrimitiveObjectType(IGF.IGM.Context.TheRawPointerType);
     auto &rawPointerTI = IGF.IGM.getRawPointerTypeInfo();
@@ -283,14 +346,14 @@ public:
     // Calling the raw pointer's getEnumTagSinglePayload may have introduced new
     // blocks. Get the current one that contains the result and save it for the
     // phi node later.
-    auto notBitwiseBorrowablePhiBB = IGF.Builder.GetInsertBlock();
+    auto addrRepPhiBB = IGF.Builder.GetInsertBlock();
 
     IGF.Builder.CreateBr(doneBB);
 
     IGF.Builder.emitBlock(doneBB);
     auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
-    phi->addIncoming(inlineResult, isBitwiseBorrowablePhiBB);
-    phi->addIncoming(pointerResult, notBitwiseBorrowablePhiBB);
+    phi->addIncoming(inlineResult, valueRepPhiBB);
+    phi->addIncoming(pointerResult, addrRepPhiBB);
 
     return phi;
   }
@@ -300,33 +363,37 @@ public:
                                  SILType T, bool isOutlined) const override {
     auto astBorrowTy = T.getASTType()->castTo<BuiltinBorrowType>();
     auto referentTy = SILType::getPrimitiveObjectType(astBorrowTy->getReferentType());
-    auto &referentTI = IGF.IGM.getTypeInfo(referentTy);
 
-    auto isBitwiseBorrowable = getBitwiseBorrowable(IGF, T);
-    auto isBitwiseBorrowableBB = IGF.createBasicBlock("is_bitwise_borrowable");
-    auto notBitwiseBorrowableBB = IGF.createBasicBlock("not_bitwise_borrowable");
+    auto &referentTI = IGF.getTypeInfo(referentTy);
 
-    IGF.Builder.CreateCondBr(isBitwiseBorrowable, isBitwiseBorrowableBB,
-                             notBitwiseBorrowableBB);
+    auto isValueRep = getIsValueRepresentation(IGF, referentTy, referentTI);
+    auto isValueRepBB = IGF.createBasicBlock("is_value_representation");
+    auto isAddrRepBB = IGF.createBasicBlock("is_address_representation");
+    
+    auto doneBB = IGF.createBasicBlock("done");
 
-    // Is bitwise borrowable, meaning we can use the referent's TypeInfo to
-    // store the tag.
-    IGF.Builder.emitBlock(isBitwiseBorrowableBB);
+    IGF.Builder.CreateCondBr(isValueRep, isValueRepBB, isAddrRepBB);
+
+    // We can use the referent's TypeInfo to emit the tag in value
+    // representation.
+    IGF.Builder.emitBlock(isValueRepBB);
 
     referentTI.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr,
                                          referentTy, isOutlined);
 
-    IGF.Builder.CreateRetVoid();
+    IGF.Builder.CreateBr(doneBB);
 
-    // Not bitwise borrowable, meaning we need to use RawPointer's TypeInfo to
-    // store the tag.
-    IGF.Builder.emitBlock(notBitwiseBorrowableBB);
+    // In pointer representation, we take on RawPointer's extra inhabitant. 
+    IGF.Builder.emitBlock(isAddrRepBB);
 
     auto pointerTy = SILType::getPrimitiveObjectType(IGF.IGM.Context.TheRawPointerType);
     auto &rawPointerTI = IGF.IGM.getRawPointerTypeInfo();
     rawPointerTI.storeEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr,
                                            pointerTy, isOutlined);
-    return;
+
+    IGF.Builder.CreateBr(doneBB);
+
+    IGF.Builder.emitBlock(doneBB);
   }
 };
 
