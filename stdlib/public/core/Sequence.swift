@@ -456,6 +456,16 @@ public protocol Sequence<Element>: BorrowingSequence {
   ) rethrows -> R?
 }
 
+// @available(SwiftStdlib 6.3, *)
+extension Sequence: @reparented BorrowingSequence 
+  where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
+  
+  @_transparent
+  public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
+    BorrowingIteratorAdapter(iterator: makeIterator())
+  }
+}
+
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
