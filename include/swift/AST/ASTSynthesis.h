@@ -592,11 +592,17 @@ struct FunctionTypeSynthesizer {
   ParamsS parameters;
   YieldsS yields;
 };
+template <class ExtInfoS, class ResultS, class ParamsS>
+FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS, YieldListSynthesizer<>>
+_function(ExtInfoS extInfo, ResultS result, ParamsS params) {
+  return {extInfo, result, params, {}};
+}
 template <class ExtInfoS, class ResultS, class ParamsS, class YieldsS>
 FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS, YieldsS>
-_function(ExtInfoS extInfo, ResultS result, ParamsS params, YieldsS yields) {
+_coroutine(ExtInfoS extInfo, ResultS result, ParamsS params, YieldsS yields) {
   return {extInfo, result, params, yields};
 }
+
 template <class ExtInfoS, class ResultS, class ParamsS, class YieldsS>
 Type synthesizeType(
     SynthesisContext &SC,

@@ -1638,7 +1638,7 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
           _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation",
                  _sending(_function(_async(_throws(_thick)), _typeparam(0),
-                                    _parameters(), _yields())))),
+                                    _parameters())))),
       _tuple(_nativeObject, _rawPointer));
 }
 
@@ -1662,7 +1662,7 @@ static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
                             _nil)),
           _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
           _label("operation", _sending(_function(_async(_throws(_thick)), _void,
-                                                 _parameters(), _yields())))),
+                                                 _parameters())))),
       _tuple(_nativeObject, _rawPointer));
 }
 
@@ -1707,7 +1707,7 @@ static ValueDecl *getTaskRunInline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
       _parameters(_function(_async(_noescape(_thick)), _typeparam(0),
-                            _parameters(), _yields())),
+                            _parameters())),
       _typeparam(0));
 }
 
