@@ -72,7 +72,6 @@ set(swift_runtime_sources
     Numeric.cpp
     Once.cpp
     Paths.cpp
-    Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
