@@ -39,10 +39,34 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   }
   let utf8Buffer = unsafe UnsafeBufferPointer(start: utf8Start, count: utf8Count)
   var result = unsafe String._fromUTF8Repairing(utf8Buffer).result
-  if strippingNewline, result.last == "\n" || result.last == "\r\n" {
-    _ = result.removeLast()
+  if strippingNewline {
+    result = result.withoutNewline()
   }
   return result
+}
+
+extension String {
+  /// Remove the newline from the string
+  fileprivate func withoutNewline() -> String {
+    var scalars = unicodeScalars[...]
+
+    // If the last character is not "\n", there's nothing to do.
+    let newline: UnicodeScalar = "\n"
+    guard let lastNewline = scalars.last, lastNewline == newline else {
+      return self
+    }
+
+    // Drop the "\n".
+    scalars = scalars.dropLast()
+
+    // Now remove "\r" if it's also there.
+    let carriageReturn: UnicodeScalar = "\r"
+    guard let lastCR = scalars.last, lastCR == carriageReturn else {
+      return String(scalars)
+    }
+
+    return String(scalars.dropLast())
+  }
 }
 
 #endif

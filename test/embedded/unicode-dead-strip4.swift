@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Osize -parse-as-library -enable-experimental-feature Embedded %s -c -o %t/a.o
+// RUN: %target-swift-frontend -Osize -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern %s -c -o %t/a.o
 // RUN: %target-clang %target-clang-resource-dir-opt %t/a.o -o %t/a.out -dead_strip %swift_obj_root/lib/swift/embedded/%module-target-triple/libswiftUnicodeDataTables.a
 // RUN: %llvm-nm --defined-only --format=just-symbols --demangle %t/a.out | sort | %FileCheck %s --check-prefix=EXCLUDES
 
@@ -7,6 +7,19 @@
 // REQUIRES: OS=macosx || OS=wasip1
 // XFAIL: OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
+
+@_extern(c, "getline")
+func getline(
+  _ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?
+) -> Int
+
+@c
+func swift_stdlib_readLine_stdin(_ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?) -> Int {
+  return getline(linePointer)
+}
+
+
 
 @main
 struct Main {
@@ -21,6 +34,10 @@ struct Main {
     print(b1 ?? false)
     print(b2 ?? false)
     print(b3 ?? false)
+
+    if let value = readLine(), let b4 = Bool(value) {
+      print(b4)
+    }
   }
 }
 
@@ -35,4 +52,3 @@ struct Main {
 // EXCLUDES-NOT: swift_stdlib_scripts
 // EXCLUDES-NOT: swift_stdlib_special_mappings
 // EXCLUDES-NOT: swift_stdlib_words
-// 
