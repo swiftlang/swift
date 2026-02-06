@@ -94,9 +94,8 @@ static void withStatusRecordLock(
               status, newStatus,
               /*success*/ SWIFT_MEMORY_ORDER_CONSUME,
               /*failure*/ std::memory_order_relaxed)) {
-        bool wasRunning = status.isRunning();
+        newStatus.traceStatusChanged(task, status, false);
         status = newStatus;
-        status.traceStatusChanged(task, false, wasRunning);
         break;
       }
     }
@@ -131,7 +130,7 @@ static void withStatusRecordLock(
             status, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false, status.isRunning());
+      newStatus.traceStatusChanged(task, status, false);
       break;
     }
   }
@@ -197,7 +196,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+        newStatus.traceStatusChanged(task, oldStatus, false);
         return true;
       } else {
         // Retry
@@ -303,7 +302,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
             oldStatus, newStatus,
             /*success*/ std::memory_order_relaxed,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+      newStatus.traceStatusChanged(task, oldStatus, false);
       return;
     }
 
@@ -905,7 +904,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task, false, oldStatus.isRunning());
+  newStatus.traceStatusChanged(task, oldStatus, false);
   if (newStatus.getInnermostRecord() == nullptr) {
      // No records, nothing to propagate
      return;
