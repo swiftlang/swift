@@ -24,8 +24,8 @@ import sys
 
 out = sys.argv[1]
 
-with open(os.path.join(out, 'check.txt'), 'w') as cf:
+with open(os.path.join(out, "check.txt"), "w") as cf:
     for i in range(1, 1101):
-        with open(os.path.join(out, f'{i}.swift'), 'w') as sf:
-            sf.write(f'public func foo{i}() {{}}\n')
-        cf.write(f'CHECK: foo{i}\n')
+        with open(os.path.join(out, f"{i}.swift"), "w") as sf:
+            sf.write(f"public func foo{i}() {{}}\n")
+        cf.write(f"CHECK: foo{i}\n")
