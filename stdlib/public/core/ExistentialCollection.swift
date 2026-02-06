@@ -190,12 +190,30 @@ internal class _AnySequenceBox<Element> {
   }
 #endif
 
-  @inlinable
-  internal func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  @_alwaysEmitIntoClient
+  internal func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     _abstract()
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    _abstract()
+  }
+#endif // !$Embedded
 
   @inlinable
   internal func _forEach(
@@ -546,12 +564,31 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   }
 #endif
 
-  @inlinable
-  internal override func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
+  @_alwaysEmitIntoClient
+  internal override func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _base.filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal override func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
+
   @inlinable
   internal override func _forEach(
     _ body: (Element) throws -> Void
@@ -641,12 +678,32 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
     try _base.map(transform)
   }
 #endif
-  @inlinable
-  internal override func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
+
+  @_alwaysEmitIntoClient
+  internal override func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _base.filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal override func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
+
   @inlinable
   internal override func _forEach(
     _ body: (Element) throws -> Void
@@ -838,12 +895,32 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
     try _base.map(transform)
   }
 #endif
-  @inlinable
-  internal override func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+
+  @_alwaysEmitIntoClient
+  internal override func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     return try _base.filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal override func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
+
   @inlinable
   internal override func _forEach(
     _ body: (Element) throws -> Void
@@ -1053,12 +1130,32 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
     try _base.map(transform)
   }
 #endif
-  @inlinable
-  internal override func _filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
+
+  @_alwaysEmitIntoClient
+  internal override func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _base.filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal override func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
+
   @inlinable
   internal override func _forEach(
     _ body: (Element) throws -> Void
@@ -1360,12 +1457,30 @@ extension AnySequence {
   }
 #endif
 
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _box._filter(isIncluded)
+  @_alwaysEmitIntoClient
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _box._filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
 
   @inlinable
   public __consuming func forEach(
@@ -1466,12 +1581,30 @@ extension AnyCollection {
   }
 #endif
 
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _box._filter(isIncluded)
+  @_alwaysEmitIntoClient
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _box._filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
 
   @inlinable
   public __consuming func forEach(
@@ -1578,12 +1711,30 @@ extension AnyBidirectionalCollection {
   }
 #endif
 
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _box._filter(isIncluded)
+  @_alwaysEmitIntoClient
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _box._filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
 
   @inlinable
   public __consuming func forEach(
@@ -1692,12 +1843,30 @@ extension AnyRandomAccessCollection {
   }
 #endif
 
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _box._filter(isIncluded)
+  @_alwaysEmitIntoClient
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
+    try _box._filter(isIncluded)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !$Embedded
 
   @inlinable
   public __consuming func forEach(
