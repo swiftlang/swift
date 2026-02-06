@@ -1478,14 +1478,12 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
 
   auto &ctx = decl->getASTContext();
   if (initKind == MemberwiseInitKind::Compatibility) {
-    // Only generate the regular memberwise init if the feature is disabled.
-    if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
-      return false;
-
     // In the next language mode we should stop creating the compatibility
-    // initializer.
-    if (ctx.isAtLeastFutureMajorLanguageMode())
+    // initializer if 'DeprecateCompatMemberwiseInit' is enabled.
+    if (ctx.LangOpts.hasFeature(Feature::DeprecateCompatMemberwiseInit) &&
+        ctx.isAtLeastFutureMajorLanguageMode()) {
       return false;
+    }
 
     // If there are no extra properties present for the compatibility
     // initializer we don't need to synthesize it. The compatibility initializer
@@ -1594,12 +1592,10 @@ ConstructorDecl *
 ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
                                                 NominalTypeDecl *decl) const {
   // For now, use the compatibility memberwise initializer that includes all
-  // private properties when ExcludePrivateFromMemberwiseInit is enabled.
+  // private properties.
   // FIXME: Can we switch to the regular?
   auto &ctx = decl->getASTContext();
-  auto initKind = MemberwiseInitKind::Regular;
-  if (ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
-    initKind = MemberwiseInitKind::Compatibility;
+  auto initKind = MemberwiseInitKind::Compatibility;
 
   // Compute the access level for the memberwise initializer. The minimum of:
   // - Public, by default. This enables public nominal types to have public
@@ -1629,11 +1625,7 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
     auto *initDecl = [&]() -> ConstructorDecl * {
       using Kind = MemberwiseInitKind;
 
-      // If we don't have the feature just take the regular init.
-      if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
-        return decl->getMemberwiseInitializer(Kind::Regular);
-
-      // If we have the feature, we can always use the compat init if present.
+      // Always use the compat init if present.
       if (auto *init = decl->getMemberwiseInitializer(Kind::Compatibility))
         return init;
 
