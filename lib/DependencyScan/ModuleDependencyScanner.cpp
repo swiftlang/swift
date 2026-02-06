@@ -2170,11 +2170,6 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   auto clangArgs = invocation.getCC1CommandLine();
   llvm::for_each(clangArgs, addClangArg);
 
-  // CASFileSystemRootID.
-  std::string RootID = clangModuleDep.CASFileSystemRootID
-                           ? clangModuleDep.CASFileSystemRootID.value()
-                           : "";
-
   std::string IncludeTree =
       clangModuleDep.IncludeTreeID ? *clangModuleDep.IncludeTreeID : "";
 
@@ -2198,7 +2193,7 @@ ModuleDependencyInfo ModuleDependencyScanner::bridgeClangModuleDependency(
   llvm::StringSet<> alreadyAddedModules;
   auto bridgedDependencyInfo = ModuleDependencyInfo::forClangModule(
       pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
-      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries, RootID,
+      clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, LinkLibraries,
       IncludeTree, /*module-cache-key*/ "", clangModuleDep.IsSystem);
 
   std::vector<ModuleDependencyID> directDependencyIDs;
