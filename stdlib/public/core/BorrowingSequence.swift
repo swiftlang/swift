@@ -104,6 +104,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 
 /// A type that provides sequential, borrowing access to its elements.
 //@available(SwiftStdlib 6.3, *)
+@reparentable
 public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element: ~Copyable
@@ -148,22 +149,6 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
   public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
     curValue = iterator.next()
     return curValue._span
-  }
-}
-
-//@available(SwiftStdlib 6.3, *)
-//extension Sequence where BorrowingIterator == BorrowingIteratorAdapter<Iterator> {
-//  @_transparent
-//  public func makeBorrowingIterator() -> BorrowingIterator {
-//    BorrowingIteratorAdapter(iterator: makeIterator())
-//  }
-//}
-
-//@available(SwiftStdlib 6.3, *)
-extension Sequence {
-  @_transparent
-  public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
-    BorrowingIteratorAdapter(iterator: makeIterator())
   }
 }
 
