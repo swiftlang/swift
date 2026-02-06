@@ -214,6 +214,15 @@ static bool isTransferrable(const PotentialBinding &binding,
   return true;
 }
 
+static void forEachTransferable(
+    const PotentialBindings &bindings, ChainDirection direction,
+    llvm::function_ref<void(const PotentialBinding &binding)> callback) {
+  llvm::for_each(bindings.Bindings, [&](const auto &binding) {
+    if (isTransferrable(binding, direction))
+      callback(binding);
+  });
+}
+
 /// Collect all of the subtypes of the given constraint graph node that
 /// propagated transitive supertype bindings to it.
 static void collectBindingProducingSubtypesOf(
@@ -290,19 +299,18 @@ void ConstraintGraphNode::updateTypeVariableAssociations(Constraint *constraint,
               typeVar->getImpl().getRepresentative(/*trail=*/nullptr);
           // Transfer all of the existing viable bindings of this type variable,
           // both direct and transitive, over to its new supertype.
-          for (const auto &binding : CG[subtypeRepr].Potential.Bindings) {
-            if (!isTransferrable(binding, ChainDirection::Supertypes))
-              continue;
+          forEachTransferable(
+              CG[subtypeRepr].Potential, ChainDirection::Supertypes,
+              [&](const auto &binding) {
+                auto transitive =
+                    binding.isTransitive()
+                        ? binding
+                        : binding.withKind(AllowedBindingKind::Supertypes)
+                              .asTransitiveFrom(subtypeRepr);
 
-            auto transitive =
-                binding.isTransitive()
-                    ? binding
-                    : binding.withKind(AllowedBindingKind::Supertypes)
-                          .asTransitiveFrom(subtypeRepr);
-
-            CG[supertypeRepr].introduceTransitive(transitive,
-                                                  ChainDirection::Supertypes);
-          }
+                CG[supertypeRepr].introduceTransitive(
+                    transitive, ChainDirection::Supertypes);
+              });
         }
       }
     }
@@ -749,10 +757,12 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *repr,
   // as part of merging by introducing new member's constraints to the
   // representative.
   if (supportsTransitiveInference()) {
-    for (const auto &binding : nonRepNode.Potential.Bindings) {
-      if (binding.isTransitiveSupertype())
-        (*this)[repr].introduceTransitive(binding, ChainDirection::Supertypes);
-    }
+    forEachTransferable(nonRepNode.Potential, ChainDirection::Supertypes,
+                        [&](const auto &binding) {
+                          if (binding.isTransitiveSupertype())
+                            (*this)[repr].introduceTransitive(
+                                binding, ChainDirection::Supertypes);
+                        });
   }
 
   // Now we retract all the bindings from the member we are about to add.
@@ -764,18 +774,18 @@ void ConstraintGraph::mergeNodesPre(TypeVariableType *repr,
   // bindings from the new member. Now, we need to introduce all of the bindings
   // of the representative to the supertype chain of the new member.
   if (supportsTransitiveInference()) {
-    for (const auto &binding : (*this)[repr].Potential.Bindings) {
-      if (isTransferrable(binding, ChainDirection::Supertypes)) {
-        nonRepNode.notifySupertypes(
-            [&binding, repr](ConstraintGraphNode &supertype) {
-              supertype.introduceTransitive(
-                  binding.isTransitive()
-                      ? binding
-                      : binding.withKind(AllowedBindingKind::Supertypes)
-                            .asTransitiveFrom(repr));
-            });
-      }
-    }
+    forEachTransferable(
+        (*this)[repr].Potential, ChainDirection::Supertypes,
+        [&](const auto &binding) {
+          nonRepNode.notifySupertypes(
+              [&binding, repr](ConstraintGraphNode &supertype) {
+                supertype.introduceTransitive(
+                    binding.isTransitive()
+                        ? binding
+                        : binding.withKind(AllowedBindingKind::Supertypes)
+                              .asTransitiveFrom(repr));
+              });
+        });
   }
 }
 
