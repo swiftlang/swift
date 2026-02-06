@@ -25,6 +25,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSBindings.h"
+#include "swift/Sema/Subtyping.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -33,6 +34,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cstddef>
 #include <functional>
+
+#define DEBUG_TYPE "CSLookahead"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 using namespace constraints;
@@ -71,13 +75,13 @@ static ConflictReason canPossiblyConvertTo(
     ConstraintSystem &cs,
     Type lhs, Type rhs,
     GenericSignature sig) {
-  auto lhsKind = inference::getConversionBehavior(lhs);
-  auto rhsKind = inference::getConversionBehavior(rhs);
+  auto lhsKind = getConversionBehavior(lhs);
+  auto rhsKind = getConversionBehavior(rhs);
 
   // Conversion between two types with the same conversion behavior.
   if (lhsKind == rhsKind) {
     switch (lhsKind) {
-    case inference::ConversionBehavior::None:
+    case ConversionBehavior::None:
       if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
           !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
         if (!lhs->isEqual(rhs))
@@ -88,7 +92,7 @@ static ConflictReason canPossiblyConvertTo(
         return ConflictFlag::Nominal;
       break;
 
-    case inference::ConversionBehavior::Class: {
+    case ConversionBehavior::Class: {
       auto *lhsDecl = lhs->getClassOrBoundGenericClass();
       auto *rhsDecl = rhs->getClassOrBoundGenericClass();
 
@@ -110,20 +114,20 @@ static ConflictReason canPossiblyConvertTo(
       break;
     }
 
-    case inference::ConversionBehavior::Double:
+    case ConversionBehavior::Double:
       // There are only two types with this behavior, and they convert
       // to each other.
       break;
 
-    case inference::ConversionBehavior::AnyHashable:
+    case ConversionBehavior::AnyHashable:
       // AnyHashable converts to AnyHashable.
       break;
 
-    case inference::ConversionBehavior::Pointer:
+    case ConversionBehavior::Pointer:
       // FIXME: Implement
       break;
 
-    case inference::ConversionBehavior::Array: {
+    case ConversionBehavior::Array: {
       auto subResult = canPossiblyConvertTo(
           cs,
           lhs->getArrayElementType(),
@@ -133,15 +137,15 @@ static ConflictReason canPossiblyConvertTo(
 
       break;
     }
-    case inference::ConversionBehavior::Dictionary: {
+    case ConversionBehavior::Dictionary: {
       // FIXME: Implement
       break;
     }
-    case inference::ConversionBehavior::Set: {
+    case ConversionBehavior::Set: {
       // FIXME: Implement
       break;
     }
-    case inference::ConversionBehavior::Optional: {
+    case ConversionBehavior::Optional: {
       // Optional-to-optional conversion.
       auto argObjectType = lhs->getOptionalObjectType();
       auto objectType = rhs->getOptionalObjectType();
@@ -152,20 +156,20 @@ static ConflictReason canPossiblyConvertTo(
         return optionalToOptional | ConflictFlag::Optional;
       break;
     }
-    case inference::ConversionBehavior::Structural:
+    case ConversionBehavior::Structural:
       if (lhs->getCanonicalType()->getKind()
           != rhs->getCanonicalType()->getKind())
         return ConflictFlag::Structural;
       break;
-    case inference::ConversionBehavior::Unknown:
+    case ConversionBehavior::Unknown:
       break;
     }
 
   // Handle case where the kinds don't match, and we're not converting
   // from an unknown type.
-  } else if (lhsKind != inference::ConversionBehavior::Unknown) {
+  } else if (lhsKind != ConversionBehavior::Unknown) {
     switch (rhsKind) {
-    case inference::ConversionBehavior::Class: {
+    case ConversionBehavior::Class: {
       // Archetypes can convert to classes.
       if (lhs->is<ArchetypeType>()) {
         auto superclassType = lhs->getSuperclass();
@@ -185,15 +189,15 @@ static ConflictReason canPossiblyConvertTo(
       return ConflictFlag::Category;
     }
 
-    case inference::ConversionBehavior::AnyHashable:
+    case ConversionBehavior::AnyHashable:
       // FIXME: Check if lhs definitely not Hashable
       break;
 
-    case inference::ConversionBehavior::Pointer:
+    case ConversionBehavior::Pointer:
       // FIXME: Array, String, InOutType convert to pointers
       break;
 
-    case inference::ConversionBehavior::Optional: {
+    case ConversionBehavior::Optional: {
       // We have a non-optional on the left. Try value-to-optional.
       auto objectType = rhs->getOptionalObjectType();
       auto valueToOptional = canPossiblyConvertTo(
@@ -204,15 +208,15 @@ static ConflictReason canPossiblyConvertTo(
       break;
     }
 
-    case inference::ConversionBehavior::None:
-    case inference::ConversionBehavior::Double:
-    case inference::ConversionBehavior::Array:
-    case inference::ConversionBehavior::Dictionary:
-    case inference::ConversionBehavior::Set:
-    case inference::ConversionBehavior::Structural:
+    case ConversionBehavior::None:
+    case ConversionBehavior::Double:
+    case ConversionBehavior::Array:
+    case ConversionBehavior::Dictionary:
+    case ConversionBehavior::Set:
+    case ConversionBehavior::Structural:
       return ConflictFlag::Category;
 
-    case inference::ConversionBehavior::Unknown:
+    case ConversionBehavior::Unknown:
       break;
     }
   }
@@ -224,7 +228,7 @@ static ConflictReason canPossiblyConvertTo(
       // FIXME: String converts to UnsafePointer<UInt8> which
       // can satisfy a conformance to P that String does not
       // satisfy. Encode this more thoroughly.
-      if (lhsKind == inference::ConversionBehavior::None)
+      if (lhsKind == ConversionBehavior::None)
         return !lhs->isString();
 
       return false;
@@ -246,10 +250,10 @@ static ConflictReason canPossiblyConvertTo(
     // If '$LHS conv $RHS' and '$RHS conforms P', does it follow
     // that '$LHS conforms P'?
     auto isConformanceTransitiveOnRHS = [rhsKind]() -> bool {
-      if (rhsKind == inference::ConversionBehavior::None ||
-          rhsKind == inference::ConversionBehavior::Array ||
-          rhsKind == inference::ConversionBehavior::Dictionary ||
-          rhsKind == inference::ConversionBehavior::Set)
+      if (rhsKind == ConversionBehavior::None ||
+          rhsKind == ConversionBehavior::Array ||
+          rhsKind == ConversionBehavior::Dictionary ||
+          rhsKind == ConversionBehavior::Set)
         return true;
 
       return false;
@@ -269,9 +273,9 @@ static ConflictReason canPossiblyConvertTo(
     }
   }
 
-  /*llvm::errs() << "unknown conversion:\n";
-  lhs->dump(llvm::errs());
-  rhs->dump(llvm::errs());*/
+  LLVM_DEBUG(llvm::dbgs() << "unknown conversion:\n";
+             lhs->dump(llvm::dbgs());
+             rhs->dump(llvm::dbgs()));
   return std::nullopt;
 }
 
