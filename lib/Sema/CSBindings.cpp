@@ -921,7 +921,14 @@ static bool isLikelyExactMatch(Type first, Type second) {
   return false;
 }
 
-static std::optional<bool> subsumeBinding(const PotentialBinding &binding,
+/// Decide if the new binding subsumes the existing binding, or vice versa.
+///
+/// Return value:
+/// - std::nullopt: new binding is unrelated to old binding; both bindings
+///   remain valid.
+/// - true: the possibly modified new binding subsumes old binding.
+/// - false: discard new binding
+static std::optional<bool> subsumeBinding(PotentialBinding &binding,
                                           const PotentialBinding &existing,
                                           bool isClosureParameterType) {
   auto existingType = existing.BindingType;
@@ -989,6 +996,40 @@ static std::optional<bool> subsumeBinding(const PotentialBinding &binding,
       return true;
   }
 
+  // If this is a non-defaulted supertype binding,
+  // check whether we can combine it with another
+  // supertype binding by computing the 'join' of the types.
+  if (binding.isViableForJoin()) {
+    if (existing.isViableForJoin()) {
+      auto isAcceptableJoin = [](Type type) {
+        return !type->isAny() && (!type->getOptionalObjectType() ||
+                                  !type->getOptionalObjectType()->isAny());
+      };
+
+      auto joinType =
+          Type::join(existing.BindingType, binding.BindingType);
+
+      if (joinType && isAcceptableJoin(*joinType)) {
+        // Result of the join has to use new binding because it refers
+        // to the constraint that triggered the join that replaced the
+        // existing binding.
+        //
+        // For "join" to be transitive, both bindings have to be as
+        // well, otherwise we consider it a refinement of a direct
+        // binding.
+        auto *originator =
+            binding.isTransitive() && existing.isTransitive()
+                ? binding.Originator
+                : nullptr;
+
+        binding = PotentialBinding(*joinType, binding.Kind,
+                                   binding.BindingSource,
+                                   originator);
+        return true;
+      }
+    }
+  }
+
   return std::nullopt;
 }
 
@@ -1019,17 +1060,19 @@ void BindingSet::addBinding(PotentialBinding binding) {
   }
 
   bool isClosureParameterType = TypeVar->getImpl().isClosureParameterType();
+  SmallVector<PotentialBinding, 1> joined;
 
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
   // for this constraint system, which is problematic for overload
   // resolution.
-  for (auto existing = Bindings.begin(); existing != Bindings.end();
-       ++existing) {
+  auto existing = Bindings.begin();
+  while (existing != Bindings.end()) {
     auto result = subsumeBinding(binding, *existing, isClosureParameterType);
     if (result == std::nullopt) {
       // Record a new binding, unless it subsumed by something else.
+       ++existing;
       continue;
     } else if (*result) {
       // First, remove all of the adjacent type variables associated
@@ -1048,65 +1091,25 @@ void BindingSet::addBinding(PotentialBinding binding) {
       // Remove the existing binding.
       existing = Bindings.erase(existing);
 
-      // Fall through to add a new binding.
-      break;
+      // Insert the possibly updated binding.
+      for (auto *adjacentVar : referencedTypeVars)
+        AdjacentVars.insert(adjacentVar);
+
+      joined.push_back(binding);
+      continue;
     } else {
       // Drop the new binding.
       return;
     }
   }
 
-  // If this is a non-defaulted supertype binding,
-  // check whether we can combine it with another
-  // supertype binding by computing the 'join' of the types.
-  if (binding.isViableForJoin()) {
-    auto isAcceptableJoin = [](Type type) {
-      return !type->isAny() && (!type->getOptionalObjectType() ||
-                                !type->getOptionalObjectType()->isAny());
-    };
+  for (const auto &binding : joined)
+    (void)Bindings.insert(binding);
 
-    SmallVector<PotentialBinding, 4> joined;
-    for (auto existingBinding = Bindings.begin();
-         existingBinding != Bindings.end();) {
-      if (existingBinding->isViableForJoin()) {
-        auto joinType =
-            Type::join(existingBinding->BindingType, binding.BindingType);
-
-        if (joinType && isAcceptableJoin(*joinType)) {
-          // Result of the join has to use new binding because it refers
-          // to the constraint that triggered the join that replaced the
-          // existing binding.
-          //
-          // For "join" to be transitive, both bindings have to be as
-          // well, otherwise we consider it a refinement of a direct
-          // binding.
-          auto *origintor =
-              binding.isTransitive() && existingBinding->isTransitive()
-                  ? binding.Originator
-                  : nullptr;
-
-          PotentialBinding join(*joinType, binding.Kind, binding.BindingSource,
-                                origintor);
-
-          joined.push_back(join);
-          // Remove existing binding from the set.
-          // It has to be re-introduced later, since its type has been changed.
-          existingBinding = Bindings.erase(existingBinding);
-          continue;
-        }
-      }
-
-      ++existingBinding;
-    }
-
-    for (const auto &binding : joined)
-      (void)Bindings.insert(binding);
-
-    // If new binding has been joined with at least one of existing
-    // bindings, there is no reason to include it into the set.
-    if (!joined.empty())
-      return;
-  }
+  // If new binding has been joined with at least one of existing
+  // bindings, there is no reason to include it into the set.
+  if (!joined.empty())
+    return;
 
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
