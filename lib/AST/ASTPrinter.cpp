@@ -3158,6 +3158,8 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
+      if (inherited.isReparented())
+        Printer << "@reparented ";
       switch (inherited.getExplicitSafety()) {
       case ExplicitSafety::Unspecified:
       case ExplicitSafety::Safe:

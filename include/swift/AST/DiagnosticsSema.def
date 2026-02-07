@@ -2811,6 +2811,9 @@ ERROR(extension_nongeneric_trailing_where,none,
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot declare inheritance relationship",
       (Identifier))
+ERROR(extension_protocol_reparented_not_inheriting,none,
+      "%0 must directly inherit from %1 in order to be reparented",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())

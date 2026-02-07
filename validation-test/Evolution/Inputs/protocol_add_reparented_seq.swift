@@ -31,7 +31,7 @@ public protocol Seq<Element> {
   func makeIterator() -> Iterator
 }
 #else
-public protocol Seq<Element> {
+public protocol Seq<Element>: BorrowingSeq {
   associatedtype Element
   associatedtype Iterator: Iterable
   func makeIterator() -> Iterator

@@ -316,7 +316,11 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
   auto &ctx = dc->getASTContext();
 
   // If there was no type declaration, synthesize one.
-  if (typeDecl == nullptr) {
+  //
+  // Skip reparented conformances. They take place within protocol extensions
+  // and typealiases with the same name as an associatedtype are typically
+  // defined to constrain the associatedtype within the whole protocol.
+  if (typeDecl == nullptr && !conformance->isReparented()) {
     Identifier name;
     bool needsImplementsAttr;
     if (isAsyncIteratorOrSequenceFailure(assocType)) {

@@ -193,6 +193,34 @@ static void checkExtensionAddsSoloInvertibleProtocol(const ExtensionDecl *ext) {
   }
 }
 
+/// FIXME: it'd be better if this was done elsewhere, as we're going to see
+/// quadratic behavior as the number of @reparented entries in a program grows,
+/// as we scan the getInheritedProtocols list for each entry.
+/// Ideally we'd also roll this into a check that ensures there is only one
+/// extension declaring a reparenting per protocol. Probably should happen
+/// at top-level when checking extensions generally.
+static void checkReparentedExtensionEntry(const ExtensionDecl *ext,
+                                          InheritedEntry const &entry,
+                                          Type resolvedTy) {
+  assert(entry.isReparented());
+  auto *childProto = ext->getExtendedProtocolDecl();
+  ASSERT(childProto && "expected TypeCheckType to exclude this case");
+
+  auto rpProto = resolvedTy->getAs<ProtocolType>();
+  ASSERT(rpProto && "expected TypeCheckType to exclude non-protocols");
+
+  auto reparentedProto = rpProto->getDecl();
+  bool found = llvm::any_of(
+      childProto->getInheritedProtocols(),
+      [&](ProtocolDecl *inherited) { return inherited == reparentedProto; });
+
+  if (!found) {
+    ext->getASTContext().Diags.diagnose(
+        entry.getLoc(), diag::extension_protocol_reparented_not_inheriting,
+        childProto, reparentedProto);
+  }
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -277,6 +305,9 @@ static void checkInheritanceClause(
     if (isa<GenericTypeParamDecl>(decl) ||
         isa<AssociatedTypeDecl>(decl))
       continue;
+
+    if (inherited.isReparented())
+      checkReparentedExtensionEntry(ext, inherited, inheritedTy);
 
     // Check whether we inherited from 'AnyObject' twice.
     // Other redundant-inheritance scenarios are checked below, the
