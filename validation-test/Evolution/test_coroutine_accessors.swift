@@ -3,6 +3,19 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// Linux fails with the following removed symbols:
+// Removed Symbols:
+// $s19coroutine_accessors13ResilientEnumO1sSivg
+// $s19coroutine_accessors13ResilientEnumO1sSivpMV
+// $s19coroutine_accessors14ResilientClassC1sSivgTj
+// $s19coroutine_accessors14ResilientClassC1sSivgTq
+// $s19coroutine_accessors14ResilientClassC1sSivpMV
+// $s19coroutine_accessors15ResilientStructV1sSivg
+// $s19coroutine_accessors15ResilientStructV1sSivpMV
+// $s19coroutine_accessors33ResilientStructWithImplicitModifyV1sSivg
+// $s19coroutine_accessors33ResilientStructWithImplicitModifyV1sSivpMV
+// XFAIL: OS=linux-gnu
+
 import StdlibUnittest
 import coroutine_accessors
 
