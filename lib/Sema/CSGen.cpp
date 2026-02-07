@@ -2052,12 +2052,9 @@ namespace {
         if (hasIsolatedParameter(closureParams))
           return FunctionTypeIsolation::forParameter();
 
-        // Honor an explicit global actor.  This is suppressed if the
-        // closure is async (but should it be?).
-        if (!extInfo.isAsync()) {
-          if (auto actorType = getExplicitGlobalActor(closure))
-            return FunctionTypeIsolation::forGlobalActor(actorType);
-        }
+        // Honor an explicit global actor.
+        if (auto actorType = getExplicitGlobalActor(closure))
+          return FunctionTypeIsolation::forGlobalActor(actorType);
 
         if (closure->getAttrs().hasAttribute<ConcurrentAttr>()) {
           return FunctionTypeIsolation::forNonIsolated();
