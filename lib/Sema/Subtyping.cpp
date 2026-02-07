@@ -96,22 +96,18 @@ swift::constraints::getConversionBehavior(Type type) {
   return ConversionBehavior::Unknown;
 }
 
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-bool swift::constraints::hasConversions(Type type) {
+bool swift::constraints::hasProperSubtypes(Type type) {
   switch (getConversionBehavior(type)) {
   case ConversionBehavior::None:
     return false;
   case ConversionBehavior::Array:
-    return hasConversions(type->getArrayElementType());
+    return hasProperSubtypes(type->getArrayElementType());
   case ConversionBehavior::Dictionary: {
     auto pair = ConstraintSystem::isDictionaryType(type);
-    return hasConversions(pair->first) || hasConversions(pair->second);
+    return hasProperSubtypes(pair->first) || hasProperSubtypes(pair->second);
   }
   case ConversionBehavior::Set:
-    return hasConversions(*ConstraintSystem::isSetType(type));
+    return hasProperSubtypes(*ConstraintSystem::isSetType(type));
   case ConversionBehavior::Class:
   case ConversionBehavior::AnyHashable:
   case ConversionBehavior::Double:
