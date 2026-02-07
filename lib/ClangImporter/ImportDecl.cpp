@@ -5472,10 +5472,11 @@ namespace {
         }
       }
 
-      auto result = createFuncOrAccessor(Impl,
-                                         /*funcLoc*/ SourceLoc(), accessorInfo,
-                                         importedName.getDeclName(),
-                                         /*nameLoc*/ SourceLoc(),
+      auto loc = Impl.importSourceLoc(decl->getLocation());
+      // FIXME: more precise source location.
+      auto nameLoc = loc;
+      auto result = createFuncOrAccessor(Impl, loc, accessorInfo,
+                                         importedName.getDeclName(), nameLoc,
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 
