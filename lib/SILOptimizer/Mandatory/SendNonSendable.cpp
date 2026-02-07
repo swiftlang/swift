@@ -439,6 +439,39 @@ static InFlightDiagnostic diagnoseNote(const SILInstruction *inst,
 }
 
 //===----------------------------------------------------------------------===//
+//               MARK: Unknown Pattern Error Helper
+//===----------------------------------------------------------------------===//
+
+// Helper to emit unknown pattern errors with diagnostic context
+static void
+emitUnknownPatternErrorHelper(const char *emitterName, SILInstruction *inst,
+                              std::optional<DiagnosticBehavior> behaviorLimit,
+                              const char *file, int line) {
+  if (shouldAbortOnUnknownPatternMatchError()) {
+    llvm::report_fatal_error(
+        "RegionIsolation: Aborting on unknown pattern match error");
+  }
+
+  REGIONBASEDISOLATION_LOG(llvm::dbgs()
+                           << "Emitting Error. DiagnosticEmission Error: "
+                              "Unknown Code Pattern.\n"
+                           << "  Emitter: " << emitterName << "\n"
+                           << "  Instruction: " << *inst
+                           << "  Location: " << file << ":" << line << "\n");
+
+  diagnoseError(inst, diag::regionbasedisolation_unknown_pattern)
+      .limitBehaviorIf(behaviorLimit);
+}
+
+#ifdef EMIT_UNKNOWN_PATTERN_ERROR
+#error "EMIT_UNKNOWN_PATTERN_ERROR macro is already defined"
+#endif
+
+#define EMIT_UNKNOWN_PATTERN_ERROR(emitterName, inst, behaviorLimit)           \
+  emitUnknownPatternErrorHelper(#emitterName, inst, behaviorLimit, __FILE__,   \
+                                __LINE__)
+
+//===----------------------------------------------------------------------===//
 //                           MARK: Require Liveness
 //===----------------------------------------------------------------------===//
 
@@ -751,6 +784,9 @@ struct DiagnosticEvaluator final
           "RegionIsolation: Aborting on unknown pattern match error");
     }
 
+    REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Emitting Error. Verbatim Error: "
+                                             "Unknown Code Pattern.\n"
+                             << "  Inst: " << *op.getSourceInst());
     diagnoseError(op.getSourceInst(),
                   diag::regionbasedisolation_unknown_pattern);
   }
@@ -1099,14 +1135,8 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(sendingOp->getUser(),
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    EMIT_UNKNOWN_PATTERN_ERROR(UseAfterSendDiagnosticEmitter,
+                               sendingOp->getUser(), getBehaviorLimit());
   }
 
 private:
@@ -1505,12 +1535,11 @@ void SendNonSendableImpl::emitUseAfterSendDiagnostics() {
     // tells the user to file a bug. This importantly ensures that we can
     // guarantee that we always find the require if we successfully compile.
     if (!didEmitRequireNote) {
-      if (shouldAbortOnUnknownPatternMatchError()) {
-        llvm::report_fatal_error(
-            "RegionIsolation: Aborting on unknown pattern match error");
-      }
-
-      diagnoseError(sendingOp, diag::regionbasedisolation_unknown_pattern);
+      auto behaviorLimit =
+          sendingOp->get()->getType().getConcurrencyDiagnosticBehavior(
+              function);
+      EMIT_UNKNOWN_PATTERN_ERROR(emitUseAfterSendDiagnostics,
+                                 sendingOp->getUser(), behaviorLimit);
       continue;
     }
 
@@ -1608,14 +1637,8 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(getOperand()->getUser(),
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    EMIT_UNKNOWN_PATTERN_ERROR(SendNeverSentDiagnosticEmitter,
+                               getOperand()->getUser(), getBehaviorLimit());
   }
 
   void emitUnknownUse(SILLocation loc) {
@@ -2414,14 +2437,8 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(functionExitingInst,
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingReturnedDiagnosticEmitter,
+                               functionExitingInst, getBehaviorLimit());
   }
 
   void emit();
@@ -3043,14 +3060,8 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(functionExitingInst,
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingNotDisconnectedDiagnosticEmitter,
+                               functionExitingInst, getBehaviorLimit());
   }
 
   void emit();
@@ -3174,14 +3185,9 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(srcOperand->getUser(),
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
+    EMIT_UNKNOWN_PATTERN_ERROR(AssignIsolatedIntoSendingResultDiagnosticEmitter,
+                               srcOperand->getUser(),
+                               getConcurrencyDiagnosticBehavior());
   }
 
   void emit();
@@ -3444,14 +3450,9 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(error.op->getSourceInst(),
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    EMIT_UNKNOWN_PATTERN_ERROR(
+        NonSendableIsolationCrossingResultDiagnosticEmitter,
+        error.op->getSourceInst(), getBehaviorLimit());
   }
 
   Type getType() const {
@@ -3616,14 +3617,9 @@ public:
   }
 
   void emitUnknownPatternError() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
-      llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
-    }
-
-    diagnoseError(functionExitingInst,
-                  diag::regionbasedisolation_unknown_pattern)
-        .limitBehaviorIf(getBehaviorLimit());
+    EMIT_UNKNOWN_PATTERN_ERROR(
+        InOutSendingParametersInSameRegionDiagnosticEmitter,
+        functionExitingInst, getBehaviorLimit());
   }
 
   void emit();
