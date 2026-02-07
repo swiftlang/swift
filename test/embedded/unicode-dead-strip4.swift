@@ -5,7 +5,6 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
-// XFAIL: OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
 
