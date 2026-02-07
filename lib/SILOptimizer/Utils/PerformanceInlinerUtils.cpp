@@ -744,6 +744,30 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   return true;
 }
 
+
+// rdar://169150387 ([SILGen] implement conversion between any Error and a typed
+// throws)
+//
+// Until this is implemented, avoid inlining the invalid SIL that is generated
+// for indirect error results. Doing so will create a phi with mismatched types
+// (some address and some values), and it will break any utility that tries to
+// traverse addresses.
+static bool hasInvalidThrow(SILFunction *function) {
+  SmallVector<SILBasicBlock *, 2> exitingBlocks;
+  function->findExitingBlocks(exitingBlocks);
+  for (auto *block : exitingBlocks) {
+    auto *throwInst = dyn_cast<ThrowInst>(block->getTerminator());
+    if (!throwInst)
+      continue;
+
+    // We should be throwing a value... Throwing an address has got to be a
+    // mismatch with the error type (otherwise we would use throw_addr).
+    if (throwInst->getOperand()->getType().isAddress())
+      return true;
+  }
+  return false;
+}
+
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline,
@@ -877,6 +901,9 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
         Callee->getInlineStrategy() != HeuristicAlwaysInline && !Callee->isTransparent())
       return nullptr;
   }
+
+  if (hasInvalidThrow(Callee))
+    return nullptr;
 
   return Callee;
 }
