@@ -399,7 +399,7 @@ namespace constraints {
 namespace inference {
 class BindingSet {
   using BindingScore =
-      std::tuple<bool, bool, unsigned, bool, bool, bool, bool, unsigned char, int>;
+      std::tuple<bool, bool, bool, unsigned, bool, bool, bool, bool, unsigned char, int>;
 
   ConstraintSystem &CS;
 
@@ -408,6 +408,8 @@ class BindingSet {
   const PotentialBindings &Info;
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
+
+  bool IsContradictory = false;
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
@@ -442,6 +444,11 @@ public:
   /// Check whether this binding set belongs to a type variable
   /// that represents a generic parameter.
   bool forGenericParameter() const;
+
+  /// Check whether this binding set is known to refer to a type variable
+  /// that is subject to an unsatisfiable set of constraints, such as
+  /// $T0 conv Int, String conv $T0.
+  bool isContradictory() const { return IsContradictory; }
 
   bool canBeNil() const;
 

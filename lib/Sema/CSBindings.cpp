@@ -1261,6 +1261,7 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
                                    : b.TypeVar->getImpl().isClosureType() ? 1
                                                                           : 0;
   return std::make_tuple(b.isHole(),
+                         !b.isContradictory(),
                          numExactBindings == 0, numExactBindings,
                          numNonDefaultableBindings == 0,
                          b.isDelayed(), b.isSubtypeOfExistentialType(),
@@ -1324,6 +1325,7 @@ bool BindingSet::operator<(const BindingSet &other) {
 #include "swift/Sema/CSTrail.def"
 
 void BindingSet::finalizeSupertypeBindings() {
+  llvm::SmallDenseSet<ProtocolDecl *, 1> protos;
   bool hasSupertypeConformanceRestriction = false;
   auto *optionalDecl = CS.getASTContext().getOptionalDecl();
   for (auto *constraint : Info.Protocols) {
@@ -1338,6 +1340,7 @@ void BindingSet::finalizeSupertypeBindings() {
         continue;
 
       hasSupertypeConformanceRestriction = true;
+      protos.insert(protoDecl);
       break;
     }
   }
@@ -1351,6 +1354,87 @@ void BindingSet::finalizeSupertypeBindings() {
         addBinding(newBinding);
         break;
       }
+    }
+  }
+
+  for (const auto &binding : Bindings) {
+    switch (binding.Kind) {
+    case AllowedBindingKind::Supertypes:
+      // If a type does not conform to a protocol, neither will any
+      // of its supertypes, unless the protocol is a marker protocol
+      // or its existentials conform to itself.
+      for (auto *proto : protos) {
+        if (!CS.lookupConformance(binding.BindingType, proto)) {
+          llvm::errs() << "marking as failed because of supertype conformance\n";
+          auto PO = PrintOptions::forDebugging();
+          llvm::errs() << binding.BindingType.getString(PO) << " vs " << proto->getName() << "\n";
+          IsContradictory = true;
+
+          // Replace a subtype binding that is not a subtype of a
+          // supertype with an exact binding, and drop all other
+          // bindings. We will attempt this binding next, and
+          // fail some constraints.
+          auto newBinding = binding;
+          newBinding.Kind = AllowedBindingKind::Exact;
+          Bindings.clear();
+          Bindings.insert(newBinding);
+          return;
+        }
+      }
+
+      break;
+
+    case AllowedBindingKind::Exact: {
+      // If an exact binding doesn't conform to one of our protocols,
+      // our type variable is subject to contradictory constraints, so
+      // this binding set is attempted as soon as possible.
+      for (auto *proto : protos) {
+        if (!CS.lookupConformance(binding.BindingType, proto)) {
+          llvm::errs() << "marking as failed because of exact conformance\n";
+          auto PO = PrintOptions::forDebugging();
+          llvm::errs() << binding.BindingType.getString(PO) << " vs " << proto->getName() << "\n";
+          IsContradictory = true;
+          return;
+        }
+      }
+
+      break;
+    }
+    case AllowedBindingKind::Subtypes: {
+      // For subtype bindings, we can't conclude anything from the
+      // protocols, because subtype bindings without proper subtypes
+      // have been ruled out by now, and subtype bindings with proper
+      // subtypes might still have subtypes that conform.
+      //
+      // However, we can check if our subtypes are actually plausible
+      // subtypes of any of the supertypes.
+      for (const auto &other : Bindings) {
+        if (other.Kind == AllowedBindingKind::Supertypes) {
+          auto reason =
+            canPossiblyConvertTo(CS,
+                                 other.BindingType,
+                                 binding.BindingType,
+                                 GenericSignature());
+          if (reason) {
+            llvm::errs() << "marking as failed because of subtyping: reason = " << unsigned(reason) << "\n";
+            auto PO = PrintOptions::forDebugging();
+            llvm::errs() << other.BindingType.getString(PO) << " vs " << binding.BindingType.getString(PO) << "\n";
+            binding.BindingType.dump();
+            IsContradictory = true;
+
+            // Replace a subtype binding that is not a subtype of a
+            // supertype with an exact binding, and drop all other
+            // bindings. We will attempt this binding next, and
+            // fail some constraints.
+            auto newBinding = binding;
+            newBinding.Kind = AllowedBindingKind::Exact;
+            Bindings.clear();
+            Bindings.insert(newBinding);
+            return;
+          }
+        }
+      }
+    }
     }
   }
 }
