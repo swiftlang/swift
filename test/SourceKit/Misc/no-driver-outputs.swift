@@ -25,3 +25,7 @@
 // RUN: %empty-directory(%t)
 // RUN: env TMPDIR=%t __XPC_TMPDIR=%t %sourcekitd-test -req=sema %s -- %s -emit-module -module-name main -emit-module-path %t/main.swiftmodule -emit-executable -o %t/foo
 // RUN: ls %t/ | count 0
+
+// RUN: %empty-directory(%t)
+// RUN: env TMP=%t TMPDIR=%t __XPC_TMPDIR=%t %sourcekitd-test -req=open %s -- %s -driver-force-response-files
+// RUN: ls %t/ | count 0
