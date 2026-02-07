@@ -1,9 +1,4 @@
-// RUN: %target-resilience-test-coroutine-accessors
-
-// The symbol diffing code does not seem to work on linux:
-//  nm: invalid argument to -U/--unicode
-// AssertionError: ['nm', '-gjU', '/home/../Output/test_coroutine_accessors.swift.tmp/before/libcoroutine_accessors.so'
-// UNSUPPORTED: OS=linux-gnu
+// RUN: %target-resilience-test --additional-compile-flags '-enable-experimental-feature CoroutineAccessors'
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_CoroutineAccessors
