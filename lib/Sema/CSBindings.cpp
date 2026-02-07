@@ -992,10 +992,15 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
       if (binding.BindingType->hasTypeVariable())
         return false;
 
-      // If new type doesn't have any type variables,
-      // but existing binding does, let's replace existing
+      // If new type doesn't have any type variables
+      // but the existing binding does, let's replace existing
       // binding with new one.
       if (existingType->hasTypeVariable())
+        return true;
+
+      // If new binding is exact, always replace the existing
+      // binding.
+      if (binding.Kind == AllowedBindingKind::Exact)
         return true;
     }
   }
