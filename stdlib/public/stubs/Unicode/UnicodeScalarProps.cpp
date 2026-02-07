@@ -21,8 +21,6 @@
 #include "Common/CaseData.h"
 #include "Common/ScriptData.h"
 
-#else
-#include "swift/Runtime/Debug.h"
 #endif
 
 #include "UnicodeData.h"
