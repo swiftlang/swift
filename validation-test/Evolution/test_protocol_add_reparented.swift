@@ -14,9 +14,29 @@ let clientVersion = 0
 let clientVersion = 1
 #endif
 
+protocol P {
+  func getPValue() -> Int
+}
+
 // A type on the client side that is never updated for the new world
 struct Eagle: Bird {
   func eat(_ food: Int) -> Int { return food }
+}
+
+// A conditionally-conforming type that is not updated.
+struct Lark<T> {
+  let t: T
+  init(_ t: T) { self.t = t }
+}
+extension Lark: Bird where T: P {
+  func eat(_ food: Int) -> Int {
+    return food + t.getPValue()
+  }
+}
+
+// Strings return their length for a "P-value"
+extension String: P {
+  func getPValue() -> Int { return self.count }
 }
 
 #if !BEFORE
@@ -37,28 +57,50 @@ extension UInt: @retroactive AsInt {
 #endif
 
 ProtocolAddReparentedTest.test("Some Types") {
-  let e = Eagle()
-  let ans = libraryVersion() + clientVersion
-  expectEqual(SomeType.feed(e, clientVersion), ans)
-  expectEqual(SomeType.count(e, clientVersion), ans)
+  let base = libraryVersion() + clientVersion // basic answer
+  do {
+    let e = Eagle()
+    expectEqual(SomeType.feed(e, clientVersion), base)
+    expectEqual(SomeType.count(e, clientVersion), base)
+  }
+
+  do {
+    let str = "12345"
+    let e = Lark(str)
+    expectEqual(SomeType.feed(e, clientVersion), base + str.count)
+    expectEqual(SomeType.count(e, clientVersion), base)
+  }
 
   #if !BEFORE
-  let 💯 = Plus100Eagle()
-  expectEqual(SomeType.feed(💯, clientVersion), ans + 100)
-  expectEqual(SomeType.count(💯, clientVersion), ans + 100)
+  do {
+    let 💯 = Plus100Eagle()
+    expectEqual(SomeType.feed(💯, clientVersion), base + 100)
+    expectEqual(SomeType.count(💯, clientVersion), base + 100)
+  }
   #endif
 }
 
 ProtocolAddReparentedTest.test("Existential Types") {
-  let e = Eagle()
-  let ans = libraryVersion() + clientVersion
-  expectEqual(ExistentialType.feed(e, clientVersion), ans)
-  expectEqual(ExistentialType.count(e, clientVersion), ans)
+  let base = libraryVersion() + clientVersion // basic answer
+  do {
+    let e = Eagle()
+    expectEqual(ExistentialType.feed(e, clientVersion), base)
+    expectEqual(ExistentialType.count(e, clientVersion), base)
+  }
+
+  do {
+    let str = "12345"
+    let e = Lark(str)
+    expectEqual(ExistentialType.feed(e, clientVersion), base + str.count)
+    expectEqual(ExistentialType.count(e, clientVersion), base)
+  }
 
   #if !BEFORE
-  let 💯 = Plus100Eagle()
-  expectEqual(ExistentialType.feed(💯, clientVersion), ans + 100)
-  expectEqual(ExistentialType.count(💯, clientVersion), ans + 100)
+  do {
+    let 💯 = Plus100Eagle()
+    expectEqual(ExistentialType.feed(💯, clientVersion), base + 100)
+    expectEqual(ExistentialType.count(💯, clientVersion), base + 100)
+  }
   #endif
 }
 
