@@ -87,8 +87,10 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
   assert(FileSystem);
 
   llvm::SmallString<128> PrimaryFile;
-  if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
-    PrimaryFile = UnresolvedPrimaryFile;
+  if (!UnresolvedPrimaryFile.empty()) {
+    if (auto err = FileSystem->getRealPath(UnresolvedPrimaryFile, PrimaryFile))
+      PrimaryFile = UnresolvedPrimaryFile;
+  }
 
   unsigned primaryCount = 0;
   // FIXME: The frontend should be dealing with symlinks, maybe similar to
