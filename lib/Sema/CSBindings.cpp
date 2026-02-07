@@ -1229,12 +1229,14 @@ bool BindingSet::operator<(const BindingSet &other) {
   // for "subtype" type variable to attempt more bindings later.
   // This is required because algorithm can't currently infer
   // bindings for subtype transitively through superclass ones.
-  if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
-    if (Info.isSubtypeOf(other.getTypeVariable()))
-      return false;
+  if (!CS.Options.contains(ConstraintSystemFlags::EnableTransitiveInference)) {
+    if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
+      if (Info.isSubtypeOf(other.getTypeVariable()))
+        return false;
 
-    if (other.Info.isSubtypeOf(getTypeVariable()))
-      return true;
+      if (other.Info.isSubtypeOf(getTypeVariable()))
+        return true;
+    }
   }
 
   // As a last resort, let's check if the bindings are
