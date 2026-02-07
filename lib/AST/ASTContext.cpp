@@ -59,6 +59,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeTransform.h"
 #include "swift/Basic/APIntMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicBridging.h"
@@ -3658,18 +3659,25 @@ static Type replacingTypeVariablesAndPlaceholders(Type ty) {
   if (!ty || !ty->hasTypeVariableOrPlaceholder())
     return ty;
 
-  auto &ctx = ty->getASTContext();
+  struct Transform : public TypeTransform<Transform> {
+    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
 
-  return ty.transformRec([&](Type ty) -> std::optional<Type> {
-    if (!ty->hasTypeVariableOrPlaceholder())
-      return ty;
+    std::optional<Type> transform(TypeBase *ty, TypePosition) {
+      if (!ty->hasTypeVariableOrPlaceholder())
+        return ty;
 
-    auto *typePtr = ty.getPointer();
-    if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
-      return ErrorType::get(ctx);
+      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+        return ErrorType::get(ctx);
 
-    return std::nullopt;
-  });
+      return std::nullopt;
+    }
+    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+      // Fold away the sendable dependence if present, the function type will
+      // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+  };
+  return Transform(ty->getASTContext()).doIt(ty, TypePosition::Invariant);
 }
 
 Type ErrorType::get(Type originalType) {
