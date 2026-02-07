@@ -128,29 +128,6 @@ lookupInClassTemplateSpecialization(
   return found;
 }
 
-static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
-                                        const clang::Decl *memberContext,
-                                        const clang::Decl *parent) {
-  if (memberContext->getCanonicalDecl() == parent->getCanonicalDecl())
-    return true;
-  if (auto *namespaceDecl = dyn_cast<clang::NamespaceDecl>(memberContext)) {
-    if (namespaceDecl->isInline()) {
-      if (auto *memberCtxParent =
-              dyn_cast<clang::Decl>(namespaceDecl->getParent()))
-        return isDirectLookupMemberContext(foundClangDecl, memberCtxParent,
-                                           parent);
-    }
-  }
-  // Enum constant decl can be found in the parent context of the enum decl.
-  if (auto *ED = dyn_cast<clang::EnumDecl>(memberContext)) {
-    if (isa<clang::EnumConstantDecl>(foundClangDecl)) {
-      if (auto *firstDecl = dyn_cast<clang::Decl>(ED->getDeclContext()))
-        return firstDecl->getCanonicalDecl() == parent->getCanonicalDecl();
-    }
-  }
-  return false;
-}
-
 static_assert(
     std::is_same_v<SwiftLookupTable::SingleEntry, ClangDirectLookupEntry>,
     "ClangDirectLookupRequest should return same type as entries in "
@@ -160,73 +137,106 @@ SmallVector<ClangDirectLookupEntry, 4>
 ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
                                    ClangDirectLookupDescriptor desc) const {
   auto &ctx = desc.decl->getASTContext();
-  auto *clangDecl = desc.clangDecl;
+  auto *whereDecl = desc.clangDecl;
+
   // Class templates aren't in the lookup table.
-  if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
+  if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(whereDecl))
     return lookupInClassTemplateSpecialization(ctx, spec, desc.name);
 
-  SwiftLookupTable *lookupTable;
-  if (isa<clang::NamespaceDecl>(clangDecl)) {
-    // DeclContext of a namespace imported into Swift is the __ObjC module.
-    lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
-  } else {
-    auto *clangModule =
-        importer::getClangOwningModule(clangDecl, clangDecl->getASTContext());
-    lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
-  }
+  auto *clangModule =
+      importer::getClangOwningModule(whereDecl, whereDecl->getASTContext());
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
 
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(desc.name.getBaseName()), EffectiveClangContext());
+
+  // lookup() just gives us all decls in the module of the given name.
   // Make sure that `clangDecl` is the parent of all the members we found.
-  SmallVector<SwiftLookupTable::SingleEntry, 4> filteredDecls;
-  llvm::copy_if(foundDecls, std::back_inserter(filteredDecls),
-                [clangDecl](SwiftLookupTable::SingleEntry decl) {
-                  auto *foundClangDecl = decl.dyn_cast<clang::NamedDecl *>();
-                  if (!foundClangDecl)
-                    return false;
-                  auto *first = foundClangDecl->getDeclContext();
-                  auto *second = cast<clang::DeclContext>(clangDecl);
-                  if (auto *firstDecl = dyn_cast<clang::Decl>(first)) {
-                    if (auto *secondDecl = dyn_cast<clang::Decl>(second)) {
-                      return isDirectLookupMemberContext(foundClangDecl,
-                                                         firstDecl, secondDecl);
-                    }
-                    return false;
-                  }
-                  return first == second;
-                });
-  return filteredDecls;
+  SmallVector<SwiftLookupTable::SingleEntry, 4> result;
+  for (auto entry : foundDecls) {
+    auto *found = entry.dyn_cast<clang::NamedDecl *>();
+    if (!found)
+      continue; // What we found wasn't a NamedDecl
+
+    auto *foundCtx = found->getDeclContext();
+    if (auto *foundCtxDecl = dyn_cast<clang::Decl>(foundCtx)) {
+      // Context of found decl is also a decl; compare canonical decl of each
+      auto *whereCanonical = whereDecl->getCanonicalDecl();
+
+      if (foundCtxDecl->getCanonicalDecl() == whereCanonical) {
+        result.push_back(entry);
+      } else if (isa<clang::EnumDecl>(foundCtxDecl) &&
+                 isa<clang::EnumConstantDecl>(found)) {
+        // Enum constants can be found in the parent context of the enum decl.
+        auto *enumCtx = dyn_cast<clang::Decl>(foundCtxDecl->getDeclContext());
+        if (enumCtx && enumCtx->getCanonicalDecl() == whereCanonical)
+          result.push_back(entry);
+      }
+    } else {
+      // Context of found decl is not a decl; compare contexts directly
+      if (foundCtx == cast<clang::DeclContext>(whereDecl))
+        result.push_back(entry);
+    }
+  }
+
+  return result;
 }
 
 TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     Evaluator &evaluator, CXXNamespaceMemberLookupDescriptor desc) const {
-  EnumDecl *namespaceDecl = desc.namespaceDecl;
   DeclName name = desc.name;
-  auto *clangNamespaceDecl =
-      cast<clang::NamespaceDecl>(namespaceDecl->getClangDecl());
-  auto &ctx = namespaceDecl->getASTContext();
+  auto &ctx = desc.namespaceDecl->getASTContext();
+
+  auto *theNamespace =
+      cast<clang::NamespaceDecl>(desc.namespaceDecl->getClangDecl())
+          ->getCanonicalDecl();
 
   TinyPtrVector<ValueDecl *> result;
+
+  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(nullptr);
+  auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
+                                        EffectiveClangContext());
+
   CollectLookupResults collector(name, result);
+  llvm::SmallPtrSet<clang::NamedDecl *, 8> seenDecls;
+  for (auto entry : foundDecls) {
+    auto *foundDecl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!foundDecl)
+      continue; // What we found wasn't a NamedDecl
 
-  llvm::SmallPtrSet<clang::NamedDecl *, 8> importedDecls;
-  for (auto redecl : clangNamespaceDecl->redecls()) {
-    auto allResults = evaluateOrDefault(
-        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
-        {});
+    auto *foundCtx = foundDecl->getDeclContext();
 
-    for (auto found : allResults) {
-      auto clangMember = cast<clang::NamedDecl *>(found);
-      auto it = importedDecls.insert(clangMember);
-      // Skip over members already found during lookup in prior redeclarations.
-      if (!it.second)
-        continue;
-      if (auto import =
-              ctx.getClangModuleLoader()->importDeclDirectly(clangMember))
-        collector.add(cast<ValueDecl>(import));
+    if (auto *ED = dyn_cast<clang::EnumDecl>(foundCtx);
+        ED && isa<clang::EnumConstantDecl>(foundDecl)) {
+      // enum constants are found in the enum decl's parent
+      foundCtx = ED->getDeclContext();
     }
-  }
 
+    auto found = false;
+    while (auto *foundNamespace =
+               dyn_cast_or_null<clang::NamespaceDecl>(foundCtx)) {
+      // Compare theNamespace with the namespace enclosing the found decl,
+      // as well as any outer namespaces if it is inline.
+      if (foundNamespace->getCanonicalDecl() == theNamespace) {
+        found = true;
+        break;
+      }
+
+      if (!foundNamespace->isInline())
+        break;
+
+      foundCtx = foundNamespace->getParent();
+    }
+
+    if (!found)
+      continue;
+
+    if (!seenDecls.insert(foundDecl).second)
+      continue; // We've already seen this; a re-declaration?
+    if (auto *import =
+            ctx.getClangModuleLoader()->importDeclDirectly(foundDecl))
+      collector.add(cast<ValueDecl>(import));
+  }
   return result;
 }
 
@@ -444,8 +454,7 @@ static auto filterMethodOverloads(clang::LookupResult &R,
                                   const clang::CXXRecordDecl *Origin) {
   return llvm::make_filter_range(
       llvm::map_range(
-          llvm::make_range(ResultIterator{R.begin()},
-                           ResultIterator{R.end()}),
+          llvm::make_range(ResultIterator{R.begin()}, ResultIterator{R.end()}),
           [=](std::pair<const clang::NamedDecl *, clang::AccessSpecifier> da) {
             auto [nd, access] = da;
 
