@@ -1,16 +1,28 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
-// RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -strict-memory-safety -warnings-as-errors
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
 
+// RUN: %target-swift-frontend %t/test.swift -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety -verify
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend %t/test.swift -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2> %t/expansions.out
+// RUN: %diff %t/expansions.out %t/expansions.expected
+
+//--- test.swift
 @_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)))
-func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) -> CInt {
+public func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt) -> CInt {
+// expected-error@+1{{missing return in global function expected to return 'CInt' (aka 'Int32')}}
 }
 
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
-// CHECK-NEXT: func myFunc(_ ptr: Span<CInt>) -> CInt {
-// CHECK-NEXT:     let len = CInt(exactly: ptr.count)!
-// CHECK-NEXT:     return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-// CHECK-NEXT:       return unsafe myFunc(_ptrPtr.baseAddress!, len)
-// CHECK-NEXT:     }
-// CHECK-NEXT: }
+//--- expansions.expected
+@__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
+------------------------------
+/// This is an auto-generated wrapper for safer interop
+@_alwaysEmitIntoClient @_disfavoredOverload
+public func myFunc(_ ptr: Span<CInt>) -> CInt {
+    let len = CInt(exactly: ptr.count)!
+    let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+        unsafe $0
+    }
+    return unsafe myFunc(_ptrPtr.baseAddress!, len)
+}
+------------------------------
