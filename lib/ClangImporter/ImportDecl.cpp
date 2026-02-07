@@ -49,6 +49,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
@@ -10525,9 +10526,39 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
     E->loadAllMembers();
 }
 
-void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
-    NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord,
-    ClangInheritanceInfo inheritance) {
+namespace {
+class ClangRecordMemberLoader {
+  ClangImporter::Implementation &Impl;
+  NominalTypeDecl *swiftDecl;
+
+public:
+  ClangRecordMemberLoader(ClangImporter::Implementation &Impl,
+                          NominalTypeDecl *swiftDecl)
+      : Impl{Impl}, swiftDecl{swiftDecl} {
+    ASSERT(swiftDecl);
+    ASSERT(isa_and_nonnull<clang::RecordDecl>(swiftDecl->getClangDecl()));
+  }
+  void loadMembers() {
+    ASSERT(swiftDecl && "each Decl should only be loaded once!");
+    load(cast<clang::RecordDecl>(swiftDecl->getClangDecl()),
+         ClangInheritanceInfo());
+    swiftDecl = nullptr;
+  }
+
+private:
+  void load(const clang::RecordDecl *clangRecord,
+            ClangInheritanceInfo inheritance);
+};
+
+static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl) {
+  if (auto *func = dyn_cast<FuncDecl>(valueDecl))
+    if (auto *params = func->getParameters())
+      return params->size();
+  return 0;
+}
+
+void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
+                                   ClangInheritanceInfo inheritance) {
 
   // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
   // to import all non-public members by default; if that is disabled, we only
@@ -10578,10 +10609,10 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     const bool isCanonicalInContext =
         (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
     if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
-        isVisibleClangEntry(nd))
+        Impl.isVisibleClangEntry(nd))
       // We don't pass `swiftDecl` as `expectedDC` because we might be in a
       // recursive call that adds base class members to a derived class.
-      insertMembersAndAlternates(nd, members);
+      Impl.insertMembersAndAlternates(nd, members);
   }
 
   // Add the members here.
@@ -10610,7 +10641,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
       // So we need to clone the member into the derived class.
       if (auto cloned =
-              importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+              Impl.importBaseMemberDecl(baseMember, swiftDecl, inheritance))
         swiftDecl->addMember(cloned);
 
       continue;
@@ -10623,8 +10654,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
     // FIXME: constructors are added eagerly, but shouldn't be
     // FIXME: subscripts are added eagerly, but shouldn't be
-    if (!isa<AccessorDecl>(member) &&
-        !isa<SubscriptDecl>(member) &&
+    if (!isa<AccessorDecl>(member) && !isa<SubscriptDecl>(member) &&
         !isa<ConstructorDecl>(member)) {
       swiftDecl->addMember(member);
     }
@@ -10639,7 +10669,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       clang::QualType baseType = base.getType();
-      if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
+      if (auto spectType =
+              dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
       if (auto elaborated = dyn_cast<clang::ElaboratedType>(baseType))
         baseType = elaborated->desugar();
@@ -10648,15 +10679,16 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
       auto baseInheritance = ClangInheritanceInfo(inheritance, base);
-      loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
+      load(baseRecord, baseInheritance);
     }
   }
 
   if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !inheritance) {
-    lookupAndImportPointee(swiftDecl);
-    lookupAndImportSuccessor(swiftDecl);
+    Impl.lookupAndImportPointee(swiftDecl);
+    Impl.lookupAndImportSuccessor(swiftDecl);
   }
 }
+} // namespace
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
@@ -10693,9 +10725,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
-    loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
-                               cast<clang::RecordDecl>(D->getClangDecl()),
-                               ClangInheritanceInfo());
+    ClangRecordMemberLoader(*this, cast<NominalTypeDecl>(D)).loadMembers();
     if (IDC) // Set member deserialization status
       IDC->setDeserializedMembers(true);
     return;
