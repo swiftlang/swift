@@ -1,3 +1,6 @@
+// Windows does not currently build with zlib support.
+// UNSUPPORTED: OS=windows-msvc
+
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -index-store-path %t/idx -index-store-compress -o %t.o -typecheck %s
 // RUN: c-index-test core -print-record %t/idx | %FileCheck %s
