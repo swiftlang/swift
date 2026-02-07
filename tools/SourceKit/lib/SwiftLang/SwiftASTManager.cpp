@@ -1146,10 +1146,7 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       Invocation, convertFileContentsToInputs(getFileContents()));
 
   Invocation.getLangOptions().CollectParsedToken = true;
-
-  if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CompIns.getSourceMgr().setFileSystem(FileSystem);
-  }
+  CompIns.getSourceMgr().setFileSystem(FileSystem);
 
   if (CompIns.setup(Invocation, Error)) {
     LOG_WARN_FUNC("Compilation setup failed!!!");
