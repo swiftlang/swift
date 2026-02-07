@@ -1,12 +1,11 @@
 // RUN: %target-typecheck-verify-swift -solver-scope-threshold=10000 -solver-enable-prune-disjunctions
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=200000
 
 // FIXME: -solver-enable-prune-disjunctions just moves the location of the
 // reasonable time diagnostic. It also decreases the number of scopes but
 // not below 10000.
 
 // REQUIRES: objc_interop
-
-// This type checks successfully with default limits, but slow (600k scopes).
 
 import Foundation
 import Combine

@@ -1256,11 +1256,13 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
   // ranking because we'd like to prioritize resolving
   // closures to gain more information from their bodies.
   unsigned numBindings = b.Bindings.size() + b.getNumViableLiteralBindings();
+  unsigned numExactBindings = b.getNumExactBindings();
   auto numNonDefaultableBindings = numBindings > 0 ? numBindings
                                    : b.TypeVar->getImpl().isClosureType() ? 1
                                                                           : 0;
-
-  return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
+  return std::make_tuple(b.isHole(),
+                         numExactBindings == 0, numExactBindings,
+                         numNonDefaultableBindings == 0,
                          b.isDelayed(), b.isSubtypeOfExistentialType(),
                          b.involvesTypeVariables(),
                          static_cast<unsigned char>(b.getLiteralForScore()),
