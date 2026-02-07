@@ -1863,7 +1863,7 @@ InversesAtDepth::InversesAtDepth(GenericContext *level) {
 }
 bool InversesAtDepth::operator()(const InverseRequirement &inverse) const {
   if (includedDepth) {
-    auto d = inverse.subject->castTo<GenericTypeParamType>()->getDepth();
+    auto d = inverse.subject->getRootGenericParam()->getDepth();
     return d == includedDepth.value();
   }
   return false;

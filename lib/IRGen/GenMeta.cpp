@@ -7771,7 +7771,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     auto genericParam =
         sig.getReducedType(inverse.subject)->getAs<GenericTypeParamType>();
     if (!genericParam)
-      continue;
+      continue; // FIXME: do we need to encode associated type inverses?
 
     // Insert this suppression into the set for that generic parameter.
     auto invertibleKind = inverse.getKind();

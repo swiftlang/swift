@@ -1356,6 +1356,24 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     SmallVector<InverseRequirement, 2> &inverses) const {
   auto &ctx = getASTContext();
 
+  // TODO: deprecate support for this old version of the feature.
+  const bool LegacySuppAssoc =
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
+
+  auto addInverses = [&](Type tyParam) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If we can derive a conformance to this protocol, then don't add an
+      // inverse.
+      if (requiresProtocol(tyParam, proto))
+        continue;
+
+      // Nothing implies a conformance to this protocol, so record the inverse.
+      inverses.push_back({tyParam, proto, SourceLoc()});
+    }
+  };
+
   // Record the absence of conformances to invertible protocols.
   for (auto gp : getGenericParams()) {
     // Any generic parameter with a superclass bound or concrete type does not
@@ -1367,25 +1385,67 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     if (gp->isValue())
       continue;
 
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+    addInverses(gp);
+  }
 
-      // If we can derive a conformance to this protocol, then don't add an
-      // inverse.
-      if (requiresProtocol(gp, proto))
-        continue;
+  // Determine the set of dependent member types corresponding to primary
+  // associated types that could be defaulted, if they are suppressed.
+  //
+  // TODO: avoid redundant work by storing in each ProtocolDecl a precomputed
+  //       set of these associated type declarations.
+  llvm::SmallSet<CanType, 24> defaultedPATs;
+  for (auto req : getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
 
-      // Nothing implies a conformance to this protocol, so record the inverse.
-      inverses.push_back({gp, proto, SourceLoc()});
+    auto subject = req.getFirstType();
+    auto *proto = req.getProtocolDecl();
+    // Try to add inverses for all associated type members, as runtime metadata
+    // relies on knowing all types for which to not check these requirements
+    // based on there being an inverse. There's no harm in specifying an inverse
+    // that is redundant because no default would've been inferred.
+    for (auto assoc : proto->getAssociatedTypeMembers()) {
+      auto member = DependentMemberType::get(subject, assoc);
+      addInverses(member);
+    }
+
+    // No defaults are inferred for the legacy feature.
+    if (LegacySuppAssoc)
+      continue;
+
+    // Now remember all primary associated types for later filtering.
+    for (auto pat : proto->getPrimaryAssociatedTypes()) {
+      auto member = DependentMemberType::get(subject, pat);
+      defaultedPATs.insert(member->getCanonicalType());
     }
   }
 
-  // Filter out explicit conformances to invertible protocols.
+  // Filter out most explicit conformances to invertible protocols.
   for (auto req : getRequirements()) {
-    if (req.isInvertibleProtocolRequirement()) {
+    // If it's not a conformance to an invertible protocol, include it.
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      reqs.push_back(req);
       continue;
     }
 
+    auto subject = req.getFirstType();
+
+    // Drop conformances to invertibles for generic type parameters, as we do
+    // infer a default for them.
+    if (subject->is<GenericTypeParamType>())
+      continue;
+
+    // The remaining subjects must be dependent member types...
+    ASSERT(subject->is<DependentMemberType>());
+
+    // If the subject matches a primary associated type we identified earlier,
+    // then we infer a default for them.
+    if (defaultedPATs.contains(subject->getCanonicalType()))
+      continue;
+
+    // Otherwise, for a non-primary associated type, no default is inferred,
+    // thus this conformance requirement was explicitly stated. Keep it.
     reqs.push_back(req);
   }
 }
