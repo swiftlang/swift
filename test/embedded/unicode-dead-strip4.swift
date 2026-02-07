@@ -11,12 +11,14 @@
 
 @_extern(c, "getline")
 func getline(
-  _ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?
+  _ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+  _ linecapp: UnsafeMutablePointer<UInt>?,
+  _ stream: UnsafeRawPointer?
 ) -> Int
 
 @c
 func swift_stdlib_readLine_stdin(_ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?) -> Int {
-  return getline(linePointer)
+  return getline(linePointer, nil, nil)
 }
 
 

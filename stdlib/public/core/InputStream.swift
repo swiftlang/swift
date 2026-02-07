@@ -40,20 +40,20 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   let utf8Buffer = unsafe UnsafeBufferPointer(start: utf8Start, count: utf8Count)
   var result = unsafe String._fromUTF8Repairing(utf8Buffer).result
   if strippingNewline {
-    result = result.withoutNewline()
+    result.removeNewline()
   }
   return result
 }
 
 extension String {
   /// Remove the newline from the string
-  fileprivate func withoutNewline() -> String {
+  fileprivate mutating func removeNewline() {
     var scalars = unicodeScalars[...]
 
     // If the last character is not "\n", there's nothing to do.
     let newline: UnicodeScalar = "\n"
     guard let lastNewline = scalars.last, lastNewline == newline else {
-      return self
+      return
     }
 
     // Drop the "\n".
@@ -61,11 +61,13 @@ extension String {
 
     // Now remove "\r" if it's also there.
     let carriageReturn: UnicodeScalar = "\r"
-    guard let lastCR = scalars.last, lastCR == carriageReturn else {
-      return String(scalars)
+    if let lastCR = scalars.last, lastCR == carriageReturn {
+      // Drop the "\rn".
+      scalars = scalars.dropLast()
     }
 
-    return String(scalars.dropLast())
+    // Remove from the end of the adjusted scalars to the end of this string.
+    _guts.remove(from: scalars.endIndex, to: endIndex)
   }
 }
 
