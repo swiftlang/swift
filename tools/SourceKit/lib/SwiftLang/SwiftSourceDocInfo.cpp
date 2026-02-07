@@ -1982,7 +1982,7 @@ static void resolveName(
 
   Lang.getASTManager()->processASTAsync(
       Invok, std::move(Consumer), /*OncePerASTToken=*/nullptr,
-      CancellationToken, llvm::vfs::getRealFileSystem());
+      CancellationToken, llvm::vfs::createPhysicalFileSystem());
 }
 
 static void
@@ -2088,7 +2088,7 @@ resolveRange(SwiftLangSupport &Lang, StringRef PrimaryFilePath,
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   Lang.getASTManager()->processASTAsync(Invok, std::move(Consumer), Once,
                                         CancellationToken,
-                                        llvm::vfs::getRealFileSystem());
+                                        llvm::vfs::createPhysicalFileSystem());
 }
 
 static void deliverCursorInfoResults(
@@ -2725,7 +2725,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
   static const char OncePerASTToken = 0;
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   ASTMgr->processASTAsync(Invok, std::move(Consumer), Once, CancellationToken,
-                          llvm::vfs::getRealFileSystem());
+                          llvm::vfs::createPhysicalFileSystem());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2805,7 +2805,7 @@ void SwiftLangSupport::findActiveRegionsInFile(
       std::make_shared<IfConfigConsumer>(InputBufferName, Receiver, Invok);
   ASTMgr->processASTAsync(Invok, std::move(Consumer),
                           /*OncePerASTToken=*/nullptr, CancellationToken,
-                          llvm::vfs::getRealFileSystem());
+                          llvm::vfs::createPhysicalFileSystem());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2885,7 +2885,7 @@ void SwiftLangSupport::semanticRefactoring(
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   getASTManager()->processASTAsync(Invok, std::move(Consumer), Once,
                                    CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 void SwiftLangSupport::collectExpressionTypes(
@@ -2960,7 +2960,7 @@ void SwiftLangSupport::collectExpressionTypes(
   static const char OncePerASTToken = 0;
   getASTManager()->processASTAsync(Invok, std::move(Collector),
                                    &OncePerASTToken, CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 void SwiftLangSupport::collectVariableTypes(
@@ -3050,5 +3050,5 @@ void SwiftLangSupport::collectVariableTypes(
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   getASTManager()->processASTAsync(Invok, std::move(Collector), Once,
                                    CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }

@@ -4354,8 +4354,8 @@ bool CompilerInvocation::parseArgs(
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
-  
-  SDKInfo = parseSDKSettings(*llvm::vfs::getRealFileSystem(), LangOpts,
+
+  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
                              SearchPathOpts, Diags);
 
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
