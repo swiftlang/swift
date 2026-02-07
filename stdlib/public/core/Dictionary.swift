@@ -933,6 +933,23 @@ extension Dictionary {
     return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
   }
 
+  /// Returns a new dictionary containing the keys of this dictionary with the
+  /// values transformed by the given closure.
+  ///
+  /// - Parameter transform: A closure that transforms a value. `transform`
+  ///   accepts each key and value of the dictionary as its arguments and returns
+  ///   a transformed value of the same or of a different type.
+  /// - Returns: A new dictionary containing the keys and transformed values of
+  ///   this dictionary.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the dictionary.
+  @inlinable
+  public func mapValuesWithKeys<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> Dictionary<Key, T> {
+    return try Dictionary<Key, T>(_native: _variant.mapValuesWithKeys(transform))
+  }
+
   /// Returns a new dictionary containing only the key-value pairs that have
   /// non-`nil` values as the result of transformation by the given closure.
   ///

@@ -465,6 +465,18 @@ extension Dictionary._Variant {
   }
 
   @inlinable
+  internal func mapValuesWithKeys<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return try asCocoa.mapValuesWithKeys(transform)
+    }
+#endif
+    return try asNative.mapValuesWithKeys(transform)
+  }
+
+  @inlinable
   internal mutating func merge<S: Sequence>(
     _ keysAndValues: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value

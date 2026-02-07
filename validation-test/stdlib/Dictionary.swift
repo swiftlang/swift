@@ -2013,6 +2013,31 @@ DictionaryTestSuite.test("mapValues(_:)") {
   }
 }
 
+DictionaryTestSuite.test("mapValuesWithKeys") {
+  let d1 = [10: 1010, 20: 1020, 30: 1030]
+  let d2 = d1.mapValuesWithKeys { "\($0): \($1)" }
+
+  expectEqual(d1.count, d2.count)
+  expectEqual(d1.keys.first, d2.keys.first)
+
+  for (key, value) in d1 {
+    expectEqual("\(key): \(value)", d2[key]!)
+  }
+
+  do {
+    let d3: [MinimalHashableValue : Int] = Dictionary(
+      uniqueKeysWithValues: d1.lazy.map { (MinimalHashableValue($0), $1) })
+    expectEqual(d3.count, 3)
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
+
+    let d4 = d3.mapValuesWithKeys { "\($0): \($1)" }
+    expectEqual(d4.count, d3.count)
+    expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
+  }
+}
+
 DictionaryTestSuite.test("filter(_:)") {
   let d1 = [1: 1, 2: 2, 3: 100, 4: 4, 5: 100, 6: 6]
   let d2 = d1.filter() {key, value in key == value}

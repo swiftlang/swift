@@ -774,6 +774,22 @@ extension _NativeDictionary { // High-level operations
   }
 
   @inlinable
+  internal func mapValuesWithKeys<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
+    let resultStorage = unsafe _DictionaryStorage<Key, T>.copy(original: _storage)
+    unsafe _internalInvariant(resultStorage._seed == _storage._seed)
+    let result = unsafe _NativeDictionary<Key, T>(resultStorage)
+    for unsafe bucket in unsafe hashTable {
+      let key = unsafe self.uncheckedKey(at: bucket)
+      let old = unsafe self.uncheckedValue(at: bucket)
+      let new = try transform(key, old)
+      try result._insert(at: bucket, key: key, value: new)
+    }
+    return result
+  }
+
+  @inlinable
   internal mutating func merge<S: Sequence>(
     _ keysAndValues: __owned S,
     isUnique: Bool,
