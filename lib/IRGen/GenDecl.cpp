@@ -5399,6 +5399,20 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
   addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
 
   // For concrete metadata, declare the alias to its address point.
+
+  if (hasEmbeddedExistentials) {
+    auto isFromOtherModule = [] (NominalTypeDecl *d) -> bool {
+      auto module = d->getModuleContext();
+      auto &ctx = module->getASTContext();
+      return module != ctx.MainModule && ctx.MainModule;
+    };
+    auto nom = concreteType->getAnyNominal();
+    if (!nom || isFromOtherModule(nom)) {
+      // We don't actually use the defined type medata in the non-home module
+      // but rather reference the full metadata at an offset.
+      return nullptr;
+    }
+  }
   auto directEntity = LinkEntity::forTypeMetadata(
       concreteType, TypeMetadataAddress::AddressPoint);
   return defineAlias(directEntity, addr, TypeMetadataStructTy);
@@ -5532,6 +5546,30 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/nullptr);
     typeOfValue = entity->getDefaultDeclarationType(*this);
+  } else if (hasEmbeddedExistentials) {
+    // We want to avoid generating any local uses of metadata address point
+    // definitions. Instead any local use should be to the offset full metadata
+    // symbol, that is "(gep <full metadata symbol> <offset>)".
+    auto fullMetadataEntity = LinkEntity::forTypeMetadata(
+      concreteType, TypeMetadataAddress::FullMetadata);
+    auto fullMetadata = getAddrOfLLVMVariable(fullMetadataEntity,
+                                              ConstantInit(), DbgTy, refKind,
+                                              /*overrideDeclType=*/nullptr);
+
+    if (auto *GV = dyn_cast<llvm::GlobalVariable>(fullMetadata.getValue()))
+      if (GV->isDeclaration())
+        GV->setComdat(nullptr);
+
+    llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty,
+                             MetadataAdjustmentIndex::EmbeddedWithExistentials)
+    };
+    addr = ConstantReference(
+      llvm::ConstantExpr::getInBoundsGetElementPtr(defaultVarTy,
+                                                   fullMetadata.getValue(),
+                                                   indices),
+      fullMetadata.isIndirect());
   } else {
     addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                  /*overrideDeclType=*/defaultVarTy);
