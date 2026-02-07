@@ -2595,6 +2595,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
       allowImpliedConditionalConformance = true;
   } else if (Proto->isMarkerProtocol()) {
     allowImpliedConditionalConformance = true;
+  } else if (Proto->getAttrs().hasAttribute<ReparentableAttr>()) {
+    allowImpliedConditionalConformance = true;
   }
 
   if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
