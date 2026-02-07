@@ -1088,6 +1088,12 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
 }
 
 void BindingSet::addBinding(PotentialBinding binding) {
+  // Optimization.
+  if (binding.Kind == AllowedBindingKind::Subtypes &&
+      !hasProperSubtypes(binding.BindingType)) {
+    binding.Kind = AllowedBindingKind::Exact;
+  }
+
   if (Bindings.count(binding))
     return;
 
