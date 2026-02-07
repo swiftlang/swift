@@ -620,6 +620,8 @@ public:
   /// Handle diagnostics of unresolved member chains.
   void finalizeUnresolvedMemberChainResult();
 
+  void finalizeSupertypeBindings();
+
   static BindingScore formBindingScore(const BindingSet &b);
 
   bool operator==(const BindingSet &other);

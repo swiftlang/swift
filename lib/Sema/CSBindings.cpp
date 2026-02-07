@@ -1368,6 +1368,43 @@ bool BindingSet::operator<(const BindingSet &other) {
   }
 #include "swift/Sema/CSTrail.def"
 
+void BindingSet::finalizeSupertypeBindings() {
+  bool hasSupertypeConformanceRestriction = false;
+  auto *optionalDecl = CS.getASTContext().getOptionalDecl();
+  for (auto *constraint : Info.Protocols) {
+    if (auto *protoTy = constraint->getSecondType()->getAs<ProtocolType>()) {
+      auto *protoDecl = protoTy->getDecl();
+
+      // FIXME: Unify this with shouldBeConservativeWithProto() in Subtyping.cpp
+      // and the logic for ConstraintKind::TransitivelyConformsTo in CSSimplify.cpp.
+      if (protoDecl->existentialConformsToSelf())
+        continue;
+
+      if (optionalDecl) {
+        SmallVector<ProtocolConformance *, 1> results;
+        optionalDecl->lookupConformance(protoDecl, results);
+        if (!results.empty())
+          continue;
+      }
+
+      hasSupertypeConformanceRestriction = true;
+      break;
+    }
+  }
+
+  if (hasSupertypeConformanceRestriction) {
+    for (const auto &binding : Bindings) {
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          !hasProperSupertypes(binding.BindingType)) {
+        auto newBinding = binding;
+        newBinding.Kind = AllowedBindingKind::Exact;
+        addBinding(newBinding);
+        break;
+      }
+    }
+  }
+}
+
 const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
@@ -1418,6 +1455,8 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
 
     if (!isViable)
       continue;
+
+    bindings.finalizeSupertypeBindings();
 
     if (isDebugMode() && bindings.hasViableBindings()) {
       if (first) {
