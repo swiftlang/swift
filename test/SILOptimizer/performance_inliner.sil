@@ -989,3 +989,29 @@ entry(%executor: $Builtin.Executor):
   %r = tuple ()
   return %r : $()
 }
+
+sil [ossa] @does_not_throw : $@convention(thin) () -> @error any Error {
+bb0:
+  %1 = tuple ()
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @inlining_produces_infinite_loop
+// CHECK:         builtin "infinite_loop_true_condition"()
+// CHECK:         unreachable
+// CHECK:       } // end sil function 'inlining_produces_infinite_loop'
+sil [ossa] @inlining_produces_infinite_loop : $@convention(thin) () -> @error any Error {
+bb0:
+  br bb1
+
+bb1:
+  %4 = function_ref @does_not_throw : $@convention(thin) () -> @error any Error
+  try_apply %4() : $@convention(thin) () -> @error any Error, normal bb2, error bb3
+
+bb2(%6 : $()):
+  br bb1
+
+bb3(%13 : @owned $any Error):
+  throw %13
+}
+
