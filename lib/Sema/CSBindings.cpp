@@ -1323,6 +1323,38 @@ bool BindingSet::operator<(const BindingSet &other) {
   }
 #include "swift/Sema/CSTrail.def"
 
+void BindingSet::finalizeSupertypeBindings() {
+  bool hasSupertypeConformanceRestriction = false;
+  auto *optionalDecl = CS.getASTContext().getOptionalDecl();
+  for (auto *constraint : Info.Protocols) {
+    if (auto *protoTy = constraint->getSecondType()->getAs<ProtocolType>()) {
+      auto *protoDecl = protoTy->getDecl();
+      if (protoDecl->existentialConformsToSelf())
+        continue;
+
+      SmallVector<ProtocolConformance *, 1> results;
+      optionalDecl->lookupConformance(protoDecl, results);
+      if (!results.empty())
+        continue;
+
+      hasSupertypeConformanceRestriction = true;
+      break;
+    }
+  }
+
+  if (hasSupertypeConformanceRestriction) {
+    for (const auto &binding : Bindings) {
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          !hasProperSupertypes(binding.BindingType)) {
+        auto newBinding = binding;
+        newBinding.Kind = AllowedBindingKind::Exact;
+        addBinding(newBinding);
+        break;
+      }
+    }
+  }
+}
+
 const BindingSet *ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   BindingSet *bestBindings = nullptr;
@@ -1384,6 +1416,8 @@ const BindingSet *ConstraintSystem::determineBestBindings() {
       bindings.dump(log, solverState->getCurrentIndent() + 2);
       log << "\n";
     }
+
+    bindings.finalizeSupertypeBindings();
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
