@@ -1,4 +1,4 @@
-// RUN: %batch-code-completion
+// RUN: %batch-code-completion -solver-scope-threshold=50
 
 protocol P0 {}
 protocol P1 {}
@@ -47,8 +47,16 @@ S {
     S {
       S {
         S {
+          let x = 0
+          let y: Int = 0
           #^COMPLETE^#
-          // COMPLETE: Decl[Struct]/CurrModule: FooBar[#FooBar#]; name=FooBar
+          // COMPLETE-DAG: Decl[Struct]/CurrModule: FooBar[#FooBar#]; name=FooBar
+
+          // We decline to type-check a variable indepedently of the surrounding
+          // closure, so this has an ErrorType. If this changes, you either need
+          // to make this test case more complex or tweak the limits.
+          // COMPLETE-DAG: Decl[LocalVar]/Local: x[#_#]; name=x
+          // COMPLETE-DAG: Decl[LocalVar]/Local: y[#Int#]; name=y
         }
       }
     }

@@ -124,6 +124,7 @@ protected:
                                SmallVectorImpl<ASTNode> &container,
                                Type type = Type(), Expr *initExpr = nullptr) {
     auto *var = builder.buildVar(loc);
+    var->setIsPlaceholderVar();
     Pattern *placeholder = TypedPattern::createImplicit(
         ctx, NamedPattern::createImplicit(ctx, var),
         type ? type : PlaceholderType::get(ctx, var));
