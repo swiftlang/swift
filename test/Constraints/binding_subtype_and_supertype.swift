@@ -28,8 +28,8 @@ do {
 // https://github.com/swiftlang/swift/issues/77003
 do {
   struct Task<E> {
-    init(_: () -> ()) where E == Never {}  // expected-note {{found this candidate}}
-    init(_: () throws -> ()) where E == Error {}  // expected-note {{found this candidate}}
+    init(_: () -> ()) where E == Never {}
+    init(_: () throws -> ()) where E == Error {}
   }
 
   func f0<T, U>(_: T.Type, _ fn: (T) -> U, _: (U) -> ()) {}
@@ -43,10 +43,9 @@ do {
 
   func f2<T, U>(_: T.Type, _ fn: (T) -> (U, U), _: (U) -> ()) {}
 
-  // FIXME
   func g2(x: (Int, Int).Type) {
       f0(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
-      f2(x, { $0 }, { _ in Task {} })  // expected-error {{ambiguous use of 'init(_:)'}}
+      f2(x, { $0 }, { _ in Task {} })  // expected-warning {{result of 'Task<E>' initializer is unused}}
   }
 
   func f3<T, U>(_: T.Type, _ fn: (T) -> [U], _: (U) -> ()) {}
