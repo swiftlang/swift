@@ -10530,11 +10530,12 @@ namespace {
 class ClangRecordMemberLoader {
   ClangImporter::Implementation &Impl;
   NominalTypeDecl *swiftDecl;
+  bool storage;
 
 public:
   ClangRecordMemberLoader(ClangImporter::Implementation &Impl,
-                          NominalTypeDecl *swiftDecl)
-      : Impl{Impl}, swiftDecl{swiftDecl} {
+                          NominalTypeDecl *swiftDecl, bool storage)
+      : Impl{Impl}, swiftDecl{swiftDecl}, storage{storage} {
     ASSERT(swiftDecl);
     ASSERT(isa_and_nonnull<clang::RecordDecl>(swiftDecl->getClangDecl()));
   }
@@ -10600,6 +10601,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     // Currently, we don't import unnamed bitfields.
     if (isa<clang::FieldDecl>(m) &&
         cast<clang::FieldDecl>(m)->isUnnamedBitField())
+      continue;
+
+    // Skip this member if caller asked for storage and this isn't a field,
+    // or vice versa.
+    if (storage != isa<clang::FieldDecl>(m))
       continue;
 
     // Make sure we always pull in record fields. Everything else had better
@@ -10683,19 +10689,19 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     }
   }
 
-  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !inheritance) {
+  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
+      !inheritance) {
     Impl.lookupAndImportPointee(swiftDecl);
     Impl.lookupAndImportSuccessor(swiftDecl);
   }
 }
 } // namespace
 
-void
-ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-
+void ClangImporter::Implementation::loadStorageMembers(Decl *D,
+                                                       uint64_t extra) {
   FrontendStatsTracer tracer(D->getASTContext().Stats,
-                             "load-all-members", D);
-  assert(D);
+                             "load-storage-members", D);
+  ASSERT(D);
 
   // If a Clang decl has no owning module, then it needs to be added to the
   // bridging header lookup table. This has most likely already been done, but
@@ -10710,42 +10716,52 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     }
   }
 
-  // Check whether we're importing an Objective-C container of some sort.
-  auto objcContainer =
-    dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
-  auto *IDC = dyn_cast<IterableDeclContext>(D);
-
-  // If not, we're importing globals-as-members into an extension.
-  if (objcContainer) {
-    loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
-    loadAllMembersOfObjcContainer(D, objcContainer);
-    if (IDC) // Set member deserialization status
-      IDC->setDeserializedMembers(true);
+  if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
+    // Namespace members will only be loaded lazily.
+    cast<EnumDecl>(D)->forceSetHasLazyMembers();
     return;
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
-    ClangRecordMemberLoader(*this, cast<NominalTypeDecl>(D)).loadMembers();
-    if (IDC) // Set member deserialization status
+    ClangRecordMemberLoader(*this, cast<NominalTypeDecl>(D), /*storage=*/true)
+        .loadMembers();
+    return;
+  }
+
+  if (auto *objcContainer =
+          dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl())) {
+    loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
+    loadAllMembersOfObjcContainer(D, objcContainer);
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D))
+      IDC->setDeserializedMembers(true);
+    return;
+  }
+}
+
+void ClangImporter::Implementation::loadNonStorageMembers(Decl *D,
+                                                          uint64_t extra) {
+
+  FrontendStatsTracer tracer(D->getASTContext().Stats,
+                             "load-non-storage-members", D);
+  ASSERT(D);
+
+  if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
+    ClangRecordMemberLoader(*this, cast<NominalTypeDecl>(D), /*storage=*/false)
+        .loadMembers();
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D))
       IDC->setDeserializedMembers(true);
     return;
   }
 
-  if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-    // Namespace members will only be loaded lazily.
-    cast<EnumDecl>(D)->setHasLazyMembers(true);
-    return;
+  if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+    loadAllMembersIntoExtension(ext, extra);
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D))
+      IDC->setDeserializedMembers(true);
   }
-
-  loadAllMembersIntoExtension(D, extra);
-  if (IDC) // Set member deserialization status
-    IDC->setDeserializedMembers(true);
 }
 
 void ClangImporter::Implementation::loadAllMembersIntoExtension(
-    Decl *D, uint64_t extra) {
-  // We have extension.
-  auto ext = cast<ExtensionDecl>(D);
+    ExtensionDecl *ext, uint64_t extra) {
   auto nominal = ext->getExtendedNominal();
 
   // The submodule of the extension is encoded in the extra data.

@@ -1698,8 +1698,8 @@ public:
     return found->second;
   }
 
-  virtual void
-  loadAllMembers(Decl *D, uint64_t unused) override;
+  virtual void loadStorageMembers(Decl *D, uint64_t unused) override;
+  virtual void loadNonStorageMembers(Decl *D, uint64_t unused) override;
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
@@ -1716,7 +1716,7 @@ private:
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
-  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void loadAllMembersIntoExtension(ExtensionDecl *ext, uint64_t extra);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
   /// it and its alternates to \p ext.
