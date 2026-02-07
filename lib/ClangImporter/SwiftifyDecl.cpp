@@ -52,7 +52,6 @@ using namespace importer;
 #define DLOG_SCOPE(x) do {} while(false);
 #endif
 
-
 namespace {
 #ifndef NDEBUG
 struct LogIndentTracker {
@@ -447,6 +446,20 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
   }
 }
 
+static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {
+  if (!isa<ConstructorDecl>(MappedDecl))
+    return false;
+  const auto *Parent = MappedDecl->getParent();
+  if (const auto *Ext = dyn_cast<ExtensionDecl>(Parent)) {
+    Parent = Ext->getExtendedNominal();
+  }
+  const auto *ParentClass = dyn_cast<ClassDecl>(Parent);
+  if (!ParentClass)
+    return false;
+
+  return ParentClass->getForeignClassKind() != ClassDecl::ForeignKind::Normal;
+}
+
 template<typename T>
 static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
@@ -484,6 +497,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   bool IsInBridgingHeader = MappedDecl->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME;
   ASSERT(OwningModule || IsInBridgingHeader);
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
+
+  if (wouldBeIllegalInitializer(MappedDecl)) {
+    DLOG("illegal initializer\n");
+    return false;
+  }
 
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement

@@ -9,10 +9,10 @@ protocol Q {}
 @reparentable
 protocol R {}
 
-protocol P {}
+protocol P: Q {}
 extension P : @reparented Q {}
 
-protocol P2 {}
+protocol P2: Q, R {}
 extension P2 : @reparented Q, @reparented R {}
 
 protocol DirectlyOnProto: @reparented R {}
@@ -50,14 +50,14 @@ public protocol GrandParentJiji {
 }
 @reparentable
 public protocol ParentJiji: GrandParentJiji {} // expected-note {{'Jiji' does not conform to inherited protocol 'GrandParentJiji'}}
-public protocol Jiji {
+public protocol Jiji: ParentJiji {
   associatedtype Element
 }
 extension Jiji: @reparented ParentJiji {} // expected-error {{'Jiji' cannot conform to 'GrandParentJiji'}}
 // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
 
-public protocol Pumpkin {}
+public protocol Pumpkin: AnyObjParent, ActorParent, SendableParent {}
 @reparentable public protocol AnyObjParent: AnyObject {}
 @reparentable public protocol ActorParent: Actor {}
 @reparentable public protocol SendableParent: Sendable {}
@@ -65,3 +65,13 @@ public protocol Pumpkin {}
 extension Pumpkin: @reparented AnyObjParent {} // expected-error {{non-class type 'Pumpkin' cannot conform to class protocol 'AnyObjParent'}}
 extension Pumpkin: @reparented ActorParent {}  // expected-error {{non-class type 'Pumpkin' cannot conform to class protocol 'ActorParent'}}
 extension Pumpkin: @reparented SendableParent {}
+
+@reparentable protocol Shape {}
+protocol Pyramid {}
+extension Pyramid: @reparented Shape {}
+// expected-error@-1 {{'Pyramid' must directly inherit from 'Shape' in order to be reparented}}
+
+protocol Rectangle: Shape {}
+protocol Square: Rectangle {}
+extension Square : @reparented Shape {}
+// expected-error@-1 {{'Square' must directly inherit from 'Shape' in order to be reparented}}

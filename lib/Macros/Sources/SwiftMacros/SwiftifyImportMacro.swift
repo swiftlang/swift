@@ -424,6 +424,9 @@ protocol BoundsCheckedThunkBuilder {
   // It may refer to names constructed in buildBasicBoundsChecks (in the case of shared variables),
   // so those must come before this in the function body.
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
+  // Extracts the inner bufferpointer from spans, so that the rest of the code is not nested in
+  // closures, which is not allowed for calls to delegated initializers.
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item]
   // The second component of the return value is true when only the return type of the
   // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -454,6 +457,9 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     return []
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return []
+  }
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
     return []
   }
 
@@ -537,6 +543,9 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
   }
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildSpanUnwraps()
+  }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
@@ -589,6 +598,9 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
+  }
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildSpanUnwraps()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -751,6 +763,9 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
   }
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildSpanUnwraps()
+  }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     let call = try base.buildFunctionCall(pointerArgs)
@@ -860,11 +875,29 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     return res
   }
 
-  func unwrapIfNullable(_ expr: ExprSyntax) -> ExprSyntax {
-    if nullable {
-      return ExprSyntax(ForceUnwrapExprSyntax(expression: expr))
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildSpanUnwraps()
+
+    if generateSpan {
+      assert(nonescaping)
+      let unwrappedName = TokenSyntax("_\(name.withoutBackticks)Ptr").escapeIfNeeded
+      let questionMark = if nullable { "?" } else { "" }
+
+      let funcName =
+        switch (isSizedBy, isMutablePointerType(oldType)) {
+        case (true, true): "withUnsafeMutableBytes"
+        case (true, false): "withUnsafeBytes"
+        case (false, true): "withUnsafeMutableBufferPointer"
+        case (false, false): "withUnsafeBufferPointer"
+        }
+      let unwrappedCall = ExprSyntax(
+        """
+        unsafe \(raw: name)\(raw: questionMark).\(raw: funcName) { unsafe $0 }
+        """)
+      res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax("let \(unwrappedName) = \(unwrappedCall)")))
     }
-    return expr
+
+    return res
   }
 
   func unwrapIfNonnullable(_ expr: ExprSyntax) -> ExprSyntax {
@@ -879,31 +912,6 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
       return expr
     }
     return ExprSyntax("\(type)(exactly: \(expr))!")
-  }
-
-  func buildUnwrapCall(_ argOverrides: [Int: ExprSyntax]) throws -> ExprSyntax {
-    let unwrappedName = TokenSyntax("_\(name.withoutBackticks)Ptr").escapeIfNeeded
-    var args = argOverrides
-    let argExpr = ExprSyntax("\(unwrappedName).baseAddress")
-    assert(args[index] == nil)
-    args[index] = try castPointerToTargetType(unwrapIfNonnullable(argExpr))
-    let call = try base.buildFunctionCall(args)
-    let ptrRef = unwrapIfNullable("\(name)")
-
-    let funcName =
-      switch (isSizedBy, isMutablePointerType(oldType)) {
-      case (true, true): "withUnsafeMutableBytes"
-      case (true, false): "withUnsafeBytes"
-      case (false, true): "withUnsafeMutableBufferPointer"
-      case (false, false): "withUnsafeBufferPointer"
-      }
-    let unwrappedCall = ExprSyntax(
-      """
-      unsafe \(ptrRef).\(raw: funcName) { \(unwrappedName) in
-        return \(call)
-      }
-      """)
-    return unwrappedCall
   }
 
   func makeCount() -> ExprSyntax {
@@ -947,20 +955,11 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     assert(args[index] == nil)
     if generateSpan {
       assert(nonescaping)
-      let unwrappedCall = try buildUnwrapCall(args)
-      if nullable {
-        var nullArgs = args
-        nullArgs[index] = ExprSyntax(NilLiteralExprSyntax(nilKeyword: .keyword(.nil)))
-        return ExprSyntax(
-          """
-          { () in return if \(name) == nil {
-              \(try base.buildFunctionCall(nullArgs))
-            } else {
-              \(unwrappedCall)
-            } }()
-          """)
-      }
-      return unwrappedCall
+      let unwrappedName = TokenSyntax("_\(name.withoutBackticks)Ptr").escapeIfNeeded
+      let questionMark = if nullable { "?" } else { "" }
+      let argExpr = ExprSyntax("\(unwrappedName)\(raw: questionMark).baseAddress")
+      args[index] = try castPointerToTargetType(unwrapIfNonnullable(argExpr))
+      return try base.buildFunctionCall(args)
     }
 
     args[index] = try castPointerToTargetType(getPointerArg())
@@ -1589,7 +1588,7 @@ func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> Funct
 
 func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, leadingTrivia: Trivia,
                                args arguments: [ExprSyntax], spanAvailability: String?,
-                               typeMappings: [String: String]?) throws -> DeclSyntax {
+                               typeMappings: [String: String]?, parentNode: Syntax?) throws -> DeclSyntax {
   let origFuncComponents = try deconstructFunction(declaration)
   let (funcComponents, rewriter) = renameParameterNamesIfNeeded(origFuncComponents)
 
@@ -1635,7 +1634,8 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   var eliminatedArgs = Set<Int>()
   let basicChecks = try builder.buildBasicBoundsChecks(&eliminatedArgs)
   let compoundChecks = try builder.buildCompoundBoundsChecks()
-  let checks = (basicChecks + compoundChecks).map { e in
+  let unwraps = try builder.buildSpanUnwraps()
+  let checks = (basicChecks + compoundChecks + unwraps).map { e in
     CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
   }
   let call: CodeBlockItemSyntax =
@@ -1691,11 +1691,21 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
         .with(\.leadingTrivia, trivia))
   }
   if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
+    var modifiers = funcComponents.modifiers
+    if parentNode?.as(ClassDeclSyntax.self) != nil { // convenience inits are forbidden in structs
+      let alreadyConvenienceInit = modifiers.contains(where: { mod in
+        mod.name.text == "convenience"
+      })
+      if !alreadyConvenienceInit {
+        modifiers.append(DeclModifierSyntax(name: TokenSyntax(stringLiteral: "convenience")))
+      }
+    }
     return DeclSyntax(
       origInitDecl
         .with(\.signature, newSignature)
         .with(\.body, body)
         .with(\.attributes, AttributeListSyntax(attributes))
+        .with(\.modifiers, modifiers)
         .with(\.leadingTrivia, trivia))
   }
   throw DiagnosticError(
@@ -1730,7 +1740,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         try constructOverloadFunction(
           forDecl: declaration, leadingTrivia: node.leadingTrivia, args: args,
           spanAvailability: spanAvailability,
-          typeMappings: typeMappings)]
+          typeMappings: typeMappings, parentNode: context.lexicalContext.first)]
     } catch let error as DiagnosticError {
       context.diagnose(
         Diagnostic(
@@ -1828,12 +1838,13 @@ public struct SwiftifyImportProtocolMacro: ExtensionMacro {
         let result = try constructOverloadFunction(
           forDecl: method, leadingTrivia: Trivia(), args: args,
           spanAvailability: spanAvailability,
-          typeMappings: typeMappings)
-        guard let newMethod = result.as(FunctionDeclSyntax.self)?
-          .with(\.modifiers, method.modifiers
-              + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))])) else {
+          typeMappings: typeMappings, parentNode: context.lexicalContext.first)
+        guard let resultFunc = result.as(FunctionDeclSyntax.self) else {
           throw RuntimeError("expected FunctionDeclSyntax but got \(result.kind) for \(method.description)")
         }
+        let newMethod = resultFunc
+          .with(\.modifiers, resultFunc.modifiers
+              + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))]))
         return MemberBlockItemSyntax(decl: newMethod)
       }
 

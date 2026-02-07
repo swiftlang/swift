@@ -64,9 +64,10 @@ public func impNullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPo
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func nonnullSpan(p: RawSpan) -> RawSpan {
     let size = CInt(exactly: p.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(unsafe p.withUnsafeBytes { _pPtr in
-      return unsafe nonnullSpan(p: OpaquePointer(_pPtr.baseAddress!), size: size)
-                }), byteCount: Int(size)), copying: ())
+    let _pPtr = unsafe p.withUnsafeBytes {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(unsafe nonnullSpan(p: OpaquePointer(_pPtr.baseAddress!), size: size)), byteCount: Int(size)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test12nullableSpan15_SwiftifyImportfMp_.swift
@@ -75,16 +76,11 @@ public func nonnullSpan(p: RawSpan) -> RawSpan {
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func nullableSpan(p: RawSpan?) -> RawSpan? {
     let size = CInt(exactly: p?.byteCount ?? 0)!
+    let _pPtr = unsafe p?.withUnsafeBytes {
+        unsafe $0
+    }
     return unsafe _swiftifyOverrideLifetime({ () in
-      let _resultValue = { () in
-              return if p == nil {
-                  unsafe nullableSpan(p: nil, size)
-                } else {
-                  unsafe p!.withUnsafeBytes { _pPtr in
-                    return unsafe nullableSpan(p: OpaquePointer(_pPtr.baseAddress), size)
-                  }
-                }
-          }()
+      let _resultValue = unsafe nullableSpan(p: OpaquePointer(_pPtr?.baseAddress), size)
       if unsafe _resultValue == nil {
         return nil
       } else {
@@ -99,9 +95,10 @@ public func nullableSpan(p: RawSpan?) -> RawSpan? {
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
 public func impNullableSpan(p: RawSpan) -> RawSpan {
     let size = CInt(exactly: p.byteCount)!
-    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(unsafe p.withUnsafeBytes { _pPtr in
-      return unsafe impNullableSpan(p: OpaquePointer(_pPtr.baseAddress!), size)
-                }), byteCount: Int(size)), copying: ())
+    let _pPtr = unsafe p.withUnsafeBytes {
+        unsafe $0
+    }
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(unsafe impNullableSpan(p: OpaquePointer(_pPtr.baseAddress!), size)), byteCount: Int(size)), copying: ())
 }
 ------------------------------
 
