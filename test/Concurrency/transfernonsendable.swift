@@ -2416,3 +2416,22 @@ struct IndirectAssignTests {
     }
   }
 }
+
+// rdar://169803154 - @MainActor async closure with for-try-await must not produce
+// spurious non-Sendable / unknown-pattern errors.  The constraint solver must honor
+// an explicit global actor on an async closure the same way it does for a sync one.
+@MainActor
+class rdar169803154_Klass {
+  init() {
+    Task.detached { @MainActor in
+      _ = self
+      for try await x in rdar169803154_Seq.seq { _ = x }
+    }
+  }
+}
+
+enum rdar169803154_Seq {
+  static var seq: some AsyncSequence<Float, Error> {
+    AsyncThrowingStream(Float.self) { $0.finish() }
+  }
+}
