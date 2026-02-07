@@ -38,6 +38,8 @@ public struct EnumeratedSequence<Base: Sequence> {
   }
 }
 
+extension EnumeratedSequence: BitwiseCopyable where Base: BitwiseCopyable {}
+
 extension EnumeratedSequence: Sendable where Base: Sendable {}
 
 extension EnumeratedSequence {
@@ -70,6 +72,9 @@ extension EnumeratedSequence {
     }
   }
 }
+
+extension EnumeratedSequence.Iterator: BitwiseCopyable
+where Base.Iterator: BitwiseCopyable {}
 
 extension EnumeratedSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
