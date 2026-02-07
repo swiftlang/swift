@@ -1535,7 +1535,7 @@ bool BindingSet::isViable(PotentialBinding &binding) {
     // subtype and other conversions.
     if (existing->Kind != AllowedBindingKind::Exact) {
       if (existingType->isKnownStdlibCollectionType() &&
-          hasConversions(existingType)) {
+          hasProperSubtypes(existingType)) {
         continue;
       }
     }
@@ -1578,7 +1578,7 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
         if (CS.shouldAttemptFixes())
           return false;
 
-        return !hasConversions(binding.BindingType);
+        return !hasProperSubtypes(binding.BindingType);
       })) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&
