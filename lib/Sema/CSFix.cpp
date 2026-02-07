@@ -366,6 +366,17 @@ bool MarkGlobalActorFunction::attempt(ConstraintSystem &cs,
   return cs.recordFix(fix);
 }
 
+AddSendableAttribute::AddSendableAttribute(ConstraintSystem &cs,
+                                           FunctionType *fromType,
+                                           FunctionType *toType,
+                                           ConstraintLocator *locator,
+                                           FixBehavior fixBehavior)
+    : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
+                         locator, fixBehavior) {
+  DEBUG_ASSERT(cs.simplifyType(fromType)->isSendableType() !=
+               cs.simplifyType(toType)->isSendableType());
+}
+
 bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
