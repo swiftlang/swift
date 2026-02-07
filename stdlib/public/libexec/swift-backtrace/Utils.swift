@@ -99,7 +99,7 @@ internal func recursiveRemoveContents(_ dir: String) throws {
   while let dp = readdir(dirp) {
     let name: String =
       withUnsafePointer(to: &dp.pointee.d_name) {
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
         let len = Int(dp.pointee.d_namlen)
 #else
         let len = Int(strlen($0))
