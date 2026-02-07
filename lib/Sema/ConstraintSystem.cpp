@@ -2592,6 +2592,11 @@ static bool diagnoseAmbiguity(
       auto *primaryFix = aggregateFix.front().second;
       if (primaryFix->diagnoseForAmbiguity(aggregateFix))
         return true;
+
+      if (fixKind == FixKind::AllowArgumentTypeMismatch) {
+        auto &primaryFix = aggregateFix.front();
+        return primaryFix.second->diagnose(*primaryFix.first);
+      }
     }
   }
 
