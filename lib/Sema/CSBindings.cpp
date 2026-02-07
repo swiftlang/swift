@@ -1721,15 +1721,8 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
           return constraint->getKind() == ConstraintKind::Disjunction ||
                  constraint->getKind() == ConstraintKind::ValueMember;
         })) {
-      if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
-          if (binding.Kind == AllowedBindingKind::Supertypes ||
-              binding.Kind == AllowedBindingKind::Fallback)
-            return false;
-
-          return !hasProperSubtypes(binding.BindingType);
-      })) {
+      if (getNumExactBindings() > 0)
         return true;
-      }
     }
   }
 

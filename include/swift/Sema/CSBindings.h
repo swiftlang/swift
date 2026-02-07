@@ -575,6 +575,12 @@ public:
     return numDefaultable - unviable;
   }
 
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
+  }
+
   ASTNode getAssociatedCodeCompletionToken() const {
     return Info.AssociatedCodeCompletionToken;
   }
