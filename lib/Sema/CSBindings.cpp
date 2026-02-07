@@ -1670,22 +1670,22 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   if (isHole())
     return false;
 
-  if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
-        if (binding.Kind == AllowedBindingKind::Supertypes)
-          return false;
-
-        if (CS.shouldAttemptFixes())
-          return false;
-
-        return !hasProperSubtypes(binding.BindingType);
-      })) {
+  if (!CS.shouldAttemptFixes()) {
     // Result type of subscript could be l-value so we can't bind it early.
     if (!TypeVar->getImpl().isSubscriptResultType() &&
         llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Disjunction ||
                  constraint->getKind() == ConstraintKind::ValueMember;
-        }))
-      return true;
+        })) {
+      if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
+          if (binding.Kind == AllowedBindingKind::Supertypes)
+            return false;
+
+          return !hasProperSubtypes(binding.BindingType);
+      })) {
+        return true;
+      }
+    }
   }
 
   if (isDelayed())
