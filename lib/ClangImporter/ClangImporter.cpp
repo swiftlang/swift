@@ -6730,6 +6730,15 @@ DeclContext *DeclContext::getImplementedObjCContext() const {
   return const_cast<DeclContext *>(this);
 }
 
+bool DeclContext::isInObjCImplementationContext() const {
+  auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(getAsDecl());
+  if (!AFD)
+    return false;
+
+  return (AFD->getCDeclKind() && AFD->getImplementedObjCDecl()) ||
+         AFD->isObjCMemberImplementation();
+}
+
 Decl *Decl::getObjCImplementationDecl() const {
   if (!hasClangNode())
     // This *is* the implementation, if it has one.

@@ -265,6 +265,25 @@ const {
     }
   }
 
+  // Allow references to hidden dependencies from `@c/objc @implementation`
+  // decl signatures.
+  if (getDeclContext()->isInObjCImplementationContext()) {
+    switch (originKind) {
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+    case DisallowedOriginKind::ImplementationOnly:
+      return DiagnosticBehavior::Ignore;
+    case DisallowedOriginKind::SPIOnly:
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::FragileCxxAPI:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+      break;
+    }
+  }
+
   // Exportability checking for non-library-evolution was introduced late,
   // downgrade errors to warnings by default.
   auto &ctx = DC->getASTContext();
