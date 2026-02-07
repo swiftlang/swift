@@ -90,6 +90,9 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->is<FunctionType>() || type->is<MetatypeType>())
     return ConversionBehavior::Structural;
 
+  if (type->isVoid())
+    return ConversionBehavior::None;
+
   return ConversionBehavior::Unknown;
 }
 
