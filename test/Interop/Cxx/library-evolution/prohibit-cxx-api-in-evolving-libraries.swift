@@ -49,6 +49,10 @@ void freeCxxFunction();
 
 using BuiltinIntTypealis = int;
 
+namespace NS {
+class CxxClassInNamespace {};
+}
+
 //--- test.swift
 
 import CxxModule
@@ -65,6 +69,10 @@ public func usesCxxSingletonReference() -> SingletonReference {
 
 // expected-error@+1 {{cannot use struct 'CxxStruct' here; C++ types from imported module 'CxxModule' do not support library evolution}}
 public func usesCxxStruct(_ x: CxxStruct) {
+}
+
+// expected-error@+1 {{cannot use struct 'CxxClassInNamespace' here; C++ types from imported module 'CxxModule' do not support library evolution}}
+public func usesCxxClassInNamespace(_ x: NS.CxxClassInNamespace) {
 }
 
 // expected-error@+1 {{cannot use enum 'CxxEnum' here; C++ types from imported module 'CxxModule' do not support library evolution}}
