@@ -529,19 +529,13 @@ FrontendStatsTracer::~FrontendStatsTracer()
     Reporter->saveAnyFrontendStatsEvents(*this, false);
 }
 
-static int64_t getCurrentTimeInMicroseconds() {
-  return std::chrono::duration_cast<std::chrono::microseconds>(
-             std::chrono::steady_clock::now().time_since_epoch())
-      .count();
-}
-
-static const int64_t processStartTimeMicroseconds = getCurrentTimeInMicroseconds();
-
 // Copy any interesting process-wide resource accounting stats to
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
-    UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
-  C.WallClockMicroseconds = getCurrentTimeInMicroseconds() - processStartTimeMicroseconds;
+    UnifiedStatsReporter::AlwaysOnFrontendCounters &C,
+    llvm::TimeRecord &StartTime,
+    llvm::TimeRecord &Now) {
+  C.WallClockMicroseconds = uint64_t(1000000.0 * (Now.getWallTime() - StartTime.getWallTime()));
 
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
@@ -610,7 +604,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
   auto Now = llvm::TimeRecord::getCurrentTime();
   auto &Curr = getFrontendCounters();
   auto &Last = *LastTracedFrontendCounters;
-  updateProcessWideFrontendCounters(Curr);
+  updateProcessWideFrontendCounters(Curr, StartedTime, Now);
   if (EventProfilers) {
     auto TimeDelta = Now;
     TimeDelta -= EventProfilers->LastUpdated;
@@ -688,8 +682,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
   }
 
+  auto Now = llvm::TimeRecord::getCurrentTime();
+
   if (FrontendCounters)
-    updateProcessWideFrontendCounters(getFrontendCounters());
+    updateProcessWideFrontendCounters(getFrontendCounters(), StartedTime, Now);
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
@@ -700,7 +696,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 
   // We currently do this by manual TimeRecord keeping because LLVM has decided
   // not to allow access to the Timers inside NamedRegionTimers.
-  auto ElapsedTime = llvm::TimeRecord::getCurrentTime();
+  auto ElapsedTime = Now;
   ElapsedTime -= StartedTime;
 
   if (DriverCounters) {
