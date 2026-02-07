@@ -1,3 +1,8 @@
+module AutoReturnType {
+  header "auto-return-type.h"
+  export *
+}
+
 module FunctionTemplates {
   header "function-templates.h"
   requires cplusplus
