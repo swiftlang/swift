@@ -1,5 +1,6 @@
 // Tests merging of modules each with their own local types
 
+// REQUIRES: legacy_swift_driver
 // RUN: %empty-directory(%t)
 
 // Create separate modules and merge them together
