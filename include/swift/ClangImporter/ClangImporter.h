@@ -768,6 +768,12 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// attributes that makes it import as a reference types.
 bool hasImportAsRefAttr(const clang::RecordDecl *decl);
 
+/// Determine whether the given Clang record declaration or any of its base
+/// classes has the import_reference attribute. This is a lightweight check
+/// that only examines attributes without triggering CxxRecordSemantics
+/// evaluation, making it safe to use during name importing.
+bool hasImportAsRefAttrInHierarchy(const clang::RecordDecl *decl);
+
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 

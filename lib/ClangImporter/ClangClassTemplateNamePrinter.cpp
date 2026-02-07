@@ -132,10 +132,14 @@ struct TemplateInstantiationNamePrinter
     // If this is a pointer to foreign reference type, we should not wrap
     // it in Unsafe(Mutable)?Pointer, since it will be imported as a class
     // in Swift.
+    // Note: We use hasImportAsRefAttrInHierarchy instead of
+    // recordHasReferenceSemantics here because this code runs during name
+    // importing, and CxxRecordSemantics should not be evaluated at that time
+    // (Clang sema has not yet defined implicit special members).
     bool isReferenceType = false;
     if (auto tagDecl = pointee->getAsTagDecl()) {
       if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
-        isReferenceType = recordHasReferenceSemantics(rd, importerImpl);
+        isReferenceType = hasImportAsRefAttrInHierarchy(rd);
     }
 
     llvm::SmallString<128> storage;
