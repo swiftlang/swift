@@ -1036,7 +1036,8 @@ void IterableDeclContext::addMemberPreservingSourceOrder(Decl *member) {
   SourceLoc start = member->getStartLoc();
   Decl *hint = nullptr;
 
-  for (auto *existingMember : getMembers()) {
+  addParsedMembers();
+  for (auto *existingMember : getCurrentMembersWithoutLoading()) {
     if (existingMember->isImplicit())
       continue;
 
