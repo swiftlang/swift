@@ -99,3 +99,17 @@ func outerFunction(_ a: any Actor) async {
 
   await middleFunction(a)
 }
+
+// Check async defer matches enclosing isolation
+actor AsyncDeferActor {
+  func foo() async {
+    // CHECK-LABEL: // $defer #1 () in AsyncDeferActor.foo()
+    // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation15AsyncDeferActorC3fooyyYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+    defer {
+      await test()
+    }
+
+    await test()
+  }
+}
