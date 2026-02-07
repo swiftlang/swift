@@ -274,7 +274,7 @@ public func nonescaping(_ p: inout MutableSpan<Int32>) {
 @__swiftmacro_So1BV24nonescapingLifetimebound15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy self) @_disfavoredOverload
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(&self) @_disfavoredOverload
 public mutating func nonescapingLifetimebound(_ len: Int32) -> MutableSpan<Int32> {
     return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: unsafe nonescapingLifetimebound(len), count: Int(len)), copying: ())
 }

@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -521,6 +522,15 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
       return false;
 
+    auto isNonEscapable = [&Self](clang::QualType ty) {
+      // We only care whether it's _known_ ~Escapable, because it affects
+      // lifetime info requirements.
+      return evaluateOrDefault(Self.SwiftContext.evaluator,
+                               ClangTypeEscapability({ty.getTypePtr(), &Self}),
+                               CxxEscapability::Escapable) ==
+             CxxEscapability::NonEscapable;
+    };
+
     bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
     auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
@@ -618,7 +628,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           // If this parameter has bounds info we will tranform it into a Span,
           // so then it will no longer be Escapable.
           bool willBeEscapable =
-              swiftParamTy->isEscapable() &&
+              !isNonEscapable(clangParamTy) &&
               (!paramHasBoundsInfo ||
                mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
           printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
