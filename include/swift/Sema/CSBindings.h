@@ -57,7 +57,10 @@ enum class AllowedBindingKind : uint8_t {
   /// Supertypes of the specified type.
   Supertypes,
   /// Subtypes of the specified type.
-  Subtypes
+  Subtypes,
+  /// Special hack for `extension P where Self == S { ... }` members
+  /// and keypaths.
+  Fallback,
 };
 
 /// The kind of literal binding found.
@@ -93,7 +96,8 @@ struct PotentialBinding {
                    PointerUnion<Constraint *, ConstraintLocator *> source,
                    TypeVariableType *originator)
       : BindingType(type), Kind(kind), BindingSource(source),
-        Originator(originator) {}
+        Originator(originator) {
+  }
 
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
@@ -131,14 +135,17 @@ struct PotentialBinding {
   Constraint *getSource() const { return cast<Constraint *>(BindingSource); }
 
   PotentialBinding withType(Type type) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     return {type, Kind, BindingSource, Originator};
   }
 
   PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+    ASSERT(kind != AllowedBindingKind::Fallback);
     return {type, kind, BindingSource, Originator};
   }
 
   PotentialBinding asTransitiveFrom(TypeVariableType *originator) const {
+    ASSERT(Kind != AllowedBindingKind::Fallback);
     ASSERT(originator);
     return {BindingType, Kind, BindingSource, originator};
   }

@@ -114,7 +114,7 @@ namespace {
 
 struct PrintableBinding {
 private:
-  enum class BindingKind { Exact, Subtypes, Supertypes, Literal };
+  enum class BindingKind { Exact, Subtypes, Supertypes, Fallback, Literal };
   BindingKind Kind;
   Type BindingType;
   bool Viable;
@@ -134,6 +134,10 @@ public:
     return PrintableBinding{BindingKind::Exact, binding, true};
   }
 
+  static PrintableBinding fallback(Type binding) {
+    return PrintableBinding{BindingKind::Fallback, binding, true};
+  }
+
   static PrintableBinding literalDefaultType(Type binding, bool viable) {
     return PrintableBinding{BindingKind::Literal, binding, viable};
   }
@@ -148,6 +152,9 @@ public:
       break;
     case BindingKind::Supertypes:
       out << "(supertypes of) ";
+      break;
+    case BindingKind::Fallback:
+      out << "(fallback to) ";
       break;
     case BindingKind::Literal:
       out << "(default type of literal) ";
@@ -173,6 +180,9 @@ void PotentialBinding::print(llvm::raw_ostream &out,
     break;
   case AllowedBindingKind::Subtypes:
     PrintableBinding::subtypesOf(BindingType).print(out, PO);
+    break;
+  case AllowedBindingKind::Fallback:
+    PrintableBinding::fallback(BindingType).print(out, PO);
     break;
   }
 }
@@ -735,7 +745,7 @@ void BindingSet::inferTransitiveUnresolvedMemberRefBindings() {
               }
             }
 
-            addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+            addBinding({protocolTy, AllowedBindingKind::Fallback, constraint});
           }
         }
       }
@@ -850,7 +860,7 @@ bool BindingSet::finalizeKeyPathBindings() {
           // better diagnostics.
           auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
                                           CS.getKeyPathValueType(keyPath));
-          updatedBindings.insert({keyPathTy, AllowedBindingKind::Exact, locator,
+          updatedBindings.insert({keyPathTy, AllowedBindingKind::Fallback, locator,
                                   /*originator=*/nullptr});
         } else if (CS.shouldAttemptFixes()) {
           auto fixedRootTy = CS.getFixedType(rootTy);
@@ -868,7 +878,7 @@ bool BindingSet::finalizeKeyPathBindings() {
             assert(fallback != Defaults.end());
             updatedBindings.insert(
                 {(*fallback)->getSecondType(),
-                 AllowedBindingKind::Exact,
+                 AllowedBindingKind::Fallback,
                  *fallback});
           } else {
             updatedBindings.insert(PotentialBinding::forHole(
@@ -1463,6 +1473,9 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
                                 ConstraintSystem &CS) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
+  case AllowedBindingKind::Fallback:
+    return std::make_pair(false, Type());
+
   case AllowedBindingKind::Exact:
     type = binding.BindingType;
     break;
@@ -1586,7 +1599,8 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
                  constraint->getKind() == ConstraintKind::ValueMember;
         })) {
       if (llvm::any_of(Bindings, [&](const PotentialBinding &binding) {
-          if (binding.Kind == AllowedBindingKind::Supertypes)
+          if (binding.Kind == AllowedBindingKind::Supertypes ||
+              binding.Kind == AllowedBindingKind::Fallback)
             return false;
 
           return !hasConversions(binding.BindingType);
@@ -2558,7 +2572,8 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   for (const auto &binding : Bindings) {
     switch (binding.Kind) {
     case AllowedBindingKind::Exact:
-      potentialBindings.push_back(PrintableBinding::exact(binding.BindingType));
+      potentialBindings.push_back(
+          PrintableBinding::exact(binding.BindingType));
       break;
     case AllowedBindingKind::Supertypes:
       potentialBindings.push_back(
@@ -2567,6 +2582,10 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     case AllowedBindingKind::Subtypes:
       potentialBindings.push_back(
           PrintableBinding::subtypesOf(binding.BindingType));
+      break;
+    case AllowedBindingKind::Fallback:
+      potentialBindings.push_back(
+          PrintableBinding::fallback(binding.BindingType));
       break;
     }
   }
