@@ -6435,6 +6435,14 @@ static bool checkFunctionSignature(
   if (!candidateGenSig.requirementsNotSatisfiedBy(requiredGenSig).empty())
     return false;
 
+  // Check that both functions throws same error type (if any)
+  if (required->isThrowing() != candidateFnTy->isThrowing())
+    return false;
+  if (required->hasThrownError() != candidateFnTy->hasThrownError() ||
+      (required->hasThrownError() &&
+       !required->getThrownError()->isEqual(candidateFnTy->getThrownError())))
+    return false;
+
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
     return false;
