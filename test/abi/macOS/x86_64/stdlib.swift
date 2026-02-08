@@ -1180,3 +1180,6 @@ Added: __swift_exclusivityAccessSetNext
 Added: _swift_dereferenceBorrow
 Added: _swift_getBorrowTypeMetadata
 Added: _swift_initBorrow
+
+// SE-NNNN: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSSgvpZMV
