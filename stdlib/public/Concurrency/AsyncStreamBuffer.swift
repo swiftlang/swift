@@ -607,10 +607,24 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
   }
 }
 
-@inline(never)
-@_silgen_name("asyncstream_on_multiple_awaiters_detected")
-func onMultipleAwaitersDetected() {
-  unsafe logFailedCheck("SWIFT ASYNCSTREAM: used by multiple awaiters!")
+public func _onMultipleAwaitersDetectedHook(
+  _ newValue: ((() -> ()) -> ())?
+) {
+  onMultipleAwaitersDetectedHook = newValue
 }
+
+@inline(never)
+fileprivate func onMultipleAwaitersDetected() {
+  let original = {
+    unsafe logFailedCheck("SWIFT ASYNCSTREAM: used by multiple awaiters!")
+  }
+  if let onMultipleAwaitersDetectedHook {
+    onMultipleAwaitersDetectedHook(original)
+  } else {
+    original()
+  }
+}
+
+var onMultipleAwaitersDetectedHook: ((() -> ()) -> ())?
 
 #endif
