@@ -888,6 +888,8 @@ ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
       "expected expression after '=' in 'case'", ())
 ERROR(nonliteral_enum_case_raw_value,PointsToFirstBadToken,
       "raw value for enum case must be a literal", ())
+ERROR(nonliteral_int_expr_enum_case_raw_value,PointsToFirstBadToken,
+      "raw value for enum case must be an integer literal expression", ())
 
 // Collection Types
 ERROR(new_array_syntax,none,

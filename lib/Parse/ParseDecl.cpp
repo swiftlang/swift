@@ -9560,7 +9560,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
-static bool isValidEnumRawValueLiteral(LiteralExpr *expr) {
+static bool isValidEnumRawValueLiteral(Expr *expr) {
   if (expr == nullptr)
     return false;
 
@@ -9673,7 +9673,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
-    LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
       EqualsLoc = consumeToken();
       {
@@ -9689,12 +9688,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      // The raw value must be syntactically a simple literal.
-      LiteralRawValueExpr = dyn_cast<LiteralExpr>(RawValueExpr.getPtrOrNull());
-      if (!isValidEnumRawValueLiteral(LiteralRawValueExpr)) {
-        diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
-                 diag::nonliteral_enum_case_raw_value);
-        LiteralRawValueExpr = nullptr;
+
+      if (!Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+        if (!isValidEnumRawValueLiteral(RawValueExpr.getPtrOrNull())) {
+          diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
+                   diag::nonliteral_enum_case_raw_value);
+          RawValueExpr = nullptr;
+        }
       }
     }
     
@@ -9720,7 +9720,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     auto *result = new (Context) EnumElementDecl(NameLoc, FullName,
                                                  ArgParams.getPtrOrNull(),
                                                  EqualsLoc,
-                                                 LiteralRawValueExpr,
+                                                 RawValueExpr.getPtrOrNull(),
                                                  CurDeclContext);
 
     if (NameLoc == CaseLoc) {

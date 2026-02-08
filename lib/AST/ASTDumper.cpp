@@ -2748,6 +2748,29 @@ namespace {
       if (auto *paramList = EED->getParameterList()) {
         printRec(paramList, Label::optional("params"));
       }
+
+      // Use `getRawValueUnchecked()` for non-type-checked printing to avoid
+      // triggering EnumRawValuesRequest which requres type-checking.
+      if (isTypeChecked()) {
+        if (auto *rawValueExpr = EED->getRawValueExpr()) {
+          if (EED->getASTContext().LangOpts.hasFeature(
+                  Feature::LiteralExpressions)) {
+            auto origRawValueExpr = EED->getOriginalRawValueExpr();
+            if (isa<LiteralExpr>(origRawValueExpr))
+              printRec(origRawValueExpr, Label::always("raw_value_expr"));
+            else {
+              printRec(EED->getOriginalRawValueExpr(),
+                       Label::always("original_raw_value_expr"));
+              printRec(EED->getRawValueExpr(),
+                       Label::always("folded_raw_value_expr"));
+            }
+          } else {
+            printRec(rawValueExpr, Label::always("raw_value_expr"));
+          }
+        }
+      } else if (auto *rawValueExpr = EED->getRawValueUnchecked())
+        printRec(rawValueExpr, Label::always("raw_value_expr"));
+
       printAttributes(EED);
       printFoot();
     }
@@ -2793,9 +2816,12 @@ namespace {
                     printRec(PBD->getOriginalInit(idx),
                              Label::always("original_init"));
                   }
-                  if (PBD->getInit(idx)) {
+                  if (auto initExpr = PBD->getInit(idx)) {
                     printRec(PBD->getInit(idx),
                              Label::always("processed_init"));
+                    if (PBD->hasSingleVarConstantFoldedInit())
+                      printRec(PBD->getExecutableInit(idx),
+                               Label::always("processed_constant_folded_init"));
                   }
 
                   printFoot();

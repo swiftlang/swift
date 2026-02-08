@@ -3683,7 +3683,7 @@ public:
     }
 
     // Force the raw value expr then yell if our parent doesn't have a raw type.
-    Expr *RVE = EED->getRawValueExpr();
+    Expr *RVE = EED->getOriginalRawValueExpr();
     if (RVE && !ED->hasRawType()) {
       DE.diagnose(RVE->getLoc(), diag::enum_raw_value_without_raw_type);
       EED->setInvalid();

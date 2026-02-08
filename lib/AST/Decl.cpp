@@ -2785,6 +2785,20 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
+bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto *singleVar = getSingleVar();
+  return singleVar && singleVar->isConstValue() &&
+         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+}
+
+Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
+  auto idxInit = getPatternList()[i].getExecutableInit();
+  if (auto &ctx = getASTContext(); idxInit && hasSingleVarConstantFoldedInit())
+    return evaluateOrDefault(ctx.evaluator,
+                             ConstantFoldExpression{idxInit, &ctx}, {});
+  return idxInit;
+}
+
 bool VarDecl::isInitExposedToClients() const {
   // 'lazy' initializers are emitted inside the getter, which is never
   // @inlinable.
@@ -11803,7 +11817,7 @@ SourceRange FuncDecl::getSourceRange() const {
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                                  ParameterList *Params,
                                  SourceLoc EqualsLoc,
-                                 LiteralExpr *RawValueExpr,
+                                 Expr *RawValueExpr,
                                  DeclContext *DC)
   : DeclContext(DeclContextKind::EnumElementDecl, DC),
     ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
@@ -11867,28 +11881,37 @@ EnumCaseDecl *EnumElementDecl::getParentCase() const {
 
   llvm_unreachable("enum element not in case of parent enum");
 }
-      
+
+Expr *EnumElementDecl::getOriginalRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum()},
+      {});
+  return RawValueExpr;
+}
+
 LiteralExpr *EnumElementDecl::getRawValueExpr() const {
   // The return value of this request is irrelevant - it exists as
   // a cache-warmer.
-  (void)evaluateOrDefault(
-      getASTContext().evaluator,
-      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
-      {});
-  return RawValueExpr;
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          EnumRawValuesRequest{getParentEnum()}, {});
+  // This request will have been evaluated during the above
+  // 'EnumRawValuesRequest' so this is meant to return the
+  // cached result, if the above request was successful.
+  if (RawValueExpr)
+    if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+      return dyn_cast<LiteralExpr>(evaluateOrDefault(
+            getASTContext().evaluator,
+            ConstantFoldExpression{RawValueExpr, &getASTContext()}, {}));
+    else
+      return dyn_cast<LiteralExpr>(RawValueExpr);
+  else
+    return nullptr;
 }
 
-LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
-  // The return value of this request is irrelevant - it exists as
-  // a cache-warmer.
-  (void)evaluateOrDefault(
-      getASTContext().evaluator,
-      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
-      {});
-  return RawValueExpr;
-}
-
-void EnumElementDecl::setRawValueExpr(LiteralExpr *e) {
+void EnumElementDecl::setRawValueExpr(Expr *e) {
   assert((!RawValueExpr || e == RawValueExpr || e->getType()) &&
          "Illegal mutation of raw value expr");
   RawValueExpr = e;

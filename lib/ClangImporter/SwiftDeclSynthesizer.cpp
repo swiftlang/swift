@@ -1398,12 +1398,12 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
     SmallVector<CaseLabelItem, 8> validCaseLabels;
     for (auto *elt : enumDecl->getAllElements()) {
       // Get the raw value literal for this element
-      auto rawValueExpr = elt->getStructuralRawValueExpr();
+      auto rawValueExpr = elt->getRawValueExpr();
       if (!rawValueExpr)
         continue;
 
       // Clone the raw value expression for pattern matching
-      auto *litExpr = cloneRawLiteralExpr(ctx, cast<LiteralExpr>(rawValueExpr));
+      auto *litExpr = cloneRawLiteralExpr(ctx, rawValueExpr);
       auto *litPat = ExprPattern::createImplicit(ctx, litExpr, ctorDecl);
 
       // Add to the list of valid case labels
