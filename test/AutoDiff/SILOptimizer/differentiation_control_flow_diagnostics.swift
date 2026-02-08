@@ -107,6 +107,18 @@ func testNilCoalescingActive(_ maybeX: Float?, y: Float) -> Float {
   return maybeX ?? y
 }
 
+func nilCoalescingNonThrowing(_ x: Float?, _ y: @autoclosure () -> Float) -> Float {
+  if x == nil {
+    return y()
+  }
+  return x!
+}
+
+@differentiable(reverse)
+func testNilCoalescingNonThrowingActive(_ maybeX: Float?, y: Float) -> Float {
+  return nilCoalescingNonThrowing(maybeX, y)
+}
+
 // Test unsupported differentiation of active enum values.
 
 // expected-error @+1 {{function is not differentiable}}

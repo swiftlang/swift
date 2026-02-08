@@ -2001,6 +2001,35 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   return !noUsers;
 }
 
+bool PartialApplyInst::isSupportedAsDifferentiableClosure() const {
+  // Right now, we only support closures capturing exactly one argument with the
+  // type equal to the result type. No other arguments except the captured one
+  // are supported.
+  // TODO: support arbitrary captured and non-captured arguments types.
+
+  auto origCalleeType = getOrigCalleeType();
+  auto closureType = getType().getAs<SILFunctionType>();
+
+  if (!closureType->isSupportedAsDifferentiableClosure())
+    return false;
+  if (origCalleeType->getNumParameters() != 1)
+    return false;
+  if (!origCalleeType->getIndirectMutatingParameters().empty())
+    return false;
+  if (origCalleeType->getParameters()[0].getInterfaceType() !=
+      closureType->getSingleResult().getInterfaceType())
+    return false;
+  // TODO: support non-empty substitution map
+  if (getSubstitutionMap())
+    return false;
+
+  assert(getArgumentOperands().size() == 1);
+  assert(getArguments()[0]->getType().getASTType() ==
+         closureType->getSingleResult().getInterfaceType());
+
+  return true;
+}
+
 namespace swift::test {
 FunctionTest PartialApplyPrintOnStackLifetimeEnds(
     "partial_apply_print_on_stack_lifetime_ends",
