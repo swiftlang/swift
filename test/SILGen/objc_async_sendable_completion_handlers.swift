@@ -28,10 +28,10 @@ func test(v: Test.Type) async {
 // CHECK: [[TEST_TYPE:%.*]] = thick_to_objc_metatype %0 to $@objc_metatype Test.Type
 // CHECK: [[METHOD:%.*]] = objc_method %5, #Test.compute!foreign : (Test.Type) -> () async -> (), $@convention(objc_method) (Optional<@convention(block) @Sendable () -> ()>, @objc_metatype Test.Type) -> ()
 // CHECK: [[BLOCK:%.*]] = alloc_stack $@block_storage Any
-// CHECK: [[COMPLETION_HANDLER:%.*]] = function_ref @$sIeyBh_ytTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
+// CHECK: [[COMPLETION_HANDLER:%.*]] = function_ref @$sIeyBh_ytTZ_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
 // CHECK: [[HEADER:%.*]] = init_block_storage_header [[BLOCK]], invoke [[COMPLETION_HANDLER]]
 // CHECK: [[OPTIONAL_HEADER:%.*]] = enum $Optional<@convention(block) @Sendable () -> ()>, #Optional.some!enumelt, [[HEADER]]
 // CHECK: {{.*}} = apply [[METHOD]]([[OPTIONAL_HEADER]], [[TEST_TYPE]])
 // CHECK: } // end sil function '$s4main4test1vySo4TestCm_tYaF'
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @$sIeyBh_ytTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
+// CHECK-LABEL: sil shared [transparent] [thunk] @$sIeyBh_ytTZ_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()

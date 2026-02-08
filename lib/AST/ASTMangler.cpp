@@ -606,16 +606,16 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
     CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
-    std::optional<bool> ErrorOnZero, bool predefined) {
+    std::optional<bool> ErrorOnZero, bool checked) {
   beginMangling();
   appendType(BlockType, Sig);
   appendType(ResultType, Sig);
   if (Sig)
     appendGenericSignature(Sig);
   if (ErrorOnZero)
-    appendOperator(predefined ? "TZ" : "Tz", Index(*ErrorOnZero + 1));
+    appendOperator(checked ? "TZ" : "Tz", Index(*ErrorOnZero + 1));
   else
-    appendOperator(predefined ? "TZ" : "Tz", Index(0));
+    appendOperator(checked ? "TZ" : "Tz", Index(0));
   return finalize();
 }
 
