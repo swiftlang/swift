@@ -11,6 +11,31 @@
 
 import _Concurrency
 
+@usableFromInline
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("swift_task_addCancellationHandler")
+func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 5.1, *)
+@_silgen_name("swift_task_removeCancellationHandler")
+func _taskRemoveCancellationHandler(
+  record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+)
+
+func withIsolatedTaskCancellationHandler<T: Sendable>(
+  operation: @isolated(any) () async throws -> T,
+  onCancel handler: @Sendable () -> Void,
+  isolation: isolated (any Actor)? = #isolation
+) async rethrows -> T {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+  let record = _taskAddCancellationHandler(handler: handler)
+  defer { _taskRemoveCancellationHandler(record: record) }
+
+  return try await operation()
+}
+
 /// An asychronous sequence generated from a closure that tracks the transactional changes of `@Observable` types.
 ///
 /// `Observations` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
@@ -177,18 +202,44 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
       // this ferries in an intermediate form with Result to skip over `withObservationTracking` not handling errors being thrown
       // particularly this case is that the error is also an iteration state transition data point (it terminates the sequence)
       // so we need to hold that to get a chance to catch and clean-up
-      let result = withObservationTracking {
-        switch emit {
-        case .element(let element):
-          Result(catching: element).map { Iteration.next($0) }
-        case .iteration(let iteration):
-          Result(catching: iteration)
+      if #available(SwiftStdlib 6.4, *) {
+        return try withObservationTracking(options: [.willSet, .deinit]) { () throws(Failure) -> Observations<Element, Failure>.Iteration in
+          switch emit {
+          case .element(let element):
+            let extracted: () throws(Failure) -> Element = element
+            return try Iteration.next(extracted())
+          case .iteration(let iteration):
+            let extracted: () throws(Failure) -> Iteration = iteration
+            return try extracted()
+          }
+        } onChange: { [state] (event) in
+          // resume all cases where the awaiting continuations are awaiting a willSet
+          State.emitWillChange(state)
         }
-      } onChange: { [state] in
-        // resume all cases where the awaiting continuations are awaiting a willSet
-        State.emitWillChange(state)
+      } else {
+        // fallback to the previous version
+        let result = withObservationTracking { () -> Result<Observations<Element, Failure>.Iteration, Failure> in
+          do {
+            switch emit {
+            case .element(let element):
+              let extracted: () throws(Failure) -> Element = element
+              return .success(try Iteration.next(extracted()))
+            case .iteration(let iteration):
+              let extracted: () throws(Failure) -> Iteration = iteration
+              return .success(try extracted())
+            }
+          } catch {
+            return .failure(error as! Failure)
+          }
+        } onChange: { [state] in
+          // resume all cases where the awaiting continuations are awaiting a willSet
+          State.emitWillChange(state)
+        }
+        switch result {
+        case .success(let value): return value
+        case .failure(let failure): throw failure
+        }
       }
-      return try result.get()
     }
     
     fileprivate mutating func terminate(throwing failure: Failure? = nil, id: Int) throws(Failure) -> Element? {

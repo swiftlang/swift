@@ -97,6 +97,7 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_library(swiftObservation
+  Sources/Observation/ContinuousObservation.swift
   Sources/Observation/Locking.swift
   Sources/Observation/Observable.swift
   Sources/Observation/ObservationRegistrar.swift
