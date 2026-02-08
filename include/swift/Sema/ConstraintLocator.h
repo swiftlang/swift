@@ -55,6 +55,8 @@ enum ContextualTypePurpose : uint8_t {
   CTP_ThrowStmt,         ///< Value specified to a 'throw' statement.
   CTP_DiscardStmt,       ///< Value specified to a 'discard' statement.
   CTP_EnumCaseRawValue,  ///< Raw value specified for "case X = 42" in enum.
+  CTP_IntGenericParam,   ///< Raw value specified for an integer generic
+                         ///< parameter '<3, Int>'
   CTP_DefaultParameter,  ///< Default value in parameter 'foo(a : Int = 42)'.
 
   /// Default value in @autoclosure parameter

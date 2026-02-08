@@ -410,10 +410,6 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
-static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
 }
@@ -422,6 +418,8 @@ static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(CompileTimeValuesPreview)
+UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
 UNINTERESTING_FEATURE(SafeInteropWrappers)

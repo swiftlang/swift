@@ -2793,9 +2793,12 @@ namespace {
                     printRec(PBD->getOriginalInit(idx),
                              Label::always("original_init"));
                   }
-                  if (PBD->getInit(idx)) {
+                  if (auto initExpr = PBD->getInit(idx)) {
                     printRec(PBD->getInit(idx),
                              Label::always("processed_init"));
+                    if (PBD->hasSingleVarConstantFoldedInit())
+                      printRec(PBD->getExecutableInit(idx),
+                               Label::always("processed_constant_folded_init"));
                   }
 
                   printFoot();
@@ -4967,12 +4970,7 @@ public:
 
   void visitIntegerTypeRepr(IntegerTypeRepr *T, Label label) {
     printCommon("type_integer", label);
-
-    if (T->getMinusLoc()) {
-      printCommon("is_negative", label);
-    }
-
-    printFieldQuoted(T->getValue(), Label::always("value"), IdentifierColor);
+    printRec(T->getValue(), Label::optional("value_expr"));
     printFoot();
   }
 };

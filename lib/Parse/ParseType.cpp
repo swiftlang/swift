@@ -1538,22 +1538,30 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue() {
 
 ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
                                                 ParseTypeReason reason) {
-  // Eat any '-' preceding integer literals.
-  SourceLoc minusLoc;
-  if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
-    minusLoc = consumeToken();
-  }
+  auto startsWithType = [&]() {
+    BacktrackingScope backtrack(*this);
+    return canParseType();
+  };
+  if (startsWithType())
+    return parseType(MessageID, reason);
+  else {
+    auto genericValueExpr = parseExprBasic(diag::expected_integer_generic_value);
+    if (genericValueExpr.isNull()) {
+      diagnose(Tok, MessageID);
+      return makeParserError();
+    }
 
-  // Attempt to parse values first. Right now the only value that can be parsed
-  // as a type are integers.
-  if (Tok.is(tok::integer_literal)) {
-    auto text = copyAndStripUnderscores(Tok.getText());
-    auto loc = consumeToken(tok::integer_literal);
-    return makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
+      return makeParserResult(new (Context) IntegerTypeRepr(genericValueExpr.get()));
+    } else {
+      if (auto intValueExpr = dyn_cast<IntegerLiteralExpr>(genericValueExpr.get()))
+        return makeParserResult(new (Context) IntegerTypeRepr(intValueExpr));
+      else {
+        diagnose(Tok, diag::expected_integer_generic_value);
+        return makeParserError();
+      }
+    }
   }
-
-  // Otherwise, attempt to parse a regular type.
-  return parseType(MessageID, reason);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1622,8 +1630,26 @@ bool Parser::canParseGenericArguments() {
     return true;
   }
 
+  auto startsWithType = [&]() {
+    BacktrackingScope backtrack(*this);
+    return canParseType();
+  };
+  // ACTODO: This is not ideal...
+  auto canParseExpr = [&]() {
+    CancellableBacktrackingScope backtrack(*this);
+    auto genericValueExpr = parseExprBasic(diag::expected_integer_generic_value);
+    if (genericValueExpr.isNull())
+      return false;
+    else {
+      backtrack.cancelBacktrack();
+      return true;
+    }
+  };
+
   do {
-    if (!canParseType())
+    if (startsWithType())
+      parseType(); // Proceed to the next element
+    else if (!canParseExpr())
       return false;
     // Parse the comma, if the list continues.
     // This could be the trailing comma.
@@ -1647,7 +1673,7 @@ bool Parser::canParseTypeSimple() {
       return false;
     break;
   case tok::oper_prefix:
-    if (!Tok.isTilde() && !Tok.isMinus()) {
+    if (!Tok.isTilde()) {
       return false;
     }
 
@@ -1657,16 +1683,6 @@ bool Parser::canParseTypeSimple() {
 
       if (!canParseTypeIdentifier())
         return false;
-    }
-
-    // '-' can only appear before integers being used as types like '-123'.
-    if (Tok.isMinus()) {
-      consumeToken();
-
-      if (!Tok.is(tok::integer_literal))
-        return false;
-
-      consumeToken();
     }
 
     break;
@@ -1689,9 +1705,6 @@ bool Parser::canParseTypeSimple() {
       return false;
     break;
   case tok::kw__:
-    consumeToken();
-    break;
-  case tok::integer_literal:
     consumeToken();
     break;
 

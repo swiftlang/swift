@@ -16624,6 +16624,7 @@ void ConstraintSystem::addContextualConversionConstraint(
   case CTP_CaseStmt:
   case CTP_ThrowStmt:
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
   case CTP_ClosureResult:

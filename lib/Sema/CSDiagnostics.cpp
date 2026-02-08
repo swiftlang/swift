@@ -869,6 +869,7 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_Unused:
   case CTP_YieldByReference:
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
     break;
@@ -2955,6 +2956,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return std::nullopt;
 
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
     return diag::cannot_convert_raw_initializer_value_nil;
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
@@ -3719,6 +3721,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                        : diag::cannot_convert_to_return_type;
   }
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
     return diag::cannot_convert_raw_initializer_value;
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:

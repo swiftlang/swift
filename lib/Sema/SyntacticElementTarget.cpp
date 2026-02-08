@@ -261,6 +261,7 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
   case CTP_ThrowStmt:
   case CTP_DiscardStmt:
   case CTP_EnumCaseRawValue:
+  case CTP_IntGenericParam:
   case CTP_DefaultParameter:
   case CTP_AutoclosureDefaultParameter:
   case CTP_CallArgument:

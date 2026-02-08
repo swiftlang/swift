@@ -1652,26 +1652,17 @@ private:
 
 /// A TypeRepr for an integer appearing in a type position.
 class IntegerTypeRepr final : public TypeRepr {
-  StringRef Value;
-  SourceLoc Loc;
-  SourceLoc MinusLoc;
+  Expr *ValueExpr;
 
 public:
-  IntegerTypeRepr(StringRef value, SourceLoc loc, SourceLoc minusLoc)
-    : TypeRepr(TypeReprKind::Integer), Value(value), Loc(loc),
-      MinusLoc(minusLoc) {}
+  IntegerTypeRepr(Expr *valueExpr)
+    : TypeRepr(TypeReprKind::Integer), ValueExpr(valueExpr) {}
 
-  StringRef getValue() const {
-    return Value;
+  Expr* getValue() const {
+    return ValueExpr;
   }
 
-  SourceLoc getLoc() const {
-    return Loc;
-  }
-
-  SourceLoc getMinusLoc() const {
-    return MinusLoc;
-  }
+  SourceLoc getLoc() const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Integer;
@@ -1679,14 +1670,11 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const {
-    if (MinusLoc)
-      return MinusLoc;
-
-    return Loc;
+    return getLoc();
   }
 
-  SourceLoc getEndLocImpl() const { return Loc; }
-  SourceLoc getLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return getLoc(); }
+  SourceLoc getLocImpl() const { return getLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
                  NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;

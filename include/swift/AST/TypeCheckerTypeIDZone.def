@@ -674,3 +674,7 @@ SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
 SWIFT_REQUEST(TypeChecker, DesugarForEachStmtRequest,
               BraceStmt *(ForEachStmt *),
               SeparatelyCached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ConstantFoldExpression,
+              Expr *(const Expr *, ASTContext *),
+              Cached, NoLocationInfo)
