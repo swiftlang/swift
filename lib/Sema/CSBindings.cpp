@@ -1716,7 +1716,8 @@ bool BindingSet::isDelayedByDisjunction() const {
 
   return llvm::any_of(Info.DelayedBy, [](const Constraint *constraint) {
     return constraint->getKind() == ConstraintKind::Disjunction ||
-           constraint->getKind() == ConstraintKind::ValueMember;
+           constraint->getKind() == ConstraintKind::ValueMember ||
+           constraint->getKind() == ConstraintKind::UnresolvedValueMember;
   });
 }
 
