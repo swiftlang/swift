@@ -1523,7 +1523,14 @@ void ConstraintSystem::openGenericRequirement(
         signature->prohibitsIsolatedConformance(req.getFirstType()).has_value();
   }
 
-  addConstraint(req.tranformSubjectTypes(substFn),
+  // Open the requirement's subject type, replacing ErrorTypes with holes if
+  // needed in case of substitution failure.
+  auto openedReq = req.tranformSubjectTypes([&](Type ty) {
+    return replaceInferableTypesWithTypeVars(substFn(ty), locator,
+                                             preparedOverload);
+  });
+
+  addConstraint(openedReq,
                 locator.withPathElement(
                     LocatorPathElt::TypeParameterRequirement(index, kind)),
                 /*isFavored=*/false, prohibitIsolatedConformance,

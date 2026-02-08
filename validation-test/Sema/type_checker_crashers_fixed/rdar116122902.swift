@@ -12,8 +12,7 @@ struct Test {
   var tuple: (value: any AnyValue, id: Int)?
 
   mutating func test<T>(v: Value<T>) {
-    // FIXME(diagnostics): This isn't a useful error message
-    _ = { // expected-error {{unable to infer closure type without a type annotation}}
+    _ = {
       self.tuple = (v, 42)
       return 0
     }

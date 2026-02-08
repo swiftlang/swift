@@ -9025,7 +9025,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           loc,
           LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
 
-      for (const auto &req : conformance.getConditionalRequirements()) {
+      for (auto req : conformance.getConditionalRequirements()) {
+        // Replace any ErrorTypes with holes if needed in case of substitution
+        // failure.
+        req = req.tranformSubjectTypes([&](Type ty) {
+          return replaceInferableTypesWithTypeVars(ty, loc);
+        });
         addConstraint(
             req, getConstraintLocator(conformanceLoc,
                                       LocatorPathElt::ConditionalRequirement(
