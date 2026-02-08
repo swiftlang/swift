@@ -351,7 +351,7 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
   // These are currently not peepholed.
   _ = [i].self as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
   _ = (try [i]) as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
-  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}{{8-12=}}
 
   // These are wrong, but make sure we don't warn about the value cast always succeeding.
   _  = [i: i] as! [String: Any]

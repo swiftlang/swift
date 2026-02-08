@@ -392,3 +392,9 @@ func superDuperUnsafe(_ bytes: UnsafeRawBufferPointer) {
   _ = byte
   _ = unsafe bytes.first ?? 0
 }
+
+// Test fix-it for redundant unsafe on switch expression
+func testRedundantUnsafeSwitch() -> Int {
+  unsafe switch Bool.random() { case true: 0 case false: 1 }
+  // expected-warning@-1 {{'unsafe' has no effect on 'switch' expression}}{{3-10=}}
+}

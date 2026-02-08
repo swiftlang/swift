@@ -1977,6 +1977,7 @@ public:
   void setSubExpr(Expr *E) { SubExpr = E; }
 
   SourceLoc getTryLoc() const { return TryLoc; }
+  SourceRange getTrySourceRange() const;
 
   SourceLoc getStartLoc() const { return TryLoc; }
   SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
