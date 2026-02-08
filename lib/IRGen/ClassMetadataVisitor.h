@@ -87,7 +87,7 @@ public:
   }
 
   void layout() {
-    static_assert(MetadataAdjustmentIndex::Class == 3,
+    static_assert(MetadataAdjustmentIndex::Class == 5,
                   "Adjustment index must be synchronized with this layout");
 
     if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
@@ -110,6 +110,9 @@ public:
       asImpl().addClassDataPointer();
       return;
     }
+
+    asImpl().addExtendedFlags();
+    asImpl().addTypedMallocTypeId();
 
     // Pointer to layout string
     asImpl().addLayoutStringPointer();
@@ -290,6 +293,8 @@ public:
   void addNominalTypeDescriptor() { addPointer(); }
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
+  void addExtendedFlags() { addInt64(); }
+  void addTypedMallocTypeId() { addInt64(); }
   void addLayoutStringPointer() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addSuperclass() { addPointer(); }
@@ -331,6 +336,7 @@ private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
+  void addInt64() { NextOffset += Size(8); }
   void addInt32() {
     NextOffset += Size(4);
   }

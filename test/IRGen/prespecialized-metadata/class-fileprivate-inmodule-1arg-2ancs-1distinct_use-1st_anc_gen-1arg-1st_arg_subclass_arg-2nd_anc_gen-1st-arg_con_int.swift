@@ -12,6 +12,8 @@
 // CHECK-unknown-SAME: constant 
 //   CHECK-apple-SAME: global 
 //         CHECK-SAME: <{
+//         CHECK-SAME:   i64,
+//         CHECK-SAME:   i64,
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   ptr,
 //                   :   [[INT]],
@@ -37,6 +39,8 @@
 //         CHECK-SAME:   ptr,
 //         CHECK-SAME:   [[INT]]
 //         CHECK-SAME: }> <{
+//         CHECK-SAME:   i64
+//         CHECK-SAME:   i64
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]LLCfD
 //         CHECK-SAME:   $sBoWV
 //   CHECK-apple-SAME:   $s4main5Value[[UNIQUE_ID_1]]LLCySSGMM
@@ -60,9 +64,9 @@
 //         CHECK-SAME:   i32 {{(56|36)}},
 //         CHECK-SAME:   i16 {{(7|3)}},
 //         CHECK-SAME:   i16 0,
-//   CHECK-apple-SAME:   i32 {{(168|96)}},
-// CHECK-unknown-SAME:   i32 144,
-//         CHECK-SAME:   i32 {{(24|12)}},
+//   CHECK-apple-SAME:   i32 {{(184|112)}},
+// CHECK-unknown-SAME:   i32 160,
+//         CHECK-SAME:   i32 {{(40|28)}},
 //                   :   $s4main5Value[[UNIQUE_ID_1]]LLCMn
 //         CHECK-SAME:   $s4main5Value[[UNIQUE_ID_1]]LLCfE
 //         CHECK-SAME:   $sSSN

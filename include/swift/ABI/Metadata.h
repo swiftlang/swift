@@ -131,6 +131,14 @@ struct MetadataDependency {
   }
 };
 
+/// Prefix of a metadata header, containing the extended flags
+/// and typed malloc type identifier.
+template <typename Runtime>
+struct TargetTypeMetadataExtendedFlagsPrefix {
+  ExtendedTypeContextDescriptorFlags extendedFlags;
+  uint64_t typedMallocTypeId;
+};
+
 /// Prefix of a metadata header, containing a pointer to the
 /// type layout string.
 template <typename Runtime>
@@ -156,14 +164,17 @@ struct TargetTypeMetadataHeaderBase {
 
 template <typename Runtime>
 struct TargetTypeMetadataHeader
-    : TargetTypeMetadataLayoutPrefix<Runtime>,
+    : TargetTypeMetadataExtendedFlagsPrefix<Runtime>,
+      TargetTypeMetadataLayoutPrefix<Runtime>,
       TargetTypeMetadataHeaderBase<Runtime> {
 
   TargetTypeMetadataHeader() = default;
   constexpr TargetTypeMetadataHeader(
-    const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
-    const TargetTypeMetadataHeaderBase<Runtime> &header)
-      : TargetTypeMetadataLayoutPrefix<Runtime>(layout),
+      const TargetTypeMetadataExtendedFlagsPrefix<Runtime> &extendedFlags,
+      const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
+      const TargetTypeMetadataHeaderBase<Runtime> &header)
+      : TargetTypeMetadataExtendedFlagsPrefix<Runtime>(extendedFlags),
+        TargetTypeMetadataLayoutPrefix<Runtime>(layout),
         TargetTypeMetadataHeaderBase<Runtime>(header) {}
 };
 
@@ -366,7 +377,40 @@ public:
 
     return false;
   }
-  
+
+  bool hasExtendedFlags() {
+    if (auto *descriptor = getTypeContextDescriptor()) {
+      return descriptor->hasExtendedFlags();
+    }
+
+    return getKind() == MetadataKind::HeapLocalVariable;
+  }
+
+  bool hasTypedMallocTypeId() {
+    if (!hasExtendedFlags()) {
+      return false;
+    }
+
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->extendedFlags.hasTypeMallocTypeId();
+    } else {
+      return asFullMetadata(this)->extendedFlags.hasTypeMallocTypeId();
+    }
+  }
+
+  uint64_t getTypedMallocTypeId() {
+    assert(hasTypedMallocTypeId());
+    if (isAnyClass()) {
+      return asFullMetadata(
+                 reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->typedMallocTypeId;
+    } else {
+      return asFullMetadata(this)->typedMallocTypeId;
+    }
+  }
+
   // Define forwarders for value witnesses. These invoke this metadata's value
   // witness table with itself as the 'self' parameter.
   #define WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -537,16 +581,19 @@ using HeapMetadataHeaderPrefix =
 /// The header present on all heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeader
-    : TargetTypeMetadataLayoutPrefix<Runtime>,
+    : TargetTypeMetadataExtendedFlagsPrefix<Runtime>,
+      TargetTypeMetadataLayoutPrefix<Runtime>,
       TargetHeapMetadataHeaderPrefix<Runtime>,
       TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
+      const TargetTypeMetadataExtendedFlagsPrefix<Runtime> &extendedFlags,
       const TargetTypeMetadataLayoutPrefix<Runtime> &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
       const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
-    : TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
-      TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
-      TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
+      : TargetTypeMetadataExtendedFlagsPrefix<Runtime>(extendedFlags),
+        TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
+        TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+        TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };
 using HeapMetadataHeader =
   TargetHeapMetadataHeader<InProcess>;
@@ -4084,6 +4131,10 @@ public:
 
   bool hasLayoutString() const {
     return getTypeContextDescriptorFlags().hasLayoutString();
+  }
+
+  bool hasExtendedFlags() const {
+    return getTypeContextDescriptorFlags().hasExtendedFlags();
   }
 
   /// Given that this type has foreign metadata initialization, return the
