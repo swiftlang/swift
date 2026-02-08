@@ -7183,6 +7183,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
+  // Refuse to match types with errors. We ought to consider making this an
+  // assert (clients should instead use holes), but for now let's bail out of
+  // solving.
+  if (desugar1->hasError() || desugar2->hasError())
+    return getTypeMatchFailure(locator);
+
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
   // is a concrete type substituted for generic parameter,
@@ -7517,15 +7523,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType in constraint");
 
-    // Note: Mismatched builtin types fall through to the TypeKind::Error
-    // case below.
+    // Mismatched builtin types
 #define BUILTIN_GENERIC_TYPE(id, parent)
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+      return getTypeMatchFailure(locator);
 
     case TypeKind::Error:
-      return getTypeMatchFailure(locator);
+      llvm_unreachable("Rejected above");
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
