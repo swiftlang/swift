@@ -149,7 +149,7 @@ do {
   let x = NE()
   var y = NE()
   takeGetGenericAndArgs(f: getGeneric, o: &y, i: x)
-  // expected-error@-1{{cannot convert value of type '(inout T, borrowing T) -> ()' to expected argument type '@_lifetime(outValue: borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
+  // expected-error@-1{{cannot convert value of type '(inout T, borrowing T) -> ()' to expected argument type '@_lifetime(outValue: copy outValue, borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
   // expected-error@-2{{generic parameter 'T' could not be inferred}}
 }
 do {
@@ -161,7 +161,7 @@ do {
   let x = NE()
   var y = NE()
   takeGetGenericAndArgs(f: getImmortalNE, o: &y, i: x)
-  //  expected-error@-1{{cannot convert value of type '@_lifetime(0: immortal) (inout NE, borrowing NE) -> ()' to expected argument type '@_lifetime(outValue: borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
+  //  expected-error@-1{{cannot convert value of type '@_lifetime(0: immortal) (inout NE, borrowing NE) -> ()' to expected argument type '@_lifetime(outValue: copy outValue, borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
 }
 do {
   let _ = transfer // OK
