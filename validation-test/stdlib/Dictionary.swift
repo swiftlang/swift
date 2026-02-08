@@ -2026,6 +2026,26 @@ DictionaryTestSuite.test("filter(_:)") {
   expectNil(d2[5])
 }
 
+DictionaryTestSuite.test("filter(_:) pt. 2") {
+  let d1 = [1: 1, 2: 2, 3: 100, 4: 4, 5: 100, 6: 6]
+
+  struct AnError: Error, Equatable {}
+
+  do throws(AnError) {
+    let d2 = try d1.filter() {
+      key, value throws(AnError) -> Bool in
+      if key.isMultiple(of: 3) {
+        throw AnError()
+      }
+      return key == value
+    }
+    expectUnreachable()
+    _ = d2
+  } catch {
+    expectEqual(error, AnError())
+  }
+}
+
 DictionaryTestSuite.test("capacity/init(minimumCapacity:)") {
   let d0 = Dictionary<String, Int>(minimumCapacity: 0)
   expectGE(d0.capacity, 0)
