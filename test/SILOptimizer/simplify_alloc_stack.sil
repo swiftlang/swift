@@ -44,6 +44,12 @@ public struct T2: P {
 enum MP {
   case A(S)
   case B(S)
+  case C(T1)
+}
+
+enum MP2 {
+  case A(T1)
+  case B(T)
 }
 
 public enum X {
@@ -160,10 +166,38 @@ bb3:
   return %11 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases :
-// CHECK:         alloc_stack $MP
-// CHECK:       } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
-sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (S) -> () {
+// CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum_multiple_cases2 :
+// CHECK:         [[A:%[0-9]+]] = alloc_stack $Optional<T>
+// CHECK:       } // end sil function 'expand_alloc_stack_of_enum_multiple_cases2'
+sil [ossa] @expand_alloc_stack_of_enum_multiple_cases2 : $@convention(method) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Optional<T>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  store %0 to [init] %2
+  inject_enum_addr %1, #Optional.some!enumelt
+  %7 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %9 = apply undef(%7) : $@convention(thin) (@in_guaranteed T) -> ()
+  br bb3
+
+bb2:
+  inject_enum_addr %1, #Optional.none!enumelt
+  destroy_value %0
+  br bb3
+
+bb3:
+  destroy_addr %1
+  dealloc_stack %1
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @different_cases_same_payload_type :
+// CHECK:         alloc_stack $S
+// CHECK:       } // end sil function 'different_cases_same_payload_type'
+sil [ossa] @different_cases_same_payload_type : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
   cond_br undef, bb1, bb2
@@ -183,6 +217,33 @@ bb2:
 bb3:
   destroy_addr %1 : $*MP
   dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @different_case_different_payload_type :
+// CHECK:         alloc_stack $MP
+// CHECK:       } // end sil function 'different_case_different_payload_type'
+sil [ossa] @different_case_different_payload_type : $@convention(method) (S, T1) -> () {
+bb0(%0 : $S, %t : $T1):
+  %1 = alloc_stack $MP
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %2
+  inject_enum_addr %1, #MP.A!enumelt
+  br bb3
+
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.C!enumelt
+  store %t to [trivial] %3
+  inject_enum_addr %1, #MP.C!enumelt
+  br bb3
+
+bb3:
+  destroy_addr %1
+  dealloc_stack %1
   %11 = tuple ()
   return %11 : $()
 }
@@ -229,6 +290,321 @@ bb0(%0 : $S):
   %11 = tuple ()
   return %11 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @enum_with_store :
+// CHECK:         %1 = alloc_stack $C
+// CHECK:         %2 = unchecked_enum_data %0, #Optional.some
+// CHECK:         store %2 to [init] %1
+// CHECK:         load [take] %1
+// CHECK:       } // end sil function 'enum_with_store'
+sil [ossa] @enum_with_store : $@convention(thin) (@owned Optional<C>) -> @owned C {
+bb0(%0 : @owned $Optional<C>):
+  %1 = alloc_stack $Optional<C>
+  store %0 to [init] %1
+  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %4 = load [take] %3
+  dealloc_stack %1
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_and_overlapping_inject :
+// CHECK:         %1 = alloc_stack $Optional<C>
+// CHECK:       } // end sil function 'store_and_overlapping_inject'
+sil [ossa] @store_and_overlapping_inject : $@convention(thin) (@guaranteed Optional<C>) -> () {
+bb0(%0 : @guaranteed $Optional<C>):
+  %1 = alloc_stack $Optional<C>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %0
+  store %2 to [init] %1
+  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %4 = load [copy] %3
+  destroy_value %4
+  br bb3
+
+bb2:
+  inject_enum_addr %1, #Optional.none!enumelt
+  br bb3
+
+bb3:
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @inject_diamond :
+// CHECK:         %1 = alloc_stack $Optional<C>
+// CHECK:       } // end sil function 'inject_diamond'
+sil [ossa] @inject_diamond : $@convention(thin) () -> @out C {
+bb0(%0 : $*C):
+  %1 = alloc_stack $Optional<C>
+  cond_br undef, bb1, bb3
+
+bb1:
+  inject_enum_addr %1, #Optional.none!enumelt
+  %4 = integer_literal $Builtin.Int32, 0
+  %5 = integer_literal $Builtin.Int32, 1
+  switch_value %5, case %4: bb2, case %5: bb5
+
+bb2:
+  br bb4
+
+bb3:
+  %8 = init_enum_data_addr %1, #Optional.some!enumelt
+  %9 = apply undef(%8) : $@convention(thin) () -> @out C
+  inject_enum_addr %1, #Optional.some!enumelt
+  br bb4
+
+bb4:
+  %12 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  copy_addr [take] %12 to [init] %0
+  br bb6
+
+bb5:
+  %15 = apply undef(%0) : $@convention(thin) () -> @out C
+  destroy_addr %1
+  br bb6
+
+bb6:
+  dealloc_stack %1
+  %19 = tuple ()
+  return %19
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_case_of_nontrivial_enum :
+// CHECK:         %1 = alloc_stack $T1
+// CHECK:         %2 = unchecked_enum_data %0, #MP2.A
+// CHECK:         store %2 to [trivial] %1
+// CHECK:         load [trivial] %1
+// CHECK:       } // end sil function 'trivial_case_of_nontrivial_enum'
+sil [ossa] @trivial_case_of_nontrivial_enum : $@convention(thin) (@owned MP2) -> T1 {
+bb0(%0 : @owned $MP2):
+  %1 = alloc_stack $MP2
+  store %0 to [init] %1
+  %3 = unchecked_take_enum_data_addr %1, #MP2.A!enumelt
+  %4 = load [trivial] %3
+  dealloc_stack %1
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_doesnt_dominate_all_loads :
+// CHECK:         %1 = alloc_stack $Optional<C>
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK:       } // end sil function 'store_doesnt_dominate_all_loads'
+sil [ossa] @store_doesnt_dominate_all_loads : $@convention(thin) (@owned Optional<C>) -> () {
+bb0(%0 : @owned $Optional<C>):
+  %1 = alloc_stack $Optional<C>
+  store %0 to [init] %1
+  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  cond_br undef, bb1, bb2
+bb1:
+  %4 = load [take] %3
+  destroy_value %4
+  br bb3
+bb2:
+  destroy_addr %1
+  br bb3
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @store_dominates_multiple_case_blocks :
+// CHECK:         %1 = alloc_stack $C
+// CHECK:       bb1:
+// CHECK-NEXT:    [[P:%.*]] = unchecked_enum_data %0, #Optional.some
+// CHECK-NEXT:    store [[P]] to [init] %1
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'store_dominates_multiple_case_blocks'
+sil [ossa] @store_dominates_multiple_case_blocks : $@convention(thin) (@owned Optional<C>) -> () {
+bb0(%0 : @owned $Optional<C>):
+  %1 = alloc_stack $Optional<C>
+  store %0 to [init] %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %4 = load [copy] %3
+  destroy_value %4
+  destroy_addr %1
+  br bb3
+
+bb2:
+  destroy_addr %1
+  inject_enum_addr %1, #Optional.none!enumelt
+  br bb3
+
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @store_dominates_multiple_case_blocks_trivial :
+// CHECK:         %1 = alloc_stack $Int
+// CHECK:       bb1:
+// CHECK-NEXT:    [[P:%.*]] = unchecked_enum_data %0, #Optional.some
+// CHECK-NEXT:    store [[P]] to [trivial] %1
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       } // end sil function 'store_dominates_multiple_case_blocks_trivial'
+sil [ossa] @store_dominates_multiple_case_blocks_trivial : $@convention(thin) (Optional<Int>) -> () {
+bb0(%0 : $Optional<Int>):
+  %1 = alloc_stack $Optional<Int>
+  store %0 to [trivial] %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %4 = load [trivial] %3
+  fix_lifetime %4
+  br bb3
+
+bb2:
+  inject_enum_addr %1, #Optional.none!enumelt
+  br bb3
+
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @store_in_loop :
+// CHECK:         %0 = alloc_stack $C
+// CHECK:       bb1:
+// CHECK-NEXT:    %2 = apply
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %2
+// CHECK-NEXT:    br bb1
+// CHECK:       bb3:
+// CHECK-NEXT:    [[P:%.*]] = unchecked_enum_data %2
+// CHECK-NEXT:    store [[P]] to [init] %0
+// CHECK:       } // end sil function 'store_in_loop'
+sil [ossa] @store_in_loop : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Optional<C>
+  br bb1
+
+bb1:
+  %3 = apply undef() : $@convention(thin) () -> @owned Optional<C>
+  store %3 to [init] %1
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_addr %1
+  br bb1
+
+bb3:
+  %8 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %9 = load [copy] %8
+  destroy_value %9
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @store_not_in_pred_block :
+// CHECK:         %1 = alloc_stack $Optional<C>
+// CHECK:       } // end sil function 'store_not_in_pred_block'
+sil [ossa] @store_not_in_pred_block : $@convention(thin) (@owned Optional<C>) -> () {
+bb0(%0 : @owned $Optional<C>):
+  %1 = alloc_stack $Optional<C>
+  store %0 to [init] %1
+  cond_br undef, bb1, bb4
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = unchecked_take_enum_data_addr %1, #Optional.some!enumelt
+  %4 = load [copy] %3
+  destroy_value %4
+  destroy_addr %1
+  br bb5
+
+bb3:
+  destroy_addr %1
+  br bb5
+
+bb4:
+  destroy_addr %1
+  br bb5
+
+bb5:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+
+
+// CHECK-LABEL: sil [ossa] @not_a_single_store :
+// CHECK:         %2 = alloc_stack $Optional<C>
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK:       } // end sil function 'not_a_single_store'
+sil [ossa] @not_a_single_store : $@convention(thin) (@owned Optional<C>, @owned Optional<C>) -> @owned C {
+bb0(%0 : @owned $Optional<C>, %1 : @owned $Optional<C>):
+  %2 = alloc_stack $Optional<C>
+  store %0 to [init] %2
+  destroy_addr %2
+  store %1 to [init] %2
+  %3 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %4 = load [take] %3
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @store_and_init :
+// CHECK:         %2 = alloc_stack $Optional<C>
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK:       } // end sil function 'store_and_init'
+sil [ossa] @store_and_init : $@convention(thin) (@owned Optional<C>, @owned C) -> @owned C {
+bb0(%0 : @owned $Optional<C>, %1 : @owned $C):
+  %2 = alloc_stack $Optional<C>
+  store %0 to [init] %2
+  destroy_addr %2
+  %5 = init_enum_data_addr %2, #Optional.some!enumelt
+  store %1 to [init] %5
+  inject_enum_addr %2, #Optional.some!enumelt
+  %8 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %9 = load [take] %8
+  dealloc_stack %2
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @mismatching_case :
+// CHECK:         %1 = alloc_stack $MP
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK:         unchecked_take_enum_data_addr
+// CHECK:       } // end sil function 'mismatching_case'
+sil [ossa] @mismatching_case : $@convention(thin) (MP) -> () {
+bb0(%0 : $MP):
+  %1 = alloc_stack $MP
+  store %0 to [trivial] %1
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = unchecked_take_enum_data_addr %1, #MP.A!enumelt
+  %4 = load [trivial] %3
+  fix_lifetime %4
+  br bb3
+bb2:
+  %7 = unchecked_take_enum_data_addr %1, #MP.B!enumelt
+  %8 = load [trivial] %7
+  fix_lifetime %8
+  br bb3
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
 
 // CHECK-LABEL: sil [ossa] @replace_archetype :
 // CHECK:         [[S:%.*]] = alloc_stack [lexical] $T
