@@ -396,7 +396,7 @@ namespace constraints {
 namespace inference {
 class BindingSet {
   using BindingScore =
-      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
+      std::tuple<bool, bool, bool, bool, unsigned char, int>;
 
   ConstraintSystem &CS;
 
@@ -485,26 +485,6 @@ public:
   /// case, but that could happen when certain constraints like
   /// `bind param` are present in the system.
   bool isPotentiallyIncomplete() const;
-
-  /// Determine if the bindings only constrain the type variable from above
-  /// with an existential type; such a binding is not very helpful because
-  /// it's impossible to enumerate the existential type's subtypes.
-  bool isSubtypeOfExistentialType() const {
-    if (Bindings.empty())
-      return false;
-
-    // Literal requirements always result in a subtype/supertype
-    // relationship to a concrete type.
-    if (llvm::any_of(Literals, [](const auto &literal) {
-          return literal.viableAsBinding();
-        }))
-      return false;
-
-    return llvm::all_of(Bindings, [](const PotentialBinding &binding) {
-      return binding.BindingType->isExistentialType() &&
-             binding.Kind == AllowedBindingKind::Subtypes;
-    });
-  }
 
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
