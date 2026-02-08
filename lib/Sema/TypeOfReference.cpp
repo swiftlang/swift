@@ -1509,38 +1509,21 @@ void ConstraintSystem::openGenericRequirements(
 }
 
 void ConstraintSystem::openGenericRequirement(
-    DeclContext *outerDC, GenericSignature signature,
-    unsigned index, Requirement req,
-    ConstraintLocatorBuilder locator,
+    DeclContext *outerDC, GenericSignature signature, unsigned index,
+    Requirement req, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn,
     PreparedOverloadBuilder *preparedOverload) {
-  std::optional<Requirement> openedReq;
-  auto openedFirst = substFn(req.getFirstType());
 
   bool prohibitIsolatedConformance = false;
   auto kind = req.getKind();
-  switch (kind) {
-  case RequirementKind::Conformance: {
+  if (kind == RequirementKind::Conformance && signature) {
     // Check whether the given type parameter has requirements that
     // prohibit it from using an isolated conformance.
-    if (signature &&
-        signature->prohibitsIsolatedConformance(req.getFirstType()))
-      prohibitIsolatedConformance = true;
-
-    openedReq = Requirement(kind, openedFirst, req.getSecondType());
-    break;
-  }
-  case RequirementKind::Superclass:
-  case RequirementKind::SameType:
-  case RequirementKind::SameShape:
-    openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
-    break;
-  case RequirementKind::Layout:
-    openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
-    break;
+    prohibitIsolatedConformance =
+        signature->prohibitsIsolatedConformance(req.getFirstType()).has_value();
   }
 
-  addConstraint(*openedReq,
+  addConstraint(req.tranformSubjectTypes(substFn),
                 locator.withPathElement(
                     LocatorPathElt::TypeParameterRequirement(index, kind)),
                 /*isFavored=*/false, prohibitIsolatedConformance,
