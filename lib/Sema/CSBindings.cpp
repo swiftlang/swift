@@ -1285,10 +1285,11 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
   // It's considered to be non-default for purposes of
   // ranking because we'd like to prioritize resolving
   // closures to gain more information from their bodies.
-  unsigned numBindings = b.Bindings.size() + b.getNumViableLiteralBindings();
-  auto numNonDefaultableBindings = numBindings > 0 ? numBindings
-                                   : b.TypeVar->getImpl().isClosureType() ? 1
-                                                                          : 0;
+  auto numNonDefaultableBindings = b.Bindings.size() + b.getNumViableLiteralBindings();
+  if (numNonDefaultableBindings == 0 &&
+      b.TypeVar->getImpl().isClosureType()) {
+    numNonDefaultableBindings = 1;
+  }
 
   return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
                          b.isDelayed(), b.involvesTypeVariables(),
@@ -1297,6 +1298,28 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
 }
 
 bool BindingSet::operator<(const BindingSet &other) {
+  if (!CS.shouldAttemptFixes()) {
+    unsigned xExactBindings = (isDelayedByDisjunction()
+                               ? 0 : getNumExactBindings());
+    unsigned yExactBindings = (other.isDelayedByDisjunction()
+                               ? 0 : other.getNumExactBindings());
+
+    // Always prefer a binding set with one exact binding over anything else.
+    if (xExactBindings == 1 && yExactBindings != 1)
+      return true;
+
+    // Anything else is worse than a binding set with one exact binding.
+    if (xExactBindings != 1 && yExactBindings == 1)
+      return false;
+
+    // If both have one exact binding, it shouldn't matter which one we pick,
+    // so intentionally skip the rest of the ranking logic.
+    if (xExactBindings == 1 && yExactBindings == 1)
+      return false;
+
+    // For any other combination, do the old ranking.
+  }
+  
   auto xScore = formBindingScore(*this);
   auto yScore = formBindingScore(other);
 
