@@ -131,6 +131,12 @@
         },
         "swift-subprocess": {
           "remote": { "id": "swiftlang/swift-subprocess" }
+        },
+        "boringssl": {
+          "remote": {
+            "id": "google/boringssl",
+            "url": "https://boringssl.googlesource.com/boringssl"
+          }
         }
     },
     "default-branch-scheme": "main",
@@ -191,7 +197,8 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.2.1"
+                "swift-subprocess": "0.2.1",
+                "boringssl": "817ab07ebb53da35afea409ab9328f578492832d"
             }
         },
         "release/6.3": {
@@ -250,7 +257,8 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.1.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.2.1"
+                "swift-subprocess": "0.2.1",
+                "boringssl": "817ab07ebb53da35afea409ab9328f578492832d"
             }
         },
         "release/6.2": {
