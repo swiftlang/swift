@@ -819,9 +819,21 @@ Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing f
 
 // Functions changed for typed throws
 Constructor Array.init(_unsafeUninitializedCapacity:initializingWith:) has been removed
+Constructor Dictionary.init(_:uniquingKeysWith:) has been removed
+Constructor Dictionary.init(grouping:by:) has been removed
+Constructor _NativeDictionary.init(grouping:by:) has been removed
 Func Array.withUnsafeBufferPointer(_:) has been removed
 Func ArraySlice.withUnsafeBufferPointer(_:) has been removed
 Func ContiguousArray.withUnsafeBufferPointer(_:) has been removed
+Func Dictionary._Variant.mapValues(_:) has been removed
+Func Dictionary._Variant.merge(_:uniquingKeysWith:) has been removed
+Func Dictionary.mapValues(_:) has been removed
+Func Dictionary.merge(_:uniquingKeysWith:) has been removed
+Func Dictionary.merging(_:uniquingKeysWith:) has been removed
+Func _NativeDictionary.mapValues(_:) has been removed
+Func _NativeDictionary.merge(_:isUnique:uniquingKeysWith:) has been removed
+Func __CocoaDictionary.mapValues(_:) has been removed
+
 
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
