@@ -932,6 +932,26 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
 static std::optional<bool> subsumeBinding(PotentialBinding &binding,
                                           const PotentialBinding &existing,
                                           bool isClosureParameterType) {
+  if (binding.BindingType->isEqual(existing.BindingType)) {
+    if (binding.Kind == AllowedBindingKind::Subtypes &&
+        existing.Kind == AllowedBindingKind::Supertypes) {
+      binding.Kind = AllowedBindingKind::Subtypes;
+      return true;
+    } else if (binding.Kind == AllowedBindingKind::Supertypes &&
+               existing.Kind == AllowedBindingKind::Subtypes) {
+      binding.Kind = AllowedBindingKind::Subtypes;
+      return true;
+    } else if (binding.Kind == AllowedBindingKind::Exact) {
+      return true;
+    } else if (existing.Kind == AllowedBindingKind::Exact) {
+      return false;
+    } else if (existing.Kind == AllowedBindingKind::Fallback) {
+      return true;
+    } else if (binding.Kind == AllowedBindingKind::Fallback) {
+      return false;
+    }
+  }
+
   auto existingType = existing.BindingType;
   auto result = isLikelyExactMatch(binding.BindingType, existingType);
   if (result.has_value() && *result) {
