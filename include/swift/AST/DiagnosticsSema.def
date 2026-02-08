@@ -6534,6 +6534,9 @@ ERROR(opaque_type_in_parameter,none,
       "'some' cannot appear in parameter position in %select{result|parameter}0"
       " type %1",
       (bool, Type))
+ERROR(opaque_type_member_type,none,
+      "cannot access member type %0 on opaque type %1",
+      (DeclNameRef, Type))
 
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,

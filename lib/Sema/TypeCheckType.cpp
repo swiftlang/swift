@@ -222,6 +222,16 @@ Type TypeResolution::resolveDependentMemberType(
   if (!genericSig)
     return ErrorType::get(baseTy);
 
+  if (baseTy->is<OpaqueTypeArchetypeType>()) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      ctx.Diags.diagnose(repr->getNameLoc(),
+                         diag::opaque_type_member_type,
+                         repr->getNameRef(), baseTy)
+          .highlight(baseRange);
+    }
+    return ErrorType::get(ctx);
+  }
+
   // Look for a nested type with the given name.
   if (auto nestedType = genericSig->lookupNestedType(baseTy, refIdentifier)) {
     if (options.isGenericRequirement()) {
@@ -2052,6 +2062,15 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
 
   // Short-circuiting.
   if (repr->isInvalid()) return ErrorType::get(ctx);
+  if (parentTy->is<OpaqueTypeArchetypeType>()) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diags.diagnose(repr->getNameLoc(),
+                     diag::opaque_type_member_type,
+                     repr->getNameRef(), parentTy)
+          .highlight(parentRange);
+    }
+    return ErrorType::get(ctx);
+  }
 
   // If the parent is a type parameter, the member is a dependent member,
   // and we skip much of the work below.
