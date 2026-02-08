@@ -151,6 +151,11 @@ public:
     if (!func->requiresNewWitnessTableEntry())
       return;
 
+    // Functions in unconditionally unavailable protocol requirements
+    // are unreachable and should not generate witness entries
+    if (func->isUnreachableAtRuntime())
+      return;
+
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
     addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
     addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
