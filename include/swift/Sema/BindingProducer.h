@@ -127,10 +127,11 @@ private:
 
 class TypeVariableBinding {
   TypeVariableType *TypeVar;
-  PotentialBinding Binding;
+  inference::PotentialBinding Binding;
 
 public:
-  TypeVariableBinding(TypeVariableType *typeVar, PotentialBinding &binding)
+  TypeVariableBinding(TypeVariableType *typeVar,
+                      inference::PotentialBinding &binding)
       : TypeVar(typeVar), Binding(binding) {}
 
   TypeVariableType *getTypeVariable() const { return TypeVar; }
@@ -183,8 +184,8 @@ public:
 };
 
 class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
-  using BindingKind = AllowedBindingKind;
-  using Binding = PotentialBinding;
+  using BindingKind = inference::AllowedBindingKind;
+  using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
   llvm::SmallVector<Binding, 8> Bindings;
@@ -213,7 +214,7 @@ public:
 
   TypeVarBindingProducer(ConstraintSystem &cs,
                          TypeVariableType *typeVar,
-                         const BindingSet &bindings);
+                         const inference::BindingSet &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }

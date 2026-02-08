@@ -359,6 +359,9 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    if (LHS.Kind != RHS.Kind)
+      return false;
+
     auto lhsTy = LHS.BindingType.getPointer();
     auto rhsTy = RHS.BindingType.getPointer();
 
@@ -396,7 +399,7 @@ namespace constraints {
 namespace inference {
 class BindingSet {
   using BindingScore =
-      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
+      std::tuple<bool, bool, bool, unsigned, bool, bool, bool, bool, unsigned char, int>;
 
   ConstraintSystem &CS;
 
@@ -405,6 +408,8 @@ class BindingSet {
   const PotentialBindings &Info;
 
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
+
+  bool IsContradictory = false;
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
@@ -439,6 +444,11 @@ public:
   /// Check whether this binding set belongs to a type variable
   /// that represents a generic parameter.
   bool forGenericParameter() const;
+
+  /// Check whether this binding set is known to refer to a type variable
+  /// that is subject to an unsatisfiable set of constraints, such as
+  /// $T0 conv Int, String conv $T0.
+  bool isContradictory() const { return IsContradictory; }
 
   bool canBeNil() const;
 
@@ -506,14 +516,6 @@ public:
     });
   }
 
-  /// Check if this binding is viable for inclusion in the set.
-  ///
-  /// \param binding The binding to validate.
-  /// \param isTransitive Indicates whether this binding has been
-  /// acquired through transitive inference and requires extra
-  /// checking.
-  bool isViable(PotentialBinding &binding);
-
   /// Determine whether this set has any "viable" (or non-hole) bindings.
   ///
   /// A viable binding could be - a direct or transitive binding
@@ -563,6 +565,12 @@ public:
 
     assert(numDefaultable >= unviable);
     return numDefaultable - unviable;
+  }
+
+  unsigned getNumExactBindings() const {
+    return llvm::count_if(Bindings, [&](const PotentialBinding &binding) {
+      return binding.Kind == AllowedBindingKind::Exact;
+    });
   }
 
   ASTNode getAssociatedCodeCompletionToken() const {
@@ -630,6 +638,8 @@ public:
   /// Handle diagnostics of unresolved member chains.
   void finalizeUnresolvedMemberChainResult();
 
+  void finalizeSupertypeBindings();
+
   static BindingScore formBindingScore(const BindingSet &b);
 
   bool operator==(const BindingSet &other);
@@ -661,29 +671,6 @@ private:
 #undef ENTRY
   }
 };
-
-enum class ConversionBehavior : unsigned {
-  None,
-  Class,
-  AnyHashable,
-  Double,
-  Pointer,
-  Array,
-  Dictionary,
-  Set,
-  Optional,
-  Structural,
-  Unknown
-};
-
-/// Classify the possible conversions having this type as result type.
-ConversionBehavior getConversionBehavior(Type type);
-
-/// Check whether there exists a type that could be implicitly converted
-/// to a given type i.e. is the given type is Double or Optional<..> this
-/// function is going to return true because CGFloat could be converted
-/// to a Double and non-optional value could be injected into an optional.
-bool hasConversions(Type type);
 
 /// Check whether the given type can be used as a binding for the given
 /// type variable.

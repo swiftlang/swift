@@ -21,6 +21,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -31,6 +32,11 @@
 using namespace llvm;
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "Constraint solver overall"
+
+STATISTIC(NumEarlyBindingAttempts, "bindings attempted before disjunctions");
+STATISTIC(NumLateBindingAttempts, "bindings attempted after disjunctions");
 
 ComponentStep::Scope::Scope(ComponentStep &component)
     : CS(component.CS), Component(component) {
@@ -290,6 +296,11 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (auto step = chooseStep()) {
     switch (*step) {
     case StepKind::Binding:
+      if (disjunction)
+        ++NumEarlyBindingAttempts;
+      else
+        ++NumLateBindingAttempts;
+
       return suspend(
           std::make_unique<TypeVariableStep>(CS, bestBindings->getTypeVariable(),
                                              *bestBindings, Solutions));

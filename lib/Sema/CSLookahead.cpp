@@ -25,6 +25,7 @@
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSBindings.h"
+#include "swift/Sema/Subtyping.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -34,246 +35,11 @@
 #include <cstddef>
 #include <functional>
 
+#define DEBUG_TYPE "CSLookahead"
+#include "llvm/Support/Debug.h"
+
 using namespace swift;
 using namespace constraints;
-
-enum ConflictFlag : unsigned {
-  Category = 1 << 0,
-  Exact = 1 << 1,
-  Nominal = 1 << 2,
-  Class = 1 << 3,
-  Structural = 1 << 4,
-  Array = 1 << 5,
-  Dictionary = 1 << 6,
-  Set = 1 << 7,
-  Optional = 1 << 8,
-  Double = 1 << 9,
-  Conformance = 1 << 10,
-  Mutability = 1 << 11
-};
-using ConflictReason = OptionSet<ConflictFlag>;
-
-static bool shouldBeConservativeWithProto(ProtocolDecl *proto) {
-  if (proto->isMarkerProtocol())
-    return true;
-
-  if (proto->isObjC())
-    return true;
-
-  return false;
-}
-
-static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
-  return classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
-}
-
-static ConflictReason canPossiblyConvertTo(
-    ConstraintSystem &cs,
-    Type lhs, Type rhs,
-    GenericSignature sig) {
-  auto lhsKind = inference::getConversionBehavior(lhs);
-  auto rhsKind = inference::getConversionBehavior(rhs);
-
-  // Conversion between two types with the same conversion behavior.
-  if (lhsKind == rhsKind) {
-    switch (lhsKind) {
-    case inference::ConversionBehavior::None:
-      if (!lhs->hasTypeVariable() && !lhs->hasTypeParameter() &&
-          !rhs->hasTypeVariable() && !rhs->hasTypeParameter()) {
-        if (!lhs->isEqual(rhs))
-          return ConflictFlag::Exact;
-      }
-
-      if (lhs->getAnyNominal() != rhs->getAnyNominal())
-        return ConflictFlag::Nominal;
-      break;
-
-    case inference::ConversionBehavior::Class: {
-      auto *lhsDecl = lhs->getClassOrBoundGenericClass();
-      auto *rhsDecl = rhs->getClassOrBoundGenericClass();
-
-      // Toll-free bridging CF -> ObjC.
-      if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
-          rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        lhsDecl = getBridgedObjCClass(lhsDecl);
-
-      // Toll-free bridging ObjC -> CF.
-      } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
-                 rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        rhsDecl = getBridgedObjCClass(rhsDecl);
-      }
-
-      // Check for a subclassing relationship.
-      if (!rhsDecl->isSuperclassOf(lhsDecl))
-        return ConflictFlag::Class;
-
-      break;
-    }
-
-    case inference::ConversionBehavior::Double:
-      // There are only two types with this behavior, and they convert
-      // to each other.
-      break;
-
-    case inference::ConversionBehavior::AnyHashable:
-      // AnyHashable converts to AnyHashable.
-      break;
-
-    case inference::ConversionBehavior::Pointer:
-      // FIXME: Implement
-      break;
-
-    case inference::ConversionBehavior::Array: {
-      auto subResult = canPossiblyConvertTo(
-          cs,
-          lhs->getArrayElementType(),
-          rhs->getArrayElementType(), sig);
-      if (subResult)
-        return subResult | ConflictFlag::Array;
-
-      break;
-    }
-    case inference::ConversionBehavior::Dictionary: {
-      // FIXME: Implement
-      break;
-    }
-    case inference::ConversionBehavior::Set: {
-      // FIXME: Implement
-      break;
-    }
-    case inference::ConversionBehavior::Optional: {
-      // Optional-to-optional conversion.
-      auto argObjectType = lhs->getOptionalObjectType();
-      auto objectType = rhs->getOptionalObjectType();
-      auto optionalToOptional = canPossiblyConvertTo(
-          cs, argObjectType, objectType, sig);
-
-      if (optionalToOptional)
-        return optionalToOptional | ConflictFlag::Optional;
-      break;
-    }
-    case inference::ConversionBehavior::Structural:
-      if (lhs->getCanonicalType()->getKind()
-          != rhs->getCanonicalType()->getKind())
-        return ConflictFlag::Structural;
-      break;
-    case inference::ConversionBehavior::Unknown:
-      break;
-    }
-
-  // Handle case where the kinds don't match, and we're not converting
-  // from an unknown type.
-  } else if (lhsKind != inference::ConversionBehavior::Unknown) {
-    switch (rhsKind) {
-    case inference::ConversionBehavior::Class: {
-      // Archetypes can convert to classes.
-      if (lhs->is<ArchetypeType>()) {
-        auto superclassType = lhs->getSuperclass();
-        if (!superclassType)
-          return ConflictFlag::Class;
-
-        return canPossiblyConvertTo(cs, superclassType, rhs, sig);
-      }
-
-      // Protocol metatypes can convert to instances of the Protocol class
-      // on Objective-C interop platforms.
-      if (lhs->is<MetatypeType>())
-        break;
-
-      // Nothing else converts to a class except for existentials
-      // (which are 'ConversionBehavior::Unknown').
-      return ConflictFlag::Category;
-    }
-
-    case inference::ConversionBehavior::AnyHashable:
-      // FIXME: Check if lhs definitely not Hashable
-      break;
-
-    case inference::ConversionBehavior::Pointer:
-      // FIXME: Array, String, InOutType convert to pointers
-      break;
-
-    case inference::ConversionBehavior::Optional: {
-      // We have a non-optional on the left. Try value-to-optional.
-      auto objectType = rhs->getOptionalObjectType();
-      auto valueToOptional = canPossiblyConvertTo(
-          cs, lhs, objectType, sig);
-      if (valueToOptional)
-        return valueToOptional | ConflictFlag::Optional;
-
-      break;
-    }
-
-    case inference::ConversionBehavior::None:
-    case inference::ConversionBehavior::Double:
-    case inference::ConversionBehavior::Array:
-    case inference::ConversionBehavior::Dictionary:
-    case inference::ConversionBehavior::Set:
-    case inference::ConversionBehavior::Structural:
-      return ConflictFlag::Category;
-
-    case inference::ConversionBehavior::Unknown:
-      break;
-    }
-  }
-
-  if (sig) {
-    // If '$LHS conv $RHS' and '$LHS conforms P', does it follow
-    // that '$RHS conforms P'?
-    auto isConformanceTransitiveOnLHS = [lhsKind, lhs]() -> bool {
-      // FIXME: String converts to UnsafePointer<UInt8> which
-      // can satisfy a conformance to P that String does not
-      // satisfy. Encode this more thoroughly.
-      if (lhsKind == inference::ConversionBehavior::None)
-        return !lhs->isString();
-
-      return false;
-    };
-
-    if (rhs->isTypeParameter() &&
-        isConformanceTransitiveOnLHS()) {
-      bool failed = llvm::any_of(
-          sig->getRequiredProtocols(rhs),
-          [&](ProtocolDecl *proto) {
-            if (shouldBeConservativeWithProto(proto))
-              return false;
-            return !lookupConformance(lhs, proto);
-          });
-      if (failed)
-        return ConflictFlag::Conformance;
-    }
-
-    // If '$LHS conv $RHS' and '$RHS conforms P', does it follow
-    // that '$LHS conforms P'?
-    auto isConformanceTransitiveOnRHS = [rhsKind]() -> bool {
-      if (rhsKind == inference::ConversionBehavior::None ||
-          rhsKind == inference::ConversionBehavior::Array ||
-          rhsKind == inference::ConversionBehavior::Dictionary ||
-          rhsKind == inference::ConversionBehavior::Set)
-        return true;
-
-      return false;
-    };
-
-    if (lhs->isTypeParameter() &&
-        isConformanceTransitiveOnRHS()) {
-      bool failed = llvm::any_of(
-          sig->getRequiredProtocols(lhs),
-          [&](ProtocolDecl *proto) {
-            if (shouldBeConservativeWithProto(proto))
-              return false;
-            return !lookupConformance(rhs, proto);
-          });
-      if (failed)
-        return ConflictFlag::Conformance;
-    }
-  }
-
-  /*llvm::errs() << "unknown conversion:\n";
-  lhs->dump(llvm::errs());
-  rhs->dump(llvm::errs());*/
-  return std::nullopt;
-}
 
 static void forEachDisjunctionChoice(
     ConstraintSystem &cs, Constraint *disjunction,
@@ -464,8 +230,6 @@ static void pruneDisjunctionImpl(
             llvm::errs() << " category";
           if (reason.contains(ConflictFlag::Exact))
             llvm::errs() << " exact";
-          if (reason.contains(ConflictFlag::Nominal))
-            llvm::errs() << " nominal";
           if (reason.contains(ConflictFlag::Class))
             llvm::errs() << " class";
           if (reason.contains(ConflictFlag::Structural))

@@ -51,8 +51,6 @@
 #include <cstddef>
 #include <functional>
 
-using namespace swift::constraints::inference;
-
 namespace swift {
 
 class Expr;
@@ -4689,13 +4687,13 @@ public:
 
   /// Determine whether given type variable with its set of bindings is viable
   /// to be attempted on the next step of the solver.
-  const BindingSet *determineBestBindings();
+  const inference::BindingSet *determineBestBindings();
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
   ///
   /// FIXME: Remove this.
-  BindingSet getBindingsFor(TypeVariableType *typeVar);
+  inference::BindingSet getBindingsFor(TypeVariableType *typeVar);
 
 private:
   /// Add a constraint to the constraint system.
