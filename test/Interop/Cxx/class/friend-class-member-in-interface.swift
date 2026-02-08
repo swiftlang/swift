@@ -30,6 +30,6 @@ struct C: B {
 // CHECK:  mutating func memberInB()
 // CHECK-NEXT: }
 // CHECK: struct C {
+// CHECK:  mutating func memberInB()
 // CHECK:  mutating func memberInC()
-// CHECK-NEXT:  mutating func memberInB()
 // CHECK-NEXT: }

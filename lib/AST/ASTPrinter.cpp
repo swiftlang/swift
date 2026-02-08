@@ -3024,6 +3024,112 @@ static void addNamespaceMembers(Decl *decl,
   }
 }
 
+/// Sort and print Clang record members in the following order:
+///
+///   struct PrintMe {
+///     // non-Clang init()
+///     // non-Clang init(...)
+///     // Clang decls (in source order)
+///     // non-Clang decls
+///   }
+///
+///  Doing so keeps the commonly-synthesized constructors near the top,
+///  and the rarely synthesized other decls near the bottom.
+///
+///  Within each section, members are sorted according to source order.
+static bool sortClangDecls(Decl *lhs, Decl *rhs) {
+  auto &SM = lhs->getASTContext().SourceMgr;
+  auto *CML = lhs->getASTContext().getClangModuleLoader();
+
+  auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
+    // Has an attached clang::Decl
+    if (auto *D = d->getClangDecl())
+      return D;
+
+    // Cloned from some base member associated with some clang::Decl
+    if (auto *vd = dyn_cast<ValueDecl>(d); vd && CML)
+      if (auto *ovd = CML->getOriginalForClonedMember(vd))
+        return ovd->getClangDecl();
+
+    return nullptr;
+  };
+
+  auto *LHS = getClangDecl(lhs), *RHS = getClangDecl(rhs);
+  if (LHS && RHS) {
+    // Both lhs and rhs are directly imported from Clang
+    // First, sort based on module name, if any
+    auto *LMod = LHS->getOwningModule(), *RMod = RHS->getOwningModule();
+    if (!LMod || !RMod)
+      return (bool)LMod < (bool)RMod;
+    if (LMod != RMod)
+      return LMod->Name < RMod->Name;
+
+    // Both come from the same module; sort based on location, if any
+    auto LLoc = LHS->getLocation(), RLoc = RHS->getLocation();
+    if (!LLoc.isValid() || !RLoc.isValid())
+      return LLoc.isValid() < RLoc.isValid();
+    auto &ClangSM = LHS->getASTContext().getSourceManager();
+    return ClangSM.isBeforeInTranslationUnit(LLoc, RLoc);
+  }
+
+  // At least one of lhs or rhs does not have an associated Clang decl,
+  // i.e., synthesized in some way.
+
+  auto *lctor = LHS ? nullptr : dyn_cast<ConstructorDecl>(lhs),
+       *rctor = RHS ? nullptr : dyn_cast<ConstructorDecl>(rhs);
+  if (!lctor ^ !rctor)
+    // One of these is a non-Clang constructor, and the other is not.
+    return !lctor < !rctor;
+
+  if (lctor && rctor) {
+    // Both of these are non-Clang constructors.
+
+    // If only one of these has zero arguments, prioritize that
+    auto l0 = !lctor->getParameters() || lctor->getParameters()->size() == 0,
+         r0 = !rctor->getParameters() || rctor->getParameters()->size() == 0;
+    if (!l0 ^ !r0)
+      return !l0 < !r0;
+
+    auto *lmod = lhs->getDeclContext()->getModuleScopeContext(),
+         *rmod = rhs->getDeclContext()->getModuleScopeContext();
+    if (lmod != rmod) {
+      // They are somehow from different modules; sort by file name
+      auto *lfile = dyn_cast<SourceFile>(lmod),
+           *rfile = dyn_cast<SourceFile>(rmod);
+      if (!lfile || !rfile)
+        return (bool)lfile < (bool)rfile;
+
+      return lfile->getFilename() < rfile->getFilename();
+    }
+
+    // Same module; use SourceManager to break all other ties
+    return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+  }
+
+  // Neither are non-Clang constructors
+
+  if (!LHS ^ !RHS)
+    // One of these is from Clang; that goes before the other
+    return !LHS < !RHS;
+
+  // Neither are from Clang
+
+  auto *lmod = lhs->getDeclContext()->getModuleScopeContext(),
+       *rmod = rhs->getDeclContext()->getModuleScopeContext();
+  if (lmod != rmod) {
+    // They are somehow from different modules; sort by file name
+    auto *lfile = dyn_cast<SourceFile>(lmod),
+         *rfile = dyn_cast<SourceFile>(rmod);
+    if (!lfile || !rfile)
+      return (bool)lfile < (bool)rfile;
+
+    return lfile->getFilename() < rfile->getFilename();
+  }
+
+  // Same module; use SourceManager to break all other ties
+  return SM.isBeforeInBuffer(lhs->getLoc(), rhs->getLoc());
+}
+
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
                                   bool closeBracket, bool doIndent) {
   llvm::SmallVector<Decl *, 16> Members;
@@ -3055,8 +3161,13 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
         }
       }
     }
-    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl()))
+    if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
       addNamespaceMembers(D, Members);
+    } else if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
+      // For Clang records, sort their members, because we may import them
+      // in an unstable order.
+      std::stable_sort(Members.begin(), Members.end(), sortClangDecls);
+    }
   }
   printMembers(Members, needComma, openBracket, closeBracket, doIndent);
 }
