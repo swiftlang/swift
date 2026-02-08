@@ -531,8 +531,12 @@ EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
-/// Allow declaration of compile-time values
+/// Allow declaration of compile-time values bypassing
+/// syntactic legality checking
 EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
+
+/// Allow use of literal expressions as literals
+EXPERIMENTAL_FEATURE(LiteralExpressions, true)
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
