@@ -1590,10 +1590,12 @@ void PrintAST::printAttributes(const Decl *D) {
     }
   }
 
-  // Attributes that are not permitted to appear should not be printed
-  for (auto *attr : attrs) {
-    if (!attr->canAppearOnDecl(D))
-      scope.Options.ExcludeAttrList.push_back(attr->getKind());
+  // Attributes that are not permitted to appear should not be attached.
+  // This is the last line of defense against printing incorrect attributes
+  // and by so doing breaking interface files.
+  if (CONDITIONAL_ASSERT_enabled()) {
+    for (auto *attr : attrs)
+      ASSERT(attr->canAppearOnDecl(D));
   }
 
   attrs.print(Printer, Options, D);
