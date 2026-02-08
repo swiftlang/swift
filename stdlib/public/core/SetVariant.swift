@@ -381,9 +381,9 @@ extension Set._Variant {
 
 extension Set._Variant {
   @_alwaysEmitIntoClient
-  internal __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> _NativeSet<Element> {
+  internal consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> _NativeSet<Element> {
 #if _runtime(_ObjC)
     guard isNative else {
       var result = _NativeSet<Element>()

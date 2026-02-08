@@ -748,18 +748,19 @@ extension _NativeSet {
   }
 
   @_alwaysEmitIntoClient
-  internal __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> _NativeSet<Element> {
-    try unsafe _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) { bitset in
+  internal consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> _NativeSet<Element> {
+    try unsafe _UnsafeBitset.withTemporaryBitset(capacity: bucketCount) {
+      [s = consume self] bitset throws(E) -> _NativeSet<Element> in
       var count = 0
-      for unsafe bucket in unsafe hashTable {
-        if try isIncluded(unsafe uncheckedElement(at: bucket)) {
+      for unsafe bucket in unsafe s.hashTable {
+        if try isIncluded(unsafe s.uncheckedElement(at: bucket)) {
           unsafe bitset.uncheckedInsert(bucket.offset)
           count += 1
         }
       }
-      return unsafe extractSubset(using: bitset, count: count)
+      return unsafe s.extractSubset(using: bitset, count: count)
     }
   }
 

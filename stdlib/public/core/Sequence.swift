@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -736,17 +736,30 @@ extension Sequence {
   /// - Returns: An array of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  @_alwaysEmitIntoClient
+  public __consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     return try _filter(isIncluded)
   }
 
-  @_transparent
-  public func _filter(
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) throws -> [Element] {
+    try filter(isIncluded)
+  }
+
+  @_alwaysEmitIntoClient  @inline(__always)
+  public func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
 
     var result = ContiguousArray<Element>()
 
@@ -759,6 +772,19 @@ extension Sequence {
     }
 
     return Array(result)
+  }
+
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_underscore_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
   }
 
   /// A value less than or equal to the number of elements in the sequence,

@@ -85,12 +85,28 @@ Enum Never has added a conformance to an existing protocol Encodable
 Enum Never has added a conformance to an existing protocol Identifiable
 
 // These functions haven't actually changed ABI, but are using @_silgen_name tricks to maintain the old ABI while moving to typed throws.
+Func AnyBidirectionalCollection.filter(_:) has been removed
 Func AnyBidirectionalCollection.map(_:) has been removed
+Func AnyCollection.filter(_:) has been removed
 Func AnyCollection.map(_:) has been removed
+Func AnyRandomAccessCollection.filter(_:) has been removed
 Func AnyRandomAccessCollection.map(_:) has been removed
+Func AnySequence.filter(_:) has been removed
 Func AnySequence.map(_:) has been removed
 Func Collection.map(_:) has been removed
+Func RangeReplaceableCollection.filter(_:) has been removed
+Func Sequence._filter(_:) has been removed
+Func Sequence.filter(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func Dictionary.filter(_:) has been removed
+Func Set.filter(_:) has been removed
+Func Substring.filter(_:) has been removed
+Func _AnySequenceBox._filter(_:) has been removed
+Func _ArrayProtocol.filter(_:) has been removed
+Func _BidirectionalCollectionBox._filter(_:) has been removed
+Func _CollectionBox._filter(_:) has been removed
+Func _RandomAccessCollectionBox._filter(_:) has been removed
+Func _SequenceBox._filter(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'

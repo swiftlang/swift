@@ -593,6 +593,10 @@ Added: _$ss20_ArrayBufferProtocolP010withUnsafeB7Pointeryqd__qd__SRy7ElementQzGq
 Added: _$ss20_ArrayBufferProtocolP017withUnsafeMutableB7Pointeryqd__qd__Sry7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTj
 Added: _$ss20_ArrayBufferProtocolP017withUnsafeMutableB7Pointeryqd__qd__Sry7ElementQzGqd_0_YKXEqd_0_YKs5ErrorRd_0_r0_lFTq
 
+// Typed throws for _AnySequenceBox operations.
+Added: _$ss15_AnySequenceBoxC7_filterySayxGSbxqd__YKXEqd__YKs5ErrorRd__lFTj
+Added: _$ss15_AnySequenceBoxC7_filterySayxGSbxqd__YKXEqd__YKs5ErrorRd__lFTq
+
 // Add property descriptors for static properties
 Added: _$sSP4_maxSPyxGvpZMV
 Added: _$sSS5IndexV10__utf16Bits6UInt64VvpZMV

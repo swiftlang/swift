@@ -1353,11 +1353,26 @@ extension Substring {
     return String(self).uppercased()
   }
 
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> String {
-    return try String(self.lazy.filter(isIncluded))
+  @_alwaysEmitIntoClient
+  public func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> String {
+    try String(self.lazy.filter(isIncluded))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(func filter(_ isIncluded: (Element) throws -> Bool) throws -> String)
+  @usableFromInline
+  internal func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> String {
+    try filter(isIncluded)
+  }
+#endif // !$Embedded
 }
 
 extension Substring: TextOutputStream {

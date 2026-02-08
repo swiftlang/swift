@@ -297,13 +297,31 @@ extension Set {
   ///   and returns a Boolean value indicating whether the element should be
   ///   included in the returned set.
   /// - Returns: A set of the elements that `isIncluded` allows.
-  @inlinable
+  @_alwaysEmitIntoClient
   @available(swift, introduced: 4.0)
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> Set {
-    return try Set(_native: _variant.filter(isIncluded))
+  public consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> Set {
+    try Set(_native: _variant.filter(isIncluded))
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> Set
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> Set {
+    try filter(isIncluded)
+  }
+#endif // !$Embedded
 }
 
 extension Set: Collection {
