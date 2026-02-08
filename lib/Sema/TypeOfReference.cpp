@@ -445,7 +445,7 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   auto *expansionLoc = getConstraintLocator(locator.withPathElement(
       LocatorPathElt::PackExpansionType(openedPackExpansion)));
 
-  auto *expansionVar = createTypeVariable(expansionLoc, TVO_PackExpansion,
+  auto *expansionVar = createTypeVariable(expansionLoc, TVO_PackExpansion | TVO_CanBindToNoEscape,
                                           preparedOverload);
 
   // This constraint is important to make sure that pack expansion always
