@@ -99,8 +99,8 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
     def build(self, host_target):
         override_deployment_version = None
         if host_target.startswith('macosx'):
-            if Version(self.args.darwin_deployment_version_osx) < Version('10.15'):
-                override_deployment_version = '10.15'
+            if Version(self.args.darwin_deployment_version_osx) < Version('14.0'):
+                override_deployment_version = '14.0'
 
             # On Darwin platforms, specify a module ABI name suffix so that this
             # copy does not encounter runtime conflicts with a copy loaded from
