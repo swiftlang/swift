@@ -293,7 +293,7 @@ final internal class _SetStorage<Element: Hashable>
       let element = unsafe _elements[bucket.offset]
       unsafe unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
       stored += 1
-      bucket = unsafe hashTable.occupiedBucket(after: bucket)
+      unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
     }
     unsafe theState.extra.0 = CUnsignedLong(bucket.offset)
     unsafe state.pointee = theState
