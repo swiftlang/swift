@@ -488,6 +488,33 @@ class NotSendable {}
         _ = await consumer1.value
         _ = await consumer2.value
       }
+      
+      tests.test("throwing finish behavior with multiple consumers") {
+        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
+        let finished = Expectation()
+        let threw = Expectation()
+        func makeTask() -> Task<(), Never> {
+          Task { @MainActor in
+            do {
+              for try await e in stream {
+                print(e)
+              }
+            } catch {
+              expectFalse(threw.fulfilled)
+              threw.fulfilled = true
+              return
+            }
+            expectFalse(finished.fulfilled)
+            finished.fulfilled = true
+          }
+        }
+        let t1 = makeTask()
+        let t2 = makeTask()
+        continuation.finish(throwing: SomeError())
+        await t1.value
+        await t2.value
+      }
+
 
       await runAllTestsAsync()
     }
