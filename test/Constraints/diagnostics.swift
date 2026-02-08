@@ -1570,6 +1570,13 @@ func testNilCoalescingOperatorRemoveFix() {
       ?? "").isEmpty {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used}} {{-1:9-+0:12=}}
 }
 
+func testMetatypeArgMismatch() {
+  func metatypeGenericOverloaded(_ x: UInt.Type) {}
+  func metatypeGenericOverloaded<T: Equatable>(_ x: T) {}
+  metatypeGenericOverloaded(Int.self)
+  // expected-error@-1 {{cannot convert value of type 'Int.Type' to expected argument type 'UInt.Type'}}
+}
+
 // https://github.com/apple/swift/issues/74617
 struct Foo_74617 {
   public var bar: Float { 123 }

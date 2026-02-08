@@ -2687,6 +2687,10 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
     // bump the impact even higher as they cannot conform to protocols at all.
     if (resolvedTy->isAny() || resolvedTy->isAnyObject())
       impact += 4;
+
+    // Metatypes also cannot conform to protocols, so bump their impact.
+    if (resolvedTy->is<AnyMetatypeType>())
+      impact += 4;
   }
 
   // If this requirement is associated with an overload choice let's
