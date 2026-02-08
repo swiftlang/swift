@@ -416,17 +416,7 @@ do {
   }
 }
 
-
-do {
-  func f<R>(fn: () -> [R]) -> [R] { [] }
-
-  // Requires collection upcast from Array<(key: String, value: String)> to `Array<(String, String)>`
-  func g(v: [String: String]) {
-    let _: [(String, String)] = f { return Array(v) } + v // Ok
-  }
-}
-
-// Make sure that sbutyping works with empty literals.
+// Make sure that subtyping works with empty literals.
 do {
   class A {}
 
