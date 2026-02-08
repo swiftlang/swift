@@ -656,6 +656,15 @@ class BuildScriptInvocation(object):
         builder.add_impl_product(products.LibDispatch,
                                  is_enabled=self.args.build_libdispatch)
 
+        # Begin a new build-script pipeline for Swift Testing only. This is a required
+        # dependency to build XCTest, which is in the next pipeline.
+        # We can't include both in the same pipeline because XCTest is an impl product.
+        builder.begin_pipeline()
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
+
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
@@ -675,10 +684,6 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
 
-        builder.add_product(products.SwiftTestingMacros,
-                            is_enabled=self.args.build_swift_testing_macros)
-        builder.add_product(products.SwiftTesting,
-                            is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
 
