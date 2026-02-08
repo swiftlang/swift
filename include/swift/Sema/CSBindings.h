@@ -369,6 +369,9 @@ struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
   }
 
   static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    if (LHS.Kind != RHS.Kind)
+      return false;
+
     auto lhsTy = LHS.BindingType.getPointer();
     auto rhsTy = RHS.BindingType.getPointer();
 
