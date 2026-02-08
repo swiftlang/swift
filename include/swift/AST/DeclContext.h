@@ -800,9 +800,16 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
+  enum class LazyMemberStatus {
+    AllLoaded,
+    StorageLoaded,
+    NotLoaded,
+  };
+
   /// The first declaration in this context along with a bit indicating whether
   /// the members of this context will be lazily produced.
-  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
+  mutable llvm::PointerIntPair<Decl *, 2, LazyMemberStatus>
+      FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
@@ -863,7 +870,8 @@ class IterableDeclContext {
 
 public:
   IterableDeclContext(IterableDeclContextKind kind)
-    : LastDeclAndKind(nullptr, kind) {
+      : FirstDeclAndLazyMembers(nullptr, LazyMemberStatus::AllLoaded),
+        LastDeclAndKind(nullptr, kind) {
     AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
     HasDerivativeDeclarations = 0;
@@ -989,18 +997,30 @@ public:
   /// only be called from the code completion delayed parsing path.
   void addMemberPreservingSourceOrder(Decl *member);
 
-  /// Check whether there are lazily-loaded members.
+  /// Whether there are lazy members to load.
   bool hasLazyMembers() const {
-    return FirstDeclAndLazyMembers.getInt();
+    return FirstDeclAndLazyMembers.getInt() != LazyMemberStatus::AllLoaded;
+  }
+
+  /// Externally tell this context that it has more lazy members,
+  /// i.e., lazy member loading is incomplete.
+  ///
+  /// Be aware that setting this may lead to the same member being added twice,
+  /// which it should never be!
+  void forceSetHasLazyMembers() const {
+    FirstDeclAndLazyMembers.setInt(LazyMemberStatus::NotLoaded);
   }
 
   /// Setup the loader for lazily-loaded members.
   void setMemberLoader(LazyMemberLoader *loader, uint64_t contextData);
 
-  /// Externally tell this context that it has no more lazy members, i.e. all lazy member loading is complete.
-  void setHasLazyMembers(bool hasLazyMembers) const;
+  /// Ensure parsed members of this context are added, if they aren't already.
+  void addParsedMembers() const;
 
-  /// Load all of the members of this context.
+  /// Ensure storage members of this context are loaded, if they aren't already.
+  void loadStorageMembers() const;
+
+  /// Ensure all members of this context are loaded, if they aren't already.
   void loadAllMembers() const;
 
   /// Determine whether this was deserialized (and thus SerialID is

@@ -10,8 +10,8 @@
 // CHECK-NEXT:   struct Decl<CInt> {
 // CHECK-NEXT:     init(fwd: NS1.ForwardDeclared<CInt>)
 // CHECK-NEXT:     init()
-// CHECK-NEXT:     typealias MyInt = Int32
 // CHECK-NEXT:     var fwd: NS1.ForwardDeclared<CInt>
+// CHECK-NEXT:     typealias MyInt = Int32
 // CHECK-NEXT:     static var intValue: NS1.Decl<CInt>.MyInt { get }
 // CHECK-NEXT:   }
 // CHECK-NEXT:   @available(*, unavailable, message: "Un-specialized class templates are not currently supported. Please use a specialization of this type.")

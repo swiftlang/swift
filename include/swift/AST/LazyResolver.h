@@ -87,11 +87,25 @@ class alignas(void*) LazyMemberLoader {
 public:
   virtual ~LazyMemberLoader() = default;
 
-  /// Populates a given decl \p D with all of its members.
+  /// Populates a given decl \p D with all members that affect storage.
   ///
-  /// The implementation should add the members to D.
-  virtual void
-  loadAllMembers(Decl *D, uint64_t contextData) = 0;
+  /// INVARIANT: this method should only ever be called once for \p D, to avoid
+  /// adding duplicates to the linked list of members. It is the responsibility
+  /// of the caller (IterableDeclContext) to ensure this.
+  ///
+  /// An exception is when \p D is an imported clang::NamespaceDecl, in which
+  /// case no members are ever added (kind of a hack, should consider fixing it)
+  virtual void loadStorageMembers(Decl *D, uint64_t contextData) = 0;
+
+  /// Populates a given decl \p D with all members that do not affect storage.
+  ///
+  /// INVARIANT: this method should only ever be called once for \p D, to avoid
+  /// adding duplicates to the linked list of members. It is the responsibility
+  /// of the caller (IterableDeclContext) to ensure this.
+  ///
+  /// INVARIANT: the caller (an IterableDeclContext with a lazy loader)
+  /// must have already called loadStorageMembers() before calling this.
+  virtual void loadNonStorageMembers(Decl *D, uint64_t contextData) = 0;
 
   /// Populates a vector with all members of \p IDC that have DeclName
   /// matching \p N.
