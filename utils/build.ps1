@@ -3506,6 +3506,7 @@ function Build-Subprocess([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers C,Swift `
     -SwiftSDK (Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK) `
+    -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
