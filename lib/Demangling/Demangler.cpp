@@ -4428,6 +4428,20 @@ NodePointer Demangler::demangleGenericRequirement() {
       if (!inverseKind)
         return nullptr;
       break;
+    case 'j':
+      ConstraintKind = Inverse;
+      TypeKind = Assoc;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
+    case 'J':
+      ConstraintKind = Inverse;
+      TypeKind = CompoundAssoc;
+      inverseKind = demangleIndexAsNode();
+      if (!inverseKind)
+        return nullptr;
+      break;
     default:  ConstraintKind = Protocol; TypeKind = Generic; pushBack(); break;
   }
 
