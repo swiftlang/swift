@@ -211,7 +211,8 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
-void swift::runJobInEstablishedExecutorContext(Job *job) {
+void swift::runJobInEstablishedExecutorContext(Job *job, HeapObject *actor,
+                                               HeapObject *executorIdentity) {
   _swift_tsan_acquire(job);
   SWIFT_TASK_DEBUG_LOG("Run job in established context %p", job);
 
@@ -230,7 +231,8 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     [[maybe_unused]]
     uint32_t dispatchOpaquePriority = task->flagAsRunning();
 
-    auto traceHandle = concurrency::trace::job_run_begin(job);
+    auto traceHandle =
+        concurrency::trace::job_run_begin(job, actor, executorIdentity);
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
 
@@ -1858,7 +1860,7 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
 
       // This thread is now going to follow the task on this actor.
       // It may hop off the actor
-      runJobInEstablishedExecutorContext(job);
+      runJobInEstablishedExecutorContext(job, currentActor, currentActor);
 
       // We could have come back from the job on a generic executor and not as
       // part of a default actor. If so, there is no more work left for us to do
@@ -2210,8 +2212,10 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
 
   trackingInfo.enterAndShadow(executor, taskExecutor);
 
+  HeapObject *actor =
+      executor.isDefaultActor() ? executor.getDefaultActor() : nullptr;
   SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job);
+  runJobInEstablishedExecutorContext(job, actor, executor.getIdentity());
 
   trackingInfo.leave();
 
@@ -2236,8 +2240,11 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
   trackingInfo.disallowSwitching();
   trackingInfo.enterAndShadow(serialExecutor, taskExecutor);
 
+  HeapObject *actor = serialExecutor.isDefaultActor()
+                          ? serialExecutor.getDefaultActor()
+                          : nullptr;
   SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job);
+  runJobInEstablishedExecutorContext(job, actor, serialExecutor.getIdentity());
 
   trackingInfo.leave();
 
@@ -2733,6 +2740,7 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   auto serialExecutorIdentity = serialExecutorRef.getIdentity();
   auto serialExecutorType = swift_getObjectType(serialExecutorIdentity);
   auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
+  concurrency::trace::job_enqueue_executor(job, serialExecutorIdentity);
   _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorType,
                                 serialExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
