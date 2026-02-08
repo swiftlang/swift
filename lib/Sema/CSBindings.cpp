@@ -1613,17 +1613,23 @@ bool swift::constraints::inference::checkTypeOfBinding(
   return true;
 }
 
+bool BindingSet::isDelayedByDisjunction() const {
+  if (TypeVar->getImpl().isSubscriptResultType())
+    return true;
+
+  return llvm::any_of(Info.DelayedBy, [](const Constraint *constraint) {
+    return constraint->getKind() == ConstraintKind::Disjunction ||
+           constraint->getKind() == ConstraintKind::ValueMember;
+  });
+}
+
 bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   if (isHole())
     return false;
 
   if (!CS.shouldAttemptFixes()) {
     // Result type of subscript could be l-value so we can't bind it early.
-    if (!TypeVar->getImpl().isSubscriptResultType() &&
-        llvm::none_of(Info.DelayedBy, [](const Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Disjunction ||
-                 constraint->getKind() == ConstraintKind::ValueMember;
-        })) {
+    if (!isDelayedByDisjunction()) {
       if (getNumExactBindings() > 0)
         return true;
     }
