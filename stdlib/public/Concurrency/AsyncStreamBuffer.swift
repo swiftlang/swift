@@ -234,9 +234,7 @@ extension AsyncStream {
     func next(_ continuation: UnsafeContinuation<Element?, Never>) {
       lock()
       unsafe state.continuations.append(continuation)
-      if unsafe state.continuations.count > 1 {
-        onMultipleAwaitersDetected()
-      }
+      let hasMultipleAwaiters = unsafe state.continuations.count > 1
       if unsafe state.pending.count > 0 {
         let cont = unsafe state.continuations.removeFirst()
         let toSend = unsafe state.pending.removeFirst()
@@ -249,7 +247,9 @@ extension AsyncStream {
       } else {
         unlock()
       }
-
+      if hasMultipleAwaiters {
+        onMultipleAwaitersDetected()
+      }
     }
 
     func next() async -> Element? {
@@ -495,9 +495,7 @@ extension AsyncThrowingStream {
     func next(_ continuation: UnsafeContinuation<Element?, Error>) {
       lock()
       unsafe state.continuations.append(continuation)
-      if unsafe state.continuations.count > 1 {
-        onMultipleAwaitersDetected()
-      }
+      let hasMultipleAwaiters = unsafe state.continuations.count > 1
       if unsafe state.pending.count > 0 {
         let cont = unsafe state.continuations.removeFirst()
         let toSend = unsafe state.pending.removeFirst()
@@ -520,6 +518,9 @@ extension AsyncThrowingStream {
         }
       } else {
         unlock()
+      }
+      if hasMultipleAwaiters {
+        onMultipleAwaitersDetected()
       }
     }
 
@@ -609,7 +610,7 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
 @inline(never)
 @_silgen_name("asyncstream_on_multiple_awaiters_detected")
 func onMultipleAwaitersDetected() {
-  unsafe logFailedCheck("SWIFT ASYNCSTREAM MISUSE: used by multiple awaiters!")
+  unsafe logFailedCheck("SWIFT ASYNCSTREAM: used by multiple awaiters!")
 }
 
 #endif
