@@ -1281,8 +1281,7 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
                                                                           : 0;
 
   return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
-                         b.isDelayed(), b.isSubtypeOfExistentialType(),
-                         b.involvesTypeVariables(),
+                         b.isDelayed(), b.involvesTypeVariables(),
                          static_cast<unsigned char>(b.getLiteralForScore()),
                          -numNonDefaultableBindings);
 }
@@ -2587,8 +2586,6 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
     attributes.push_back("potentially_incomplete");
   if (isDelayed())
     attributes.push_back("delayed");
-  if (isSubtypeOfExistentialType())
-    attributes.push_back("subtype_of_existential");
   if (isDirty())
     attributes.push_back("dirty");
   if (!attributes.empty()) {
