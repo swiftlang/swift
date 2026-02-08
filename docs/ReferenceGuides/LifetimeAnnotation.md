@@ -184,3 +184,38 @@ extension A /* Self: Escapable */ {
 An implicit setter of a `~Escapable` stored property defaults to `@_lifetime(self: copy self, copy newValue)`. This is always correct because the setter simply assigns the stored property to the newValue. Assigning a `~Escapable` variable copies the lifetime dependency.
 
 Similarly, an implicit initializer of a non-Escapable struct defaults to `@_lifetime(self: copy arg)` if all of the initializer arguments are `~Escapable`. This is equivalent to assigning each `~Escapable` stored property. If, however, any initializer arguments are `Escapable`, then no default lifetime is provided unless it is the sole argument, in which case the single parameter rule applies.
+
+## Function Type Lifetimes
+
+Function types can also have lifetime dependencies. This makes it possible to pass a callback function parameter that returns a non-Escapable type.
+The annotation syntax is the same as above, and the default lifetime inference rules for non-member functions apply.
+Support for lifetime dependencies in closures is not yet implemented, so only normal functions may be passed.
+
+Examples:
+
+```swift
+struct NE: ~Escapable {}
+
+func processNEs(ne0: NE, ne1: NE) -> NE { ne0 }
+
+/* DEFAULT: @_lifetime(copy ne0, copy ne1) */
+func takeProcessor(ne0: NE, ne1: NE,
+                   /* DEFAULT: @_lifetime(copy $0, copy $1). */
+                   fn: (NE, NE) -> NE) -> NE {
+    return fn(ne0, ne1)
+}
+
+_ = takeProcessor(ne0: NE(), ne1: NE(), fn: processNEs)
+```
+
+Note that function types cannot have argument labels, so you must use internal labels in lifetime annotations:
+
+```swift
+@_lifetime(copy ne0)
+func processNEs2(ne0: NE, ne1: NE) -> NE { ne0 }
+
+func takeProcessor2(ne0: NE, ne1: NE,
+                    fn: @_lifetime(copy ne0) (_ ne0: NE, NE) -> NE) -> NE {
+    return fn(ne0, ne1)
+}
+```
