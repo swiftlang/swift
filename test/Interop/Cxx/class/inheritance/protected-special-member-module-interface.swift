@@ -12,8 +12,8 @@
 
 // CHECK:      struct PrivatelyInheritsProtectedDtor {
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   mutating func setFromBase(_ v: Int32)
 // CHECK-NEXT:   var inDerived: Int32
+// CHECK-NEXT:   mutating func setFromBase(_ v: Int32)
 // CHECK-NEXT: }
 
 // CHECK:      struct InheritsProtectedCopy {
@@ -39,13 +39,13 @@
 // CHECK-NEXT: }
 
 // CHECK:      struct ProtectedCopyWithMove : ~Copyable {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   var fromBase: Int32
+// CHECK-NEXT:   init()
 // CHECK-NEXT: }
 
 // CHECK:      struct InheritsProtectedCopyWithMove {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   var fromBase: Int32
 // CHECK-NEXT:   func getFromBase() -> Int32
 // CHECK-NEXT:   mutating func setFromBase(_ x: Int32)
-// CHECK-NEXT:   var fromBase: Int32
 // CHECK-NEXT: }

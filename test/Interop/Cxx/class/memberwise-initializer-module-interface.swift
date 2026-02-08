@@ -4,13 +4,13 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructPublicOnly {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructEmptyPrivateSection {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructPublicAndPrivate {
@@ -18,16 +18,16 @@
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct StructWithUnimportedMemberFunction {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassPrivateOnly {
 // CHECK-NEXT:   init()
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassPublicOnly {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassEmptyPublicSection {
@@ -38,29 +38,29 @@
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassWithUnimportedMemberFunction {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassWithTemplatedFunction {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassWithTemplatedUsingDecl {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassWithStaticAssert {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(x: Int32, y: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var x: Int32
 // CHECK-NEXT:   var y: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassWithStaticAssert2 {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(x: Int32, y: Int32)
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var x: Int32
 // CHECK-NEXT:   var y: Int32
 // CHECK-NEXT: }
