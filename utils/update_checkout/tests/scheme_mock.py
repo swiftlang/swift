@@ -219,7 +219,8 @@ class SchemeMockTestCase(unittest.TestCase):
         teardown_mock_remote(self.workspace)
 
     def call(self, *args, **kwargs):
-        kwargs["cwd"] = self.source_root
+        if "cwd" not in kwargs:
+            kwargs["cwd"] = self.source_root
         return call_quietly(*args, **kwargs)
 
     def get_all_repos(self):
