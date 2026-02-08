@@ -642,6 +642,8 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
+  list(APPEND swift_flags "-enable-experimental-feature" "Lifetimes")
+  list(APPEND swift_flags "-enable-experimental-feature" "Reparenting")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
