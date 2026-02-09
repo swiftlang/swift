@@ -438,8 +438,11 @@ def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=
 def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
   HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
-def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
-  HelpText<"Disable per-name lazy member loading (obsolete)">;
+def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+  HelpText<"Reject valid solutions in diagnostic mode">;
+
+def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+  HelpText<"Accept valid solutions in diagnostic mode">;
 
 def disable_named_lazy_import_as_member_loading :
   Flag<["-"], "disable-named-lazy-import-as-member-loading">,
