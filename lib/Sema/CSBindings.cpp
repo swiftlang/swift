@@ -2081,16 +2081,34 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
   // BindParam constraints are not reflexive and must be treated specially.
   if (constraint->getKind() == ConstraintKind::BindParam) {
-    if (kind == AllowedBindingKind::Subtypes) {
+    switch (kind) {
+    case AllowedBindingKind::Subtypes: {
       if (auto *lvt = type->getAs<LValueType>()) {
         type = InOutType::get(lvt->getObjectType());
       }
-    } else if (kind == AllowedBindingKind::Supertypes) {
+      kind = AllowedBindingKind::Exact;
+      break;
+    }
+    case AllowedBindingKind::Supertypes: {
       if (auto *iot = type->getAs<InOutType>()) {
         type = LValueType::get(iot->getObjectType());
       }
+      kind = AllowedBindingKind::Exact;
+      break;
     }
-    kind = AllowedBindingKind::Exact;
+    case AllowedBindingKind::Exact:
+    case AllowedBindingKind::Fallback:
+      break;
+    }
+  }
+
+  // We allow a funny function conversion (...) -> T conv (...) -> Void
+  // in certain positions. To handle this correctly, we must not attempt
+  // a Void binding too soon in this situation. Handle it like a fallback
+  // instead of a real subtype relationship, since it isn't one.
+  if (kind == AllowedBindingKind::Subtypes && type->isVoid() &&
+      constraint->getLocator()->isLastElement<LocatorPathElt::ClosureBody>()) {
+    kind = AllowedBindingKind::Fallback;
   }
 
   return PotentialBinding{type, kind, constraint};
