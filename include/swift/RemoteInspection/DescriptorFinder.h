@@ -22,19 +22,36 @@ namespace reflection {
 
 class TypeRef;
 
+/// Enum representing the bitwise-takability and/or borrowability of a type.
+///
+/// A type is bitwise-takable if it can be moved with a `memmove`-equivalent
+/// operation. A type is bitwise-borrowable if it can be passed as a borrow
+/// with memcpy-equivalent behavior (such as passing the value in registers
+/// instead of passing its address). A type must be bitwise-takable if it is
+/// bitwise-borrowable, but the inverse is not true.
+enum class BitwiseBorrowability : unsigned {
+  None,
+  TakableOnly,
+  TakableAndBorrowable
+};
+
 /// An abstract interface for a builtin type descriptor.
 struct BuiltinTypeDescriptorBase {
   const uint32_t Size;
   const uint32_t Alignment;
   const uint32_t Stride;
   const uint32_t NumExtraInhabitants;
-  const bool IsBitwiseTakable;
+  const BitwiseBorrowability Borrowability;
+  const bool AddressableForDependencies;
 
   BuiltinTypeDescriptorBase(uint32_t Size, uint32_t Alignment, uint32_t Stride,
-                            uint32_t NumExtraInhabitants, bool IsBitwiseTakable)
+                            uint32_t NumExtraInhabitants,
+                            BitwiseBorrowability Borrowability,
+                            bool AFD)
       : Size(Size), Alignment(Alignment), Stride(Stride),
         NumExtraInhabitants(NumExtraInhabitants),
-        IsBitwiseTakable(IsBitwiseTakable) {}
+        Borrowability(Borrowability),
+        AddressableForDependencies(AFD) {}
 
   virtual ~BuiltinTypeDescriptorBase(){};
 
