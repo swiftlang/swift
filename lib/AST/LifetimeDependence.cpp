@@ -378,7 +378,8 @@ public:
   }
 
   void inferInoutDependency(unsigned paramIndex) {
-    inferDependency(paramIndex, paramIndex, LifetimeDependenceKind::Inherit);
+    auto iter = depsArray.try_emplace(paramIndex, false, sourceIndexCap).first;
+    iter->second.addIfNew(paramIndex, LifetimeDependenceKind::Inherit);
   }
 
   // Allocate LifetimeDependenceInfo in the ASTContext. Initialize it by
