@@ -143,11 +143,11 @@ import lifetime_underscored_dependence
 // CHECK: @inlinable public func takeCopierUnannotated(f: (consuming lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {}
 
 // CHECK: #if compiler(>=5.3) && $ClosureLifetimes
-// CHECK-NEXT: public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, _ ne0: consuming lifetime_underscored_dependence.AnotherView, _ ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView
+// CHECK-NEXT: public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, _ ne0: consuming lifetime_underscored_dependence.AnotherView, _ ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $ClosureLifetimes
-// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, _ ne0: consuming lifetime_underscored_dependence.AnotherView, _ ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {} 
+// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, _ ne0: consuming lifetime_underscored_dependence.AnotherView, _ ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {} 
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $Lifetimes

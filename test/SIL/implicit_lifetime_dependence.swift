@@ -232,7 +232,8 @@ public struct OuterNE: ~Escapable {
     self.inner1 = InnerNE(owner: owner)
   }
 
-  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method)
+  // (@guaranteed OuterNE.InnerNE, @lifetime(copy 0, copy 1) @inout OuterNE) -> () {
   @_lifetime(self: copy value)
   mutating func setInner(value: InnerNE) {
     self.inner1 = value
