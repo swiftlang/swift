@@ -81,8 +81,6 @@ Protocol SerialExecutor has added inherited protocol SendableMetatype
 
 // #isolated adoption in with...Continuation
 // api-digester is not aware of silgen_name trickery we do to keep this ABI compatible
-Func withCheckedContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
-Func withCheckedContinuation(function:_:) has parameter 1 type change from (_Concurrency.CheckedContinuation<τ_0_0, Swift.Never>) -> () to Swift.String
 Func withCheckedThrowingContinuation(function:_:) has been renamed to Func withCheckedThrowingContinuation(isolation:function:_:)
 Func withCheckedThrowingContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedThrowingContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A' to '_Concurrency.withCheckedThrowingContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Error>) -> ()) async throws -> A'
 Func withCheckedThrowingContinuation(function:_:) has parameter 0 type change from Swift.String to (any _Concurrency.Actor)?
@@ -91,10 +89,6 @@ Func withCheckedThrowingContinuation(function:_:) has parameter 1 type change fr
 // #isolation adoption for cancellation handlers; old APIs are kept ABI compatible
 Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func withTaskCancellationHandler(operation:onCancel:isolation:)
 Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
-
-// #isolated was adopted and the old methods kept: $ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF
-Func withCheckedContinuation(function:_:) has been renamed to Func withCheckedContinuation(isolation:function:_:)
-Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency.withCheckedContinuation<A>(isolation: isolated Swift.Optional<Swift.Actor>, function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
 
 // AsyncStream.init(unfolding:onCancel:) uses @_silgen_name to preserve mangling after adding @preconcurrency.
 Constructor AsyncStream.init(unfolding:onCancel:) has mangled name changing from 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<@Sendable () -> ()>) -> Swift.AsyncStream<A>' to 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<() -> ()>) -> Swift.AsyncStream<A>'
@@ -127,6 +121,10 @@ Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_
 Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
 Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
+
+// Adopt nonisolated(nonsending) in withCheckedContinuation
+Func withCheckedContinuation(function:_:) has been renamed to Func _unsafeInheritExecutor_withCheckedContinuation(function:_:)
+Func withCheckedContinuation(function:_:) has mangled name changing from '_Concurrency.withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A' to '_Concurrency._unsafeInheritExecutor_withCheckedContinuation<A>(function: Swift.String, _: (Swift.CheckedContinuation<A, Swift.Never>) -> ()) async -> A'
 
 Func pthread_main_np() is a new API without '@available'
 
