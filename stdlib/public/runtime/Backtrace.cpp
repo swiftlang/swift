@@ -1340,9 +1340,8 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   #ifdef _WIN32
   _swift_formatUnsigned(GetCurrentProcessId(), pid_buf);
   #endif
-#endif
 
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
+  #if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
   // Set-up the environment array
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
@@ -1358,16 +1357,16 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   // SUSv3 says argv and envp are "completely constant" and that the reason
   // posix_spawn() et al use char * const * is for compatibility.
-#ifdef __linux__
+  #ifdef __linux__
   int ret = safe_spawn(&child, swiftBacktracePath, memserver_fd,
                        const_cast<char * const *>(backtracer_argv),
                        const_cast<char * const *>(env));
-#else
+  #else
   int ret = posix_spawn(&child, swiftBacktracePath,
                         nullptr, nullptr,
                         const_cast<char * const *>(backtracer_argv),
                         const_cast<char * const *>(env));
-#endif
+  #endif
   if (ret < 0)
     return false;
 
@@ -1382,7 +1381,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   return false;
 
-#elif defined(_WIN32)
+  #elif defined(_WIN32)
   HANDLE hOutput;
   if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
     hOutput = GetStdHandle(STD_ERROR_HANDLE);
@@ -1461,6 +1460,7 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
 
   CloseHandle(processInfo.hProcess);
   return dwExitCode == 0;
+  #endif
 #endif
 }
 
