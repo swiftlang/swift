@@ -272,7 +272,6 @@ class ASTContext final {
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
-      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
@@ -299,7 +298,6 @@ public:
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
-      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 

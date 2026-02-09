@@ -131,13 +131,11 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
   SerializationOptions serializationOpts = ctx.SerializationOpts;
   std::optional<clang::DarwinSDKInfo> SDKInfo;
-  if (auto *ctxSDKInfo = ctx.getDarwinSDKInfo())
-    SDKInfo = *ctxSDKInfo;
 
   DiagnosticEngine tmpDiags(tmpSM);
-  auto &tmpCtx = *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
-                                  clangOpts, symbolOpts, casOpts,
-                                  serializationOpts, tmpSM, tmpDiags, SDKInfo);
+  auto &tmpCtx =
+      *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
+                       symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
 

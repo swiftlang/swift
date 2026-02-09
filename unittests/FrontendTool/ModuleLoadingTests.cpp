@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "gtest/gtest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
@@ -18,9 +17,9 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
-#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "gtest/gtest.h"
 
 using namespace swift;
 
@@ -106,10 +105,9 @@ protected:
     SILOptions silOpts;
     CASOptions casOpts;
     SerializationOptions serializationOpts;
-    std::optional<clang::DarwinSDKInfo> SDKInfo;
     auto ctx = ASTContext::get(langOpts, typecheckOpts, silOpts, searchPathOpts,
                                clangImpOpts, symbolGraphOpts, casOpts,
-                               serializationOpts, sourceMgr, diags, SDKInfo);
+                               serializationOpts, sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,

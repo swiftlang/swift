@@ -270,11 +270,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   SerializationOptions serializationOpts =
       CachedCI->getASTContext().SerializationOpts;
   std::optional<clang::DarwinSDKInfo> SDKInfo;
-  if (auto *contextSDKInfo = CachedCI->getASTContext().getDarwinSDKInfo())
-    SDKInfo = *contextSDKInfo;
-  std::unique_ptr<ASTContext> tmpCtx(ASTContext::get(
-      langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
-      casOpts, serializationOpts, tmpSM, tmpDiags, SDKInfo));
+  std::unique_ptr<ASTContext> tmpCtx(
+      ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
+                      symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);

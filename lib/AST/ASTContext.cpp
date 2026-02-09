@@ -798,7 +798,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &serializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
+    DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
@@ -813,7 +813,7 @@ ASTContext *ASTContext::get(
   return new (mem)
       ASTContext(langOpts, typecheckOpts, silOpts, SearchPathOpts,
                  ClangImporterOpts, SymbolGraphOpts, casOpts, serializationOpts,
-                 SourceMgr, Diags, DarwinSDKInfo, std::move(OutputBackend));
+                 SourceMgr, Diags, std::move(OutputBackend));
 }
 
 ASTContext::ASTContext(
@@ -822,7 +822,7 @@ ASTContext::ASTContext(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
     SerializationOptions &SerializationOpts, SourceManager &SourceMgr,
-    DiagnosticEngine &Diags, std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
+    DiagnosticEngine &Diags,
     llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend)
     : LangOpts(langOpts), TypeCheckerOpts(typecheckOpts), SILOpts(silOpts),
       SearchPathOpts(SearchPathOpts), ClangImporterOpts(ClangImporterOpts),
@@ -840,23 +840,23 @@ ASTContext::ASTContext(
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
       TheUnconstrainedAnyType(
           ProtocolCompositionType::theUnconstrainedAnyType(*this)),
-      TheSelfType(CanGenericTypeParamType(
-          GenericTypeParamType::getType(0, 0, *this))),
+      TheSelfType(
+          CanGenericTypeParamType(GenericTypeParamType::getType(0, 0, *this))),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
 #include "swift/AST/TypeNodes.def"
-      TheIEEE32Type(new(*this, AllocationArena::Permanent)
+      TheIEEE32Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE32, *this)),
-      TheIEEE64Type(new(*this, AllocationArena::Permanent)
+      TheIEEE64Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE64, *this)),
-      TheIEEE16Type(new(*this, AllocationArena::Permanent)
+      TheIEEE16Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE16, *this)),
-      TheIEEE80Type(new(*this, AllocationArena::Permanent)
+      TheIEEE80Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::IEEE80, *this)),
-      TheIEEE128Type(new(*this, AllocationArena::Permanent)
+      TheIEEE128Type(new (*this, AllocationArena::Permanent)
                          BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
-      ThePPC128Type(new(*this, AllocationArena::Permanent)
+      ThePPC128Type(new (*this, AllocationArena::Permanent)
                         BuiltinFloatType(BuiltinFloatType::PPC128, *this)) {
 
   // Initialize all of the known identifiers.
@@ -868,12 +868,6 @@ ASTContext::ASTContext(
     Id_StringProcessing
   };
   StdlibOverlayNames = AllocateCopy(stdlibOverlayNames);
-
-  if (DarwinSDKInfo)
-    getImpl().SDKInfo.emplace(
-        std::make_unique<clang::DarwinSDKInfo>(*DarwinSDKInfo));
-  else
-    getImpl().SDKInfo.emplace();
 
   // Record the initial set of search paths.
   for (const auto &path : SearchPathOpts.getImportSearchPaths())
@@ -7285,6 +7279,23 @@ bool ASTContext::isASCIIString(StringRef s) const {
 }
 
 clang::DarwinSDKInfo *ASTContext::getDarwinSDKInfo() const {
+  if (!getImpl().SDKInfo) {
+    auto SDKInfoOrErr = clang::parseDarwinSDKInfo(*SourceMgr.getFileSystem(),
+                                                  SearchPathOpts.SDKPath);
+    if (!SDKInfoOrErr) {
+      llvm::handleAllErrors(SDKInfoOrErr.takeError(),
+                            [](const llvm::ErrorInfoBase &) {
+                              // Ignore the error for now..
+                            });
+      getImpl().SDKInfo.emplace();
+    } else if (!*SDKInfoOrErr) {
+      getImpl().SDKInfo.emplace();
+    } else {
+      getImpl().SDKInfo.emplace(
+          std::make_unique<clang::DarwinSDKInfo>(**SDKInfoOrErr));
+    }
+  }
+
   return getImpl().SDKInfo->get();
 }
 

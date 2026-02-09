@@ -1193,7 +1193,6 @@ struct ParserUnit::Implementation {
   CASOptions CASOpts;
   SerializationOptions SerializationOpts;
   DiagnosticEngine Diags;
-  std::optional<clang::DarwinSDKInfo> SDKInfo;
   ASTContext &Ctx;
   SourceManager &SM;
   unsigned BufferID;
@@ -1206,7 +1205,7 @@ struct ParserUnit::Implementation {
         SILOpts(SILOptions()), Diags(SM),
         Ctx(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts,
                              clangImporterOpts, symbolGraphOpts, CASOpts,
-                             SerializationOpts, SM, Diags, SDKInfo)),
+                             SerializationOpts, SM, Diags)),
         SM(SM), BufferID(BufferID) {
     registerParseRequestFunctions(Ctx.evaluator);
 
