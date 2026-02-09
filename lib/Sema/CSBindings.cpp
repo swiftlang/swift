@@ -572,7 +572,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
             CS.getType(locator->getAnchor())->getAs<TypeVariableType>()) {
       auto &node = CS.getConstraintGraph()[keyPathTy];
       if (node.hasBindingSet()) {
-        auto &bindings = node.getBindingSet();
+        const auto &bindings = node.getBindingSet();
 
         for (auto &binding : bindings.Bindings) {
           auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
@@ -598,7 +598,7 @@ void BindingSet::inferTransitiveKeyPathBindings() {
             if (auto *contextualRootVar = inferredRootTy->getAs<TypeVariableType>()) {
               auto &node = CS.getConstraintGraph()[contextualRootVar];
               if (node.hasBindingSet()) {
-                auto &bindings = node.getBindingSet();
+                const auto &bindings = node.getBindingSet();
 
                 // Don't infer if root is not yet fully resolved.
                 if (bindings.isDelayed())
@@ -639,7 +639,7 @@ void BindingSet::inferTransitiveSupertypeBindings() {
     if (!node.hasBindingSet())
       continue;
 
-    auto &bindings = node.getBindingSet();
+    const auto &bindings = node.getBindingSet();
 
     // FIXME: This is a workaround necessary because solver doesn't filter
     // bindings based on protocol requirements placed on a type variable.
