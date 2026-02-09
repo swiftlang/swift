@@ -1291,10 +1291,13 @@ BindingSet::BindingScore BindingSet::formBindingScore(const BindingSet &b) {
     numNonDefaultableBindings = 1;
   }
 
-  return std::make_tuple(b.isHole(), numNonDefaultableBindings == 0,
-                         b.isDelayed(), b.involvesTypeVariables(),
+  return std::make_tuple(b.isHole(),
+                         numNonDefaultableBindings == 0,
+                         b.isDelayed(),
+                         b.involvesTypeVariables(),
                          static_cast<unsigned char>(b.getLiteralForScore()),
-                         -numNonDefaultableBindings);
+                         -numNonDefaultableBindings,
+                         b.getNumViableDefaultableBindings());
 }
 
 bool BindingSet::operator<(const BindingSet &other) {
@@ -1328,14 +1331,6 @@ bool BindingSet::operator<(const BindingSet &other) {
 
   if (yScore < xScore)
     return false;
-
-  auto xDefaults = getNumViableDefaultableBindings();
-  auto yDefaults = other.getNumViableDefaultableBindings();
-
-  // If there is a difference in number of default types,
-  // prioritize bindings with fewer of them.
-  if (xDefaults != yDefaults)
-    return xDefaults < yDefaults;
 
   // If neither type variable is a "hole" let's check whether
   // there is a subtype relationship between them and prefer
