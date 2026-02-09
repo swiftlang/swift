@@ -4154,12 +4154,6 @@ class FunctionType final
 
 public:
   /// 'Constructor' Factory Function
-#if 0  
-  static FunctionType *get(ArrayRef<Param> params, Type result,
-                           std::optional<ExtInfo> info = std::nullopt) {
-    return get(params, {}, result, info);
-  }
-#endif
   static FunctionType *get(ArrayRef<Param> params, ArrayRef<Yield> yields,
                            Type result,
                            std::optional<ExtInfo> info = std::nullopt);
@@ -4252,13 +4246,6 @@ private:
                RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-#if 0
-static CanFunctionType get(CanParamArrayRef params, CanType result,
-                           std::optional<ExtInfo> info = std::nullopt) {
-  auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
-  return cast<FunctionType>(fnType->getCanonicalType());
-}
-#endif
 static CanFunctionType get(CanParamArrayRef params, CanYieldArrayRef yields,
                            CanType result,
                            std::optional<ExtInfo> info = std::nullopt) {
@@ -4373,13 +4360,6 @@ class GenericFunctionType final
 
 public:
   /// Create a new generic function type.
-#if 0  
-  static GenericFunctionType *get(GenericSignature sig, ArrayRef<Param> params,
-                                  Type result,
-                                  std::optional<ExtInfo> info = std::nullopt) {
-    return get(sig, params, {}, result, info);
-  }
-#endif
   static GenericFunctionType *get(GenericSignature sig, ArrayRef<Param> params,
                                   ArrayRef<Yield> yields, Type result,
                                   std::optional<ExtInfo> info = std::nullopt);
@@ -4475,19 +4455,6 @@ static CanGenericFunctionType get(CanGenericSignature sig,
   return cast<GenericFunctionType>(fnType->getCanonicalType());
 }
 
-#if 0
-  static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanParamArrayRef params,
-                                    CanType result,
-                                    std::optional<ExtInfo> info = std::nullopt) {
-    // Knowing that the argument types are independently canonical is
-    // not sufficient to guarantee that the function type will be canonical.
-    auto fnType =
-      GenericFunctionType::get(sig, params.getOriginalArray(), result, info);
-    return cast<GenericFunctionType>(fnType->getCanonicalType());
-  }
-#endif
-
 CanFunctionType substGenericArgs(SubstitutionMap subs) const;
 
 CanGenericSignature getGenericSignature() const {
@@ -4503,18 +4470,6 @@ CanGenericSignature getGenericSignature() const {
                     cast<GenericFunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-
-#if 0
-inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
-                        CanType result, std::optional<ExtInfo> extInfo) {
-  if (signature) {
-    return CanGenericFunctionType::get(signature, params, result, extInfo);
-  } else {
-    return CanFunctionType::get(params, result, extInfo);
-  }
-  }
-#endif
 
 inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
