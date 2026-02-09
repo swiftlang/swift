@@ -2184,12 +2184,17 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
     // "do { ... }".
     auto *CE = dyn_cast<ClosureExpr>(E);
     if (CE || isa<CaptureListExpr>(E)) {
-      ctx.Diags.diagnose(E->getLoc(), diag::expression_unused_closure);
+      bool isBraceStmtLikeClosure =
+          CE && CE->hasAnonymousClosureVars() &&
+          CE->getParameters()->size() == 0;
 
-      if (CE && CE->hasAnonymousClosureVars() &&
-          CE->getParameters()->size() == 0) {
+      if (isBraceStmtLikeClosure) {
+        ctx.Diags.diagnose(E->getLoc(),
+                           diag::brace_stmt_starts_with_closure);
         ctx.Diags.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
             .fixItInsert(CE->getStartLoc(), "do ");
+      } else {
+        ctx.Diags.diagnose(E->getLoc(), diag::expression_unused_closure);
       }
     } else if (isDiscarded && resultTy) {
       TypeChecker::checkIgnoredExpr(E);

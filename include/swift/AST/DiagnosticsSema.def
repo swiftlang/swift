@@ -5250,6 +5250,8 @@ WARNING(guard_always_succeeds,none,
 
 ERROR(expression_unused_closure,NoUsage,
       "closure expression is unused", ())
+ERROR(brace_stmt_starts_with_closure,NoUsage,
+      "statement beginning with '{' is interpreted as a closure expression", ())
 ERROR(expression_unused_function,NoUsage,
       "function is unused", ())
 WARNING(expression_unused_lvalue,NoUsage,
