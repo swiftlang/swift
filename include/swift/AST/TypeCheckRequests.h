@@ -5020,6 +5020,24 @@ public:
 bool isCached() const { return true; }
 };
 
+/// A request to constant-fold an expression node
+class ConstantFoldExpression
+: public SimpleRequest<ConstantFoldExpression,
+                       Expr *(const Expr *, ASTContext *),
+                       RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+Expr *
+evaluate(Evaluator &evaluator, const Expr *expr, ASTContext *ctx) const;
+
+public:
+bool isCached() const { return true; }
+};
+
 /// Check @c enums for compatibility with C.
 class TypeCheckCDeclEnumRequest
     : public SimpleRequest<TypeCheckCDeclEnumRequest,
