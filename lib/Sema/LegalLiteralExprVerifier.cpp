@@ -1,4 +1,4 @@
-//===--------------------- LegalConstExprVerifier.cpp ---------------------===//
+//===--------------------- LegalLiteralExprVerifier.cpp -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
+#include "LiteralExpressionFolding.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -24,119 +25,9 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 using namespace swift;
+using namespace LiteralExprFolding;
 
 namespace {
-static bool isIntegerType(Type type) {
-  return type->isInt() || type->isInt8() || type->isInt16() ||
-         type->isInt32() || type->isInt64() || type->isUInt() ||
-         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
-         type->isUInt64();
-}
-
-static bool isFloatType(Type type) {
-  // TODO: CGFloat?
-  return type->isFloat() || type->isDouble() || type->isFloat80();
-}
-
-enum IllegalConstErrorDiagnosis {
-  TypeNotSupported,
-  AssociatedValue,
-  UnsupportedBinaryOperator,
-  UnsupportedUnaryOperator,
-  TypeExpression,
-  KeyPath,
-  Closure,
-  ClosureWithCaptures,
-  OpaqueDeclRef,
-  OpaqueFuncDeclRef,
-  NonConventionCFunc,
-  OpaqueCalleeRef,
-  NonConstParameter,
-  Default
-};
-
-/// Given a provided error expression \p errorExpr, and the reason
-/// \p reason for the failure, emit corresponding diagnostic.
-static void diagnoseError(const Expr *errorExpr,
-                          IllegalConstErrorDiagnosis reason,
-                          DiagnosticEngine &diags) {
-  SourceLoc errorLoc = errorExpr->getLoc();
-  switch (reason) {
-  case TypeNotSupported:
-    diags.diagnose(errorLoc, diag::const_unsupported_type);
-    break;
-  case AssociatedValue:
-    diags.diagnose(errorLoc, diag::const_unsupported_enum_associated_value);
-    break;
-  case UnsupportedBinaryOperator:
-    diags.diagnose(errorLoc, diag::const_unsupported_operator);
-    break;
-  case UnsupportedUnaryOperator:
-    diags.diagnose(errorLoc, diag::const_unsupported_operator);
-    break;
-  case TypeExpression:
-    diags.diagnose(errorLoc, diag::const_unsupported_type_expr);
-    break;
-  case KeyPath:
-    diags.diagnose(errorLoc, diag::const_unsupported_keypath);
-    break;
-  case Closure:
-    diags.diagnose(errorLoc, diag::const_unsupported_closure);
-    break;
-  case ClosureWithCaptures:
-    diags.diagnose(errorLoc, diag::const_unsupported_closure_with_captures);
-    break;
-  case OpaqueDeclRef:
-    diags.diagnose(errorLoc, diag::const_opaque_decl_ref);
-    break;
-  case OpaqueFuncDeclRef:
-    diags.diagnose(errorLoc, diag::const_opaque_func_decl_ref);
-    break;
-  case NonConventionCFunc:
-    diags.diagnose(errorLoc, diag::const_non_convention_c_conversion);
-    break;
-  case OpaqueCalleeRef:
-    diags.diagnose(errorLoc, diag::const_opaque_callee);
-    break;
-  case NonConstParameter:
-    diags.diagnose(errorLoc, diag::const_non_const_param);
-    break;
-  case Default:
-    diags.diagnose(errorLoc, diag::const_unknown_default);
-    break;
-  }
-}
-
-static bool supportedOperator(const ApplyExpr *operatorApplyExpr) {
-  const auto operatorDeclRefExpr =
-      operatorApplyExpr->getFn()->getMemberOperatorRef();
-  if (!operatorDeclRefExpr)
-    return false;
-
-  // Non-stdlib operators are not allowed, for now
-  auto operatorDecl = operatorDeclRefExpr->getDecl();
-  if (!operatorDecl->getModuleContext()->isStdlibModule())
-    return false;
-
-  auto operatorName = operatorDecl->getBaseName();
-  if (!operatorName.isOperator())
-    return false;
-
-  auto operatorIdentifier = operatorName.getIdentifier();
-  if (!operatorIdentifier.isArithmeticOperator() &&
-      !operatorIdentifier.isBitwiseOperator() &&
-      !operatorIdentifier.isShiftOperator() &&
-      !operatorIdentifier.isStandardComparisonOperator())
-    return false;
-
-  // Operators which are not integer or floating point type are not
-  // allowed, for now.
-  auto operatorType = operatorApplyExpr->getType();
-  if (!isIntegerType(operatorType) && !isFloatType(operatorType))
-    return false;
-
-  return true;
-}
 
 // Per SE-0492:
 // A constant expression is syntactically one of:
@@ -153,7 +44,7 @@ static bool supportedOperator(const ApplyExpr *operatorApplyExpr) {
 // - a tuple composed of only other constant expressions
 // - an array literal of type InlineArray composed of only other constant
 //   expressions
-static std::optional<std::pair<const Expr *, IllegalConstErrorDiagnosis>>
+static std::optional<std::pair<const Expr *, IllegalConstError>>
 checkSupportedWithSectionAttribute(const Expr *expr,
                                    const DeclContext *declContext) {
   SmallVector<const Expr *, 4> expressionsToCheck;
@@ -178,7 +69,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
         continue;
       }
       // Non-InlineArray arrays are not allowed
-      return std::make_pair(expr, TypeNotSupported);
+      return std::make_pair(expr, IllegalConstError::TypeNotSupported);
     }
     
     // Coerce expressions to UInt8 are allowed (to support @DebugDescription)
@@ -188,20 +79,20 @@ checkSupportedWithSectionAttribute(const Expr *expr,
         expressionsToCheck.push_back(coerceExpr->getSubExpr());
         continue;
       }
-      return std::make_pair(expr, TypeNotSupported);
+      return std::make_pair(expr, IllegalConstError::TypeNotSupported);
     }
 
     // Operators are not allowed in @section expressions
     if (isa<BinaryExpr>(expr)) {
-      return std::make_pair(expr, UnsupportedBinaryOperator);
+      return std::make_pair(expr, IllegalConstError::UnsupportedBinaryOperator);
     }
     if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr)) {
-      return std::make_pair(expr, UnsupportedUnaryOperator);
+      return std::make_pair(expr, IllegalConstError::UnsupportedUnaryOperator);
     }
 
     // Optionals are not allowed
     if (isa<InjectIntoOptionalExpr>(expr)) {
-      return std::make_pair(expr, TypeNotSupported);
+      return std::make_pair(expr, IllegalConstError::TypeNotSupported);
     }
 
     // Literal expressions are okay if they are standard types
@@ -209,7 +100,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
       auto literalType = literal->getType();
       if (literalType) {
         // Allow integer literals of standard integer types
-        if (isIntegerType(literalType))
+        if (literalType->isStdlibInteger())
           continue;
         // Allow floating-point literals of Float or Double
         if (literalType->isFloat() || literalType->isDouble())
@@ -219,18 +110,18 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           continue;
       }
       // Other literal types are not supported
-      return std::make_pair(expr, TypeNotSupported);
+      return std::make_pair(expr, IllegalConstError::TypeNotSupported);
     }
 
     // Keypath expressions not supported in constant expressions
     if (isa<KeyPathExpr>(expr))
-      return std::make_pair(expr, KeyPath);
+      return std::make_pair(expr, IllegalConstError::KeyPath);
 
     // Closures are allowed if they have no captures
     if (auto closureExpr = dyn_cast<ClosureExpr>(expr)) {
       TypeChecker::computeCaptures(const_cast<ClosureExpr *>(closureExpr));
       if (!closureExpr->getCaptureInfo().isTrivial()) {
-        return std::make_pair(expr, ClosureWithCaptures);
+        return std::make_pair(expr, IllegalConstError::ClosureWithCaptures);
       }
       continue;
     }
@@ -246,7 +137,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           continue;
         }
       }
-      return std::make_pair(expr, Default);
+      return std::make_pair(expr, IllegalConstError::Default);
     }
 
     // Direct references to non-generic functions are allowed
@@ -259,11 +150,11 @@ checkSupportedWithSectionAttribute(const Expr *expr,
             !funcDecl->getDeclContext()->isGenericContext()) {
           continue;
         }
-        return std::make_pair(expr, OpaqueFuncDeclRef);
+        return std::make_pair(expr, IllegalConstError::OpaqueFuncDeclRef);
       }
 
       // Variable references are not allowed
-      return std::make_pair(expr, OpaqueDeclRef);
+      return std::make_pair(expr, IllegalConstError::OpaqueDeclRef);
     }
 
     // Allow specific patterns of AutoClosureExpr, which is used in static func
@@ -313,12 +204,12 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           }
         }
       }
-      return std::make_pair(expr, Default);
+      return std::make_pair(expr, IllegalConstError::Default);
     }
 
     // Other closure expressions (auto-closures) are not allowed
     if (isa<AbstractClosureExpr>(expr))
-      return std::make_pair(expr, Default);
+      return std::make_pair(expr, IllegalConstError::Default);
 
     // DotSelfExpr for metatype references (but only a direct TypeExpr inside)
     if (const DotSelfExpr *dotSelfExpr = dyn_cast<DotSelfExpr>(expr)) {
@@ -335,7 +226,7 @@ checkSupportedWithSectionAttribute(const Expr *expr,
           }
         }
       }
-      return std::make_pair(expr, TypeExpression);
+      return std::make_pair(expr, IllegalConstError::TypeExpression);
     }
 
     // Look through IdentityExpr, but only after DotSelfExpr, which is also an
@@ -347,16 +238,16 @@ checkSupportedWithSectionAttribute(const Expr *expr,
 
     // Function calls and constructors are not allowed
     if (isa<ApplyExpr>(expr))
-      return std::make_pair(expr, Default);
+      return std::make_pair(expr, IllegalConstError::Default);
 
     // Anything else is not allowed
-    return std::make_pair(expr, Default);
+    return std::make_pair(expr, IllegalConstError::Default);
   }
 
   return std::nullopt;
 }
 
-static std::optional<std::pair<const Expr *, IllegalConstErrorDiagnosis>>
+static std::optional<std::pair<const Expr *, IllegalConstError>>
 checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
   SmallVector<const Expr *, 4> expressionsToCheck;
   expressionsToCheck.push_back(expr);
@@ -389,7 +280,7 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
     // point types only.
     if (const BinaryExpr *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
       if (!supportedOperator(binaryExpr))
-        return std::make_pair(binaryExpr, UnsupportedBinaryOperator);
+        return std::make_pair(binaryExpr, IllegalConstError::UnsupportedBinaryOperator);
 
       expressionsToCheck.push_back(binaryExpr->getLHS());
       expressionsToCheck.push_back(binaryExpr->getRHS());
@@ -397,7 +288,7 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
     }
     if (const PrefixUnaryExpr *unaryExpr = dyn_cast<PrefixUnaryExpr>(expr)) {
       if (!supportedOperator(unaryExpr))
-        return std::make_pair(unaryExpr, UnsupportedUnaryOperator);
+        return std::make_pair(unaryExpr, IllegalConstError::UnsupportedUnaryOperator);
 
       expressionsToCheck.push_back(unaryExpr->getOperand());
       continue;
@@ -409,16 +300,16 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
 
     // Type expressions not supported in `@const` expressions
     if (isa<TypeExpr>(expr))
-      return std::make_pair(expr, TypeExpression);
+      return std::make_pair(expr, IllegalConstError::TypeExpression);
 
     // Keypath expressions not supported in `@const` expressions for now
     if (isa<KeyPathExpr>(expr))
-      return std::make_pair(expr, KeyPath);
+      return std::make_pair(expr, IllegalConstError::KeyPath);
 
     // Closure expressions are not supported in `@const` expressions
     // TODO: `@const`-evaluable closures
     if (isa<AbstractClosureExpr>(expr))
-      return std::make_pair(expr, Closure);
+      return std::make_pair(expr, IllegalConstError::Closure);
 
     // Function conversions, as long as the conversion is to a 'convention(c)'
     // then consider the operand sub-expression
@@ -430,10 +321,10 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
           expressionsToCheck.push_back(functionConvExpr->getSubExpr());
           continue;
         } else {
-          return std::make_pair(expr, NonConventionCFunc);
+          return std::make_pair(expr, IllegalConstError::NonConventionCFunc);
         }
       }
-      return std::make_pair(expr, Default);
+      return std::make_pair(expr, IllegalConstError::Default);
     }
 
     // Default argument expressions of a function must be ensured to be a
@@ -475,9 +366,9 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
               dyn_cast<VarDecl>(memberRef->getMember().getDecl())) {
         if (checkVarDecl(memberVarDecl))
           continue;
-        return std::make_pair(expr, OpaqueDeclRef);
+        return std::make_pair(expr, IllegalConstError::OpaqueDeclRef);
       }
-      return std::make_pair(expr, OpaqueDeclRef);
+      return std::make_pair(expr, IllegalConstError::OpaqueDeclRef);
     }
 
     // Look through to initial value expressions of decl ref expressions
@@ -486,7 +377,7 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
       // `@const` paramters are always okay
       if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
         if (!paramDecl->isConstVal())
-          return std::make_pair(expr, NonConstParameter);
+          return std::make_pair(expr, IllegalConstError::NonConstParameter);
         continue;
       }
 
@@ -494,30 +385,30 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
       if (auto *funcDecl = dyn_cast<FuncDecl>(decl)) {
         if (checkFuncDecl(funcDecl))
           continue;
-        return std::make_pair(expr, OpaqueDeclRef);
+        return std::make_pair(expr, IllegalConstError::OpaqueDeclRef);
       }
 
       if (const VarDecl *varDecl = dyn_cast<VarDecl>(declRef->getDecl())) {
         if (checkVarDecl(varDecl))
           continue;
-        return std::make_pair(expr, OpaqueDeclRef);
+        return std::make_pair(expr, IllegalConstError::OpaqueDeclRef);
       }
-      return std::make_pair(expr, OpaqueDeclRef);
+      return std::make_pair(expr, IllegalConstError::OpaqueDeclRef);
     }
 
     // Otherwise only allow enum cases and function calls
     if (!isa<ApplyExpr>(expr))
-      return std::make_pair(expr, Default);
+      return std::make_pair(expr, IllegalConstError::Default);
 
     const ApplyExpr *apply = cast<ApplyExpr>(expr);
     ValueDecl *calledValue = apply->getCalledValue();
     if (!calledValue)
-      return std::make_pair(expr, OpaqueCalleeRef);
+      return std::make_pair(expr, IllegalConstError::OpaqueCalleeRef);
 
     // If this is an enum case, check that it does not have associated values
     if (EnumElementDecl *enumCase = dyn_cast<EnumElementDecl>(calledValue)) {
       if (enumCase->hasAssociatedValues())
-        return std::make_pair(expr, AssociatedValue);
+        return std::make_pair(expr, IllegalConstError::AssociatedValue);
       continue;
     }
 
@@ -527,7 +418,7 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
       if (auto type = initCallRef->getType()) {
         if (auto *funcType = type->getAs<FunctionType>()) {
           auto resultTy = funcType->getResult();
-          if (isIntegerType(resultTy) || isFloatType(resultTy)) {
+          if (resultTy->isStdlibInteger() || resultTy->isStdlibFloat()) {
             assert(apply->getArgs()->size() == 1);
             expressionsToCheck.push_back(apply->getArgs()->getExpr(0));
             continue;
@@ -545,7 +436,7 @@ checkSupportedInConst(const Expr *expr, const DeclContext *declContext) {
     //      expressionsToCheck.push_back(arg.getExpr());
     //  }
 
-    return std::make_pair(expr, Default);
+    return std::make_pair(expr, IllegalConstError::Default);
   }
   return std::nullopt;
 }
@@ -579,7 +470,7 @@ static void verifyConstArguments(const CallExpr *callExpr,
            "constantIndex exceeds the number of arguments to the function");
     if (auto error =
             checkSupportedInConst(arguments[constantIndex], declContext)) {
-      diagnoseError(error->first, error->second,
+      diagnoseError(error->first->getLoc(), error->second,
                     declContext->getASTContext().Diags);
       declContext->getASTContext().Diags.diagnose(
           arguments[constantIndex]->getLoc(),
@@ -589,11 +480,102 @@ static void verifyConstArguments(const CallExpr *callExpr,
 }
 } // anonymous namespace
 
+bool LiteralExprFolding::supportedOperator(const ApplyExpr *operatorApplyExpr) {
+  const auto operatorDecl = operatorApplyExpr->getCalledValue();
+  if (!operatorDecl)
+    return false;
+
+  // Non-stdlib operators are not allowed, for now
+  if (!operatorDecl->getModuleContext()->isStdlibModule())
+    return false;
+
+  auto operatorName = operatorDecl->getBaseName();
+  if (!operatorName.isOperator())
+    return false;
+
+  auto operatorIdentifier = operatorName.getIdentifier();
+  if (!operatorIdentifier.isArithmeticOperator() &&
+      !operatorIdentifier.isBitwiseOperator() &&
+      !operatorIdentifier.isShiftOperator() &&
+      !operatorIdentifier.isStandardComparisonOperator())
+    return false;
+
+  // Operators which are not integer or floating point type are not
+  // allowed, for now.
+  auto operatorType = operatorApplyExpr->getType();
+  if (!operatorType->isStdlibInteger() && !operatorType->isStdlibFloat())
+    return false;
+
+  return true;
+}
+
+/// Given a provided error expression \p errorExpr, and the reason
+/// \p reason for the failure, emit corresponding diagnostic.
+void LiteralExprFolding::diagnoseError(SourceLoc errorLoc,
+                                       IllegalConstError reason,
+                                       DiagnosticEngine &diags) {
+  switch (reason) {
+  case IllegalConstError::TypeNotSupported:
+    diags.diagnose(errorLoc, diag::const_unsupported_type);
+    break;
+  case IllegalConstError::AssociatedValue:
+    diags.diagnose(errorLoc, diag::const_unsupported_enum_associated_value);
+    break;
+  case IllegalConstError::UnsupportedBinaryOperator:
+    diags.diagnose(errorLoc, diag::const_unsupported_operator);
+    break;
+  case IllegalConstError::UnsupportedUnaryOperator:
+    diags.diagnose(errorLoc, diag::const_unsupported_operator);
+    break;
+  case IllegalConstError::TypeExpression:
+    diags.diagnose(errorLoc, diag::const_unsupported_type_expr);
+    break;
+  case IllegalConstError::KeyPath:
+    diags.diagnose(errorLoc, diag::const_unsupported_keypath);
+    break;
+  case IllegalConstError::Closure:
+    diags.diagnose(errorLoc, diag::const_unsupported_closure);
+    break;
+  case IllegalConstError::ClosureWithCaptures:
+    diags.diagnose(errorLoc, diag::const_unsupported_closure_with_captures);
+    break;
+  case IllegalConstError::OpaqueDeclRef:
+    diags.diagnose(errorLoc, diag::const_opaque_decl_ref);
+    break;
+  case IllegalConstError::OpaqueFuncDeclRef:
+    diags.diagnose(errorLoc, diag::const_opaque_func_decl_ref);
+    break;
+  case IllegalConstError::NonConstDeclRef:
+    diags.diagnose(errorLoc, diag::const_failed_fold_declref_init);
+    break;
+  case IllegalConstError::NonConventionCFunc:
+    diags.diagnose(errorLoc, diag::const_non_convention_c_conversion);
+    break;
+  case IllegalConstError::OpaqueCalleeRef:
+    diags.diagnose(errorLoc, diag::const_opaque_callee);
+    break;
+  case IllegalConstError::NonConstParameter:
+    diags.diagnose(errorLoc, diag::const_non_const_param);
+    break;
+  case IllegalConstError::DivideByZero:
+    diags.diagnose(errorLoc, diag::const_divide_by_zero);
+    break;
+  case IllegalConstError::IntegerOverflow:
+    diags.diagnose(errorLoc, diag::const_integer_overflow);
+    break;
+  case IllegalConstError::UpstreamError:
+    break;
+  case IllegalConstError::Default:
+    diags.diagnose(errorLoc, diag::const_unknown_default);
+    break;
+  }
+}
+
 void swift::diagnoseInvalidConstExpressions(const Expr *expr,
                                             const DeclContext *declContext,
                                             bool isConstInitExpr) {
-  if (declContext->getASTContext().LangOpts.hasFeature(
-          Feature::CompileTimeValuesPreview)) {
+  auto &ctx = declContext->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview)) {
     // No syntactic checking
     return;
   }
@@ -603,13 +585,15 @@ void swift::diagnoseInvalidConstExpressions(const Expr *expr,
             Feature::CompileTimeValues)) {
       // Syntactic checking for preview of compile-time values (@const)
       if (auto error = checkSupportedInConst(expr, declContext))
-        diagnoseError(error->first, error->second,
-                      declContext->getASTContext().Diags);
+        diagnoseError(error->first->getLoc(), error->second, ctx.Diags);
     } else {
-      // Syntactic checking for SE-0492
-      if (auto error = checkSupportedWithSectionAttribute(expr, declContext))
-        diagnoseError(error->first, error->second,
-                      declContext->getASTContext().Diags);
+      if (ctx.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+          expr->getType()->isStdlibInteger())
+        foldLiteralExpression(expr, &ctx);
+      else if (auto error =
+                   checkSupportedWithSectionAttribute(expr, declContext))
+        // Syntactic checking for SE-0492
+        diagnoseError(error->first->getLoc(), error->second, ctx.Diags);
     }
   } else if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
     verifyConstArguments(callExpr, declContext);
