@@ -7615,6 +7615,12 @@ NOTE(missing_several_cases,none,
 NOTE(missing_unknown_case,none,
      "handle unknown values using \"@unknown default\"", ())
 
+GROUPED_WARNING(decompose_default_case,StrictExhaustiveSwitches,none,
+  "switch can be made exhaustive without use of 'default'; replace with known cases", ())
+
+GROUPED_WARNING(default_after_catchall,StrictExhaustiveSwitches,none,
+                "a 'default' case is equivalent to a catch-all case; remove one", ())
+
 NOTE(non_exhaustive_switch_drop_unknown,none,
      "remove '@unknown' to handle remaining values", ())
 
