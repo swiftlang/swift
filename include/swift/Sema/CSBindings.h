@@ -424,7 +424,7 @@ enum class KnownLValueKind: uint8_t {
 
 class BindingSet {
   using BindingScore =
-      std::tuple<bool, bool, bool, bool, unsigned char, int>;
+      std::tuple<bool, bool, bool, bool, unsigned char, int, unsigned>;
 
   ConstraintSystem &CS;
 
