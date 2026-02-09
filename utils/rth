@@ -146,7 +146,7 @@ class ResilienceTest(object):
         try:
             subprocess.check_output(diff_cmd)
         except subprocess.CalledProcessError as e:
-            assert len(e.output) == 0, "Removed symbols:\n" + e.output
+            assert len(e.output) == 0, "Removed symbols:\n" + '\n'.join(e.output.decode('utf-8').split('\n'))
 
     def compile_main(self):
         for config in self.config_dir_map:
