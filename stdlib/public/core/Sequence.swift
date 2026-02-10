@@ -322,7 +322,7 @@ public protocol IteratorProtocol<Element> {
 /// makes no other requirements about element access, so routines that
 /// traverse a sequence should be considered O(*n*) unless documented
 /// otherwise.
-public protocol Sequence<Element> {
+public protocol Sequence<Element>: BorrowingSequence {
   /// A type representing the sequence's elements.
   associatedtype Element
 
