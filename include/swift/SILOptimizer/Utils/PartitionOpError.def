@@ -10,63 +10,162 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file contains macros for creating PartitionOpErrors for use with
-/// SendNonSendable. This just makes it easier to add these errors without
-/// needing to write so much boielr plate.
+/// This file contains macros for defining PartitionOpError kinds used by
+/// SendNonSendable diagnostics. Using an X-macro pattern reduces boilerplate
+/// when adding new error types and ensures consistency across:
+/// - Error kind enumeration
+/// - Error struct definitions
+/// - Error handler dispatch (handleError)
+/// - Verbatim error emission (emitVerbatimErrors)
 ///
 //===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+//                              Macro Definitions
+//===----------------------------------------------------------------------===//
+//
+// Errors fall into two categories based on how they are emitted:
+//
+// 1. Data Dependent Errors: These errors require additional context from
+//    analysis data structures (like sendingOpToRequireInstMultiMap) to emit
+//    diagnostics. They are handled immediately during dataflow evaluation in
+//    handleError(). Example: LocalUseAfterSend needs to record send/use pairs
+//    for later. These are today just made PARTITION_OP_ERROR. We can categorize
+//    them separately in the future if needed.
+//
+// 2. VERBATIM ERRORS (PARTITION_OP_VERBATIM_ERROR):
+//    These errors are self-contained - all information needed for emission
+//    is stored within the error struct itself. They are collected during
+//    dataflow and batch-emitted later in emitVerbatimErrors().
+//    Example: SentNeverSendable contains the operand and isolation info.
+//
+// The VERBATIM_SPECIAL_EMISSION_EMITTER variant handles verbatim errors that
+// require custom emission logic that doesn't fit the standard pattern.
+
+/// Base macro for all partition operation errors. Data-dependent errors that
+/// require immediate handling during dataflow should use this directly.
 #ifndef PARTITION_OP_ERROR
 #define PARTITION_OP_ERROR(Name)
 #endif
 
-/// An error created if we discover a value was locally used after it
-/// was already sent.
+/// Macro for verbatim errors that contain all state needed for emission.
+/// These are collected during dataflow and emitted later via a diagnostic
+/// emitter class named `<Name>DiagnosticEmitter` with an `emit()` method.
+/// The emitter constructor takes (RegionAnalysisFunctionInfo*, <Name>Error).
+#ifndef PARTITION_OP_VERBATIM_ERROR
+#define PARTITION_OP_VERBATIM_ERROR(Name) PARTITION_OP_ERROR(Name)
+#endif
+
+/// Macro for verbatim errors with non-standard emission patterns.
 ///
-/// The arguments in the type are:
+/// Standard verbatim errors map 1:1 to diagnostic emitters. This macro is for
+/// errors that need special handling, such as:
+/// - Emitting multiple diagnostics from a single error
+/// - Requiring additional filtering logic before emission
+/// - Needing access to data not passed through the standard constructor
 ///
-/// 1. The PartitionOp that required the element to be alive.
+/// Errors using this macro are explicitly handled in emitVerbatimErrors()
+/// rather than through the X-macro expansion.
+#ifndef PARTITION_OP_VERBATIM_SPECIAL_EMISSION_EMITTER
+#define PARTITION_OP_VERBATIM_SPECIAL_EMISSION_EMITTER(Name) PARTITION_OP_VERBATIM_ERROR(Name)
+#endif
+
+//===----------------------------------------------------------------------===//
+//                              Error Definitions
+//===----------------------------------------------------------------------===//
+
+/// A value was used after its region was already sent to another isolation
+/// domain.
 ///
-/// 2. The element in the PartitionOp that was asked to be alive.
+/// This is a data-dependent error because we need to track the relationship
+/// between the sending operation and all subsequent uses in
+/// sendingOpToRequireInstMultiMap for deferred diagnostic emission.
 ///
-/// 3. The operand of the instruction that originally sent the region. Can be
-/// used to get the immediate value sent or the sending instruction.
+/// Error struct fields:
+/// - op: The PartitionOp representing the use that required the element.
+/// - sentElement: The element that was used after being sent.
+/// - sendingOp: The operand of the instruction that originally sent the region.
 PARTITION_OP_ERROR(LocalUseAfterSend)
 
-/// This is called if we detect a never sendable element that was actually sent.
+/// An 'inout sending' parameter was sent but not reinitialized before the
+/// function exits.
 ///
-/// E.x.: passing a main actor exposed value to a sending parameter.
-PARTITION_OP_ERROR(SentNeverSendable)
-
-/// This is emitted when a never sendable value is passed into a sending
-/// result. The sending result will be viewed in our caller as disconnected and
-/// able to be sent.
-PARTITION_OP_ERROR(AssignNeverSendableIntoSendingResult)
-
-/// This is emitted when an inout sending parameter has been sent in a function
-/// body but has not been reinitialized at the end of the function.
+/// When a function sends an 'inout sending' parameter's region, it must
+/// reinitialize the parameter with a disconnected value before returning.
+/// This ensures the caller doesn't observe the parameter in an invalid state.
+///
+/// This is a data-dependent error because it needs to record the send location
+/// for use in later diagnostic emission alongside other send-related errors.
 PARTITION_OP_ERROR(InOutSendingNotInitializedAtExit)
 
-/// This is emitted when an inout sending parameter has been assigned a
-/// non-disconnected value (e.x.: a value exposed to main actor isolated code)
-/// at end of function without being reinitialized with something disconnected.
-PARTITION_OP_ERROR(InOutSendingNotDisconnectedAtExit)
+//===---
+// Verbatim Errors
+//
+// These are self-contained and can be emitted using only their stored state.
+//===---
 
-/// This is emitted when a concrete inout sending parameter is returned.
-PARTITION_OP_ERROR(InOutSendingReturned)
-
-/// Used to signify an "unknown code pattern" has occured while performing
-/// dataflow.
+/// An unrecognized code pattern was encountered during dataflow analysis.
 ///
-/// DISCUSSION: Our dataflow cannot emit errors itself so this is a callback
-/// to our user so that we can emit that error as we process.
-PARTITION_OP_ERROR(UnknownCodePattern)
+/// This is a fallback error indicating the analysis found SIL that it doesn't
+/// know how to handle. It may indicate a gap in the analysis or new SIL
+/// constructs that need support.
+PARTITION_OP_VERBATIM_ERROR(UnknownCodePattern)
 
-/// Used to signify that an isolation crossing function is returning a
-/// non-Sendable value.
-PARTITION_OP_ERROR(NonSendableIsolationCrossingResult)
+/// A non-Sendable value that must stay in its isolation domain was passed to a
+/// 'sending' parameter or into another isolation domain.
+///
+/// Example: Passing a value in a @MainActor region to a function expecting a
+/// 'sending' parameter.
+///
+/// Error struct contains the sending operand and isolation info of the
+/// non-Sendable value, which is sufficient to emit the diagnostic.
+PARTITION_OP_VERBATIM_ERROR(SentNeverSendable)
 
-/// Used to signify that two 'inout sending' values are in the same region.
-PARTITION_OP_ERROR(InOutSendingParametersInSameRegion)
+/// A non-Sendable value was assigned into a 'sending' result parameter.
+///
+/// When a function has a 'sending' out-parameter, the caller expects to
+/// receive a disconnected value that can be freely sent. Assigning an
+/// isolated value violates this contract.
+///
+/// Example: Storing a value from an @MainActor-isolated region into an 'inout
+/// sending T' parameter that the caller expects to be sendable.
+PARTITION_OP_VERBATIM_ERROR(AssignNeverSendableIntoSendingResult)
 
+/// An 'inout sending' parameter was assigned an isolated (non-disconnected)
+/// value at function exit.
+///
+/// Similar to InOutSendingNotInitializedAtExit, but here the parameter WAS
+/// reinitialized - just with a value that isn't disconnected. The caller
+/// expects 'inout sending' parameters to contain disconnected values.
+PARTITION_OP_VERBATIM_ERROR(InOutSendingNotDisconnectedAtExit)
+
+/// A concrete 'inout sending' parameter's value is being returned from
+/// the function.
+PARTITION_OP_VERBATIM_ERROR(InOutSendingReturned)
+
+/// A function crossing isolation boundaries is returning a non-Sendable value.
+///
+/// When a function's result crosses isolation domains (e.g., an async function
+/// called from a different actor), returning a non-Sendable type is unsafe.
+PARTITION_OP_VERBATIM_ERROR(NonSendableIsolationCrossingResult)
+
+//===---
+// Verbatim Errors with Special Emission
+//
+// These need custom handling that doesn't fit the standard emitter pattern.
+//===---
+
+/// Two or more 'inout sending' parameters belong to the same region.
+///
+/// This is problematic because 'inout sending' parameters must be
+/// independently transferable. If they share a region, sending one would
+/// invalidate the other.
+///
+/// Uses SPECIAL_EMISSION because a single error may need to emit multiple
+/// diagnostics (one for each pair of parameters in the same region) and
+/// requires filtering based on diagnostic behavior settings.
+PARTITION_OP_VERBATIM_SPECIAL_EMISSION_EMITTER(InOutSendingParametersInSameRegion)
+
+#undef PARTITION_OP_VERBATIM_SPECIAL_EMISSION_EMITTER
+#undef PARTITION_OP_VERBATIM_ERROR
 #undef PARTITION_OP_ERROR
