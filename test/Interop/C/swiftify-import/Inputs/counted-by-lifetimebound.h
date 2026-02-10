@@ -29,3 +29,5 @@ struct EscapableStruct lifetimeboundEscapableReturn(int len, int * __counted_by(
 
 struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
 struct NonescapableStruct lifetimeboundNonescapableReturn(int len, int * __counted_by(len) p __lifetimebound);
+
+struct NonescapableStruct lifetimeboundNonescapableReturnDoubleBounds(int len, int * __counted_by(len) p __lifetimebound, struct NonescapableStruct s __lifetimebound);

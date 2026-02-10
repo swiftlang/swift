@@ -34,6 +34,12 @@ import CountedByLifetimeboundClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT: @_lifetime(copy p, copy s)
+// CHECK-NEXT: @_lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func lifetimeboundNonescapableReturnDoubleBounds(_ p: inout MutableSpan<Int32>, _ s: NonescapableStruct) -> NonescapableStruct
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_lifetime(borrow p)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func noncountedLifetime(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) -> MutableSpan<Int32>
 
@@ -125,4 +131,10 @@ public func callLifetimeboundEscapableReturn(_ p: UnsafeMutableBufferPointer<CIn
 @inlinable
 public func callLifetimeboundNonescapableReturn(_ p: inout MutableSpan<CInt>) {
   let _ = lifetimeboundNonescapableReturn(&p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@inlinable
+public func callLifetimeboundNonescapableReturnDoubleBounds(_ p: inout MutableSpan<CInt>, _ s: NonescapableStruct) {
+  let _ = lifetimeboundNonescapableReturnDoubleBounds(&p, s)
 }
