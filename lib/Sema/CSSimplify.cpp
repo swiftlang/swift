@@ -10853,20 +10853,23 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
 
     // While looking for subscript choices it's possible to find
-    // `subscript(dynamicMember: {Writable}KeyPath)` on types
-    // marked as `@dynamicMemberLookup`, let's mark this candidate
-    // as representing "dynamic lookup" unless it's a direct call
-    // to such subscript (in that case label is expected to match).
-    if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (memberLocator && instanceTy->hasDynamicMemberLookupAttribute() &&
-          isValidKeyPathDynamicMemberLookup(subscript)) {
-        auto *args = getArgumentList(memberLocator);
-
-        if (!(args && args->isUnary() &&
-              args->getLabel(0) == getASTContext().Id_dynamicMember)) {
-          return OverloadChoice::getDynamicMemberLookup(
-              baseTy, subscript, ctx.getIdentifier("subscript"),
-              /*isKeyPathBased=*/true);
+    // `subscript(dynamicMember: {Reference{Writable}}KeyPath, ...)` on types
+    // marked as `@dynamicMemberLookup`; let's mark this candidate as
+    // representing "dynamic lookup" unless it's a direct call to such subscript
+    // (in that case label is expected to match).
+    if (auto *SD = dyn_cast<SubscriptDecl>(cand)) {
+      if (memberLocator && instanceTy->hasDynamicMemberLookupAttribute()) {
+        if (SD->getDynamicMemberLookupKind(instanceTy->getAnyNominal()) ==
+            SubscriptDecl::DynamicMemberLookupKind::KeyPath) {
+          auto *args = getArgumentList(memberLocator);
+          auto isDirectCallToSubscript =
+              args && args->isUnary() &&
+              args->getLabel(0) == getASTContext().Id_dynamicMember;
+          if (!isDirectCallToSubscript) {
+            return OverloadChoice::getDynamicMemberLookup(
+                baseTy, SD, ctx.getIdentifier("subscript"),
+                /*isKeyPathBased=*/true);
+          }
         }
       }
     }
@@ -10976,7 +10979,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // or if all of the candidates come from conditional conformances (which
   // might not be applicable), and we are looking for members in a type with
   // the @dynamicMemberLookup attribute, then we resolve a reference to a
-  // `subscript(dynamicMember:)` method and pass the member name as a string
+  // `subscript(dynamicMember:...)` method and pass the member name as a string
   // parameter.
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial() &&
@@ -10987,33 +10990,40 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
          allFromConditionalConformances(*this, instanceTy, candidates)) &&
         !isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
                                                    memberLocator)) {
-      auto &ctx = getASTContext();
 
-      // Recursively look up `subscript(dynamicMember:)` methods in this type.
-      DeclNameRef subscriptName(
-          { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
       auto subscripts = performMemberLookup(
-          constraintKind, subscriptName, baseTy, functionRefInfo, memberLocator,
-          includeInaccessibleMembers);
+          constraintKind, DeclNameRef::createSubscript(), baseTy,
+          functionRefInfo, memberLocator, includeInaccessibleMembers);
 
       // Reflect the candidates found as `DynamicMemberLookup` results.
       auto name = memberName.getBaseIdentifier();
       for (const auto &candidate : subscripts.ViableCandidates) {
         auto *SD = cast<SubscriptDecl>(candidate.getDecl());
-        bool isKeyPathBased = isValidKeyPathDynamicMemberLookup(SD);
+        auto kind = SD->getDynamicMemberLookupKind(DC);
+        if (!kind) {
+          continue;
+        }
 
-        if (isValidStringDynamicMemberLookup(SD, DC->getParentModule()) ||
-            isKeyPathBased)
-          result.addViable(OverloadChoice::getDynamicMemberLookup(
-              baseTy, SD, name, isKeyPathBased));
+        result.addViable(OverloadChoice::getDynamicMemberLookup(
+            baseTy, SD, name,
+            /*isKeyPathBased=*/kind ==
+                SubscriptDecl::DynamicMemberLookupKind::KeyPath));
       }
 
       for (auto index : indices(subscripts.UnviableCandidates)) {
         auto *SD =
             cast<SubscriptDecl>(subscripts.UnviableCandidates[index].getDecl());
-        auto choice = OverloadChoice::getDynamicMemberLookup(
-            baseTy, SD, name, isValidKeyPathDynamicMemberLookup(SD));
-        result.addUnviable(choice, subscripts.UnviableReasons[index]);
+        auto kind = SD->getDynamicMemberLookupKind(DC);
+        if (!kind) {
+          continue;
+        }
+
+        result.addUnviable(
+            OverloadChoice::getDynamicMemberLookup(
+                baseTy, SD, name,
+                /*isKeyPathBased=*/kind ==
+                    SubscriptDecl::DynamicMemberLookupKind::KeyPath),
+            subscripts.UnviableReasons[index]);
       }
     }
   }

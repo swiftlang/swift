@@ -31,6 +31,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -49,6 +50,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -56,6 +58,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 #include <optional>
 
 using namespace swift;
@@ -2083,215 +2086,126 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
-static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
-                                      Identifier expectedLabel,
-                                      bool ignoreLabel = false) {
-  auto *indices = decl->getIndices();
-  if (decl->isInvalid() || indices->size() != 1)
-    return false;
-
-  auto *index = indices->get(0);
-  if (index->isVariadic() || !index->hasInterfaceType())
-    return false;
-
-  if (ignoreLabel) {
-    return true;
-  }
-
-  return index->getArgumentName() == expectedLabel;
-}
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                bool ignoreLabel) {
-  // It could be
-  // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
-  // - `subscript(dynamicMember: String*)`
-  return isValidKeyPathDynamicMemberLookup(decl, ignoreLabel) ||
-         isValidStringDynamicMemberLookup(decl, ignoreLabel);
-}
-
-bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                             bool ignoreLabel) {
-  auto &ctx = decl->getASTContext();
-  // There are two requirements:
-  // - The subscript method has exactly one, non-variadic parameter.
-  // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
-                                 ignoreLabel))
-    return false;
-
-  const auto *param = decl->getIndices()->get(0);
-  auto paramType = param->getTypeInContext();
-
-  // If this is `subscript(dynamicMember: String*)`
-  return TypeChecker::conformsToKnownProtocol(
-      paramType, KnownProtocolKind::ExpressibleByStringLiteral);
-}
-
-BoundGenericType *
-swift::getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
-                                            bool ignoreLabel) {
-  auto &ctx = decl->getASTContext();
-  if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
-                                 ignoreLabel))
-    return nullptr;
-
-  auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
-
-  // Allow to compose key path type with a `Sendable` protocol as
-  // a way to express sendability requirement.
-  if (auto *existential = paramTy->getAs<ExistentialType>()) {
-    auto layout = existential->getExistentialLayout();
-
-    auto protocols = layout.getProtocols();
-    if (!llvm::all_of(protocols,
-                      [&](ProtocolDecl *proto) {
-                        if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-                          return true;
-
-                        if (proto->getInvertibleProtocolKind())
-                          return true;
-
-                        return false;
-                      })) {
-      return nullptr;
-    }
-
-    paramTy = layout.getSuperclass();
-    if (!paramTy)
-      return nullptr;
-  }
-
-  if (!paramTy->isKeyPath() &&
-      !paramTy->isWritableKeyPath() &&
-      !paramTy->isReferenceWritableKeyPath()) {
-    return nullptr;
-  }
-  return paramTy->getAs<BoundGenericType>();
-}
-
-bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                              bool ignoreLabel) {
-  return bool(getKeyPathTypeForDynamicMemberLookup(decl, ignoreLabel));
-}
-
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
 /// least one subscript member declared like this:
 ///
-/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
-///   (dynamicMember name: KeywordType) -> LookupValue { get }
+/// subscript(dynamicMember name: T, ...) -> U
+///   (where T is a concrete type conforming to `ExpressibleByStringLiteral`)
+///
+///   or
+///
+/// subscript(dynamicMember name: {{Reference}Writable}KeyPath<T, U>, ...) -> V
 ///
 /// ... but doesn't care about the mutating'ness of the getter/setter.
 /// We just manually check the requirements here.
-void AttributeChecker::
-visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
+void AttributeChecker::visitDynamicMemberLookupAttr(
+    DynamicMemberLookupAttr *attr) {
   // This attribute is only allowed on nominal types.
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
   auto &ctx = decl->getASTContext();
 
-  auto emitInvalidTypeDiagnostic = [&](const SourceLoc loc) {
-    diagnose(loc, diag::invalid_dynamic_member_lookup_type, type);
-    attr->setInvalid();
-  };
-
-  // Look up `subscript(dynamicMember:)` candidates.
-  DeclNameRef subscriptName(
-      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
-  auto candidates = TypeChecker::lookupMember(decl, type, subscriptName);
-
-  if (!candidates.empty()) {
-    // If no candidates are valid, then reject one.
-    auto oneCandidate = candidates.front().getValueDecl();
-    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
-      auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      return isValidDynamicMemberLookupSubscript(cand);
-    });
-
-    if (candidates.empty()) {
-      emitInvalidTypeDiagnostic(oneCandidate->getLoc());
-      return;
-    }
-
-    // Diagnose if there are no candidates that are sufficiently accessible.
-    auto requiredAccessScope = decl->getFormalAccessScope(/*useDC=*/nullptr);
-    auto accessDC = requiredAccessScope.getDeclContext();
-    auto inaccessibleCandidate = candidates.front().getValueDecl();
-    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
-      return entry.getValueDecl()->isAccessibleFrom(accessDC);
-    });
-
-    if (candidates.empty()) {
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
-
-      // Diagnose as an error in resilient modules regardless of language
-      // version since this will break the swiftinterface. Don't diagnose
-      // cases in existing swiftinterface files, though.
-      shouldError |= decl->getModuleContext()->isResilient() &&
-                     !decl->getDeclContext()->isInSwiftinterface();
-
-      auto diag = diagnose(inaccessibleCandidate->getLoc(),
-                            diag::dynamic_member_lookup_candidate_inaccessible,
-                            inaccessibleCandidate);
-      fixItAccess(diag, inaccessibleCandidate,
-                  requiredAccessScope.requiredAccessForDiagnostics(),
-                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
-                  /*updateAttr=*/false);
-      diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
-
-      if (shouldError) {
-        attr->setInvalid();
-        return;
-      }
-    }
-
-    return;
-  }
-
-  // If we couldn't find any candidates, it's likely because:
-  //
-  // 1. We don't have a subscript with `dynamicMember` label.
-  // 2. We have a subscript with `dynamicMember` label, but no argument label.
-  //
-  // Let's do another lookup using just the base name.
-  auto newCandidates =
+  // Because dynamic member subscripts can take any number of parameters, we
+  // can't look them up by specific name: we'll find all subscript members on
+  // the type and filter for ones attempting to fulfill the
+  // `@dynamicMemberLookup` requirement.
+  auto candidates =
       TypeChecker::lookupMember(decl, type, DeclNameRef::createSubscript());
 
-  // Validate the candidates while ignoring the label.
-  newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
-    auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    return isValidDynamicMemberLookupSubscript(cand, /*ignoreLabel*/ true);
-  });
+  // For validity and diagnostics, there are 4 kinds of subscripts we care
+  // about:
+  //
+  //   1. Subscripts which are both valid for fulfilling the requirement, and
+  //      are accessible from outside the type
+  //   2. Subscripts which have a `dynamicMember` argument/parameter label for
+  //      at least one parameter (so are considered for validation) but which
+  //      are invalid
+  //   3. Subscripts which are valid for fulfilling the requirement but which
+  //      are inaccessible from outside the type
+  //   4. Subscripts which _would_ be valid if a `dynamicMember` argument label
+  //      were inserted for their first argument (we can offer a fix-it)
+  //
+  // If we have any of (1), the attribute requirements will be considered
+  // fulfilled and we won't diagnose; if not, then we'll go through (2), (3),
+  // and (4) in order and produce diagnostics/fix-its for the first non-empty
+  // group. (3) produces warnings in the current language mode, which will be
+  // upgraded to errors in the next language mode (hence the separate diagnostic
+  // stages).
+  SmallVector<DynamicMemberLookupSubscriptEligibility> invalid,
+      validButInacessible, potentiallyValid;
 
-  // If there were no potentially valid candidates, then throw an error.
-  if (newCandidates.empty()) {
-    emitInvalidTypeDiagnostic(attr->getLocation());
-    return;
-  }
+  auto requiredAccessScope = decl->getFormalAccessScope();
+  auto accessDC = requiredAccessScope.getDeclContext();
+  for (auto &candidate : candidates) {
+    auto *SD = dyn_cast<SubscriptDecl>(candidate.getValueDecl());
+    if (!SD) {
+      continue;
+    }
 
-  // For each candidate, emit a diagnostic. If we don't have an explicit
-  // argument label, then emit a fix-it to suggest the user to add one.
-  for (auto cand : newCandidates) {
-    auto SD = cast<SubscriptDecl>(cand.getValueDecl());
-    auto index = SD->getIndices()->get(0);
-    diagnose(SD, diag::invalid_dynamic_member_lookup_type, type);
+    auto result = evaluateOrFatal(
+        ctx.evaluator, DynamicMemberLookupSubscriptRequest{SD, accessDC});
+    auto [eligibility, isAccessible] = result;
+    if (eligibility.isValid()) {
+      if (isAccessible) {
+        return;
+      }
 
-    // If we have something like `subscript(foo:)` then we want to insert
-    // `dynamicMember` before `foo`.
-    if (index->getParameterNameLoc().isValid() &&
-        index->getArgumentNameLoc().isInvalid()) {
-      diagnose(SD, diag::invalid_dynamic_member_subscript)
-          .highlight(index->getSourceRange())
-          .fixItInsert(index->getParameterNameLoc(), "dynamicMember ");
+      validButInacessible.emplace_back(eligibility);
+    } else if (eligibility.isEligibleForArgumentLabelFixIt()) {
+      potentiallyValid.emplace_back(eligibility);
+    } else {
+      invalid.emplace_back(eligibility);
     }
   }
 
+  if (!invalid.empty()) {
+    for (auto &candidate : invalid) {
+      candidate.diagnose();
+    }
+
+    attr->setInvalid();
+    return;
+  }
+
+  if (!validButInacessible.empty()) {
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
+
+    // Diagnose as an error in resilient modules regardless of language
+    // version since this will break the swiftinterface. Don't diagnose
+    // cases in existing swiftinterface files, though.
+    shouldError |= decl->getModuleContext()->isResilient() &&
+                   !decl->getDeclContext()->isInSwiftinterface();
+
+    auto firstInaccessible =
+        const_cast<SubscriptDecl *>(validButInacessible[0].getDecl());
+    auto diag = diagnose(firstInaccessible->getLoc(),
+                         diag::dynamic_member_lookup_candidate_inaccessible,
+                         firstInaccessible);
+    fixItAccess(diag, firstInaccessible,
+                requiredAccessScope.requiredAccessForDiagnostics(),
+                /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                /*updateAttr=*/false);
+    diag.warnUntilLanguageModeIf(!shouldError, futureVersion);
+
+    if (shouldError) {
+      attr->setInvalid();
+    }
+    return;
+  }
+
+  if (!potentiallyValid.empty()) {
+    for (auto &candidate : potentiallyValid) {
+      candidate.diagnose();
+    }
+
+    attr->setInvalid();
+    return;
+  }
+
+  // There were no candidates at all.
   attr->setInvalid();
-  return;
+  diagnose(attr->getStartLoc(), diag::invalid_dynamic_member_lookup_type, type);
 }
 
 /// Get the innermost enclosing declaration for a declaration.

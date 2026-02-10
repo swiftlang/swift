@@ -5612,6 +5612,189 @@ public:
   void cacheResult(BraceStmt *stmt) const;
 };
 
+/// Describes how a `SubscriptDecl` is (or is not) be eligible to fulfill a
+/// `@dynamicMemberLookup` requirement.
+///
+/// `@dynamicMemberLookup` requires that a subscript:
+///
+///   1. Take an initial argument with an explicit `dynamicMember` argument
+///      label,
+///   2. Whose parameter type is non-variadic and is either
+///      * A `{{Reference}Writable}KeyPath`, or
+///      * A concrete type conforming to `ExpressibleByStringLiteral`,
+///   3. And whose following arguments (if any) are all either variadic or have
+///      a default value
+///
+/// Subscripts which don't meet these requirements strictly are not eligible.
+class DynamicMemberLookupSubscriptEligibility {
+public:
+  /// The kind of `dynamicMember` parameter the subscript takes (or could take,
+  /// if eligible for a fix-it for a missing `dynamicMember` label).
+  using DynamicMemberKind = SubscriptDecl::DynamicMemberLookupKind;
+
+  /// Reasons why a parameter disqualifies the subscript from meeting a
+  /// `@dynamicMemberLookup` requirement.
+  enum class InvalidParameterFlag {
+    /// The subscript has no `dynamicMember` parameter (so likely isn't eligible
+    /// for `@dynamicMemberLookup` subscript checking at all), but _could_ be
+    /// made valid if the parameter had a `"dynamicMember"` argument label
+    /// (e.g., `subscript(member: String)`).
+    ///
+    /// A fix-it can be provided to insert an argument label.
+    DynamicMemberMissingArgumentLabel = 1 << 0,
+
+    /// The parameter has a `dynamicMember` parameter label but no explicit
+    /// argument label (e.g., `subscript(dynamicMember: String)`). Since the
+    /// subscript must have `dynamicMember` as its argument label, we treat this
+    /// _as if_ the parameter label is missing.
+    ///
+    /// A fix-it can be provided to insert a parameter label.
+    DynamicMemberMissingParameterLabel = 1 << 1,
+
+    /// The parameter has a `"dynamicMember"` parameter label but a different
+    /// argument label (e.g., `subscript(_ dynamicMember: String)`).
+    ///
+    /// While it's possible that such a subscript isn't intended to implement a
+    /// `@dynamicMemberLookup` requirement, it's much more likely to be a
+    /// mistake than not and is worth diagnosing.
+    DynamicMemberInvalidArgumentLabel = 1 << 2,
+
+    /// The `dynamicMember` parameter does not appear first in the argument
+    /// list (e.g., `subscript(foo: Int = 42, dynamicMember member: String)`).
+    DynamicMemberInvalidOrder = 1 << 3,
+
+    /// The `dynamicMember` parameter has a type that does not meet the
+    /// requirements of being either key-path- or string-based.
+    DynamicMemberInvalidType = 1 << 4,
+
+    /// The parameter is a non-`dynamicMember` parameter which does not have a
+    /// default value.
+    ParameterMissingDefaultValue = 1 << 5,
+  };
+
+  using InvalidParameterFlags = OptionSet<InvalidParameterFlag>;
+
+private:
+  /// The declaration this eligibility describes.
+  const SubscriptDecl *Decl;
+
+  /// The subscript index of the `dynamicMember` parameter, if present.
+  std::optional<unsigned> DynamicMemberIdx;
+
+  /// The type of the `dynamicMember` parameter; separately-optional from
+  /// `DynamicMemberIdx` to represent an invalid parameter type.
+  std::optional<DynamicMemberKind> Kind;
+
+  /// Flags describing the validity of each of the subscript parameters.
+  SmallVector<InvalidParameterFlags> ParamFlags;
+
+public:
+  DynamicMemberLookupSubscriptEligibility(
+      const SubscriptDecl *decl, std::optional<unsigned> dynamicMemberIdx,
+      std::optional<DynamicMemberKind> kind,
+      SmallVector<InvalidParameterFlags> paramFlags)
+      : Decl(decl), DynamicMemberIdx(dynamicMemberIdx), Kind(kind),
+        ParamFlags(paramFlags) {
+    assert(decl->getIndices()->size() == paramFlags.size());
+  }
+
+  bool isValid() const {
+    return DynamicMemberIdx == 0 && Kind &&
+           std::all_of(ParamFlags.begin(), ParamFlags.end(),
+                       [&](const InvalidParameterFlags &f) { return !f; });
+  }
+
+  bool isEligibleForArgumentLabelFixIt() const {
+    // We can offer a fix-it to insert a `dynamicMember` argument label iff the
+    // subscript is only missing the label itself.
+    return !DynamicMemberIdx && Kind &&
+           ParamFlags[0].toRaw() ==
+               llvm::to_underlying(
+                   InvalidParameterFlag::DynamicMemberMissingArgumentLabel) &&
+           std::all_of(ParamFlags.begin() + 1, ParamFlags.end(),
+                       [&](const InvalidParameterFlags &f) { return !f; });
+  }
+
+  const SubscriptDecl *getDecl() const { return Decl; }
+
+  /// Returns the kind of the `dynamicMember` parameter if the decl is eligible
+  /// for dynamic member lookup; `std::nullopt` otherwise.
+  std::optional<DynamicMemberKind> getDynamicMemberKind() const {
+    return isValid() ? Kind : std::nullopt;
+  }
+
+  /// If invalid, produces diagnostics describing the ineligibility.
+  ///
+  /// Uses the `SubscriptDecl`'s AST context for diagnostics unless an explicit
+  /// diagnostic engine is given.
+  ///
+  /// Returns whether an error diagnostic was produced.
+  bool diagnose(DiagnosticEngine *diags = nullptr);
+
+  friend llvm::hash_code
+  hash_value(const DynamicMemberLookupSubscriptEligibility &e) {
+    auto hash = llvm::hash_combine(llvm::hash_value(e.DynamicMemberIdx),
+                                   llvm::hash_value(e.Kind));
+    for (auto flags : e.ParamFlags) {
+      hash = llvm::hash_combine(hash, flags.toRaw());
+    }
+
+    return hash;
+  }
+
+  friend bool operator==(const DynamicMemberLookupSubscriptEligibility &lhs,
+                         const DynamicMemberLookupSubscriptEligibility &rhs) {
+    return lhs.DynamicMemberIdx == rhs.DynamicMemberIdx &&
+           lhs.Kind == rhs.Kind &&
+           // `OptionSet` intentionally does not offer `==` in favor of
+           // requiring `containsOnly`.
+           std::equal(lhs.ParamFlags.begin(), lhs.ParamFlags.end(),
+                      rhs.ParamFlags.begin(), rhs.ParamFlags.end(),
+                      [&](const InvalidParameterFlags &lhs,
+                          const InvalidParameterFlags &rhs) {
+                        return lhs.containsOnly(rhs);
+                      });
+  }
+
+  friend bool operator!=(const DynamicMemberLookupSubscriptEligibility &lhs,
+                         const DynamicMemberLookupSubscriptEligibility &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class DynamicMemberLookupSubscriptRequest
+    : public SimpleRequest<
+          DynamicMemberLookupSubscriptRequest,
+          std::pair<DynamicMemberLookupSubscriptEligibility, bool>(
+              const SubscriptDecl *, const DeclContext *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // This type alias is provided primarily for use from
+  // `TypeCheckerTypeIDZone.def`, where the comma inside `std::pair<>`
+  // interferes with macro parsing.
+  using Result = std::pair<DynamicMemberLookupSubscriptEligibility,
+                           bool /* isAccessible */>;
+
+private:
+  friend SimpleRequest;
+
+  /// Given a `SubscriptDecl` and its use (`useDC`), returns whether the decl is
+  /// a viable candidate for `@dynamicMemberLookup` accessible from that point
+  /// of use.
+  Result evaluate(Evaluator &evaluator, const SubscriptDecl *decl,
+                  const DeclContext *useDC) const;
+
+public:
+  SourceLoc getNearestLoc() const {
+    return std::get<0>(getStorage())->getLoc();
+  }
+
+  bool isCached() const { return true; }
+};
+
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

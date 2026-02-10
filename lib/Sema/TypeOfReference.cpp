@@ -23,6 +23,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
@@ -1611,6 +1612,13 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
       thrownErrorType = Type();
     }
 
+    // Mark the isolation if any parameter is isolated.
+    if (llvm::any_of(indices, [&](AnyFunctionType::Param p) {
+          return p.isIsolated();
+        })) {
+      info = info.withIsolation(FunctionTypeIsolation::forParameter());
+    }
+
     refType = FunctionType::get(indices, elementTy, info);
   } else {
     // Delay the adjustment for preconcurrency until after we've formed
@@ -2347,17 +2355,17 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     }
   };
   auto addDynamicMemberSubscriptConstraints = [&](Type argTy, Type resultTy) {
-    // DynamicMemberLookup results are always a (dynamicMember: T1) -> T2
+    // DynamicMemberLookup results are always a `(dynamicMember: T1, ...) -> T2`
     // subscript.
     auto *fnTy = openedType->castTo<FunctionType>();
-    assert(fnTy->getParams().size() == 1 &&
-           "subscript always has one argument");
+    assert(fnTy->getParams().size() > 0 &&
+           "subscript always has at least one argument");
 
     auto *callLoc = getConstraintLocator(
         locator, LocatorPathElt::ImplicitDynamicMemberSubscript());
 
-    // Associate an argument list for the implicit x[dynamicMember:] subscript
-    // if we haven't already.
+    // Associate an argument list for the implicit `x[dynamicMember:...]`
+    // subscript if we haven't already.
     auto *argLoc = getArgumentInfoLocator(callLoc);
     if (ArgumentLists.find(argLoc) == ArgumentLists.end()) {
       auto *argList = ArgumentList::createImplicit(
@@ -2422,9 +2430,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     if (!stringLiteral)
       return;
 
-    // Form constraints for a x[dynamicMember:] subscript with a string literal
-    // argument, where the overload type is bound to the result to model the
-    // fact that this a property access in the source.
+    // Form constraints for a `x[dynamicMember:...]` subscript with a string
+    // literal argument, where the overload type is bound to the result to model
+    // the fact that this a property access in the source.
     auto argTy = createTypeVariable(locator, /*options*/ 0);
     addConstraint(ConstraintKind::LiteralConformsTo, argTy,
                   stringLiteral->getDeclaredInterfaceType(), locator);
@@ -2433,8 +2441,8 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
   }
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     auto *fnType = openedType->castTo<FunctionType>();
-    assert(fnType->getParams().size() == 1 &&
-           "subscript always has one argument");
+    assert(fnType->getParams().size() > 0 &&
+           "subscript always has at least one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
     auto paramTy = fnType->getParams()[0].getPlainType();
@@ -2588,7 +2596,7 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       // type into "leaf" directly.
       addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
 
-      // Form constraints for a x[dynamicMember:] subscript with a key path
+      // Form constraints for a `x[dynamicMember:...]` subscript with a key path
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
       addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);

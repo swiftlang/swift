@@ -3385,3 +3385,204 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
 
   return memBufferStartLoc.getAdvancedLoc(targetDeclOffsetInBuffer);
 }
+
+bool DynamicMemberLookupSubscriptEligibility::diagnose(
+    DiagnosticEngine *diags) {
+  if (!diags) {
+    diags = &Decl->getASTContext().Diags;
+  }
+
+  auto outputError = false;
+  auto *indices = Decl->getIndices();
+  if (isEligibleForArgumentLabelFixIt()) {
+    auto *param = const_cast<ParamDecl *>(indices->get(0));
+    diags
+        ->diagnose(param,
+                   diag::invalid_dynamic_member_subscript_invalid_arg_label,
+                   param)
+        .highlight(param->getSourceRange())
+        .fixItInsert(param->getParameterNameLoc(), "dynamicMember ");
+    outputError = true;
+  } else {
+    for (auto idx : range(0, indices->size())) {
+      auto flags = ParamFlags[idx];
+      if (!flags) {
+        continue;
+      }
+
+      auto *param = const_cast<ParamDecl *>(indices->get(idx));
+      if (flags & InvalidParameterFlag::DynamicMemberMissingParameterLabel) {
+        // Technically, a `ParamDecl` can't have an argument label without a
+        // parameter label, but we treat `dynamicMember:` as if it were an
+        // argument label and offer to insert a new "parameter" label.
+        diags
+            ->diagnose(
+                param,
+                diag::invalid_dynamic_member_subscript_missing_param_label,
+                param)
+            .highlight(param->getSourceRange())
+            .fixItInsertAfter(param->getParameterNameLoc(), " <#label#>");
+        outputError = true;
+      }
+
+      if (flags & InvalidParameterFlag::DynamicMemberInvalidArgumentLabel) {
+        auto diag = diags->diagnose(
+            param, diag::invalid_dynamic_member_subscript_invalid_arg_label,
+            param);
+        if (param->getArgumentName().is("_")) {
+          diag.highlight(param->getSourceRange())
+              .fixItReplace(
+                  SourceRange(
+                      param->getArgumentNameLoc(),
+                      param->getArgumentNameLoc().getAdvancedLocOrInvalid(1)),
+                  "dynamicMember");
+        }
+      }
+
+      if (flags & InvalidParameterFlag::DynamicMemberInvalidOrder) {
+        diags->diagnose(
+            param, diag::invalid_dynamic_member_subscript_invalid_order, param);
+        outputError = true;
+      }
+
+      if (flags & InvalidParameterFlag::DynamicMemberInvalidType) {
+        diags->diagnose(
+            param, diag::invalid_dynamic_member_subscript_invalid_type, param);
+        outputError = true;
+      }
+
+      if (flags & InvalidParameterFlag::ParameterMissingDefaultValue) {
+        diags
+            ->diagnose(param,
+                       diag::invalid_dynamic_member_subscript_missing_default,
+                       param)
+            .highlight(param->getSourceRange())
+            .fixItInsertAfter(param->getEndLoc(), " = <#Default#>");
+        outputError = true;
+      }
+    }
+  }
+
+  return outputError;
+}
+
+DynamicMemberLookupSubscriptRequest::Result
+DynamicMemberLookupSubscriptRequest::evaluate(Evaluator &evaluator,
+                                              const SubscriptDecl *SD,
+                                              const DeclContext *useDC) const {
+  using DynamicMemberKind =
+      DynamicMemberLookupSubscriptEligibility::DynamicMemberKind;
+  using InvalidParameterFlag =
+      DynamicMemberLookupSubscriptEligibility::InvalidParameterFlag;
+  using InvalidParameterFlags =
+      DynamicMemberLookupSubscriptEligibility::InvalidParameterFlags;
+
+  auto &ctx = SD->getASTContext();
+  auto *indices = SD->getIndices();
+
+  // We want to check for the presence of a `dynamicMember` label to determine
+  // intent so we can offer fix-its for invalid types; this is inherently
+  // ambiguous, but we'll go by the following rules:
+  //
+  //  1. The first parameter with an explicit `dynamicMember` argument label (or
+  //     parameter label, with no argument label) will be considered "the"
+  //     `dynamicMember` parameter, regardless of other labels (e.g.,
+  //     `subscript(dynamicMember member: String)` or
+  //     `subscript(dynamicMember: String)`)
+  //  2. If (1) does not exist, the first parameter with an explicit
+  //     `dynamicMember` parameter label (with any argument label) will be
+  //     considered an attempt at writing (1), and worth diagnosing with a
+  //     fix-it (e.g., `subscript(_ dynamicMember: String)`)
+  //  3. If no `dynamicMember` parameter exists at all, we'll treat the first
+  //     subscript parameter as a candidate for a `dynamicMember` argument label
+  //     fix-it if it would otherwise be valid (e.g.,
+  //     `subscript(member: String)`)
+  auto seenDynamicMemberLabel = false;
+  std::optional<unsigned> dynamicMemberIdx = std::nullopt;
+  for (auto idx : range(0, indices->size())) {
+    auto *param = indices->get(idx);
+
+    auto argLabel = param->getArgumentName();
+    auto paramLabel = param->getParameterName();
+    if (argLabel == ctx.Id_dynamicMember ||
+        (param->getArgumentNameLoc().isInvalid() &&
+         paramLabel == ctx.Id_dynamicMember)) {
+      seenDynamicMemberLabel = true;
+      dynamicMemberIdx = idx;
+      break;
+    }
+
+    if (paramLabel == ctx.Id_dynamicMember) {
+      seenDynamicMemberLabel = true;
+    }
+  }
+
+  auto seenDynamicMemberParamLabel = false;
+  std::optional<DynamicMemberKind> kind = std::nullopt;
+  SmallVector<InvalidParameterFlags> paramFlags;
+  for (auto idx : range(0, indices->size())) {
+    auto *param = indices->get(idx);
+    InvalidParameterFlags flags;
+
+    auto isDynamicMemberParam = false;
+    if (idx == dynamicMemberIdx) {
+      isDynamicMemberParam = true;
+
+      // We only diagnose "the" `dynamicMember` parameter. Technically,
+      // multiple parameters can have the `dynamicMember` argument label (if
+      // they have different parameter labels), but only one of them can be
+      // first in the parameter list.
+      if (idx != 0) {
+        flags |= InvalidParameterFlag::DynamicMemberInvalidOrder;
+      }
+
+      if (param->getArgumentNameLoc().isInvalid()) {
+        flags |= InvalidParameterFlag::DynamicMemberMissingParameterLabel;
+      }
+    } else if (param->getParameterName() == ctx.Id_dynamicMember) {
+      // We'll only consider the first parameter with an explicit
+      // `dynamicMember` parameter label to be eligible for checking. (Repeated
+      // parameter labels are invalid for methods anyway.)
+      isDynamicMemberParam = !dynamicMemberIdx && !seenDynamicMemberParamLabel;
+      seenDynamicMemberParamLabel = true;
+      if (isDynamicMemberParam) {
+        flags |= InvalidParameterFlag::DynamicMemberInvalidArgumentLabel;
+      }
+    } else if (!seenDynamicMemberLabel && idx == 0) {
+      // We don't have any `dynamicMember` parameters at all, so we can check
+      // this one for potential validity.
+      isDynamicMemberParam = true;
+    }
+
+    if (isDynamicMemberParam) {
+      if (SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(
+              param->getInterfaceType())) {
+        kind = DynamicMemberKind::KeyPath;
+      } else if (TypeChecker::conformsToKnownProtocol(
+                     param->getTypeInContext(),
+                     KnownProtocolKind::ExpressibleByStringLiteral)) {
+        kind = DynamicMemberKind::String;
+      }
+
+      if (kind && !seenDynamicMemberLabel) {
+        // We can offer a fix-it if the rest of the subscript is valid.
+        flags |= InvalidParameterFlag::DynamicMemberMissingArgumentLabel;
+      } else if (!kind && seenDynamicMemberLabel) {
+        // We only want to flags this on a "real" `dynamicMember` parameter,
+        // since a subscript like `subscript(foo: Foo)` just isn't applicable
+        // for `@dynamicMemberLookup` checking at all.
+        flags |= InvalidParameterFlag::DynamicMemberInvalidType;
+      }
+    } else if (!param->isDefaultArgument() && !param->isVariadic() &&
+               !param->getInterfaceType()->is<PackExpansionType>()) {
+      flags |= InvalidParameterFlag::ParameterMissingDefaultValue;
+    }
+
+    paramFlags.push_back(flags);
+  }
+
+  auto eligibility = DynamicMemberLookupSubscriptEligibility(
+      SD, dynamicMemberIdx, kind, paramFlags);
+  auto isAccessible = SD->isAccessibleFrom(useDC);
+  return std::pair(eligibility, isAccessible);
+}

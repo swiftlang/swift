@@ -354,13 +354,6 @@ namespace swift {
   llvm::TinyPtrVector<ValueDecl *>
   findWitnessedObjCRequirements(const ValueDecl *witness,
                                 bool anySingleRequirement);
-  /// Returns true if the given subscript method is a valid implementation of
-  /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-  /// @dynamicMemberLookup.
-  /// The method is given to be defined as `subscript(dynamicMember:)` which
-  /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-  bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                         bool ignoreLabel = false);
 }
 
 #endif

@@ -542,9 +542,10 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
+  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2+2,
     StaticSpelling : 2
   );
+
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+2+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
@@ -7544,6 +7545,7 @@ enum class ObjCSubscriptKind {
   Keyed
 };
 
+
 /// Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
@@ -7573,6 +7575,19 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+public:
+  /// Describes the kinds of supported types for `dynamicMember` parameters to a
+  /// subscript which can fulfill a `@dynamicMemberLookup` requirement.
+  enum class DynamicMemberLookupKind : uint8_t {
+    /// A `{{Reference}Writable}KeyPath`.
+    KeyPath,
+
+    /// A concrete type conforming to `ExpressibleByStringLiteral`.
+    String,
+  };
+
+private:
+  friend class DynamicMemberLookupSubscriptRequest;
   friend class ResultTypeRequest;
 
   SourceLoc StaticLoc;
@@ -7597,6 +7612,11 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
+
+  /// Returns the given as a `BoundGenericType` if it is a
+  /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
+  /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
+  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -7658,6 +7678,35 @@ public:
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// Returns whether the decl can be used to satisfy an `@dynamicMemberLookup`
+  /// requirement.
+  ///
+  /// If `useDC` is provided (where the decl is being used), validates that
+  /// access control is being used consistently and that `decl` is appropriately
+  /// accessible, returning `false` if inaccessible.
+  bool isValidDynamicMemberLookupSubscript(
+      std::optional<const DeclContext *> useDC) const;
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement,
+  /// returns whether it satisfies the requirement using a key-path- or string-
+  /// based type.
+  ///
+  /// If `useDC` is provided (where the decl is being used), validates that
+  /// access control is being used consistently and that `decl` is appropriately
+  /// accessible, returning `std::nullopt` if inaccessible.
+  std::optional<DynamicMemberLookupKind>
+  getDynamicMemberLookupKind(std::optional<const DeclContext *> useDC) const;
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement
+  /// using a `{{Reference}Writable}KeyPath` dynamic member parameter, returns
+  /// the type of that parameter; `nullptr` otherwise.
+  ///
+  /// If `useDC` is provided (where the decl is being used), validates that
+  /// access control is being used consistently and that `decl` is appropriately
+  /// accessible, returning `nullptr` if inaccessible.
+  BoundGenericType *getDynamicMemberLookupKeyPathType(
+      std::optional<const DeclContext *> useDC) const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(

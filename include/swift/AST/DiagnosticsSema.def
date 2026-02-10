@@ -1752,10 +1752,25 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
-NOTE(invalid_dynamic_member_subscript, none,
-     "add an explicit argument label to this subscript to satisfy "
-     "the '@dynamicMemberLookup' requirement", ())
-ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+ERROR(invalid_dynamic_member_subscript_missing_param_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit parameter label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_arg_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit 'dynamicMember' "
+      "argument label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_order, none,
+      "'@dynamicMemberLookup' requires %0 to appear first in the parameter "
+      "list",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_type, none,
+      "'@dynamicMemberLookup' requires %0 to be either "
+      "'ExpressibleByStringLiteral' or a key path",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_missing_default, none,
+      "'@dynamicMemberLookup' requires %0 to have a default value",
+      (ParamDecl *))
+ERROR(dynamic_member_lookup_candidate_inaccessible, none,
       "'@dynamicMemberLookup' requires %0 to be as accessible as its "
       "enclosing type",
       (ValueDecl *))
