@@ -365,11 +365,11 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
 
     // Look through indirect pack references. A function with a pack parameter
     // will get the address, set the pack, and later get and load the pack. We
-    // want to follow this indirection to diagnose where the pack value is
-    // actually used.
+    // want to follow this indirection until the load, so we can diagnose where
+    // the pack is used, like `repeat each x`
     if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
       if (isa<TuplePackElementAddrInst>(user) ||
-          isa<PackElementGetInst>(user) || isa<LoadInst>(user)) {
+          isa<PackElementGetInst>(user)) {
         for (auto *use : svi->getUses())
           uselistInsert(use);
         continue;
