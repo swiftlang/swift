@@ -77,6 +77,10 @@ extension _ArrayProtocol {
     try _filter(isIncluded)
   }
 
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @abi(
     __consuming func filter(
@@ -89,4 +93,5 @@ extension _ArrayProtocol {
   ) throws -> [Element] {
     try filter(isIncluded)
   }
+#endif // !hasFeature(Embedded)
 }

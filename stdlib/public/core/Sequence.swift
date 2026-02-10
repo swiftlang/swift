@@ -743,6 +743,10 @@ extension Sequence {
     return try _filter(isIncluded)
   }
 
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @abi(
     __consuming func filter(
@@ -755,6 +759,7 @@ extension Sequence {
   ) throws -> [Element] {
     try filter(isIncluded)
   }
+#endif // !hasFeature(Embedded)
 
   @_alwaysEmitIntoClient  @inline(__always)
   public func _filter<E: Error>(
@@ -774,6 +779,10 @@ extension Sequence {
     return Array(result)
   }
 
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of _filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @abi(
     __consuming func _filter(
@@ -786,6 +795,7 @@ extension Sequence {
   ) throws -> [Element] {
     try _filter(isIncluded)
   }
+#endif // !hasFeature(Embedded)
 
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
