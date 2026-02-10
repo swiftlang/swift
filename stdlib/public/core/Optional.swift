@@ -1018,7 +1018,7 @@ extension Optional: _ObjectiveCBridgeable {
 #endif
 
 extension Optional where Wrapped: ~Copyable {
-//  @available(SwiftStdlib 6.3, *)
+  @available(SwiftStdlib 6.3, *)
   @_transparent
   public var _span: Span<Wrapped> {
     @_addressableSelf
