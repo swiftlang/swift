@@ -167,12 +167,28 @@ extension Task {
   ///
   /// - Returns: The task's result.
   public var value: Success {
+    @_alwaysEmitIntoClient
+    // This name is slightly different purely to avoid a clash with
+    // the original property and keep the mangling concise.
+    @_silgen_name("$sScT6_valuexvg")
     get async throws(Failure) {
       do {
         return try await _taskFutureGetThrowing(_task)
       } catch {
         throw (error as! Failure) // as!-safe, because typed throw on the operation closure
       }
+    }
+  }
+
+  /// This is the original property as it was defined before
+  /// adoption of typed throws. It is preserved for backward
+  /// compatibility with its original name and shouldn't be
+  /// directly referenceable.
+  var _abi_value: Success {
+    @usableFromInline
+    @_silgen_name("$sScT5valuexvg")
+    get async throws {
+      return try await _taskFutureGetThrowing(_task)
     }
   }
 
