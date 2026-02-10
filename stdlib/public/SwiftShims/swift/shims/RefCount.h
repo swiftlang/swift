@@ -1590,7 +1590,7 @@ template <>
 template <PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
-  swift::crash("side table refcount must not have "
+  ::swift::crash("side table refcount must not have "
                "a side table entry of its own");
 }
 
@@ -1598,7 +1598,7 @@ template <>
 template <PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
-  swift::crash("side table refcount must not have "
+  ::swift::crash("side table refcount must not have "
                "a side table entry of its own");
 }
 
