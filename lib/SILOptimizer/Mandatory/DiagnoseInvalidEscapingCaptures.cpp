@@ -25,6 +25,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -155,22 +156,56 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   return true;
 }
 
+/// Given a /p alloc stack inst, try to find the pack that is allocated to
+/// it. Follow the users of the allocation to find the address, find the source
+/// for copies into that address, and then find the pack that is used for get
+/// instructions.
+static const SILValue tryGetPackForTempAllocStack(AllocStackInst *alloc) {
+  InstructionWorklist worklist(alloc);
+
+  while (SILInstruction *inst = worklist.pop()) {
+    if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(asi->getUsers());
+      continue;
+    }
+
+    if (auto *tuplePackElemAddr = dyn_cast<TuplePackElementAddrInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(tuplePackElemAddr->getUsers());
+      continue;
+    }
+
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+      worklist.pushIfNotVisited(copyAddr->getSrc()->getDefiningInstruction());
+      continue;
+    }
+
+    if (auto *packElemGet = dyn_cast<PackElementGetInst>(inst)) {
+      return packElemGet->getPack();
+    }
+  }
+
+  return nullptr;
+}
+
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
-  while (true) {
+  while (value) {
     // Look through mark must check.
     if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(value)) {
       value = mmci->getOperand();
     // Look through copies.
     } else if (auto *ci = dyn_cast<CopyValueInst>(value)) {
       value = ci->getOperand();
+    } else if (auto *alloc = dyn_cast<AllocStackInst>(value)) {
+      value = tryGetPackForTempAllocStack(alloc);
     } else {
       break;
     }
   }
 
-  if (auto *arg = dyn_cast<SILArgument>(value))
-    if (auto *decl = dyn_cast_or_null<ParamDecl>(arg->getDecl()))
-      return decl;
+  if (value)
+    if (auto *arg = dyn_cast<SILArgument>(value))
+      if (auto *decl = dyn_cast_or_null<ParamDecl>(arg->getDecl()))
+        return decl;
 
   return nullptr;
 }
