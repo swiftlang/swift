@@ -6725,10 +6725,10 @@ private:
   /// a type representation with the given parent requires paretheses.
   static bool anySyntaxNeedsParens(TypeRepr *parent) {
     switch (parent->getKind()) {
-    case TypeReprKind::Optional:
-    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Protocol:
       return true;
+    case TypeReprKind::Optional:
+    case TypeReprKind::ImplicitlyUnwrappedOptional:
     case TypeReprKind::Metatype:
     case TypeReprKind::Attributed:
     case TypeReprKind::Error:
@@ -6837,7 +6837,9 @@ private:
 
       // Look through parens, inverses, `.Type` metatypes, and compositions.
       if ((*it)->isParenType() || isa<InverseTypeRepr>(*it) ||
-          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it)) {
+          isa<CompositionTypeRepr>(*it) || isa<MetatypeTypeRepr>(*it) ||
+          isa<OptionalTypeRepr>(*it) ||
+          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
         continue;
       }
 
