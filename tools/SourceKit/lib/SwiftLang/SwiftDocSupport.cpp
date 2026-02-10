@@ -1499,7 +1499,7 @@ void SwiftLangSupport::findLocalRenameRanges(
   static const char OncePerASTToken = 0;
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(

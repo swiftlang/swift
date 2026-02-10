@@ -1169,7 +1169,7 @@ static bool performWithCompletionLikeOperationParams(
 
   CompletionLikeOperationParams Params{Invocation,
                                        /*Args=*/{},
-                                       llvm::vfs::getRealFileSystem(),
+                                       llvm::vfs::createPhysicalFileSystem(),
                                        CompletionBuffer.get(),
                                        Offset,
                                        CodeCompletionDiagnostics ? &PrintDiags
@@ -1709,7 +1709,8 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
   }
 
   CompilerInvocation Invocation(InitInvok);
-  auto FileSystem = llvm::vfs::getRealFileSystem();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem =
+      llvm::vfs::createPhysicalFileSystem();
 
   IDEInspectionInstance IDEInspectionInst(std::make_shared<PluginRegistry>());
 
