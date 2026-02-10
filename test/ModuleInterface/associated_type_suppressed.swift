@@ -84,6 +84,12 @@ extension Holder where S.Iterator: Copyable {
   public func forceIntoInterface2() {}
 }
 
+// CHECK: extension assoc.Holder where S.Element : ~Copyable {
+extension Holder where S.Element: ~Copyable {
+  // SIL: @$s5assoc6HolderVAA7ElementRj_zrlE19forceIntoInterface5yyF :
+  public func forceIntoInterface5() {}
+}
+
 // CHECK: extension assoc.P {
 extension P {
   // SIL: @$s5assoc1PPAAE19forceIntoInterface3yyF :
