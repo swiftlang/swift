@@ -813,7 +813,8 @@ void ModuleDependenciesCache::recordClangDependency(
         diag::dependency_scan_unexpected_variant_module_map_note,
         priorClangModuleDetails->moduleMapFile, dependency.ClangModuleMapFile);
 
-    auto newClangModuleDetails = bridgeClangModule(dependency).getAsClangModule();
+    auto newClangModuleInfo = bridgeClangModule(dependency);
+    auto newClangModuleDetails = newClangModuleInfo.getAsClangModule();
     auto diagnoseExtraCommandLineFlags =
         [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
                const ClangModuleDependencyStorage *baseModuleDetails,
