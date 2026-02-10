@@ -475,3 +475,18 @@ func testForLoops() {
   // CHECK: function_ref @$s7ranking12testForLoopsyyF3fooL1_SaySiGyF : $@convention(thin) () -> @owned Array<Int>
   for _ in foo() {}
 }
+
+extension Collection {
+  // CHECK-LABEL: sil hidden [ossa] @$sSl7rankingE13testDropFirstyySiF
+  func testDropFirst(_ i: Int) {
+    // These should refer to the default Collection implementation of 'dropFirst'.
+    for _ in self.dropFirst(i) {}
+    // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
+
+    // CHECK-LABEL: sil private [ossa] @$sSl7rankingE13testDropFirstyySiFyycfU_
+    _ = {
+      for _ in self.dropFirst(i) {}
+      // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
+    }
+  }
+}

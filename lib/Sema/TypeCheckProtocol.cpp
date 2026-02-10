@@ -1698,7 +1698,8 @@ bool WitnessChecker::findBestWitness(
 
     if (anyFromUnconstrainedExtension &&
         conformance != nullptr &&
-        conformance->isInvalid()) {
+        conformance->isInvalid() &&
+        !conformance->isReparented()) {
       doNotDiagnoseMatches = true;
     }
 
@@ -2593,6 +2594,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     if (!Context.isLanguageModeAtLeast(6))
       allowImpliedConditionalConformance = true;
   } else if (Proto->isMarkerProtocol()) {
+    allowImpliedConditionalConformance = true;
+  } else if (Proto->getAttrs().hasAttribute<ReparentableAttr>()) {
     allowImpliedConditionalConformance = true;
   }
 

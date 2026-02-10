@@ -962,7 +962,8 @@ namespace {
       if (entry.isBase()) {
         assert(entry.isOutOfLineBase());
         auto flags = Flags(Flags::Kind::BaseProtocol);
-        return { flags, nullptr };
+        auto *defltImpl = findDefaultAssocConformanceForBase(entry.getBase());
+        return {flags, defltImpl};
       }
 
       if (entry.isAssociatedType()) {
@@ -1176,6 +1177,43 @@ namespace {
       return nullptr;
     }
 
+    llvm::Constant *findDefaultAssocConformanceForBase(ProtocolDecl *base) {
+      if (!DefaultWitnesses) return nullptr;
+
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() ||
+            entry.getKind() != SILWitnessTable::BaseProtocol)
+          continue;
+
+        auto &baseWitness = entry.getBaseProtocolWitness();
+        if (baseWitness.Requirement != base)
+          continue;
+
+        ProtocolConformance *conf = baseWitness.Witness;
+        if (!cast<NormalProtocolConformance>(conf)->isReparented()) {
+          ASSERT(false &&
+                 "non-reparented conformances have not yet been considered");
+          return nullptr;
+        }
+
+        // A reparented conformance is a protocol-to-protocol conformance whose
+        // witness table can't be fully resolved statically, as we do not know
+        // which nominal type is conforming (in other words, it's dependent).
+        //
+        // The associated conformance emission is used here, as the witness
+        // table for Self: RefiningProto needs to be used to build a
+        // default witness table for Self: Base. That default witness table
+        // will be instantiated at runtime by a conformance access function.
+        auto selfType = Proto->getASTContext().TheSelfType;
+        AssociatedConformance assocConf(Proto, selfType, conf->getProtocol());
+        defineDefaultAssociatedConformanceAccessFunction(
+            assocConf, ProtocolConformanceRef(conf));
+        return IGM.getMangledAssociatedConformance(nullptr, assocConf);
+      }
+
+      return nullptr;
+    }
+
     llvm::Constant *findDefaultAssociatedConformanceWitness(
                                                   CanType association,
                                                   ProtocolDecl *requirement) {
@@ -1198,6 +1236,48 @@ namespace {
       }
 
       return nullptr;
+    }
+
+    void emitReparentedAssociatedConformanceAccessBody(
+        IRGenFunction &IGF, ProtocolConformance *conf,
+        llvm::Value *associatedTypeMetadata, llvm::Value *wtable) {
+      assert(conf->isReparented());
+      assert(conf->getDeclContext()->getSelfProtocolDecl() == Proto);
+      assert(conf->getProtocol() != Proto);
+
+      // Get the protocol conformance descriptor.
+      auto *descriptor = IGM.getAddrOfProtocolConformanceDescriptor(
+          conf->getRootConformance());
+
+      unsigned argumentCount = 0;
+      SILWitnessTable::enumerateWitnessTableConditionalConformances(
+          conf, [&](unsigned, CanType, ProtocolDecl *condProto) {
+            ASSERT(condProto == Proto && "only expected Self: Proto");
+            argumentCount++;
+            return false; // finished?
+          });
+      ASSERT(argumentCount == 1 && "unexpected number of instantiation args!");
+
+      // This conformance of Proto: Base, where Base is the new parent, depends
+      // solely on the witness table for Self: Proto being present. Thus, that
+      // witness table is the only expected instantiation argument to create
+      // the witness table of Proto: Base. It'll be present in the private
+      // area at wt[-1].
+
+      // void* instantationArgs = wtable;
+      auto alloca = IGF.createAlloca(
+          wtable->getType(), IGM.getPointerAlignment(), "instantiationArgs");
+      IGF.Builder.CreateStore(wtable, alloca);
+
+      // swift_getWitnessTable(descriptor,
+      //                       associatedTypeMetadata,
+      //                       &instantiationArgs)
+      auto *func = IGM.getGetWitnessTableFn();
+      auto *funcTy = IGM.getGetWitnessTableFnType();
+      auto thisTable = IGF.Builder.CreateCall(
+          funcTy, func,
+          {descriptor, associatedTypeMetadata, alloca.getAddress()});
+      IGF.Builder.CreateRet(thisTable);
     }
 
     void defineDefaultAssociatedConformanceAccessFunction(
@@ -1239,8 +1319,14 @@ namespace {
       // For a concrete witness table, call it.
       ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
       if (conformance.isConcrete()) {
-        auto conformanceI = &IGM.getConformanceInfo(associatedProtocol,
-                                                    conformance.getConcrete());
+        ProtocolConformance *concConf = conformance.getConcrete();
+        // Reparented conformances get special emission.
+        if (concConf->isReparented())
+          return emitReparentedAssociatedConformanceAccessBody(
+              IGF, concConf, associatedTypeMetadata, wtable);
+
+        auto conformanceI =
+            &IGM.getConformanceInfo(associatedProtocol, concConf);
         auto returnValue = conformanceI->getTable(IGF, &associatedTypeMetadata);
         IGF.Builder.CreateRet(returnValue);
         return;
@@ -5561,7 +5647,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
   FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
                                     vtable);
   builder.layoutEmbedded(classTy);
-  bool canBeConstant = builder.canBeConstant();
+  bool canBeConstant = true;
 
   StringRef section{};
   auto var = IGM.defineTypeMetadata(classTy, /*isPattern*/ false, canBeConstant,

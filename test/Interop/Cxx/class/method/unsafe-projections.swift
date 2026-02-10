@@ -34,6 +34,8 @@
 // CHECK: }
 
 // CHECK: struct InheritSelfContained {
+// CHECK:   func explicitSelfContained() -> ExplicitSelfContained
+// CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK:   func name() -> std{{.*}}string
 // CHECK:   func selfContained() -> SelfContained
 // CHECK:   func nested() -> NestedSelfContained
@@ -41,8 +43,6 @@
 // CHECK:   func value() -> Int32
 // CHECK:   func __viewUnsafe() -> View
 // CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
-// CHECK:   func explicitSelfContained() -> ExplicitSelfContained
-// CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
 
 // CHECK: struct ExplicitSelfContained {

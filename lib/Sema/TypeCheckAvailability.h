@@ -213,8 +213,7 @@ public:
 };
 
 /// Diagnose uses of unavailable declarations in expressions.
-void diagnoseExprAvailability(const Expr *E, DeclContext *DC,
-                              bool preconcurrency);
+void diagnoseExprAvailability(const Expr *E, DeclContext *DC);
 
 /// Diagnose uses of unavailable declarations in statements (via patterns, etc)
 /// but not expressions.

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=StdSpan -source-filename=x -enable-experimental-cxx-interop -Xcc -std=c++20 -module-cache-path %t > %t/interface.swift
-// RUN: %FileCheck %s < %t/interface.swift
+// RUN: %FileCheck %s --match-full-lines < %t/interface.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -warnings-as-errors -verify -Xcc -std=c++20 %s
@@ -9,28 +9,35 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span
 
-// REQUIRES: rdar163085444
-
 #if !BRIDGING_HEADER
 import StdSpan
 #endif
 import CxxStdlib
 
 // CHECK:     struct DependsOnSelf {
+// CHECK:       @safe borrowing func get() -> ConstSpanOfInt
 // CHECK:       @_lifetime(borrow self)
 // CHECK-NEXT:  @_alwaysEmitIntoClient @_disfavoredOverload public borrowing func get() -> Span<CInt>
-// CHECK-NEXT:  borrowing func get() -> ConstSpanOfInt
+// CHECK:     }
 
+// CHECK:     struct CaptureByReference {
 // CHECK:      mutating func set(_ x: borrowing std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>)
+// CHECK:     }
+
 // CHECK:      func funcWithSafeWrapper(_ s: ConstSpanOfInt)
 // CHECK-NEXT: func funcWithSafeWrapper2(_ s: ConstSpanOfInt) -> ConstSpanOfInt
 // CHECK-NEXT: func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> ConstSpanOfInt
 // CHECK:      struct X {
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func methodWithSafeWrapper(_ s: Span<CInt>)
 // CHECK-NEXT:   mutating func methodWithSafeWrapper(_ s: ConstSpanOfInt)
+// CHECK-NEXT:   mutating func getMutable(_ s: ConstSpanOfInt) -> SpanOfInt
+// CHECK-DAG:    /// This is an auto-generated wrapper for safer interop
+// CHECK-DAG:    @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-DAG:    @_alwaysEmitIntoClient @_disfavoredOverload public mutating func methodWithSafeWrapper(_ s: Span<CInt>)
+// CHECK-DAG:    /// This is an auto-generated wrapper for safer interop
+// CHECK-DAG:    @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-DAG:    @_lifetime(&self)
+// CHECK-DAG:    @_alwaysEmitIntoClient @_disfavoredOverload public mutating func getMutable(_ s: Span<CInt>) -> MutableSpan<CInt>
 // CHECK-NEXT: }
 // CHECK: struct SpanWithoutTypeAlias {
 // CHECK-NEXT:   init()
@@ -42,9 +49,9 @@ import CxxStdlib
 
 // CHECK: class DependsOnSelfFRT {
 // CHECK-NEXT:   init()
+// CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
 // CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt
-// CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT: }
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
@@ -149,6 +156,7 @@ import CxxStdlib
 
 func callMethodWithSafeWrapper(_ x: inout X, s: Span<CInt>) {
     x.methodWithSafeWrapper(s)
+    let _ = x.getMutable(s)
 }
 
 func callFooBar(_ x: inout SpanWithoutTypeAlias, _ s: ConstSpanOfInt) {

@@ -1680,6 +1680,7 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
                                        const llvm::opt::ArgList &args,
                                        StringRef SDKPath, bool shared) const {
   SmallString<128> scratchPath;
+  scratchPath.clear();
   getResourceDirPath(scratchPath, args, shared);
   runtimeLibPaths.push_back(std::string(scratchPath.str()));
 

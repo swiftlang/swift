@@ -431,6 +431,24 @@ public:
   int operator*() const { return value; }
 };
 
+class AllStar {
+private:
+  long L = 111;
+
+public:
+  // The unary variant (i.e., dereference) should be accessible
+  // via the synthesized .pointee member
+  long &operator*() { return L; }
+
+  // The binary variant (i.e., multiply) should be accessible
+  // via the synthesized static func *(lhs, rhs) operator
+  AllStar operator*(const AllStar &rhs) const {
+    AllStar a;
+    a.L = this->L * rhs.L;
+    return a;
+  }
+};
+
 struct AmbiguousOperatorStar {
 private:
   int value = 567;

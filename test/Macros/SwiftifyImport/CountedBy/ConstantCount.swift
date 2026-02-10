@@ -117,9 +117,10 @@ public func noescape(_ ptr: Span<CInt>) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescape: expected \(37) but got \(_ptrCount)")
     }
-    return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
-      return unsafe noescape(_ptrPtr.baseAddress!)
+    let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
+        unsafe $0
     }
+    return unsafe noescape(_ptrPtr.baseAddress!)
 }
 ------------------------------
 @__swiftmacro_4test11noescapeOpt15_SwiftifyImportfMp_.swift
@@ -131,15 +132,10 @@ public func noescapeOpt(_ ptr: Span<CInt>?) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
     }
-    return { () in
-        return if ptr == nil {
-            unsafe noescapeOpt(nil)
-          } else {
-            unsafe ptr!.withUnsafeBufferPointer { _ptrPtr in
-              return unsafe noescapeOpt(_ptrPtr.baseAddress)
-            }
-          }
-    }()
+    let _ptrPtr = unsafe ptr?.withUnsafeBufferPointer {
+        unsafe $0
+    }
+    return unsafe noescapeOpt(_ptrPtr?.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test11noescapeMut15_SwiftifyImportfMp_.swift
@@ -151,9 +147,10 @@ public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeMut: expected \(37) but got \(_ptrCount)")
     }
-    return unsafe ptr.withUnsafeMutableBufferPointer { _ptrPtr in
-      return unsafe noescapeMut(_ptrPtr.baseAddress!)
+    let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
+        unsafe $0
     }
+    return unsafe noescapeMut(_ptrPtr.baseAddress!)
 }
 ------------------------------
 @__swiftmacro_4test14noescapeMutOpt15_SwiftifyImportfMp_.swift
@@ -165,15 +162,10 @@ public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
     }
-    return { () in
-        return if ptr == nil {
-            unsafe noescapeMutOpt(nil)
-          } else {
-            unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-              return unsafe noescapeMutOpt(_ptrPtr.baseAddress)
-            }
-          }
-    }()
+    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+        unsafe $0
+    }
+    return unsafe noescapeMutOpt(_ptrPtr?.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test11plainReturn15_SwiftifyImportfMp_.swift

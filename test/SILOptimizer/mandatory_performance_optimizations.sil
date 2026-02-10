@@ -13,6 +13,12 @@ struct NonTrivialStruct {
   var s: String
 }
 
+struct S6: ~Copyable {
+  deinit
+}
+
+class C {}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
 sil_global [let] @g3 : $Int32
@@ -227,6 +233,27 @@ bb3:
   return %1 : $Int32
 }
 
+sil [ossa] @generic_no_return : $@convention(thin) <T> () -> @out T {
+bb0(%0 : $*T):
+  unreachable
+}
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @specialize_no_return :
+// CHECK:          destroy_value [dead_end] %0
+// CHECK-NEXT:     unreachable
+// CHECK:       } // end sil function 'specialize_no_return'
+sil [ossa] [no_allocation] @specialize_no_return : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack $Never
+  %4 = function_ref @generic_no_return : $@convention(thin) <T> () -> @out T
+  apply %4<Never>(%1) : $@convention(thin) <T> () -> @out T
+  apply undef<Never>(%1) : $@convention(thin) <T> () -> @out T
+  dealloc_stack %1
+  destroy_value %0
+  %19 = tuple ()
+  return %19
+}
+
 sil @createNonTrivialStruct : $@convention(thin) (Int) -> @owned NonTrivialStruct
 
 // CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @test_dead_alloc_elimination_with_mark_dependence :
@@ -246,6 +273,25 @@ bb0(%0 : $Int):
   %12 = tuple ()
   dealloc_stack %1
   return %12
+}
+
+// CHECK-LABEL: sil [serialized] [no_allocation] [perf_constraint] [ossa] @devirtualze_hidden_deinit :
+// CHECK:         function_ref @s6_deinit
+// CHECK-NEXT:    apply
+// CHECK:       } // end sil function 'devirtualze_hidden_deinit'
+sil [serialized] [no_allocation] [ossa] @devirtualze_hidden_deinit : $@convention(thin) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  destroy_value %0
+  %r = tuple()
+  return %r
+}
+
+// CHECK-LABEL: sil [perf_constraint] [ossa] @s6_deinit :
+sil hidden [ossa] @s6_deinit : $@convention(method) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  end_lifetime %0
+  %r = tuple ()
+  return %r
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
@@ -382,3 +428,7 @@ bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
 // CHECK:         return %1 : $Builtin.NativeObject
 // CHECK:       } // end sil function '$s12metatype_argTf4ndn_n'
 
+
+sil_moveonlydeinit S6 {
+  @s6_deinit
+}

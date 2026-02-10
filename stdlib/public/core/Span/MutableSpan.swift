@@ -399,7 +399,7 @@ extension MutableSpan where Element: ~Copyable {
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
-      start: _pointer, count: _count
+      start: _pointer, count: _count &* MemoryLayout<Element>.stride
     )
     return try unsafe bytes.withMemoryRebound(to: Element.self) {
       buffer throws(E) -> Result in

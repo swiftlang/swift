@@ -132,6 +132,9 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
+.PARAMETER TraceExpand
+Enable trace-expand mode for CMake.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -221,7 +224,8 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [switch] $TraceExpand
 )
 
 ## Prepare the build environment.
@@ -913,6 +917,7 @@ enum Project {
   SwiftInspect
   ExperimentalDynamicRuntime
   ExperimentalDynamicOverlay
+  ExperimentalDynamicRuntimeModule
   ExperimentalDynamicStringProcessing
   ExperimentalDynamicSynchronization
   ExperimentalDynamicDistributed
@@ -923,6 +928,7 @@ enum Project {
   ExperimentalDynamicFoundation
   ExperimentalStaticRuntime
   ExperimentalStaticOverlay
+  ExperimentalStaticRuntimeModule
   ExperimentalStaticStringProcessing
   ExperimentalStaticSynchronization
   ExperimentalStaticDistributed
@@ -1876,6 +1882,10 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
+    if ($TraceExpand) {
+      $cmakeGenerateArgs += @("--trace-expand")
+    }
+
     if ($UseBuiltCompilers.Contains("Swift")) {
       $env:Path = "$([IO.Path]::Combine((Get-InstallDir $BuildPlatform), "Runtimes", $ProductVersion, "usr", "bin"));$(Get-CMarkBinaryCache $BuildPlatform)\src;$($BuildPlatform.ToolchainInstallRoot)\usr\bin;$(Get-PinnedToolchainRuntime);${env:Path}"
     } elseif ($UsePinnedCompilers.Contains("Swift")) {
@@ -2164,7 +2174,14 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
   }
 
   # If DebugInfo is enabled limit the number of parallel links to avoid OOM.
-  $DebugDefines = if ($DebugInfo) { @{ SWIFT_PARALLEL_LINK_JOBS = "4"; } } else { @{} }
+  $DebugDefines = if ($DebugInfo) {
+    @{
+      SWIFT_PARALLEL_LINK_JOBS = "2";
+      LLVM_PARALLEL_LINK_JOBS = "2";
+    }
+  } else {
+    @{}
+  }
 
   # In the latest versions of VS, STL typically requires a newer version of
   # Clang than released Swift toolchains include. Relax this requirement when
@@ -2225,6 +2242,12 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
+    SWIFT_ENABLE_RUNTIME_MODULE = "YES";
+    SWIFT_ENABLE_BACKTRACING = $(if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+        "YES"
+      } else {
+        "NO"
+      });
     SWIFT_ENABLE_SYNCHRONIZATION = "YES";
     SWIFT_ENABLE_VOLATILE = "YES";
     SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -2266,7 +2289,17 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
-    if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
+    if ($TestSwift) {
+      $Targets += @("check-swift", "SwiftCompilerPlugin")
+
+      # Copy the backtracer into position 
+      $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
+      $CompilerCache = Get-ProjectBinaryCache $BuildPlatform Compilers
+      Copy-Item `
+        -Path $RuntimeBinaryCache\libexec `
+        -Destination $CompilerCache `
+        -Recurse -Force
+    }
     if ($TestLLDB) { $Targets += @("check-lldb") }
     if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
@@ -2480,7 +2513,6 @@ function Build-Brotli([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
-      CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
     }
 }
 
@@ -2697,6 +2729,13 @@ function Build-Runtime([Hashtable] $Platform) {
       SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
       SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
       SWIFT_ENABLE_SYNCHRONIZATION = "YES";
+      SWIFT_ENABLE_RUNTIME_MODULE = "YES";
+      SWIFT_ENABLE_BACKTRACING = $(if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
+          "YES"
+        } else {
+          "NO"
+        });
+      SWIFT_BUILD_LIBEXEC = "YES";
       SWIFT_ENABLE_VOLATILE = "YES";
       SWIFT_NATIVE_SWIFT_TOOLS_PATH = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin"));
       SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -2704,6 +2743,9 @@ function Build-Runtime([Hashtable] $Platform) {
     })
 }
 
+# Note: This is only used by Android; if you're looking for tests on the Swift
+#       compiler/runtime otherwise, Test-Compilers is the place you need to be
+#       looking.
 function Test-Runtime([Hashtable] $Platform) {
   if ($IsCrossCompiling) {
     throw "Swift runtime tests are not supported when cross-compiling"
@@ -2718,6 +2760,7 @@ function Test-Runtime([Hashtable] $Platform) {
   }
 
   $PlatformDefines = @{}
+
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
       SWIFT_ANDROID_API_LEVEL = "$AndroidAPILevel";
@@ -2735,13 +2778,14 @@ function Test-Runtime([Hashtable] $Platform) {
       -UseBuiltCompilers C,CXX,Swift `
       -SwiftSDK $null `
       -BuildTargets check-swift-validation-only_non_executable `
-      -Defines ($PlatformDefines + @{
+      -Defines @{
         SWIFT_INCLUDE_TESTS = "YES";
         SWIFT_INCLUDE_TEST_BINARIES = "YES";
         SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
         SWIFT_NATIVE_LLVM_TOOLS_PATH = Join-Path -Path $CompilersBinaryCache -ChildPath "bin";
+        SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
         LLVM_LIT_ARGS = "-vv";
-      })
+      }
   }
 }
 
@@ -2773,39 +2817,45 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
     }
 
     $StringProcessingBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticStringProcessing
+      Get-ProjectBinaryCache $Platform ExperimentalStaticStringProcessing
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicStringProcessing
     }
 
     $SynchronizationBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticSynchronization
+      Get-ProjectBinaryCache $Platform ExperimentalStaticSynchronization
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicSynchronization
     }
 
     $DistributedBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticDistributed
+      Get-ProjectBinaryCache $Platform ExperimentalStaticDistributed
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicDistributed
     }
 
     $ObservationBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticObservation
+      Get-ProjectBinaryCache $Platform ExperimentalStaticObservation
     } else {
-      Get-ProjectBinaryCache $Platform ExperimentalDynamicObservation
+      Get-ProjectBinarycache $Platform ExperimentalDynamicObservation
     }
 
     $DifferentiationBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticDifferentiation
+      Get-ProjectBinaryCache $Platform ExperimentalStaticDifferentiation
     } else {
       Get-ProjectBinarycache $Platform ExperimentalDynamicDifferentiation
     }
 
     $VolatileBinaryCache = if ($Static) {
-      Get-ProjectBinarycache $Platform ExperimentalStaticVolatile
+      Get-ProjectBinaryCache $Platform ExperimentalStaticVolatile
     } else {
-      Get-ProjectBinaryCache $Platform ExperimentalDynamicVolatile
+      Get-ProjectBinarycache $Platform ExperimentalDynamicVolatile
+    }
+
+    $RuntimeModuleBinaryCache = if ($Static) {
+      Get-ProjectBinaryCache $Platform ExperimentalStaticRuntimeModule
+    } else {
+      Get-ProjectBinarycache $Platform ExperimentalDynamicRuntimeModule
     }
 
     Build-CMakeProject `
@@ -2864,6 +2914,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftStringProcessing_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2883,6 +2934,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2904,6 +2956,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftDistributed_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2925,6 +2978,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftObservation_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2944,6 +2998,7 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION = "NO";
@@ -2964,9 +3019,32 @@ function Build-ExperimentalRuntime([Hashtable] $Platform, [switch] $Static = $fa
 
         SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
         SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+
         # FIXME(compnerd) this currently causes a build failure on Windows, but
         # this should be enabled when building the dynamic runtime.
         SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
+      }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift\Runtimes\Supplemental\Runtime `
+      -Bin $RuntimeModuleBinaryCache `
+      -InstallTo "${SDKROOT}\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK $null `
+      -UseGNUDriver `
+      -Defines @{
+        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+        SwiftCore_DIR = "${RuntimeBinaryCache}\cmake\SwiftCore";
+        SwiftOverlay_DIR = "${OverlayBinaryCache}\cmake\SwiftOverlay";
+        SwiftCxxOverlay_DIR = "${OverlayBinaryCache}\Cxx\cmake\SwiftCxxOverlay";
+
+        # FIXME(compnerd) this currently causes a build failure on Windows, but
+        # this should be enabled when building the dynamic runtime.
+        SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
       }
   }
 }
@@ -3369,7 +3447,6 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
         -SwiftSDK ${SDKROOT} `
         -Defines @{
           BUILD_SHARED_LIBS = "NO";
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -4193,6 +4270,7 @@ if (-not $SkipBuild) {
 
             # FIXME(compnerd) how do we select which SDK is meant to be re-distributed?
             Copy-Directory "${SDKROOT}\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
+            Copy-Directory "${SDKROOT}\usr\libexec" "$([IO.Path]::Combine((Get-InstallDir $Build), "Runtimes", $ProductVersion, "usr"))"
           }
 
           Install-SDK $WindowsSDKBuilds

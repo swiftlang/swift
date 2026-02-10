@@ -41,6 +41,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -2940,6 +2941,52 @@ matchFunctionThrowing(ConstraintSystem &cs,
   }
 }
 
+ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionSendability(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    ConstraintSystem::TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *constraint = Constraint::create(*this, kind, func1, func2,
+                                            getConstraintLocator(locator));
+      addUnsolvedConstraint(constraint);
+      return getTypeMatchSuccess();
+    }
+    return getTypeMatchAmbiguous();
+  };
+
+  // First check to see if we have any sendable dependent function types, if
+  // any of them still have unresolved type variables we need to wait until
+  // they're fully resolved.
+  auto dep1 = func1->getSendableDependentType();
+  if (dep1) {
+    dep1 = simplifyType(dep1);
+    if (dep1->hasTypeVariable())
+      return formUnsolved();
+  }
+  auto dep2 = func2->getSendableDependentType();
+  if (dep2) {
+    dep2 = simplifyType(dep2);
+    if (dep2->hasTypeVariable())
+      return formUnsolved();
+  }
+
+  // Sendability is given by either the sendability of the dependent type if
+  // present, otherwise it's given by the function itself.
+  auto func1Sendable = dep1 ? dep1->isSendableType() : func1->isSendable();
+  auto func2Sendable = dep2 ? dep2->isSendableType() : func2->isSendable();
+
+  if (func1Sendable != func2Sendable) {
+    // A @Sendable function can be a subtype of a non-@Sendable function.
+    if (kind < ConstraintKind::Subtype || func2Sendable) {
+      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
+        return getTypeMatchFailure(locator);
+    }
+  }
+  return getTypeMatchSuccess();
+}
+
 static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void) locator.getLocatorParts(path);
@@ -3127,6 +3174,12 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
+  // If the locator is for a @Sendable match, that's all we want to do.
+  if (auto last = locator.last()) {
+    if (last->is<LocatorPathElt::FunctionSendability>())
+      return matchFunctionSendability(func1, func2, kind, flags, locator);
+  }
+
   // Match the 'throws' effect.
   TypeMatchResult throwsResult =
       matchFunctionThrowing(*this, func1, func2, kind, flags, locator);
@@ -3159,14 +3212,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       increaseScore(SK_SyncInAsync, locator);
   }
 
-  // A @Sendable function can be a subtype of a non-@Sendable function.
-  if (func1->isSendable() != func2->isSendable()) {
-    // Cannot add '@Sendable'.
-    if (func2->isSendable() || kind < ConstraintKind::Subtype) {
-      if (AddSendableAttribute::attempt(*this, kind, func1, func2, locator))
-        return getTypeMatchFailure(locator);
-    }
-  }
+  // Match @Sendable.
+  auto sendableResult = matchFunctionSendability(
+      func1, func2, kind, TMF_GenerateConstraints,
+      locator.withPathElement(ConstraintLocator::FunctionSendability));
+  if (sendableResult.isFailure())
+    return sendableResult;
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
@@ -10472,55 +10523,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
-  // Delay solving member constraint for unapplied methods
-  // where the base type has a conditional Sendable conformance
-  auto shouldDelayDueToPartiallyResolvedBaseType =
-      [&](Type baseTy, ValueDecl *decl,
-          FunctionRefInfo functionRefInfo) -> bool {
-    if (!Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures))
-      return false;
-
-    if (!Context.getProtocol(KnownProtocolKind::Sendable))
-      return false;
-
-    auto shouldCheckSendabilityOfBase = [&]() {
-      if (!isa_and_nonnull<FuncDecl>(decl))
-        return Type();
-
-      if (!decl->isInstanceMember() &&
-          !decl->getDeclContext()->getSelfProtocolDecl())
-        return Type();
-
-      auto hasAppliedSelf =
-          decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseTy, decl);
-      auto numApplies = getNumApplications(hasAppliedSelf, functionRefInfo);
-      if (numApplies >= decl->getNumCurryLevels())
-        return Type();
-
-      return decl->isInstanceMember() ? baseTy->getMetatypeInstanceType()
-                                      : baseTy;
-    };
-
-    Type baseTyToCheck = shouldCheckSendabilityOfBase();
-    if (!baseTyToCheck)
-      return false;
-
-    auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
-    auto baseConformance = lookupConformance(baseTyToCheck, sendableProtocol);
-
-    return llvm::any_of(baseConformance.getConditionalRequirements(),
-                        [&](const auto &req) {
-                          if (req.getKind() != RequirementKind::Conformance)
-                            return false;
-
-                          return (req.getFirstType()->hasTypeVariable() &&
-                                  (req.getProtocolDecl()->isSpecificProtocol(
-                                       KnownProtocolKind::Sendable) ||
-                                   req.getProtocolDecl()->isSpecificProtocol(
-                                       KnownProtocolKind::SendableMetatype)));
-                        });
-  };
-
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -10546,12 +10548,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // we are going to see.
     auto baseTy = candidate.getBaseType();
     const auto baseObjTy = baseTy->getRValueType();
-
-    // If we need to delay, update the status but record the member.
-    if (shouldDelayDueToPartiallyResolvedBaseType(
-            baseObjTy, decl, candidate.getFunctionRefInfo())) {
-      result.OverallResult = MemberLookupResult::Unsolved;
-    }
 
     bool hasInstanceMembers = false;
     bool hasInstanceMethods = false;
@@ -13363,18 +13359,20 @@ retry_after_fail:
           return true;
         }
 
-        // If types of arguments/parameters and result lined up exactly,
-        // let's favor this overload choice.
-        //
-        // Note this check ignores `ExtInfo` on purpose and only compares
-        // types, if there are overloads that differ only in effects then
-        // all of them are going to be considered and filtered as part of
-        // "favored" group after forming a valid partial solution.
-        if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
-          if (FunctionType::equalParams(argFnType->getParams(),
-                                        choiceFnType->getParams()) &&
-              argFnType->getResult()->isEqual(choiceFnType->getResult()))
-            constraint->setFavored();
+        if (getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          // If types of arguments/parameters and result lined up exactly,
+          // let's favor this overload choice.
+          //
+          // Note this check ignores `ExtInfo` on purpose and only compares
+          // types, if there are overloads that differ only in effects then
+          // all of them are going to be considered and filtered as part of
+          // "favored" group after forming a valid partial solution.
+          if (auto *choiceFnType = choiceType->getAs<FunctionType>()) {
+            if (FunctionType::equalParams(argFnType->getParams(),
+                                          choiceFnType->getParams()) &&
+                argFnType->getResult()->isEqual(choiceFnType->getResult()))
+              constraint->setFavored();
+          }
         }
 
         // Account for any optional unwrapping/binding

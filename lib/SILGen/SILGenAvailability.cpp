@@ -199,23 +199,32 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     SILBasicBlock *unwindBB = SGF.createBasicBlock();
 
     auto *apply = SGF.B.createBeginApply(loc, functionRef, subs, params);
-    SmallVector<SILValue, 4> rawResults;
-    for (auto result : apply->getAllResults())
-      rawResults.push_back(result);
 
-    auto token = rawResults.pop_back_val();
-    SGF.B.createYield(loc, rawResults, resumeBB, unwindBB);
+    SmallVector<SILValue, 4> yields;
+    auto yieldResults = apply->getYieldedValues();
+    yields.append(yieldResults.begin(), yieldResults.end());
+
+    SGF.B.createYield(loc, yields, resumeBB, unwindBB);
 
     // Emit resume block.
     SGF.B.emitBlock(resumeBB);
-    SGF.B.createEndApply(loc, token,
+    SGF.B.createEndApply(loc, apply->getTokenResult(),
                          SILType::getEmptyTupleType(SGF.getASTContext()));
+    if (apply->isCalleeAllocated()) {
+      SGF.B.createDeallocStack(loc, apply->getCalleeAllocationResult());
+    }
+
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
 
     // Emit unwind block.
     SGF.B.emitBlock(unwindBB);
-    SGF.B.createEndApply(loc, token,
+    SGF.B.createEndApply(loc, apply->getTokenResult(),
                          SILType::getEmptyTupleType(SGF.getASTContext()));
+
+    if (apply->isCalleeAllocated()) {
+      SGF.B.createDeallocStack(loc, apply->getCalleeAllocationResult());
+    }
+
     SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
     return;
   }

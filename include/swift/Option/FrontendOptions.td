@@ -113,6 +113,11 @@ def block_list_file
     Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
     HelpText<"The path to a blocklist configuration file">;
 
+def const_gather_protocols_file
+  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
@@ -272,10 +277,6 @@ def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overl
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
-
-def const_gather_protocols_file
-  : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
 
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
@@ -928,12 +929,22 @@ def solver_disable_prune_disjunctions : Flag<["-"], "solver-disable-prune-disjun
 def solver_enable_prune_disjunctions : Flag<["-"], "solver-enable-prune-disjunctions">,
   HelpText<"Enable experimental disjunction pruning algorithm for lookahead in the solver">;
 
+def solver_disable_optimize_operator_defaults : Flag<["-"], "solver-disable-optimize-operator-defaults">,
+  HelpText<"Disable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_enable_optimize_operator_defaults : Flag<["-"], "solver-enable-optimize-operator-defaults">,
+  HelpText<"Enable experimental optimization to sometimes skip operators in protocol extensions">;
+
+def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-hacks">,
+  HelpText<"Disable various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
+def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
+  HelpText<"Enble various constraint solver performance optimizations that have been "
+           "subsumed by subsequent improvements">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
-
-def enable_operator_designated_types :
-  Flag<["-"], "enable-operator-designated-types">,
-  HelpText<"Enable operator designated types">;
 
 def enable_invalid_ephemeralness_as_error :
   Flag<["-"], "enable-invalid-ephemeralness-as-error">,

@@ -123,3 +123,45 @@ import lifetime_underscored_dependence
 // CHECK:   }
 // CHECK:   #endif
 // CHECK: }
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT: @_lifetime(copy ne0)
+// CHECK-NEXT: @inlinable public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inview: consuming lifetime_underscored_dependence.AnotherView, _ io: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, ne0: consuming lifetime_underscored_dependence.AnotherView, ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView {
+// CHECK-NEXT:   let ne2 = f(ne0, &ne1)
+// CHECK-NEXT:   return ne2
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @lifetime(copy ne0)
+// CHECK-NEXT: @inlinable public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inview: consuming lifetime_underscored_dependence.AnotherView, _ io: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, ne0: consuming lifetime_underscored_dependence.AnotherView, ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView {
+// CHECK-NEXT:   let ne2 = f(ne0, &ne1)
+// CHECK-NEXT:   return ne2
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
+
+// CHECK: @inlinable public func takeCopierUnannotated(f: (consuming lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {}
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, _ ne0: consuming lifetime_underscored_dependence.AnotherView, _ ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView, _ ne0: consuming lifetime_underscored_dependence.AnotherView, _ ne1: inout lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView) {} 
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT: @inlinable public func returnableCopier(_ aView: lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView {
+// CHECK-NEXT:   return aView
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @inlinable public func returnableCopier(_ aView: lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView {
+// CHECK-NEXT:   return aView
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func returnCopier() -> @_lifetime(copy a) (_ a: lifetime_underscored_dependence.AnotherView) -> lifetime_underscored_dependence.AnotherView {
+// CHECK-NEXT:  return returnableCopier
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif

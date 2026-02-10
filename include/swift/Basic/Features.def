@@ -278,6 +278,8 @@ LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
+LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
+BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -529,8 +531,12 @@ EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
-/// Allow declaration of compile-time values
+/// Allow declaration of compile-time values bypassing
+/// syntactic legality checking
 EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
+
+/// Allow use of literal expressions as literals
+EXPERIMENTAL_FEATURE(LiteralExpressions, true)
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
@@ -545,9 +551,9 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
-/// Excludes '(file)private' properties with initial values from the memberwise
-/// initializer if there is a more accessible initializable property.
-EXPERIMENTAL_FEATURE(ExcludePrivateFromMemberwiseInit, true)
+/// Deprecates the compatibility memberwise initializer introduced by SE-0502,
+/// and removes it in the next major language mode.
+EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
 
 /// Allow macro based aliases to be imported into Swift
 EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
@@ -586,6 +592,9 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
+
+/// Allows an existing protocol to refine a new one, without ABI break.
+EXPERIMENTAL_FEATURE(Reparenting, true)
 
 /// Enable source-level warning control with `@warn`
 EXPERIMENTAL_FEATURE(SourceWarningControl, true)

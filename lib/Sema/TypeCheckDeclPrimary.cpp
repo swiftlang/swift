@@ -193,6 +193,34 @@ static void checkExtensionAddsSoloInvertibleProtocol(const ExtensionDecl *ext) {
   }
 }
 
+/// FIXME: it'd be better if this was done elsewhere, as we're going to see
+/// quadratic behavior as the number of @reparented entries in a program grows,
+/// as we scan the getInheritedProtocols list for each entry.
+/// Ideally we'd also roll this into a check that ensures there is only one
+/// extension declaring a reparenting per protocol. Probably should happen
+/// at top-level when checking extensions generally.
+static void checkReparentedExtensionEntry(const ExtensionDecl *ext,
+                                          InheritedEntry const &entry,
+                                          Type resolvedTy) {
+  assert(entry.isReparented());
+  auto *childProto = ext->getExtendedProtocolDecl();
+  ASSERT(childProto && "expected TypeCheckType to exclude this case");
+
+  auto rpProto = resolvedTy->getAs<ProtocolType>();
+  ASSERT(rpProto && "expected TypeCheckType to exclude non-protocols");
+
+  auto reparentedProto = rpProto->getDecl();
+  bool found = llvm::any_of(
+      childProto->getInheritedProtocols(),
+      [&](ProtocolDecl *inherited) { return inherited == reparentedProto; });
+
+  if (!found) {
+    ext->getASTContext().Diags.diagnose(
+        entry.getLoc(), diag::extension_protocol_reparented_not_inheriting,
+        childProto, reparentedProto);
+  }
+}
+
 /// Check the inheritance clause of a type declaration or extension thereof.
 ///
 /// This routine performs detailed checking of the inheritance clause of the
@@ -208,13 +236,15 @@ static void checkInheritanceClause(
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
 
-    // Protocol extensions cannot have inheritance clauses.
+    // Protocol extensions can only have an inheritance clause
+    // consisting of @reparented entries.
     if (auto proto = ext->getExtendedProtocolDecl()) {
-      if (!inheritedClause.empty()) {
-        ext->diagnose(diag::extension_protocol_inheritance,
-                 proto->getName())
-          .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                                 inheritedClause.back().getSourceRange().End));
+      for (auto const &entry : inheritedClause) {
+        if (entry.isReparented())
+          continue;
+
+        ext->diagnose(diag::extension_protocol_inheritance, proto->getName())
+            .highlight(entry.getSourceRange());
         return;
       }
     }
@@ -275,6 +305,9 @@ static void checkInheritanceClause(
     if (isa<GenericTypeParamDecl>(decl) ||
         isa<AssociatedTypeDecl>(decl))
       continue;
+
+    if (inherited.isReparented())
+      checkReparentedExtensionEntry(ext, inherited, inheritedTy);
 
     // Check whether we inherited from 'AnyObject' twice.
     // Other redundant-inheritance scenarios are checked below, the
@@ -3437,6 +3470,8 @@ public:
     if (!PD->getPrimaryAssociatedTypeNames().empty())
       (void) PD->getPrimaryAssociatedTypes();
 
+    checkInheritanceClause(PD);
+
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member references another declaration whose generic signature
@@ -3448,8 +3483,6 @@ public:
       visit(Member);
 
     checkAccessControl(PD);
-
-    checkInheritanceClause(PD);
 
     checkProtocolRefinementRequirements(PD);
 
@@ -3481,6 +3514,14 @@ public:
     }
 
     checkExplicitAvailability(PD);
+
+    // For reparented protocols, we need to check that the derived protocol's
+    // default witnesses are enough to satisfy the new base's requirements.
+    //
+    // To support -parse-stdlib test cases, we synthesize special protocols like
+    // Copyable that will appear as if deserialized, so skip checking those.
+    if (PD->getParentSourceFile())
+      TypeChecker::checkConformancesInContext(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {

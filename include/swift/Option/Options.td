@@ -1600,6 +1600,16 @@ def target_variant : Separate<["-"], "target-variant">,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
 
+def target_arch_variant
+    : Separate<["-"], "target-arch-variant">,
+      Flags<[FrontendOption, NoInteractiveOption, NewDriverOnlyOption,
+             ModuleInterfaceOption, ModuleWrapOption,
+             SwiftSynthesizeInterfaceOption]>,
+      MetaVarName<"<arch-variant>">,
+      HelpText<"Generate code for an additional arch/slice variant of the "
+               "target architecture"
+               "into fat mach-o binaries">;
+
 def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
@@ -2012,10 +2022,21 @@ def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"SPI group name to not diagnose about">;
 
+def ignore_spi_groups_new_api
+    : Separate<["-", "--"], "ignore-spi-group-new-api">,
+      Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+      HelpText<"Suppress “new API without '@available’ diagnostic for given "
+               "SPI group name">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,
   MetaVarName<"<path>">;
+
+def const_gather_protocols_list
+  : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,

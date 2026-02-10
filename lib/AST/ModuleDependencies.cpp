@@ -321,11 +321,6 @@ std::optional<std::string> ModuleDependencyInfo::getCASFSRootID() const {
     Root = swiftSourceStorage->textualModuleDetails.CASFileSystemRootID;
     break;
   }
-  case swift::ModuleDependencyKind::Clang: {
-    auto clangModuleStorage = cast<ClangModuleDependencyStorage>(storage.get());
-    Root = clangModuleStorage->CASFileSystemRootID;
-    break;
-  }
   default:
     return std::nullopt;
   }
@@ -518,11 +513,10 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
     : Alloc(), Saver(Alloc) {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::tooling::dependencies::ScanningOutputFormat::FullTree,
+      clang::tooling::dependencies::ScanningOutputFormat::Full,
       clang::CASOptions(),
       /* CAS (llvm::cas::ObjectStore) */ nullptr,
       /* Cache (llvm::cas::ActionCache) */ nullptr,
-      /* SharedFS */ nullptr,
       // ScanningOptimizations::Default excludes the current working
       // directory optimization. Clang needs to communicate with
       // the build system to handle the optimization safely.
@@ -656,7 +650,6 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
       clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
       Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
-      /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)
       // should not impact CAS. We set the optization to all to be
       // consistent with the non-CAS case.
@@ -820,7 +813,8 @@ void ModuleDependenciesCache::recordClangDependency(
         diag::dependency_scan_unexpected_variant_module_map_note,
         priorClangModuleDetails->moduleMapFile, dependency.ClangModuleMapFile);
 
-    auto newClangModuleDetails = bridgeClangModule(dependency).getAsClangModule();
+    auto newClangModuleInfo = bridgeClangModule(dependency);
+    auto newClangModuleDetails = newClangModuleInfo.getAsClangModule();
     auto diagnoseExtraCommandLineFlags =
         [&diags](const ClangModuleDependencyStorage *checkModuleDetails,
                const ClangModuleDependencyStorage *baseModuleDetails,

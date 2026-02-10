@@ -41,6 +41,7 @@ public let _noopClosure = { (x : String, y : UnsafeBufferPointer<UInt8>) in retu
 ///     byte buffer and asserts a condition.
 @_semantics("oslog.requires_constant_arguments")
 @_transparent
+@_alwaysEmitIntoClient
 @_optimize(none)
 public // @testable
 func _osLogTestHelper(

@@ -171,13 +171,15 @@ BridgedParameterInfo BridgedParameterInfoArray::at(SwiftInt parameterIndex) cons
 //                       BridgedLifetimeDependenceInfo
 //===----------------------------------------------------------------------===//
 
-BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info)
+BridgedLifetimeDependenceInfo::BridgedLifetimeDependenceInfo(
+    swift::LifetimeDependenceInfo info)
     : inheritLifetimeParamIndices(info.getInheritIndices()),
       scopeLifetimeParamIndices(info.getScopeIndices()),
       addressableParamIndices(info.getAddressableIndices()),
       conditionallyAddressableParamIndices(
-        info.getConditionallyAddressableIndices()),
-      targetIndex(info.getTargetIndex()), immortal(info.isImmortal()) {}
+          info.getConditionallyAddressableIndices()),
+      targetIndex(info.getTargetIndex()), immortal(info.isImmortal()),
+      fromAnnotation(info.isFromAnnotation()) {}
 
 SwiftInt BridgedLifetimeDependenceInfoArray::count() const {
   return lifetimeDependenceInfoArray.unbridged<swift::LifetimeDependenceInfo>().size();
@@ -1155,6 +1157,10 @@ void BridgedInstruction::setOperand(SwiftInt index, BridgedValue value) const {
 
 BridgedLocation BridgedInstruction::getLocation() const {
   return unbridged()->getDebugLocation();
+}
+
+void BridgedInstruction::setLocation(BridgedLocation loc) const {
+  return unbridged()->setDebugLocation(loc.getLoc());
 }
 
 BridgedMemoryBehavior BridgedInstruction::getMemBehavior() const {

@@ -15,6 +15,7 @@
 /// - Parameters:
 ///   - x: An instance to preserve until this function returns.
 @_alwaysEmitIntoClient
+@_transparent
 public func extendLifetime<T: ~Copyable & ~Escapable>(
   _ x: borrowing T
 ) {
@@ -31,6 +32,7 @@ public func extendLifetime<T: ~Copyable & ~Escapable>(
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
+@inline(always)
 public func withExtendedLifetime<
   T: ~Copyable & ~Escapable,
   E: Error,
@@ -64,6 +66,7 @@ internal func __abi_withExtendedLifetime<T, Result>(
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @_alwaysEmitIntoClient
+@inline(always)
 public func withExtendedLifetime<
   T: ~Copyable & ~Escapable,
   E: Error,
@@ -117,6 +120,7 @@ public func _fixLifetime<T: ~Copyable & ~Escapable>(_ x: borrowing T) {
 ///     execution.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@inline(always)
 public func withUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -141,6 +145,7 @@ internal func __abi_se0413_withUnsafeMutablePointer<T, Result>(
 /// This function is similar to `withUnsafeMutablePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
+@inline(always)
 public func _withUnprotectedUnsafeMutablePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -176,6 +181,7 @@ public func _withUnprotectedUnsafeMutablePointer<
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@inline(always)
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: borrowing T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
@@ -224,6 +230,7 @@ internal func __abi_withUnsafePointer<T, Result>(
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @_alwaysEmitIntoClient
+@inline(always)
 public func withUnsafePointer<T: ~Copyable, E: Error, Result: ~Copyable>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws(E) -> Result
@@ -250,6 +257,7 @@ internal func __abi_se0413_withUnsafePointer<T, Result>(
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
+@inline(always)
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
@@ -268,6 +276,7 @@ public func _withUnprotectedUnsafePointer<
 /// This function is similar to `withUnsafePointer`, except that it
 /// doesn't trigger stack protection for the pointer.
 @_alwaysEmitIntoClient
+@inline(always)
 public func _withUnprotectedUnsafePointer<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(

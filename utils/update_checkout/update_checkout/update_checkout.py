@@ -13,12 +13,13 @@ import os
 from pathlib import Path
 import platform
 import re
+import subprocess
 import sys
 import traceback
 from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git, GitException, is_any_repository_locked
+from .git_command import Git, GitException, is_any_repository_locked, is_commit_hash
 from .retry import exponential_retry
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
@@ -367,29 +368,75 @@ def _check_missing_clones(
         args (CliArguments): Parsed CLI arguments.
         config (Dict[str, Any]): deserialized `update-checkout-config.json`.
         scheme_map (Dict[str, str] | None): map of repo names to branches to check out.
-
-    Returns:
-        Prints a warning if any required repository is missing.
     """
 
-    directory_contents = {path.name for path in args.source_root.iterdir()}
-    current_platform = platform.system()
-
     for repo in scheme_map:
-        repo_config = config["repos"].get(repo, {})
-
-        if (
-            "platforms" in repo_config
-            and current_platform not in repo_config["platforms"]
-        ):
+        if _should_skip_repo(args, config, repo):
             continue
 
-        if repo not in directory_contents and repo not in args.skip_repository_list:
+        if not args.source_root.joinpath(repo).exists():
             print(
                 "You don't have all swift sources. "
                 "Call this script with --clone to get them."
             )
             return
+
+
+def _check_git_config(
+    args: CliArguments, config: Dict[str, Any], scheme_map: Dict[str, Any]
+):
+    """
+    Verify git configuration for all cloned repositories.
+    Warns if core.symlinks or core.autocrlf are not set correctly.
+
+    Args:
+        args (CliArguments): Parsed CLI arguments.
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`.
+        scheme_map (Dict[str, str] | None): map of repo names to branches to check out.
+    """
+
+    git_configs = {
+        "core.symlinks": "true",
+        "core.autocrlf": "false",
+    }
+
+    for repo in scheme_map:
+        if _should_skip_repo(args, config, repo):
+            continue
+
+        repo_path = args.source_root.joinpath(repo)
+        if not repo_path.exists():
+            continue
+
+        for config_key, expected_value in git_configs.items():
+            try:
+                output = subprocess.check_output(
+                    ["git", "-C", str(repo_path), "config", "--get", config_key],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                )
+                if expected_value not in output:
+                    print(
+                        f"[WARNING] '{repo}' was not cloned with "
+                        f"'{config_key}={expected_value}'. "
+                        "This can cause build/tests failures."
+                    )
+            except subprocess.CalledProcessError:
+                pass
+
+
+def _should_skip_repo(args: CliArguments, config: Dict[str, Any], repo: str) -> bool:
+    """Check if a repository should be skipped based on platform or skip list."""
+    if repo in args.skip_repository_list:
+        return True
+
+    repo_config = config["repos"].get(repo, {})
+    if "platforms" in repo_config:
+        current_platform = platform.system()
+        if current_platform not in repo_config["platforms"]:
+            return True
+
+    return False
 
 
 def _move_llvm_project_to_first_index(
@@ -481,22 +528,53 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if args.skip_history:
-        Git.run(
-            args.source_root,
-            [
-                "clone",
-                "--recursive",
-                "--depth",
-                "1",
-                "--branch",
-                repo_branch,
-                remote,
-                repo_name,
-            ]
-            + (["--no-tags"] if skip_tags else []),
-            env=env,
-            echo=verbose,
-        )
+        if is_commit_hash(repo_branch):
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--depth",
+                    "1",
+                    remote,
+                    repo_name,
+                ]
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
+            repo_path = args.source_root.joinpath(repo_name)
+            Git.run(
+                repo_path,
+                ["fetch", "--depth", "1", "origin", repo_branch],
+                env=env,
+                echo=verbose,
+            )
+            Git.run(repo_path, ["checkout", repo_branch], env=env, echo=verbose)
+        else:
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--recursive",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    repo_branch,
+                    remote,
+                    repo_name,
+                ]
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
     elif args.use_submodules:
         Git.run(
             args.source_root,
@@ -508,7 +586,16 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
     else:
         Git.run(
             args.source_root,
-            ["clone", "--recursive", remote, repo_name]
+            [
+                "clone",
+                "--config",
+                "core.symlinks=true",
+                "--config",
+                "core.autocrlf=false",
+                "--recursive",
+                remote,
+                repo_name,
+            ]
             + (["--no-tags"] if skip_tags else []),
             env=env,
             echo=verbose,
@@ -848,6 +935,8 @@ def main() -> int:
             skipped_repositories, clone_results = obtain_all_additional_swift_sources(
                 args, config, scheme_name, skip_repo_list
             )
+            _check_git_config(args, config, scheme_map)
+
             SkippedReason.print_skipped_repositories(skipped_repositories, "clone")
 
         swift_repo_path = args.source_root.joinpath("swift")

@@ -66,7 +66,7 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
   if (!Opts.UseProfile.empty()) {
     // FIXME: Create file system to read the profile. In the future, the vfs
     // needs to come from CompilerInstance.
-    auto FS = llvm::vfs::getRealFileSystem();
+    auto FS = llvm::vfs::createPhysicalFileSystem();
     auto ReaderOrErr =
         llvm::IndexedInstrProfReader::create(Opts.UseProfile, *FS);
     if (auto E = ReaderOrErr.takeError()) {

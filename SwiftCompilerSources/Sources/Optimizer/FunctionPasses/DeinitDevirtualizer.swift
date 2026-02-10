@@ -24,11 +24,11 @@ let deinitDevirtualizer = FunctionPass(name: "deinit-devirtualizer") {
   for inst in function.instructions {
     switch inst {
     case let destroyValue as DestroyValueInst:
-      _ = devirtualizeDeinits(of: destroyValue, context)
+      _ = devirtualizeDeinits(of: destroyValue, isMandatory: false, context)
     case let destroyAddr as DestroyAddrInst:
-      _ = devirtualizeDeinits(of: destroyAddr, context)
+      _ = devirtualizeDeinits(of: destroyAddr, isMandatory: false, context)
     case let builtin as BuiltinInst:
-      _ = devirtualizeDeinits(of: builtin, context)
+      _ = devirtualizeDeinits(of: builtin, isMandatory: false, context)
     default:
       break
     }

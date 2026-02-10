@@ -361,6 +361,18 @@ Func ContiguousArray.withUnsafeBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
+Func Dictionary.mapValues(_:) has generic signature change from <Key, Value, T where Key : Swift.Hashable> to <Key, Value, T, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.mapValues(_:) is now without rethrows
+Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merge(_:uniquingKeysWith:) is now without rethrows
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merging(_:uniquingKeysWith:) is now without rethrows
+Constructor Dictionary.init(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Constructor Dictionary.init(_:uniquingKeysWith:) is now without rethrows
+Constructor Dictionary.init(grouping:by:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, Value == [S.Element], S : Swift.Sequence> to <Key, Value, S, E where Key : Swift.Hashable, Value == [S.Element], S : Swift.Sequence, E : Swift.Error>
+Constructor Dictionary.init(grouping:by:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies

@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1014,36 +1015,43 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
         }
       } else if (numApplies < decl->getNumCurryLevels() &&
                  decl->hasCurriedSelf() ) {
-        auto shouldMarkMemberTypeSendable = [&]() {
-          Type capturedBaseType = baseType;
+        Type sendableDepTy = baseType;
+        if (!decl->isInstanceMember()) {
+          // Static member types are Sendable when the metatype of their
+          // base type is Sendable, because they capture that metatype.
+          // For example, `(S.Type) -> () -> Void`.
+          if (!sendableDepTy)
+            sendableDepTy = decl->getDeclContext()->getSelfTypeInContext();
 
-          if (!decl->isInstanceMember()) {
-            // Static member types are Sendable when the metatype of their
-            // base type is Sendable, because they capture that metatype.
-            // For example, `(S.Type) -> () -> Void`.
-            if (!capturedBaseType)
-              capturedBaseType = decl->getDeclContext()->getSelfTypeInContext();
+          if (!sendableDepTy->is<AnyMetatypeType>())
+            sendableDepTy = MetatypeType::get(sendableDepTy);
+        } else if (sendableDepTy) {
+          // For instance members we need to check whether instance type
+          // is Sendable because @Sendable function values cannot capture
+          // non-Sendable values (base instance type in this case).
+          // For example, `(C) -> () -> Void` where `C` should be Sendable
+          // for the inner function type to be Sendable as well.
+          sendableDepTy = sendableDepTy->getMetatypeInstanceType();
 
-            if (!capturedBaseType->is<AnyMetatypeType>())
-              capturedBaseType = MetatypeType::get(capturedBaseType);
-          } else if (capturedBaseType) {
-            // For instance members we need to check whether instance type
-            // is Sendable because @Sendable function values cannot capture
-            // non-Sendable values (base instance type in this case).
-            // For example, `(C) -> () -> Void` where `C` should be Sendable
-            // for the inner function type to be Sendable as well.
-            capturedBaseType = capturedBaseType->getMetatypeInstanceType();
-          }
-
-          return capturedBaseType && capturedBaseType->isSendableType();
-        };
+          // Partially applied actor instance methods cannot cross isolation
+          // boundary unless they are asynchronous otherwise it would be
+          // possible to escape the actor context and access actor-isolated
+          // storage from different isolation.
+          if (sendableDepTy->isAnyActorType() && !decl->isAsync())
+            sendableDepTy = Type();
+        }
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
-        if (shouldMarkMemberTypeSendable()) {
+        if (sendableDepTy && !referenceTy->isSendable()) {
+          sendableDepTy = simplifyType(sendableDepTy);
+          auto extInfo = referenceTy->getExtInfo();
+          if (sendableDepTy->hasTypeVariable()) {
+            extInfo = extInfo.withSendableDependentType(sendableDepTy);
+          } else {
+            extInfo = extInfo.withSendable(sendableDepTy->isSendableType());
+          }
           referenceTy =
-              referenceTy
-                  ->withExtInfo(referenceTy->getExtInfo().withSendable())
-                  ->getAs<FunctionType>();
+              referenceTy->withExtInfo(extInfo)->castTo<FunctionType>();
         }
 
         // @Sendable since fully uncurried type doesn't capture anything.

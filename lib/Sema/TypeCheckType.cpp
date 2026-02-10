@@ -2468,7 +2468,7 @@ namespace {
     CallerIsolatedTypeRepr *nonisolatedNonsendingAttr;
 
     llvm::TinyPtrVector<CustomAttr*> customAttrs;
-    EnumMap<TypeAttrKind, TypeAttribute *> typeAttrs;
+    EnumMap<TypeAttrKind, llvm::TinyPtrVector<TypeAttribute *>> typeAttrs;
 
     llvm::SmallBitVector claimedCustomAttrs;
     FixedBitSet<NumTypeAttrKinds> claimedTypeAttrs;
@@ -2515,33 +2515,35 @@ namespace {
       claimedCustomAttrs.set(it - customAttrs.begin());
     }
 
-    TypeAttribute *getWithoutClaiming(TypeAttrKind attrKind) {
+    ArrayRef<TypeAttribute *> getWithoutClaiming(TypeAttrKind attrKind) {
       auto it = typeAttrs.find(attrKind);
       if (it != typeAttrs.end()) {
         return *it;
       } else {
-        return nullptr;
+        return {};
       }
     }
 
     /// Claim the attribute matching the given representative kind.
     /// It will not be diagnosed as unused.
-    TypeAttribute *claim(TypeAttrKind attrKind) {
+    ArrayRef<TypeAttribute *> claim(TypeAttrKind attrKind) {
       assert(getRepresentative(attrKind) == attrKind);
       auto it = typeAttrs.find(attrKind);
       if (it != typeAttrs.end()) {
         claimedTypeAttrs.insert(it - typeAttrs.begin());
         return *it;
       } else {
-        return nullptr;
+        return {};
       }
     }
 
     /// Claim all attributes for which the given function returns true.
     void claimAllWhere(ContextualTypeAttrResolver resolver) {
       size_t i = 0;
-      for (TypeAttribute *attr : typeAttrs) {
-        if (resolver(attr))
+      for (auto &attrVector : typeAttrs) {
+        // Only claim the attribute if the resolver matches for every instance
+        // of it.
+        if (llvm::all_of(attrVector, resolver))
           claimedTypeAttrs.insert(i);
         i++;
       }
@@ -2551,8 +2553,10 @@ namespace {
     /// but process them in reverse source order.
     void reversedClaimAllWhere(ContextualTypeAttrResolver resolver) {
       for (size_t i = typeAttrs.size(); i > 0; --i) {
-        TypeAttribute *attr = typeAttrs.begin()[i - 1];
-        if (resolver(attr))
+        auto &attrVector = typeAttrs.begin()[i - 1];
+        // Only claim the attribute if the resolver matches for every instance
+        // of it.
+        if (llvm::all_of(attrVector, resolver))
           claimedTypeAttrs.insert(i - 1);
       }
     }
@@ -2584,33 +2588,66 @@ namespace {
     }
   };
 
-  template <class AttrClass>
-  AttrClass *claim(TypeAttrSet &attrs) {
-    auto attr = attrs.claim(AttrClass::StaticKind);
-    return cast_or_null<AttrClass>(attr);
+  template <TypeAttrKind Kind>
+  auto claim(TypeAttrSet &attrs) {
+    auto attrVector = attrs.claim(Kind);
+    if constexpr (!TypeAttribute::allowMultipleAttributes(Kind)) {
+      return attrVector.empty() ? nullptr : attrVector.front();
+    } else {
+      return attrVector;
+    }
   }
 
   template <class AttrClass>
-  AttrClass *claim(TypeAttrSet *attrs) {
-    return (attrs ? claim<AttrClass>(*attrs) : nullptr);
+  auto claim(TypeAttrSet &attrs) {
+    ArrayRef<TypeAttribute *> attrVector = attrs.claim(AttrClass::StaticKind);
+    if constexpr (!TypeAttribute::allowMultipleAttributes(
+                      AttrClass::StaticKind)) {
+      return attrVector.empty() ? nullptr
+                                : cast_or_null<AttrClass>(attrVector.front());
+    } else {
+      // The type attributes in attrVector are all instances of the type
+      // attribute that corresponds to the claimed type attribute kind (i.e.
+      // AttrClass) so casting the data pointer should always be safe. Since we
+      // cannot statically prove this, perform a paranoid check.
+      if (llvm::all_of(attrVector, [](TypeAttribute *attr) {
+            return isa<AttrClass>(attr);
+          })) {
+        return ArrayRef<AttrClass *>(
+            reinterpret_cast<AttrClass *const *>(attrVector.data()),
+            attrVector.size());
+      } else {
+        return ArrayRef<AttrClass *>{};
+      }
+    }
   }
 
   template <class AttrClass>
-  AttrClass *getWithoutClaiming(TypeAttrSet &attrs) {
-    auto attr = attrs.getWithoutClaiming(AttrClass::StaticKind);
-    return cast_or_null<AttrClass>(attr);
+  auto claim(TypeAttrSet *attrs) {
+    return (attrs ? claim<AttrClass>(*attrs)
+                  : decltype(claim<AttrClass>(*attrs)){});
   }
 
   template <class AttrClass>
-  std::enable_if_t<std::is_base_of_v<TypeAttribute, AttrClass>, AttrClass *>
-  getWithoutClaiming(TypeAttrSet *attrs) {
-    return (attrs ? getWithoutClaiming<AttrClass>(*attrs) : nullptr);
+  auto getWithoutClaiming(TypeAttrSet &attrs) {
+    auto attrVector = attrs.getWithoutClaiming(AttrClass::StaticKind);
+    if constexpr (!TypeAttribute::allowMultipleAttributes(
+                      AttrClass::StaticKind)) {
+      return attrVector.empty() ? nullptr
+                                : cast_or_null<AttrClass>(attrVector.front());
+    } else {
+      return attrVector;
+    }
   }
 
   template <class AttrClass>
-  std::enable_if_t<std::is_same_v<AttrClass, CallerIsolatedTypeRepr>,
-                   CallerIsolatedTypeRepr *>
-  getWithoutClaiming(TypeAttrSet *attrs) {
+  auto getWithoutClaiming(TypeAttrSet *attrs) {
+    return (attrs ? getWithoutClaiming<AttrClass>(*attrs)
+                  : decltype(getWithoutClaiming<AttrClass>(*attrs)){});
+  }
+
+  template <>
+  auto getWithoutClaiming<CallerIsolatedTypeRepr>(TypeAttrSet *attrs) {
     return attrs ? attrs->getNonisolatedNonsendingAttr() : nullptr;
   }
 } // end anonymous namespace
@@ -3282,8 +3319,15 @@ void TypeAttrSet::accumulate(ArrayRef<TypeOrCustomAttr> attrs) {
     auto insertResult = typeAttrs.insert(representativeKind, typeAttr);
     if (insertResult.second) continue;
 
+    // If an attribute with the same kind already exists, only add this one if
+    // there can be more than one.
+    if (TypeAttribute::allowMultipleAttributes(representativeKind)) {
+      insertResult.first->push_back(typeAttr);
+      continue;
+    }
+
     // Dignose the conflict.
-    TypeAttribute *previousAttr = *insertResult.first;
+    TypeAttribute *previousAttr = insertResult.first->front();
 
     diagnoseConflict(representativeKind, previousAttr, typeAttr);
   }
@@ -3340,11 +3384,12 @@ void TypeAttrSet::diagnoseUnclaimed(const TypeResolution &resolution,
 
   // Type attributes
   size_t i = 0;
-  for (auto attr : typeAttrs) {
+  for (auto const &attrVector : typeAttrs) {
     if (claimedTypeAttrs.contains(i)) continue;
     i++;
 
-    diagnoseUnclaimed(attr, resolution, options, resolvedType);
+    for (auto attr : attrVector)
+      diagnoseUnclaimed(attr, resolution, options, resolvedType);
   }
 }
 
@@ -3517,7 +3562,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
 
   // These are the total type transforms.
   Type ty;
-  if (auto attr = attrs.claim(TAR_TypeTransformer)) {
+  if (auto attr = claim<TAR_TypeTransformer>(attrs)) {
     if (auto opaqueAttr = dyn_cast<OpaqueReturnTypeOfTypeAttr>(attr)) {
       ty = resolveOpaqueReturnType(repr, opaqueAttr->getMangledName(),
                                    opaqueAttr->getIndex(),
@@ -3531,8 +3576,8 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
 
   // The SIL metatype attributes are basically total type transforms, too.
   // TODO: this should really be restricted to lowered types
-  } else if (auto attr = isSILSourceFile()
-                            ? attrs.claim(TAR_SILMetatype) : nullptr) {
+  } else if (auto attr =
+                 isSILSourceFile() ? claim<TAR_SILMetatype>(attrs) : nullptr) {
     ty = resolveSILMetatype(repr, options, attr);
 
   // Okay, propagate attributes down to specific resolvers.
@@ -3607,6 +3652,47 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
                       retroactiveAttr)
           .fixItRemove(retroactiveAttr->getSourceRange());
       ty = ErrorType::get(getASTContext());
+    }
+  }
+
+  // Check validity of @reparented
+  if (auto attr = claim<ReparentedTypeAttr>(attrs)) {
+    if (ty->hasError())
+      return ty;
+
+    // The protocol declaring it's been reparented can't be @objc
+    if (auto *proto = getDeclContext()->getSelfProtocolDecl()) {
+      if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
+        diagnoseInvalid(repr, attr->getAtLoc(),
+                        diag::typeattr_invalid_for_objc_protocol, attr, proto);
+      }
+    }
+
+    // Only a protocol's extension can declare it's been @reparented.
+    if (!options.is(TypeResolverContext::Inherited) ||
+        !getDeclContext()->getSelfProtocolDecl() ||
+        !isa<ExtensionDecl>(getDeclContext())) {
+      diagnoseInvalid(repr, attr->getAtLoc(),
+                      diag::typeattr_not_protocol_inheritance_clause, attr)
+          .fixItRemove(attr->getSourceRange());
+      ty = ErrorType::get(getASTContext());
+    } else {
+      // The new parent must be just a protocol.
+      if (auto protoTy = ty->getAs<ProtocolType>()) {
+        // That protocol must be declared as @reparentable
+        auto *parent = protoTy->getDecl();
+        if (!parent->getAttrs().hasAttribute<ReparentableAttr>()) {
+          diagnoseInvalid(
+              repr, attr->getAtLoc(),
+              diag::typeattr_reparented_requires_reparentable_protocol, attr,
+              parent);
+          ty = ErrorType::get(getASTContext());
+        }
+      } else {
+        diagnoseInvalid(repr, attr->getAtLoc(), diag::typeattr_not_existential,
+                        attr, ty);
+        ty = ErrorType::get(getASTContext());
+      }
     }
   }
 
@@ -4271,6 +4357,12 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                           diag::isolated_attr_bad_convention,
                           isolatedAttr->getIsolationKindName(),
                           conventionAttr->getConventionName());
+        } else if (!ctx.getLoadedModule(ctx.Id_Concurrency) &&
+                   !ctx.SILOpts.ParseStdlib) {
+          // If the Actor protocol isn't available, we have to reject this.
+          diagnoseInvalid(repr, isolatedAttr->getAtLoc(),
+                          diag::no_concurrency_module,
+                          "@isolated(any)");
         } else {
           isolation = FunctionTypeIsolation::forErased();
         }
@@ -4480,21 +4572,50 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
+  AnyFunctionType *aft;
   if (auto genericSig = repr->getGenericSignature()) {
-    return GenericFunctionType::get(genericSig, params, outputTy, extInfo);
+    aft = GenericFunctionType::get(genericSig, params, outputTy, extInfo);
+  } else {
+
+    auto fnTy = FunctionType::get(params, outputTy, extInfo);
+    if (fnTy->hasError())
+      return fnTy;
+
+    if (TypeChecker::diagnoseInvalidFunctionType(fnTy, repr->getLoc(), repr,
+                                                 getDeclContext(),
+                                                 resolution.getStage()))
+      return ErrorType::get(fnTy);
+
+    aft = fnTy;
   }
 
-  auto fnTy = FunctionType::get(params, outputTy, extInfo);
-  
-  if (fnTy->hasError())
-    return fnTy;
+  auto const lifetimeAttributes = claim<LifetimeTypeAttr>(attrs);
 
-  if (TypeChecker::diagnoseInvalidFunctionType(fnTy, repr->getLoc(), repr,
-                                               getDeclContext(),
-                                               resolution.getStage()))
-    return ErrorType::get(fnTy);
+  // Lifetime dependence inference has to map parameter and result types into
+  // the generic environment of the DeclContext, so it must request the generic
+  // signature of the type. In order to prevent cycles in request evaluation, we
+  // defer lifetime dependence checking until the Interface type resolution
+  // stage. Since the analysis depends on the type's generic environment, it can
+  // only run after a type has already been produced.
+  if (!ctx.LangOpts.hasFeature(Feature::Lifetimes) &&
+      !lifetimeAttributes.empty()) {
+    diagnose(lifetimeAttributes[0]->getAttrLoc(),
+             diag::requires_experimental_feature, "@_lifetime", false,
+             Feature::Lifetimes.getName());
+    return ErrorType::get(getASTContext());
+  }
 
-  return fnTy;
+  if (inStage(TypeResolutionStage::Interface)) {
+    if (auto const resolvedLifetimeDependence =
+            LifetimeDependenceInfo::getFromAST(
+                repr, aft, lifetimeAttributes, getDeclContext(),
+                resolution.getGenericSignature().getGenericEnvironment())) {
+      aft = aft->withExtInfo(aft->getExtInfo().withLifetimeDependencies(
+          *resolvedLifetimeDependence));
+    }
+  }
+
+  return aft;
 }
 
 NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
@@ -4570,7 +4691,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool hasError = false;
 
   auto coroutineKind = SILCoroutineKind::None;
-  if (auto coroAttr = attrs ? attrs->claim(TAR_SILCoroutine) : nullptr) {
+  if (auto coroAttr = attrs ? claim<TAR_SILCoroutine>(*attrs) : nullptr) {
     assert(isa<YieldOnceTypeAttr>(coroAttr) ||
            isa<YieldOnce2TypeAttr>(coroAttr) ||
            isa<YieldManyTypeAttr>(coroAttr));
@@ -4590,7 +4711,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;
-  if (auto calleeAttr = attrs ? attrs->claim(TAR_SILCalleeConvention) : nullptr) {
+  if (auto calleeAttr =
+          attrs ? claim<TAR_SILCalleeConvention>(*attrs) : nullptr) {
     assert(isa<CalleeOwnedTypeAttr>(calleeAttr) ||
            isa<CalleeGuaranteedTypeAttr>(calleeAttr));
     callee = (isa<CalleeOwnedTypeAttr>(calleeAttr)
@@ -5007,7 +5129,7 @@ bool TypeResolver::resolveSingleSILResult(
       return false;
     }
 
-    if (auto conventionAttr = attrs.claim(TAR_SILValueConvention)) {
+    if (auto conventionAttr = claim<TAR_SILValueConvention>(attrs)) {
       switch (conventionAttr->getKind()) {
 #define ERROR(ATTR, CONVENTION)                                                \
   case TypeAttrKind::ATTR:                                                     \

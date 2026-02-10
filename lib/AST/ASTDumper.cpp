@@ -2793,9 +2793,12 @@ namespace {
                     printRec(PBD->getOriginalInit(idx),
                              Label::always("original_init"));
                   }
-                  if (PBD->getInit(idx)) {
+                  if (auto initExpr = PBD->getInit(idx)) {
                     printRec(PBD->getInit(idx),
                              Label::always("processed_init"));
+                    if (PBD->hasSingleVarConstantFoldedInit())
+                      printRec(PBD->getExecutableInit(idx),
+                               Label::always("processed_constant_folded_init"));
                   }
 
                   printFoot();
@@ -3967,10 +3970,10 @@ public:
     printCommon(E, "collection_upcast_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     if (auto keyConversion = E->getKeyConversion()) {
-      printRec(keyConversion, Label::always("key_conversion"));
+      printRec(keyConversion.Conversion, Label::always("key_conversion"));
     }
     if (auto valueConversion = E->getValueConversion()) {
-      printRec(valueConversion, Label::always("value_conversion"));
+      printRec(valueConversion.Conversion, Label::always("value_conversion"));
     }
     printFoot();
   }
@@ -5117,6 +5120,7 @@ public:
                        requires_stored_property_inits)
   TRIVIAL_ATTR_PRINTER(ResultBuilder, result_builder)
   TRIVIAL_ATTR_PRINTER(Rethrows, rethrows)
+  TRIVIAL_ATTR_PRINTER(Reparentable, reparentable)
   TRIVIAL_ATTR_PRINTER(Safe, safe)
   TRIVIAL_ATTR_PRINTER(SPIOnly, spi_only)
   TRIVIAL_ATTR_PRINTER(Sendable, sendable)

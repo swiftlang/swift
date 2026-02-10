@@ -647,11 +647,9 @@ ManagedValue Transform::transform(ManagedValue v,
         llvm::report_fatal_error("unsupported collection upcast kind");
       }
 
-      return SGF
-          .emitCollectionConversion(Loc, fn, inputSubstType, outputSubstType, v,
-                                    /*keyConversion*/ nullptr,
-                                    /*valueConversion*/ nullptr, ctxt)
-          .getScalarValue();
+      return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
+                                          outputSubstType, v, ctxt)
+                .getScalarValue();
     }
   }
 
@@ -2981,7 +2979,8 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
       auto forwardedArg =
           SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
+      if (forwardedArg->getType().isObject() &&
+          fTy->hasGuaranteedResult(/*loweredAddresses*/ true)) {
         forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
       }
       forwardedArgs.push_back(forwardedArg);

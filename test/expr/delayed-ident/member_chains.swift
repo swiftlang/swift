@@ -409,3 +409,22 @@ do {
     }
   }
 }
+
+protocol P {
+  associatedtype X
+}
+protocol Q {}
+
+struct S: P, Q {
+  typealias X = S
+}
+
+extension Q where Self == S {
+  static var value: S { S() }
+}
+
+// Leading-dot syntax used to infer base from non-direct requirements which is incorrect.
+do {
+  func test_indirect<T: P>(_ x: T) where T.X: Q {}
+  test_indirect(.value) // expected-error {{type 'P' has no member 'value'}}
+}

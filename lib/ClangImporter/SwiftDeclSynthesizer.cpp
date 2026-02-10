@@ -1852,13 +1852,8 @@ synthesizeUnwrappingAddressSetterBody(AbstractFunctionDecl *afd,
   ASTContext &ctx = setterDecl->getASTContext();
 
   auto selfArg = createSelfArg(setterDecl);
-  SmallVector<Expr *> arguments;
-  for (size_t idx = 0, end = setterDecl->getParameters()->size(); idx < end;
-       ++idx)
-    arguments.push_back(createParamRefExpr(setterDecl, idx));
-
   auto *setterImplCallExpr =
-      createAccessorImplCallExpr(setterImpl, selfArg, arguments);
+      createAccessorImplCallExpr(setterImpl, selfArg, {});
 
   auto *returnStmt = ReturnStmt::createImplicit(ctx, setterImplCallExpr);
 
@@ -1877,6 +1872,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
 
+  // FIXME: support unsafeAddress accessors.
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
@@ -1914,27 +1910,17 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   }
   subscript->copyFormalAccessFrom(getterImpl);
 
-  bool useAddress = rawElementTy->getAnyPointerElementType() &&
-                    // if the result is a generic, use the default get and set
-                    !elementTy->hasTypeParameter() &&
-                    elementTy->isNoncopyable();
-
-  AccessorDecl *getterDecl = AccessorDecl::create(
-      ctx, getterImpl->getLoc(), getterImpl->getLoc(),
-      useAddress ? AccessorKind::Address : AccessorKind::Get, subscript,
-      /*async*/ false, SourceLoc(),
-      /*throws*/ false, SourceLoc(),
-      /*ThrownType=*/TypeLoc(), bodyParams,
-      useAddress ? elementTy->wrapInPointer(PTK_UnsafePointer) : elementTy, dc);
+  AccessorDecl *getterDecl =
+      AccessorDecl::create(ctx, getterImpl->getLoc(), getterImpl->getLoc(),
+                           AccessorKind::Get, subscript,
+                           /*async*/ false, SourceLoc(),
+                           /*throws*/ false, SourceLoc(),
+                           /*ThrownType=*/TypeLoc(), bodyParams, elementTy, dc);
   getterDecl->copyFormalAccessFrom(subscript);
-  if (!useAddress)
-    getterDecl->setImplicit();
+  getterDecl->setImplicit();
   getterDecl->setIsDynamic(false);
   getterDecl->setIsTransparent(true);
-  getterDecl->setBodySynthesizer(useAddress
-                                     ? synthesizeUnwrappingAddressGetterBody
-                                     : synthesizeUnwrappingGetterBody,
-                                 getterImpl);
+  getterDecl->setBodySynthesizer(synthesizeUnwrappingGetterBody, getterImpl);
 
   if (getterImpl->isMutating()) {
     getterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1950,31 +1936,22 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     paramVarDecl->setInterfaceType(elementTy);
 
     SmallVector<ParamDecl *> setterParams;
-    if (!useAddress)
-      setterParams.push_back(paramVarDecl);
+    setterParams.push_back(paramVarDecl);
     setterParams.append(bodyParams->begin(), bodyParams->end());
 
     auto setterParamList = ParameterList::create(ctx, setterParams);
 
     setterDecl = AccessorDecl::create(
-        ctx, setterImpl->getLoc(), setterImpl->getLoc(),
-        useAddress ? AccessorKind::MutableAddress : AccessorKind::Set,
+        ctx, setterImpl->getLoc(), setterImpl->getLoc(), AccessorKind::Set,
         subscript,
         /*async*/ false, SourceLoc(),
         /*throws*/ false, SourceLoc(), /*ThrownType=*/TypeLoc(),
-        setterParamList,
-        useAddress ? elementTy->wrapInPointer(PTK_UnsafeMutablePointer)
-                   : TupleType::getEmpty(ctx),
-        dc);
+        setterParamList, TupleType::getEmpty(ctx), dc);
     setterDecl->copyFormalAccessFrom(subscript);
-    if (!useAddress)
-      setterDecl->setImplicit();
+    setterDecl->setImplicit();
     setterDecl->setIsDynamic(false);
     setterDecl->setIsTransparent(true);
-    setterDecl->setBodySynthesizer(useAddress
-                                       ? synthesizeUnwrappingAddressSetterBody
-                                       : synthesizeUnwrappingSetterBody,
-                                   setterImpl);
+    setterDecl->setBodySynthesizer(synthesizeUnwrappingSetterBody, setterImpl);
 
     if (setterImpl->isMutating()) {
       setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);

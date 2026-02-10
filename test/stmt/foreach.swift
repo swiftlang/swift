@@ -364,6 +364,17 @@ func testExistentialElementErasure(_ x: any HasPSeq) {
   for _ in x.pseq() {}
 }
 
+struct IntIter: IteratorProtocol {
+  func next() -> Int? { nil }
+}
+protocol IntSeq: Sequence where Iterator == IntIter {}
+
+func testExistentialWithConcreteIter(_ xs: any IntSeq) {
+  for x in xs {
+    let _: Int = x
+  }
+}
+
 // Make sure the bodies still type-check okay if the preamble is invalid.
 func testInvalidPreamble() {
   func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }

@@ -2607,6 +2607,7 @@ static void performBasicLayout(TypeLayout &layout,
   bool isPOD = layout.flags.isPOD();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
+  bool isAddressableForDependencies = layout.flags.isAddressableForDependencies();
   for (unsigned i = 0; i != numElements; ++i) {
     auto &elt = elements[i];
 
@@ -2623,6 +2624,8 @@ static void performBasicLayout(TypeLayout &layout,
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
     if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
+    if (eltLayout->flags.isAddressableForDependencies())
+      isAddressableForDependencies = true;
   }
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
@@ -2633,6 +2636,7 @@ static void performBasicLayout(TypeLayout &layout,
                      .withPOD(isPOD)
                      .withBitwiseTakable(isBitwiseTakable)
                      .withBitwiseBorrowable(isBitwiseBorrowable)
+                     .withAddressableForDependencies(isAddressableForDependencies)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));

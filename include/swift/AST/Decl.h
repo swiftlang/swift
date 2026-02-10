@@ -1936,6 +1936,9 @@ public:
   bool isNonisolated() const {
     return getOptions().contains(ProtocolConformanceFlags::Nonisolated);
   }
+  bool isReparented() const {
+    return getOptions().contains(ProtocolConformanceFlags::Reparented);
+  }
 
   TypeExpr *getGlobalActorIsolationType() const {
     return globalActorIsolationType;
@@ -2251,6 +2254,8 @@ public:
   /// conformed to otherwise.
   std::optional<InvertibleProtocolKind>
   isAddingConformanceToInvertible() const;
+
+  bool isForReparenting() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.
@@ -2704,9 +2709,8 @@ public:
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getExecutableInit(unsigned i) const {
-    return getPatternList()[i].getExecutableInit();
-  }
+  bool hasSingleVarConstantFoldedInit() const;
+  Expr *getExecutableInit(unsigned i) const;
   Expr *getOriginalInit(unsigned i) const {
     return getPatternList()[i].getOriginalInit();
   }

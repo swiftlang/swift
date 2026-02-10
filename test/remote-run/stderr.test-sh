@@ -1,5 +1,5 @@
 REQUIRES: rsync
-REQUIRES: shell
+UNSUPPORTED: OS=windows-msvc
 
 RUN: %debug-remote-run sh -c "echo hello; echo goodbye >&2" > %t.stdout.txt 2> %t.stderr.txt
 RUN: %FileCheck -check-prefix CHECK-STDOUT %s < %t.stdout.txt

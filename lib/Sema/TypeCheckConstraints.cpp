@@ -34,6 +34,7 @@
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -50,169 +51,6 @@
 
 using namespace swift;
 using namespace constraints;
-
-//===----------------------------------------------------------------------===//
-// Type variable implementation.
-//===----------------------------------------------------------------------===//
-#pragma mark Type variable implementation
-
-void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
-  getTypeVariable()->print(OS, PrintOptions::forDebugging());
-
-  SmallVector<TypeVariableOptions, 4> bindingOptions;
-  if (canBindToLValue())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
-  if (canBindToInOut())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToInOut);
-  if (canBindToNoEscape())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToNoEscape);
-  if (canBindToHole())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToHole);
-  if (canBindToPack())
-    bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToPack);
-  if (isPackExpansion())
-    bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
-  if (!bindingOptions.empty()) {
-    OS << " [can bind to: ";
-    interleave(bindingOptions, OS,
-               [&](TypeVariableOptions option) {
-                  (OS << getTypeVariableOptions(option));},
-               ", ");
-               OS << "]";
-  }
-}
-
-GenericTypeParamType *
-TypeVariableType::Implementation::getGenericParameter() const {
-  return locator ? locator->getGenericParameter() : nullptr;
-}
-
-std::optional<ExprKind>
-TypeVariableType::Implementation::getAtomicLiteralKind() const {
-  if (!locator || !locator->directlyAt<LiteralExpr>())
-    return std::nullopt;
-
-  auto kind = getAsExpr(locator->getAnchor())->getKind();
-  switch (kind) {
-  case ExprKind::IntegerLiteral:
-  case ExprKind::FloatLiteral:
-  case ExprKind::StringLiteral:
-  case ExprKind::BooleanLiteral:
-  case ExprKind::NilLiteral:
-    return kind;
-  default:
-    return std::nullopt;
-  }
-}
-
-bool TypeVariableType::Implementation::isClosureType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) && locator->getPath().empty();
-}
-
-bool TypeVariableType::Implementation::isTapType() const {
-  return locator && locator->directlyAt<TapExpr>();
-}
-
-bool TypeVariableType::Implementation::isClosureParameterType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) &&
-         locator->isLastElement<LocatorPathElt::TupleElement>();
-}
-
-bool TypeVariableType::Implementation::isClosureResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  return isExpr<ClosureExpr>(locator->getAnchor()) &&
-         locator->isLastElement<LocatorPathElt::ClosureResult>();
-}
-
-bool TypeVariableType::Implementation::isKeyPathType() const {
-  return locator && locator->isKeyPathType();
-}
-
-bool TypeVariableType::Implementation::isKeyPathRoot() const {
-  return locator && locator->isKeyPathRoot();
-}
-
-bool TypeVariableType::Implementation::isKeyPathValue() const {
-  return locator && locator->isKeyPathValue();
-}
-
-bool TypeVariableType::Implementation::isKeyPathSubscriptIndex() const {
-  return locator &&
-         locator->isLastElement<LocatorPathElt::KeyPathSubscriptIndex>();
-}
-
-bool TypeVariableType::Implementation::isSubscriptResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  if (!locator->isLastElement<LocatorPathElt::FunctionResult>())
-    return false;
-
-  if (isExpr<SubscriptExpr>(locator->getAnchor()))
-    return true;
-
-  auto *KP = getAsExpr<KeyPathExpr>(locator->getAnchor());
-  if (!KP)
-    return false;
-
-  auto componentLoc = locator->findFirst<LocatorPathElt::KeyPathComponent>();
-  if (!componentLoc)
-    return false;
-
-  auto &component = KP->getComponents()[componentLoc->getIndex()];
-  return component.getKind() == KeyPathExpr::Component::Kind::Subscript ||
-         component.getKind() ==
-             KeyPathExpr::Component::Kind::UnresolvedSubscript;
-}
-
-bool TypeVariableType::Implementation::isParameterPack() const {
-  return locator
-      && locator->isForGenericParameter()
-      && locator->getGenericParameter()->isParameterPack();
-}
-
-bool TypeVariableType::Implementation::isCodeCompletionToken() const {
-  return locator && locator->directlyAt<CodeCompletionExpr>();
-}
-
-bool TypeVariableType::Implementation::isOpaqueType() const {
-  if (!locator)
-    return false;
-
-  auto GP = locator->getLastElementAs<LocatorPathElt::GenericParameter>();
-  if (!GP)
-    return false;
-
-  if (auto *GPT = GP->getType()->getAs<GenericTypeParamType>())
-    return (GPT->getOpaqueDecl() != nullptr);
-
-  return false;
-}
-
-bool TypeVariableType::Implementation::isCollectionLiteralType() const {
-  return locator && (locator->directlyAt<ArrayExpr>() ||
-                     locator->directlyAt<DictionaryExpr>());
-}
-
-bool TypeVariableType::Implementation::isNumberLiteralType() const {
-  return locator && locator->directlyAt<NumberLiteralExpr>();
-}
-
-bool TypeVariableType::Implementation::isFunctionResult() const {
-  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
-}
-
-bool TypeVariableType::Implementation::isTernary() const {
-  return locator && locator->directlyAt<TernaryExpr>();
-}
 
 bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
@@ -679,8 +517,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
       // In Swift 6.2 and below we incorrectly missed checking this rule for
       // methods, downgrade to a warning until the next language mode.
-      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
-      if (!anchor->hasCurriedSelf() || ctx.isLanguageModeAtLeast(futureVersion))
+      if (!anchor->hasCurriedSelf() || ctx.isAtLeastFutureMajorLanguageMode())
         return Type();
 
       diag.warnUntilFutureLanguageMode();

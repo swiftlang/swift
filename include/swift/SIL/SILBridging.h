@@ -198,6 +198,7 @@ struct BridgedLifetimeDependenceInfo {
   swift::IndexSubset *_Nullable conditionallyAddressableParamIndices;
   SwiftUInt targetIndex;
   bool immortal;
+  bool fromAnnotation;
 
   BRIDGED_INLINE BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info);
 
@@ -731,6 +732,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandArray getTypeDependentOperands() const;
   BRIDGED_INLINE void setOperand(SwiftInt index, BridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  BRIDGED_INLINE void setLocation(BridgedLocation loc) const;
   BRIDGED_INLINE BridgedMemoryBehavior getMemBehavior() const;
   BRIDGED_INLINE bool mayRelease() const;
   BRIDGED_INLINE bool mayHaveSideEffects() const;

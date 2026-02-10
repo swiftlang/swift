@@ -334,6 +334,9 @@ WARNING(old_coroutine_accessor,none,
 ERROR(accessor_requires_borrow_and_mutate_accessors,none,
       "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
       (StringRef))
+ERROR(borrow_mutate_pair_restrict,none,
+      "A '%0' accessor can only be defined along with a '%1' accessor",
+      (StringRef, StringRef))
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -485,9 +488,6 @@ ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
       "unexpected attribute %0 in operator declaration", (DeclAttribute))
-WARNING(operator_decl_remove_designated_types,none,
-        "designated types are no longer used by the compiler; please remove "
-        "the designated type list from this operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -1314,8 +1314,6 @@ ERROR(dollar_identifier_decl,none,
      "cannot declare entity named %0; the '$' prefix is reserved for "
      "implicitly-synthesized declarations", (Identifier))
 
-ERROR(anon_closure_arg_not_in_closure,none,
-      "anonymous closure argument not contained in a closure", ())
 ERROR(anon_closure_arg_in_closure_with_args,none,
       "anonymous closure arguments cannot be used inside a closure that has "
       "explicit arguments", ())
@@ -2180,8 +2178,8 @@ ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
 
 ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
       PointsToFirstBadToken,
-      "expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier",
-      ())
+      "expected 'copy', 'borrow', or '&' followed by an identifier%select{|, index}0 or 'self' in lifetime dependence specifier",
+      (bool))
 
 ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
       "expected ')' after parameter list in lifetime dependence specifier", ())

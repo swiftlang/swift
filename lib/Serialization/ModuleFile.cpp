@@ -152,7 +152,6 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
                                            SourceLoc diagLoc,
                                            bool forTestable) {
   ASTContext &ctx = getContext();
-  auto clangImporter = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   ModuleDecl *M = file->getParentModule();
 
   bool missingDependency = false;
@@ -163,6 +162,11 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     assert(!dependency.isLoaded() && "already loaded?");
 
     if (dependency.isHeader()) {
+      auto clangImporter =
+          static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      if (!clangImporter)
+        return Status::FailedToLoadBridgingHeader;
+
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
       if (!dependency.Core.RawPath.empty()) {
