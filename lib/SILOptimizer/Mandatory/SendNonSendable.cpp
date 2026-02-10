@@ -3732,6 +3732,264 @@ public:
 } // namespace
 
 //===----------------------------------------------------------------------===//
+//                      MARK: Incompatible Region Merge
+//===----------------------------------------------------------------------===//
+
+struct IncompatibleRegionMergeDiagnosticEmitter {
+  using Error = DiagnosticEvaluator::IncompatibleRegionMergeError;
+  RegionAnalysisValueMap &valueMap;
+  Operand *op;
+  Element srcRegionValueElt;
+  SILDynamicMergedIsolationInfo srcIsolationInfo;
+  Element dstRegionValueElt;
+  SILDynamicMergedIsolationInfo dstIsolationInfo;
+  RegionMergeReason reason;
+
+  IncompatibleRegionMergeDiagnosticEmitter(RegionAnalysisFunctionInfo *info,
+                                           Error error)
+      : valueMap(info->getValueMap()), op(error.op->getSourceOp()),
+        srcRegionValueElt(error.srcRegionElt),
+        srcIsolationInfo(error.srcIsolationRegionInfo),
+        dstRegionValueElt(error.dstRegionElt),
+        dstIsolationInfo(error.dstIsolationRegionInfo),
+        // NOTE: We purposely use the reason from the error, not from the op in
+        // the error since we may have an error reason that was specified
+        // explicitly when the error was created, not from the actual
+        // PartitionOp.
+        reason(error.reason) {}
+
+  void emit();
+
+  SILFunction *getFunction() const { return op->getFunction(); }
+
+  std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    return op->get()->getType().getConcurrencyDiagnosticBehavior(getFunction());
+  }
+
+private:
+  void emitUnknownPatternError() {
+    EMIT_UNKNOWN_PATTERN_ERROR(IncompatibleRegionMergeErrorEmitter,
+                               op->getUser(), getBehaviorLimit());
+  }
+
+  void emitUnknown();
+  void emitAssign();
+  void emitNonisolatedFunction();
+  void emitIsolatedFunction();
+};
+
+void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
+  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
+  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
+
+  // For now skip this.
+  if (dstRegionValue.hasRegionIntroducingInst())
+    return;
+
+  auto srcIsolation = srcIsolationInfo;
+  auto dstIsolation = dstIsolationInfo;
+
+  // Canonicalize so that srcRegionValue is always the task-isolated value. We
+  // do this only here since in this case, we can get away with doing this to
+  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
+    std::swap(srcIsolation, dstIsolation);
+    std::swap(srcRegionValue, dstRegionValue);
+  }
+
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto srcName = inferNameHelper(srcRegionValue.getValue());
+  if (!srcName) {
+    return emitUnknownPatternError();
+  }
+  auto dstName = inferNameHelper(dstRegionValue.getValue());
+  if (!dstName) {
+    return emitUnknownPatternError();
+  }
+
+  auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
+  auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
+
+  diagnoseError(op->getUser(),
+                diag::regionbasedisolation_merge_region_failure_error_unknown,
+                *srcName, srcIsolationStr, *dstName, dstIsolationStr,
+                !srcIsolation->isTaskIsolated())
+      .limitBehaviorIf(getBehaviorLimit());
+  diagnoseNote(
+      op->getUser(),
+      diag::regionbasedisolation_merge_region_failure_error_unknown_note,
+      *srcName, srcIsolationStr, *dstName, dstIsolationStr,
+      !srcIsolation->isTaskIsolated());
+}
+
+void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
+  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
+  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
+
+  auto srcIsolation = srcIsolationInfo;
+  auto dstIsolation = dstIsolationInfo;
+
+  // Canonicalize so that srcRegionValue is always the task-isolated value. We
+  // do this only here since in this case, we can get away with doing this to
+  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
+    std::swap(srcIsolation, dstIsolation);
+    std::swap(srcRegionValue, dstRegionValue);
+  }
+
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto srcName = inferNameHelper(srcRegionValue.getValue());
+  if (!srcName) {
+    return emitUnknownPatternError();
+  }
+  auto dstName = inferNameHelper(dstRegionValue.getValue());
+  if (!dstName) {
+    return emitUnknownPatternError();
+  }
+
+  auto srcIsolationStr = srcIsolationInfo.printForDiagnostics(getFunction());
+  auto dstIsolationStr = dstIsolationInfo.printForDiagnostics(getFunction());
+  diagnoseError(op->getUser(),
+                diag::regionbasedisolation_merge_region_failure_error_assign,
+                *srcName, srcIsolationStr, *dstName, dstIsolationStr,
+                !srcIsolation->isTaskIsolated())
+      .limitBehaviorIf(getBehaviorLimit());
+  diagnoseNote(
+      op->getUser(),
+      diag::regionbasedisolation_merge_region_failure_error_assign_note,
+      *srcName, srcIsolationStr, dstIsolationStr,
+      !srcIsolation->isTaskIsolated());
+}
+
+void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
+  auto srcIsolation = srcIsolationInfo;
+  auto dstIsolation = dstIsolationInfo;
+  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
+  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
+
+  // Canonicalize so that srcRegionValue is always the task-isolated value. We
+  // do this only here since in this case, we can get away with doing this to
+  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
+    std::swap(srcIsolation, dstIsolation);
+    std::swap(srcRegionValue, dstRegionValue);
+  }
+
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto srcName = inferNameHelper(srcRegionValue.getValue());
+  if (!srcName) {
+    return emitUnknownPatternError();
+  }
+  auto dstName = inferNameHelper(dstRegionValue.getValue());
+  if (!dstName) {
+    return emitUnknownPatternError();
+  }
+
+  auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
+  auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
+  auto as = ApplySite::isa(op->getUser());
+  if (!as)
+    return emitUnknownPatternError();
+  auto declRef = as.getCalleeDeclRef();
+  if (!declRef)
+    return emitUnknownPatternError();
+
+  diagnoseError(
+      op->getUser(),
+      diag::regionbasedisolation_merge_region_failure_error_nonisolatedfunction,
+      *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
+      !srcIsolation->isTaskIsolated())
+      .limitBehaviorIf(getBehaviorLimit());
+  diagnoseNote(
+      op->getUser(),
+      diag::
+          regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note,
+      *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
+      !srcIsolation->isTaskIsolated());
+}
+
+void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
+
+  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
+  assert(dstRegionValue.hasRegionIntroducingInst());
+
+  auto declRef = ApplySite::isa(dstRegionValue.getActorRegionIntroducingInst())
+                     .getCalleeDeclRef();
+  if (!declRef)
+    return emitUnknownPatternError();
+
+  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
+  auto srcIsolation = srcIsolationInfo;
+  auto dstIsolation = dstIsolationInfo;
+
+  // Canonicalize so that srcRegionValue is always the task-isolated value. We
+  // do this only here since in this case, we can get away with doing this to
+  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
+    std::swap(srcIsolation, dstIsolation);
+    std::swap(srcRegionValue, dstRegionValue);
+  }
+
+  auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
+  auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
+
+  // We should always be able to find a name for an inout sending param. If we
+  // do not, emit an unknown pattern error.
+  auto srcName = inferNameHelper(srcRegionValue.getValue());
+  if (!srcName) {
+    if (auto *svi =
+            dyn_cast<SingleValueInstruction>(srcRegionValue.getValue())) {
+      if (auto *expr = svi->getLoc().getAsASTNode<Expr>()) {
+        diagnoseError(
+            op->getUser(),
+            diag::
+                regionbasedisolation_merge_region_failure_error_functionisolation_type,
+            expr->findOriginalType(), srcIsolationStr, declRef.getDecl(),
+            dstIsolationStr, !srcIsolation->isTaskIsolated())
+            .limitBehaviorIf(getBehaviorLimit());
+        return;
+      }
+    }
+    if (auto *arg = dyn_cast<SILFunctionArgument>(srcRegionValue.getValue())) {
+      diagnoseError(
+          op->getUser(),
+          diag::
+              regionbasedisolation_merge_region_failure_error_functionisolation_type,
+          arg->getDecl()->getInterfaceType(), srcIsolationStr,
+          declRef.getDecl(), dstIsolationStr, !srcIsolation->isTaskIsolated())
+          .limitBehaviorIf(getBehaviorLimit());
+      return;
+    }
+    return emitUnknownPatternError();
+  }
+  diagnoseError(
+      op->getUser(),
+      diag::regionbasedisolation_merge_region_failure_error_functionisolation,
+      *srcName, srcIsolationStr, declRef.getDecl(), dstIsolationStr,
+      !srcIsolation->isTaskIsolated())
+      .limitBehaviorIf(getBehaviorLimit());
+}
+
+void IncompatibleRegionMergeDiagnosticEmitter::emit() {
+  switch (reason) {
+  case RegionMergeReason::NonisolatedFunction:
+    return emitNonisolatedFunction();
+  case RegionMergeReason::NonisolatedClosure:
+  case RegionMergeReason::Builtin:
+  case RegionMergeReason::Unknown:
+    return emitUnknown();
+  case RegionMergeReason::Assign:
+    return emitAssign();
+  case RegionMergeReason::IsolatedFunction:
+    return emitIsolatedFunction();
+  }
+  llvm_unreachable("Unhandled case");
+}
+
+//===----------------------------------------------------------------------===//
 //                         MARK: Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 

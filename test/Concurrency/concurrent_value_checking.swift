@@ -45,7 +45,7 @@ actor A2 {
 
   nonisolated init(nonisoAsync value: NotConcurrent, _ c: Int) async {
     if c == 0 {
-      await self.init(valueAsync: value) // expected-warning {{pattern that the region-based isolation checker does not understand how to check}}
+      await self.init(valueAsync: value) // expected-warning {{passing 'value' to 'self'-isolated initializer 'init(valueAsync:)' risks causing data races}}
     } else {
       self.init(value: value)
     }
@@ -255,7 +255,6 @@ protocol AsyncProto {
 
 extension A1: AsyncProto {
   func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-Sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMethod' into actor-isolated implementation}}
-  // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check}}
 }
 
 protocol MainActorProto {
@@ -265,7 +264,6 @@ protocol MainActorProto {
 class SomeClass: MainActorProto {
   @SomeGlobalActor
   func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-Sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMainMethod' into global actor 'SomeGlobalActor'-isolated implementation}}
-  // expected-warning @-1 2{{pattern that the region-based isolation checker does not understand how to check}}
 }
 
 // ----------------------------------------------------------------------
