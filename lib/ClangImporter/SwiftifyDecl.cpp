@@ -533,23 +533,30 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
     bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
+    bool returnHasBoundsInfo = returnIsStdSpan;
     auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
     if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
-      attachMacro = true;
+      returnHasBoundsInfo = attachMacro = true;
     }
     auto dependsOnClass = [](const ParamDecl *fromParam) {
       return fromParam->getInterfaceType()->isAnyClassReferenceType();
     };
+    bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
+    bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
       if (!dependsOnClass(
               MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
-        printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
-                                         true);
-        returnHasLifetimeInfo = true;
+        if (returnValueCanBeNonEscapable) {
+          printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
+                                           true);
+          returnHasLifetimeInfo = true;
+        } else {
+          DLOG("lifetimebound ignored because return value is escapable");
+        }
       } else {
         DLOG("lifetimebound ignored because it depends on class with refcount\n");
       }
@@ -625,23 +632,32 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
         DLOG("Found lifetimebound attribute\n");
         if (!dependsOnClass(swiftParam)) {
-          // If this parameter has bounds info we will tranform it into a Span,
-          // so then it will no longer be Escapable.
-          bool willBeEscapable =
-              !isNonEscapable(clangParamTy) &&
-              (!paramHasBoundsInfo ||
-               mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
-          printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
-          paramHasLifetimeInfo = true;
-          returnHasLifetimeInfo = true;
+          if (returnValueCanBeNonEscapable) {
+            // If this parameter has bounds info we will tranform it into a
+            // Span, so then it will no longer be Escapable.
+            bool willBeEscapable =
+                !isNonEscapable(clangParamTy) &&
+                (!paramHasBoundsInfo ||
+                 mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
+            printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
+            paramHasLifetimeInfo = true;
+            returnHasLifetimeInfo = true;
+          } else {
+            DLOG("lifetimebound ignored because return value is escapable\n");
+          }
         } else {
-          DLOG("lifetimebound ignored because it depends on class with refcount\n");
+          DLOG("lifetimebound ignored because it depends on class with "
+               "refcount\n");
         }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
         DLOG("Found both std::span and lifetime info\n");
         attachMacro = true;
       }
+    }
+    if (!returnHasLifetimeInfo && returnValueIsNonEscapable) {
+      DLOG("~Escapable return value without lifetime info\n");
+      return false;
     }
     if (returnIsStdSpan && returnHasLifetimeInfo) {
       DLOG("Found both std::span and lifetime info for return value\n");
