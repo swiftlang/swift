@@ -1965,7 +1965,7 @@ InversesAtDepth::InversesAtDepth(GenericContext *level) {
 }
 bool InversesAtDepth::operator()(const InverseRequirement &inverse) const {
   if (includedDepth) {
-    auto d = inverse.subject->castTo<GenericTypeParamType>()->getDepth();
+    auto d = inverse.subject->getRootGenericParam()->getDepth();
     return d == includedDepth.value();
   }
   return false;
@@ -2036,7 +2036,7 @@ void PrintAST::printGenericSignature(
 
     SmallVector<InverseRequirement, 2> inversesAtDepth;
     for (auto inverseReq : inverses) {
-      if (inverseReq.subject->castTo<GenericTypeParamType>()->getDepth() == depth)
+      if (inverseReq.subject->getRootGenericParam()->getDepth() == depth)
         inversesAtDepth.push_back(inverseReq);
     }
 

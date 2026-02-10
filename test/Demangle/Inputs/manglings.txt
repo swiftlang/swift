@@ -366,6 +366,8 @@ $S1T19protocol_resilience17ResilientProtocolPTl ---> associated type descriptor 
 $S18resilient_protocol21ResilientBaseProtocolTL ---> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol
 $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocType2: t.Q
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
+$s4mini3SeqPxAA06BorrowB0TN ---> default associated conformance accessor for mini.Seq.A: mini.BorrowSeq
+$s4mini3SeqPxAA06BorrowB0Tn ---> associated conformance descriptor for mini.Seq.A: mini.BorrowSeq
 $s4Test6testityyxlFAA8MystructV_TB5 ---> generic specialization <Test.Mystruct> of Test.testit<A>(A) -> ()
 $sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A
 $s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
