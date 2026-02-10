@@ -469,7 +469,7 @@ func testAnyFixIt() {
   let _: HasAssoc.Type.Type.Protocol
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-31=(any (~Copyable).Type.Type)}}
   let _: (~Copyable).Type.Type.Protocol
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
+  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=any HasAssoc}}
   let _: HasAssoc?
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: ~Copyable?
@@ -477,7 +477,7 @@ func testAnyFixIt() {
   let _: (HasAssoc)?
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}
   let _: (~Copyable)?
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
+  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=any HasAssoc}}
   let _: HasAssoc!
   // expected-note@+4 {{use '?' instead}}{{19-20=?}}
   // expected-default-swift-mode-warning@+3 {{using '!' here is deprecated}}
@@ -486,9 +486,9 @@ func testAnyFixIt() {
   let _: ~Copyable!
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}
   let _: (~Copyable)!
-  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=(any HasAssoc.Type)}}
+  // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-23=any HasAssoc.Type}}
   let _: HasAssoc.Type?
-  // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-26=(any (~Copyable).Type)}}
+  // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{10-26=any (~Copyable).Type}}
   let _: (~Copyable).Type?
   // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   let _: HasAssoc.Protocol?
@@ -532,9 +532,9 @@ func testAnyFixIt() {
   // expected-warning@+2 {{constraint that suppresses conformance requires 'any'}}{{21-52=any NonCopyableHasAssoc & ~Copyable}}
   // expected-warning@+1 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{21-52=any NonCopyableHasAssoc & ~Copyable}}
   let _: (borrowing NonCopyableHasAssoc & ~Copyable) -> Void
-  // expected-warning@+3:15 {{constraint that suppresses conformance requires 'any'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
-  // expected-warning@+2:28 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
-  // expected-warning@+1:51 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=(any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type)}}
+  // expected-warning@+3:15 {{constraint that suppresses conformance requires 'any'}}{{10-88=any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type}}
+  // expected-warning@+2:28 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type}}
+  // expected-warning@+1:51 {{use of protocol 'NonCopyableHasAssoc' as a type must be written 'any NonCopyableHasAssoc'}}{{10-88=any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type}}
   let _: (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type?
   let _: any (((((~Copyable) & NonCopyableHasAssoc) & NonCopyableHasAssoc).Type.Type)).Type // OK
 
