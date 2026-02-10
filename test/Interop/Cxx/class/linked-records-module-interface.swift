@@ -26,6 +26,7 @@
 // CHECK: struct F {
 // CHECK:   init(_ __Anonymous_field0: F.__Unnamed_union___Anonymous_field0, m2: M)
 // CHECK:   init()
+// CHECK:   var __Anonymous_field0: F.__Unnamed_union___Anonymous_field0
 // CHECK:   struct __Unnamed_union___Anonymous_field0 {
 // CHECK:     init(c: F.__Unnamed_union___Anonymous_field0.__Unnamed_struct_c)
 // CHECK:     init(m: M)
@@ -36,7 +37,6 @@
 // CHECK:     var c: F.__Unnamed_union___Anonymous_field0.__Unnamed_struct_c
 // CHECK:     var m: M
 // CHECK:   }
-// CHECK:   var __Anonymous_field0: F.__Unnamed_union___Anonymous_field0
 // CHECK:   var c: F.__Unnamed_union___Anonymous_field0.__Unnamed_struct_c
 // CHECK:   var m: M
 // CHECK:   var m2: M

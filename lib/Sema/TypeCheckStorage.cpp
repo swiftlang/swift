@@ -130,7 +130,8 @@ static void computeLoweredProperties(NominalTypeDecl *decl,
 
   // Just walk over the members of the type, forcing backing storage
   // for lazy properties and property wrappers to be synthesized.
-  for (auto *member : implDecl->getMembers()) {
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading()) {
     // Expand peer macros.
     (void)evaluateOrDefault(
         ctx.evaluator,
@@ -229,7 +230,8 @@ static void enumerateStoredPropertiesAndMissing(
     visitMember(idVar);
   if (auto actorSystemVar = decl->getDistributedActorSystemProperty())
     visitMember(actorSystemVar);
-  for (auto *member : implDecl->getMembers())
+  implDecl->loadStorageMembers();
+  for (auto *member : implDecl->getCurrentMembersWithoutLoading())
     visitMember(member);
 }
 
@@ -351,7 +353,8 @@ InitializablePropertiesRequest::evaluate(Evaluator &evaluator,
     member->visitAuxiliaryDecls(visitMember);
   };
 
-  for (auto *member : decl->getMembers())
+  decl->loadStorageMembers();
+  for (auto *member : decl->getCurrentMembersWithoutLoading())
     visitMember(member);
 
   return decl->getASTContext().AllocateCopy(results);
