@@ -44,9 +44,9 @@ public struct ObservationRegistrar: Sendable {
     
     private struct Observation {
       private var kind: ObservationKind
-      internal var properties: Set<AnyKeyPath>
+      internal var properties: OptimizedSet<AnyKeyPath>
       
-      internal init(kind: ObservationKind, properties: Set<AnyKeyPath>) {
+      internal init(kind: ObservationKind, properties: OptimizedSet<AnyKeyPath>) {
         self.kind = kind
         self.properties = properties
       }
@@ -70,37 +70,49 @@ public struct ObservationRegistrar: Sendable {
       }
     }
     
+    private var used = UInt64(0)
     private var id = 0
-    private var observations = [Int : Observation]()
-    private var lookups = [AnyKeyPath : Set<Int>]()
+    
+    private var observations = Table<Observation>(capacity: 64)
+    
+    private var lookups = [AnyKeyPath : OptimizedSet<Int>]()
     
     internal mutating func generateId() -> Int {
-      defer { id &+= 1 }
-      return id
+      let available = (~used).trailingZeroBitCount
+      if available < 64 {
+        used |= 1 << available
+        return available
+      } else {
+        defer { id &+= 1 }
+        return id &+ 64
+      }
     }
     
-    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
+    internal mutating func registerTracking(for properties: OptimizedSet<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .willSetTracking(observer), properties: properties)
-      for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
+      for property in properties {
+        lookups[property, default: .empty].insert(id)
       }
       return id
     }
 
-    internal mutating func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
+    internal mutating func registerTracking(for properties: OptimizedSet<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       let id = generateId()
       observations[id] = Observation(kind: .didSetTracking(observer), properties: properties)
       for keyPath in properties {
-        lookups[keyPath, default: []].insert(id)
+        lookups[keyPath, default: .empty].insert(id)
       }
       return id
     }
     
     internal mutating func cancel(_ id: Int) {
+      if id < 64 {
+        used &= ~(1 << id)
+      }
       if let observation = observations.removeValue(forKey: id) {
-        for keyPath in observation.properties {
-          if let index = lookups.index(forKey: keyPath) {
+        for property in observation.properties {
+          if let index = lookups.index(forKey: property) {
             lookups.values[index].remove(id)
             if lookups.values[index].isEmpty {
               lookups.remove(at: index)
@@ -145,11 +157,11 @@ public struct ObservationRegistrar: Sendable {
     
     internal var id: ObjectIdentifier { state.id }
     
-    internal func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
+    internal func registerTracking(for properties: OptimizedSet<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, willSet: observer) }
     }
 
-    internal func registerTracking(for properties: Set<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
+    internal func registerTracking(for properties: OptimizedSet<AnyKeyPath>, didSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, didSet: observer) }
     }
     

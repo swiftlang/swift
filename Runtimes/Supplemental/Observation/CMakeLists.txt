@@ -102,6 +102,8 @@ add_library(swiftObservation
   Sources/Observation/ObservationRegistrar.swift
   Sources/Observation/ObservationTracking.swift
   Sources/Observation/Observations.swift
+  Sources/Observation/OptimizedSet.swift
+  Sources/Observation/Table.swift
   Sources/Observation/ThreadLocal.swift
   Sources/Observation/ThreadLocal.cpp)
 set_target_properties(swiftObservation PROPERTIES
