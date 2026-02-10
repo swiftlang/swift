@@ -1,10 +1,10 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=ClangIncludesNoExportModule -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=ClangIncludesNoExportModule -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature StabilizedSafeInteropWrappers | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesNoExport.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesNoExport.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesNoExport.swiftmodule -I %S/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/ClangIncludesNoExport.swiftmodule -I %S/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %s -cxx-interoperability-mode=default
 
 import ClangIncludesNoExportModule
 

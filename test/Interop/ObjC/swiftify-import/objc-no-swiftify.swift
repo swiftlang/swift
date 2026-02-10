@@ -1,9 +1,9 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=NoSwiftifyClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=NoSwiftifyClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature StabilizedSafeInteropWrappers | %FileCheck %s
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/NoSwiftify.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers %s -verify -verify-additional-file %S/Inputs/objc-no-swiftify.h
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/NoSwiftify.swiftmodule -I %S/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %s -verify -verify-additional-file %S/Inputs/objc-no-swiftify.h
 
 import NoSwiftifyClang
 

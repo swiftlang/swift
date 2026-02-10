@@ -630,24 +630,30 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         paramHasLifetimeInfo = true;
       }
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
-        DLOG("Found lifetimebound attribute\n");
-        if (!dependsOnClass(swiftParam)) {
-          if (returnValueCanBeNonEscapable) {
-            // If this parameter has bounds info we will tranform it into a
-            // Span, so then it will no longer be Escapable.
-            bool willBeEscapable =
-                !isNonEscapable(clangParamTy) &&
-                (!paramHasBoundsInfo ||
-                 mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
-            printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
-            paramHasLifetimeInfo = true;
-            returnHasLifetimeInfo = true;
+        if (Self.SwiftContext.LangOpts.hasFeature(
+                Feature::SafeInteropWrappers)) {
+          DLOG("Found lifetimebound attribute\n");
+          if (!dependsOnClass(swiftParam)) {
+            if (returnValueCanBeNonEscapable) {
+              // If this parameter has bounds info we will tranform it into a
+              // Span, so then it will no longer be Escapable.
+              bool willBeEscapable =
+                  !isNonEscapable(clangParamTy) &&
+                  (!paramHasBoundsInfo ||
+                   mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
+              printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
+              paramHasLifetimeInfo = true;
+              returnHasLifetimeInfo = true;
+            } else {
+              DLOG("lifetimebound ignored because return value is escapable\n");
+            }
           } else {
-            DLOG("lifetimebound ignored because return value is escapable\n");
+            DLOG("lifetimebound ignored because it depends on class with "
+                 "refcount\n");
           }
         } else {
-          DLOG("lifetimebound ignored because it depends on class with "
-               "refcount\n");
+          DLOG("lifetimebound not yet supported by stable feature-set - skipping\n");
+          return false;
         }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
@@ -750,7 +756,9 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (!SwiftContext.LangOpts.hasFeature(
+          Feature::StabilizedSafeInteropWrappers) &&
+      !SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)

@@ -1,4 +1,4 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // Tests that we don't try to import modules that don't work well with C++ interop (when enabled)
 
@@ -6,20 +6,20 @@
 // RUN: split-file --leading-lines %s %t
 
 // Case 1: a.swift calls A1.B1.foo with C++ interop
-// RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/a.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-A,CHECK-A-CXX %s
-// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/a.swift -verify -verify-additional-prefix cxx- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
+// RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/a.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-A,CHECK-A-CXX %s
+// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/a.swift -verify -verify-additional-prefix cxx- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
 
 // Case 2: a.swift calls A1.B1.foo without C++ interop
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/a.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-A,CHECK-A-C %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/a.swift -verify
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/a.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-A,CHECK-A-C %s
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/a.swift -verify
 
 // Case 3: b.swift calls A2.B2.foo with C++ interop
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/b.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-B,CHECK-B-CXX %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/b.swift -verify
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/b.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefixes CHECK-B,CHECK-B-CXX %s
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/b.swift -verify
 
 // Case 4: b.swift calls A2.B2.foo without C++ interop
-// RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/b.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefix CHECK-B %s
-// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/b.swift -verify -verify-additional-prefix c- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B2.h -verify-ignore-macro-note
+// RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/b.swift -dump-source-file-imports 2>&1 | %FileCheck --check-prefix CHECK-B %s
+// RUN:     %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/b.swift -verify -verify-additional-prefix c- -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B2.h -verify-ignore-macro-note
 
 // CHECK-A:      imports for {{.*}}a.swift:
 // CHECK-A-NEXT: 	Swift

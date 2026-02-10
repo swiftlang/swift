@@ -1,9 +1,9 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default -enable-experimental-feature SafeInteropWrappers %t/namespace.swift -emit-module -verify
-// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=Namespace -source-filename=x > %t/interface.txt
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default -enable-experimental-feature StabilizedSafeInteropWrappers %t/namespace.swift -emit-module -verify
+// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature StabilizedSafeInteropWrappers -print-module -module-to-print=Namespace -source-filename=x > %t/interface.txt
 // RUN: diff %t/interface.txt %t/interface.txt.expected
 
 //--- interface.txt.expected

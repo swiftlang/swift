@@ -1,10 +1,13 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: std_span
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 -verify -verify-additional-file %t/Inputs/instance.h -DVERIFY
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 \
+// RUN:   -verify -verify-additional-file %t/Inputs/instance.h -DVERIFY
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers -strict-memory-safety -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 \
+// RUN:   -verify -verify-additional-file %t/Inputs/instance.h -DVERIFY -verify-additional-prefix nolifetimebound-
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -cxx-interoperability-mode=default -Xcc -std=c++20 -dump-macro-expansions 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --implicit-check-not __swiftmacro
 
 //--- test.swift
@@ -22,12 +25,16 @@ func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, s: IntSpan, cs: ConstI
   baz.this(&aa, &p)
 
   let _: IntSpan = unsafe s.spanSelf()
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
   let _: MutableSpan<CInt> = unsafe s.spanSelf()
   let _: IntSpan = unsafe s.spanConstSelf()
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
   let _: MutableSpan<CInt> = unsafe s.spanConstSelf()
   let _: ConstIntSpan = unsafe cs.constSpanSelf()
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'ConstIntSpan' (aka 'std.__1.span<__cxxConst<CInt>, _CUnsignedLong_18446744073709551615>') to specified type 'Span<CInt>' (aka 'Span<Int32>')}}
   let _: Span<CInt> = unsafe cs.constSpanSelf()
   let _: IntSpan = unsafe asp.spanSelf()
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
   let _: MutableSpan<CInt> = unsafe asp.spanSelf()
 #if VERIFY
   p.spanSelf() // expected-error{{value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') has no member 'spanSelf'}}

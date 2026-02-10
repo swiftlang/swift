@@ -1,9 +1,9 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-module -I %t -plugin-path %swift-plugin-dir -strict-memory-safety -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes %t/test.swift \
+// RUN: %target-swift-frontend -emit-module -I %t -plugin-path %swift-plugin-dir -strict-memory-safety -enable-experimental-feature StabilizedSafeInteropWrappers -enable-experimental-feature Lifetimes %t/test.swift \
 // RUN:    -Rmacro-expansions -verify -verify-additional-file %t%{fs-sep}test.h
 
 //--- module.modulemap
