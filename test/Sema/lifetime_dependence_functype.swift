@@ -164,6 +164,16 @@ do {
   //  expected-error@-1{{cannot convert value of type '@_lifetime(0: immortal) (inout NE, borrowing NE) -> ()' to expected argument type '@_lifetime(outValue: copy outValue, borrow inValue) (_ outValue: inout NE, _ inValue: borrowing NE) -> ()'}}
 }
 do {
+  let x = NE()
+  var y = NE()
+  takeGetGenericAndArgs(f: { $1 = $0 }, o: &y, i: x) // expected-error{{cannot assign to value: '$1' is immutable}}
+}
+do {
+  let x = NE()
+  var y = NE()
+  takeGetGenericAndArgs(f: { $0 = $1 }, o: &y, i: x) // OK
+}
+do {
   let _ = transfer // OK
   let _: (NE) -> NE = transfer // OK
   let _: @_lifetime(copy ne) (_ ne: NE) -> NE = transfer // OK
