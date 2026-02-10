@@ -4237,7 +4237,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
     consumeToken();
     if (Version.empty()) {
       // Versions cannot be empty (e.g. "0").
-      diagnose(Range.Start, D).warnUntilLanguageMode(6);
+      diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
       return true;
     }
     return false;
@@ -4278,7 +4278,7 @@ bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
 
   if (Version.empty()) {
     // Versions cannot be empty (e.g. "0.0").
-    diagnose(Range.Start, D).warnUntilLanguageMode(6);
+    diagnose(Range.Start, D).warnUntilLanguageMode(LanguageMode::v6);
     return true;
   }
 
@@ -4316,7 +4316,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(SourceLoc atLoc) {
   if (isAtAttributeLParen(/*isCustomAttribute=*/true)) {
     if (getEndOfPreviousLoc() != Tok.getLoc()) {
       diagnose(getEndOfPreviousLoc(), diag::attr_extra_whitespace_before_lparen)
-          .warnUntilLanguageMode(6);
+          .warnUntilLanguageMode(LanguageMode::v6);
     }
     // If we have no local context to parse the initial value into, create
     // one for the attribute.
@@ -4375,7 +4375,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
                                         bool isFromClangAttribute) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   bool hasModuleSelector = peekToken().is(tok::colon_colon);
@@ -4438,12 +4438,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
 
   // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
   // warning for compatibility. Otherwise, don't diagnose at all.
-  if (Context.isLanguageModeAtLeast(5)) {
+  if (Context.isLanguageModeAtLeast(LanguageMode::v5)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline, diag::attr_renamed);
     checkInvalidAttrName("_inlineable", "inlinable", DeclAttrKind::Inlinable,
                          diag::attr_renamed);
-  } else if (Context.isLanguageModeAtLeast(4, 2)) {
+  } else if (Context.isLanguageModeAtLeast(LanguageMode::v4_2)) {
     checkInvalidAttrName("_versioned", "usableFromInline",
                          DeclAttrKind::UsableFromInline,
                          diag::attr_renamed_warning);
@@ -4794,7 +4794,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                         bool justChecking) {
   if (AtEndLoc != Tok.getLoc()) {
     diagnose(AtEndLoc, diag::attr_extra_whitespace_after_at)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
 
   // If this not an identifier, the attribute is malformed.

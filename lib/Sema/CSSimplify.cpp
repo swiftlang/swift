@@ -1784,7 +1784,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         // this is Swift version >= 5 where forwarding is not allowed,
         // argument would always be wrapped into an implicit closure
         // at the end, so we can safely match against result type.
-        if (ctx.isLanguageModeAtLeast(5) || !isAutoClosureArgument(argExpr)) {
+        if (ctx.isLanguageModeAtLeast(LanguageMode::v5) ||
+            !isAutoClosureArgument(argExpr)) {
           // In Swift >= 5 mode there is no @autoclosure forwarding,
           // so let's match result types.
           if (auto *fnType = paramTy->getAs<FunctionType>()) {
@@ -2594,7 +2595,7 @@ static bool isSingleTupleParam(ASTContext &ctx,
   // let foo: ((Int, Int)?) -> Void = { _ in }
   //
   // bar(foo) // Ok
-  if (!ctx.isLanguageModeAtLeast(5))
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5))
     paramType = paramType->lookThroughAllOptionalTypes();
 
   // Parameter type should either a tuple or something that can become a
@@ -3455,7 +3456,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
             canImplodeParams(func1Params, /*destFn*/ func2)) {
           implodeParams(func1Params);
           increaseScore(SK_FunctionConversion, locator);
-        } else if (!ctx.isLanguageModeAtLeast(5) &&
+        } else if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
                    isSingleTupleParam(ctx, func1Params) &&
                    canImplodeParams(func2Params,  /*destFn*/ func1)) {
           auto *simplified = locator.trySimplifyToExpr();
@@ -3542,8 +3543,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // https://github.com/apple/swift/issues/49345
   // Add a super-narrow hack to allow '(()) -> T' to be passed in place
   // of '() -> T'.
-  if (getASTContext().isLanguageModeAtLeast(4) &&
-      !getASTContext().isLanguageModeAtLeast(5)) {
+  if (getASTContext().isLanguageModeAtLeast(LanguageMode::v4) &&
+      !getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     SmallVector<LocatorPathElt, 4> path;
     locator.getLocatorParts(path);
 
@@ -4726,7 +4727,7 @@ ConstraintSystem::matchTypesBindTypeVar(
             ->isLastElement<LocatorPathElt::ApplyArgument>();
 
     if (!(typeVar->getImpl().canBindToPack() && representsParameterList) ||
-        getASTContext().isLanguageModeAtLeast(6)) {
+        getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
@@ -5106,7 +5107,8 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
 
   if (auto *optTryExpr = dyn_cast<OptionalTryExpr>(anchor)) {
     auto subExprType = cs.getType(optTryExpr->getSubExpr());
-    const bool isSwift5OrGreater = cs.getASTContext().isLanguageModeAtLeast(5);
+    const bool isSwift5OrGreater =
+        cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
 
     if (subExprType->getOptionalObjectType()) {
       if (isSwift5OrGreater) {
@@ -5822,7 +5824,7 @@ bool ConstraintSystem::repairFailures(
           // (note that `swift_attr` in type contexts weren't supported
           // before) and for witnesses to adopt them gradually by matching
           // with a warning in non-strict concurrency mode.
-          if (!(Context.isLanguageModeAtLeast(6) ||
+          if (!(Context.isLanguageModeAtLeast(LanguageMode::v6) ||
                 Context.LangOpts.StrictConcurrencyLevel ==
                     StrictConcurrency::Complete)) {
             auto strippedLHS = lhs->stripConcurrency(/*recursive=*/true,
@@ -8694,7 +8696,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // affect the prioritization of bindings, which can affect behavior for tuple
   // matching as tuple subtyping is currently a *weaker* constraint than tuple
   // conversion.
-  if (!getASTContext().isLanguageModeAtLeast(6)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
     auto paramTypeVar = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
         TVO_CanBindToLValue | TVO_CanBindToInOut | TVO_CanBindToNoEscape |
@@ -10883,7 +10885,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
   // method or property named `init`.
-  if (!ctx.isLanguageModeAtLeast(5) &&
+  if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
       memberName.getBaseName().isConstructor() && !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
                                       DeclNameRef(ctx.getIdentifier("init")),
@@ -12633,7 +12635,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   // type must be a (potentially optional) type variable, as only such a
   // constraint could have been previously been left unsolved.
   auto canUseCompatFix = [&]() {
-    if (Context.isLanguageModeAtLeast(6))
+    if (Context.isLanguageModeAtLeast(LanguageMode::v6))
       return false;
 
     if (!rawType1->lookThroughAllOptionalTypes()->isTypeVariableOrMember())

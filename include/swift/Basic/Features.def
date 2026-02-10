@@ -285,33 +285,41 @@ BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude privat
 // suppression of @c in Swift interfaces as a temporary measure.
 SUPPRESSIBLE_LANGUAGE_FEATURE(CAttribute, 495, "@c attribute")
 
-// Swift 6
-UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
-UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
-UPCOMING_FEATURE(StrictConcurrency, 0337, 6)
-UPCOMING_FEATURE(BareSlashRegexLiterals, 354, 6)
-UPCOMING_FEATURE(DeprecateApplicationMain, 383, 6)
-UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
-UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
-UPCOMING_FEATURE(IsolatedDefaultValues, 411, 6)
-UPCOMING_FEATURE(GlobalConcurrency, 412, 6)
-UPCOMING_FEATURE(InferSendableFromCaptures, 418, 6)
-UPCOMING_FEATURE(ImplicitOpenExistentials, 352, 6)
-UPCOMING_FEATURE(RegionBasedIsolation, 414, 6)
-UPCOMING_FEATURE(DynamicActorIsolation, 423, 6)
-UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
-UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
+//===----------------------------------------------------------------------===//
+// MARK: - Swift 6 features
+//===----------------------------------------------------------------------===//
 
-// Swift 7
-MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
-UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
-MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
-MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
-MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
-UPCOMING_FEATURE(ImmutableWeakCaptures, 481, 7)
-UPCOMING_FEATURE(StrictAccessControl, 0, 7)
+UPCOMING_FEATURE(ConciseMagicFile, 274, LanguageMode::v6)
+UPCOMING_FEATURE(ForwardTrailingClosures, 286, LanguageMode::v6)
+UPCOMING_FEATURE(StrictConcurrency, 0337, LanguageMode::v6)
+UPCOMING_FEATURE(BareSlashRegexLiterals, 354, LanguageMode::v6)
+UPCOMING_FEATURE(DeprecateApplicationMain, 383, LanguageMode::v6)
+UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, LanguageMode::v6)
+UPCOMING_FEATURE(DisableOutwardActorInference, 401, LanguageMode::v6)
+UPCOMING_FEATURE(IsolatedDefaultValues, 411, LanguageMode::v6)
+UPCOMING_FEATURE(GlobalConcurrency, 412, LanguageMode::v6)
+UPCOMING_FEATURE(InferSendableFromCaptures, 418, LanguageMode::v6)
+UPCOMING_FEATURE(ImplicitOpenExistentials, 352, LanguageMode::v6)
+UPCOMING_FEATURE(RegionBasedIsolation, 414, LanguageMode::v6)
+UPCOMING_FEATURE(DynamicActorIsolation, 423, LanguageMode::v6)
+UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, LanguageMode::v6)
+UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, LanguageMode::v6)
 
-// Optional language features / modes
+//===----------------------------------------------------------------------===//
+// MARK: - Future Swift features
+//===----------------------------------------------------------------------===//
+
+MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, LanguageMode::future)
+UPCOMING_FEATURE(InternalImportsByDefault, 409, LanguageMode::future)
+MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, LanguageMode::future)
+MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, LanguageMode::future)
+MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, LanguageMode::future)
+UPCOMING_FEATURE(ImmutableWeakCaptures, 481, LanguageMode::future)
+UPCOMING_FEATURE(StrictAccessControl, 0, LanguageMode::future)
+
+//===----------------------------------------------------------------------===//
+// MARK: - Optional features
+//===----------------------------------------------------------------------===//
 
 /// Diagnose uses of language constructs and APIs that can violate memory
 /// safety.
@@ -319,7 +327,9 @@ MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory saf
 
 OPTIONAL_LANGUAGE_FEATURE(LibraryEvolution, 0, "Library evolution")
 
-// Experimental features
+//===----------------------------------------------------------------------===//
+// MARK: - Experimental features
+//===----------------------------------------------------------------------===//
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
