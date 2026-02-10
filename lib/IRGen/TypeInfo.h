@@ -327,6 +327,7 @@ public:
   virtual llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                                  SILType T) const = 0;
 

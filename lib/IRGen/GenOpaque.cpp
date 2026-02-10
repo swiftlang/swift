@@ -1053,10 +1053,24 @@ llvm::Value *irgen::emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T) {
 /// Load the 'isBitwiseBorrowable' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonBitwiseBorrowable);
+
+  // Bitwise-takable implies bitwise-borrowable, and the not-bitwise-borrowable
+  // bit may be left indeterminate if the type is already not-bitwise-takable. 
+  // So the type is bitwise-borrowable only when both bits are zero.
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonBitwiseBorrowable
+                               | ValueWitnessFlags::IsNonBitwiseTakable);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
                                   flags->getName() + ".isBitwiseBorrowable");
+}
+
+/// Load the 'isAddressableForDependencies' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsAddressableForDependencies(IRGenFunction &IGF, SILType T) {
+  auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
+  auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsAddressableForDependencies);
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return IGF.Builder.CreateICmpNE(masked, IGF.IGM.getInt32(0),
+                                  flags->getName() + ".isAddressableForDependencies");
 }
 
 /// Load the 'isInline' valueWitness from the given table as an i1.
