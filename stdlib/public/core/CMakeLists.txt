@@ -45,7 +45,6 @@ split_embedded_sources(
   EMBEDDED BidirectionalCollection.swift
   EMBEDDED Bitset.swift
   EMBEDDED Bool.swift
-  EMBEDDED Box.swift
     NORMAL BridgeObjectiveC.swift
   EMBEDDED BridgeStorage.swift
     NORMAL BridgingBuffer.swift
@@ -235,6 +234,7 @@ split_embedded_sources(
   EMBEDDED UnicodeSPI.swift
   EMBEDDED UnicodeScalar.swift
   EMBEDDED UnicodeScalarProperties.swift
+  EMBEDDED Unique.swift
   EMBEDDED Unmanaged.swift
   EMBEDDED UnmanagedOpaqueString.swift
   EMBEDDED UnmanagedString.swift

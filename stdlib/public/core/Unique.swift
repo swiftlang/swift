@@ -14,13 +14,14 @@
 @available(SwiftStdlib 6.4, *)
 @frozen
 @safe
-public struct Box<Value: ~Copyable>: ~Copyable {
+public struct Unique<Value: ~Copyable>: ~Copyable {
   @usableFromInline
   let pointer: UnsafeMutablePointer<Value>
 
-  /// Initializes a value of this box with the given initial value.
+  /// Initializes a value of this unqiue box with the given initial value.
   ///
-  /// - Parameter initialValue: The initial value to initialize the box with.
+  /// - Parameter initialValue: The initial value to initialize the unqiue box
+  ///                           with.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -38,12 +39,12 @@ public struct Box<Value: ~Copyable>: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Box: Sendable where Value: Sendable & ~Copyable {}
+extension Unique: Sendable where Value: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
-extension Box where Value: ~Copyable {
-  /// Dereferences the box allowing for in-place reads and writes to the stored
-  /// `Value`.
+extension Unique where Value: ~Copyable {
+  /// Dereferences the unique box allowing for in-place reads and writes to the
+  /// stored `Value`.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var value: Value {
@@ -60,8 +61,8 @@ extension Box where Value: ~Copyable {
     }
   }
 
-  /// Consumes the box and returns the instance of `Value` that was within the
-  /// box.
+  /// Consumes the unique box and returns the instance of `Value` that was
+  /// within the box.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -74,9 +75,9 @@ extension Box where Value: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Box where Value: ~Copyable {
+extension Unique where Value: ~Copyable {
   /// Returns a single element span reference to the instance of `Value` stored
-  /// within this box.
+  /// within this unqiue box.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var span: Span<Value> {
@@ -88,7 +89,7 @@ extension Box where Value: ~Copyable {
   }
 
   /// Returns a single element mutable span reference to the instance of `Value`
-  /// stored within this box.
+  /// stored within this unqiue box.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Value> {
@@ -101,11 +102,12 @@ extension Box where Value: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Box where Value: Copyable {
-  /// Copies the value within the box and returns it in a new box instance.
+extension Unique where Value: Copyable {
+  /// Copies the value within the unqiue box and returns it in a new unique
+  /// instance.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public func clone() -> Box<Value> {
-    Box(value)
+  public func clone() -> Unique<Value> {
+    Unique(value)
   }
 }

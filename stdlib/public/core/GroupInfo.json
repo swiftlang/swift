@@ -279,7 +279,7 @@
     "InlineArray.swift",
     "_InlineArray.swift",
     "Exclusivity.swift",
-    "Box.swift"
+    "Unique.swift"
   ],
   "Result": [
     "Result.swift"
