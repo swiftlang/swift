@@ -2956,6 +2956,13 @@ static CanSILFunctionType getSILFunctionType(
   auto lowerLifetimeDependence
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
+      if (target == parameterMap.size()) {
+        // The target is the result, represented by the number of parameters.
+        // Parameters may have been added if there were closure captures, so
+        // update the result index accordingly.
+        target = inputs.size();
+      }
+
       if (formalDeps.isImmortal()) {
         return LifetimeDependenceInfo(
             nullptr, nullptr, target,
