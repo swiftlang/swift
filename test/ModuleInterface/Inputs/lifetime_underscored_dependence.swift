@@ -116,3 +116,23 @@ public func returnableCopier(_ aView: AnotherView) -> AnotherView {
 public func returnCopier() -> @_lifetime(copy a) (_ a: AnotherView) -> AnotherView {
   return returnableCopier
 }
+
+@inlinable
+@_lifetime(dest: immortal)
+public func immortalInout(dest: inout AnotherView) {
+  dest = _overrideLifetime(dest, copying: ())
+}
+
+@inlinable public func takeImmortalInout(
+  closure: @_lifetime(dest: immortal) (_ dest: inout AnotherView) -> ()
+) {}
+
+@inlinable
+@_lifetime(dest: immortal, copy source)
+public func fullReassign(dest: inout AnotherView, source: AnotherView) {
+  dest = source
+}
+
+@inlinable public func takeFullReassign(
+  closure: @_lifetime(dest: immortal, copy source) (_ dest: inout AnotherView, _ source: AnotherView) -> ()
+) {}

@@ -68,6 +68,11 @@ func invalidDependenceInoutInt(_ x: inout Int) -> NE {
   NE()
 }
 
+@_lifetime(immortal)
+func immortalDependenceInout(_ ne: inout NE) -> NE {
+  NE()
+}
+
 @_lifetime(result: copy source1) // expected-error{{invalid duplicate target lifetime dependencies on function}}
 @_lifetime(result: copy source2)
 func invalidTarget(_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) {

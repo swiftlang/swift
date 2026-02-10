@@ -520,6 +520,41 @@ func testReassignToBorrowBad(span: inout Span<Int>, array: [Int]) { // expected-
   reassign(dest: &span, source: array.span())
 } // expected-note{{this use causes the lifetime-dependent value to escape}}
 
+// 'dest' does not depend on the function input.
+@_lifetime(dest: immortal)
+func noMutation<T: ~Escapable>(dest: inout T) {
+  dest = _overrideLifetime(dest, copying: ())
+}
+
+// OK
+@_lifetime(immortal)
+func testNoMutation(calleeArray: consuming [Int]) -> Span<Int> {
+  var span = calleeArray.span()
+  noMutation(dest: &span)
+  return span
+}
+
+// 'dest' does not depend on itself.
+@_lifetime(dest: immortal, copy source)
+func fullReassign<T: ~Escapable>(dest: inout T, source: T) {
+  dest = source
+}
+
+@_lifetime(borrow callerArray)
+func testFullReassignGood(callerArray: borrowing [Int], calleeArray: consuming [Int]) -> Span<Int> {
+  var span = calleeArray.span()
+  fullReassign(dest: &span, source: callerArray.span())
+  return span
+}
+
+@_lifetime(immortal)
+func testFullReassignBad(callerArray: borrowing [Int], calleeArray: consuming [Int]) -> Span<Int> {
+  var span = calleeArray.span() // expected-error{{lifetime-dependent variable 'span' escapes its scope}}
+  fullReassign(dest: &span, source: callerArray.span())
+  return span // expected-note{{this use causes the lifetime-dependent value to escape}}
+  // expected-note@-4{{it depends on the lifetime of argument 'callerArray'}}
+}
+
 // =============================================================================
 // Copied dependence on mutable captures
 // =============================================================================

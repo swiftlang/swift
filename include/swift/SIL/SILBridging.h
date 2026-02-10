@@ -197,7 +197,7 @@ struct BridgedLifetimeDependenceInfo {
   swift::IndexSubset *_Nullable addressableParamIndices;
   swift::IndexSubset *_Nullable conditionallyAddressableParamIndices;
   SwiftUInt targetIndex;
-  bool immortal;
+  bool hasImmortalSpecifier;
   bool fromAnnotation;
 
   BRIDGED_INLINE BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info);

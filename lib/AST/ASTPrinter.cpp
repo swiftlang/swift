@@ -532,13 +532,13 @@ static std::string getLifetimeDependenceInfoSourceListString(
   auto addressable = info.getAddressableIndices();
   auto condAddressable = info.getConditionallyAddressableIndices();
 
+  bool isFirstSpecifier = true;
   auto getSourceString = [&](IndexSubset *bitvector,
                              StringRef kind) -> std::string {
     std::string result;
-    bool isFirstSetBit = true;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
       if (bitvector->contains(i)) {
-        if (!isFirstSetBit) {
+        if (!isFirstSpecifier) {
           result += ", ";
         }
         result += kind;
@@ -551,11 +551,18 @@ static std::string getLifetimeDependenceInfoSourceListString(
         // print the index. Indices should ideally never be used in Swift
         // lifetime annotations, especially in module interfaces.
         result += getLifetimeDependenceIdentifier(i, params);
-        isFirstSetBit = false;
+        isFirstSpecifier = false;
       }
     }
     return result;
   };
+  if (info.hasImmortalSpecifier()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += "immortal";
+    isFirstSpecifier = false;
+  }
   auto inheritLifetimeParamIndices = info.getInheritIndices();
   if (inheritLifetimeParamIndices) {
     assert(!inheritLifetimeParamIndices->isEmpty());
@@ -564,14 +571,8 @@ static std::string getLifetimeDependenceInfoSourceListString(
   }
   if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
     assert(!scopeLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices) {
-      lifetimeDependenceString += ", ";
-    }
     lifetimeDependenceString +=
         getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  if (info.isImmortal()) {
-    lifetimeDependenceString += "immortal";
   }
   return lifetimeDependenceString;
 }
@@ -579,6 +580,8 @@ static std::string getLifetimeDependenceInfoSourceListString(
 /// Get a string representation for this dependence info as a Swift lifetime
 /// attribute (for a type or decl). The target and sources are referred to by
 /// their labels if possible (see getLifetimeDependenceIdentifier).
+///
+/// TODO: Factor this with LifetimeDependenceInfo::getString.
 static std::string
 getLifetimeDependenceInfoSwiftString(LifetimeDependenceInfo const &info,
                                      ArrayRef<AnyFunctionType::Param> params) {
