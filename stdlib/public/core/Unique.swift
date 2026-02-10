@@ -39,7 +39,7 @@ public struct Unique<Value: ~Copyable>: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Unique: Sendable where Value: Sendable & ~Copyable {}
+extension Unique: @unchecked Sendable where Value: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
 extension Unique where Value: ~Copyable {
