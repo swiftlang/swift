@@ -773,14 +773,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
       unsigned pcmOutputPathID, mappedPCMPathID, moduleMapPathID, contextHashID,
-          commandLineArrayID, fileDependenciesArrayID,
-          CASFileSystemRootID, clangIncludeTreeRootID, moduleCacheKeyID,
-          isSystem;
+          commandLineArrayID, fileDependenciesArrayID, clangIncludeTreeRootID,
+          moduleCacheKeyID, isSystem;
       ClangModuleDetailsLayout::readRecord(
           Scratch, pcmOutputPathID, mappedPCMPathID, moduleMapPathID,
           contextHashID, commandLineArrayID, fileDependenciesArrayID,
-          CASFileSystemRootID, clangIncludeTreeRootID,
-          moduleCacheKeyID, isSystem);
+          clangIncludeTreeRootID, moduleCacheKeyID, isSystem);
       auto pcmOutputPath = getIdentifier(pcmOutputPathID);
       if (!pcmOutputPath)
         llvm::report_fatal_error("Bad pcm output path");
@@ -799,9 +797,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       auto fileDependencies = getStringArray(fileDependenciesArrayID);
       if (!fileDependencies)
         llvm::report_fatal_error("Bad file dependencies");
-      auto rootFileSystemID = getIdentifier(CASFileSystemRootID);
-      if (!rootFileSystemID)
-        llvm::report_fatal_error("Bad CASFileSystem RootID");
       auto clangIncludeTreeRoot = getIdentifier(clangIncludeTreeRootID);
       if (!clangIncludeTreeRoot)
         llvm::report_fatal_error("Bad clang include tree ID");
@@ -813,7 +808,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       auto moduleDep = ModuleDependencyInfo::forClangModule(
           *pcmOutputPath, *mappedPCMPath, *moduleMapPath, *contextHash,
           *commandLineArgs, *fileDependencies, linkLibraries,
-          *rootFileSystemID, *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
+          *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
       addCommonDependencyInfo(moduleDep);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep));
@@ -1692,7 +1687,6 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
                              ModuleIdentifierArrayKind::NonPathCommandLine),
         getIdentifierArrayID(moduleID,
                              ModuleIdentifierArrayKind::FileDependencies),
-        getIdentifier(clangDeps->CASFileSystemRootID),
         getIdentifier(clangDeps->CASClangIncludeTreeRootID),
         getIdentifier(clangDeps->moduleCacheKey), clangDeps->IsSystem);
 
@@ -1982,7 +1976,6 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                        clangDeps->buildCommandLine);
         addStringArray(moduleID, ModuleIdentifierArrayKind::FileDependencies,
                        clangDeps->fileDependencies);
-        addIdentifier(clangDeps->CASFileSystemRootID);
         addIdentifier(clangDeps->CASClangIncludeTreeRootID);
         addIdentifier(clangDeps->moduleCacheKey);
         break;

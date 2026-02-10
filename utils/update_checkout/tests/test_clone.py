@@ -219,6 +219,65 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(call_count[0], 2)
 
 
+class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
+    def __init__(self, *args, **kwargs):
+        super(SchemeWithHashTestCase, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        import json
+
+        super().setUp()
+        remote_repo_path = os.path.join(self.workspace, "remote", "repo1")
+
+        commits = (
+            self.call(["git", "rev-list", "main"], cwd=remote_repo_path, text=True)
+            .strip()
+            .split("\n")
+        )
+
+        self.commit_hash = commits[-1]
+        self.commit_scheme_name = "commit-hash-scheme"
+        commit_scheme = {
+            "aliases": [self.commit_scheme_name],
+            "repos": {
+                "repo1": self.commit_hash,
+                "repo2": "main",
+            },
+        }
+        self.add_branch_scheme(self.commit_scheme_name, commit_scheme)
+
+        with open(self.config_path, "w") as f:
+            json.dump(self.config, f)
+
+    def test_clone_with_commit_hash(self):
+        """
+        Test that cloning with --skip-history works with commit hashes.
+        """
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.source_root,
+                "--clone",
+                "--skip-history",
+                "--scheme",
+                self.commit_scheme_name,
+                "--verbose",
+            ]
+        )
+
+        for repo in self.get_all_repos():
+            repo_path = os.path.join(self.source_root, repo)
+            self.assertTrue(os.path.isdir(repo_path))
+
+        current_commit = self.call(
+            ["git", "rev-parse", "HEAD"], cwd=os.path.join(self.source_root, "repo1")
+        ).strip()
+        self.assertEqual(current_commit, self.commit_hash)
+
+
 class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

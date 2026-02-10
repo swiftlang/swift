@@ -2957,8 +2957,10 @@ static CanSILFunctionType getSILFunctionType(
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
       if (formalDeps.isImmortal()) {
-        return LifetimeDependenceInfo(nullptr, nullptr,
-                                      target, /*immortal*/ true);
+        return LifetimeDependenceInfo(
+            nullptr, nullptr, target,
+            /*immortal*/ true,
+            /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
       
       auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
@@ -2992,8 +2994,10 @@ static CanSILFunctionType getSILFunctionType(
       // entirely (such as if they were of `()` type), then there is effectively
       // no dependency, leaving behind an immortal value.
       if (!inheritIndicesSet && !scopeIndicesSet) {
-        return LifetimeDependenceInfo(nullptr, nullptr, target,
-                                      /*immortal*/ true);
+        return LifetimeDependenceInfo(
+            nullptr, nullptr, target,
+            /*immortal*/ true,
+            /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
       
       SmallBitVector addressableDeps = scopeIndicesSet
@@ -3009,12 +3013,11 @@ static CanSILFunctionType getSILFunctionType(
       IndexSubset *condAddressableSet = condAddressableDeps.any()
         ? IndexSubset::get(TC.Context, condAddressableDeps)
         : nullptr;
-      
-      return LifetimeDependenceInfo(inheritIndicesSet,
-                                    scopeIndicesSet,
-                                    target, /*immortal*/ false,
-                                    addressableSet,
-                                    condAddressableSet);
+
+      return LifetimeDependenceInfo(
+          inheritIndicesSet, scopeIndicesSet, target, /*immortal*/ false,
+          /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
+          condAddressableSet);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {

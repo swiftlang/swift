@@ -233,6 +233,16 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     // stores in global init functions.
     eliminateDeadStores(in: function, context)
   }
+
+  // This cleanup is already done in `runSimplification`. However, `specializeApplies`, which runs
+  // afterwards, can create unreachable blocks and incomplete lifetimes, again.
+  _ = context.removeDeadBlocks(in: function)
+  if context.needBreakInfiniteLoops {
+    breakInfiniteLoops(in: function, context)
+  }
+  if context.needCompleteLifetimes {
+    completeLifetimes(in: function, context)
+  }
 }
 
 private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions: inout Set<PathFunctionTuple>,

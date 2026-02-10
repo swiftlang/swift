@@ -1179,7 +1179,15 @@ ClangImporter::computeClangImporterFileSystem(
   if (fileMapping.redirectedFiles.empty() && fileMapping.overridenFiles.empty())
     return baseFS;
 
+  // Compute and set working directory.
   const auto &importerOpts = ctx.ClangImporterOpts;
+  auto workingDirPos =
+      std::find(importerOpts.ExtraArgs.rbegin(), importerOpts.ExtraArgs.rend(),
+                "-working-directory");
+  if (workingDirPos != importerOpts.ExtraArgs.rend() &&
+      workingDirPos != importerOpts.ExtraArgs.rbegin())
+    baseFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
+
   if (!fileMapping.redirectedFiles.empty()) {
     if (importerOpts.DumpClangDiagnostics) {
       llvm::errs() << "clang importer redirected file mappings:\n";
@@ -6226,9 +6234,9 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
 
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types, unless the base accessor returns it by value.
-  bool useAddress = baseClassVar->getAccessor(AccessorKind::Address) ||
-                    (contextTy->isNoncopyable() &&
-                     baseClassVar->getReadImpl() == ReadImplKind::Stored);
+  bool useAddress = contextTy->isNoncopyable() &&
+                    (baseClassVar->getReadImpl() == ReadImplKind::Stored ||
+                     baseClassVar->getAccessor(AccessorKind::Address));
 
   ParameterList *bodyParams = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -6376,6 +6384,12 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
   }
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto contextTy =
+        newContext->mapTypeIntoEnvironment(subscript->getElementInterfaceType());
+    // Subscripts that return non-copyable types are not yet supported.
+    // See: https://github.com/apple/swift/issues/70047.
+    if (contextTy->isNoncopyable())
+      return nullptr;
     auto out = SubscriptDecl::create(
         subscript->getASTContext(), subscript->getName(), subscript->getStaticLoc(),
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),

@@ -17,4 +17,4 @@ public func foo() -> Int {
 import MyModule
 
 @const let constGlobal1: Int = foo()
-// expected-error@-1 {{not supported in a constant expression}}
+// expected-error@-1 {{not supported in a literal expression}}

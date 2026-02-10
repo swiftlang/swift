@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/PreparedOverload.h"
+#include "swift/Sema/TypeVariableType.h"
 
 using namespace swift;
 using namespace constraints;
@@ -1031,6 +1032,13 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
           // For example, `(C) -> () -> Void` where `C` should be Sendable
           // for the inner function type to be Sendable as well.
           sendableDepTy = sendableDepTy->getMetatypeInstanceType();
+
+          // Partially applied actor instance methods cannot cross isolation
+          // boundary unless they are asynchronous otherwise it would be
+          // possible to escape the actor context and access actor-isolated
+          // storage from different isolation.
+          if (sendableDepTy->isAnyActorType() && !decl->isAsync())
+            sendableDepTy = Type();
         }
 
         auto referenceTy = adjustedTy->getResult()->castTo<FunctionType>();

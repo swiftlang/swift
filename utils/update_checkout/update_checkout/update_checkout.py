@@ -19,7 +19,7 @@ import traceback
 from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
-from .git_command import Git, GitException, is_any_repository_locked
+from .git_command import Git, GitException, is_any_repository_locked, is_commit_hash
 from .retry import exponential_retry
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
@@ -528,26 +528,53 @@ def obtain_additional_swift_sources(pool_args: AdditionalSwiftSourcesArguments):
         print("Cloning '" + pool_args.repo_name + "'")
 
     if args.skip_history:
-        Git.run(
-            args.source_root,
-            [
-                "clone",
-                "--config",
-                "core.symlinks=true",
-                "--config",
-                "core.autocrlf=false",
-                "--recursive",
-                "--depth",
-                "1",
-                "--branch",
-                repo_branch,
-                remote,
-                repo_name,
-            ]
-            + (["--no-tags"] if skip_tags else []),
-            env=env,
-            echo=verbose,
-        )
+        if is_commit_hash(repo_branch):
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--depth",
+                    "1",
+                    remote,
+                    repo_name,
+                ]
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
+            repo_path = args.source_root.joinpath(repo_name)
+            Git.run(
+                repo_path,
+                ["fetch", "--depth", "1", "origin", repo_branch],
+                env=env,
+                echo=verbose,
+            )
+            Git.run(repo_path, ["checkout", repo_branch], env=env, echo=verbose)
+        else:
+            Git.run(
+                args.source_root,
+                [
+                    "clone",
+                    "--config",
+                    "core.symlinks=true",
+                    "--config",
+                    "core.autocrlf=false",
+                    "--recursive",
+                    "--depth",
+                    "1",
+                    "--branch",
+                    repo_branch,
+                    remote,
+                    repo_name,
+                ]
+                + (["--no-tags"] if skip_tags else []),
+                env=env,
+                echo=verbose,
+            )
     elif args.use_submodules:
         Git.run(
             args.source_root,

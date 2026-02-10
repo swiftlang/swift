@@ -68,6 +68,16 @@ bb0(%0 : @owned $S1):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_devirtualize_deadend_destroys :
+// CHECK:         destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dont_devirtualize_deadend_destroys'
+sil [ossa] @dont_devirtualize_deadend_destroys : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  destroy_value [dead_end] %0
+  unreachable
+}
+
 // CHECK-LABEL: sil [ossa] @test_two_field_deinits :
 // CHECK:         ([[S1:%.*]], [[S2:%.*]], %{{[0-9]*}}) = destructure_struct %0
 // CHECK:         [[D1:%.*]] = function_ref @s1_deinit

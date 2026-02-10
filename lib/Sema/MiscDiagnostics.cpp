@@ -5607,17 +5607,13 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
     /// Returns true iff the collection upcast coercion is an Optional-to-Any
     /// coercion.
-    bool isOptionalToAnyCoercion(ClosureExpr *conversion) {
-      if (!conversion)
+    bool isOptionalToAnyCoercion(CollectionUpcastConversionExpr::ConversionPair
+                                   conversion) {
+      if (!conversion.OrigValue || !conversion.Conversion)
         return false;
 
-      auto fnType = conversion->getType()->getAs<FunctionType>();
-      if (!fnType)
-        return false;
-
-      assert(fnType->getNumParams() == 1);
-      auto srcType = fnType->getParams()[0].getPlainType();
-      auto destType = fnType->getResult();
+      auto srcType = conversion.OrigValue->getType();
+      auto destType = conversion.Conversion->getType();
       return isOptionalToAnyCoercion(srcType, destType);
     }
 
@@ -5763,13 +5759,10 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
 
       // We're handling the coercion of the entire collection, so we don't need
       // to re-visit a nested ErasureExpr for the value.
-      if (valueConversion) {
-        Expr *body = valueConversion->getSingleExpressionBody();
+      if (auto conversionExpr = valueConversion.Conversion)
         if (auto *erasureExpr =
-                findErasureExprThroughOptionalInjections(body)) {
+              findErasureExprThroughOptionalInjections(conversionExpr))
           IgnoredExprs.insert(erasureExpr);
-        }
-      }
 
       if (coercion.shouldSuppressDiagnostic() ||
           !isOptionalToAnyCoercion(valueConversion))
@@ -6673,17 +6666,11 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
         return Action::Continue(E);
 
       if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
-        SourceLoc diagnosticLoc = func->getLoc();
-        if (diagnosticLoc.isInvalid() && func->getClangDecl()) {
-          // FIXME: Remove the diagnosticLoc once the source locations of the
-          // objc method declarations are imported correctly.
-          diagnosticLoc = Ctx.getClangModuleLoader()->importSourceLocation(
-              ND->getLocation());
-        }
-
         Ctx.Diags.diagnose(CE->getLoc(),
                            diag::warn_unannotated_cxx_func_returning_frt, func);
 
+        SourceLoc diagnosticLoc = func->getLoc();
+        ASSERT(diagnosticLoc.isValid());
         Ctx.Diags.diagnose(diagnosticLoc,
                            diag::note_unannotated_cxx_func_returning_frt, func);
       }
@@ -6719,8 +6706,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (!ctx.isLanguageModeAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(E, DC);
   if (!ctx.LangOpts.DisableAvailabilityChecking)
-    diagnoseExprAvailability(E, const_cast<DeclContext *>(DC),
-                             /*preconcurrency=*/false);
+    diagnoseExprAvailability(E, const_cast<DeclContext*>(DC));
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);

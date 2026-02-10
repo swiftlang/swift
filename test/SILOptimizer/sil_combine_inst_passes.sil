@@ -8,6 +8,11 @@ import SwiftShims
 
 class Buffer {}
 
+struct NCWithoutDeinit: ~Copyable {
+  var a: Bool
+  var b: Int
+}
+
 sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 // CHECK-LABEL: sil [ossa] @remove_end_begin_cow_pair
@@ -166,3 +171,14 @@ bb3(%9 : @guaranteed $Buffer):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_remove_non_copyable_destructure
+// CHECK:         (%1, %2) = destructure_struct %0
+// CHECK:       } // end sil function 'dont_remove_non_copyable_destructure'
+sil [ossa] @dont_remove_non_copyable_destructure : $@convention(thin) (@owned NCWithoutDeinit) -> () {
+bb0(%0 : @owned $NCWithoutDeinit):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+

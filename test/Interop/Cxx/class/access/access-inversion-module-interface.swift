@@ -6,8 +6,8 @@
 // CHECK:   private typealias PrivateAlias = Bool
 
 // CHECK:   private struct PrivateRec {
-// CHECK:     public init()
 // CHECK:     private init()
+// CHECK:     public init()
 // CHECK:     public func privateRecMethod()
 // CHECK:     public static var PRIVATE_REC_CONST: Bool { get }
 // CHECK:   }
@@ -39,32 +39,32 @@
 // CHECK:   public typealias AliasToPrivateEnumClass = Leaky.PrivateEnumClass
 
 // CHECK:   public struct RecWithPrivateAlias {
-// CHECK:     public init()
 // CHECK:     public init(mem: Leaky.PrivateAlias)
+// CHECK:     public init()
 // CHECK:     public var mem: Leaky.PrivateAlias
 // CHECK:   }
 
 // CHECK:   public struct RecWithPrivateRec {
-// CHECK:     public init()
 // CHECK:     public init(mem: Leaky.PrivateRec)
+// CHECK:     public init()
 // CHECK:     public var mem: Leaky.PrivateRec
 // CHECK:   }
 
 // CHECK:   public struct RecWithPrivateEnum {
-// CHECK:     public init()
 // CHECK:     public init(mem: Leaky.PrivateEnum)
+// CHECK:     public init()
 // CHECK:     public var mem: Leaky.PrivateEnum
 // CHECK:   }
 
 // CHECK:   public struct RecWithPrivateEnumClass {
-// CHECK:     public init()
 // CHECK:     public init(mem: Leaky.PrivateEnumClass)
+// CHECK:     public init()
 // CHECK:     public var mem: Leaky.PrivateEnumClass
 // CHECK:   }
 
 // CHECK:   public struct RecWithPrivateConst {
-// CHECK:     public init()
 // CHECK:     public init(mem: Bool)
+// CHECK:     public init()
 // CHECK:     public var mem: Bool { get }
 // CHECK:   }
 

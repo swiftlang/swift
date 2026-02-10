@@ -33,6 +33,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -44,6 +45,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -2102,7 +2104,8 @@ namespace {
       }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, resultIndex,
-                                              /*isImmortal*/ true);
+                                              /*isImmortal*/ true,
+                                              /*isFromAnnotation*/ true);
       lifetimeDependencies.push_back(immortalLifetime);
       Impl.SwiftContext.evaluator.cacheOutput(
         LifetimeDependenceInfoRequest{fd},
@@ -2216,6 +2219,16 @@ namespace {
 
       return synthesizer.addRefCountOperations(nominal, clangDecl,
                                                baseSwiftDecl, baseClangDecl);
+    }
+
+    void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) {
+      auto inheritedTypes = D->getInherited();
+      SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
+      auto proto = Impl.SwiftContext.getProtocol(kind);
+      entries.push_back(InheritedEntry(
+          TypeLoc::withoutLoc(proto->getDeclaredInterfaceType())));
+      entries.back().setSuppressed();
+      D->setInherited(Impl.SwiftContext.AllocateCopy(entries));
     }
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
@@ -2385,6 +2398,7 @@ namespace {
         }
         result->addAttribute(new (Impl.SwiftContext)
                                  MoveOnlyAttr(/*Implicit=*/true));
+        addSuppressedProtocol(result, KnownProtocolKind::Copyable);
       }
 
       bool isNonEscapable = false;
@@ -2394,6 +2408,7 @@ namespace {
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->addAttribute(new (Impl.SwiftContext)
                                  NonEscapableAttr(/*Implicit=*/true));
+        addSuppressedProtocol(result, KnownProtocolKind::Escapable);
         isNonEscapable = true;
       }
 
@@ -3780,6 +3795,10 @@ namespace {
       switch (cxxOperatorKind) {
       case clang::OverloadedOperatorKind::OO_None:
         llvm_unreachable("should only be handling operators at this point");
+      case clang::OverloadedOperatorKind::OO_Call:
+      case clang::OverloadedOperatorKind::OO_Subscript:
+        break;
+
       case clang::OverloadedOperatorKind::OO_PlusPlus:
         if (clangFunc->getMinRequiredArguments() != 0)
           // Do not allow post-increment to be used from Swift
@@ -3793,16 +3812,25 @@ namespace {
         break;
 
       case clang::OverloadedOperatorKind::OO_Star:
-        if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
-            method && method->getRefQualifier() == clang::RQ_RValue)
-          // TODO: we shouldn't have to handle this case. We only mark it as
-          // unavailable for now to preserve old behavior, where r-value-this
-          // operator * overloads are always unavailable.
-          Impl.markUnavailable(func, "use .pointee property");
-        break;
-      case clang::OverloadedOperatorKind::OO_Call:
-      case clang::OverloadedOperatorKind::OO_Subscript:
-        break;
+        if (clangFunc->param_empty() || (clangFunc->param_size() == 1 &&
+                                         !clangFunc->isCXXInstanceMember())) {
+          // Dereference operator, i.e., T operator*()     [member]
+          //                         or  T operator*(U op) [non-member]
+          // NOTE: non-member case is currently not reachable due to logic in
+          //       NameImporter that attaches a custom name to such functions.
+          if (auto *method = dyn_cast<clang::CXXMethodDecl>(clangFunc);
+              method && method->getRefQualifier() == clang::RQ_RValue) {
+            // TODO: we shouldn't have to handle this case. We only mark it as
+            // unavailable for now to preserve old behavior, where r-value-this
+            // operator * overloads are always unavailable.
+            Impl.markUnavailable(func, "use .pointee property");
+          }
+          break;
+        }
+
+        // Multiply operator, T operator*(R rhs) or T operator*(L lhs, R rhs)
+        // which we handle like most other operators
+        LLVM_FALLTHROUGH;
       default:
         auto opFuncDecl = synthesizer.makeOperator(func, cxxOperatorKind);
         Impl.addAlternateDecl(func, opFuncDecl);
@@ -4216,7 +4244,7 @@ namespace {
         lifetimeDependencies.push_back(LifetimeDependenceInfo(
             nullptr, IndexSubset::get(Impl.SwiftContext, dependenciesOfRet),
             returnIdx,
-            /*isImmortal*/ false));
+            /*isImmortal*/ false, /*isFromAnnotation*/ true));
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
@@ -4285,7 +4313,8 @@ namespace {
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(nullptr, nullptr, 0,
-                                              /*isImmortal*/ true);
+                                              /*isImmortal*/ true,
+                                              /*isFromAnnotation*/ true);
       if (hasUnsafeAPIAttr(decl) && !isEscapable(decl->getReturnType())) {
         lifetimeDependencies.push_back(immortalLifetime);
         Impl.SwiftContext.evaluator.cacheOutput(
@@ -4373,8 +4402,11 @@ namespace {
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
       for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
-        lifetimeDependencies.push_back(LifetimeDependenceInfo(inheritedDepVec.any() ? IndexSubset::get(Impl.SwiftContext,
-                                   inheritedDepVec): nullptr, nullptr, idx, /*isImmortal=*/false));
+        lifetimeDependencies.push_back(LifetimeDependenceInfo(
+            inheritedDepVec.any()
+                ? IndexSubset::get(Impl.SwiftContext, inheritedDepVec)
+                : nullptr,
+            nullptr, idx, /*isImmortal=*/false, /*isFromAnnotation=*/true));
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
@@ -4389,7 +4421,7 @@ namespace {
                                    scopedLifetimeParamIndicesForReturn)
                 : nullptr,
             returnIdx,
-            /*isImmortal*/ false));
+            /*isImmortal*/ false, /*isFromAnnotation*/ true));
       else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
         // Assume default constructed view types have no dependencies.
         if (ctordecl->isDefaultConstructor() &&
@@ -5440,10 +5472,11 @@ namespace {
         }
       }
 
-      auto result = createFuncOrAccessor(Impl,
-                                         /*funcLoc*/ SourceLoc(), accessorInfo,
-                                         importedName.getDeclName(),
-                                         /*nameLoc*/ SourceLoc(),
+      auto loc = Impl.importSourceLoc(decl->getLocation());
+      // FIXME: more precise source location.
+      auto nameLoc = loc;
+      auto result = createFuncOrAccessor(Impl, loc, accessorInfo,
+                                         importedName.getDeclName(), nameLoc,
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 

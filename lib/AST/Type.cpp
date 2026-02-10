@@ -1300,6 +1300,15 @@ bool TypeBase::isCGFloat() {
          NTD->getName().is("CGFloat");
 }
 
+bool TypeBase::isStdlibInteger() {
+  return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
+         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+}
+
+bool TypeBase::isStdlibFloat() {
+  return isFloat() || isDouble() || isFloat80();
+}
+
 bool TypeBase::isObjCBool() {
   auto *NTD = getAnyNominal();
   if (!NTD)
@@ -4216,6 +4225,14 @@ CanType ProtocolCompositionType::getMinimalCanonicalType() const {
       /*forExistentialSelf=*/true,
       /*includeParameterizedProtocols=*/true);
   return result.subst(existentialSig.Generalization)->getCanonicalType();
+}
+
+bool AnyFunctionType::hasExplicitLifetimeDependencies() const {
+  return hasLifetimeDependencies() &&
+         llvm::any_of(getLifetimeDependencies(),
+                      [](const LifetimeDependenceInfo &dep) {
+                        return dep.isFromAnnotation();
+                      });
 }
 
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {

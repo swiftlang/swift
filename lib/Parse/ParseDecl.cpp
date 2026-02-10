@@ -2545,7 +2545,7 @@ static std::optional<Identifier> parseSingleAttrOptionImpl(
 }
 
 static std::optional<LifetimeDescriptor>
-parseLifetimeDescriptor(Parser &P,
+parseLifetimeDescriptor(Parser &P, bool allowIndices,
                         ParsedLifetimeDependenceKind lifetimeDependenceKind =
                             ParsedLifetimeDependenceKind::Default) {
   auto token = P.Tok;
@@ -2577,6 +2577,13 @@ parseLifetimeDescriptor(Parser &P,
   case tok::integer_literal: {
     SourceLoc loc;
     unsigned index;
+    if (!allowIndices) {
+      P.diagnose(
+          token,
+          diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+          /* allow indices */ false);
+      return std::nullopt;
+    }
     if (P.parseUnsignedInteger(
             index, loc, diag::expected_param_index_lifetime_dependence)) {
       return std::nullopt;
@@ -2590,7 +2597,8 @@ parseLifetimeDescriptor(Parser &P,
   default: {
     P.diagnose(
         token,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        allowIndices);
     return std::nullopt;
   }
   }
@@ -2601,7 +2609,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(StringRef attrName,
                                                           SourceLoc loc) {
   ParserStatus status;
 
-  auto lifetimeEntry = parseLifetimeEntry(loc);
+  auto lifetimeEntry = parseLifetimeEntry(loc, /*allowIndices=*/false);
   if (lifetimeEntry.isNull()) {
     status.setIsParseError();
     return status;
@@ -5076,6 +5084,22 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     return makeParserSuccess();
   }
 
+  case TypeAttrKind::Lifetime: {
+    const auto entryResult = parseLifetimeEntry(AtLoc, /*allowIndices=*/false);
+    if (entryResult.isNull()) {
+      return makeParserError();
+    }
+
+    auto *entry = entryResult.get();
+
+    if (!justChecking) {
+      result = new (Context) LifetimeTypeAttr(
+          AtLoc, attrLoc, SourceRange(entry->getStartLoc(), entry->getEndLoc()),
+          entryResult.get());
+    }
+    return makeParserSuccess();
+  }
+
   case TypeAttrKind::Convention: {
     ConventionTypeAttr *convention = nullptr;
     if (parseConventionAttributeInternal(AtLoc, attrLoc, convention,
@@ -5148,7 +5172,8 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   llvm_unreachable("bad attribute kind");
 }
 
-ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
+ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc,
+                                                       bool allowIndices) {
   ParserStatus status;
 
   auto getLifetimeDependenceKind =
@@ -5182,7 +5207,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   std::optional<LifetimeDescriptor> targetDescriptor;
   if (Tok.isAny(tok::identifier, tok::integer_literal, tok::kw_self) &&
       peekToken().is(tok::colon)) {
-    targetDescriptor = parseLifetimeDescriptor(*this);
+    targetDescriptor = parseLifetimeDescriptor(*this, allowIndices);
     if (!targetDescriptor) {
       status.setIsParseError();
       return status;
@@ -5207,8 +5232,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
           consumeToken();
         }
 
-        auto sourceDescriptor =
-            parseLifetimeDescriptor(*this, lifetimeDependenceKind);
+        auto sourceDescriptor = parseLifetimeDescriptor(*this, allowIndices,
+                                                        lifetimeDependenceKind);
         if (!sourceDescriptor) {
           invalidSourceDescriptor = true;
           listStatus.setIsParseError();
@@ -5225,7 +5250,8 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   if (!foundParamId) {
     diagnose(
         Tok,
-        diag::expected_identifier_or_index_or_self_after_lifetime_dependence);
+        diag::expected_identifier_or_index_or_self_after_lifetime_dependence,
+        /* allow indices */ isInSILMode());
     status.setIsParseError();
     return status;
   }
@@ -5567,7 +5593,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'
-      auto result = P.parseLifetimeEntry(loc);
+      auto result = P.parseLifetimeEntry(loc, /*allowIndices=*/true);
       if (result.isNull()) {
         status |= result;
         continue;

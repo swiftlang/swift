@@ -822,47 +822,26 @@ void swift::rewriting::realizeInheritedRequirements(
     TypeDecl *decl, Type type, bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
+  auto inheritedTypes = decl->getInherited();
+  auto *dc = decl->getInnermostDeclContext();
+  auto *moduleForInference = dc->getParentModule();
 
-  using TypeOrExt = PointerUnion<const TypeDecl *, const ExtensionDecl *>;
-  auto realizeFromInheritedTypes = [&](TypeOrExt decl, DeclContext *dc) {
-    InheritedTypes inheritedTypes(decl);
-    auto *moduleForInference = dc->getParentModule();
+  for (auto index : inheritedTypes.getIndices()) {
+    Type inheritedType =
+        inheritedTypes.getResolvedType(index, TypeResolutionStage::Structural);
 
-    for (auto index : inheritedTypes.getIndices()) {
-      Type inheritedType = inheritedTypes.getResolvedType(
-          index, TypeResolutionStage::Structural);
+    if (!inheritedType) continue;
 
-      if (!inheritedType)
-        continue;
-
-      if (shouldInferRequirements)
-        inferRequirements(inheritedType, moduleForInference, dc, result);
-
-      auto *typeRepr = inheritedTypes.getTypeRepr(index);
-      SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
-
-      realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
-                             /*isFromInheritanceClause*/ true);
+    if (shouldInferRequirements) {
+      inferRequirements(inheritedType, moduleForInference,
+                        decl->getInnermostDeclContext(), result);
     }
-  };
 
-  DeclContext *dc = decl->getInnermostDeclContext();
+    auto *typeRepr = inheritedTypes.getTypeRepr(index);
+    SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
-  // Add from the inheritance clause of the type decl.
-  realizeFromInheritedTypes(decl, dc);
-
-  // Protocols also have reparented relationships in extensions.
-  // They're also considered to be inherited requirements.
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (!proto->isObjC()) {
-      for (auto *ext : proto->getExtensions()) {
-        // No valid reparentings can appear outside the protocol's module.
-        if (ext->getModuleContext() != proto->getModuleContext())
-          continue;
-
-        realizeFromInheritedTypes(ext, ext);
-      }
-    }
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors,
+                           /*isFromInheritanceClause*/ true);
   }
 
   // Also check for `SynthesizedProtocolAttr`s with additional constraints added
@@ -1272,7 +1251,10 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
           // FIXME: Protocol extensions with noncopyable generics can!
           if (ext->getTrailingWhereClause()) continue;
 
-          // Also ignore extensions defining a reparenting
+          // Also ignore extensions defining a reparenting, this request will
+          // infer a same-type requirement upon the entire protocol, whereas
+          // reparented extensions only want the same-type requirement within
+          // the extension's generic environment.
           if (ext->isForReparenting()) continue;
         }
 

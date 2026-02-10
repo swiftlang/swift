@@ -8,7 +8,7 @@
 // doesn't refer to itself, e.g.,
 // "CheckReparentingWitnesses found illegal witness Self.Element of BorrowingSeq that is not within expected protocol context Seq"
 
-public protocol Seq {
+public protocol Seq: BorrowingSeq {
 
 // Seq should've declared an Element to witness BorrowingSeq's Element
 #if FIXED

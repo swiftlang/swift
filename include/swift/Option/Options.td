@@ -1600,6 +1600,16 @@ def target_variant : Separate<["-"], "target-variant">,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
 
+def target_arch_variant
+    : Separate<["-"], "target-arch-variant">,
+      Flags<[FrontendOption, NoInteractiveOption, NewDriverOnlyOption,
+             ModuleInterfaceOption, ModuleWrapOption,
+             SwiftSynthesizeInterfaceOption]>,
+      MetaVarName<"<arch-variant>">,
+      HelpText<"Generate code for an additional arch/slice variant of the "
+               "target architecture"
+               "into fat mach-o binaries">;
+
 def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,

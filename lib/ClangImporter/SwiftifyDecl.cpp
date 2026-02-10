@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -51,7 +52,6 @@ using namespace importer;
 #else
 #define DLOG_SCOPE(x) do {} while(false);
 #endif
-
 
 namespace {
 #ifndef NDEBUG
@@ -447,6 +447,20 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
   }
 }
 
+static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {
+  if (!isa<ConstructorDecl>(MappedDecl))
+    return false;
+  const auto *Parent = MappedDecl->getParent();
+  if (const auto *Ext = dyn_cast<ExtensionDecl>(Parent)) {
+    Parent = Ext->getExtendedNominal();
+  }
+  const auto *ParentClass = dyn_cast<ClassDecl>(Parent);
+  if (!ParentClass)
+    return false;
+
+  return ParentClass->getForeignClassKind() != ClassDecl::ForeignKind::Normal;
+}
+
 template<typename T>
 static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
@@ -485,6 +499,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   ASSERT(OwningModule || IsInBridgingHeader);
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
 
+  if (wouldBeIllegalInitializer(MappedDecl)) {
+    DLOG("illegal initializer\n");
+    return false;
+  }
+
   // We only attach the macro if it will produce an overload. Any __counted_by
   // will produce an overload, since UnsafeBufferPointer is still an improvement
   // over UnsafePointer, but std::span will only produce an overload if it also
@@ -502,6 +521,15 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
     if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
       return false;
+
+    auto isNonEscapable = [&Self](clang::QualType ty) {
+      // We only care whether it's _known_ ~Escapable, because it affects
+      // lifetime info requirements.
+      return evaluateOrDefault(Self.SwiftContext.evaluator,
+                               ClangTypeEscapability({ty.getTypePtr(), &Self}),
+                               CxxEscapability::Escapable) ==
+             CxxEscapability::NonEscapable;
+    };
 
     bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
@@ -600,7 +628,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           // If this parameter has bounds info we will tranform it into a Span,
           // so then it will no longer be Escapable.
           bool willBeEscapable =
-              swiftParamTy->isEscapable() &&
+              !isNonEscapable(clangParamTy) &&
               (!paramHasBoundsInfo ||
                mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
           printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);

@@ -44,7 +44,10 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
 find_package(SwiftCore REQUIRED)
 find_package(SwiftOverlay REQUIRED)
 find_package(SwiftCxxOverlay REQUIRED)
+
+if(APPLE)
 find_package(SwiftDarwin)
+endif()
 
 include(GNUInstallDirs)
 
@@ -62,14 +65,14 @@ set(${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
+option(${PROJECT_NAME}_ENABLE_BACKTRACING "Enable backtracing support"
+  ${SwiftCore_ENABLE_BACKTRACING})
+
 option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
-
-option(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release"
-  ${SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE})
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
@@ -95,10 +98,7 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
-if(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE)
-  find_package(SwiftSwiftDirectRuntime REQUIRED)
-  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
-endif()
+find_package(SwiftSwiftDirectRuntime)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
@@ -112,44 +112,77 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
 
 add_library(swiftRuntime
-  Address.swift
-  Backtrace.swift
-  Backtrace+Codable.swift
-  BacktraceFormatter.swift
-  BacktraceJSONFormatter.swift
-  Base64.swift
-  ByteSwapping.swift
-  CachingMemoryReader.swift
-  CompactBacktrace.swift
-  CompactImageMap.swift
-  Compression.swift
-  Context.swift
-  CoreSymbolication.swift
-  CrashLog.swift
-  CrashLogCapture.swift
-  Dwarf.swift
-  EightByteBuffer.swift
-  Elf.swift
-  ElfImageCache.swift
-  FramePointerUnwinder.swift
-  Image.swift
-  ImageMap.swift
-  ImageMap+Darwin.swift
-  ImageMap+Linux.swift
-  ImageSource.swift
-  Libc.swift
-  LimitSequence.swift
-  Mangling.swift
-  MemoryReader.swift
-  OSReleaseScanner.swift
-  ProcMapsScanner.swift
-  Registers.swift
-  Runtime.swift
-  RichFrame.swift
-  SymbolicatedBacktrace.swift
-  Utils.swift
-  Win32Extras.cpp
-  get-cpu-context.${SWIFT_ASM_EXT})
+  Mangling.swift)
+
+# Optionally add backtracing sources
+if(${PROJECT_NAME}_ENABLE_BACKTRACING)
+  target_sources(swiftRuntime
+    Address.swift
+    Backtrace.swift
+    Backtrace+Codable.swift
+    BacktraceFormatter.swift
+    BacktraceJSONFormatter.swift
+    Base64.swift
+    ByteSwapping.swift
+    CachingMemoryReader.swift
+    CompactBacktrace.swift
+    CompactImageMap.swift
+    Compression.swift
+    Context.swift
+    CoreSymbolication.swift
+    CrashLog.swift
+    CrashLogCapture.swift
+    Dwarf.swift
+    EightByteBuffer.swift
+    Elf.swift
+    ElfImageCache.swift
+    FramePointerUnwinder.swift
+    Image.swift
+    ImageMap.swift
+    ImageMap+Darwin.swift
+    ImageMap+Linux.swift
+    ImageMap+Win32.swift
+    ImageSource.swift
+    Libc.swift
+    LimitSequence.swift
+    MemoryReader.swift
+    OSReleaseScanner.swift
+    PeCoff.swift
+    PeImageCache.swift
+    ProcMapsScanner.swift
+    Registers.swift
+    Runtime.swift
+    RichFrame.swift
+    SymbolicatedBacktrace.swift
+    Utils.swift
+    Win32Unwinder.swift
+  )
+
+  # Add the correct assembly language files
+  if(WIN32)
+    # On Windows, the assembly syntax differs depending on architecture in
+    # such a way that we can't write a single `.asm` file that supports all
+    # the different architectures we support.
+    string(TOUPPER "${CMAKE_SYSTEM_PROCESSOR}" processor)
+    if(processor STREQUAL "AMD64")
+      target_sources(swiftRuntime
+        get-cpu-context-x86_64.asm)
+    elseif(processor STREQUAL "X86")
+      target_sources(swiftRuntime
+        get-cpu-context-i686.asm)
+    elseif(processor STREQUAL "ARM64")
+      target_sources(swiftRuntime
+        get-cpu-context-aarch64.asm)
+    else()
+      message(FATAL_ERROR "You need to implement assembly code for ${processor}")
+    endif()
+  else()
+    # Other platforms can use the shared `.S` file.
+    target_sources(swiftRuntime
+      get-cpu-context.S)
+  endif()
+
+endif()
 
 set_target_properties(swiftRuntime PROPERTIES
   Swift_MODULE_NAME Runtime)
@@ -161,11 +194,12 @@ target_compile_options(swiftRuntime PRIVATE
 # pulling in headers from the compiler.
 target_include_directories(swiftRuntime PRIVATE
   "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include")
-target_link_libraries(swiftRuntime PRIVATE
+target_link_libraries(swiftRuntime PUBLIC
   swiftShims
   swiftCore
   swift_Concurrency
   swiftCxxStdlib
+  swiftCxx
   $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Linux>:swiftGlibc>

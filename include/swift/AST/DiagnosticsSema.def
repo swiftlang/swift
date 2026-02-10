@@ -823,31 +823,37 @@ ERROR(expect_compile_time_literal,none,
       "expect a compile-time constant literal", ())
 
 ERROR(const_unsupported_enum_associated_value,none,
-      "enums with associated values not supported in a constant expression", ())
+      "enums with associated values not supported in a literal expression", ())
 ERROR(const_unsupported_operator,none,
-      "unsupported operator in a constant expression", ())
+      "unsupported operator in a literal expression", ())
 ERROR(const_unsupported_type,none,
-      "unsupported type in a constant expression", ())
+      "unsupported type in a literal expression", ())
 ERROR(const_unsupported_type_expr,none,
-      "type expressions not supported in a constant expression", ())
+      "type expressions not supported in a literal expression", ())
 ERROR(const_unsupported_closure,none,
-      "closures not supported in a constant expression", ())
+      "closures not supported in a literal expression", ())
 ERROR(const_unsupported_closure_with_captures,none,
-      "closures with captures not supported in a constant expression", ())
+      "closures with captures not supported in a literal expression", ())
 ERROR(const_unsupported_keypath,none,
-      "keypaths not supported in a constant expression", ())
+      "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
-      "unable to resolve variable reference in a constant expression", ())
+      "unable to resolve variable reference in a literal expression", ())
 ERROR(const_opaque_func_decl_ref,none,
-      "unable to resolve function reference in a constant expression", ())
+      "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
-      "only 'convention(c)' function values are supported in a constant expression", ())
+      "only 'convention(c)' function values are supported in a literal expression", ())
 ERROR(const_opaque_callee,none,
-      "unable to resolve callee in a constant expression", ())
+      "unable to resolve callee in a literal expression", ())
 ERROR(const_non_const_param,none,
-      "reference to a non-'@const' parameter in a constant expression", ())
+      "reference to a non-'@const' parameter in a literal expression", ())
+ERROR(const_integer_overflow,none,
+      "operation results in integer overflow", ())
+ERROR(const_divide_by_zero,none,
+      "division by zero", ())
 ERROR(const_unknown_default,none,
-      "not supported in a constant expression", ())
+      "not supported in a literal expression", ())
+NOTE(const_failed_fold_declref_init,none,
+     "requested from reference in a literal expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Import Resolution
@@ -1017,18 +1023,18 @@ ERROR(cxx_stdlib_kind_mismatch,none,
       (Identifier, StringRef, StringRef))
 
 ERROR(modularization_issue_decl_moved,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "%1 was expected to be in %2, but now a candidate is found only in %3",
-      (bool, DeclName, const ModuleDecl*, const ModuleDecl*))
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "'%1' was expected to be in %2, but now a candidate is found only in %3",
+      (bool, StringRef, const ModuleDecl*, const ModuleDecl*))
 ERROR(modularization_issue_decl_type_changed,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "the declaration kind of %1 %select{from %2|}5 changed since building '%3'"
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "the declaration kind of '%1' %select{from %2|}5 changed since building '%3'"
       "%select{|, it was in %2 and now a candidate is found only in %4}5",
-      (bool, DeclName, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
+      (bool, StringRef, const ModuleDecl*, StringRef, const ModuleDecl*, bool))
 ERROR(modularization_issue_decl_not_found,Fatal,
-      "reference to %select{top-level declaration|type}0 %1 broken by a context change; "
-      "%1 is not found, it was expected to be in %2",
-      (bool, DeclName, const ModuleDecl*))
+      "reference to %select{declaration|type}0 '%1' broken by a context change; "
+      "'%1' is not found, it was expected to be in %2",
+      (bool, StringRef, const ModuleDecl*))
 
 NOTE(modularization_issue_note_expected,none,
      "the %select{declaration|type}0 was expected to be found in module %1 at '%2'",
@@ -1066,9 +1072,9 @@ NOTE(modularization_issue_layering_found_local,none,
      "the local module %1 for a reference from the distributed module %0",
      (const ModuleDecl*, const ModuleDecl*))
 NOTE(modularization_issue_related_modules,none,
-     "the %select{declaration|type}0 %1 moved between related modules; "
+     "the %select{declaration|type}0 '%1' moved between related modules; "
      "clang preprocessor macros may affect headers shared between these modules",
-     (bool, DeclName))
+     (bool, StringRef))
 NOTE(interface_block_listed_broken,none,
      "textual interface for %0 is blocklisted as broken; "
      "interface verification errors are downgraded to warnings", (StringRef))
@@ -2811,6 +2817,9 @@ ERROR(extension_nongeneric_trailing_where,none,
 ERROR(extension_protocol_inheritance,none,
       "extension of protocol %0 cannot declare inheritance relationship",
       (Identifier))
+ERROR(extension_protocol_reparented_not_inheriting,none,
+      "%0 must directly inherit from %1 in order to be reparented",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
@@ -8511,6 +8520,8 @@ ERROR(lifetime_target_requires_nonescapable, none,
       "invalid lifetime dependence on an Escapable %0", (StringRef))
 NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
+ERROR(lifetime_dependence_unknown_type, none,
+      "lifetime dependence checking failed due to unknown %0 type", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements

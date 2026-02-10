@@ -35,9 +35,13 @@ target_compile_options(swiftCxx PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BuiltinModule>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Lifetimes>")
-target_link_libraries(swiftCxx PRIVATE
+target_link_libraries(swiftCxx PUBLIC
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   swiftCore)
+
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftCxx INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
 install(TARGETS swiftCxx
   EXPORT SwiftCxxOverlayTargets

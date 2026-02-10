@@ -2785,6 +2785,20 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
   return getPatternList()[i].getAnchoringVarDecl();
 }
 
+bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
+  auto *singleVar = getSingleVar();
+  return singleVar && singleVar->isConstValue() &&
+         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+}
+
+Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
+  auto idxInit = getPatternList()[i].getExecutableInit();
+  if (auto &ctx = getASTContext(); idxInit && hasSingleVarConstantFoldedInit())
+    return evaluateOrDefault(ctx.evaluator,
+                             ConstantFoldExpression{idxInit, &ctx}, {});
+  return idxInit;
+}
+
 bool VarDecl::isInitExposedToClients() const {
   // 'lazy' initializers are emitted inside the getter, which is never
   // @inlinable.
@@ -8533,16 +8547,12 @@ static bool isMemberwiseInitExcludedVar(const VarDecl *VD,
   auto &ctx = VD->getASTContext();
 
   // For property wrappers, the property must be at least internal. This
-  // predates 'ExcludePrivateFromMemberwiseInit'.
+  // predates SE-0502.
   if (VD->hasAttachedPropertyWrapper()) {
     minAccess.emplace(AccessLevel::Internal);
-  } else {
+  } else if (initKind == MemberwiseInitKind::Compatibility) {
     // We don't exclude private VarDecls for the compatibility overload.
-    if (initKind == MemberwiseInitKind::Compatibility)
-      return false;
-    // Must have the feature enabled.
-    if (!ctx.LangOpts.hasFeature(Feature::ExcludePrivateFromMemberwiseInit))
-      return false;
+    return false;
   }
 
   if (!minAccess) {

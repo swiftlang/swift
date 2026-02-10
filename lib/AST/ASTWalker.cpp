@@ -881,17 +881,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
     }
 
-    if (auto keyConv = E->getKeyConversion()) {
-      if (Expr *E2 = doIt(keyConv)) {
-        E->setKeyConversion(cast<ClosureExpr>(E2));
+    if (auto &keyConv = E->getKeyConversion()) {
+      auto kConv = keyConv.Conversion;
+      if (!kConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(kConv)) {
+        E->setKeyConversion({keyConv.OrigValue, E2});
       } else {
         return nullptr;
       }
     }
 
-    if (auto valueConv = E->getValueConversion()) {
-      if (Expr *E2 = doIt(valueConv)) {
-        E->setValueConversion(cast<ClosureExpr>(E2));
+    if (auto &valueConv = E->getValueConversion()) {
+      auto vConv = valueConv.Conversion;
+      if (!vConv) {
+        return nullptr;
+      } else if (Expr *E2 = doIt(vConv)) {
+        E->setValueConversion({valueConv.OrigValue, E2});
       } else {
         return nullptr;
       }
