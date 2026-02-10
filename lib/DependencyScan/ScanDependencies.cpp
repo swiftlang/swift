@@ -927,7 +927,8 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
     moduleInfo->module_name = ttt;
     moduleInfo->module_path = create_clone(modulePath.c_str());
     moduleInfo->source_files = create_set(sourceFiles);
-    moduleInfo->direct_dependencies = create_set(bridgeDependencyIDs(cache.getAllDependencies(moduleID)));
+    moduleInfo->direct_dependencies = create_set(
+        bridgeDependencyIDs(cache.getDirectImportedDependencies(moduleID)));
     moduleInfo->details = getModuleDetails();
 
     // Create a link libraries set for this module
