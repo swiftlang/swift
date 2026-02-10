@@ -1404,6 +1404,16 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
           *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
     return nullptr;
 
+  // Disable validation for PCH in LLDB. This option is not controllable via a
+  // command line option; setting it depending on the DebuggerSupport flag.
+  // LLDB makes a best effort to create a 100% compatible environment by
+  // deserializing its CompilerInvocation and Clang flags from the main Swift
+  // module, but it needs to be able to adjust other language options on top in
+  // a way that otherwise would make validation fail.
+  if (importerOpts.DebuggerSupport)
+    CI->getPreprocessorOpts().DisablePCHOrModuleValidation =
+      clang::DisableValidationForModuleKind::PCH;
+
   return CI;
 }
 

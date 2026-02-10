@@ -1126,7 +1126,8 @@ namespace swift {
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attributes.
     bool EnableClangSPI = true;
 
-    /// When set, don't enforce warnings with -Werror.
+    /// When set, don't enforce warnings with -Werror, and disable PCH
+    /// validation.
     bool DebuggerSupport = false;
 
     /// Prefer the serialized preprocessed header over the one on disk.
