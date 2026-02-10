@@ -38,6 +38,8 @@ Func AnySequence.map(_:) has generic signature change from <Element, T> to <Elem
 Func AnySequence.map(_:) is now without rethrows
 Func Collection.map(_:) has generic signature change from <Self, T where Self : Swift.Collection> to <Self, T, E where Self : Swift.Collection, E : Swift.Error>
 Func Collection.map(_:) is now without rethrows
+Func Sequence.filter(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.filter(_:) is now without rethrows
 Func Sequence.map(_:) has generic signature change from <Self, T where Self : Swift.Sequence> to <Self, T, E where Self : Swift.Sequence, E : Swift.Error>
 Func Sequence.map(_:) is now without rethrows
 Func withUnsafeMutablePointer(to:_:) is now without rethrows
@@ -361,6 +363,8 @@ Func ContiguousArray.withUnsafeBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
+Func Dictionary.filter(_:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.filter(_:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies

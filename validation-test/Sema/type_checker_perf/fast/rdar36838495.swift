@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=2000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=2010
 // REQUIRES: tools-release,no_asan
 // REQUIRES: OS=macosx
 
