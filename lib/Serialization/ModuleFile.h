@@ -921,8 +921,11 @@ public:
   /// Has no effect in NDEBUG builds.
   void verify() const;
 
-  virtual void loadAllMembers(Decl *D,
-                              uint64_t contextData) override;
+  // For now, loadStorageMembers() does the job of loading both storage and
+  // non-storage members. In the future, these responsibilities may be divided
+  // between the two methods so that we do not deserialize unneeded members.
+  virtual void loadStorageMembers(Decl *D, uint64_t contextData) override;
+  virtual void loadNonStorageMembers(Decl *D, uint64_t contextData) override {}
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,

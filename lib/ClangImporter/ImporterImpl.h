@@ -749,8 +749,6 @@ public:
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
-  static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
-
   // Cache for already-specialized function templates and any thunks they may
   // have.
   llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
@@ -1700,28 +1698,25 @@ public:
     return found->second;
   }
 
-  virtual void
-  loadAllMembers(Decl *D, uint64_t unused) override;
+  virtual void loadStorageMembers(Decl *D, uint64_t unused) override;
+  virtual void loadNonStorageMembers(Decl *D, uint64_t unused) override;
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
+  void insertMembersAndAlternates(const clang::NamedDecl *nd,
+                                  SmallVectorImpl<Decl *> &members,
+                                  DeclContext *expectedDC = nullptr);
+
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
-  void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
-                                  const clang::RecordDecl *clangRecord,
-                                  ClangInheritanceInfo inheritance);
-
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
-  void insertMembersAndAlternates(const clang::NamedDecl *nd,
-                                  SmallVectorImpl<Decl *> &members,
-                                  DeclContext *expectedDC = nullptr);
-  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void loadAllMembersIntoExtension(ExtensionDecl *ext, uint64_t extra);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
   /// it and its alternates to \p ext.
