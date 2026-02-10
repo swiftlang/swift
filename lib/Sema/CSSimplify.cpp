@@ -1822,8 +1822,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
       }
 
       auto shouldOpenExistentialArgument =
-        [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
-
+          [&]() -> std::optional<std::pair<TypeVariableType *, Type>> {
         Type argTypeForOpening = argTy;
         // 1) First try: the normal path.
         auto opened = shouldOpenExistentialCallArgument(
@@ -1832,9 +1831,10 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         if (opened)
           return opened;
 
-        // 2) If opening failed, consider ForceOptional ONLY if fixes are enabled
-        //    and arg is Optional whose object is an existential any ... with protocols
-        //    and not class-constrained.
+        // 2) If opening failed, consider ForceOptional ONLY if fixes are
+        // enabled
+        //    and arg is Optional whose object is an existential any ... with
+        //    protocols and not class-constrained.
         if (!cs.shouldAttemptFixes())
           return std::nullopt;
 
@@ -1848,10 +1848,8 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
                   callee, paramIdx, paramTy, unwrapped, argExpr, cs);
 
               if (openedAfterPeel) {
-                cs.recordFix(ForceOptional::create(cs,
-                                                   argTy,
-                                                   unwrapped,
-                                                   cs.getConstraintLocator(loc)));
+                cs.recordFix(ForceOptional::create(
+                    cs, argTy, unwrapped, cs.getConstraintLocator(loc)));
 
                 return openedAfterPeel;
               }
@@ -1875,7 +1873,7 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
 
           Type openedTy;
           std::tie(openedTy, openedArchetype) =
-            cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
+              cs.openAnyExistentialType(t, cs.getConstraintLocator(loc));
 
           return openedTy;
         });
