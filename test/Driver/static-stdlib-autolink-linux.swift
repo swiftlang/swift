@@ -12,10 +12,7 @@
 // RUN: %t/main | %FileCheck %s
 // CHECK: Hello
 
-// RUN: if [ %target-os == "linux-gnu" ]; \
-// RUN: then \
-// RUN:   ldd %t/main | %FileCheck %s --check-prefix=LDD; \
-// RUN: fi
+// RUN: %if OS=linux-gnu %{ ldd %t/main | %FileCheck %s --check-prefix=LDD %}
 
 // LDD-NOT: libswiftCore.so
 // LDD-NOT: libswift_Concurrency.so
