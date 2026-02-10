@@ -543,14 +543,14 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     auto dependsOnClass = [](const ParamDecl *fromParam) {
       return fromParam->getInterfaceType()->isAnyClassReferenceType();
     };
-    bool returnValueIsEscapable = !isNonEscapable(clangReturnTy);
-    bool returnValueWillBeEscapable = returnValueIsEscapable && !returnHasBoundsInfo;
+    bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
+    bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
       if (!dependsOnClass(
               MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
-        if (!returnValueWillBeEscapable) {
+        if (returnValueCanBeNonEscapable) {
           printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
                                            true);
           returnHasLifetimeInfo = true;
@@ -632,7 +632,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
         DLOG("Found lifetimebound attribute\n");
         if (!dependsOnClass(swiftParam)) {
-          if (!returnValueWillBeEscapable) {
+          if (returnValueCanBeNonEscapable) {
             // If this parameter has bounds info we will tranform it into a
             // Span, so then it will no longer be Escapable.
             bool willBeEscapable =
@@ -643,7 +643,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
             paramHasLifetimeInfo = true;
             returnHasLifetimeInfo = true;
           } else {
-            DLOG("lifetimebound ignored because return value is escapable");
+            DLOG("lifetimebound ignored because return value is escapable\n");
           }
         } else {
           DLOG("lifetimebound ignored because it depends on class with "
@@ -655,7 +655,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         attachMacro = true;
       }
     }
-    if (!returnHasLifetimeInfo && !returnValueIsEscapable) {
+    if (!returnHasLifetimeInfo && returnValueIsNonEscapable) {
       DLOG("~Escapable return value without lifetime info\n");
       return false;
     }
