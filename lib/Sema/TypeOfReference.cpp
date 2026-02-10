@@ -3150,7 +3150,8 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
           // method without any applications at all, which would get
           // miscompiled into a function with undefined behavior. Warn for
           // source compatibility.
-          bool isWarning = !getASTContext().isLanguageModeAtLeast(5);
+          bool isWarning =
+              !getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
           (void)recordFix(
               AllowInvalidPartialApplication::create(isWarning, *this, locator));
         } else if (level == 1) {

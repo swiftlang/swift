@@ -32,7 +32,7 @@
 // CHECK-SWIFT-5-NOT: warning:
 
 // CHECK-SWIFT-7-NOT: warning:
-// CHECK-SWIFT-7-COUNT-6: warning: upcoming feature 'ExistentialAny' is already enabled as of Swift version 7{{$}}
+// CHECK-SWIFT-7-COUNT-6: warning: upcoming feature 'ExistentialAny' already enabled as of the Swift 7 language mode{{$}}
 // CHECK-SWIFT-7-NOT: warning:
 
 // CHECK-NOT: error:

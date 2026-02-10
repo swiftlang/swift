@@ -3218,7 +3218,8 @@ public:
 
     Diags.diagnose(loc, message)
         .highlight(highlight)
-        .warnUntilLanguageModeIf(classification.shouldDowngradeToWarning(), 6);
+        .warnUntilLanguageModeIf(classification.shouldDowngradeToWarning(),
+                                 LanguageMode::v6);
     maybeAddRethrowsNote(Diags, loc, reason);
 
     // If this is a call without expected 'try[?|!]', like this:
@@ -4795,7 +4796,7 @@ private:
       return;
 
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
-        .warnUntilLanguageModeIf(downgradeToWarning, 6)
+        .warnUntilLanguageModeIf(downgradeToWarning, LanguageMode::v6)
         .fixItInsert(loc, insertText)
         .highlight(anchor->getSourceRange());
 
@@ -4898,7 +4899,8 @@ private:
       Ctx.Diags
           .diagnose(loc, diag::actor_isolated_access_outside_of_actor_context,
                     declIsolation, declRef.getDecl(), isCall)
-          .warnUntilLanguageModeIf(errorInfo.downgradeToWarning, 6)
+          .warnUntilLanguageModeIf(errorInfo.downgradeToWarning,
+                                   LanguageMode::v6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
       return true;

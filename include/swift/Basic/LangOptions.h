@@ -22,6 +22,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
@@ -740,21 +741,14 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
-    /// Whether our effective Swift version is at least 'major'.
+    /// Returns a boolean value indicating whether the language mode is at least
+    /// `mode`.
     ///
-    /// This is usually the check you want; for example, when introducing
+    /// This is very likely the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
-    /// check for isLanguageModeAtLeast(5).
-    bool isLanguageModeAtLeast(unsigned major, unsigned minor = 0) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
-    }
-
-    /// Whether the "next major" language mode is being used. This isn't a real
-    /// language mode, it only exists to signal clients that expect to be
-    /// included in the next language mode when it becomes available.
-    bool isAtLeastFutureMajorLanguageMode() const {
-      using namespace version;
-      return isLanguageModeAtLeast(Version::getFutureMajorLanguageVersion());
+    /// check for `isLanguageModeAtLeast(LanguageMode::v5)`.
+    bool isLanguageModeAtLeast(LanguageMode mode) const {
+      return mode.isEffectiveIn(EffectiveLanguageVersion);
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.

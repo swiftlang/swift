@@ -700,7 +700,7 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
       auto *var = dyn_cast<VarDecl>(attachedTo);
       if (var && var->isLet()) {
         ctx.Diags.diagnose(var->getLoc(), diag::let_accessor_expansion)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
       }
 
       continue;

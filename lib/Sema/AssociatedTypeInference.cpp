@@ -361,7 +361,7 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
         ctx.evaluator, ConformanceAccessScopeRequest{dc, proto},
         std::make_pair(AccessScope::getPublic(), false));
 
-    if (!ctx.isLanguageModeAtLeast(5) &&
+    if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
         !dc->getParentModule()->isResilient()) {
       // HACK: In pre-Swift-5, these typealiases were synthesized with the
       // same access level as the conforming type, which might be more
@@ -593,7 +593,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     // AsyncSequence.Failure. We'll infer it from the AsyncIterator.Failure
     // instead.
     if (isAsyncSequenceFailure(assocType) &&
-        !ctx.isLanguageModeAtLeast(6) &&
+        !ctx.isLanguageModeAtLeast(LanguageMode::v6) &&
         assocType->getName() == genericDecl->getName())
       continue;
 

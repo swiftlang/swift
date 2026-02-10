@@ -4976,7 +4976,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // get any special power from being formed in certain contexts, such
   // as the ability to assign to `let`s in initialization contexts, so
   // we pass null for the DC to `isSettable` here.)
-  if (!getASTContext().isLanguageModeAtLeast(5)) {
+  if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     // As a source-compatibility measure, continue to allow
     // WritableKeyPaths to be formed in the same conditions we did
     // in previous releases even if we should not be able to set

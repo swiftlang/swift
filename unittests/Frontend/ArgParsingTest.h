@@ -24,7 +24,7 @@ class ArgParsingTest : public ::testing::Test {
   swift::DiagnosticEngine diags;
 
 protected:
-  std::optional<std::string> langMode;
+  std::optional<std::string> languageMode;
 
 public:
   ArgParsingTest();

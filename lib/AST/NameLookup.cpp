@@ -626,7 +626,8 @@ static void recordShadowedDeclsAfterTypeMatch(
       // This is due to the fact that in Swift 4, we only gave custom overload
       // types to properties in extensions of generic types, otherwise we
       // used the null type.
-      if (!ctx.isLanguageModeAtLeast(5) && isa<ValueDecl>(firstDecl)) {
+      if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
+          isa<ValueDecl>(firstDecl)) {
         auto secondSig = cast<ValueDecl>(secondDecl)->getOverloadSignature();
         auto firstSig = cast<ValueDecl>(firstDecl)->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)

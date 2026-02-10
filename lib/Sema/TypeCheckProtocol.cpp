@@ -790,7 +790,7 @@ RequirementMatch swift::matchWitness(
       // If our requirement says that it has a sending result, then our witness
       // must also have a sending result since otherwise, in generic contexts,
       // we would be returning non-disconnected values as disconnected.
-      if (dc->getASTContext().isLanguageModeAtLeast(6)) {
+      if (dc->getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
         if (reqFnType->hasExtInfo() && reqFnType->hasSendingResult() &&
             (!witnessFnType->hasExtInfo() || !witnessFnType->hasSendingResult()))
           return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
@@ -830,7 +830,7 @@ RequirementMatch swift::matchWitness(
 
       // If we have a requirement without sending and our witness expects a
       // sending parameter, error.
-      if (dc->getASTContext().isLanguageModeAtLeast(6)) {
+      if (dc->getASTContext().isLanguageModeAtLeast(LanguageMode::v6)) {
         if (!reqParams[i].getParameterFlags().isSending() &&
             witnessParams[i].getParameterFlags().isSending())
           return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
@@ -2591,7 +2591,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   if (Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     // In -swift-version 5 mode, a conditional conformance to a protocol can imply
     // a Sendable conformance.
-    if (!Context.isLanguageModeAtLeast(6))
+    if (!Context.isLanguageModeAtLeast(LanguageMode::v6))
       allowImpliedConditionalConformance = true;
   } else if (Proto->isMarkerProtocol()) {
     allowImpliedConditionalConformance = true;
@@ -3054,9 +3054,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::RequiresNonSendable:
-    diags.diagnose(match.Witness, diag::protocol_witness_non_sendable,
-                   withAssocTypes,
-                   module->getASTContext().isLanguageModeAtLeast(6));
+    diags.diagnose(
+        match.Witness, diag::protocol_witness_non_sendable, withAssocTypes,
+        module->getASTContext().isLanguageModeAtLeast(LanguageMode::v6));
     break;
 
   case MatchKind::RenamedMatch: {
@@ -3700,7 +3700,7 @@ public:
     SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, witness);
     ctx.Diags
         .diagnose(diagLoc, diag::witness_not_usable_from_inline, witness, proto)
-        .warnUntilLanguageMode(5);
+        .warnUntilLanguageMode(LanguageMode::v5);
     emitDeclaredHereIfNeeded(ctx.Diags, diagLoc, witness);
   }
 };
@@ -4449,7 +4449,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                 .diagnose(getLocForDiagnosingWitness(conformance, witness),
                           diag::witness_not_as_sendable, witness,
                           conformance->getProtocol())
-                .limitBehaviorUntilLanguageMode(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)
                 .limitBehaviorIf(preconcurrencyBehaviorLimit);
             diags.diagnose(requirement, diag::less_sendable_reqt_here);
             return preconcurrencyBehaviorLimit &&
@@ -4477,7 +4477,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       //
       // Work around this by discarding the witness if its not sufficiently
       // visible.
-      if (!getASTContext().isLanguageModeAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         if (requirement->getAttrs().hasAttribute<OptionalAttr>())
           return ResolveWitnessResult::Missing;
 
@@ -5071,13 +5071,13 @@ static void diagnoseConformanceIsolationErrors(
                     diag::conformance_mismatched_isolation_common,
                     conformance->getType(), conformance->getProtocol(),
                     *potentialIsolation)
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
     } else {
       ctx.Diags
           .diagnose(conformance->getProtocolNameLoc(),
                     diag::conformance_mismatched_isolation,
                     conformance->getType(), conformance->getProtocol())
-          .limitBehaviorUntilLanguageMode(behavior, 6);
+          .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6);
     }
 
     // Suggest isolating the conformance, if possible.
@@ -5268,7 +5268,7 @@ static void diagnoseInvariantSelfRequirement(
   diags.diagnose(loc, diag::non_final_class_cannot_conform_to_self_same_type,
                  adoptee, proto->getDeclaredInterfaceType(),
                  firstType, kind, secondType)
-      .warnUntilLanguageMode(6);
+      .warnUntilLanguageMode(LanguageMode::v6);
 }
 
 static bool
@@ -5291,9 +5291,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   // In Swift 6 and earlier type witness availability diagnostics are warnings.
   using namespace version;
-  const unsigned warnBeforeVersion = Version::getFutureMajorLanguageVersion();
-  bool shouldError =
-      ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
+  const auto languageModeForError = LanguageMode::future;
+  bool shouldError = ctx.LangOpts.isLanguageModeAtLeast(languageModeForError);
 
   switch (domain.getKind()) {
   case AvailabilityDomain::Kind::Universal:
@@ -5311,15 +5310,15 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
   if (constraint->isUnavailable()) {
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
-        [witness, assocType, attr,
-         shouldError](NormalProtocolConformance *conformance) {
+        [witness, assocType, attr, shouldError,
+         languageModeForError](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
           EncodedDiagnosticMessage encodedMessage(attr.getMessage());
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::witness_unavailable, witness,
                         conformance->getProtocol(), encodedMessage.Message)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
 
           emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
           ctx.Diags.diagnose(assocType, diag::requirement_declared_here,
@@ -5332,8 +5331,8 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
 
   ctx.addDelayedConformanceDiag(
       conformance, shouldError,
-      [witness, attr, requiredRange,
-       shouldError](NormalProtocolConformance *conformance) {
+      [witness, attr, requiredRange, shouldError,
+       languageModeForError](NormalProtocolConformance *conformance) {
         SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
         auto &ctx = conformance->getDeclContext()->getASTContext();
         auto domain = attr.getDomain();
@@ -5344,14 +5343,14 @@ diagnoseTypeWitnessAvailability(NormalProtocolConformance *conformance,
                         domain.isPlatform() ? ctx.getTargetAvailabilityDomain()
                                             : domain,
                         *requiredRange)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
         } else {
           ctx.Diags
               .diagnose(
                   loc,
                   diag::availability_protocol_requirement_only_available_in,
                   conformance->getProtocol(), witness, domain)
-              .warnUntilLanguageModeIf(!shouldError, warnBeforeVersion);
+              .warnUntilLanguageModeIf(!shouldError, languageModeForError);
         }
 
         emitDeclaredHereIfNeeded(ctx.Diags, loc, witness);
