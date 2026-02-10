@@ -488,23 +488,6 @@ void SPIGroupsRequest::cacheResult(llvm::ArrayRef<Identifier> result) const {
 // clang importer).
 
 //----------------------------------------------------------------------------//
-// ClangDirectLookupRequest computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           const ClangDirectLookupDescriptor &desc) {
-  out << "Looking up ";
-  simple_display(out, desc.name);
-  out << " in ";
-  simple_display(out, desc.decl);
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc) {
-  return extractNearestSourceLoc(desc.decl);
-}
-
-//----------------------------------------------------------------------------//
 // CXXNamespaceMemberLookup computation.
 //----------------------------------------------------------------------------//
 
@@ -519,6 +502,22 @@ void swift::simple_display(llvm::raw_ostream &out,
 SourceLoc
 swift::extractNearestSourceLoc(const CXXNamespaceMemberLookupDescriptor &desc) {
   return extractNearestSourceLoc(desc.namespaceDecl);
+}
+
+//----------------------------------------------------------------------------//
+// CXXNamespaceMemberEnumeration computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const CXXNamespaceMemberEnumerationDescriptor &desc) {
+  out << "Enumerating members in namespace ";
+  simple_display(out, desc.namespaceEnum);
+}
+
+SourceLoc swift::extractNearestSourceLoc(
+    const CXXNamespaceMemberEnumerationDescriptor &desc) {
+  return extractNearestSourceLoc(desc.namespaceEnum);
 }
 
 //----------------------------------------------------------------------------//

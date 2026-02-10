@@ -14,8 +14,8 @@ func ns1() {
 // CHECK-NS1-NEXT: Keyword[self]/CurrNominal:          self[#NS1.Type#]; name=self
 // CHECK-NS1-NEXT: Keyword/CurrNominal:                Type[#NS1.Type#]; name=Type
 // CHECK-NS1-NEXT: Decl[Enum]/CurrNominal:             NS2[#NS1.NS2#]; name=NS2
-// CHECK-NS1-NEXT: Decl[Struct]/CurrNominal:           BasicB[#NS1.BasicB#]; name=BasicB
 // CHECK-NS1-NEXT: Decl[Struct]/CurrNominal:           BasicA[#NS1.BasicA#]; name=BasicA
+// CHECK-NS1-NEXT: Decl[Struct]/CurrNominal:           BasicB[#NS1.BasicB#]; name=BasicB
 // CHECK-NS1-NEXT: End completions
 
 func ns2() {
@@ -25,8 +25,8 @@ func ns2() {
 // CHECK-NS2: Begin completions, 4 items
 // CHECK-NS2-NEXT: Keyword[self]/CurrNominal:          self[#NS1.NS2.Type#]; name=self
 // CHECK-NS2-NEXT: Keyword/CurrNominal:                Type[#NS1.NS2.Type#]; name=Type
-// CHECK-NS2-NEXT: Decl[Struct]/CurrNominal:           BasicDeepB[#NS1.NS2.BasicDeepB#]; name=BasicDeepB
 // CHECK-NS2-NEXT: Decl[Struct]/CurrNominal:           BasicDeepA[#NS1.NS2.BasicDeepA#]; name=BasicDeepA
+// CHECK-NS2-NEXT: Decl[Struct]/CurrNominal:           BasicDeepB[#NS1.NS2.BasicDeepB#]; name=BasicDeepB
 // CHECK-NS2-NEXT: End completions
 
 func nsTemplates() {
