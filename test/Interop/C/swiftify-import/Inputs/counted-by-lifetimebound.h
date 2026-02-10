@@ -22,3 +22,12 @@ opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * p __counted_by
 int * __counted_by(len) noncountedLifetime(int len, int * p __lifetimebound);
 
 int * __counted_by(13) _Nullable constant(int * _Nullable p __counted_by_or_null(13) __lifetimebound);
+
+struct EscapableStruct {};
+// make sure __lifetimebound is ignored when return value is escapable
+struct EscapableStruct lifetimeboundEscapableReturn(int len, int * __counted_by(len) p __lifetimebound);
+
+struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
+struct NonescapableStruct lifetimeboundNonescapableReturn(int len, int * __counted_by(len) p __lifetimebound);
+
+struct NonescapableStruct lifetimeboundNonescapableReturnDoubleBounds(int len, int * __counted_by(len) p __lifetimebound, struct NonescapableStruct s __lifetimebound);
