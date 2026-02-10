@@ -488,23 +488,6 @@ void SPIGroupsRequest::cacheResult(llvm::ArrayRef<Identifier> result) const {
 // clang importer).
 
 //----------------------------------------------------------------------------//
-// ClangDirectLookupRequest computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           const ClangDirectLookupDescriptor &desc) {
-  out << "Looking up ";
-  simple_display(out, desc.name);
-  out << " in ";
-  simple_display(out, desc.decl);
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc) {
-  return extractNearestSourceLoc(desc.decl);
-}
-
-//----------------------------------------------------------------------------//
 // CXXNamespaceMemberLookup computation.
 //----------------------------------------------------------------------------//
 

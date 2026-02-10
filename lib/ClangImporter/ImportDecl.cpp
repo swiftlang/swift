@@ -4643,7 +4643,7 @@ namespace {
       // and may affect the imported name (e.g., adding a "__*Unsafe" prefix).
       // We defer this instantiation to after importing the method so that we
       // don't eagerly instantiate templates for methods we may not even end up
-      // importing. The "__*Unsafe" lookup fallback in ClangDirectLookupRequest
+      // importing. The "__*Unsafe" lookup fallback in ClangRecordMemberLookup
       // will also find methods whose imported name changes due to safety after
       // instantiation.
       //
