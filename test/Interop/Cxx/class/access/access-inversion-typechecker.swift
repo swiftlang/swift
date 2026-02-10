@@ -208,8 +208,8 @@ func usePrivateEnum(a: inout Leaky.AliasToPrivateEnum) -> Leaky.AliasToPrivateEn
     // Constructing and reading PrivateEnum
     //
 
-    let _ = Leaky.privateEnumMember // FIXME: nested enum members are not being imported (#54905)
-    // expected-error@-1 {{type 'Leaky' has no member 'privateEnumMember'}}
+    let _ = Leaky.privateEnumMember
+    // expected-error@-1 {{'privateEnumMember' is inaccessible due to 'private' protection level}}
     let rv0 = Leaky.AliasToPrivateEnum(rawValue: 0)
     let _ = Leaky.PrivateEnum(rawValue: 0)
     // expected-error@-1 {{'PrivateEnum' is inaccessible due to 'private' protection level}}

@@ -30,16 +30,11 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/Basic/Module.h"
-#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SetVector.h"
-#include <set>
 
 using namespace swift;
 
@@ -562,63 +557,6 @@ static void
                                      getReasonForSuper(Reason), Visited);
 }
 
-static void lookupVisibleCxxNamespaceMemberDecls(
-    EnumDecl *swiftDecl, const clang::NamespaceDecl *clangNamespace,
-    VisibleDeclConsumer &Consumer, VisitedSet &Visited) {
-  if (!Visited.insert(swiftDecl).second)
-    return;
-  auto &ctx = swiftDecl->getASTContext();
-  auto namespaceDecl = clangNamespace;
-
-  // This is only to keep track of the members we've already seen.
-  llvm::SmallPtrSet<Decl *, 16> addedMembers;
-  for (auto redecl : namespaceDecl->redecls()) {
-    for (auto member : redecl->decls()) {
-      auto lookupAndAddMembers = [&](DeclName name) {
-        auto allResults = evaluateOrDefault(
-            ctx.evaluator, ClangDirectLookupRequest({swiftDecl, redecl, name}),
-            {});
-
-        for (auto found : allResults) {
-          auto clangMember = cast<clang::NamedDecl *>(found);
-          if (auto importedDecl =
-                  ctx.getClangModuleLoader()->importDeclDirectly(
-                      cast<clang::NamedDecl>(clangMember))) {
-            if (addedMembers.insert(importedDecl).second) {
-              if (importedDecl->getDeclContext()->getAsDecl() != swiftDecl) {
-                return;
-              }
-              Consumer.foundDecl(cast<ValueDecl>(importedDecl),
-                                 DeclVisibilityKind::MemberOfCurrentNominal);
-            }
-          }
-        }
-      };
-
-      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-      if (!namedDecl)
-        continue;
-      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-      if (!name)
-        continue;
-      lookupAndAddMembers(name);
-
-      // Unscoped enums could have their enumerators present
-      // in the parent namespace.
-      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
-        if (!ed->isScoped()) {
-          for (const auto *ecd : ed->enumerators()) {
-            auto name = ctx.getClangModuleLoader()->importName(ecd);
-            if (!name)
-              continue;
-            lookupAndAddMembers(name);
-          }
-        }
-      }
-    }
-  }
-}
-
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, VisitedSet &Visited) {
@@ -706,13 +644,19 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
-  // Lookup members of C++ namespace without looking type members, as
+  // Lookup members of C++ namespace without looking up type members, as
   // C++ namespace uses lazy lookup.
   if (auto *ET = BaseTy->getAs<EnumType>()) {
-    if (auto *clangNamespace = dyn_cast_or_null<clang::NamespaceDecl>(
-            ET->getDecl()->getClangDecl())) {
-      lookupVisibleCxxNamespaceMemberDecls(ET->getDecl(), clangNamespace,
-                                           Consumer, Visited);
+    if (isa_and_nonnull<clang::NamespaceDecl>(ET->getDecl()->getClangDecl()) &&
+        Visited.insert(ET->getDecl()).second) {
+      auto members = evaluateOrDefault(
+          ET->getASTContext().evaluator,
+          CXXNamespaceMemberEnumeration({cast<EnumDecl>(ET->getDecl()),
+                                         /*includeSpecializations=*/false,
+                                         /*includeOtherModules=*/true}),
+          {});
+      for (auto *member : members)
+        Consumer.foundDecl(member, DeclVisibilityKind::MemberOfCurrentNominal);
     }
   }
 

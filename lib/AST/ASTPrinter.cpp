@@ -2930,105 +2930,6 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   indent();
 }
 
-// This provides logic for looking up all members of a namespace. This is
-// intentionally implemented only in the printer and should *only* be used for
-// debugging, testing, generating module dumps, etc. (In other words, if you're
-// trying to get all the members of a namespace in another part of the compiler,
-// you're probably doing something wrong. This is a very expensive operation,
-// so we want to do it only when absolutely necessary.)
-static void addNamespaceMembers(Decl *decl,
-                                llvm::SmallVector<Decl *, 16> &members) {
-  auto &ctx = decl->getASTContext();
-  auto namespaceDecl = cast<clang::NamespaceDecl>(decl->getClangDecl());
-
-  // This is only to keep track of the members we've already seen.
-  llvm::SmallPtrSet<Decl *, 16> addedMembers;
-  const auto *declOwner = namespaceDecl->getOwningModule();
-  if (declOwner)
-    declOwner = declOwner->getTopLevelModule();
-  auto Redecls = llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
-  std::stable_sort(Redecls.begin(), Redecls.end(), [&](clang::NamespaceDecl *LHS, clang::NamespaceDecl *RHS) {
-    // A namespace redeclaration will not have an owning Clang module if it is
-    // declared in a bridging header.
-    if (!LHS->getOwningModule() || !RHS->getOwningModule())
-      return (bool)LHS->getOwningModule() < (bool)RHS->getOwningModule();
-    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
-  });
-  for (auto redecl : Redecls) {
-    // Skip namespace declarations that come from other top-level modules.
-    if (const auto *redeclOwner = redecl->getOwningModule()) {
-      if (declOwner && declOwner != redeclOwner->getTopLevelModule())
-        continue;
-    }
-    for (auto member : redecl->decls()) {
-      if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(member)) {
-        // Add all specializations to a worklist so we don't accidentally mutate
-        // the list of decls we're iterating over.
-        llvm::SmallPtrSet<const clang::ClassTemplateSpecializationDecl *, 16> specWorklist;
-        for (auto spec : classTemplate->specializations())
-          specWorklist.insert(spec);
-        for (auto spec : specWorklist) {
-          if (auto import =
-                  ctx.getClangModuleLoader()->importDeclDirectly(spec))
-            if (addedMembers.insert(import).second)
-              members.push_back(import);
-        }
-      }
-
-      auto lookupAndAddMembers = [&](DeclName name) {
-        auto allResults = evaluateOrDefault(
-            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
-
-        for (auto found : allResults) {
-          auto clangMember = cast<clang::NamedDecl *>(found);
-          if (auto importedDecl =
-                  ctx.getClangModuleLoader()->importDeclDirectly(clangMember)) {
-            if (addedMembers.insert(importedDecl).second) {
-              members.push_back(importedDecl);
-
-              // Handle macro-expanded declarations.
-              importedDecl->visitAuxiliaryDecls([&](Decl *decl) {
-                auto valueDecl = dyn_cast<ValueDecl>(decl);
-                if (!valueDecl)
-                  return;
-
-                // Bail out if the auxiliary decl was not produced by a macro.
-                auto module = decl->getDeclContext()->getParentModule();
-                auto *sf = module->getSourceFileContainingLocation(decl->getLoc());
-                if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
-                  return;
-
-                members.push_back(valueDecl);
-              });
-            }
-          }
-        }
-      };
-
-      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
-      if (!namedDecl)
-        continue;
-      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
-      if (!name)
-        continue;
-      lookupAndAddMembers(name);
-
-      // Unscoped enums could have their enumerators present
-      // in the parent namespace.
-      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
-        if (!ed->isScoped()) {
-          for (const auto *ecd : ed->enumerators()) {
-            auto name = ctx.getClangModuleLoader()->importName(ecd);
-            if (!name)
-              continue;
-            lookupAndAddMembers(name);
-          }
-        }
-      }
-    }
-  }
-}
-
 /// Sort and print Clang record members in the following order:
 ///
 ///   struct PrintMe {
@@ -3167,7 +3068,13 @@ void PrintAST::printMembersOfDecl(Decl *D, bool needComma, bool openBracket,
       }
     }
     if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-      addNamespaceMembers(D, Members);
+      auto namespaceMembers = evaluateOrDefault(
+          D->getASTContext().evaluator,
+          CXXNamespaceMemberEnumeration({cast<EnumDecl>(D),
+                                         /*includeSpecializations=*/true,
+                                         /*includeOtherModules=*/false}),
+          {});
+      Members.append(namespaceMembers.begin(), namespaceMembers.end());
     } else if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
       // For Clang records, sort their members, because we may import them
       // in an unstable order.
