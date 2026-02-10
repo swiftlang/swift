@@ -980,7 +980,7 @@ private:
       }
 
       // Print the raw values, even the ones that we synthesize.
-      auto *ILE = cast<IntegerLiteralExpr>(Elt->getStructuralRawValueExpr());
+      auto *ILE = cast<IntegerLiteralExpr>(Elt->getRawValueExpr());
       os << " = ";
       if (ILE->isNegative())
         os << "-";
