@@ -96,7 +96,7 @@ struct CXXNamespaceMemberLookupDescriptor final {
 
   CXXNamespaceMemberLookupDescriptor(EnumDecl *namespaceDecl, DeclName name)
       : namespaceDecl(namespaceDecl), name(name) {
-    assert(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
+    ASSERT(isa<clang::NamespaceDecl>(namespaceDecl->getClangDecl()));
   }
 
   friend llvm::hash_code
