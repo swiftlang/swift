@@ -5,8 +5,6 @@
 
 // BCANALYZER-NOT: UnknownCode
 
-// UNSUPPORTED: OS=wasip1
-
 import _Differentiation
 
 // Dummy `Differentiable`-conforming type.
