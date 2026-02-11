@@ -18,6 +18,8 @@
 #include <cstddef>
 #include <new>
 
+#define SWIFT_METADATA_SEGMENT_TYPE 0x73356d64 // s5md or dms5 on little-endian
+
 extern "C" const char __ehdr_start[] __attribute__((__weak__));
 
 #if SWIFT_ENABLE_BACKTRACING
@@ -72,44 +74,105 @@ DECLARE_SWIFT_SECTION(swift5_tests)
 #undef DECLARE_SWIFT_SECTION
 
 namespace {
+struct ElfNoteHeader {
+  uint32_t namesz;
+  uint32_t descsz;
+  uint32_t type;
+};
+
+struct  SectionRange {
+  uintptr_t start;
+  uintptr_t stop;
+};
+
+struct MetadataSections {
+  uintptr_t version;
+  uintptr_t base;
+  uintptr_t unused0;
+  uintptr_t unused1;
+
+#define HANDLE_SWIFT_SECTION(name, coff) \
+  SectionRange name;
+#include "MetadataSectionNames.def"
+#undef HANDLE_SWIFT_SECTION
+};
+
+struct SwiftMetadataNote {
+  ElfNoteHeader header;
+  char name[8]; // "swift6\0" + 1 byte(s) of padding
+
+  MetadataSections sections;
+};
+
+/// .note.swift_metadata section stores the table of start/stop symbols for
+/// ingestion into the runtime and for static tool access.
+// TODO: We should replace addNewDSOImage with something that takes a pointer to
+// the table directly, removing the need for the additional global constructor
+// that converts the start/stop symbol pointer ranges to start/byte-count,
+// before stabilizing any ELF platform ABIs. This will help reduce program
+// launch times.
+// This will require changes to Swift Testing and the runtime metadata
+// registration.
+__asm__(".section .note.swift_metadata, \"a\", @note");
+
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
+__attribute__((section(".note.swift_metadata"), used, aligned(4)))
+const static SwiftMetadataNote swiftMetadataNote = {
+  // header
+  .header = {
+    .namesz = 7,                               // namesz: "swift6\0"
+    .descsz = sizeof(MetadataSections),
+    .type = SWIFT_METADATA_SEGMENT_TYPE,
+  },
+  .name = {
+    's', 'w', 'i', 'f', 't', '6', '\0',
+    '\0', // padding
+  },
+  .sections = {
+    .version = 5,
+    .base = reinterpret_cast<uintptr_t>(&__ehdr_start),
+    .unused0 = 0xa1a1a1a1,
+    .unused1 = 0xb2b2b2b2,
+
+#define HANDLE_SWIFT_SECTION(elfname, coffname) \
+    .elfname = { \
+      reinterpret_cast<uintptr_t>(&__start_##elfname), \
+      reinterpret_cast<uintptr_t>(&__stop_##elfname), },
+
+#include "MetadataSectionNames.def"
+
+#undef HANDLE_SWIFT_SECTION
+
+  },
+};
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+
+} // anonymous namespace
+
+namespace {
 static swift::MetadataSections sections{};
 }
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((__constructor__))
 static void swift_image_constructor() {
-#define SWIFT_SECTION_RANGE(name)                                              \
-  { reinterpret_cast<uintptr_t>(&__start_##name),                              \
-    static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
+#define SWIFT_SECTION_RANGE(name) \
+  { swiftMetadataNote.sections.name.start, \
+    swiftMetadataNote.sections.name.stop - swiftMetadataNote.sections.name.start, }
 
-    const void *baseAddress = nullptr;
-  if (&__ehdr_start != nullptr) {
-    baseAddress = __ehdr_start;
-  }
+  ::new(&sections) swift::MetadataSections {
+      swiftMetadataNote.sections.version,
+      reinterpret_cast<const char*>(swiftMetadataNote.sections.base),
 
-  ::new (&sections) swift::MetadataSections {
-      swift::CurrentSectionMetadataVersion,
-      baseAddress,
+      reinterpret_cast<void*>(swiftMetadataNote.sections.unused0),
+      reinterpret_cast<void*>(swiftMetadataNote.sections.unused1),
 
-      nullptr,
-      nullptr,
+#define HANDLE_SWIFT_SECTION(elfname, coffname) \
+      SWIFT_SECTION_RANGE(elfname),
 
-      SWIFT_SECTION_RANGE(swift5_protocols),
-      SWIFT_SECTION_RANGE(swift5_protocol_conformances),
-      SWIFT_SECTION_RANGE(swift5_type_metadata),
+#include "MetadataSectionNames.def"
 
-      SWIFT_SECTION_RANGE(swift5_typeref),
-      SWIFT_SECTION_RANGE(swift5_reflstr),
-      SWIFT_SECTION_RANGE(swift5_fieldmd),
-      SWIFT_SECTION_RANGE(swift5_assocty),
-      SWIFT_SECTION_RANGE(swift5_replace),
-      SWIFT_SECTION_RANGE(swift5_replac2),
-      SWIFT_SECTION_RANGE(swift5_builtin),
-      SWIFT_SECTION_RANGE(swift5_capture),
-      SWIFT_SECTION_RANGE(swift5_mpenum),
-      SWIFT_SECTION_RANGE(swift5_accessible_functions),
-      SWIFT_SECTION_RANGE(swift5_runtime_attributes),
-      SWIFT_SECTION_RANGE(swift5_tests),
+#undef HANDLE_SWIFT_SECTION
   };
 
 #undef SWIFT_SECTION_RANGE
