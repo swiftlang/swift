@@ -2,10 +2,17 @@
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %S/Inputs -print-module -module-to-print=StdSpan -source-filename=x -enable-experimental-cxx-interop -Xcc -std=c++20 -module-cache-path %t > %t/interface.swift
 // RUN: %FileCheck %s --match-full-lines < %t/interface.swift
 
+// Test legacy wrappers
+// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %S/Inputs -print-module -module-to-print=StdSpan -source-filename=x -enable-experimental-cxx-interop -enable-experimental-feature SafeInteropWrappers -Xcc -std=c++20 -module-cache-path %t > %t/interface-lifetimebound.swift
+// RUN: %FileCheck %s --match-full-lines --check-prefixes=CHECK,CHECK-LEGACY < %t/interface-lifetimebound.swift
+
 // Make sure we trigger typechecking and SIL diagnostics
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -warnings-as-errors -verify -Xcc -std=c++20 %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s -verify-additional-prefix default- -suppress-notes
+
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s
 
 // REQUIRES: swift_feature_StabilizedSafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span
 
@@ -55,27 +62,27 @@ import CxxStdlib
 // CHECK-NEXT: @_lifetime(s: copy s)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper(_ s: inout MutableSpan<CInt>)
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy s)
-// CHECK-NEXT: @_lifetime(s: copy s)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper2(_ s: inout MutableSpan<CInt>) -> MutableSpan<CInt>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(copy s)
+// CHECK-LEGACY-NEXT: @_lifetime(s: copy s)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper2(_ s: inout MutableSpan<CInt>) -> MutableSpan<CInt>
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(&v)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper3(_ v: inout VecOfInt) -> MutableSpan<CInt>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(&v)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func FuncWithMutableSafeWrapper3(_ v: inout VecOfInt) -> MutableSpan<CInt>
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy p)
-// CHECK-NEXT: @_lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper1(_ p: inout MutableSpan<Int32>) -> MutableSpan<CInt>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(copy p)
+// CHECK-LEGACY-NEXT: @_lifetime(p: copy p)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper1(_ p: inout MutableSpan<Int32>) -> MutableSpan<CInt>
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(&v)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper2(_ v: inout VecOfInt, _ len: Int32) -> MutableSpan<Int32>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(&v)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func MixedFuncWithMutableSafeWrapper2(_ v: inout VecOfInt, _ len: Int32) -> MutableSpan<Int32>
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -107,25 +114,25 @@ import CxxStdlib
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper(_ s: Span<CInt>)
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy s)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper2(_ s: Span<CInt>) -> Span<CInt>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(copy s)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper2(_ s: Span<CInt>) -> Span<CInt>
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(borrow v)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(borrow v)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper1(_ p: Span<Int32>) -> Span<CInt>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(copy p)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper1(_ p: Span<Int32>) -> Span<CInt>
 
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(borrow v)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt, _ len: Int32) -> Span<Int32>
+// CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT: @_lifetime(borrow v)
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt, _ len: Int32) -> Span<Int32>
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -167,16 +174,22 @@ func callFuncWithMutableSafeWrapper(_ span: inout MutableSpan<CInt>, ) {
 
 @_lifetime(span: copy span)
 func callFuncWithMutableSafeWrapper2(_ span: inout MutableSpan<CInt>, ) {
+    // expected-default-error@+2{{cannot convert value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') to expected argument type 'SpanOfInt' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>')}}
+    // expected-default-error@+1{{cannot convert value of type 'SpanOfInt' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
     let _: MutableSpan<CInt> = FuncWithMutableSafeWrapper2(&span)
 }
 
 @_lifetime(span: copy span)
 func callMixedFuncWithMutableSafeWrapper1(_ span: inout MutableSpan<CInt>, ) {
+    // expected-default-error@+3{{missing argument for parameter #2 in call}}
+    // expected-default-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<CInt>>' (aka 'UnsafeMutablePointer<MutableSpan<Int32>>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+    // expected-default-error@+1{{cannot convert value of type 'SpanOfInt' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
     let _: MutableSpan<CInt> = MixedFuncWithMutableSafeWrapper1(&span)
 }
 
 func MixedFuncWithMutableSafeWrapper2(_ v: VecOfInt) {
     var v2 = v
+    // expected-default-error@+1{{cannot convert value of type 'UnsafeMutablePointer<Int32>?' to specified type 'MutableSpan<Int32>'}}
     let _ : MutableSpan<Int32> = MixedFuncWithMutableSafeWrapper2(&v2, 37)
 }
 
@@ -209,18 +222,24 @@ func callFuncWithSafeWrapper(_ s: Span<CInt>) {
 }
 
 func callFuncWithSafeWrapper2(_ s: Span<CInt>) {
+    // expected-default-error@+1{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'ConstSpanOfInt' (aka 'std.__1.span<__cxxConst<CInt>, _CUnsignedLong_18446744073709551615>')}}
     let _ = funcWithSafeWrapper2(s)
 }
 
 func callFuncWithSafeWrapper3(_ v: borrowing VecOfInt) {
+    // expected-default-error@+1{{cannot convert value of type 'ConstSpanOfInt' (aka 'std.__1.span<__cxxConst<CInt>, _CUnsignedLong_18446744073709551615>') to specified type 'Span<CInt>' (aka 'Span<Int32>')}}
     let _: Span<CInt> = funcWithSafeWrapper3(v)
 }
 
 func callMixedFuncWithSafeWrapper1(_ s: Span<CInt>) {
+    // expected-default-error@+3{{missing argument for parameter #2 in call}}
+    // expected-default-error@+2{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'UnsafePointer<Int32>'}}
+    // expected-default-error@+1{{cannot convert value of type 'ConstSpanOfInt' (aka 'std.__1.span<__cxxConst<CInt>, _CUnsignedLong_18446744073709551615>') to specified type 'Span<CInt>' (aka 'Span<Int32>')}}
     let _: Span<CInt> = mixedFuncWithSafeWrapper1(s)
 }
 
 func callMixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt) {
+    // expected-default-error@+1{{cannot convert value of type 'UnsafePointer<Int32>?' to specified type 'Span<CInt>' (aka 'Span<Int32>')}}
     let _: Span<CInt> = mixedFuncWithSafeWrapper2(v, 73)
 }
 
