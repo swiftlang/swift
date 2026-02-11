@@ -249,9 +249,15 @@ class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
         with open(self.config_path, "w") as f:
             json.dump(self.config, f)
 
-    def test_clone_with_commit_hash(self):
+    def test_clone_with_skip_history(self):
+        self._test_clone_with_commit_hash(["--skip-history"])
+
+    def test_clone_with_reset_to_remote(self):
+        self._test_clone_with_commit_hash(["--reset-to-remote"])
+
+    def _test_clone_with_commit_hash(self, additional_flags):
         """
-        Test that cloning with --skip-history works with commit hashes.
+        Test that cloning works with commit hashes.
         """
         self.call(
             [
@@ -261,11 +267,10 @@ class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
                 "--source-root",
                 self.source_root,
                 "--clone",
-                "--skip-history",
                 "--scheme",
                 self.commit_scheme_name,
                 "--verbose",
-            ]
+            ] + additional_flags
         )
 
         for repo in self.get_all_repos():
