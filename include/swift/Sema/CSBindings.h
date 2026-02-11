@@ -412,6 +412,16 @@ private:
 namespace swift {
 namespace constraints {
 namespace inference {
+
+enum class KnownLValueKind: uint8_t {
+  /// Insufficient information to determine yet.
+  Unknown,
+  /// Definitely not an lvalue.
+  RValue,
+  /// Definitely an lvalue.
+  LValue
+};
+
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, unsigned char, int>;
@@ -429,6 +439,8 @@ class BindingSet {
   bool IsDirty = false;
   /// Generation number of PotentialBindings.
   unsigned GenerationNumber = 0;
+  /// Computed early by computeLValueState().
+  KnownLValueKind LValueState = KnownLValueKind::Unknown;
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
@@ -479,6 +491,10 @@ public:
   /// Check if this binding set is known to be up to date.
   bool isUpToDate() const {
     return (GenerationNumber == Info.GenerationNumber && !IsDirty);
+  }
+
+  KnownLValueKind getLValueState() const {
+    return LValueState;
   }
 
   /// Whether this type variable is subject to a ExpressibleByNilLiteral
@@ -672,6 +688,8 @@ public:
   }
 
 private:
+  void computeLValueState();
+
   void markDirty() {
     IsDirty = true;
   }

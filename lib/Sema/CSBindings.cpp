@@ -57,6 +57,7 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
   GenerationNumber = Info.GenerationNumber;
+  computeLValueState();
 
   for (const auto &binding : info.Bindings)
     addBinding(binding);
@@ -74,6 +75,80 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
     AdjacentVars.insert(entry.first);
 
   ASSERT(!IsDirty);
+}
+
+void BindingSet::computeLValueState() {
+  // If this type variable is not an lvalue, there is nothing to check.
+  if (!TypeVar->getImpl().canBindToLValue()) {
+    LValueState = KnownLValueKind::RValue;
+    return;
+  }
+
+  // If this type variable appears on the left-hand side of an LValueObject
+  // constraint, we know it has to be bound to an lvalue type.
+  if (!Info.LValueOf.empty()) {
+    LValueState = KnownLValueKind::LValue;
+    return;
+  }
+
+  // Assume something is an rvalue unless proven otherwise.
+  LValueState = KnownLValueKind::RValue;
+
+  for (auto *constraint : Info.DelayedBy) {
+    // If this type variable is delayed by a disjunction or member reference,
+    // we won't know if its an lvalue until an overload choice is picked.
+    //
+    // FIXME: Consider if any active choices are actually lvalues.
+    switch (constraint->getKind()) {
+    case ConstraintKind::Disjunction:
+    case ConstraintKind::ValueMember:
+    case ConstraintKind::UnresolvedValueMember:
+      LValueState = KnownLValueKind::Unknown;
+      return;
+
+    // This handles subscript result types, which require one more level of
+    // indirection.
+    //
+    // The setup is something like:
+    //
+    // ($T1) -> $T2 applicable fn $T1
+    // $T1 is a disjunction where some of the overloads return lvalue results
+    // $T1 arg conv Int
+    //
+    // We must consider $T1 to have unknown lvalue status, and we cannot
+    // attempt the Int binding until it has been resolved.
+    //
+    // FIXME: Consider if any active choices are actually lvalues.
+    case ConstraintKind::ApplicableFunction: {
+      auto secondType = constraint->getSecondType();
+      if (auto *otherTypeVar = secondType->getAs<TypeVariableType>()) {
+        if (!CS.getFixedType(otherTypeVar)) {
+          otherTypeVar = CS.getRepresentative(otherTypeVar);
+
+          const auto &node = CS.getConstraintGraph()[otherTypeVar];
+          const auto &info = node.getPotentialBindings();
+
+          // Now check if the type variable representing the applied function is
+          // itself delayed by a disjunction.
+          for (auto *constraint : info.DelayedBy) {
+            switch (constraint->getKind()) {
+            case ConstraintKind::Disjunction:
+            case ConstraintKind::ValueMember:
+            case ConstraintKind::UnresolvedValueMember:
+              LValueState = KnownLValueKind::Unknown;
+              return;
+            default:
+              break;
+            }
+          }
+        }
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
 }
 
 bool BindingSet::forClosureResult() const {
