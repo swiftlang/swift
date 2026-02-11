@@ -9,7 +9,7 @@ import shlex
 
 tmp = sys.argv[1]
 testcases = sys.argv[2]
-build_cmd = sys.argv[3]
+build_cmd = sys.argv[3].replace("\\", "/")
 lib_pattern = sys.argv[4]
 
 imports = []
