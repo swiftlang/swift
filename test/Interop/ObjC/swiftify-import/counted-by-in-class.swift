@@ -2,8 +2,8 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers %t/method.swift -dump-macro-expansions -typecheck -verify
+// RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs %t/method.swift -dump-macro-expansions -typecheck -verify
 
 // CHECK: class Foo {
 // CHECK:  func bar(_ p: UnsafeMutableBufferPointer<Float>)

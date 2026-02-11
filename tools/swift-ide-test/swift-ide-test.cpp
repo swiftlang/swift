@@ -4579,6 +4579,9 @@ int main(int argc, char *argv[]) {
 
   InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
 
+  // FIXME: swift-ide-test doesn't currently have a way to manually disable features.
+  InitInvok.getLangOptions().enableFeature(Feature::StabilizedSafeInteropWrappers);
+
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
 

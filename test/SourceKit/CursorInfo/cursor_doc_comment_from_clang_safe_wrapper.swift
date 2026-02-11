@@ -20,7 +20,7 @@ module MyClangModule { header "header.h" }
 import MyClangModule
 
 func test(_ s: Span<CInt>) {
-  // RUN: %sourcekitd-test -req=cursor -pos=%(line + 1):4 -req-opts=retrieve_symbol_graph=1 %s -- %s -I %t -enable-experimental-feature StabilizedSafeInteropWrappers | %FileCheck %s
+  // RUN: %sourcekitd-test -req=cursor -pos=%(line + 1):4 -req-opts=retrieve_symbol_graph=1 %s -- %s -I %t | %FileCheck %s
   testCDecl(s)
 }
 

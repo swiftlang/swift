@@ -6,7 +6,7 @@
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
 // RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -enable-experimental-feature StabilizedSafeInteropWrappers -strict-memory-safety \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -strict-memory-safety \
 // RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY -verify-additional-prefix nolifetimebound-
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -dump-macro-expansions -I %bridging-path 2> %t/out.txt
 // RUN: diff --strip-trailing-cr %t/out.txt %t/out.expected

@@ -3,10 +3,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default -enable-experimental-feature StabilizedSafeInteropWrappers %t/namespace.swift -emit-module \
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -emit-module \
 // RUN:   -verify -verify-additional-file %t%{fs-sep}namespace.h -Rmacro-expansions -strict-memory-safety -o %t/out.swiftmodule -import-bridging-header %t/bridging.h
 
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default -enable-experimental-feature StabilizedSafeInteropWrappers %t/namespace.swift -typecheck \
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default %t/namespace.swift -typecheck \
 // RUN:   -dump-source-file-imports -import-bridging-header %t/bridging.h 2>&1 | %FileCheck --dry-run > %t/imports.txt
 // RUN: %diff %t/imports.txt %t/imports.txt.expected
 

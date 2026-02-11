@@ -3,14 +3,14 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -enable-experimental-feature StabilizedSafeInteropWrappers -strict-memory-safety %t/test.swift \
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -strict-memory-safety %t/test.swift \
 // RUN:   -verify
 
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -enable-experimental-feature StabilizedSafeInteropWrappers -strict-memory-safety %t/test.swift \
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -strict-memory-safety %t/test.swift \
 // RUN:   -dump-macro-expansions 2>&1 | %FileCheck --dry-run > %t/macro-expansions.out
 // RUN: %diff %t/macro-expansions.out %t/macro-expansions.expected
 
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -enable-experimental-feature StabilizedSafeInteropWrappers -strict-memory-safety %t/test.swift \
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -strict-memory-safety %t/test.swift \
 // RUN:   -dump-source-file-imports 2>&1 | %FileCheck --dry-run > %t/imports.out
 // RUN: %diff %t/imports.out %t/imports.expected
 

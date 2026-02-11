@@ -6,7 +6,7 @@
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 \
 // RUN:   -verify -verify-additional-file %t/Inputs/instance.h -DVERIFY
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature StabilizedSafeInteropWrappers -strict-memory-safety -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 \
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -strict-memory-safety -Xcc -Werror %t/test.swift  -cxx-interoperability-mode=default -Xcc -std=c++20 \
 // RUN:   -verify -verify-additional-file %t/Inputs/instance.h -DVERIFY -verify-additional-prefix nolifetimebound-
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -cxx-interoperability-mode=default -Xcc -std=c++20 -dump-macro-expansions 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --implicit-check-not __swiftmacro
 

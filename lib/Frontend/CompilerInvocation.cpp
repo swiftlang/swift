@@ -1018,6 +1018,15 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       Opts.enableFeature(Feature::SwiftRuntimeAvailability, forMigration);
   }
 
+  // This is purposefully not defined before explicit features have been processed.
+  auto enableFeatureByDefault = [&seenFeatures, &Opts](Feature f) {
+    if (seenFeatures.insert(f).second) {
+      Opts.enableFeature(f);
+    }
+  };
+
+  enableFeatureByDefault(Feature::StabilizedSafeInteropWrappers);
+
   // Since pseudo-features don't have a boolean on/off state, process them in
   // the order they were specified on the command line.
   for (auto featureName = psuedoFeatures.rbegin(), end = psuedoFeatures.rend();
