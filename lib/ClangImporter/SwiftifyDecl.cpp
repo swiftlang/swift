@@ -575,9 +575,12 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     }
     if (getNumParams(ClangDecl) != swiftNumParams) {
       DLOG("mismatching parameter lists");
-      assert(ClangDecl->isVariadic() ||
-             MappedDecl->getForeignErrorConvention().has_value() ||
-             MappedDecl->getForeignAsyncConvention().has_value());
+      assert(
+          ClangDecl->isVariadic() ||
+          MappedDecl->getForeignErrorConvention().has_value() ||
+          MappedDecl->getForeignAsyncConvention().has_value() ||
+          (swiftNumParams == 1 &&
+           MappedDecl->getParameters()->get(0)->getInterfaceType()->isVoid()));
       return false;
     }
 
