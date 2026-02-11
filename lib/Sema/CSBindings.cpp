@@ -2029,6 +2029,12 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     // simplification.
     if (kind == AllowedBindingKind::Subtypes) {
       if (type->isTypeVariableOrMember()) {
+        if (type->is<TypeVariableType>()) {
+          DEBUG_BAILOUT("Unsolved l-value object");
+          recordLValueOf(constraint);
+          return std::nullopt;
+        }
+
         DEBUG_BAILOUT("Disallowed l-value inference");
         return std::nullopt;
       }
@@ -2438,8 +2444,8 @@ void PotentialBindings::retract(Constraint *constraint) {
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
                  << AdjacentVars.size() << " " << DelayedBy.size() << " "
-                 << SubtypeOf.size() << " " << SupertypeOf.size() << " "
-                 << EquivalentTo.size() << "\n");
+                 << LValueOf.size() << " " << SubtypeOf.size() << " "
+                 << SupertypeOf.size() << " " << EquivalentTo.size() << "\n");
 
   Bindings.erase(
       llvm::remove_if(Bindings,
@@ -2509,6 +2515,7 @@ void PotentialBindings::reset() {
     ASSERT(Bindings.empty());
     ASSERT(DelayedBy.empty());
     ASSERT(AdjacentVars.empty());
+    ASSERT(LValueOf.empty());
     ASSERT(SubtypeOf.empty());
     ASSERT(SupertypeOf.empty());
     ASSERT(EquivalentTo.empty());

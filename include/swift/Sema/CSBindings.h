@@ -266,6 +266,11 @@ struct PotentialBindings {
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
 
+  /// The set of LValueObject constraints having this type variable on the
+  /// left-hand side. If this is non-empty, we know that the type variable
+  /// must be bound to an lvalue.
+  llvm::TinyPtrVector<Constraint *> LValueOf;
+
   /// The set of type variables adjacent to the current one.
   ///
   /// Type variables contained here are either related through the
