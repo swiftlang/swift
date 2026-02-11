@@ -50,6 +50,9 @@ public protocol Clock<Duration>: Sendable {
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   func run(_ job: consuming ExecutorJob,
            at instant: Instant, tolerance: Duration?)
@@ -70,6 +73,9 @@ public protocol Clock<Duration>: Sendable {
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
+  #if !os(Windows)
+  @_weakLinked
+  #endif
   @available(StdlibDeploymentTarget 6.3, *)
   func enqueue(_ job: consuming ExecutorJob,
                on executor: some Executor,
