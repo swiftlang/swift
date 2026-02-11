@@ -1,4 +1,5 @@
 // REQUIRES: std_span
+// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
