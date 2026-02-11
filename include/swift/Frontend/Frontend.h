@@ -324,11 +324,6 @@ public:
     return SymbolGraphOpts;
   }
 
-  std::optional<clang::DarwinSDKInfo> &getSDKInfo() { return SDKInfo; }
-  const std::optional<clang::DarwinSDKInfo> &getSDKInfo() const {
-    return SDKInfo;
-  }
-
   SearchPathOptions &getSearchPathOptions() { return SearchPathOpts; }
   const SearchPathOptions &getSearchPathOptions() const {
     return SearchPathOpts;

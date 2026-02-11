@@ -83,10 +83,9 @@ struct LibParseExecutor {
     symbolgraphgen::SymbolGraphOptions symbolOpts;
     CASOptions casOpts;
     SerializationOptions serializationOpts;
-    std::optional<clang::DarwinSDKInfo> SDKInfo;
     std::unique_ptr<ASTContext> ctx(ASTContext::get(
         langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
-        casOpts, serializationOpts, SM, diagEngine, SDKInfo));
+        casOpts, serializationOpts, SM, diagEngine));
     auto &eval = ctx->evaluator;
     registerParseRequestFunctions(eval);
     registerTypeCheckerRequestFunctions(eval);
@@ -156,14 +155,13 @@ struct ASTGenExecutor {
     CASOptions casOpts;
     symbolgraphgen::SymbolGraphOptions symbolOpts;
     SerializationOptions serializationOpts;
-    std::optional<clang::DarwinSDKInfo> SDKInfo;
 
     // Enable ASTGen.
     langOpts.enableFeature(Feature::ParserASTGen);
 
     std::unique_ptr<ASTContext> ctx(ASTContext::get(
         langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts, symbolOpts,
-        casOpts, serializationOpts, SM, diagEngine, SDKInfo));
+        casOpts, serializationOpts, SM, diagEngine));
     auto &eval = ctx->evaluator;
     registerParseRequestFunctions(eval);
     registerTypeCheckerRequestFunctions(eval);
