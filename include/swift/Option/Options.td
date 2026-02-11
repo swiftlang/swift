@@ -938,6 +938,12 @@ def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enables serialization/deserialization of debug scopes">;
+
+def disable_safe_interop_wrappers :
+  Flag<["-"], "disable-safe-interop-wrappers">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption, HelpHidden]>,
+  HelpText<"Disable safe interop wrapper generation and bounds attribute parsing">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

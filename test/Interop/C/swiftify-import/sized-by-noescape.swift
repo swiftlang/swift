@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SizedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Werror -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness | %FileCheck %s

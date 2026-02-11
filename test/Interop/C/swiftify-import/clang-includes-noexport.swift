@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=ClangIncludesNoExportModule -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x | %FileCheck %s
 

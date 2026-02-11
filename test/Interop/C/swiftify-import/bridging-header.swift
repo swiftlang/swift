@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

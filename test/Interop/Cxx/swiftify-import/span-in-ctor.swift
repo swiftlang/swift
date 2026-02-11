@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: std_span
 
 // RUN: rm -rf %t

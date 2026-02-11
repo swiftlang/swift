@@ -3,7 +3,6 @@
 //--- Main.swift
 import FromClang // NOTE: line offset = -4
 
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: swift_feature_LifetimeDependence
 
 // The macro-generated interface we're looking up source info for

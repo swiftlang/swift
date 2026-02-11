@@ -755,9 +755,7 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(
-          Feature::StabilizedSafeInteropWrappers) &&
-      !SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)

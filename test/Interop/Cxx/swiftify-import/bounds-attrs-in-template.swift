@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t

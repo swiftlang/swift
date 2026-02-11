@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // Tests that we don't try to import modules that don't work well with C++ interop (when enabled)
 

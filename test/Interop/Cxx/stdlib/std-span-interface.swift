@@ -11,7 +11,6 @@
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -verify -Xcc -std=c++20 %s
 
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: std_span

@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: OS=macosx
 
 // Don't run this test with libc++ versions 17-19, when the top-level std module was split into multiple top-level modules.

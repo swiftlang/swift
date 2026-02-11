@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)

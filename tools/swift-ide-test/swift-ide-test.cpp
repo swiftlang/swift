@@ -4584,8 +4584,8 @@ int main(int argc, char *argv[]) {
 
   InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
 
-  if (!options::DisableSafeInterop)
-    InitInvok.getLangOptions().enableFeature(Feature::StabilizedSafeInteropWrappers);
+  if (options::DisableSafeInterop)
+    InitInvok.getLangOptions().DisableSafeInteropWrappers = true;
 
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);

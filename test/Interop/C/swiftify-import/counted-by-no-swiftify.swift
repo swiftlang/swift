@@ -1,6 +1,5 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CountedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast  | %FileCheck %s
 
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // These functions use __counted_by annotations that are not syntactically valid
 // in Swift, so they should not be Swiftified

@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 
 // XFAIL: *
 // Safe interop Protocol support removed for now

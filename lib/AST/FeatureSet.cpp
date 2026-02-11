@@ -424,7 +424,6 @@ static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
 
 UNINTERESTING_FEATURE(StrictMemorySafety)
 UNINTERESTING_FEATURE(LibraryEvolution)
-UNINTERESTING_FEATURE(StabilizedSafeInteropWrappers)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)

@@ -3,7 +3,6 @@
 
 // RUN: %target-swift-frontend -emit-ir -I %swift_src_root/lib/ClangImporter/SwiftBridging -plugin-path %swift-plugin-dir %t/blessed.swift -module-name main -I %t/Inputs -o %t/out -Xcc -std=c++20  -cxx-interoperability-mode=default -verify
 
-// REQUIRES: swift_feature_StabilizedSafeInteropWrappers
 // REQUIRES: std_span
 
 //--- Inputs/swiftify-non-public.h

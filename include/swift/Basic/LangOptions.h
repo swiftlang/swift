@@ -670,6 +670,8 @@ namespace swift {
     /// Defines the default actor isolation.
     DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
+    bool DisableSafeInteropWrappers = false;
+
     /// Whether or not to allow experimental features that are only available
     /// in "production".
 #ifdef NDEBUG
@@ -1158,6 +1160,10 @@ namespace swift {
     /// in versioned attributes, where the importer must select the appropriate
     /// ones to apply.
     bool LoadVersionIndependentAPINotes = false;
+
+    /// Whether to enable generation of safe wrappers and parsing of bounds
+    /// attributes (default enabled) or not.
+    bool DisableSafeInteropWrappers = false;
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.
