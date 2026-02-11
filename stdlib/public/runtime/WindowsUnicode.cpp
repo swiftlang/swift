@@ -1,4 +1,4 @@
-//===--- Win32.cpp - Win32 utility functions --------------------*- C++ -*-===//
+//===--- WindowsUnicode.cpp - Windows Unicode utility functions -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
