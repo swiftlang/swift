@@ -309,6 +309,26 @@ func badNoEscapeCaptureFromDeferedPackIteration<each T>(_ fn: repeat () -> each 
   }
 }
 
+func badNoEscapeCaptureFromDeferredEscapingPack<each T>(_ fn: repeat () -> each T) { // expected-note@:59 {{parameter 'fn' is implicitly non-escaping}}
+  defer {
+    takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+      let _ = (repeat (each fn)()) // expected-note@:24 {{captured here}}
+    }
+  }
+  let _ = 5
+}
+
+func badNoEscapeCaptureFromDeferedEscapingPackIteration<each T>(_ fn: repeat () -> each T) { // expected-note@:67 {{parameter 'fn' is implicitly non-escaping}}
+  defer {
+    takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+      for f in repeat each fn { // expected-note@:23 {{captured here}}
+        let _ = f()
+      }
+    }
+  }
+  let _ = 42
+}
+
 func badNoEscapeCaptureAfterPackExpansion<each T>(_ fn: repeat () -> each T) {
   let tup = (repeat each fn)
 

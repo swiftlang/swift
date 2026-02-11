@@ -156,31 +156,57 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   return true;
 }
 
-/// Given a /p alloc stack inst, try to find the pack that is allocated to
-/// it. Follow the users of the allocation to find the address, find the source
-/// for copies into that address, and then find the pack that is used for get
-/// instructions.
+/// Given a /p alloc stack inst, try to find the argument pack that is allocated
+/// to it as a best effort. If no appropriate value can be found, return
+/// nullptr.
 static const SILValue tryGetPackForTempAllocStack(AllocStackInst *alloc) {
   InstructionWorklist worklist(alloc);
-
   while (SILInstruction *inst = worklist.pop()) {
+    // Follow the users of the stack allocation.
     if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
       worklist.pushInstructionsIfNotVisited(asi->getUsers());
       continue;
     }
 
-    if (auto *tuplePackElemAddr = dyn_cast<TuplePackElementAddrInst>(inst)) {
-      worklist.pushInstructionsIfNotVisited(tuplePackElemAddr->getUsers());
+    // Follow the users of the pack allocation.
+    if (auto *allocPack = dyn_cast<AllocPackInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(allocPack->getUsers());
       continue;
     }
 
+    // Follow the source of copy addr.
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
       worklist.pushIfNotVisited(copyAddr->getSrc()->getDefiningInstruction());
       continue;
     }
 
+    // Follow the value of a pack set, ideally to a tuple pack element addr
+    // inst.
+    if (auto *packElemSet = dyn_cast<PackElementSetInst>(inst)) {
+      worklist.pushIfNotVisited(
+          packElemSet->getValue()->getDefiningInstruction());
+      continue;
+    }
+
+    // TuplePackElementAddrInst may have a function argument as its tuple
+    // operand's definition. Otherwise, follow the users of the address.
+    if (auto *tuplePackElemAddr = dyn_cast<TuplePackElementAddrInst>(inst)) {
+      if (auto *arg = dyn_cast<SILArgument>(tuplePackElemAddr->getTuple())) {
+        return arg;
+      }
+      worklist.pushInstructionsIfNotVisited(tuplePackElemAddr->getUsers());
+      continue;
+    }
+
+    // PackElementGetInst may have a function argument as its pack operand's
+    // definition. Otherwise, follow to the definition of the pack.
     if (auto *packElemGet = dyn_cast<PackElementGetInst>(inst)) {
-      return packElemGet->getPack();
+      if (auto *arg = dyn_cast<SILArgument>(packElemGet->getPack())) {
+        return arg;
+      }
+      worklist.pushIfNotVisited(
+          packElemGet->getPack()->getDefiningInstruction());
+      continue;
     }
   }
 
