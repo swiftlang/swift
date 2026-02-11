@@ -874,7 +874,7 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   // CxxBorrowingSequence protocol. This type is currently
   // `CxxBorrowingIterator<Self>`.
   auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
-      ctx.getIdentifier("BorrowingIterator"));
+      ctx.getIdentifier("_BorrowingIterator"));
   assert(borrowingIteratorDecl &&
          "CxxBorrowingSequence must have a BorrowingIterator associated type");
   auto borrowingIteratorNominal =
@@ -886,9 +886,10 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_Element"), pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_BorrowingIterator"),
                                borrowingIteratorTy);
 
   auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(

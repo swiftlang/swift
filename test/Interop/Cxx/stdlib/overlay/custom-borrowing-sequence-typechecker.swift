@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -enable-experimental-cxx-interop -I %swift_src_root/lib/ClangImporter/SwiftBridging
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -enable-experimental-cxx-interop -I %swift_src_root/lib/ClangImporter/SwiftBridging -disable-availability-checking
 
 import CustomBorrowingSequence
 

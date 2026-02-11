@@ -17,7 +17,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopyableSequence as Swift.Borrowing
   var iterator = seq.makeBorrowingIterator()
     var counter = 0
     while true {
-        let span = iterator.nextSpan()
+        let span = iterator._nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(span[i], arr[counter])
@@ -35,7 +35,7 @@ CxxBorrowingSequenceTestSuite.test("SimpleNonCopArrayWrapper as Swift.BorrowingS
   var iterator = seq.makeBorrowingIterator()
     var counter = 0
     while true {
-        let span = iterator.nextSpan()
+        let span = iterator._nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(span[i].number, arr[counter])
