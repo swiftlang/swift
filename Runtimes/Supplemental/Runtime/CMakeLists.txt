@@ -98,6 +98,11 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+if(WIN32 AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "X86")
+  # Turn on /safeseh for 32-bit x86 or we won't be able to link
+  add_compile_options($<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+endif()
+
 find_package(SwiftSwiftDirectRuntime)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
