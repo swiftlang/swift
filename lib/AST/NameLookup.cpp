@@ -391,8 +391,8 @@ bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
   decls.erase(
     std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) -> bool {
       bool inScope = llvm::any_of(visibleFrom, [&](ModuleDecl *visibleFromMod) {
-        return ctx.getImportCache().isImportedBy(decl->getModuleContext(),
-                                                 visibleFromMod);
+        return ctx.getImportCache().isImportedBy(
+                       decl->getModuleContextForNameLookup(), visibleFromMod);
       });
 
       LLVM_DEBUG(decl->dumpRef(llvm::dbgs()));
