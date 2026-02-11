@@ -839,7 +839,7 @@ static llvm::cl::opt<std::string>
                       llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-    DisableSafeInterop("disable-safe-interop",
+    DisableSafeInterop("disable-safe-interop-wrappers",
                        llvm::cl::desc("Disable safe interop wrappers."),
                        llvm::cl::cat(Category), llvm::cl::init(false));
 

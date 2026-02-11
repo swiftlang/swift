@@ -807,7 +807,7 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.insert(invocationArgStrs.end(),
                              {"-fswift-version-independent-apinotes"});
 
-  if (!importerOpts.DisableSafeInteropWrappers)
+  if (!LangOpts.DisableSafeInteropWrappers)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 }
 
