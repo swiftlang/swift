@@ -399,10 +399,7 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
       return Action::Continue;
     }
 
-    const clang::TagDecl *Def = TD->getDefinition();
-    ASSERT(Def && "concrete type without type definition?");
     const clang::Module *M = getOwningModule(ClangDecl);
-
     if (!M) {
       DLOG("Concrete type is in bridging header, which is always imported\n");
       return Action::Continue;
@@ -411,13 +408,15 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
     if (!Owner) {
       hasForwardDeclaredConcreteType = true;
       DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
-      LLVM_DEBUG(DUMP(Def));
+      if (const clang::TagDecl *Def = TD->getDefinition())
+        LLVM_DEBUG(DUMP(Def));
       return Action::Stop;
     }
     if (!Owner->isModuleVisible(M)) {
       hasForwardDeclaredConcreteType = true;
       DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
-      LLVM_DEBUG(DUMP(Def));
+      if (const clang::TagDecl *Def = TD->getDefinition())
+        LLVM_DEBUG(DUMP(Def));
       return Action::Stop;
     }
 

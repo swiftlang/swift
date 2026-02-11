@@ -45,6 +45,24 @@ struct container_t {
 // }}
 void fooWrapped(struct container_t * x, int * __counted_by(len) p, int len);
 
+typedef struct __attribute__((swift_attr("import_as_ref")))
+__attribute__((swift_attr("retain:foobar_retain")))
+__attribute__((swift_attr("release:foobar_release"))) foobar_t *foobar_ref;
+
+void foobar_retain(foobar_ref x);
+void foobar_release(foobar_ref x);
+
+// expected-expansion@+10:57{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<Int32>, _ _foobar_param2: foobar_ref!) {|}}
+//   expected-remark@3{{macro content: |    let _foobar_param1 = Int32(exactly: _foobar_param0.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe foobar(_foobar_param0.baseAddress!, _foobar_param1, _foobar_param2)|}}
+//   expected-remark@5{{macro content: |}|}}
+// }}
+// expected-expansion@+3:6{{
+//   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on global function 'foobar' here}}
+// }}
+void foobar(int * __counted_by(len), int len, foobar_ref);
 
 //--- bar.h
 #pragma once
@@ -115,6 +133,9 @@ enum fwd_declared_enum : int {
   enum_member,
 };
 
+struct foobar {
+  int placeholder;
+};
 
 //--- test.swift
 import Foo
@@ -180,6 +201,10 @@ func callBaz(_ x: UnsafeMutablePointer<qux>, _ p: UnsafeMutablePointer<CInt>, _ 
 func callBaz2(_ x: UnsafeMutablePointer<qux>, _ p: UnsafeMutableBufferPointer<CInt>) {
   unsafe baz(x, p)
   let _: UnsafeMutablePointer<qux> = unsafe bazReturn(p)
+}
+
+func callFoobar(_ p: UnsafeMutablePointer<CInt>, _ len: CInt, _ fb: foobar_ref) {
+  unsafe foobar(p, len, fb);
 }
 
 
