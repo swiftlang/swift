@@ -1,4 +1,4 @@
-//===--- Errors.cpp - Error reporting utilities ---------------------------===//
+//===--- RuntimeErrorReporting.cpp - Error reporting utilities ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
