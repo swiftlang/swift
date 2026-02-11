@@ -27,6 +27,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -8645,6 +8646,7 @@ swift::getInheritedForPrinting(
 
   InheritedTypes inherited = InheritedTypes(decl);
 
+  bool explicitSendable = false;
   // Collect explicit inherited types.
   for (auto i : inherited.getIndices()) {
     if (auto ty = inherited.getResolvedType(i)) {
@@ -8710,6 +8712,10 @@ swift::getInheritedForPrinting(
         entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
                                entry.getOptions());
       }
+
+      if (auto P = type->getKnownProtocol()) {
+        explicitSendable |= *P == KnownProtocolKind::Sendable;
+      }
     }
 
     Results.push_back(entry);
@@ -8740,6 +8746,38 @@ swift::getInheritedForPrinting(
         uncheckedProtocols.push_back(proto);
       if (attr->isSuppressed())
         suppressedProtocols.push_back(proto);
+    }
+  }
+
+  if (auto *T = dyn_cast<NominalTypeDecl>(decl)) {
+    auto *sendable =
+        T->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+
+    // If printing is for a package interface, let's add derived/implied `Sendable`
+    // conformance to avoid having to infer it while type-checking the interface
+    // file later. Such inference is not always possible, because i.e. a package
+    // declaration can have private storage that won't be printed in a package
+    // interface file and attempting inference would produce an invalid result.
+    bool shouldPrintSynthesizedSendable = [&] {
+      // If `Sendable` is stated explicit or imported from ObjC, were are done.
+      if (explicitSendable || protocols.contains(sendable))
+        return false;
+
+      // Otherwise only do this for package declarations.
+      return options.printPackageInterface() && isPackage(T);
+    }();
+
+    if (shouldPrintSynthesizedSendable) {
+      auto conformance =
+          lookupConformance(T->getDeclaredInterfaceType(), sendable,
+                            /*allowMissing=*/false);
+      if (conformance.isConcrete() &&
+          !conformance.hasUnavailableConformance()) {
+        auto *concrete = conformance.getConcrete();
+        if (concrete->getSourceKind() == ConformanceEntryKind::Synthesized ||
+            concrete->getSourceKind() == ConformanceEntryKind::Implied)
+          protocols.insert(sendable);
+      }
     }
   }
 
