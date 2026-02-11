@@ -9,19 +9,15 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx
+// REQUIRES: OS=linux-gnu
 
 // This test proved unstable on Linux so we disabled it while focus is elsewhere,
 // as it's not critical function, but it would be nice to restore it one day.
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
+#if canImport(Glibc)
   import Glibc
 #elseif canImport(Android)
   import Android
-#elseif os(Windows)
-  import CRT
 #else
 #error("Unsupported platform")
 #endif
@@ -55,11 +51,7 @@ func unlockMutex() {
 
 
 func spawnThread(_ shouldCrash: Bool) {
-  #if os(Linux)
   var thread: pthread_t = 0
-  #elseif os(macOS)
-  var thread = pthread_t(nil)
-  #endif
   if shouldCrash {
     pthread_create(&thread, nil, { _ in
                                 // take mutex
@@ -100,6 +92,8 @@ while (true) {
 }
 
 // CHECK: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
+
+// CHECK-NOT: backtraces will be missing information
 
 // make sure there are no threads before the crashing thread (rdar://164566321)
 // and check that we have some vaguely sane and symbolicated threads, including
