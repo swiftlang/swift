@@ -1453,6 +1453,9 @@ def emit_executable : Flag<["-"], "emit-executable">,
 def emit_library : Flag<["-"], "emit-library">,
   HelpText<"Emit a linked library">, ModeOpt,
   Flags<[NoInteractiveOption]>;
+def emit_relocatable_object : Flag<["-"], "emit-relocatable-object">,
+  HelpText<"Emit a relocatable object file">, ModeOpt,
+  Flags<[NoInteractiveOption]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
