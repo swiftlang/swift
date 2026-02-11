@@ -50,7 +50,7 @@ SWIFT_REQUEST(NameLookup, AllInheritedProtocolsRequest,
               ArrayRef<ProtocolDecl *>(ProtocolDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ReparentingProtocolsRequest,
-              ArrayRef<ProtocolDecl *>(ProtocolDecl *), Cached,
+              ArrayRef<ReparentingProtocolsRequest::Result>(ProtocolDecl *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ProtocolRequirementsRequest,
               ArrayRef<ValueDecl *>(ProtocolDecl *), SeparatelyCached,

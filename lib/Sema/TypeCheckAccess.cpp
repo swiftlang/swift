@@ -2516,9 +2516,10 @@ public:
       // the default witness table for the inherited protocol's requirements.
       if (auto inheritedTy = requirement.getType()->getAs<ProtocolType>()) {
         ProtocolDecl const *inherited = inheritedTy->getDecl();
-        auto isForReparenting = llvm::any_of(
-            proto->getReparentingProtocols(),
-            [&](ProtocolDecl const *RP) { return RP == inherited; });
+        bool isForReparenting = llvm::any_of(
+            proto->getReparentingProtocols(), [=](auto const &tup) {
+              return std::get<ProtocolDecl *>(tup) == inherited;
+            });
         if (isForReparenting) {
           continue;
         }

@@ -243,17 +243,23 @@ public:
 
 /// Computes the set of protocols that are reparenting a given protocol.
 class ReparentingProtocolsRequest
-    : public SimpleRequest<ReparentingProtocolsRequest,
-                           ArrayRef<ProtocolDecl *>(ProtocolDecl *),
-                           RequestFlags::Cached> {
+    : public SimpleRequest<
+          ReparentingProtocolsRequest,
+          ArrayRef<std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>>(
+              ProtocolDecl *),
+          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
+
+  /// Indicates a reparenting by a protocol, defined at a specific extension,
+  /// with an index into the extension's InheritedTypes establishing it.
+  using Result = std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>;
 
 private:
   friend SimpleRequest;
 
   // Evaluation.
-  ArrayRef<ProtocolDecl *> evaluate(Evaluator &, ProtocolDecl *) const;
+  ArrayRef<Result> evaluate(Evaluator &, ProtocolDecl *) const;
 
 public:
   bool isCached() const { return true; }

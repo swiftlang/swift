@@ -7377,11 +7377,11 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
                            {});
 }
 
-ArrayRef<ProtocolDecl *> ProtocolDecl::getReparentingProtocols() const {
+ArrayRef<ReparentingProtocolsRequest::Result>
+ProtocolDecl::getReparentingProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           ReparentingProtocolsRequest{mutThis},
-                           {});
+                           ReparentingProtocolsRequest{mutThis}, {});
 }
 
 ArrayRef<AssociatedTypeDecl *>
