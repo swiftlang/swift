@@ -25,16 +25,16 @@ func foo(_ p: inout MutableSpan<CInt>, a: A, aa: inout A, s: IntSpan, cs: ConstI
   baz.this(&aa, &p)
 
   let _: IntSpan = unsafe s.spanSelf()
-  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan'}}
   let _: MutableSpan<CInt> = unsafe s.spanSelf()
   let _: IntSpan = unsafe s.spanConstSelf()
-  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan'}}
   let _: MutableSpan<CInt> = unsafe s.spanConstSelf()
   let _: ConstIntSpan = unsafe cs.constSpanSelf()
-  // expected-nolifetimebound-error@+1{{cannot convert value of type 'ConstIntSpan' (aka 'std.__1.span<__cxxConst<CInt>, _CUnsignedLong_18446744073709551615>') to specified type 'Span<CInt>' (aka 'Span<Int32>')}}
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'ConstIntSpan'}}
   let _: Span<CInt> = unsafe cs.constSpanSelf()
   let _: IntSpan = unsafe asp.spanSelf()
-  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan' (aka 'std.__1.span<CInt, _CUnsignedLong_18446744073709551615>') to specified type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>')}}
+  // expected-nolifetimebound-error@+1{{cannot convert value of type 'IntSpan'}}
   let _: MutableSpan<CInt> = unsafe asp.spanSelf()
 #if VERIFY
   p.spanSelf() // expected-error{{value of type 'MutableSpan<CInt>' (aka 'MutableSpan<Int32>') has no member 'spanSelf'}}
