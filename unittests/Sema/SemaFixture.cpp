@@ -30,10 +30,9 @@ using namespace swift::unittest;
 using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
-    : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts,
-                               SearchPathOpts, ClangImporterOpts,
-                               SymbolGraphOpts, CASOpts, SerializationOpts,
-                               SourceMgr, Diags, SDKInfo)) {
+    : Context(*ASTContext::get(
+          LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
+          SymbolGraphOpts, CASOpts, SerializationOpts, SourceMgr, Diags)) {
   INITIALIZE_LLVM();
 
   registerParseRequestFunctions(Context.evaluator);
