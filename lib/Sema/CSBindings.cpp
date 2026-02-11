@@ -1163,10 +1163,27 @@ static std::optional<bool> subsumeBinding(PotentialBinding &binding,
 }
 
 void BindingSet::addBinding(PotentialBinding binding) {
-  // Optimization.
+  // Optimization. If the type has no proper subtypes, and the lvalue
+  // state of the type variable is known, we can rewrite a subtype
+  // binding into an exact binding. If the lvalue state isn't known,
+  // then every type T still has @lvalue T as a subtype, so this
+  // isn't sound in that case.
   if (binding.Kind == AllowedBindingKind::Subtypes &&
       !hasProperSubtypes(binding.BindingType)) {
-    binding.Kind = AllowedBindingKind::Exact;
+    switch (getLValueState()) {
+    case KnownLValueKind::Unknown:
+      // Can't do anything
+      break;
+
+    case KnownLValueKind::LValue:
+      if (!binding.BindingType->is<LValueType>())
+        binding.BindingType = LValueType::get(binding.BindingType);
+      LLVM_FALLTHROUGH;
+
+    case KnownLValueKind::RValue:
+      binding.Kind = AllowedBindingKind::Exact;
+      break;
+    }
   }
 
   if (Bindings.count(binding))
