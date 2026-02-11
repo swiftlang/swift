@@ -116,7 +116,7 @@ add_library(swiftRuntime
 
 # Optionally add backtracing sources
 if(${PROJECT_NAME}_ENABLE_BACKTRACING)
-  target_sources(swiftRuntime
+  target_sources(swiftRuntime PRIVATE
     Address.swift
     Backtrace.swift
     Backtrace+Codable.swift
@@ -165,13 +165,13 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     # the different architectures we support.
     string(TOUPPER "${CMAKE_SYSTEM_PROCESSOR}" processor)
     if(processor STREQUAL "AMD64")
-      target_sources(swiftRuntime
+      target_sources(swiftRuntime PRIVATE
         get-cpu-context-x86_64.asm)
     elseif(processor STREQUAL "X86")
-      target_sources(swiftRuntime
+      target_sources(swiftRuntime PRIVATE
         get-cpu-context-i686.asm)
     elseif(processor STREQUAL "ARM64")
-      target_sources(swiftRuntime
+      target_sources(swiftRuntime PRIVATE
         get-cpu-context-aarch64.asm)
     else()
       message(FATAL_ERROR "You need to implement assembly code for ${processor}")
