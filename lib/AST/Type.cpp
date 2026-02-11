@@ -5338,7 +5338,7 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!declCtx->getASTContext().isAtLeastFutureMajorLanguageMode())
+    if (!declCtx->getASTContext().isLanguageModeAtLeast(LanguageMode::future))
       return DiagnosticBehavior::Warning;
   }
 

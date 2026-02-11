@@ -13,8 +13,6 @@
 // RUN: sed -e 's/import Swift$/import Swift; import _Differentiation/' %t/tmp.sil > %t/tmp_fixed.sil
 // RUN: %target-sil-opt -sil-print-types %t/tmp_fixed.sil -module-name main -emit-sorted-sil | %FileCheck %s --check-prefix=CHECK-SIL
 
-// UNSUPPORTED: OS=wasip1
-
 sil_stage raw
 
 import Swift

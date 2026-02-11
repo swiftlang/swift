@@ -696,7 +696,7 @@ bool SwiftASTManager::initCompilerInvocation(
     StringRef UnresolvedPrimaryFile, std::string &Error) {
   return initCompilerInvocation(Invocation, OrigArgs, Action, Diags,
                                 UnresolvedPrimaryFile,
-                                llvm::vfs::getRealFileSystem(), Error);
+                                llvm::vfs::createPhysicalFileSystem(), Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(
@@ -747,7 +747,7 @@ SwiftASTManager::getTypecheckInvocation(ArrayRef<const char *> OrigArgs,
                                         StringRef PrimaryFile,
                                         std::string &Error) {
   return getTypecheckInvocation(OrigArgs, PrimaryFile,
-                                llvm::vfs::getRealFileSystem(), Error);
+                                llvm::vfs::createPhysicalFileSystem(), Error);
 }
 
 SwiftInvocationRef SwiftASTManager::getTypecheckInvocation(
@@ -1146,10 +1146,7 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       Invocation, convertFileContentsToInputs(getFileContents()));
 
   Invocation.getLangOptions().CollectParsedToken = true;
-
-  if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CompIns.getSourceMgr().setFileSystem(FileSystem);
-  }
+  CompIns.getSourceMgr().setFileSystem(FileSystem);
 
   if (CompIns.setup(Invocation, Error)) {
     LOG_WARN_FUNC("Compilation setup failed!!!");

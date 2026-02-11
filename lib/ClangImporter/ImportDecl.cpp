@@ -49,6 +49,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
@@ -6127,7 +6128,7 @@ namespace {
 
       auto access = AccessLevel::Open;
       if (decl->hasAttr<clang::ObjCSubclassingRestrictedAttr>() &&
-          Impl.SwiftContext.isLanguageModeAtLeast(5)) {
+          Impl.SwiftContext.isLanguageModeAtLeast(LanguageMode::v5)) {
         access = AccessLevel::Public;
       }
 
@@ -10525,9 +10526,40 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
     E->loadAllMembers();
 }
 
-void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
-    NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord,
-    ClangInheritanceInfo inheritance) {
+namespace {
+class ClangRecordMemberLoader {
+  ClangImporter::Implementation &Impl;
+  NominalTypeDecl *swiftDecl;
+  bool storage;
+
+public:
+  ClangRecordMemberLoader(ClangImporter::Implementation &Impl,
+                          NominalTypeDecl *swiftDecl, bool storage)
+      : Impl{Impl}, swiftDecl{swiftDecl}, storage{storage} {
+    ASSERT(swiftDecl);
+    ASSERT(isa_and_nonnull<clang::RecordDecl>(swiftDecl->getClangDecl()));
+  }
+  void loadMembers() {
+    ASSERT(swiftDecl && "each Decl should only be loaded once!");
+    load(cast<clang::RecordDecl>(swiftDecl->getClangDecl()),
+         ClangInheritanceInfo());
+    swiftDecl = nullptr;
+  }
+
+private:
+  void load(const clang::RecordDecl *clangRecord,
+            ClangInheritanceInfo inheritance);
+};
+
+static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl) {
+  if (auto *func = dyn_cast<FuncDecl>(valueDecl))
+    if (auto *params = func->getParameters())
+      return params->size();
+  return 0;
+}
+
+void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
+                                   ClangInheritanceInfo inheritance) {
 
   // Whether to skip non-public members. Feature::ImportNonPublicCxxMembers says
   // to import all non-public members by default; if that is disabled, we only
@@ -10571,6 +10603,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         cast<clang::FieldDecl>(m)->isUnnamedBitField())
       continue;
 
+    // Skip this member if caller asked for storage and this isn't a field,
+    // or vice versa.
+    if (storage != isa<clang::FieldDecl>(m))
+      continue;
+
     // Make sure we always pull in record fields. Everything else had better
     // be canonical. Note that this check mostly catches nested C++ types since
     // we import nested C struct types by C's usual convention of chucking them
@@ -10578,10 +10615,10 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     const bool isCanonicalInContext =
         (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
     if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
-        isVisibleClangEntry(nd))
+        Impl.isVisibleClangEntry(nd))
       // We don't pass `swiftDecl` as `expectedDC` because we might be in a
       // recursive call that adds base class members to a derived class.
-      insertMembersAndAlternates(nd, members);
+      Impl.insertMembersAndAlternates(nd, members);
   }
 
   // Add the members here.
@@ -10610,7 +10647,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
       // So we need to clone the member into the derived class.
       if (auto cloned =
-              importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+              Impl.importBaseMemberDecl(baseMember, swiftDecl, inheritance))
         swiftDecl->addMember(cloned);
 
       continue;
@@ -10623,8 +10660,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
     // FIXME: constructors are added eagerly, but shouldn't be
     // FIXME: subscripts are added eagerly, but shouldn't be
-    if (!isa<AccessorDecl>(member) &&
-        !isa<SubscriptDecl>(member) &&
+    if (!isa<AccessorDecl>(member) && !isa<SubscriptDecl>(member) &&
         !isa<ConstructorDecl>(member)) {
       swiftDecl->addMember(member);
     }
@@ -10639,7 +10675,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       clang::QualType baseType = base.getType();
-      if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
+      if (auto spectType =
+              dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
       if (auto elaborated = dyn_cast<clang::ElaboratedType>(baseType))
         baseType = elaborated->desugar();
@@ -10648,22 +10685,23 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
       auto baseInheritance = ClangInheritanceInfo(inheritance, base);
-      loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
+      load(baseRecord, baseInheritance);
     }
   }
 
-  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !inheritance) {
-    lookupAndImportPointee(swiftDecl);
-    lookupAndImportSuccessor(swiftDecl);
+  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
+      !inheritance) {
+    Impl.lookupAndImportPointee(swiftDecl);
+    Impl.lookupAndImportSuccessor(swiftDecl);
   }
 }
+} // namespace
 
-void
-ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
-
+void ClangImporter::Implementation::loadStorageMembers(Decl *D,
+                                                       uint64_t extra) {
   FrontendStatsTracer tracer(D->getASTContext().Stats,
-                             "load-all-members", D);
-  assert(D);
+                             "load-storage-members", D);
+  ASSERT(D);
 
   // If a Clang decl has no owning module, then it needs to be added to the
   // bridging header lookup table. This has most likely already been done, but
@@ -10678,44 +10716,52 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     }
   }
 
-  // Check whether we're importing an Objective-C container of some sort.
-  auto objcContainer =
-    dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
-  auto *IDC = dyn_cast<IterableDeclContext>(D);
-
-  // If not, we're importing globals-as-members into an extension.
-  if (objcContainer) {
-    loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
-    loadAllMembersOfObjcContainer(D, objcContainer);
-    if (IDC) // Set member deserialization status
-      IDC->setDeserializedMembers(true);
+  if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
+    // Namespace members will only be loaded lazily.
+    cast<EnumDecl>(D)->forceSetHasLazyMembers();
     return;
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
-    loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
-                               cast<clang::RecordDecl>(D->getClangDecl()),
-                               ClangInheritanceInfo());
-    if (IDC) // Set member deserialization status
+    ClangRecordMemberLoader(*this, cast<NominalTypeDecl>(D), /*storage=*/true)
+        .loadMembers();
+    return;
+  }
+
+  if (auto *objcContainer =
+          dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl())) {
+    loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
+    loadAllMembersOfObjcContainer(D, objcContainer);
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D))
+      IDC->setDeserializedMembers(true);
+    return;
+  }
+}
+
+void ClangImporter::Implementation::loadNonStorageMembers(Decl *D,
+                                                          uint64_t extra) {
+
+  FrontendStatsTracer tracer(D->getASTContext().Stats,
+                             "load-non-storage-members", D);
+  ASSERT(D);
+
+  if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
+    ClangRecordMemberLoader(*this, cast<NominalTypeDecl>(D), /*storage=*/false)
+        .loadMembers();
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D))
       IDC->setDeserializedMembers(true);
     return;
   }
 
-  if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
-    // Namespace members will only be loaded lazily.
-    cast<EnumDecl>(D)->setHasLazyMembers(true);
-    return;
+  if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+    loadAllMembersIntoExtension(ext, extra);
+    if (auto *IDC = dyn_cast<IterableDeclContext>(D))
+      IDC->setDeserializedMembers(true);
   }
-
-  loadAllMembersIntoExtension(D, extra);
-  if (IDC) // Set member deserialization status
-    IDC->setDeserializedMembers(true);
 }
 
 void ClangImporter::Implementation::loadAllMembersIntoExtension(
-    Decl *D, uint64_t extra) {
-  // We have extension.
-  auto ext = cast<ExtensionDecl>(D);
+    ExtensionDecl *ext, uint64_t extra) {
   auto nominal = ext->getExtendedNominal();
 
   // The submodule of the extension is encoded in the extra data.

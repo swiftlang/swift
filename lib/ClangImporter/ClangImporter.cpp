@@ -7898,16 +7898,6 @@ void ClangImporter::Implementation::markMemberSynthesizedPerType(
   membersSynthesizedPerType.insert(decl);
 }
 
-size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
-    const ValueDecl *valueDecl) {
-  if (auto *func = dyn_cast<FuncDecl>(valueDecl)) {
-    if (auto *params = func->getParameters()) {
-      return params->size();
-    }
-  }
-  return 0;
-}
-
 ValueDecl *
 ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                     ClangInheritanceInfo inheritance) {

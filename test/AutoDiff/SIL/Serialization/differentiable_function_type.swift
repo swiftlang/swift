@@ -9,8 +9,6 @@
 // RUN: %target-sil-opt -sil-print-types %t/tmp_fixed.sil -module-name main -emit-sorted-sil | %FileCheck %s
 
 
-// UNSUPPORTED: OS=wasip1
-
 sil_stage raw
 
 import Swift

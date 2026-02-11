@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -differentiation %s | %FileCheck %s
 
-// UNSUPPORTED: OS=wasip1
-
 sil_stage raw
 
 import _Differentiation

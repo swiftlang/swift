@@ -375,7 +375,7 @@ static bool checkProtocolSelfRequirementsImpl(
                        secondType.getString())
         // FIXME: This should become an unconditional error since violating
         // this invariant can introduce compiler and run time crashes.
-        .warnUntilFutureLanguageModeIf(downgrade);
+        .warnUntilLanguageModeIf(downgrade, LanguageMode::future);
     return true;
   }
 
@@ -717,7 +717,7 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       } else {
         genericParamDecl
             ->diagnose(diag::shadowed_generic_param, genericParamDecl)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
       }
 
       if (existingParamDecl->getLoc()) {

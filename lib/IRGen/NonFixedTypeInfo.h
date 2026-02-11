@@ -114,6 +114,10 @@ public:
     return emitLoadOfIsBitwiseBorrowable(IGF, T);
   }
 
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsAddressableForDependencies(IGF, T);
+  }
+
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     return emitLoadOfIsInline(IGF, T);

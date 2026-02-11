@@ -108,7 +108,7 @@ static StringRef getLibstdcxxModulemapContents() {
     llvm::sys::path::remove_filename(libstdcxxModuleMapPath);
     llvm::sys::path::append(libstdcxxModuleMapPath, "libstdcxx.modulemap");
 
-    auto fs = llvm::vfs::getRealFileSystem();
+    auto fs = llvm::vfs::createPhysicalFileSystem();
     auto file = fs->openFileForRead(libstdcxxModuleMapPath);
     if (!file)
       return "";

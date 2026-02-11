@@ -506,8 +506,7 @@ void IDEInspectionInstance::performNewOperation(
         CI->removeDiagnosticConsumer(DiagC);
     };
 
-    if (FileSystem != llvm::vfs::getRealFileSystem())
-      CI->getSourceMgr().setFileSystem(FileSystem);
+    CI->getSourceMgr().setFileSystem(FileSystem);
 
     Invocation.setIDEInspectionTarget(ideInspectionTargetBuffer, Offset);
 

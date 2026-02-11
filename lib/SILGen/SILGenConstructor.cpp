@@ -663,7 +663,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   MarkUninitializedInst::Kind MUIKind;
   if (isDelegating) {
     MUIKind = MarkUninitializedInst::DelegatingSelf;
-  } else if (getASTContext().isLanguageModeAtLeast(5)) {
+  } else if (getASTContext().isLanguageModeAtLeast(LanguageMode::v5)) {
     MUIKind = MarkUninitializedInst::RootSelf;
   } else {
     auto *dc = ctor->getParent();

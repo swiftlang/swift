@@ -2967,7 +2967,7 @@ static void reconcileInverses(
       if (baseSig && baseSig->requiresProtocol(inv.subject, inv.protocol))
         return true;
 
-      auto gp = inv.subject->castTo<GenericTypeParamType>();
+      auto gp = inv.subject->getRootGenericParam();
 
       // Remove inverses that were either already mangled for this entity,
       // or chosen not to be included in the output.
