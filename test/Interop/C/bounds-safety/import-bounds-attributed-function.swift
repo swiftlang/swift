@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,C-ONLY
-// RUN: %target-swift-ide-test -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
-// RUN: %target-swift-ide-test -Xcc -fbounds-safety -disable-objc-interop -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,BOUNDS-SAFETY,C-ONLY
+// RUN: %target-swift-ide-test -disable-safe-interop -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,C-ONLY
+// RUN: %target-swift-ide-test -disable-safe-interop -Xcc -fexperimental-bounds-safety-attributes -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x -cxx-interoperability-mode=default | %FileCheck %s
+// RUN: %target-swift-ide-test -disable-safe-interop -Xcc -fbounds-safety -disable-objc-interop -print-module -module-to-print=BoundsAttributedFunction -I %S/Inputs -source-filename=x | %FileCheck %s --check-prefixes=CHECK,BOUNDS-SAFETY,C-ONLY
 
 // This test case checks that ClangImporter can import declarations using various bounds attributes,
 // rather than being marked unavailable because of an unknown type.
@@ -34,9 +34,9 @@
 // CHECK-NEXT: func v(_ p: UnsafeMutablePointer<Int{{[0-9]+}}>!) -> UnsafeMutablePointer<Int{{[0-9]+}}>!
 
 
-// RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -D C_ONLY
-// RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -cxx-interoperability-mode=default
-// RUN: %target-swift-frontend -Xcc -fbounds-safety -disable-objc-interop -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -D C_ONLY -D BOUNDS_SAFETY
+// RUN: %target-swift-frontend -disable-experimental-feature StabilizedSafeInteropWrappers -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -D C_ONLY
+// RUN: %target-swift-frontend -disable-experimental-feature StabilizedSafeInteropWrappers -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -cxx-interoperability-mode=default
+// RUN: %target-swift-frontend -disable-experimental-feature StabilizedSafeInteropWrappers -Xcc -fbounds-safety -disable-objc-interop -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s -D C_ONLY -D BOUNDS_SAFETY
 
 import BoundsAttributedFunction
 

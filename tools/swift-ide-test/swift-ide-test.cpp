@@ -839,6 +839,11 @@ static llvm::cl::opt<std::string>
                       llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+    DisableSafeInterop("disable-safe-interop",
+                       llvm::cl::desc("Disable safe interop wrappers."),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
         llvm::cl::cat(Category), llvm::cl::init(false));
@@ -4579,8 +4584,8 @@ int main(int argc, char *argv[]) {
 
   InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
 
-  // FIXME: swift-ide-test doesn't currently have a way to manually disable features.
-  InitInvok.getLangOptions().enableFeature(Feature::StabilizedSafeInteropWrappers);
+  if (!options::DisableSafeInterop)
+    InitInvok.getLangOptions().enableFeature(Feature::StabilizedSafeInteropWrappers);
 
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
