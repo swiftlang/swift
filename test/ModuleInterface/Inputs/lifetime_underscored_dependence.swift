@@ -101,21 +101,8 @@ public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inv
 @inlinable
 public func takeCopierUnannotated(f: (consuming AnotherView) -> AnotherView) {}
 
-public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((AnotherView) -> AnotherView, _ ne0: consuming AnotherView, _ ne1: inout AnotherView) -> AnotherView
-
 @inlinable
-public func takeExplicitNestedType(f: ExplicitNestedType) {}
-
-
-@inlinable
-public func returnableCopier(_ aView: AnotherView) -> AnotherView {
-  return aView
-}
-
-@inlinable
-public func returnCopier() -> @_lifetime(copy a) (_ a: AnotherView) -> AnotherView {
-  return returnableCopier
-}
+public func takeExplicitNestedType(f: @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((AnotherView) -> AnotherView, _ ne0: consuming AnotherView, _ ne1: inout AnotherView) -> AnotherView) {}
 
 @inlinable
 @_lifetime(dest: immortal)

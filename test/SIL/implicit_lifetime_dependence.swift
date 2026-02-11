@@ -7,13 +7,10 @@
 
 struct NE: ~Escapable {}
 
-// CHECK-LABEL: typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
-typealias ImplicitNestedType = ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE
-
 // CHECK-LABEL: func takeImplicitNestedType(f: ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE)
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence22takeImplicitNestedType1fyAA2NEVA2E_AEztXE_AEnAEztXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callee_guaranteed (@guaranteed NE, @lifetime(copy 1) @inout NE) -> @lifetime(copy 0) @owned NE, @owned NE, @lifetime(copy 2) @inout NE) -> @lifetime(copy 1) @owned NE) -> () {
-func takeImplicitNestedType(f: ImplicitNestedType) {}
+func takeImplicitNestedType(f: ((NE, inout NE) -> NE, consuming NE, inout NE) -> NE) {}
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer

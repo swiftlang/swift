@@ -8522,6 +8522,8 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
+ERROR(lifetime_dependence_escaping_closure, none,
+      "an escaping function type cannot output ~Escapable values", ())
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements

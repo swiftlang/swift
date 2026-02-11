@@ -57,72 +57,74 @@ func testBorrow(nc: consuming NC) {
 
 // Tests adapted from lifetime_attr.swift for function types.
 class Klass {}
-typealias InvalidAttrOnNonExistingParamType = @_lifetime(copy nonexisting) (_ ne: NE) -> NE // expected-error{{invalid parameter name specified 'nonexisting'}}
+func takeInvalidAttrOnNonExistingParamType(f: @_lifetime(copy nonexisting) (_ ne: NE) -> NE) {} // expected-error{{invalid parameter name specified 'nonexisting'}}
 
-typealias InvalidAttrOnNonExistingSelfType = @_lifetime(copy self) (_ ne: NE) -> NE // expected-error{{invalid lifetime dependence specifier on non-existent self}}
+func takeInvalidAttrOnNonExistingSelfType(f: @_lifetime(copy self) (_ ne: NE) -> NE) {} // expected-error{{invalid lifetime dependence specifier on non-existent self}}
 
-typealias InvalidAttrOnExistingParamIndexType = @_lifetime(0) (_ ne: NE) -> NE // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func takeInvalidAttrOnExistingParamIndexType(f: @_lifetime(0) (_ ne: NE) -> NE) {} // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 
-typealias InvalidAttrOnNonExistingParamIndexType = @_lifetime(2) (_ ne: NE) -> NE // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func takeInvalidAttrOnNonExistingParamIndexType(f: @_lifetime(2) (_ ne: NE) -> NE) {} // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 
-typealias InvalidDuplicateLifetimeDependenceType = @_lifetime(copy ne, borrow ne) (_ ne: borrowing NE) -> NE // expected-error{{duplicate lifetime dependence specifier}}
+func takeInvalidDuplicateLifetimeDependenceType(f: @_lifetime(copy ne, borrow ne) (_ ne: borrowing NE) -> NE) {} // expected-error{{duplicate lifetime dependence specifier}}
 
-typealias InvalidDependenceConsumeKlassType = @_lifetime(borrow x) (_ x: consuming Klass) -> NE // expected-error{{invalid use of borrow dependence with consuming ownership}}
+func takeInvalidDependenceConsumeKlassType(f: @_lifetime(borrow x) (_ x: consuming Klass) -> NE) {} // expected-error{{invalid use of borrow dependence with consuming ownership}}
 
-typealias InvalidDependenceBorrowKlassType = @_lifetime(&x) (_ x: borrowing Klass) -> NE // expected-error{{invalid use of & dependence with borrowing ownership}}
+func takeInvalidDependenceBorrowKlassType(f: @_lifetime(&x) (_ x: borrowing Klass) -> NE) {} // expected-error{{invalid use of & dependence with borrowing ownership}}
                                                                                          // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
 
-typealias InvalidDependenceInoutKlassType = @_lifetime(borrow x) (_ x: inout Klass) -> NE // expected-error{{invalid use of borrow dependence with inout ownership}}
+func takeInvalidDependenceInoutKlassType(f: @_lifetime(borrow x) (_ x: inout Klass) -> NE) {} // expected-error{{invalid use of borrow dependence with inout ownership}}
                                                                                           // expected-note @-1{{use '@_lifetime(&x)' instead}}
 
-typealias InvalidDependenceConsumeIntType = @_lifetime(borrow x) (_ x: consuming Int) -> NE // OK
+func takeInvalidDependenceConsumeIntType(f: @_lifetime(borrow x) (_ x: consuming Int) -> NE) {} // OK
 
-typealias InvalidDependenceBorrowIntType = @_lifetime(&x) (_ x: borrowing Int) -> NE // expected-error{{invalid use of & dependence with borrowing ownership}}
+func takeInvalidDependenceBorrowIntType(f: @_lifetime(&x) (_ x: borrowing Int) -> NE) {} // expected-error{{invalid use of & dependence with borrowing ownership}}
                                                                                      // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
 
-typealias InvalidDependenceInoutIntType = @_lifetime(borrow x) (_ x: inout Int) -> NE // expected-error{{invalid use of borrow dependence with inout ownership}}
+func takeInvalidDependenceInoutIntType(f: @_lifetime(borrow x) (_ x: inout Int) -> NE) {} // expected-error{{invalid use of borrow dependence with inout ownership}}
                                                                                       // expected-note @-1{{use '@_lifetime(&x)' instead}}
 
-typealias InvalidTargetType =
-  @_lifetime(result: copy source1)
-  @_lifetime(result: copy source2) // expected-error{{invalid duplicate target lifetime dependencies on function}}                                 
-  (_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) -> ()
+func takeInvalidTargetType(
+  f:
+    @_lifetime(result: copy source1)
+    @_lifetime(result: copy source2) // expected-error{{invalid duplicate target lifetime dependencies on function}}                                 
+    (_ result: inout NE, _ source1: consuming NE, _ source2: consuming NE) -> ()) {}
 
-typealias InvalidSourceType =
-  @_lifetime(result: copy source)
-  @_lifetime(result: borrow source) // expected-error{{invalid duplicate target lifetime dependencies on function}}
-  (_ result: inout NE, _ source: consuming NE) -> ()
+func takeInvalidSourceType(
+  f:
+    @_lifetime(result: copy source)
+    @_lifetime(result: borrow source) // expected-error{{invalid duplicate target lifetime dependencies on function}}
+    (_ result: inout NE, _ source: consuming NE) -> ()) {}
 
-typealias ImmortalConflictType = @_lifetime(immortal) (_ immortal: Int) -> NE // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
+func takeImmortalConflictType(f: @_lifetime(immortal) (_ immortal: Int) -> NE) {} // expected-error{{conflict between the parameter name and 'immortal' contextual keyword}}
 
-typealias TestParameterDepType = @_lifetime(span: borrow holder) (_ holder: AnyObject, _ span: Span<Int>) -> () // expected-error{{lifetime-dependent parameter 'span' must be 'inout'}}
+func takeTestParameterDepType(f: @_lifetime(span: borrow holder) (_ holder: AnyObject, _ span: Span<Int>) -> ()) {} // expected-error{{lifetime-dependent parameter 'span' must be 'inout'}}
 
-typealias InoutLifetimeDependenceType = @_lifetime(&ne) (_ ne: inout NE) -> NE
+func takeInoutLifetimeDependenceType(f: @_lifetime(&ne) (_ ne: inout NE) -> NE) {}
 
-typealias DependOnEscapableType1 = @_lifetime(copy k) (_ k: inout Klass) -> NE // expected-error{{cannot copy the lifetime of an Escapable type}}
+func takeDependOnEscapableType1(f: @_lifetime(copy k) (_ k: inout Klass) -> NE) {} // expected-error{{cannot copy the lifetime of an Escapable type}}
                                                                                // expected-note@-1{{use '@_lifetime(&k)' instead}}
 
-typealias DependOnEscapableType2 = @_lifetime(copy k) (_ k: borrowing Klass) -> NE // expected-error{{cannot copy the lifetime of an Escapable type}}
+func takeDependOnEscapableType2(f: @_lifetime(copy k) (_ k: borrowing Klass) -> NE) {} // expected-error{{cannot copy the lifetime of an Escapable type}}
                                                                                    // expected-note@-1{{use '@_lifetime(borrow k)' instead}}
 
-typealias DependOnEscapableType3 = @_lifetime(copy k) (_ k: consuming Klass) -> NE // expected-error{{cannot copy the lifetime of an Escapable type}}
+func takeDependOnEscapableType3(f: @_lifetime(copy k) (_ k: consuming Klass) -> NE) {} // expected-error{{cannot copy the lifetime of an Escapable type}}
                                                                                    // expected-note@-1{{use '@_lifetime(borrow k)' instead}}
 
-typealias GetIntType1 = @_lifetime(inValue) (_ inValue: Int) -> Int // expected-error{{invalid lifetime dependence on an Escapable result}}
+func takeGetIntType1(f: @_lifetime(inValue) (_ inValue: Int) -> Int) {} // expected-error{{invalid lifetime dependence on an Escapable result}}
 
-typealias GetIntType2 = @_lifetime(outValue: borrow inValue) (_ outValue: inout Int, _ inValue: Int) -> () // expected-error{{invalid lifetime dependence on an Escapable target}}
+func takeGetIntType2(f: @_lifetime(outValue: borrow inValue) (_ outValue: inout Int, _ inValue: Int) -> ()) {} // expected-error{{invalid lifetime dependence on an Escapable target}}
 
-typealias GetGenericEscapableType<T> = @_lifetime(inValue) (_ inValue: T) -> T // expected-error{{invalid lifetime dependence on an Escapable result}}
+func takeGetGenericEscapableType<T>(f: @_lifetime(inValue) (_ inValue: T) -> T) {} // expected-error{{invalid lifetime dependence on an Escapable result}}
 
-typealias GetGenericEscapableType2<T> =
-  @_lifetime(outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
-  (_ outValue: inout T, _ inValue: T) -> ()
+func takeGetGenericEscapableType2<T>(
+  f: @_lifetime(outValue: borrow inValue) // expected-error{{invalid lifetime dependence on an Escapable target}}
+    (_ outValue: inout T, _ inValue: T) -> ()) {}
 
-typealias GetGenericNonEscapableType2<T: ~Escapable> =
-  @_lifetime(borrow inValue) (_ inValue: borrowing T) -> T // OK
+func takeGetGenericNonEscapableType2<T: ~Escapable>(
+  f: @_lifetime(borrow inValue) (_ inValue: borrowing T) -> T) {} // OK
 
-typealias GetGenericCorrectType<T: ~Escapable> =
-  @_lifetime(outValue: borrow inValue) (_ outValue: inout T, _ inValue: borrowing T) -> () // OK
+func takeGetGenericCorrectType<T: ~Escapable>(
+  f: @_lifetime(outValue: borrow inValue) (_ outValue: inout T, _ inValue: borrowing T) -> ()) {} // OK
 
 @_lifetime(outValue: copy inValue) // OK
 func getGeneric<T : ~Escapable>(_ outValue: inout T, _ inValue: borrowing T) { // expected-note{{in call to function 'getGeneric'}}
@@ -174,9 +176,12 @@ do {
   takeGetGenericAndArgs(f: { $0 = $1 }, o: &y, i: x) // OK
 }
 do {
+  // Lifetime-annotated escaping function types
   let _ = transfer // OK
-  let _: (NE) -> NE = transfer // OK
-  let _: @_lifetime(copy ne) (_ ne: NE) -> NE = transfer // OK
+  let _: (NE) -> NE = transfer // expected-error{{an escaping function type cannot output ~Escapable values}}
+                               // expected-error@-1{{value of type 'NE' does not conform to specified type 'Escapable'}}
+  let _: @_lifetime(copy ne) (_ ne: NE) -> NE = transfer // expected-error{{an escaping function type cannot output ~Escapable values}}
+                                                         // expected-error@-1{{value of type 'NE' does not conform to specified type 'Escapable'}}
 }
 
 // rdar://166912068 (Incorrect error when passing a local function with a non-escapable parameter)
@@ -207,23 +212,28 @@ struct CNE<T: ~Escapable>: ~Escapable {
 func copyCNE(cne: CNE<NE>) -> CNE<NE> {
     return cne
 }
+func inoutCNE(cne: inout CNE<NE>) {}
 
-public let UnboundGenericParamFunctionType : (CNE) -> CNE<NE> = copyCNE                                         // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
-                                                                                                                // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
-public let UnboundGenericParamFunctionTypeAnnotated : @_lifetime(borrow cne) (_ cne: CNE) -> CNE<NE> = copyCNE  // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
-                                                                                                                // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
-public let UnboundGenericResultFunctionType : (CNE<NE>) -> CNE = copyCNE                                        // expected-error{{lifetime dependence checking failed due to unknown result type}}
-                                                                                                                // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
-public let UnboundGenericResultFunctionTypeAnnotated : @_lifetime(borrow cne) (_ cne: CNE<NE>) -> CNE = copyCNE // expected-error{{lifetime dependence checking failed due to unknown result type}}
-                                                                                                                // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
+public let UnboundGenericParamFunctionType : (CNE) -> CNE<NE> = copyCNE                                             // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
+                                                                                                                    // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
+public let UnboundGenericParamFunctionTypeAnnotated : @_lifetime(borrow cne) (_ cne: CNE) -> CNE<NE> = copyCNE      // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
+                                                                                                                    // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
+public let UnboundGenericResultFunctionType : (CNE<NE>) -> CNE = copyCNE                                            // expected-error{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
+public let UnboundGenericResultFunctionTypeAnnotated : @_lifetime(borrow cne) (_ cne: CNE<NE>) -> CNE = copyCNE     // expected-error{{lifetime dependence checking failed due to unknown result type}}
+                                                                                                                    // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
+public let UnboundGenericInoutFunctionType : (inout CNE) -> () = inoutCNE                                           // expected-error{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
+public let UnboundGenericInoutFunctionTypeAnnotated : @_lifetime(cne: copy cne) (_ cne: inout CNE) -> () = inoutCNE // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
+                                                                                                                    // expected-error@-1{{value of type 'CNE<NE>' does not conform to specified type 'Escapable'}}
 
 public let TypeParameterParamFunctionType = copyCNE as (_) -> CNE<NE>                                         // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
                                                                                                               // expected-error@-1{{failed to produce diagnostic for expression}}
 public let TypeParameterParamFunctionTypeAnnotated = copyCNE as @_lifetime(borrow cne) (_ cne: _) -> CNE<NE>  // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
                                                                                                               // expected-error@-1{{failed to produce diagnostic for expression}}
-public let TypeParameterResultFunctionType = copyCNE as (CNE<NE>) -> _                                        // expected-error{{lifetime dependence checking failed due to unknown result type}}
-                                                                                                              // expected-error@-1{{failed to produce diagnostic for expression}}
+public let TypeParameterResultFunctionType = copyCNE as (CNE<NE>) -> _                                        // expected-error{{failed to produce diagnostic for expression}}
 public let TypeParameterResultFunctionTypeAnnotated = copyCNE as @_lifetime(borrow cne) (_ cne: CNE<NE>) -> _ // expected-error{{lifetime dependence checking failed due to unknown result type}}
+                                                                                                              // expected-error@-1{{failed to produce diagnostic for expression}}
+public let TypeParameterInoutFunctionType = inoutCNE as (_) -> ()                                             // expected-error{{failed to produce diagnostic for expression}}
+public let TypeParameterInoutFunctionTypeAnnotated = inoutCNE as @_lifetime(copy cne) (_ cne: _) -> ()        // expected-error{{lifetime dependence checking failed due to unknown parameter type}}
                                                                                                               // expected-error@-1{{failed to produce diagnostic for expression}}
 
 // Closure Context Dependence Tests
@@ -243,4 +253,17 @@ func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
   // expected-error @-1{{a function with a ~Escapable result needs a parameter to depend on}}
   // expected-note  @-2{{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
   f()
+}
+
+// Escaping Closure Tests
+func returnEscapingTransfer() -> @_lifetime(copy a) (_ a: NE) -> NE {
+  // expected-error @-1{{an escaping function type cannot output ~Escapable values}}
+  return transfer // expected-error{{return expression of type 'NE' does not conform to 'Escapable'}}
+}
+func implicitReturnEscapingTransfer() -> (NE) -> NE {
+  // expected-error @-1{{an escaping function type cannot output ~Escapable values}}
+  return transfer // expected-error{{return expression of type 'NE' does not conform to 'Escapable}}
+}
+func takeEscapingTransfer(f: @escaping @_lifetime(copy a) (_ a: NE) -> NE) -> () {
+  // expected-error @-1{{an escaping function type cannot output ~Escapable values}}
 }

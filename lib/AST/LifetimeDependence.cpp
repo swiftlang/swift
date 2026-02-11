@@ -663,7 +663,8 @@ public:
   }
 
   /// Perform lifetime dependence checks for a function type.
-  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncType() {
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+  checkFuncType(AnyFunctionType *aft, FunctionTypeRepr *funcRepr) {
     // Check if the function type contains any types for which we cannot
     // determine Escapability. We cannot perform lifetime inference for such
     // types, or check the correctness of lifetime annotations on them, so bail
@@ -674,7 +675,8 @@ public:
     // be worth the effort.
     //
     // Even if there were no explicit lifetime entries, we still need to
-    // diagnose failed inference if a parameter or the result was ~Escapable.
+    // diagnose failed inference if an inout parameter or the result was
+    // ~Escapable.
     const auto isNonEscapableSafe = [](Type t) {
       return !isTypeUnknown(t) && isDiagnosedNonEscapable(t);
     };
@@ -682,9 +684,11 @@ public:
         !lifetimeEntries.empty() ||
         llvm::any_of(parameterInfos,
                      [&](const ParamInfo &paramInfo) {
-                       return isNonEscapableSafe(paramInfo.typeInContext);
+                       return isNonEscapableSafe(paramInfo.typeInContext) &&
+                              paramInfo.param.isInOut();
                      }) ||
         isNonEscapableSafe(resultTy);
+
     bool unknownTypeFound = false;
     for (const auto &paramInfo : parameterInfos) {
       if (isTypeUnknown(paramInfo.typeInContext)) {
@@ -702,6 +706,16 @@ public:
 
     if (unknownTypeFound)
       return std::nullopt;
+
+    // Do not perform lifetime checking on an escaping function type.
+    if (!aft->isNoEscape()) {
+      if (shouldDiagnose) {
+        diagnose(lifetimeEntries.empty() ? funcRepr->getLoc()
+                                         : lifetimeEntries.front()->getLoc(),
+                 diag::lifetime_dependence_escaping_closure);
+      }
+      return std::nullopt;
+    }
 
     return checkCommon();
   }
@@ -1857,7 +1871,7 @@ LifetimeDependenceInfo::getFromAST(
     GenericEnvironment *env) {
   return LifetimeDependenceChecker(funcRepr, funcType, lifetimeAttributes, dc,
                                    env)
-      .checkFuncType();
+      .checkFuncType(funcType, funcRepr);
 }
 
 void LifetimeDependenceInfo::dump() const {
