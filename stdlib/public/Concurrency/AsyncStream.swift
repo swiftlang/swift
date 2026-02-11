@@ -193,7 +193,7 @@ public struct AsyncStream<Element> {
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: sending Element) -> YieldResult {
-      storage.yield(value).toStream()
+      storage.yield(value).nonThrowingRepresentation
     }
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -222,14 +222,14 @@ public struct AsyncStream<Element> {
       get {
         storage.getOnTermination().map { handler in
           return { @Sendable termination in
-            handler(termination.toInternal())
+            handler(termination.throwingRepresentation)
           }
         }
       }
       nonmutating set {
         storage.setOnTermination(newValue.map { handler in
           return { @Sendable termination in
-            handler(termination.toStream())
+            handler(termination.nonThrowingRepresentation)
           }
         })
       }
@@ -300,7 +300,7 @@ public struct AsyncStream<Element> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _Storage = .create(limit: limit.toInternal())
+    let storage: _Storage = .create(limit: limit.throwingRepresentation)
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
@@ -434,7 +434,7 @@ extension AsyncStream.Continuation {
   ) -> YieldResult {
     switch result {
     case .success(let val):
-      return storage.yield(val).toStream()
+      return storage.yield(val).nonThrowingRepresentation
     }
   }
 
@@ -452,7 +452,7 @@ extension AsyncStream.Continuation {
   /// blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
-    return storage.yield(()).toStream()
+    return storage.yield(()).nonThrowingRepresentation
   }
 }
 
@@ -616,114 +616,155 @@ extension AsyncStream.Continuation {
 extension AsyncStream: @unchecked Sendable where Element: Sendable { }
 #endif
 
-extension _StreamInternals.YieldResult {
-  func toThrowingStream() -> AsyncThrowingStream<Element, Failure>.Continuation.YieldResult {
-    switch self {
-    case .dropped(let element): .dropped(element)
-    case .enqueued(let remaining): .enqueued(remaining: remaining)
-    case .terminated: .terminated
-    }
-  }
-
-  func toStream() -> AsyncStream<Element>.Continuation.YieldResult {
-    switch self {
-    case .dropped(let element): .dropped(element)
-    case .enqueued(let remaining): .enqueued(remaining: remaining)
-    case .terminated: .terminated
-    }
-  }
-}
-
-extension AsyncStream.Continuation.YieldResult {
-  func toInternal() -> _StreamInternals<Element, Never>.YieldResult {
-    switch self {
-    case .dropped(let element): .dropped(element)
-    case .enqueued(let remaining): .enqueued(remaining: remaining)
-    case .terminated: .terminated
-    }
-  }
-}
+//extension _StreamInternals.YieldResult {
+//  func toThrowingStream() -> AsyncThrowingStream<Element, Failure>.Continuation.YieldResult {
+//    switch self {
+//    case .dropped(let element): .dropped(element)
+//    case .enqueued(let remaining): .enqueued(remaining: remaining)
+//    case .terminated: .terminated
+//    }
+//  }
+//
+//  func toStream() -> AsyncStream<Element>.Continuation.YieldResult {
+//    switch self {
+//    case .dropped(let element): .dropped(element)
+//    case .enqueued(let remaining): .enqueued(remaining: remaining)
+//    case .terminated: .terminated
+//    }
+//  }
+//}
+//
+//extension AsyncStream.Continuation.YieldResult {
+//  func toInternal() -> _StreamInternals<Element, Never>.YieldResult {
+//    switch self {
+//    case .dropped(let element): .dropped(element)
+//    case .enqueued(let remaining): .enqueued(remaining: remaining)
+//    case .terminated: .terminated
+//    }
+//  }
+//}
 
 extension AsyncThrowingStream.Continuation.YieldResult {
-  func toInternal() -> _StreamInternals<Element, Failure>.YieldResult {
+
+  var nonThrowingRepresentation: AsyncStream<Element>.Continuation.YieldResult {
     switch self {
     case .dropped(let element): .dropped(element)
     case .enqueued(let remaining): .enqueued(remaining: remaining)
     case .terminated: .terminated
     }
   }
+
+//  func toInternal() -> _StreamInternals<Element, Failure>.YieldResult {
+//    switch self {
+//    case .dropped(let element): .dropped(element)
+//    case .enqueued(let remaining): .enqueued(remaining: remaining)
+//    case .terminated: .terminated
+//    }
+//  }
 }
 
-extension _StreamInternals.BufferingPolicy {
-  func toThrowingStream() -> AsyncThrowingStream<Element, Failure>.Continuation.BufferingPolicy {
-    switch self {
-    case .bufferingNewest(let limit): .bufferingNewest(limit)
-    case .bufferingOldest(let limit): .bufferingOldest(limit)
-    case .unbounded: .unbounded
-    }
-  }
-
-  func toStream() -> AsyncStream<Element>.Continuation.BufferingPolicy {
-    switch self {
-    case .bufferingNewest(let limit): .bufferingNewest(limit)
-    case .bufferingOldest(let limit): .bufferingOldest(limit)
-    case .unbounded: .unbounded
-    }
-  }
-}
+//extension _StreamInternals.BufferingPolicy {
+//  func toThrowingStream() -> AsyncThrowingStream<Element, Failure>.Continuation.BufferingPolicy {
+//    switch self {
+//    case .bufferingNewest(let limit): .bufferingNewest(limit)
+//    case .bufferingOldest(let limit): .bufferingOldest(limit)
+//    case .unbounded: .unbounded
+//    }
+//  }
+//
+//  func toStream() -> AsyncStream<Element>.Continuation.BufferingPolicy {
+//    switch self {
+//    case .bufferingNewest(let limit): .bufferingNewest(limit)
+//    case .bufferingOldest(let limit): .bufferingOldest(limit)
+//    case .unbounded: .unbounded
+//    }
+//  }
+//}
 
 extension AsyncStream.Continuation.BufferingPolicy {
-  func toInternal() -> _StreamInternals<Element, Never>.BufferingPolicy {
+  var throwingRepresentation: AsyncThrowingStream<Element, Never>.Continuation.BufferingPolicy {
     switch self {
     case .bufferingNewest(let limit): .bufferingNewest(limit)
     case .bufferingOldest(let limit): .bufferingOldest(limit)
     case .unbounded: .unbounded
     }
   }
+
+//  func toInternal() -> _StreamInternals<Element, Never>.BufferingPolicy {
+//    switch self {
+//    case .bufferingNewest(let limit): .bufferingNewest(limit)
+//    case .bufferingOldest(let limit): .bufferingOldest(limit)
+//    case .unbounded: .unbounded
+//    }
+//  }
 }
 
 extension AsyncThrowingStream.Continuation.BufferingPolicy {
-  func toInternal() -> _StreamInternals<Element, Failure>.BufferingPolicy {
+
+  var nonThrowingRepresentation: AsyncStream<Element>.Continuation.BufferingPolicy {
     switch self {
     case .bufferingNewest(let limit): .bufferingNewest(limit)
     case .bufferingOldest(let limit): .bufferingOldest(limit)
     case .unbounded: .unbounded
     }
   }
+
+//  func toInternal() -> _StreamInternals<Element, Failure>.BufferingPolicy {
+//    switch self {
+//    case .bufferingNewest(let limit): .bufferingNewest(limit)
+//    case .bufferingOldest(let limit): .bufferingOldest(limit)
+//    case .unbounded: .unbounded
+//    }
+//  }
 }
 
-extension _StreamInternals.Termination {
-  func toThrowingStream() -> AsyncThrowingStream<Element, Failure>.Continuation.Termination {
-    switch self {
-    case .finished(let failure): .finished(failure)
-    case .cancelled: .cancelled
-    }
-  }
-}
-
-extension _StreamInternals.Termination where Failure == Never {
-  func toStream() -> AsyncStream<Element>.Continuation.Termination {
-    switch self {
-    case .finished: .finished
-    case .cancelled: .cancelled
-    }
-  }
-}
+//extension _StreamInternals.Termination {
+//  func toThrowingStream() -> AsyncThrowingStream<Element, Failure>.Continuation.Termination {
+//    switch self {
+//    case .finished(let failure): .finished(failure)
+//    case .cancelled: .cancelled
+//    }
+//  }
+//}
+//
+//extension _StreamInternals.Termination where Failure == Never {
+//  func toStream() -> AsyncStream<Element>.Continuation.Termination {
+//    switch self {
+//    case .finished: .finished
+//    case .cancelled: .cancelled
+//    }
+//  }
+//}
 
 extension AsyncStream.Continuation.Termination {
-  func toInternal() -> _StreamInternals<Element, Never>.Termination {
+  var throwingRepresentation: AsyncThrowingStream<Element, Never>.Continuation.Termination {
     switch self {
     case .finished: .finished(nil)
     case .cancelled: .cancelled
     }
   }
+
+//  func toInternal() -> _StreamInternals<Element, Never>.Termination {
+//    switch self {
+//    case .finished: .finished(nil)
+//    case .cancelled: .cancelled
+//    }
+//  }
 }
 
 extension AsyncThrowingStream.Continuation.Termination {
-  func toInternal() -> _StreamInternals<Element, Failure>.Termination {
+
+  var nonThrowingRepresentation: AsyncStream<Element>.Continuation.Termination {
     switch self {
-    case .finished(let failure): .finished(failure)
+    case .finished: .finished
     case .cancelled: .cancelled
     }
   }
+
+//  func toInternal() -> _StreamInternals<Element, Failure>.Termination {
+//    switch self {
+//    case .finished(let failure): .finished(failure)
+//    case .cancelled: .cancelled
+//    }
+//  }
 }

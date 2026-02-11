@@ -215,7 +215,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// without blocking for any awaiting consumption from the iteration.
     @discardableResult
     public func yield(_ value: sending Element) -> YieldResult {
-      storage.yield(value).toThrowingStream()
+      storage.yield(value)
     }
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -244,18 +244,10 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     ///  `AsyncThrowingStream` disposes of the callback.
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
-        storage.getOnTermination().map { handler in
-          return { @Sendable termination in
-            handler(termination.toInternal())
-          }
-        }
+        storage.getOnTermination()
       }
       nonmutating set {
-        storage.setOnTermination(newValue.map { handler in
-          return { @Sendable termination in
-            handler(termination.toThrowingStream())
-          }
-        })
+        storage.setOnTermination(newValue)
       }
     }
   }
@@ -335,7 +327,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
     _ build: (Continuation) -> Void
   ) where Failure == Error {
-    let storage: _Storage = .create(limit: limit.toInternal())
+    let storage: _Storage = .create(limit: limit)
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
@@ -475,7 +467,7 @@ extension AsyncThrowingStream.Continuation {
   ) -> YieldResult where Failure == Error {
     switch result {
     case .success(let val):
-      return storage.yield(val).toThrowingStream()
+      return storage.yield(val)
     case .failure(let err):
       storage.finish(throwing: err)
       return .terminated
@@ -496,7 +488,7 @@ extension AsyncThrowingStream.Continuation {
   /// without blocking for any awaiting consumption from the iteration.
   @discardableResult
   public func yield() -> YieldResult where Element == Void {
-    storage.yield(()).toThrowingStream()
+    storage.yield(())
   }
 }
 
