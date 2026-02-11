@@ -3601,6 +3601,12 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   for (const auto &found :
        getDirectlyInheritedNominalTypeDecls(PD, inverses, anyObject)) {
     auto proto = dyn_cast<ProtocolDecl>(found.Item);
+
+    // The inherited type can be a reparentable protocol that is less available
+    // than the protocol itself. In such a case, don't consider it inherited.
+    if (proto && proto->isReparentableAndUnavailable())
+      continue;
+
     if (proto && proto != PD)
       inherited.insert(proto);
   }
@@ -3647,6 +3653,51 @@ AllInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   });
 
   return PD->getASTContext().AllocateCopy(result.getArrayRef());
+}
+
+ArrayRef<ProtocolDecl *>
+ReparentingProtocolsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  // ObjC protocols cannot be reparented.
+  if (PD->isObjC())
+    return {};
+
+  auto const *expectedModule = PD->getModuleContext();
+
+  llvm::SmallSetVector<ProtocolDecl *, 4> result;
+  for (auto const *ext : PD->getExtensions()) {
+
+    // Extensions in other modules can't validly declare a reparenting.
+    if (ext->getModuleContext() != expectedModule)
+      continue;
+
+    // Search for @reparented entries in the extension's inheritance clause.
+    auto inheritedTypes = ext->getInherited();
+    for (auto index : inheritedTypes.getIndices()) {
+      auto const &inherited = inheritedTypes.getEntry(index);
+
+      if (!inherited.isReparented())
+        continue;
+
+      // Resolve the type.
+      Type ty = inheritedTypes.getResolvedType(index,
+                                               TypeResolutionStage::Structural);
+
+      if (!ty || ty->hasError())
+        continue;
+
+      auto protoTy = ty->castTo<ProtocolType>();
+      result.insert(protoTy->getDecl());
+    }
+  }
+
+  if (result.empty())
+    return {};
+
+  // Give a stable ordering of the protocols to avoid later non-determinism.
+  auto vec = result.takeVector();
+  llvm::array_pod_sort(vec.begin(), vec.end(), TypeDecl::compare);
+  return PD->getASTContext().AllocateCopy(vec);
 }
 
 ArrayRef<ValueDecl *>

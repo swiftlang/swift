@@ -5636,6 +5636,9 @@ public:
   /// this protocol itself.
   ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
 
+  /// Retrieve the set of protocols that are reparenting this protocol.
+  ArrayRef<ProtocolDecl *> getReparentingProtocols() const;
+
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
@@ -5731,6 +5734,11 @@ public:
   /// Determine whether this is a "marker" protocol, meaning that is indicates
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
+
+  /// Determine whether this is a @reparentable protocol with availability
+  /// that indicates it was introduced in a version that pre-dates the
+  /// current compilation's deployment target.
+  bool isReparentableAndUnavailable() const;
 
   /// Determine if this is an invertible protocol and return its kind,
   /// i.e., for a protocol P, returns the kind if inverse constraint ~P exists.

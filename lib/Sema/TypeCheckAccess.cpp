@@ -2508,6 +2508,22 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *proto) {
     for (TypeLoc requirement : proto->getInherited().getEntries()) {
+
+      // Inherited protocols can be less available than this protocol, only if
+      // this protocol has defined a @reparented extension and thus default
+      // conformance. Otherwise, clients compiled for an older version of the
+      // library could send types into a newer library that fails to provide
+      // the default witness table for the inherited protocol's requirements.
+      if (auto inheritedTy = requirement.getType()->getAs<ProtocolType>()) {
+        ProtocolDecl const *inherited = inheritedTy->getDecl();
+        auto isForReparenting = llvm::any_of(
+            proto->getReparentingProtocols(),
+            [&](ProtocolDecl const *RP) { return RP == inherited; });
+        if (isForReparenting) {
+          continue;
+        }
+      }
+
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
                 ExportabilityReason::General,
                 DeclAvailabilityFlag::DisableUnsafeChecking);
@@ -2605,7 +2621,14 @@ public:
     //
     // 1) If the extension defines conformances, the conformed-to protocols
     // must be exported.
-    DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+    DeclAvailabilityFlags flags;
+
+    // Extensions of protocols can only have inherited entries for reparenting.
+    // For understandability, the `extension P: @reparented Q` defines a
+    // relationship that should have the same availability as the protocol Q.
+    if (!isa<ProtocolDecl>(extendedType))
+      flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+
     flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
     ExportabilityReason inheritanceReason =
       Where.getExportedLevel() == ExportedLevel::ImplicitlyExported ?

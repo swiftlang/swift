@@ -214,6 +214,12 @@ static void checkReparentedExtensionEntry(const ExtensionDecl *ext,
       childProto->getInheritedProtocols(),
       [&](ProtocolDecl *inherited) { return inherited == reparentedProto; });
 
+  // If the protocol is unavailable, then there's no issue.
+  if (reparentedProto->isReparentableAndUnavailable()) {
+    ASSERT(!found && "shouldn't be inheriting from an unavailable protocol!");
+    return;
+  }
+
   if (!found) {
     ext->getASTContext().Diags.diagnose(
         entry.getLoc(), diag::extension_protocol_reparented_not_inheriting,

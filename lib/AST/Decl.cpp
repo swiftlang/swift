@@ -7326,6 +7326,21 @@ bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
 }
 
+bool ProtocolDecl::isReparentableAndUnavailable() const {
+  auto &ctx = getASTContext();
+  if (getAttrs().hasAttribute<ReparentableAttr>()) {
+    if (auto protoAvail = getActiveAvailableAttrForCurrentPlatform()) {
+      if (auto protoIntroduction = protoAvail->getIntroducedRange(ctx)) {
+        auto deploymentRange = AvailabilityRange::forDeploymentTarget(ctx);
+        if (!deploymentRange.isContainedIn(*protoIntroduction)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 std::optional<InvertibleProtocolKind>
 ProtocolDecl::getInvertibleProtocolKind() const {
   if (auto kp = getKnownProtocolKind())
@@ -7359,6 +7374,13 @@ ArrayRef<ProtocolDecl *> ProtocolDecl::getAllInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            AllInheritedProtocolsRequest{mutThis},
+                           {});
+}
+
+ArrayRef<ProtocolDecl *> ProtocolDecl::getReparentingProtocols() const {
+  auto *mutThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ReparentingProtocolsRequest{mutThis},
                            {});
 }
 

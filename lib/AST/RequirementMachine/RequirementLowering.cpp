@@ -832,6 +832,26 @@ void swift::rewriting::realizeInheritedRequirements(
 
     if (!inheritedType) continue;
 
+    // The inherited type can be a reparentable protocol that is less available
+    // than the protocol itself. In such a case, don't consider the requirement.
+    if (isa<ProtocolDecl>(decl)) {
+      auto isUnavailable = [](Type t) {
+        if (auto pt = t->getAs<ProtocolType>()) {
+          if (pt->getDecl()->isReparentableAndUnavailable())
+            return true;
+        }
+        return false;
+      };
+
+      if (auto protoTy = inheritedType->getAs<ProtocolType>()) {
+        if (isUnavailable(protoTy))
+          continue;
+      } else if (auto pct = inheritedType->getAs<ProtocolCompositionType>()) {
+        if (llvm::any_of(pct->getMembers(), isUnavailable))
+          continue;
+      }
+    }
+
     if (shouldInferRequirements) {
       inferRequirements(inheritedType, moduleForInference,
                         decl->getInnermostDeclContext(), result);
