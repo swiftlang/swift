@@ -15,6 +15,7 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
+    CxxBorrowingSequence.swift
     CxxVector.swift
     CxxSpan.swift
     UnsafeCxxIterators.swift
