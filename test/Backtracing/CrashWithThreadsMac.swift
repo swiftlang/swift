@@ -11,9 +11,6 @@
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx
 
-// This test proved unstable on Linux so we disabled it while focus is elsewhere,
-// as it's not critical function, but it would be nice to restore it one day.
-
 import Darwin
 
 let mutex = UnsafeMutablePointer<pthread_mutex_t>.allocate(capacity: 1)
