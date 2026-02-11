@@ -1185,3 +1185,10 @@ Added: __swift_exclusivityAccessSetNext
 Added: _swift_dereferenceBorrow
 Added: _swift_getBorrowTypeMetadata
 Added: _swift_initBorrow
+
+// Unique type metadata accessor
+Added: _$ss6UniqueVMa
+// Unique type descriptor
+Added: _$ss6UniqueVMn
+// Unique.pointer getter
+Added: _$ss6UniqueVsRi_zrlE7pointerSpyxGvg
