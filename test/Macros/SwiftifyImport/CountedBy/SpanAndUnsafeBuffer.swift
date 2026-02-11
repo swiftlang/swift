@@ -23,6 +23,9 @@ public func myFunc(_ ptr1: Span<CInt>, _ ptr2: UnsafeBufferPointer<CInt>) {
     let _ptr1Ptr = unsafe ptr1.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr1)
+    }
     return unsafe myFunc(_ptr1Ptr.baseAddress!, len1, ptr2.baseAddress!, len2)
 }
 ------------------------------

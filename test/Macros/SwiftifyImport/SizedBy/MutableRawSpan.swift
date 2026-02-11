@@ -22,6 +22,9 @@ public func myFunc(_ ptr: inout MutableRawSpan) {
     let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe myFunc(_ptrPtr.baseAddress!, size)
 }
 ------------------------------

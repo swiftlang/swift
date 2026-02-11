@@ -42,6 +42,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------

@@ -120,6 +120,9 @@ public func noescape(_ ptr: Span<CInt>) {
     let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe noescape(_ptrPtr.baseAddress!)
 }
 ------------------------------
@@ -134,6 +137,9 @@ public func noescapeOpt(_ ptr: Span<CInt>?) {
     }
     let _ptrPtr = unsafe ptr?.withUnsafeBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe noescapeOpt(_ptrPtr?.baseAddress)
 }
@@ -150,6 +156,9 @@ public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
     let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe noescapeMut(_ptrPtr.baseAddress!)
 }
 ------------------------------
@@ -164,6 +173,9 @@ public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
     }
     let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe noescapeMutOpt(_ptrPtr?.baseAddress)
 }

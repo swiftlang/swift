@@ -24,8 +24,14 @@ public func myFunc(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CI
     let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr2)
     }
     return unsafe _swiftifyOverrideLifetime({ () in
       let _resultValue = unsafe myFunc(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
