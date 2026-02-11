@@ -656,23 +656,12 @@ class BuildScriptInvocation(object):
         builder.add_impl_product(products.LibDispatch,
                                  is_enabled=self.args.build_libdispatch)
 
-        # Begin a new build-script pipeline for Swift Testing only. This is a required
-        # dependency to build XCTest, which is in the next pipeline.
-        # We can't include both in the same pipeline because XCTest is an impl product.
-        builder.begin_pipeline()
-        builder.add_product(products.SwiftTestingMacros,
-                            is_enabled=self.args.build_swift_testing_macros)
-        builder.add_product(products.SwiftTesting,
-                            is_enabled=self.args.build_swift_testing)
-
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
-        builder.add_impl_product(products.XCTest,
-                                 is_enabled=self.args.build_xctest)
         builder.add_impl_product(products.LLBuild,
                                  is_enabled=self.args.build_llbuild)
 
@@ -684,6 +673,10 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
 
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
 
@@ -742,6 +735,12 @@ class BuildScriptInvocation(object):
         builder.add_product(products.SwiftDriver,
                             is_enabled=self.args.build_swift_driver
                             or self.args.install_swift_driver)
+
+        # Build XCTest last since it must follow after Swift Testing. It requires a
+        # separate pipeline since it is an impl_product.
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
+        builder.add_impl_product(products.XCTest,
+                                 is_enabled=self.args.build_xctest)
 
         # Now that we have constructed our pass pipelines using our builder, get
         # the final schedule and finalize the builder.
