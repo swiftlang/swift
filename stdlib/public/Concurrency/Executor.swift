@@ -36,26 +36,9 @@ public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  #if os(WASI) || !$Embedded
-  /// `true` if this is the main executor.
-  @_weakLinked
-  @available(StdlibDeploymentTarget 6.3, *)
-  var isMainExecutor: Bool { get }
-  #endif // os(WASI) || !$Embedded
-
-  #if !$Embedded
-  /// Return this executable as a SchedulingExecutor, or nil if that is
-  /// unsupported.
-  ///
-  /// Executors that implement SchedulingExecutor should provide their
-  /// own copy of this method, which will allow the compiler to avoid a
-  /// potentially expensive runtime cast.
-  @_weakLinked
-  @available(StdlibDeploymentTarget 6.3, *)
-  var asSchedulingExecutor: (any SchedulingExecutor)? { get }
-  #endif
 }
 
+@_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol SchedulingExecutor: Executor {
 
@@ -141,7 +124,7 @@ extension Executor {
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
   @available(StdlibDeploymentTarget 6.3, *)
-  public var asSchedulingExecutor: (any SchedulingExecutor)? {
+  internal var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
   }
   #endif
@@ -161,16 +144,24 @@ extension Executor where Self: Equatable {
 }
 
 extension Executor {
+
   #if os(WASI) || !$Embedded
   // This defaults to `false` so that existing third-party Executor
   // implementations will work as expected.
   @available(StdlibDeploymentTarget 6.3, *)
-  public var isMainExecutor: Bool { false }
+  internal var isMainExecutor: Bool {
+    #if os(WASI) || !$Embedded
+    return self is MainExecutor
+    #else
+    return false
+    #endif
+  }
   #endif // os(WASI) || !$Embedded
 
 }
 
 // Delay support
+@_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 6.3, *)
 extension SchedulingExecutor {
 
