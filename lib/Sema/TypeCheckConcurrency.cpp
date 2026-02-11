@@ -41,6 +41,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
+#include "llvm/Support/Casting.h"
 
 using namespace swift;
 using namespace swift::version;
@@ -3294,22 +3295,32 @@ namespace {
         return Action::Continue(expr);
       }
 
-      if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
-        auto isolation = determineClosureIsolation(closure);
-        closure->setActorIsolation(isolation);
+      auto determineClosureIsolationInContext =
+          [&](AbstractClosureExpr *closure, Expr *context) {
+            // If closure has explicit captures its isolation was determined as
+            // part of the capture list expression processing.
+            if (llvm::isa_and_nonnull<CaptureListExpr>(context))
+              return;
 
-        // There is a case in which the constraint solver cannot decide
-        // that a closure is `nonisolated(nonsending)` because it cannot
-        // analyze the captures, but the closure isolation logic can.
-        // Rewrite the closure type at this point.
-        if (isolation.isCallerIsolationInheriting()) {
-          auto fnType = closure->getType()->castTo<AnyFunctionType>();
-          if (!fnType->getIsolation().isNonIsolatedCaller()) {
-            fnType = fnType->withIsolation(
-              FunctionTypeIsolation::forNonIsolatedCaller());
-            closure->setType(fnType);
-          }
-        }
+            auto isolation = determineClosureIsolation(closure, context);
+            closure->setActorIsolation(isolation);
+
+            // There is a case in which the constraint solver cannot decide
+            // that a closure is `nonisolated(nonsending)` because it cannot
+            // analyze the captures, but the closure isolation logic can.
+            // Rewrite the closure type at this point.
+            if (isolation.isCallerIsolationInheriting()) {
+              auto fnType = closure->getType()->castTo<AnyFunctionType>();
+              if (!fnType->getIsolation().isNonIsolatedCaller()) {
+                fnType = fnType->withIsolation(
+                    FunctionTypeIsolation::forNonIsolatedCaller());
+                closure->setType(fnType);
+              }
+            }
+          };
+
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
+        determineClosureIsolationInContext(closure, Parent.getAsExpr());
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
@@ -3423,6 +3434,12 @@ namespace {
         for (const auto &entry : captureList->getCaptureList()) {
           captureContexts[entry.getVar()].push_back(closure);
         }
+
+        // The parent of `CaptureListExpr` here is used instead because
+        // \c determineClosureIsolationInContext is looking for conversion
+        // expressions that wrap the closure and cannot wait for the walker
+        // to find it in this case.
+        determineClosureIsolationInContext(closure, Parent.getAsExpr());
       }
 
       if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
@@ -4815,8 +4832,16 @@ namespace {
     ///
     /// This function assumes that enclosing closures have already had their
     /// isolation checked.
-    ActorIsolation
-    determineClosureIsolation(AbstractClosureExpr *closure) const;
+    ///
+    /// \param closure The closure to analyze.
+    /// \param context The context that wraps this closure looking through
+    /// a parent `CaptureListExpr` if any. This is parameter is currently used
+    /// to determine whether the closure appears inside of
+    /// `FunctionConversionExpr` and adjust the isolation accordingly.
+    ///
+    /// \returns The isolation of the given closure.
+    ActorIsolation determineClosureIsolation(AbstractClosureExpr *closure,
+                                             Expr *context) const;
   };
 } // end anonymous namespace
 
@@ -4884,8 +4909,11 @@ computeClosureIsolationFromParent(DeclContext *closure,
   }
 }
 
-ActorIsolation ActorIsolationChecker::determineClosureIsolation(
-    AbstractClosureExpr *closure) const {
+ActorIsolation
+ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
+                                                 Expr *context) const {
+  ASSERT(!context || !isa<CaptureListExpr>(context));
+
   bool preconcurrency = false;
 
   ActorIsolation isolation = [&] {
@@ -4948,8 +4976,7 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     // conversion to nonisolated(nonsending), then we should respect that.
     if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
         isIsolationBoundary || !normalIsolation.isGlobalActor()) {
-      if (auto *fce =
-              dyn_cast_or_null<FunctionConversionExpr>(Parent.getAsExpr())) {
+      if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
         auto expectedIsolation =
             fce->getType()->castTo<FunctionType>()->getIsolation();
         if (expectedIsolation.isNonIsolatedCaller()) {
@@ -5087,7 +5114,7 @@ ActorIsolation swift::determineClosureActorIsolation(
   ActorIsolationChecker checker(closure->getParent(), getType,
                                 getClosureActorIsolation,
                                 /*checkIsolatedCapture=*/false);
-  return checker.determineClosureIsolation(closure);
+  return checker.determineClosureIsolation(closure, /*context=*/nullptr);
 }
 
 /// Determine actor isolation solely from attributes.
