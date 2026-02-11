@@ -16,7 +16,7 @@ StdOptionalTestSuite.test("pointee") {
   let pointee = nonNilOpt.pointee
   expectEqual(123, pointee)
 
-#if !os(Linux) // crashes on Ubuntu 18.04 (rdar://113414160)
+#if !os(Linux) && !os(FreeBSD) // crashes on Ubuntu 18.04 (rdar://113414160)
   var modifiedOpt = getNilOptional()
   modifiedOpt.pointee = 777
   expectEqual(777, modifiedOpt.pointee)

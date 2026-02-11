@@ -103,7 +103,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
                    LINK_FLAGS " -lobjc ")
 
     endif() # HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|FREEBSD|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
       if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS")
@@ -158,7 +158,7 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host/compiler")
       list(APPEND RPATH_LIST "@loader_path/${relative_hostlib_path}")
-    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|FREEBSD|OPENBSD")
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host/compiler")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_hostlib_path}")

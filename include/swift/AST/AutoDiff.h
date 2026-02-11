@@ -422,7 +422,14 @@ public:
   Kind kind;
 
   /// The type and index of a differentiability parameter or result.
-  using TypeAndIndex = std::pair<Type, unsigned>;
+  /// std::pair does not have a trivial copy constructor on all platforms for
+  /// ABI reasons. We must define our own.
+  struct TypeAndIndex {
+    Type first;
+    unsigned second;
+
+    TypeAndIndex(Type type, unsigned index) : first(type), second(index) {}
+  };
 
 private:
   union Value {
