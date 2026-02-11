@@ -662,8 +662,19 @@ class BuildScriptInvocation(object):
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
+
+        # Build Swift Testing here because it has to come before XCTest but after Foundation
+        builder.begin_pipeline()
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
+
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.LLBuild,
                                  is_enabled=self.args.build_llbuild)
+        builder.add_impl_product(products.XCTest,
+                                 is_enabled=self.args.build_xctest)
 
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
@@ -673,10 +684,6 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
 
-        builder.add_product(products.SwiftTestingMacros,
-                            is_enabled=self.args.build_swift_testing_macros)
-        builder.add_product(products.SwiftTesting,
-                            is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
 
@@ -735,12 +742,6 @@ class BuildScriptInvocation(object):
         builder.add_product(products.SwiftDriver,
                             is_enabled=self.args.build_swift_driver
                             or self.args.install_swift_driver)
-
-        # Build XCTest last since it must follow after Swift Testing. It requires a
-        # separate pipeline since it is an impl_product.
-        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
-        builder.add_impl_product(products.XCTest,
-                                 is_enabled=self.args.build_xctest)
 
         # Now that we have constructed our pass pipelines using our builder, get
         # the final schedule and finalize the builder.
