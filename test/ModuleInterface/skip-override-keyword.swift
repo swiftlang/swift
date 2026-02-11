@@ -21,15 +21,15 @@ public class BaseClass {
   @usableFromInline func doSomethingUsableFromInline() {}
 }
 
-// CHECK: @_inheritsConvenienceInitializers public class DerivedClass : {{Foo|FooWithTesting}}.BaseClass
+// CHECK: @_inheritsConvenienceInitializers public class DerivedClass : {{Foo|FooWithTesting}}::BaseClass
 public class DerivedClass: BaseClass {
   // CHECK: public init()
   public override init() { super.init() }
-  // CHECK: public var property: Swift.Int
+  // CHECK: public var property: Swift::Int
   public override var property : Int { return 0 }
   // CHECK: public func doSomething()
   public override func doSomething() { }
-  // CHECK: public subscript(index: Swift.Int) -> Swift.Int
+  // CHECK: public subscript(index: Swift::Int) -> Swift::Int
   public override subscript(index: Int) -> Int { get {return 0} set(newValue) {} }
   // CHECK: @inlinable override public func doSomethingInline() { super.doSomethingInline() }
   @inlinable public override func doSomethingInline() { super.doSomethingInline() }

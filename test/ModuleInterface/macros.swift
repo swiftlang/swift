@@ -9,16 +9,16 @@
 // RUN: %FileCheck %s < %t/Macros.swiftinterface --check-prefix CHECK
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Macros.swiftinterface -o %t/Macros.swiftmodule
 
-// CHECK: @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, Swift.String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+// CHECK: @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, Swift::String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) public macro publicStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
-// CHECK: @freestanding(expression) public macro labeledStringify<T>(_ value: T, label: Swift.String) -> (T, Swift.String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+// CHECK: @freestanding(expression) public macro labeledStringify<T>(_ value: T, label: Swift::String) -> (T, Swift::String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) public macro labeledStringify<T>(_ value: T, label: String) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 
-// CHECK: @freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: Swift.String) -> (T, Swift.String) = #labeledStringify(value, label: "default label")
+// CHECK: @freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: Swift::String) -> (T, Swift::String) = #labeledStringify(value, label: "default label")
 @freestanding(expression) public macro unlabeledStringify<T>(_ value: T, label: String) -> (T, String) = #labeledStringify(value, label: "default label")
 
-// CHECK: @freestanding(expression) public macro publicLine<T>() -> T = #externalMacro(module: "MacroDefinition", type: "Line") where T : Swift.ExpressibleByIntegerLiteral
+// CHECK: @freestanding(expression) public macro publicLine<T>() -> T = #externalMacro(module: "MacroDefinition", type: "Line") where T : Swift::ExpressibleByIntegerLiteral
 @freestanding(expression) public macro publicLine<T: ExpressibleByIntegerLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "Line")
 
 // CHECK: @attached(accessor) public macro myWrapper() = #externalMacro(module: "MacroDefinition", type: "Wrapper")
@@ -33,7 +33,7 @@
 // CHECK: @attached(accessor, names: named(init)) public macro AccessorInitFunc() = #externalMacro(module: "MacroDefinition", type: "AccessorInitFuncMacro")
 @attached(accessor, names: named(init)) public macro AccessorInitFunc() = #externalMacro(module: "MacroDefinition", type: "AccessorInitFuncMacro")
 
-// CHECK: @attached(extension, conformances: Swift.Sendable) @attached(member) public macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableExtensionMacro")
+// CHECK: @attached(extension, conformances: Swift::Sendable) @attached(member) public macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableExtensionMacro")
 @attached(extension, conformances: Sendable) @attached(member) public macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableExtensionMacro")
 
 // CHECK-NOT: internalStringify

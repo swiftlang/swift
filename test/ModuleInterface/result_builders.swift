@@ -40,13 +40,13 @@ public struct TupleBuilder {
   public static func buildIf<T>(_ value: T?) -> T? { return value }
 }
 
-// CHECK-LABEL: public func tuplify<T>(_ cond: Swift.Bool, @ResultBuilders.TupleBuilder body: (Swift.Bool) -> T)
+// CHECK-LABEL: public func tuplify<T>(_ cond: Swift::Bool, @ResultBuilders::TupleBuilder body: (Swift::Bool) -> T)
 public func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }
 
 public struct UsesBuilderProperty {
-  // CHECK: public var myVar: (Swift.String, Swift.String) {
+  // CHECK: public var myVar: (Swift::String, Swift::String) {
   // CHECK-NEXT: get
   // CHECK-NEXT: }
   @TupleBuilder public var myVar: (String, String) {
@@ -54,16 +54,16 @@ public struct UsesBuilderProperty {
     "goodbye"
   }
 
-  // CHECK: public func myFunc(@ResultBuilders.TupleBuilder fn: () -> ())
+  // CHECK: public func myFunc(@ResultBuilders::TupleBuilder fn: () -> ())
   public func myFunc(@TupleBuilder fn: () -> ()) {}
 }
 
 public protocol ProtocolWithBuilderProperty {
   associatedtype Assoc
 
-  // CHECK: @ResultBuilders.TupleBuilder var myVar: Self.Assoc { get }
+  // CHECK: @ResultBuilders::TupleBuilder var myVar: Self.Assoc { get }
   @TupleBuilder var myVar: Assoc { get }
 
-  // CHECK: @ResultBuilders.TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
+  // CHECK: @ResultBuilders::TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
   @TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
 }

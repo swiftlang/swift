@@ -9,7 +9,7 @@ public class HideyHole {
   @_spi(Private) public init() {}
 }
 
-// CHECK: @_inheritsConvenienceInitializers public class StashyCache : Foo.HideyHole
+// CHECK: @_inheritsConvenienceInitializers public class StashyCache : Foo::HideyHole
 public class StashyCache: HideyHole {
   // CHECK: public init()
 }

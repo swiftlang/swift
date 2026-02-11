@@ -48,13 +48,13 @@ internal struct UFIStruct {
 
 // CHECK: public protocol PublicProto {{[{]$}}
 public protocol PublicProto {
-  // CHECK-NEXT: associatedtype Assoc = Swift.Int
+  // CHECK-NEXT: associatedtype Assoc = Swift::Int
   associatedtype Assoc = Int
   // CHECK-NEXT: func requirement()
   func requirement()
 } // CHECK-NEXT: {{^[}]$}}
 
-// CHECK: extension AccessFilter.PublicProto {{[{]$}}
+// CHECK: extension AccessFilter::PublicProto {{[{]$}}
 extension PublicProto {
   // CHECK: public func publicMethod(){{$}}
   public func publicMethod() {}
@@ -65,7 +65,7 @@ extension PublicProto {
   @usableFromInline internal func ufiMethod() {}
 } // CHECK: {{^[}]$}}
 
-// CHECK: {{^}}extension AccessFilter.PublicProto {{[{]$}}
+// CHECK: {{^}}extension AccessFilter::PublicProto {{[{]$}}
 public extension PublicProto {
   // CHECK: public func publicExtPublicMethod(){{$}}
   func publicExtPublicMethod() {}
@@ -91,13 +91,13 @@ extension InternalProto_BAD {
 // CHECK-NEXT: internal protocol UFIProto {{[{]$}}
 @usableFromInline
 internal protocol UFIProto {
-  // CHECK-NEXT: associatedtype Assoc = Swift.Int
+  // CHECK-NEXT: associatedtype Assoc = Swift::Int
   associatedtype Assoc = Int
   // CHECK-NEXT: func requirement()
   func requirement()
 } // CHECK-NEXT: {{^[}]$}}
 
-// CHECK: extension AccessFilter.UFIProto {{[{]$}}
+// CHECK: extension AccessFilter::UFIProto {{[{]$}}
 extension UFIProto {
   // CHECK: public func publicMethod(){{$}}
   public func publicMethod() {}
@@ -108,9 +108,9 @@ extension UFIProto {
   @usableFromInline internal func ufiMethod() {}
 } // CHECK: {{^[}]$}}
 
-// CHECK: extension AccessFilter.PublicStruct {{[{]$}}
+// CHECK: extension AccessFilter::PublicStruct {{[{]$}}
 extension PublicStruct {
-  // CHECK: public static var secretlySettable: Swift.Int {
+  // CHECK: public static var secretlySettable: Swift::Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: }
   public private(set) static var secretlySettable: Int = 0
@@ -121,21 +121,21 @@ extension InternalStruct_BAD: PublicProto {
   internal static var dummy: Int { return 0 }
 }
 
-// CHECK: extension AccessFilter.UFIStruct : AccessFilter.PublicProto {{[{]$}}
+// CHECK: extension AccessFilter::UFIStruct : AccessFilter::PublicProto {{[{]$}}
 extension UFIStruct: PublicProto {
   // CHECK-NEXT: @usableFromInline
   // CHECK-NEXT: internal func requirement()
   @usableFromInline func requirement() {}
   internal static var dummy: Int { return 0 }
   // CHECK-NEXT: @usableFromInline
-  // CHECK-NEXT: internal typealias Assoc = Swift.Int
+  // CHECK-NEXT: internal typealias Assoc = Swift::Int
 } // CHECK-NEXT: {{^[}]$}}
 
 // CHECK: public enum PublicEnum {{[{]$}}
 public enum PublicEnum {
   // CHECK-NEXT: case x
   case x
-  // CHECK-NEXT: case y(Swift.Int)
+  // CHECK-NEXT: case y(Swift::Int)
   case y(Int)
 } // CHECK-NEXT: {{^[}]$}}
 
@@ -148,7 +148,7 @@ enum InternalEnum_BAD {
 @usableFromInline enum UFIEnum {
   // CHECK-NEXT: case x
   case x
-  // CHECK-NEXT: case y(Swift.Int)
+  // CHECK-NEXT: case y(Swift::Int)
   case y(Int)
 } // CHECK-NEXT: {{^[}]$}}
 
@@ -167,13 +167,13 @@ class InternalClass_BAD {
 // CHECK: public struct GenericStruct<T>
 public struct GenericStruct<T> {}
 
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicStruct {{[{]$}}
-extension GenericStruct where T == AccessFilter.PublicStruct {
+// CHECK: extension AccessFilter::GenericStruct where T == AccessFilter::PublicStruct {{[{]$}}
+extension GenericStruct where T == AccessFilter::PublicStruct {
   // CHECK-NEXT: public func constrainedToPublicStruct(){{$}}
   public func constrainedToPublicStruct() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.UFIStruct {{[{]$}}
-extension GenericStruct where T == AccessFilter.UFIStruct {
+// CHECK: extension AccessFilter::GenericStruct where T == AccessFilter::UFIStruct {{[{]$}}
+extension GenericStruct where T == AccessFilter::UFIStruct {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIStruct(){{$}}
   @usableFromInline internal func constrainedToUFIStruct() {}
@@ -182,12 +182,12 @@ extension GenericStruct where T == InternalStruct_BAD {
   @usableFromInline internal func constrainedToInternalStruct_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicStruct {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T == AccessFilter::PublicStruct {{[{]$}}
 extension GenericStruct where PublicStruct == T {
   // CHECK-NEXT: public func constrainedToPublicStruct2(){{$}}
   public func constrainedToPublicStruct2() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.UFIStruct {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T == AccessFilter::UFIStruct {{[{]$}}
 extension GenericStruct where UFIStruct == T {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIStruct2(){{$}}
@@ -197,12 +197,12 @@ extension GenericStruct where InternalStruct_BAD == T {
   @usableFromInline internal func constrainedToInternalStruct2_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.PublicProto {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T : AccessFilter::PublicProto {{[{]$}}
 extension GenericStruct where T: PublicProto {
   // CHECK-NEXT: public func constrainedToPublicProto(){{$}}
   public func constrainedToPublicProto() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.UFIProto {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T : AccessFilter::UFIProto {{[{]$}}
 extension GenericStruct where T: UFIProto {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIProto(){{$}}
@@ -212,12 +212,12 @@ extension GenericStruct where T: InternalProto_BAD {
   @usableFromInline internal func constrainedToInternalProto_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.PublicClass {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T : AccessFilter::PublicClass {{[{]$}}
 extension GenericStruct where T: PublicClass {
   // CHECK-NEXT: public func constrainedToPublicClass(){{$}}
   public func constrainedToPublicClass() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T : AccessFilter.UFIClass {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T : AccessFilter::UFIClass {{[{]$}}
 extension GenericStruct where T: UFIClass {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIClass(){{$}}
@@ -227,7 +227,7 @@ extension GenericStruct where T: InternalClass_BAD {
   @usableFromInline internal func constrainedToInternalClass_BAD() {}
 }
 
-// CHECK: extension AccessFilter.GenericStruct where T : AnyObject {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T : AnyObject {{[{]$}}
 extension GenericStruct where T: AnyObject {
   // CHECK-NEXT: public func constrainedToAnyObject(){{$}}
   public func constrainedToAnyObject() {}
@@ -236,21 +236,21 @@ extension GenericStruct where T: AnyObject {
 public struct PublicAliasBase {}
 internal struct ReallyInternalAliasBase_BAD {}
 
-// CHECK: public typealias PublicAlias = AccessFilter.PublicAliasBase
+// CHECK: public typealias PublicAlias = AccessFilter::PublicAliasBase
 public typealias PublicAlias = PublicAliasBase
 internal typealias InternalAlias_BAD = PublicAliasBase
 // CHECK: @usableFromInline
-// CHECK-NEXT: internal typealias UFIAlias = AccessFilter.PublicAliasBase
+// CHECK-NEXT: internal typealias UFIAlias = AccessFilter::PublicAliasBase
 @usableFromInline internal typealias UFIAlias = PublicAliasBase
 
 internal typealias ReallyInternalAlias_BAD = ReallyInternalAliasBase_BAD
 
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAliasBase {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T == AccessFilter::PublicAliasBase {{[{]$}}
 extension GenericStruct where T == PublicAlias {
   // CHECK-NEXT: public func constrainedToPublicAlias(){{$}}
   public func constrainedToPublicAlias() {}
 } // CHECK-NEXT: {{^[}]$}}
-// CHECK: extension AccessFilter.GenericStruct where T == AccessFilter.PublicAliasBase {{[{]$}}
+// CHECK: extension AccessFilter::GenericStruct where T == AccessFilter::PublicAliasBase {{[{]$}}
 extension GenericStruct where T == UFIAlias {
   // CHECK-NEXT: @usableFromInline{{$}}
   // CHECK-NEXT: internal func constrainedToUFIAlias(){{$}}
@@ -275,7 +275,7 @@ extension GenericStruct: PublicProto where T: InternalProto_BAD {
 
 public struct MultiGenericStruct<First, Second> {}
 
-// CHECK: extension AccessFilter.MultiGenericStruct where First == AccessFilter.PublicStruct, Second == AccessFilter.PublicStruct {{[{]$}}
+// CHECK: extension AccessFilter::MultiGenericStruct where First == AccessFilter::PublicStruct, Second == AccessFilter::PublicStruct {{[{]$}}
 extension MultiGenericStruct where First == PublicStruct, Second == PublicStruct {
   // CHECK-NEXT: public func publicPublic(){{$}}
   public func publicPublic() {}
