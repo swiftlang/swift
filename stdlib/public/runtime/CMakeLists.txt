@@ -46,7 +46,6 @@ set(swift_runtime_sources
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
     ErrorObjectNative.cpp
-    Errors.cpp
     ErrorDefaultImpls.cpp
     Exception.cpp
     Exclusivity.cpp
@@ -63,6 +62,7 @@ set(swift_runtime_sources
     ImageInspectionCOFF.cpp
     ImageInspectionStatic.cpp
     ImageInspectionWasm.cpp
+    RuntimeErrorReporting.cpp
     SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp

@@ -22,7 +22,6 @@ add_library(swiftRuntimeCore OBJECT
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
     ErrorObjectNative.cpp
-    Errors.cpp
     ErrorDefaultImpls.cpp
     Exception.cpp
     Exclusivity.cpp
@@ -52,6 +51,7 @@ add_library(swiftRuntimeCore OBJECT
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
+    RuntimeErrorReporting.cpp
     RuntimeInvocationsTracking.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
