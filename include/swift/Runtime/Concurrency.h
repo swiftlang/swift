@@ -604,6 +604,31 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
+/// This is an options enum that is used to pass flags to
+/// swift_task_isCancelledWithFlags. It is meant to be a flexible toggle.
+///
+/// Since this is an options enum, so all values should be powers of 2.
+///
+/// NOTE: We are purposely leaving this as a uint64_t so that on all platforms
+/// this could be a pointer to a different enum instance if we need it to be.
+enum swift_task_is_cancelled_flag : uint64_t {
+  /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode.
+  swift_task_is_cancelled_flag_None = 0x0,
+
+  /// Ignore any active cancellation shield and return the actual cancellation
+  /// state of the task.
+  swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1,
+};
+
+/// Check if the task is cancelled.
+///
+/// \param task The task to check cancellation status for.
+/// \param flags Flags controlling the behavior of the check.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCancelledWithFlags(AsyncTask* task,
+                                     swift_task_is_cancelled_flag flags);
+
 /// Returns the current priority of the task which is >= base priority of the
 /// task. This function does not exist in the base ABI of this library and must
 /// be deployment limited

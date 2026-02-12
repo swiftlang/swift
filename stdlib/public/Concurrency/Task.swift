@@ -779,6 +779,20 @@ public struct UnsafeCurrentTask {
     unsafe _taskIsCancelled(_task)
   }
 
+  /// Check if the task is cancelled, optionally ignoring active cancellation shields.
+  ///
+  /// - Parameter ignoreTaskCancellationShield: If `true`, returns the actual cancellation
+  ///   state regardless of any active cancellation shields. If `false`, respects
+  ///   cancellation shields and returns `false` when a shield is active.
+  /// - Returns: `true` if the task is cancelled (considering shield settings), `false` otherwise.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
+    // swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1
+    let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
+    return unsafe _taskIsCancelledWithFlags(_task, flags: flags)
+  }
+
   /// The current task's priority.
   ///
   /// - SeeAlso: `TaskPriority`
@@ -967,6 +981,11 @@ public func _taskCancel(_ task: Builtin.NativeObject)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+
+@available(SwiftStdlib 6.4, *)
+@_silgen_name("swift_task_isCancelledWithFlags")
+@usableFromInline
+func _taskIsCancelledWithFlags(_ task: Builtin.NativeObject, flags: UInt64) -> Bool
 
 @available(SwiftStdlib 6.4, *)
 @_silgen_name("swift_task_hasActiveCancellationShield")

@@ -1759,6 +1759,13 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
   return task->isCancelled();
 }
 
+bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
+                                            swift_task_is_cancelled_flag flags) {
+  bool ignoreCancellationShield =
+      flags & swift_task_is_cancelled_flag_IgnoreCancellationShield;
+  return task->isCancelled(ignoreCancellationShield);
+}
+
 SWIFT_CC(swift)
 static CancellationNotificationStatusRecord*
 swift_task_addCancellationHandlerImpl(

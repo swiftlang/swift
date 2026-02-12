@@ -3,12 +3,14 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: synchronization
+// REQUIRES: libdispatch
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
 import Synchronization
+import Dispatch
 
 @available(SwiftStdlib 6.4, *)
 func test_task_cancel_shield() async {
@@ -299,6 +301,57 @@ func test_hasActiveCancellationShield() async {
 }
 
 @available(SwiftStdlib 6.4, *)
+func test_task_isCancelled_instance_vs_static() async {
+  print("==== ------------------------------------------------")
+  print(#function)  // CHECK: test_task_isCancelled_instance_vs_static
+
+  let ready = DispatchSemaphore(value: 0)
+  let proceed = DispatchSemaphore(value: 0)
+  let insideShield = DispatchSemaphore(value: 0)
+  let insideShieldCheckNow = DispatchSemaphore(value: 0)
+
+  let task = Task {
+    withUnsafeCurrentTask { $0?.cancel() }
+
+    // CHECK: 1. Task.isCancelled (static): true
+    print("1. Task.isCancelled (static): \(Task.isCancelled)")
+
+    // Signal we're ready
+    ready.signal()
+    // Wait until cancelled
+    proceed.wait()
+    print("2. Task.isCancelled (static): \(Task.isCancelled)")
+
+    await withTaskCancellationShield {
+      print("3. Inside shield, Task.isCancelled (static): \(Task.isCancelled)")
+      insideShieldCheckNow.signal()
+      insideShield.wait()
+    }
+
+    print("5. After shield, Task.isCancelled (static): \(Task.isCancelled)")
+  }
+
+  // Wait for task to be ready (and has cancelled itself)
+  ready.wait()
+
+  // CHECK: 2. task.isCancelled (instance): true
+  print("2. task.isCancelled (instance): \(task.isCancelled)")
+  proceed.signal()
+
+  insideShieldCheckNow.wait()
+  // CHECK: 3. task.isCancelled (instance) (suspended while shielded): true
+  print("3. task.isCancelled (instance) (suspended while shielded): \(task.isCancelled)")
+
+  insideShield.signal()
+  // CHECK: 5. After shield, Task.isCancelled (static): true
+
+  await task.value
+
+  // Instance property remains true after task completes
+  print("task.isCancelled after completion: \(task.isCancelled)")
+}
+
+@available(SwiftStdlib 6.4, *)
 struct CancellableContinuation: ~Copyable {
   let state = Mutex<(Bool, (CheckedContinuation<Void, any Error>?))>((false, nil))
 
@@ -346,6 +399,7 @@ struct CancellableContinuation: ~Copyable {
     await test_task_group_cancel_shield()
     await test_add_task_cancel_shield()
     await test_hasActiveCancellationShield()
+    await test_task_isCancelled_instance_vs_static()
     print("DONE")
   }
 }
