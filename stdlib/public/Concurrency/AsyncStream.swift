@@ -167,13 +167,13 @@ public struct AsyncStream<Element> {
       /// When the buffer is full, discard the newly received element.
       ///
       /// This strategy enforces keeping at most the specified number of oldest values.
-      /// When the specified number is 0 or negative, the corresponding `AsyncStream` drops yielded values if no consumers is currently awaiting.
+      /// When the specified number is non-positive, the corresponding `AsyncStream` drops yielded values if no consumers is currently awaiting.
       case bufferingOldest(Int)
       
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
       /// This strategy enforces keeping at most the specified number of newest values.
-      /// When the specified number is 0 or negative, the corresponding `AsyncStream` drops yielded values if no consumers is currently awaiting.
+      /// When the specified number is non-positive, the corresponding `AsyncStream` drops yielded values if no consumers is currently awaiting.
       case bufferingNewest(Int)
     }
 
