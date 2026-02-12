@@ -753,7 +753,8 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
 
   // If our RAUW helper is invalid, we do not support RAUWing this case, so
   // just return next.
-  if (!helper.isValid())
+  if (!helper.isValid() || helper.requiresCopyBorrowAndClone() ||
+      helper.mayIntroduceUnoptimizableCopies())
     return next;
   return helper.perform();
 }
