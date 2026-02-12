@@ -290,7 +290,7 @@ final class CowTest {
 @main
 struct Validator {
   @MainActor
-  static func main() {
+  static func main() async {
 
     
     let suite = TestSuite("Observable")
@@ -532,7 +532,7 @@ struct Validator {
       let changed = CapturedState(state: false)
 
       let test = MiddleNamePerson()
-      withObservationTracking(options: .willSet) {
+      withObservationTracking(options: .didSet) {
         _blackHole(test.firstName)
       } onChange: { _ in
         changed.state = true
@@ -598,9 +598,13 @@ struct Validator {
       try! await Task.sleep(for: .seconds(0.1))
       expectEqual(changed.state, 3)
       token.cancel()
+      try! await Task.sleep(for: .seconds(0.1)) // ensure a small grace w.r.t. cancellation
+      test.firstName = "e"
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 3)
     }
 
-    runAllTests()
+    await runAllTestsAsync()
   }
 }
 
