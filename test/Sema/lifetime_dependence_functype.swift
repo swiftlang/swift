@@ -244,3 +244,168 @@ func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
   // expected-note  @-2{{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
   f()
 }
+
+// Lifetime "Subtype" Relationships
+//
+// Adding sources to a lifetime dependency makes it more restrictive, since the
+// target depends on all of the sources. Hence, closures with more dependence
+// sources can be passed as function types with a subset of those dependencies.
+
+func takeCopying0(
+  f: @_lifetime(copy ne0)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+func takeCopying1(
+  f: @_lifetime(copy ne1)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+func takeCopying01(
+  f: @_lifetime(copy ne0, copy ne1)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+@_lifetime(copy ne0)
+func copying0(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne0
+}
+
+@_lifetime(copy ne1)
+func copying1(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne1
+}
+
+@_lifetime(copy ne0, copy ne1)
+func copying01(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne0
+}
+
+
+func takeBorrowing2(
+  f: @_lifetime(borrow ne2)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+func takeBorrowing3(
+  f: @_lifetime(borrow ne3)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+func takeBorrowing23(
+  f: @_lifetime(borrow ne2, borrow ne3)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+@_lifetime(borrow ne2)
+func borrowing2(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne2
+}
+
+@_lifetime(borrow ne3)
+func borrowing3(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne3
+}
+
+@_lifetime(borrow ne2, borrow ne3)
+func borrowing23(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne2
+}
+
+
+func takeCopying0Borrowing2(
+  f: @_lifetime(copy ne0, borrow ne2)
+    (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+@_lifetime(copy ne0, borrow ne2)
+func copying0borrowing2(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne2
+}
+
+@_lifetime(copy ne0, borrow ne2, borrow ne3)
+func copying0borrowing2borrowing3(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne2
+}
+
+@_lifetime(copy ne0, copy ne1, borrow ne2)
+func copying0copying1borrowing2(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne2
+}
+
+@_lifetime(copy ne0, copy ne1, borrow ne2, borrow ne3)
+func copying0copying1borrowing2borrowing3(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE {
+  return ne2
+}
+
+@_lifetime(&ne4)
+func mutborrowing4(ne0: NE, ne1: NE, ne2: borrowing NE, ne3: borrowing NE, ne4: inout NE) -> NE{
+  return ne4
+}
+
+func takeMutborrowing4(f: @_lifetime(&ne4) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+func takeImmortal(f: @_lifetime(immortal) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE) {}
+
+
+@_lifetime(ne0: copy ne0)
+func inout0(ne0: inout NE, ne1: NE) {}
+
+@_lifetime(ne0: copy ne0, copy ne1)
+func inout01(ne0: inout NE, ne1: NE) {}
+
+func takeInout0(f: @_lifetime(ne0: copy ne0) (_ ne0: inout NE, _ ne1: NE) -> ()) {}
+func takeInout01(f: @_lifetime(ne0: copy ne0, copy ne1) (_ ne0: inout NE, _ ne1: NE) -> ()) {}
+
+
+func callLifetimeFunctions() {
+  takeCopying0(f: copying0) // OK
+  takeCopying0(f: copying1) // expected-error{{cannot convert value of type '@_lifetime(copy 1) (NE, NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying0(f: copying01) // OK
+
+  takeCopying1(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy 0) (NE, NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne1) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying1(f: copying1) // OK
+  takeCopying1(f: copying01) // OK
+
+  takeCopying01(f: copying0) // expected-error{{cannot convert value of type '@_lifetime(copy 0) (NE, NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, copy ne1) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying01(f: copying1) // expected-error{{cannot convert value of type '@_lifetime(copy 1) (NE, NE, borrowing NE, inout NE) -> NE' to expected argument type '@_lifetime(copy ne0, copy ne1) (_ ne0: NE, _ ne1: NE, _ ne2: borrowing NE, _ ne3: borrowing NE, _ ne4: inout NE) -> NE'}}
+  takeCopying01(f: copying01) // OK
+
+
+  takeBorrowing2(f: borrowing2) // OK
+  takeBorrowing2(f: borrowing3) // expected-error{{TODO}}
+  takeBorrowing2(f: borrowing23) // OK
+
+  takeBorrowing3(f: borrowing2) // expected-error{{TODO}}
+  takeBorrowing3(f: borrowing3) // OK
+  takeBorrowing3(f: borrowing23) // OK
+
+  takeBorrowing23(f: borrowing2) // expected-error{{TODO}}
+  takeBorrowing23(f: borrowing3) // expected-error{{TODO}}
+  takeBorrowing23(f: borrowing23) // OK
+
+
+  takeCopying0(f: copying0borrowing2) // expected-error{{TODO}} ?
+  takeBorrowing2(f: copying0borrowing2) // expected-error{{TODO}} ?
+
+  takeCopying0Borrowing2(f: copying0) // expected-error{{TODO}}
+  takeCopying0Borrowing2(f: borrowing2) // expected-error{{TODO}}
+  takeCopying0Borrowing2(f: copying0borrowing2) // OK
+  takeCopying0Borrowing2(f: copying0borrowing2borrowing3) // OK
+  takeCopying0Borrowing2(f: copying0copying1borrowing2) // OK
+  takeCopying0Borrowing2(f: copying0copying1borrowing2borrowing3) // OK
+
+
+  takeMutborrowing4(f: mutborrowing4) // OK
+  takeMutborrowing4(f: copying0) // expected-error{{TODO}}
+  takeCopying0(f: mutborrowing4) // expected-error{{TODO}}
+  takeBorrowing2(f: mutborrowing4) // expected-error{{TODO}}
+
+
+  takeImmortal(f: copying0) // expected-error{{TODO}}
+  takeImmortal(f: copying1) // expected-error{{TODO}}
+  takeImmortal(f: copying01) // expected-error{{TODO}}
+  takeImmortal(f: borrowing2) // expected-error{{TODO}}
+  takeImmortal(f: borrowing3) // expected-error{{TODO}}
+  takeImmortal(f: borrowing23) // expected-error{{TODO}}
+  takeImmortal(f: copying0borrowing2) // expected-error{{TODO}}
+  takeImmortal(f: mutborrowing4) // expected-error{{TODO}}
+
+  takeInout0(f: inout0) // OK
+  takeInout0(f: inout01) // expected-error{{TODO}}
+  takeInout01(f: inout01) // OK
+  takeInout01(f: inout0) // OK
+}
