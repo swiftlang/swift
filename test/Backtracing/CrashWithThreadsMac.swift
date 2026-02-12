@@ -36,7 +36,7 @@ func lockMutex() {
 
 func unlockMutex() {
   guard unsafe pthread_mutex_unlock(mutex) == 0 else {
-    fatalError("pthread_mutex_lock failed")
+    fatalError("pthread_mutex_unlock failed")
   }
 }
 

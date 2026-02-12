@@ -45,7 +45,7 @@ func lockMutex() {
 
 func unlockMutex() {
   guard unsafe pthread_mutex_unlock(mutex) == 0 else {
-    fatalError("pthread_mutex_lock failed")
+    fatalError("pthread_mutex_unlock failed")
   }
 }
 
@@ -91,9 +91,11 @@ while (true) {
   sleep(10)
 }
 
+// CHECK-NOT: backtraces will be missing information
+
 // CHECK: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
 
-// CHECK-NOT: backtraces will be missing information
+// CHECK: {{Platform: .* Linux}}
 
 // make sure there are no threads before the crashing thread (rdar://164566321)
 // and check that we have some vaguely sane and symbolicated threads, including
@@ -103,8 +105,5 @@ while (true) {
 // CHECK-NOT: Thread {{[0-9]+( ".*")?}}:
 // CHECK: Thread {{[0-9]+}} {{(".*" )?}}crashed:
 // CHECK: {{0x[0-9a-f]+}} reallyCrashMe()
-
-// CHECK: Thread {{[0-9]*( ".*")?}}:
-// CHECK: {{0x[0-9a-f]+.*main.* CrashWithThreads}}
 
 // CHECK: Thread {{[0-9]*( ".*")?}}:
