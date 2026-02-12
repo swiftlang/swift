@@ -197,7 +197,12 @@ extension Task {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// - SeeAlso: `checkCancellation()`
+  /// This property returns the actual cancellation state of the task, regardless of whether
+  /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
+  /// if you need cancellation checking that respects active shields.
+  ///
+  /// - SeeAlso: ``checkCancellation()``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   @_transparent public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
@@ -210,7 +215,14 @@ extension Task where Success == Never, Failure == Never {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// - SeeAlso: `checkCancellation()`
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``checkCancellation()``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public static var isCancelled: Bool {
      unsafe withUnsafeCurrentTask { task in
        unsafe task?.isCancelled ?? false

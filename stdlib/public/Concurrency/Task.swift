@@ -769,10 +769,12 @@ public struct UnsafeCurrentTask {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// ### Task cancellation shields effect on cancellation
-  /// A task may
-  /// - SeeAlso: `checkCancellation()`
-  /// - SeeAlso: `withTaskCancellationShield(operation:)`
+  /// This property returns the actual cancellation state of the task, regardless of whether
+  /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
+  /// if you need cancellation checking that respects active shields.
+  ///
+  /// - SeeAlso: ``Task/checkCancellation()``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     unsafe _taskIsCancelled(_task)
   }
