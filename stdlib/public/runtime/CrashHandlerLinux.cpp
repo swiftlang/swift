@@ -48,6 +48,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #define DEBUG_MEMSERVER 0
 
@@ -354,6 +355,12 @@ getdents(int fd, void *buf, size_t bufsiz)
   return syscall(SYS_getdents64, fd, buf, bufsiz);
 }
 
+// Write a string to stderr
+void
+warn(const char *str) {
+  write(STDERR_FILENO, str, strlen(str));
+}
+
 /* Find the signal to use to suspend the given thread.
 
    Sadly, libdispatch blocks SIGUSR1, so we can't just use that everywhere;
@@ -383,8 +390,10 @@ signal_for_suspend(int pid, int tid)
   strcat(status_file, "/status");   // 7 + 1 for NUL
 
   int fd = open(status_file, O_RDONLY);
-  if (fd < 0)
+  if (fd < 0) {
+    warn("swift-runtime: cannot open status file\n");
     return -1;
+  }
 
   enum match_state {
     Matching,
@@ -459,17 +468,9 @@ signal_for_suspend(int pid, int tid)
       return SIGUSR2;
     else if (!(mask & (1 << (SIGPROF - 1))))
       return SIGPROF;
-    else
-      return -1;
   }
 
   return -1;
-}
-
-// Write a string to stderr
-void
-warn(const char *str) {
-  write(STDERR_FILENO, str, strlen(str));
 }
 
 /* Stop all other threads in this process; we do this by establishing a
@@ -495,7 +496,7 @@ suspend_other_threads(struct thread *self)
 
   // Swap out the signal handlers first
   sigfillset(&sa.sa_mask);
-  sa.sa_flags = 0;
+  sa.sa_flags = SA_SIGINFO;
   sa.sa_handler = NULL;
   sa.sa_sigaction = pause_thread;
 
@@ -514,11 +515,13 @@ suspend_other_threads(struct thread *self)
 
   unsigned max_loops = 15;
   uint32_t pending = 0;
+  uint32_t waitingToSignal = 0;
 
   do {
     uint32_t paused = currently_paused();
 
     pending = 0;
+    waitingToSignal = 0;
 
     lseek(fd, 0, SEEK_SET);
 
@@ -540,29 +543,50 @@ suspend_other_threads(struct thread *self)
 
       int tid = atoi(dp->d_name);
 
+      // check if this thread is on our list of threads already known
       if ((int64_t)tid != self->tid && !seen_thread(tid)) {
+        // if not, try to find a suitable signal to suspend it
         int sig_to_use = signal_for_suspend(our_pid, tid);
 
         if (sig_to_use > 0) {
           tgkill(our_pid, tid, sig_to_use);
           ++pending;
         } else {
+          // try another time to see if we can signal via the outer loop...
+          ++waitingToSignal;
           warn("swift-runtime: failed to suspend thread ");
           warn(dp->d_name);
-          warn(" while processing a crash; backtraces will be missing "
-               "information\n");
+          warn(" retrying...\n");
         }
       }
     }
 
     // If we find no new threads, we're done
-    if (!pending)
+    if (!pending && !waitingToSignal)
       break;
+
+    if (!pending) {
+      // we are not waiting for any thread to pause, but we haven't exited
+      // so waitingToSignal > 0 and pending == 0
+      // when we are unable to get a suitable signal for at least one thread,
+      // a common cause is glibc masking signals temporarily, for things like
+      // pthread creation/termination, try a short pause, then we'll try again
+      // on the next iteration
+      struct timespec shortDelay;
+      shortDelay.tv_sec = 0;
+      shortDelay.tv_nsec = 10000000;
+      nanosleep(&shortDelay, NULL);
+    }
 
     // Wait for the threads to suspend
     struct timespec timeout = { 2, 0 };
     wait_paused(paused + pending, &timeout);
   } while (max_loops--);
+
+  if (waitingToSignal) {
+    warn("swift-runtime: failed to suspend thread while processing a crash; "
+      "backtraces will be missing information\n");
+  }
 
   // Close the directory
   close(fd);
