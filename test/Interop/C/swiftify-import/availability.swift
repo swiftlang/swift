@@ -1,4 +1,3 @@
-
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
@@ -67,6 +66,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -88,6 +90,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe span(_pPtr.baseAddress!, len)
 }
@@ -111,6 +116,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -131,6 +139,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe span(_pPtr.baseAddress!, len)
 }
 ------------------------------
@@ -150,6 +161,9 @@ public func span(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe span(_pPtr.baseAddress!, len)
 }
