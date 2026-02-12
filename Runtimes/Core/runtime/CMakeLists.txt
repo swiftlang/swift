@@ -130,7 +130,8 @@ if(SwiftCore_ENABLE_BACKTRACING)
     Backtrace.cpp
     BacktraceUtils.cpp
     CrashHandlerMacOS.cpp
-    CrashHandlerLinux.cpp)
+    CrashHandlerLinux.cpp
+    CrashHandlerWindows.cpp)
 endif()
 
 target_sources(swiftRuntimeCore PRIVATE
