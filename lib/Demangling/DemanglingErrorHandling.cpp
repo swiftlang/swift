@@ -1,4 +1,4 @@
-//===--- Errors.cpp - Demangling library error handling ---------*- C++ -*-===//
+//===-- DemanglingErrorHandling.cpp - Demangling library error handling ---===//
 //
 // This source file is part of the Swift.org open source project
 //
