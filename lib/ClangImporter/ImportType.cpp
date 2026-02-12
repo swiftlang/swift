@@ -2344,8 +2344,13 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // context that uses C++ interop. In order to avoid the x-ref resolution
   // failure, normalize the return type's nullability for builtin functions in
   // C++ interop mode, to match the imported type in C interop mode.
+  //
+  // In C interop mode some of these builtins now have bounds annotations on
+  // Apple platforms, which breaks the clang bug that drops the nullability
+  // annotations. To avoid regressing, and make sure the platforms align, strip
+  // this info in C interop mode as well.
   auto builtinContext = clang::Builtin::Context();
-  if (SwiftContext.LangOpts.EnableCXXInterop && clangDecl->getBuiltinID() &&
+  if (clangDecl->getBuiltinID() &&
       !builtinContext.isTSBuiltin(clangDecl->getBuiltinID()) &&
       builtinContext.isPredefinedLibFunction(
           clangDecl->getBuiltinID()) &&

@@ -504,8 +504,9 @@ EXPERIMENTAL_FEATURE(Extern, true)
 // Enable trailing comma for comma-separated lists.
 EXPERIMENTAL_FEATURE(TrailingComma, false)
 
-// Import bounds safety and lifetime attributes from interop headers to
-// generate Swift wrappers with safe pointer types.
+// Enable legacy wrappers that treat __lifetimebound parameters as implicitly
+//  __noescape. Kept around to avoid breaking early adopters, but will not be
+// stabilized.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 
 /// Ignore resilience errors due to C++ types.

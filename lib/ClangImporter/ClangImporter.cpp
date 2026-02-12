@@ -593,9 +593,6 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
-    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
-
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -809,6 +806,9 @@ void importer::getNormalInvocationArguments(
   if (importerOpts.LoadVersionIndependentAPINotes)
     invocationArgStrs.insert(invocationArgStrs.end(),
                              {"-fswift-version-independent-apinotes"});
+
+  if (!LangOpts.DisableSafeInteropWrappers)
+    invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 }
 
 static void
