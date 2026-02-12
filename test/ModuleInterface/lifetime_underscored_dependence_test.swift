@@ -165,3 +165,35 @@ import lifetime_underscored_dependence
 // CHECK-NEXT:  return returnableCopier
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT: @_lifetime(dest: immortal)
+// CHECK-NEXT: @inlinable public func immortalInout(dest: inout lifetime_underscored_dependence.AnotherView) {
+// CHECK-NEXT:   dest = _overrideLifetime(dest, copying: ())
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @lifetime(dest: immortal)
+// CHECK-NEXT: @inlinable public func immortalInout(dest: inout lifetime_underscored_dependence.AnotherView) {
+// CHECK-NEXT:   dest = _overrideLifetime(dest, copying: ())
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func takeImmortalInout(closure: @_lifetime(dest: immortal) (_ dest: inout lifetime_underscored_dependence.AnotherView) -> ()) {}
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT: @_lifetime(dest: immortal, copy source)
+// CHECK-NEXT: @inlinable public func fullReassign(dest: inout lifetime_underscored_dependence.AnotherView, source: lifetime_underscored_dependence.AnotherView) {
+// CHECK-NEXT:   dest = source
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @lifetime(dest: immortal, copy source)
+// CHECK-NEXT: @inlinable public func fullReassign(dest: inout lifetime_underscored_dependence.AnotherView, source: lifetime_underscored_dependence.AnotherView) {
+// CHECK-NEXT:   dest = source
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func takeFullReassign(closure: @_lifetime(dest: immortal, copy source) (_ dest: inout lifetime_underscored_dependence.AnotherView, _ source: lifetime_underscored_dependence.AnotherView) -> ()) {}
+// CHECK-NEXT: #endif

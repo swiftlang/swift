@@ -136,7 +136,7 @@ public:
 
   SourceLoc getLoc() const { return loc; }
 
-  bool isImmortal() const {
+  bool isImmortalSpecifier() const {
     if (getDescriptorKind() != LifetimeDescriptor::DescriptorKind::Named) {
       return false;
     }
@@ -193,30 +193,37 @@ class LifetimeDependenceInfo {
   IndexSubset *inheritLifetimeParamIndices;
   IndexSubset *scopeLifetimeParamIndices;
   // The outer bool is the "isFromAnnotation" bit. The inner one is the
-  // "isImmortal" bit.
+  // "hasImmortalSpecifier" bit.
   llvm::PointerIntPair<llvm::PointerIntPair<IndexSubset *, 1, bool>, 1, bool>
       addressableParamIndicesAndImmortalAndFromAnnotation;
   IndexSubset *conditionallyAddressableParamIndices;
 
   unsigned targetIndex;
 
+  static unsigned numParams(IndexSubset *paramIndices) {
+    return paramIndices ? paramIndices->getCapacity() : 0;
+  }
+
+  bool hasDependencySource() const {
+    return inheritLifetimeParamIndices || scopeLifetimeParamIndices;
+  };
+
 public:
   /// Fully-initialized dependence info.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool isImmortal,
+                         unsigned targetIndex, bool hasImmortalSpecifier,
                          bool isFromAnnotation,
                          IndexSubset *addressableParamIndices,
                          IndexSubset *conditionallyAddressableParamIndices)
       : inheritLifetimeParamIndices(inheritLifetimeParamIndices),
         scopeLifetimeParamIndices(scopeLifetimeParamIndices),
         addressableParamIndicesAndImmortalAndFromAnnotation(
-            {addressableParamIndices, isImmortal}, isFromAnnotation),
+            {addressableParamIndices, hasImmortalSpecifier}, isFromAnnotation),
         conditionallyAddressableParamIndices(
             conditionallyAddressableParamIndices),
         targetIndex(targetIndex) {
-    ASSERT(this->isImmortal() || inheritLifetimeParamIndices ||
-           scopeLifetimeParamIndices);
+    ASSERT(this->hasImmortalSpecifier() || hasDependencySource());
     ASSERT(!inheritLifetimeParamIndices ||
            !inheritLifetimeParamIndices->isEmpty());
     ASSERT(!scopeLifetimeParamIndices || !scopeLifetimeParamIndices->isEmpty());
@@ -228,19 +235,22 @@ public:
     if (CONDITIONAL_ASSERT_enabled()) {
       // Ensure inherit/scope/addressable param indices are of the same length
       // or 0.
-      unsigned paramIndicesLength = 0;
-      if (inheritLifetimeParamIndices) {
-        paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
-      }
+      unsigned paramIndicesLength = numParams(inheritLifetimeParamIndices);
       if (scopeLifetimeParamIndices) {
-        ASSERT(paramIndicesLength == 0 ||
-               paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
-        paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
+        unsigned scopeIndicesLength = numParams(scopeLifetimeParamIndices);
+        if (paramIndicesLength == 0) {
+          paramIndicesLength = scopeIndicesLength;
+        } else {
+          ASSERT(paramIndicesLength == scopeIndicesLength);
+        }
       }
       if (addressableParamIndices) {
-        ASSERT(paramIndicesLength == 0 ||
-               paramIndicesLength == addressableParamIndices->getCapacity());
-        paramIndicesLength = addressableParamIndices->getCapacity();
+        unsigned addressableIndicesLength = numParams(addressableParamIndices);
+        if (paramIndicesLength == 0) {
+          paramIndicesLength = addressableIndicesLength;
+        } else {
+          ASSERT(paramIndicesLength == addressableIndicesLength);
+        }
       }
     }
   }
@@ -249,24 +259,28 @@ public:
   /// addressable parameter indices unset for now.
   LifetimeDependenceInfo(IndexSubset *inheritLifetimeParamIndices,
                          IndexSubset *scopeLifetimeParamIndices,
-                         unsigned targetIndex, bool isImmortal,
+                         unsigned targetIndex, bool hasImmortalSpecifier,
                          bool isFromAnnotation)
       : LifetimeDependenceInfo(inheritLifetimeParamIndices,
                                scopeLifetimeParamIndices, targetIndex,
-                               isImmortal, isFromAnnotation,
+                               hasImmortalSpecifier, isFromAnnotation,
                                // set during SIL type lowering
                                nullptr, nullptr) {}
 
   operator bool() const { return !empty(); }
 
   bool empty() const {
-    return !isImmortal() && inheritLifetimeParamIndices == nullptr &&
+    return !hasImmortalSpecifier() && inheritLifetimeParamIndices == nullptr &&
            scopeLifetimeParamIndices == nullptr;
   }
 
-  bool isImmortal() const {
+  bool hasImmortalSpecifier() const {
     return addressableParamIndicesAndImmortalAndFromAnnotation.getPointer()
         .getInt();
+  }
+
+  bool isImmortal() const {
+    return hasImmortalSpecifier() && !hasDependencySource();
   }
 
   /// Whether this lifetime dependence corresponds to a @lifetime annotation in
@@ -366,7 +380,7 @@ public:
              GenericEnvironment *env);
 
   bool operator==(const LifetimeDependenceInfo &other) const {
-    return this->isImmortal() == other.isImmortal() &&
+    return this->hasImmortalSpecifier() == other.hasImmortalSpecifier() &&
            this->getTargetIndex() == other.getTargetIndex() &&
            this->getInheritIndices() == other.getInheritIndices() &&
            this->getAddressableIndices() == other.getAddressableIndices() &&

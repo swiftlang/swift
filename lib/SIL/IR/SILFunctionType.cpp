@@ -2963,13 +2963,6 @@ static CanSILFunctionType getSILFunctionType(
         target = inputs.size();
       }
 
-      if (formalDeps.isImmortal()) {
-        return LifetimeDependenceInfo(
-            nullptr, nullptr, target,
-            /*immortal*/ true,
-            /*fromAnnotation*/ formalDeps.isFromAnnotation());
-      }
-      
       auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
         if (!formal) {
           return nullptr;
@@ -3003,7 +2996,7 @@ static CanSILFunctionType getSILFunctionType(
       if (!inheritIndicesSet && !scopeIndicesSet) {
         return LifetimeDependenceInfo(
             nullptr, nullptr, target,
-            /*immortal*/ true,
+            /*hasImmortalSpecifier*/ true,
             /*fromAnnotation*/ formalDeps.isFromAnnotation());
       }
       
@@ -3022,9 +3015,10 @@ static CanSILFunctionType getSILFunctionType(
         : nullptr;
 
       return LifetimeDependenceInfo(
-          inheritIndicesSet, scopeIndicesSet, target, /*immortal*/ false,
-          /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
-          condAddressableSet);
+        inheritIndicesSet, scopeIndicesSet, target,
+        formalDeps.hasImmortalSpecifier(),
+        /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
+        condAddressableSet);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {
