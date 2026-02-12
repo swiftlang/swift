@@ -1493,6 +1493,17 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
     auto const &entry = ext->getInherited().getEntry(index);
     assert(entry.isReparented());
 
+    // If the extension is not available for this deployment target, do not
+    // produce a reparented conformance.
+    if (auto extAvail = ext->getActiveAvailableAttrForCurrentPlatform()) {
+      if (auto protoIntroduction = extAvail->getIntroducedRange(ctx)) {
+        auto deploymentRange = AvailabilityRange::forDeploymentTarget(ctx);
+        if (!deploymentRange.isContainedIn(*protoIntroduction)) {
+          continue;
+        }
+      }
+    }
+
     auto loc = entry.getLoc();
     if (!loc)
       loc = ext->getLoc();
