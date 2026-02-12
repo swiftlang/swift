@@ -287,11 +287,13 @@ static const char * const GenericParamNames[] = {
   "Z"
 };
 
-static GenericTypeParamDecl*
-createGenericParam(ASTContext &ctx, const char *name, unsigned index,
-                   bool isParameterPack = false) {
+static GenericTypeParamDecl *createGenericParam(ASTContext &ctx,
+                                                const Twine &name,
+                                                unsigned index,
+                                                bool isParameterPack = false) {
+  SmallString<2> StrBuf;
   ModuleDecl *M = ctx.TheBuiltinModule;
-  Identifier ident = ctx.getIdentifier(name);
+  Identifier ident = ctx.getIdentifier(name.toStringRef(StrBuf));
 
   auto paramKind = GenericTypeParamKind::Type;
 
@@ -308,12 +310,12 @@ createGenericParam(ASTContext &ctx, const char *name, unsigned index,
 static GenericParamList *getGenericParams(ASTContext &ctx,
                                           unsigned numParameters,
                                           bool areParameterPacks = false) {
-  assert(numParameters <= std::size(GenericParamNames));
-
+  const unsigned numNamedParams = std::size(GenericParamNames);
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
-    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i,
-                                               areParameterPacks));
+    genericParams.push_back(createGenericParam(
+        ctx, i < numNamedParams ? GenericParamNames[i] : "T" + Twine(i), i,
+        areParameterPacks));
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
