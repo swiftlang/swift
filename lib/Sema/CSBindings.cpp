@@ -2027,12 +2027,15 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     }
 
     // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
+    //
+    // This has to be a Fallback binding, because if $T is later bound to
+    // an Array type, more conversion possibilities appear.
     if (first->is<InOutType>() &&
         first->getInOutObjectType()->isEqual(TypeVar)) {
       if (auto pointeeTy = second->lookThroughAllOptionalTypes()
                                ->getAnyPointerElementType()) {
         if (!pointeeTy->isTypeVariableOrMember()) {
-          return PotentialBinding(pointeeTy, AllowedBindingKind::Exact,
+          return PotentialBinding(pointeeTy, AllowedBindingKind::Fallback,
                                   constraint);
         }
       }

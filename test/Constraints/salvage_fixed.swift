@@ -31,3 +31,9 @@ func f(x: G<String>, b: Bool) {
 }
 
 func g() {}
+
+// Over-eager binding inference for InOut $T0 conv UnsafeMutablePointer<T>
+func iuoOfArrayToPointer(arr: inout [Int]!) {
+  func test(_: UnsafeMutablePointer<Int>) {}
+  test(&arr)
+}
