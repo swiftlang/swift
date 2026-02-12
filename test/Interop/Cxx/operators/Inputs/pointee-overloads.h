@@ -95,3 +95,51 @@ struct Pointee_LNonConst_RNonConst {
   int &operator*() & { return x; }
   int &operator*() && { return y; }
 };
+
+struct FRT_Const_NonConst {
+  void ref() const { ++count; }
+  void deref() const { if (--count <= 0) delete this; }
+
+  const int& operator*() const { return value; }
+  int& operator*() { return value; }
+
+  FRT_Const_NonConst(int value) : value{value}, count{1} {}
+
+  int value;
+  mutable int count;
+} __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.ref")))
+  __attribute__((swift_attr("release:.deref")));
+
+__attribute__((swift_attr("returns_retained")))
+inline FRT_Const_NonConst * _Nonnull new_FRT_Const_NonConst(int value) {
+  return new FRT_Const_NonConst{value};
+}
+
+template<typename T>
+struct Template_FRT_Const_NonConst {
+  void ref() const { ++count; }
+  void deref() const { if (--count <= 0) delete this; }
+
+  const T& operator*() const { return value; }
+  T& operator*() { return value; }
+
+  Template_FRT_Const_NonConst(T value) : value{value}, count{1} {}
+
+  T value;
+  mutable int count;
+} __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.ref")))
+  __attribute__((swift_attr("release:.deref")));
+
+__attribute__((swift_attr("returns_retained")))
+inline Template_FRT_Const_NonConst<int> * _Nonnull
+Int_Template_FRT_Const_NonConst(int value) {
+  return new Template_FRT_Const_NonConst{value};
+}
+
+__attribute__((swift_attr("returns_retained")))
+inline Template_FRT_Const_NonConst<double> * _Nonnull
+Double_Template_FRT_Const_NonConst(double value) {
+  return new Template_FRT_Const_NonConst{value};
+}
