@@ -46,12 +46,13 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[SELF]])
 // CHECK-NEXT: end_borrow [[SELF]]
 //   Formal access to LHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!modify
-// CHECK-NEXT: ([[T1:%.*]], [[T2:%.*]]) = begin_apply [[T0]]([[ARG]])
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!yielding_mutate
+// CHECK-NEXT: ([[T1:%.*]], [[T2:%.*]], [[T3:%.*]]) = begin_apply [[T0]]([[ARG]])
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$s9accessors11OrdinarySubVyS2icis
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[T1]])
 // CHECK-NEXT: end_apply [[T2]]
+// CHECK-NEXT: dealloc_stack [[T3]]
 // CHECK-NEXT: destroy_value [[OWNED_SELF]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
@@ -81,19 +82,21 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$s9accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!modify
-// CHECK-NEXT: ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[ARG]])
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!yielding_mutate
+// CHECK-NEXT: ([[T1:%.*]], [[TOKEN:%.*]], [[ALLOC1:%.*]]) = begin_apply [[T0]]([[ARG]])
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$s9accessors11MutatingSubVyS2icig : $@convention(method) (Int, @inout MutatingSub) -> Int
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[T1]])
 // CHECK-NEXT: end_apply [[TOKEN]]
 //   Formal access to LHS.
-// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!modify
-// CHECK-NEXT: ([[T1:%.*]], [[TOKEN:%.*]]) = begin_apply [[T0]]([[ARG]])
+// CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $B, #B.array!yielding_mutate
+// CHECK-NEXT: ([[T1:%.*]], [[TOKEN:%.*]], [[ALLOC2:%.*]]) = begin_apply [[T0]]([[ARG]])
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$s9accessors11MutatingSubVyS2icis : $@convention(method) (Int, Int, @inout MutatingSub) -> ()
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[T1]])
 // CHECK-NEXT: end_apply [[TOKEN]]
+// CHECK-NEXT: dealloc_stack [[ALLOC2]]
+// CHECK-NEXT: dealloc_stack [[ALLOC1]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil -primary-file %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor1XVxSgyciM
+// CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor1XVxSgycix
 // CHECK: [[SETTER:%.*]] = function_ref @$s18subscript_accessor1XVxSgycis
 // CHECK-NEXT: apply [[SETTER]]<T>
 struct X<T> {
@@ -22,8 +22,8 @@ extension WillBeConcretelyConstrained where T == Int {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor27WillBeConcretelyConstrainedVAASiRszlEySiSgSiciM
-// CHECK-SAME: $@yield_once @convention(method) (Int, @inout WillBeConcretelyConstrained<Int>) -> @yields @inout Optional<Int>
+// CHECK-LABEL: sil hidden [transparent] @$s18subscript_accessor27WillBeConcretelyConstrainedVAASiRszlEySiSgSicix
+// CHECK-SAME: $@yield_once_2 @convention(method) (Int, @inout WillBeConcretelyConstrained<Int>) -> @yields @inout Optional<Int>
 
 // CHECK: sil{{.*}}s18subscript_accessor9testXRead1xxAA1XVyxG_tlF
 @_specialize(where T == (Int, Int))

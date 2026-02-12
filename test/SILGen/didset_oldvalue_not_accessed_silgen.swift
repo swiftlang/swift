@@ -33,9 +33,9 @@ let foo = Foo(value: "Hello")
 // CHECK: [[DIDSET:%.*]] = function_ref @$s35didset_oldvalue_not_accessed_silgen3FooC5valuexvW : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[DIDSET]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> ()
 
-// Foo.value.modify //
+// Foo.value.yielding_mutate //
 
-// CHECK-LABEL: sil hidden [ossa] @$s35didset_oldvalue_not_accessed_silgen3FooC5valuexvM : $@yield_once @convention(method) <T> (@guaranteed Foo<T>) -> @yields @inout T
+// CHECK-LABEL: sil hidden [ossa] @$s35didset_oldvalue_not_accessed_silgen3FooC5valuexvx : $@yield_once_2 @convention(method) <T> (@guaranteed Foo<T>) -> @yields @inout T
 // CHECK: debug_value [[SELF:%.*]] : $Foo<T>, let, name "self", argno {{[0-9+]}}
 // CHECK-NEXT: [[REF_ADDR:%.*]] = ref_element_addr [[SELF]] : $Foo<T>, #Foo.value
 // CHECK-NEXT: [[BEGIN_ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF_ADDR]] : $*T

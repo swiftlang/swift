@@ -83,6 +83,9 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
       // swift_retainCount is not part of private contract between the compiler and runtime, but we still need to link it
       linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting },
                                         /*byAsmName=*/true);
+      linkEmbeddedRuntimeFunctionByName(
+        "swift_deletedCalleeAllocatedCoroutineMethodError", { },
+        /*byAsmName*/ false);
   }
 
   void linkEmbeddedConcurrency() {

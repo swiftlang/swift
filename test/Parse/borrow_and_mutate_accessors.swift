@@ -34,8 +34,7 @@ struct Wrapper {
     borrow { // expected-error{{variable cannot provide both a 'borrow' accessor and a 'yielding borrow' accessor}}
       return _k
     }
-    // expected-warning@+1{{'read' is deprecated; please use 'yielding borrow' instead}}
-    read { // expected-note{{'yielding borrow' accessor defined here}}
+    yielding borrow { // expected-note{{'yielding borrow' accessor defined here}}
       yield _k
     }
   }

@@ -1,11 +1,9 @@
 // sil (this file) -> sib -> sib -> sil | FileCheck
 
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name default_override -enable-library-evolution -enable-experimental-feature CoroutineAccessors
-// RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name default_override -enable-library-evolution -enable-experimental-feature CoroutineAccessors
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name default_override -emit-sorted-sil -enable-library-evolution -enable-experimental-feature CoroutineAccessors | %FileCheck %s
-
-// REQUIRES: swift_feature_CoroutineAccessors
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name default_override -enable-library-evolution
+// RUN: %target-sil-opt %t/tmp.sib -emit-sib -o %t/tmp.2.sib -module-name default_override -enable-library-evolution
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name default_override -emit-sorted-sil -enable-library-evolution | %FileCheck %s
 
 sil_stage canonical
 

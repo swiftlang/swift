@@ -3017,10 +3017,18 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     }
   }
 
-  // Non-stable modules have no ABI to keep stable.
-  if (storage->getModuleContext()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient)
-    return false;
+  // If any overridden decl requires the underscored version, then this decl
+  // does too.  Otherwise dispatch to the underscored version on a value
+  // statically the super but dynamically this subtype would not dispatch to an
+  // override of the underscored version but rather (incorrectly) the
+  // supertype's implementation.
+  auto *current = storage;
+  while ((current = current->getOverriddenDecl())) {
+    if (current->requiresCorrespondingUnderscoredCoroutineAccessor(kind,
+                                                                   nullptr)) {
+      return true;
+    }
+  }
 
   // Non-exported storage has no ABI to keep stable.
   if (isExported(storage) == ExportedLevel::None)

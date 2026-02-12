@@ -1,14 +1,11 @@
 // RUN: %target-sil-opt %s \
 // RUN:   -enable-library-evolution \
-// RUN:   -enable-experimental-feature CoroutineAccessors \
 // RUN: | %FileCheck %s
 
 // Note:  This is the same as default_override.sil, except that the
 // input uses the transitional `read2` and `modify2` terminology to
 // ensure those continue to be parsed.  These yielding accessors will
 // still get printed as `yielding_borrow` and `yielding_mutate` respectively.
-
-// REQUIRES: swift_feature_CoroutineAccessors
 
 sil_stage canonical
 
@@ -19,7 +16,7 @@ struct Int {
 }
 
 open class B {
-  open var i: Int { read set }
+  open var i: Int { yielding borrow set }
 }
 
 sil @B_i_read : $@yield_once @convention(method) (@guaranteed B) -> @yields Int
