@@ -329,6 +329,24 @@ func badNoEscapeCaptureFromDeferedEscapingPackIteration<each T>(_ fn: repeat () 
   let _ = 42
 }
 
+func badRepeatedNoEscapeCaptureFromPackIteration<each T>(_ fn: repeat () -> each T) { // expected-note {{parameter 'fn' is implicitly non-escaping}}
+  repeat takesEscaping { // expected-error {{escaping closure captures non-escaping parameter 'fn'}}
+    _ = (each fn)() // expected-note {{captured here}}
+  }
+}
+
+// TODO: test this case when we can compile repeat ... { defer { ... } }
+// https://github.com/swiftlang/swift/issues/87206
+// 
+// func badRepeatedDeferedNoEscapeCaptureFromPackIteration<each T>(_ fn: repeat () -> each T) { // expected note {{parameter 'fn' is implicitly non-escaping}}
+//   repeat takesEscaping { // expected error {{escaping closure captures non-escaping parameter 'fn'}}
+//     defer {
+//       _ = (each fn)() // expected note {{captured here}}
+//     }
+//   }
+// }
+
+
 func badNoEscapeCaptureAfterPackExpansion<each T>(_ fn: repeat () -> each T) {
   let tup = (repeat each fn)
 
