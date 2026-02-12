@@ -5636,6 +5636,12 @@ public:
   /// this protocol itself.
   ArrayRef<ProtocolDecl *> getAllInheritedProtocols() const;
 
+  /// Retrieve the set of protocols that are reparenting this protocol,
+  /// plus the extension defining the relationship and the index into that
+  /// extension's InheritedTypes where it occurs.
+  ArrayRef<std::tuple<ProtocolDecl *, ExtensionDecl *, unsigned>>
+  getReparentingProtocols() const;
+
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
 
