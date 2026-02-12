@@ -292,6 +292,10 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(SGF, CleanupLocation(S));
+  // This scope was added to properly handle local borrow bindings.
+  // Without this, the access scope ends prematurely as it is bound
+  // to very restrictive scopes, causing illegal borrow accesses.
+  FormalEvaluationScope BraceEvaluationScope(SGF);
   // This is a workaround until the FIXME in SILGenFunction::getOrCreateScope
   // has been addressed. Property wrappers create incorrect source locations.
   DebugScope DbgScope(SGF, S);
@@ -1212,6 +1216,8 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
   {
     // Enter a scope for any bound pattern variables.
     Scope conditionScope(SGF.Cleanups, S);
+    // This scope was added to properly handle local borrow bindings.
+    FormalEvaluationScope WhileBodyEvaluationScope(SGF);
 
     auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
     auto NumFalseTaken = SGF.loadProfilerCount(S);
