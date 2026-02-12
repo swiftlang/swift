@@ -3889,6 +3889,7 @@ private:
 
     if (isBorrowing) {
       ASSERT(innerLoop);
+      innerLoop->setParentForEach(stmt);
       stmt->setContinueTarget(innerLoop);
     } else {
       stmt->setContinueTarget(whileStmt);
