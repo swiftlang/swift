@@ -2820,6 +2820,9 @@ ERROR(extension_protocol_inheritance,none,
 ERROR(extension_protocol_reparented_not_inheriting,none,
       "%0 must directly inherit from %1 in order to be reparented",
       (const NominalTypeDecl *, const NominalTypeDecl *))
+ERROR(extension_protocol_reparented_duplicate,none,
+      "cannot have multiple declarations of %0 being '@reparented' by %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())

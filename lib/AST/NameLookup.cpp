@@ -3650,6 +3650,66 @@ AllInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   return PD->getASTContext().AllocateCopy(result.getArrayRef());
 }
 
+ArrayRef<ReparentingProtocolsRequest::Result>
+ReparentingProtocolsRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *PD) const {
+  // ObjC protocols cannot be reparented.
+  if (PD->isObjC())
+    return {};
+
+  auto const *expectedModule = PD->getModuleContext();
+
+  SmallPtrSet<ProtocolDecl *, 4> reparented;
+  SmallVector<Result, 4> result;
+  for (auto *ext : PD->getExtensions()) {
+
+    // Extensions in other modules can't validly declare a reparenting.
+    if (ext->getModuleContext() != expectedModule)
+      continue;
+
+    // Search for @reparented entries in the extension's inheritance clause.
+    auto inheritedTypes = ext->getInherited();
+    for (auto index : inheritedTypes.getIndices()) {
+      auto const &inherited = inheritedTypes.getEntry(index);
+
+      if (!inherited.isReparented())
+        continue;
+
+      // Resolve the type.
+      Type ty = inheritedTypes.getResolvedType(index,
+                                               TypeResolutionStage::Structural);
+
+      if (!ty || ty->hasError())
+        continue;
+
+      auto protoTy = ty->castTo<ProtocolType>();
+      ProtocolDecl *newBase = protoTy->getDecl();
+      ASSERT(newBase != PD && "reparenting itself?");
+
+      // Duplicate extension. Should only be one.
+      if (!reparented.insert(newBase).second) {
+        // FIXME: diagnose with diag::extension_protocol_reparented_duplicate
+        // and diag::invalid_redecl_prev
+        ASSERT(false);
+        continue;
+      }
+
+      result.emplace_back(newBase, ext, index);
+    }
+  }
+
+  if (result.empty())
+    return {};
+
+  // Give a stable ordering by protocols to avoid later non-determinism.
+  llvm::array_pod_sort(result.begin(), result.end(),
+                       [](Result const *a, Result const *b) {
+                         return TypeDecl::compare(std::get<ProtocolDecl *>(*a),
+                                                  std::get<ProtocolDecl *>(*b));
+                       });
+  return PD->getASTContext().AllocateCopy(result);
+}
+
 ArrayRef<ValueDecl *>
 ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
                                       ProtocolDecl *PD) const {
