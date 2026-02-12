@@ -183,7 +183,7 @@ struct ImageSource: CustomStringConvertible {
       self.init(mapped: UnsafeRawBufferPointer(
                   start: base, count: size))
       #else
-      let fd = _swift_open(path, O_RDONLY, 0)
+      var fd = _swift_open(path, O_RDONLY, 0)
 
       if fd < 0 {
         let filePathCharacter: Character = "/" // non windows path separator
