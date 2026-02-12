@@ -365,7 +365,7 @@ private struct Liverange {
     let aliasAnalysis = context.aliasAnalysis
 
     while let inst = liverange.pop() {
-      if inst.mayWrite(toAddress: copy.sourceAddress, aliasAnalysis) {
+      if inst.mayWriteToSource(address: copy.sourceAddress, aliasAnalysis) {
         return false
       }
       if let endAccess = inst as? EndAccessInst,
@@ -464,7 +464,7 @@ private struct Liverange {
           // Note that `inst` can be a function call containing other access scopes. But doing the `inst.mayWrite`
           // check, we know that the function can only contain read accesses (to the same memory location).
           // So it's fine to move `endAccessToMove` even over such a function call.
-          if inst.mayWrite(toAddress: accessAddr, aliasAnalysis) {
+          if inst.mayWriteToSource(address: accessAddr, aliasAnalysis) {
             return false
           }
         }
@@ -485,4 +485,17 @@ private struct Liverange {
     }
   }
 
+}
+
+private extension Instruction {
+  func mayWriteToSource(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    switch self {
+    case is FixLifetimeInst:
+      // fix_lifetime has memory-write effects defined. However, in TempRValueElimination we
+      // don't shrink lifetimes. Therefore we can safely ignore this instruction.
+      return false
+    default:
+      return mayWrite(toAddress: address, aliasAnalysis)
+    }
+  }
 }

@@ -1897,3 +1897,20 @@ bb1:
   %9 = tuple ()
   return %9 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @ignore_fix_lifetime :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'ignore_fix_lifetime'
+sil [ossa] @ignore_fix_lifetime : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  copy_addr %0 to [init] %1
+  fix_lifetime %0
+  %4 = apply undef(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
