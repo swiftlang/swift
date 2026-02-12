@@ -404,6 +404,12 @@ Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 Added: _swift_task_cancellationShieldPush
 Added: _swift_task_cancellationShieldPop
 Added: _swift_task_hasActiveCancellationShield
+Added: _$sSct27hasActiveCancellationShieldSbvpMV
+Added: _$sScTss5NeverORszABRs_rlE27hasActiveCancellationShieldSbvpZMV
+
+// UnsafeCurrentTask's _task became usable from inline
+Added: _$sSct5_taskBovg
+Added: _$sSct5_taskBovpMV
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through

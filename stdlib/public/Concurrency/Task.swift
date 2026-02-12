@@ -142,6 +142,7 @@ import Swift
 @frozen
 public struct Task<Success: Sendable, Failure: Error>: Sendable {
   @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
   @_alwaysEmitIntoClient
@@ -754,6 +755,8 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> 
 @available(SwiftStdlib 5.1, *)
 @unsafe
 public struct UnsafeCurrentTask {
+  @usableFromInline
+  @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
@@ -814,8 +817,12 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public var hasActiveCancellationShield: Bool {
-    unsafe _taskHasActiveCancellationShield(_task)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe _taskHasActiveCancellationShield(_task)
+    }
   }
 }
 
@@ -961,6 +968,7 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @available(SwiftStdlib 6.4, *)
 @_silgen_name("swift_task_hasActiveCancellationShield")
+@usableFromInline
 internal func _taskHasActiveCancellationShield(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_currentPriority")

@@ -332,6 +332,7 @@ func _taskRemoveCancellationHandler(
 /// }
 /// ```
 @available(SwiftStdlib 6.4, *)
+@_alwaysEmitIntoClient
 public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Value,
 ) async throws(Failure) -> Value {
@@ -421,6 +422,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 /// }
 /// ```
 @available(SwiftStdlib 6.4, *)
+@_alwaysEmitIntoClient
 public func withTaskCancellationShield<Value, Failure>(
   operation: () throws(Failure) -> Value,
 ) throws(Failure) -> Value {
@@ -454,9 +456,14 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   /// - SeeAlso: ``UnsafeCurrentTask/hasActiveCancellationShield``
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
   public static var hasActiveCancellationShield: Bool {
-    unsafe withUnsafeCurrentTask { task in
-      unsafe task?.hasActiveCancellationShield ?? false
+    @_alwaysEmitIntoClient
+    get {
+      unsafe withUnsafeCurrentTask { task in
+        unsafe task?.hasActiveCancellationShield ?? false
+      }
     }
   }
 }
