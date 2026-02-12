@@ -81,7 +81,7 @@ set(swift_runtime_sources
     ThreadingError.cpp
     Tracing.cpp
     AccessibleFunction.cpp
-    Win32.cpp)
+    WindowsUnicode.cpp)
 
 # We pull this in separately here because other dylibs will need it, but only
 # will have the __tsan_on_initialize called, and on Darwin, RTLD_NEXT can't be

@@ -57,7 +57,7 @@ add_library(swiftRuntimeCore OBJECT
     ThreadingError.cpp
     Tracing.cpp
     AccessibleFunction.cpp
-    Win32.cpp)
+    WindowsUnicode.cpp)
 
 if(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER)
   target_sources(swiftRuntimeCore PRIVATE
