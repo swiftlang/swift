@@ -43,4 +43,27 @@ end:
   return undef : $()
 }
 
+sil @use_span : $@convention(thin) (@guaranteed Span<Int>) -> ()
+
+// CHECK-LABEL: span_count_cond_fail :
+// CHECK: mark_dependence [nonescaping]
+// CHECK-NOT: cond_fail
+// CHECK-LABEL: }
+sil [ossa] @span_count_cond_fail : $@convention(thin) (Optional<UnsafeRawPointer>, @guaranteed Array<Int>) -> () {
+bb0(%0 : $Optional<UnsafeRawPointer>, %1 : @guaranteed $Array<Int>):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct $Int (%2)
+  %5 = struct $Span<Int> (%0, %4)
+  %6 = mark_dependence [nonescaping] %5 on %1
+  %7 = struct_extract %6, #Span._count
+  %8 = struct_extract %7, #Int._value
+  %9 = builtin "assumeNonNegative_Int64"(%8) : $Builtin.Int64
+  %10 = builtin "cmp_sge_Int64"(%3, %9) : $Builtin.Int1
+  cond_fail %10, "Index out of bounds"
+  %12 = function_ref @use_span : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  apply %12(%6) : $@convention(thin) (@guaranteed Span<Int>) -> ()
+  %t = tuple ()
+  return %t
+}
 
