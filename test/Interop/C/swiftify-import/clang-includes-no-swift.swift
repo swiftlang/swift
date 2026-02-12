@@ -1,11 +1,10 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/succeed.swift
-// RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/fail.swift -dump-source-file-imports 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers %t/fail.swift -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/succeed.swift
+// RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/fail.swift -dump-source-file-imports 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs %t/fail.swift -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}B1.h -verify-ignore-macro-note
 
 // Tests that we don't try to import modules that don't work well with Swift
 

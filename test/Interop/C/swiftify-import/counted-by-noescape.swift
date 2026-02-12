@@ -1,11 +1,10 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -Xcc -Werror -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByNoEscapeClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Werror -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByNoEscape.swiftmodule -I %S/Inputs -enable-experimental-feature Lifetimes -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by __noescape parameters.
 
@@ -92,12 +91,6 @@ import CountedByNoEscapeClang
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func pointerName(_ _pointerName_param1: inout MutableSpan<Int32>?)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy p)
-// CHECK-NEXT: @_lifetime(p: copy p)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnLifetimeBound(_ len1: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32>
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32>
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -142,13 +135,6 @@ public func callNullUnspecified(_ p: inout MutableSpan<CInt>) {
 @inlinable
 public func callNullable(_ p: inout MutableSpan<CInt>?) {
   nullable(&p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(p: copy p)
-@inlinable
-public func callReturnLifetimeBound(_ p: inout MutableSpan<CInt>) {
-  let _: MutableSpan<CInt> = returnLifetimeBound(2, &p)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

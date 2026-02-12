@@ -1999,6 +1999,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::ParserValidation);
   }
 #endif
+
+  if (Args.hasArg(OPT_disable_safe_interop_wrappers))
+    Opts.DisableSafeInteropWrappers = true;
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

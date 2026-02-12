@@ -671,6 +671,10 @@ namespace swift {
     /// Defines the default actor isolation.
     DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
+    /// Whether to enable generation of safe wrappers and parsing of bounds
+    /// attributes (default enabled) or not.
+    bool DisableSafeInteropWrappers = false;
+
     /// Whether or not to allow experimental features that are only available
     /// in "production".
 #ifdef NDEBUG
