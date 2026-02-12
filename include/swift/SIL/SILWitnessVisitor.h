@@ -151,6 +151,19 @@ public:
     if (!func->requiresNewWitnessTableEntry())
       return;
 
+    // Unreachable functions (with custom availability) should not generate
+    // witness entries
+    // FIXME: cannot use func->isUnreachableAtRuntime() here rdar://170184865
+    for (auto *attr : func->getAttrs().getAttributes<AvailableAttr>()) {
+      if (auto domain = attr->getDomainOrIdentifier().getAsDomain()) {
+        if (domain->isCustom() &&
+            domain->getCustomDomain()->getKind() ==
+                CustomAvailabilityDomain::Kind::Disabled) {
+          return;
+        }
+      }
+    }
+
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
     addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
     addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
