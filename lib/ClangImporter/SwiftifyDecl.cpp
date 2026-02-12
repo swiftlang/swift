@@ -399,10 +399,7 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
       return Action::Continue;
     }
 
-    const clang::TagDecl *Def = TD->getDefinition();
-    ASSERT(Def && "concrete type without type definition?");
     const clang::Module *M = getOwningModule(ClangDecl);
-
     if (!M) {
       DLOG("Concrete type is in bridging header, which is always imported\n");
       return Action::Continue;
@@ -411,13 +408,15 @@ struct ForwardDeclaredConcreteTypeVisitor : public TypeWalker {
     if (!Owner) {
       hasForwardDeclaredConcreteType = true;
       DLOG("Imported signature contains concrete type not available in bridging header, skipping\n");
-      LLVM_DEBUG(DUMP(Def));
+      if (const clang::TagDecl *Def = TD->getDefinition())
+        LLVM_DEBUG(DUMP(Def));
       return Action::Stop;
     }
     if (!Owner->isModuleVisible(M)) {
       hasForwardDeclaredConcreteType = true;
       DLOG("Imported signature contains concrete type not available in clang module, skipping\n");
-      LLVM_DEBUG(DUMP(Def));
+      if (const clang::TagDecl *Def = TD->getDefinition())
+        LLVM_DEBUG(DUMP(Def));
       return Action::Stop;
     }
 
@@ -576,9 +575,12 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     }
     if (getNumParams(ClangDecl) != swiftNumParams) {
       DLOG("mismatching parameter lists");
-      assert(ClangDecl->isVariadic() ||
-             MappedDecl->getForeignErrorConvention().has_value() ||
-             MappedDecl->getForeignAsyncConvention().has_value());
+      assert(
+          ClangDecl->isVariadic() ||
+          MappedDecl->getForeignErrorConvention().has_value() ||
+          MappedDecl->getForeignAsyncConvention().has_value() ||
+          (swiftNumParams == 1 &&
+           MappedDecl->getParameters()->get(0)->getInterfaceType()->isVoid()));
       return false;
     }
 
@@ -630,24 +632,30 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         paramHasLifetimeInfo = true;
       }
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
-        DLOG("Found lifetimebound attribute\n");
-        if (!dependsOnClass(swiftParam)) {
-          if (returnValueCanBeNonEscapable) {
-            // If this parameter has bounds info we will tranform it into a
-            // Span, so then it will no longer be Escapable.
-            bool willBeEscapable =
-                !isNonEscapable(clangParamTy) &&
-                (!paramHasBoundsInfo ||
-                 mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
-            printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
-            paramHasLifetimeInfo = true;
-            returnHasLifetimeInfo = true;
+        if (Self.SwiftContext.LangOpts.hasFeature(
+                Feature::SafeInteropWrappers)) {
+          DLOG("Found lifetimebound attribute\n");
+          if (!dependsOnClass(swiftParam)) {
+            if (returnValueCanBeNonEscapable) {
+              // If this parameter has bounds info we will tranform it into a
+              // Span, so then it will no longer be Escapable.
+              bool willBeEscapable =
+                  !isNonEscapable(clangParamTy) &&
+                  (!paramHasBoundsInfo ||
+                   mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
+              printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
+              paramHasLifetimeInfo = true;
+              returnHasLifetimeInfo = true;
+            } else {
+              DLOG("lifetimebound ignored because return value is escapable\n");
+            }
           } else {
-            DLOG("lifetimebound ignored because return value is escapable\n");
+            DLOG("lifetimebound ignored because it depends on class with "
+                 "refcount\n");
           }
         } else {
-          DLOG("lifetimebound ignored because it depends on class with "
-               "refcount\n");
+          DLOG("lifetimebound not yet supported by stable feature-set - skipping\n");
+          return false;
         }
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
@@ -750,7 +758,7 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 }
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
-  if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
   auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)

@@ -272,7 +272,6 @@ class ASTContext final {
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
-      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
 
 public:
@@ -299,7 +298,6 @@ public:
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts, CASOptions &casOpts,
       SerializationOptions &serializationOpts, SourceManager &SourceMgr,
       DiagnosticEngine &Diags,
-      std::optional<clang::DarwinSDKInfo> &DarwinSDKInfo,
       llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr);
   ~ASTContext();
 
@@ -722,11 +720,17 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
+  /// Get BorrowingSequence.makeBorrowingIterator().
+  FuncDecl *getBorrowingSequenceMakeBorrowingIterator() const;
+
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
 
   /// Get IteratorProtocol.next().
   FuncDecl *getIteratorNext() const;
+
+  /// Get BorrowingIteratorProtocol.nextSpan(maximumCount:).
+  FuncDecl *getBorrowingIteratorNextSpan() const;
 
   /// Get AsyncIteratorProtocol.next().
   FuncDecl *getAsyncIteratorNext() const;

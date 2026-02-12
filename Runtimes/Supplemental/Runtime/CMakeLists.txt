@@ -98,6 +98,11 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
+if(WIN32 AND ${CMAKE_SYSTEM_PROCESSOR} MATCHES "X86")
+  # Turn on /safeseh for 32-bit x86 or we won't be able to link
+  add_compile_options($<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
+endif()
+
 find_package(SwiftSwiftDirectRuntime)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
@@ -116,7 +121,7 @@ add_library(swiftRuntime
 
 # Optionally add backtracing sources
 if(${PROJECT_NAME}_ENABLE_BACKTRACING)
-  target_sources(swiftRuntime
+  target_sources(swiftRuntime PRIVATE
     Address.swift
     Backtrace.swift
     Backtrace+Codable.swift
@@ -165,13 +170,13 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
     # the different architectures we support.
     string(TOUPPER "${CMAKE_SYSTEM_PROCESSOR}" processor)
     if(processor STREQUAL "AMD64")
-      target_sources(swiftRuntime
+      target_sources(swiftRuntime PRIVATE
         get-cpu-context-x86_64.asm)
     elseif(processor STREQUAL "X86")
-      target_sources(swiftRuntime
+      target_sources(swiftRuntime PRIVATE
         get-cpu-context-i686.asm)
     elseif(processor STREQUAL "ARM64")
-      target_sources(swiftRuntime
+      target_sources(swiftRuntime PRIVATE
         get-cpu-context-aarch64.asm)
     else()
       message(FATAL_ERROR "You need to implement assembly code for ${processor}")
@@ -188,12 +193,15 @@ set_target_properties(swiftRuntime PROPERTIES
   Swift_MODULE_NAME Runtime)
 target_compile_definitions(swiftRuntime PRIVATE
   SWIFT_ASM_AVAILABLE)
-target_compile_options(swiftRuntime PRIVATE
+target_compile_options(swiftRuntime PUBLIC
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/modules/module.modulemap>")
 # FIXME: We should split out the parts that are needed by the runtime to avoid
 # pulling in headers from the compiler.
 target_include_directories(swiftRuntime PRIVATE
   "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include")
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swiftRuntime INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}>>")
 target_link_libraries(swiftRuntime PUBLIC
   swiftShims
   swiftCore
@@ -220,3 +228,22 @@ generate_plist(swiftRuntime "${CMAKE_PROJECT_VERSION}" swiftRuntime)
 embed_manifest(swiftRuntime)
 
 include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/SwiftRuntime.cmake" OPTIONAL)
+
+# Inter-project install info
+export(EXPORT SwiftRuntimeTargets
+  FILE "cmake/SwiftRuntime/SwiftRuntimeTargets.cmake")
+install(EXPORT SwiftRuntimeTargets
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftRuntime"
+  FILE "SwiftRuntimeTargets.cmake"
+  COMPONENT SwiftRuntimeCMake)
+include(CMakePackageConfigHelpers)
+configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/interface/SwiftRuntimeConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftRuntime/SwiftRuntimeConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftRuntime")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftRuntime/SwiftRuntimeConfigVersion.cmake"
+  VERSION "${PROJECT_VERSION}"
+  COMPATIBILITY ExactVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftRuntime/SwiftRuntimeConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake/SwiftRuntime/SwiftRuntimeConfigVersion.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/SwiftRuntime")

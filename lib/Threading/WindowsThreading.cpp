@@ -1,4 +1,4 @@
-//==--- Win32.cpp - Threading abstraction implementation ------- -*-C++ -*-===//
+//===--- WindowsThreading.cpp - Threading abstraction implementation ------===//
 //
 // This source file is part of the Swift.org open source project
 //

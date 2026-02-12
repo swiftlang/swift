@@ -6525,8 +6525,27 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto declRef = E->getReferencedDecl())
-        checkDecl(declRef.getDecl(), E->getLoc());
+      if (auto declRef = E->getReferencedDecl()) {
+        bool downgradeToWarning = false;
+        auto *decl = declRef.getDecl();
+
+        // If this is an implicit reference to `make{Async}Iterator`
+        // or `next` methods, let's produce a warning instead of an
+        // error to maintain source compatibility since it wasn't
+        // diagnosed before in closure contexts.
+        if (E->isImplicit() && decl->isInstanceMember()) {
+          auto &ctx = decl->getASTContext();
+          auto name = decl->getBaseName();
+
+          downgradeToWarning =
+              !ctx.isLanguageModeAtLeast(LanguageMode::future) &&
+              isInClosureContext() &&
+              (name == ctx.Id_makeIterator ||
+               name == ctx.Id_makeAsyncIterator || name == ctx.Id_next);
+        }
+
+        checkDecl(decl, E->getLoc(), downgradeToWarning);
+      }
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (const auto &component : KPE->getComponents()) {
@@ -6550,6 +6569,16 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
             decl, dc, loc,
             downgradeToWarning ? DiagnosticBehavior::Warning
                                : DiagnosticBehavior::Unspecified);
+    }
+
+    bool isInClosureContext() const {
+      auto *DC = dc;
+      do {
+        if (isa<ClosureExpr>(DC))
+          return true;
+      } while ((DC = DC->getParent()));
+
+      return false;
     }
   };
 

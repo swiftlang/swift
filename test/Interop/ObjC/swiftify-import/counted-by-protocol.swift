@@ -1,4 +1,3 @@
-// REQUIRES: swift_feature_SafeInteropWrappers
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -6,8 +5,8 @@
 // XFAIL: *
 // Safe interop Protocol support removed for now
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByProtocol.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/counted-by-protocol.swift -verify -Xcc -Wno-nullability-completeness
-// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByProtocol.swiftmodule -I %t/Inputs -enable-experimental-feature SafeInteropWrappers %t/counted-by-protocol.swift -dump-macro-expansions 2> %t/expansions.out
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByProtocol.swiftmodule -I %t/Inputs %t/counted-by-protocol.swift -verify -Xcc -Wno-nullability-completeness
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedByProtocol.swiftmodule -I %t/Inputs %t/counted-by-protocol.swift -dump-macro-expansions 2> %t/expansions.out
 // RUN: %diff %t/expansions.out %t/expansions.expected
 
 //--- Inputs/module.modulemap

@@ -7183,6 +7183,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar1 = type1->getDesugaredType();
   auto desugar2 = type2->getDesugaredType();
 
+  // Refuse to match types with errors. We ought to consider making this an
+  // assert (clients should instead use holes), but for now let's bail out of
+  // solving.
+  if (desugar1->hasError() || desugar2->hasError())
+    return getTypeMatchFailure(locator);
+
   // If both sides are dependent members without type variables, it's
   // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
   // is a concrete type substituted for generic parameter,
@@ -7517,15 +7523,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType in constraint");
 
-    // Note: Mismatched builtin types fall through to the TypeKind::Error
-    // case below.
+    // Mismatched builtin types
 #define BUILTIN_GENERIC_TYPE(id, parent)
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+      return getTypeMatchFailure(locator);
 
     case TypeKind::Error:
-      return getTypeMatchFailure(locator);
+      llvm_unreachable("Rejected above");
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
@@ -9019,7 +9025,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           loc,
           LocatorPathElt::ConformanceRequirement(conformance.getConcrete()));
 
-      for (const auto &req : conformance.getConditionalRequirements()) {
+      for (auto req : conformance.getConditionalRequirements()) {
+        // Replace any ErrorTypes with holes if needed in case of substitution
+        // failure.
+        req = req.tranformSubjectTypes([&](Type ty) {
+          return replaceInferableTypesWithTypeVars(ty, loc);
+        });
         addConstraint(
             req, getConstraintLocator(conformanceLoc,
                                       LocatorPathElt::ConditionalRequirement(
@@ -9932,6 +9943,13 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto contextualTy = getContextualTypeInfo(anchor)->getType();
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
+  auto isBorrowing =
+      seqProto->isSpecificProtocol(KnownProtocolKind::BorrowingSequence);
+
+  if (seqTy->isExistentialType() && !isAsync && isBorrowing) {
+    isBorrowing = false;
+    seqProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  }
 
   auto *contextualLoc = getConstraintLocator(
       anchor, LocatorPathElt::ContextualType(CTP_ForEachSequence));
@@ -9947,7 +9965,8 @@ ConstraintSystem::simplifyForEachElementConstraint(
   // The erased element type is `any P`, but `makeIterator` can only produce
   // `any IteratorProtocol`, so the actual element type is `Any`.
   auto *iteratorAssocTy = seqProto->getAssociatedType(
-      isAsync ? ctx.Id_AsyncIterator : ctx.Id_Iterator);
+      isAsync ? ctx.Id_AsyncIterator
+              : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
   auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
                                       /*openExistential*/ true, contextualLoc);
   if (!iterTy) {
@@ -9958,10 +9977,14 @@ ConstraintSystem::simplifyForEachElementConstraint(
 
   // Now we have the Iterator type, do the same lookup for Element, opening
   // an existential if needed.
-  auto *iterProto =
-      ctx.getProtocol(isAsync ? KnownProtocolKind::AsyncIteratorProtocol
-                              : KnownProtocolKind::IteratorProtocol);
-  auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
+  auto *iterProto = ctx.getProtocol(
+      isAsync ? KnownProtocolKind::AsyncIteratorProtocol
+              : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
+                             : KnownProtocolKind::IteratorProtocol));
+  // FIXME: update this to only use Id_Element once the BorrowingSequence
+  // protocol lands.
+  auto *eltAssocTy = iterProto->getAssociatedType(
+      isBorrowing ? Context.Id_BorrowedElement : Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,
                                      /*openExistential*/ true, contextualLoc);
   if (!eltTy) {

@@ -27,11 +27,13 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -532,13 +534,13 @@ static std::string getLifetimeDependenceInfoSourceListString(
   auto addressable = info.getAddressableIndices();
   auto condAddressable = info.getConditionallyAddressableIndices();
 
+  bool isFirstSpecifier = true;
   auto getSourceString = [&](IndexSubset *bitvector,
                              StringRef kind) -> std::string {
     std::string result;
-    bool isFirstSetBit = true;
     for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
       if (bitvector->contains(i)) {
-        if (!isFirstSetBit) {
+        if (!isFirstSpecifier) {
           result += ", ";
         }
         result += kind;
@@ -551,11 +553,18 @@ static std::string getLifetimeDependenceInfoSourceListString(
         // print the index. Indices should ideally never be used in Swift
         // lifetime annotations, especially in module interfaces.
         result += getLifetimeDependenceIdentifier(i, params);
-        isFirstSetBit = false;
+        isFirstSpecifier = false;
       }
     }
     return result;
   };
+  if (info.hasImmortalSpecifier()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += "immortal";
+    isFirstSpecifier = false;
+  }
   auto inheritLifetimeParamIndices = info.getInheritIndices();
   if (inheritLifetimeParamIndices) {
     assert(!inheritLifetimeParamIndices->isEmpty());
@@ -564,14 +573,8 @@ static std::string getLifetimeDependenceInfoSourceListString(
   }
   if (auto scopeLifetimeParamIndices = info.getScopeIndices()) {
     assert(!scopeLifetimeParamIndices->isEmpty());
-    if (inheritLifetimeParamIndices) {
-      lifetimeDependenceString += ", ";
-    }
     lifetimeDependenceString +=
         getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  if (info.isImmortal()) {
-    lifetimeDependenceString += "immortal";
   }
   return lifetimeDependenceString;
 }
@@ -579,6 +582,8 @@ static std::string getLifetimeDependenceInfoSourceListString(
 /// Get a string representation for this dependence info as a Swift lifetime
 /// attribute (for a type or decl). The target and sources are referred to by
 /// their labels if possible (see getLifetimeDependenceIdentifier).
+///
+/// TODO: Factor this with LifetimeDependenceInfo::getString.
 static std::string
 getLifetimeDependenceInfoSwiftString(LifetimeDependenceInfo const &info,
                                      ArrayRef<AnyFunctionType::Param> params) {
@@ -6307,8 +6312,23 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  bool shouldUseExportedModuleName(ASTContext &ctx,
+  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
+  /// submodule; otherwise just return the parent module.
+  ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
+    // Only clang declarations can belong to a submodule
+    if (auto clangNode = TyDecl->getClangNode()) {
+      auto importer = TyDecl->getASTContext().getClangModuleLoader();
+      if (auto clangMod = importer->getClangOwningModule(clangNode)) {
+        return importer->getWrapperForModule(clangMod);
+      }
+    }
+
+    return TyDecl->getParentModule();
+  }
+
+  bool shouldUseExportedModuleName(GenericTypeDecl *TyDecl,
                                    StringRef exportedModuleName) {
+    auto &ctx = TyDecl->getASTContext();
     if (exportedModuleName.empty())
       return false;
 
@@ -6318,7 +6338,18 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     case PrintOptions::ExportedModuleNameUsage::Never:
       return false;
     case PrintOptions::ExportedModuleNameUsage::IfLoaded:
-      return ctx.getLoadedModule(ctx.getIdentifier(exportedModuleName));
+      // Has the module we're exporting as been loaded? If not, we might be
+      // in a dependency of the exported-as module, so we can't use its name.
+      auto exportAsModule = ctx.getLoadedModule(
+                                ctx.getIdentifier(exportedModuleName));
+      if (!exportAsModule)
+        return false;
+
+      // Is the specific submodule TyDecl belongs to actually visible through
+      // exportAsModule? There are some subtleties about re-exports from
+      // submodules that are captured by querying the ImportCache.
+      auto tyDeclParent = getParentSubModuleOrModule(TyDecl);
+      return ctx.getImportCache().isImportedBy(tyDeclParent, exportAsModule);
     }
 
     llvm_unreachable("Unrecognized ExportedModuleNameUsage");
@@ -6361,7 +6392,7 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     // Should use the module real (binary) name here and everywhere else the
     // module is printed in case module aliasing is used (see -module-alias)
     Identifier Name = Mod->getRealName();
-    if (shouldUseExportedModuleName(Mod->getASTContext(), ExportedModuleName)) {
+    if (shouldUseExportedModuleName(TyDecl, ExportedModuleName)) {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
@@ -8618,6 +8649,7 @@ swift::getInheritedForPrinting(
 
   InheritedTypes inherited = InheritedTypes(decl);
 
+  bool explicitSendable = false;
   // Collect explicit inherited types.
   for (auto i : inherited.getIndices()) {
     if (auto ty = inherited.getResolvedType(i)) {
@@ -8683,6 +8715,10 @@ swift::getInheritedForPrinting(
         entry = InheritedEntry(TypeLoc::withoutLoc(strippedType),
                                entry.getOptions());
       }
+
+      if (auto P = type->getKnownProtocol()) {
+        explicitSendable |= *P == KnownProtocolKind::Sendable;
+      }
     }
 
     Results.push_back(entry);
@@ -8713,6 +8749,38 @@ swift::getInheritedForPrinting(
         uncheckedProtocols.push_back(proto);
       if (attr->isSuppressed())
         suppressedProtocols.push_back(proto);
+    }
+  }
+
+  if (auto *T = dyn_cast<NominalTypeDecl>(decl)) {
+    auto *sendable =
+        T->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+
+    // If printing is for a package interface, let's add derived/implied `Sendable`
+    // conformance to avoid having to infer it while type-checking the interface
+    // file later. Such inference is not always possible, because i.e. a package
+    // declaration can have private storage that won't be printed in a package
+    // interface file and attempting inference would produce an invalid result.
+    bool shouldPrintSynthesizedSendable = [&] {
+      // If `Sendable` is stated explicit or imported from ObjC, were are done.
+      if (explicitSendable || protocols.contains(sendable))
+        return false;
+
+      // Otherwise only do this for package declarations.
+      return options.printPackageInterface() && isPackage(T);
+    }();
+
+    if (shouldPrintSynthesizedSendable) {
+      auto conformance =
+          lookupConformance(T->getDeclaredInterfaceType(), sendable,
+                            /*allowMissing=*/false);
+      if (conformance.isConcrete() &&
+          !conformance.hasUnavailableConformance()) {
+        auto *concrete = conformance.getConcrete();
+        if (concrete->getSourceKind() == ConformanceEntryKind::Synthesized ||
+            concrete->getSourceKind() == ConformanceEntryKind::Implied)
+          protocols.insert(sendable);
+      }
     }
   }
 

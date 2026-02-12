@@ -31,3 +31,5 @@ struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
 struct NonescapableStruct lifetimeboundNonescapableReturn(int len, int * __counted_by(len) p __lifetimebound);
 
 struct NonescapableStruct lifetimeboundNonescapableReturnDoubleBounds(int len, int * __counted_by(len) p __lifetimebound, struct NonescapableStruct s __lifetimebound);
+
+int * __counted_by(len) oneLifetimeboundOneEscapable(int len, int len2, int * p __counted_by(len2) __lifetimebound, int len3, int * p2 __counted_by(len3));

@@ -482,12 +482,17 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
                       : ResolutionKind::Overloadable;
   auto moduleToLookIn = dc;
   if (Name.hasModuleSelector()) {
-    // FIXME: Should we look this up relative to dc?
-    // We'd need a new ResolutionKind.
-    auto moduleName = Name.getModuleSelector();
-    moduleToLookIn = dc->getASTContext().getLoadedModule(moduleName);
-    if (!moduleToLookIn && moduleName == Ctx.TheBuiltinModule->getName())
-      moduleToLookIn = Ctx.TheBuiltinModule;
+    // Perform a second lookup for the module in the module selector.
+    auto moduleOpts = options | Options(Flags::ModuleLookup) -
+      Options({ Flags::TypeLookup, Flags::MacroLookup, Flags::ABIProviding,
+                Flags::IncludeOuterResults });
+    UnqualifiedLookupDescriptor moduleDesc(
+       DeclNameRef(Name.getModuleSelector()), const_cast<DeclContext *>(dc),
+       Loc, moduleOpts);
+
+    auto modules = evaluateOrFatal(dc->getASTContext().evaluator,
+                                   UnqualifiedLookupRequest(moduleDesc));
+    moduleToLookIn = cast_or_null<ModuleDecl>(modules.getSingleTypeResult());
   }
 
   // If we didn't find the module, it obviously can't have any results.

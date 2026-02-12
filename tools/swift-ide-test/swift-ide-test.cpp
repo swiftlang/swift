@@ -839,6 +839,11 @@ static llvm::cl::opt<std::string>
                       llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+    DisableSafeInterop("disable-safe-interop-wrappers",
+                       llvm::cl::desc("Disable safe interop wrappers."),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
     CxxInteropGettersSettersAsProperties("cxx-interop-getters-setters-as-properties",
         llvm::cl::desc("Imports getters and setters as computed properties."),
         llvm::cl::cat(Category), llvm::cl::init(false));
@@ -4579,6 +4584,9 @@ int main(int argc, char *argv[]) {
   CompilerInvocation InitInvok;
 
   InitInvok.getFrontendOptions().RequestedAction = FrontendOptions::ActionType::Typecheck;
+
+  if (options::DisableSafeInterop)
+    InitInvok.getLangOptions().DisableSafeInteropWrappers = true;
 
   for (auto &File : options::InputFilenames)
     InitInvok.getFrontendOptions().InputsAndOutputs.addInputFile(File);
