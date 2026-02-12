@@ -10,7 +10,7 @@
 
 import Synchronization
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_task_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_task_cancel_shield
@@ -77,7 +77,7 @@ func test_task_cancel_shield() async {
   await t.value
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_defer_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function) // CHECK: test_defer_cancel_shield
@@ -107,7 +107,7 @@ func test_defer_cancel_shield() async {
   await task.value
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_nested_shields() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_nested_shields
@@ -138,7 +138,7 @@ func test_nested_shields() async {
   await task.value
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_sleep_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_sleep_cancel_shield
@@ -153,7 +153,7 @@ func test_sleep_cancel_shield() async {
   await task.value
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_async_stream_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_async_stream_cancel_shield
@@ -174,7 +174,7 @@ func test_async_stream_cancel_shield() async {
   try! await task.value
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_child_task_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_child_task_cancel_shield
@@ -193,7 +193,7 @@ func test_child_task_cancel_shield() async {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_task_group_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_task_group_cancel_shield
@@ -222,7 +222,7 @@ func test_task_group_cancel_shield() async {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 func test_add_task_cancel_shield() async {
   print("==== ------------------------------------------------")
   print(#function)  // CHECK: test_add_task_cancel_shield
@@ -243,7 +243,62 @@ func test_add_task_cancel_shield() async {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
+func test_hasActiveCancellationShield() async {
+  print("==== ------------------------------------------------")
+  print(#function)  // CHECK: test_hasActiveCancellationShield
+
+  let task = Task {
+    print("hasShield:\(Task.hasActiveCancellationShield)")
+    // CHECK: hasShield:false
+
+    withUnsafeCurrentTask { $0?.cancel() }
+    print("isCancelled:\(Task.isCancelled)")
+    // CHECK: isCancelled:true
+
+    await withTaskCancellationShield {
+      print("shielded isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+      // CHECK: shielded isCancelled:false, hasShield:true
+
+      async let childAsync: Void = {
+        print("async let isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+        // CHECK: async let isCancelled:false, hasShield:false
+        withTaskCancellationShield {
+          print("async let shielded isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+          // CHECK: async let shielded isCancelled:false, hasShield:true
+        }
+      }()
+      await childAsync
+
+      await withTaskGroup(of: Void.self) { group in
+        group.addTask {
+          print("group child isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+          // CHECK: group child isCancelled:false, hasShield:false
+          withTaskCancellationShield {
+            print("group child shielded isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+            // CHECK: group child shielded isCancelled:false, hasShield:true
+          }
+        }
+      }
+
+      await Task {
+        print("unstructured isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+        // CHECK: unstructured isCancelled:false, hasShield:false
+        await withTaskCancellationShield {
+          print("unstructured shielded isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+          // CHECK: unstructured shielded isCancelled:false, hasShield:true
+        }
+      }.value
+    }
+
+    print("after shield isCancelled:\(Task.isCancelled), hasShield:\(Task.hasActiveCancellationShield)")
+    // CHECK: after shield isCancelled:true, hasShield:false
+  }
+
+  await task.value
+}
+
+@available(SwiftStdlib 6.4, *)
 struct CancellableContinuation: ~Copyable {
   let state = Mutex<(Bool, (CheckedContinuation<Void, any Error>?))>((false, nil))
 
@@ -279,7 +334,7 @@ struct CancellableContinuation: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 @main struct Main {
   static func main() async {
     await test_task_cancel_shield()
@@ -290,6 +345,7 @@ struct CancellableContinuation: ~Copyable {
     await test_child_task_cancel_shield()
     await test_task_group_cancel_shield()
     await test_add_task_cancel_shield()
+    await test_hasActiveCancellationShield()
     print("DONE")
   }
 }

@@ -731,6 +731,13 @@ bool swift_task_cancellationShieldPush();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancellationShieldPop();
 
+/// Check if the current task has an active cancellation shield.
+///
+/// Returns `true` if a cancellation shield is currently active for the given task.
+/// Returns `false` if no shield is active.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_hasActiveCancellationShield(AsyncTask *task);
+
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.
 ///

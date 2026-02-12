@@ -258,13 +258,13 @@ func _taskRemoveCancellationHandler(
 
 // ==== Task Cancellation Shielding -------------------------------------------
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Value,
 ) async throws(Failure) -> Value {
   let didInstallShield = Builtin.taskCancellationShieldPush()
 
-  defer { 
+  defer {
     if Bool(didInstallShield) {
       Builtin.taskCancellationShieldPop()
      }
@@ -273,17 +273,27 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
   return try await operation()
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 public func withTaskCancellationShield<Value, Failure>(
   operation: () throws(Failure) -> Value,
 ) throws(Failure) -> Value {
   let didInstallShield = Builtin.taskCancellationShieldPush()
 
-  defer { 
+  defer {
     if Bool(didInstallShield) {
       Builtin.taskCancellationShieldPop()
     }
   }
 
   return try operation()
+}
+
+@available(SwiftStdlib 6.4, *)
+extension Task where Success == Never, Failure == Never {
+  /// Checks if the current task has an active cancellation shield.
+  public static var hasActiveCancellationShield: Bool {
+    unsafe withUnsafeCurrentTask { task in
+      unsafe task?.hasActiveCancellationShield ?? false
+    }
+  }
 }

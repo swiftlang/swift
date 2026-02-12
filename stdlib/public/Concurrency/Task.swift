@@ -792,6 +792,12 @@ public struct UnsafeCurrentTask {
   public func cancel() {
     unsafe _taskCancel(_task)
   }
+
+  /// Checks if this task has an active cancellation shield.
+  @available(SwiftStdlib 6.4, *)
+  public var hasActiveCancellationShield: Bool {
+    unsafe _taskHasActiveCancellationShield(_task)
+  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -933,6 +939,10 @@ public func _taskCancel(_ task: Builtin.NativeObject)
 @_silgen_name("swift_task_isCancelled")
 @usableFromInline
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+
+@available(SwiftStdlib 6.4, *)
+@_silgen_name("swift_task_hasActiveCancellationShield")
+internal func _taskHasActiveCancellationShield(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_currentPriority")
 internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8

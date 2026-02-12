@@ -403,6 +403,7 @@ Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 // Cancellation shields
 Added: _swift_task_cancellationShieldPush
 Added: _swift_task_cancellationShieldPop
+Added: _swift_task_hasActiveCancellationShield
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through

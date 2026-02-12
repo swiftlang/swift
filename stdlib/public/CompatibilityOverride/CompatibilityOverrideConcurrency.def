@@ -389,6 +389,10 @@ OVERRIDE_TASK(task_cancellationShieldPop, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, , )
 
+OVERRIDE_TASK(task_hasActiveCancellationShield, bool,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+              swift::, (AsyncTask *task), (task))
+
 OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, , )

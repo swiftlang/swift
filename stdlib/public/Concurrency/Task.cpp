@@ -1858,6 +1858,12 @@ static void swift_task_cancellationShieldPopImpl() {
 }
 
 SWIFT_CC(swift)
+static bool swift_task_hasActiveCancellationShieldImpl(AsyncTask *task) {
+  return task->_private()._status().load(std::memory_order_relaxed)
+      .hasCancellationShield();
+}
+
+SWIFT_CC(swift)
 static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
