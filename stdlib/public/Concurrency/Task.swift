@@ -766,7 +766,10 @@ public struct UnsafeCurrentTask {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
+  /// ### Task cancellation shields effect on cancellation
+  /// A task may
   /// - SeeAlso: `checkCancellation()`
+  /// - SeeAlso: `withTaskCancellationShield(operation:)`
   public var isCancelled: Bool {
     unsafe _taskIsCancelled(_task)
   }
@@ -793,7 +796,23 @@ public struct UnsafeCurrentTask {
     unsafe _taskCancel(_task)
   }
 
-  /// Checks if this task has an active cancellation shield.
+  /// Checks if this task is executing in a scope with a task cancellation shield activated by the
+  /// ``withTaskCancellationShield(operation:)`` function.
+  ///
+  /// An active task cancellation shield prevents a task's ability to observe if it was cancelled,
+  /// i.e. the ``Task/isCancelled`` property will always return `false` when the task is executing
+  /// with an active shield.
+  ///
+  /// This property is primarily aimed at debugging and understanding cancellation behavior
+  /// in complex call hierarchies, and should not be used in regular control flow.
+  ///
+  /// Returns `true` when executing within a task that has an active cancellation shield.
+  ///
+  /// Cancellation shields are not automatically inherited by child tasks; each child task must install
+  /// its own shield if needed if it, independently, wanted to ignore cancellation during a specific scope.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
   @available(SwiftStdlib 6.4, *)
   public var hasActiveCancellationShield: Bool {
     unsafe _taskHasActiveCancellationShield(_task)
