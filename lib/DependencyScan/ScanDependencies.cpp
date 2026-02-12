@@ -45,6 +45,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/FrontendTool/Dependencies.h"
 #include "swift/Strings.h"
 #include "clang/CAS/IncludeTree.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1437,6 +1438,12 @@ performModuleScanImpl(
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumDepScanFilesystemLookups =
         scanner.getNumLookups();
+
+  if (!ctx.hadError()) {
+    emitLoadedModuleTraceIfNeeded(
+        mainModuleID, cache, ctx,
+        instance->getInvocation().getFrontendOptions());
+  }
 
   // Serialize the dependency cache if -serialize-dependency-scan-cache
   // is specified
