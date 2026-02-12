@@ -581,6 +581,25 @@ struct Validator {
         expectEqual(changed.state, true)
     }
 
+    suite.test("continuous tracking") {
+      let changed = CapturedState(state: 0)
+      let test: MiddleNamePerson = MiddleNamePerson()
+      let token = withContinuousObservation(options: .didSet) { _ in
+        _blackHole(test.firstName)
+        changed.state += 1
+      }
+      // the sleeps here are intended to be a simulation of returning to the main run loop
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 1)
+      test.firstName = "c"
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 2)
+      test.firstName = "d"
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 3)
+      token.cancel()
+    }
+
     runAllTests()
   }
 }
