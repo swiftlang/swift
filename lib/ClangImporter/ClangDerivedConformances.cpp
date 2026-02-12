@@ -610,24 +610,23 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   // Look for __operatorStar(), which must be non-mutating and return a
   // reference. This makes sure we use the const operator* overload.
   auto operatorStar = getNonMutatingDereferenceOperator(decl);
-  Type operatorStarReturnTy = pointeeTy;
+  Type dereferenceResultTy = pointeeTy;
   if (operatorStar) {
     assert(!operatorStar->isMutating() &&
            "this __operatorStar can't be mutating");
-    operatorStarReturnTy = operatorStar->getResultInterfaceType();
+    auto operatorStarReturnTy = operatorStar->getResultInterfaceType();
     assert(operatorStarReturnTy &&
            "__operatorStar doesn't have a return type?");
-    assert(
-        (!operatorStarReturnTy->getAnyPointerElementType() &&
-         operatorStarReturnTy->getCanonicalType() ==
-             pointee->getTypeInContext()->getCanonicalType()) ||
+
+    if (operatorStarReturnTy &&
+        operatorStarReturnTy->getAnyPointerElementType() &&
         (operatorStarReturnTy->getAnyPointerElementType()->getCanonicalType() ==
-         pointee->getTypeInContext()->getCanonicalType()) &&
-            "incompatible Pointee and DereferenceResult associated types");
+         pointeeTy->getCanonicalType()))
+      dereferenceResultTy = operatorStar->getResultInterfaceType();
   }
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Pointee"), pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("DereferenceResult"),
-                               operatorStarReturnTy);
+                               dereferenceResultTy);
 
   if (pointeeSettable)
     impl.addSynthesizedProtocolAttrs(
@@ -814,6 +813,53 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   decl->addMember(importedConstructor);
 }
 
+static void conformToCxxBorrowingSequenceIfNedded(
+    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
+    const clang::CXXRecordDecl *clangDecl,
+    const ProtocolConformance *rawIteratorConformance) {
+  PrettyStackTraceDecl trace("trying to conform to CxxBorrowingSequence", decl);
+  ASTContext &ctx = decl->getASTContext();
+
+  ProtocolDecl *cxxIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
+  ProtocolDecl *cxxBorrowingSequenceProto =
+      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
+  if (!cxxIteratorProto || !cxxBorrowingSequenceProto)
+    return;
+
+  // Take the default definition of `BorrowingIterator` from
+  // CxxBorrowingSequence protocol. This type is currently
+  // `CxxBorrowingIterator<Self>`.
+  auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
+      ctx.getIdentifier("_BorrowingIterator"));
+  if (!borrowingIteratorDecl)
+    return;
+  auto borrowingIteratorNominal =
+      borrowingIteratorDecl->getDefaultDefinitionType()->getAnyNominal();
+
+  // Substitute generic `Self` parameter.
+  auto declSelfTy = decl->getDeclaredInterfaceType();
+  auto borrowingIteratorTy =
+      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
+
+  auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
+      ctx.getIdentifier("DereferenceResult"));
+  if (!dereferenceResultDecl)
+    return;
+
+  auto dereferenceResultTy =
+      rawIteratorConformance->getTypeWitness(dereferenceResultDecl);
+
+  if (dereferenceResultTy && dereferenceResultTy->getAnyPointerElementType()) {
+    // Only conform to CxxBorrowingSequence if `__operatorStar` returns
+    // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_BorrowingIterator"),
+                                 borrowingIteratorTy);
+    impl.addSynthesizedProtocolAttrs(decl,
+                                     {KnownProtocolKind::CxxBorrowingSequence});
+  }
+}
+
 static void
 conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
                              NominalTypeDecl *decl,
@@ -823,15 +869,13 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
 
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  ProtocolDecl *cxxBorrowingSequenceProto =
-      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
   ProtocolDecl *cxxSequenceProto =
       ctx.getProtocol(KnownProtocolKind::CxxSequence);
   ProtocolDecl *cxxConvertibleProto =
       ctx.getProtocol(KnownProtocolKind::CxxConvertibleToCollection);
   // If the Cxx module is missing, or does not include one of the necessary
   // protocols, bail.
-  if (!cxxIteratorProto || !cxxSequenceProto || !cxxBorrowingSequenceProto)
+  if (!cxxIteratorProto || !cxxSequenceProto)
     return;
 
   // Check if present: `func __beginUnsafe() -> RawIterator`
@@ -869,49 +913,13 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   auto pointeeTy = rawIteratorConformance->getTypeWitness(pointeeDecl);
   assert(pointeeTy && "valid conformance must have a Pointee witness");
 
-  // CxxBorrowingSequence conformance.
-  // Take the default definition of `BorrowingIterator` from
-  // CxxBorrowingSequence protocol. This type is currently
-  // `CxxBorrowingIterator<Self>`.
-  auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
-      ctx.getIdentifier("_BorrowingIterator"));
-  assert(borrowingIteratorDecl &&
-         "CxxBorrowingSequence must have a BorrowingIterator associated type");
-  auto borrowingIteratorNominal =
-      borrowingIteratorDecl->getDefaultDefinitionType()->getAnyNominal();
-
-  // Substitute generic `Self` and `Element` parameters.
-  auto declSelfTy = decl->getDeclaredInterfaceType();
-  auto borrowingIteratorTy =
-      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
-
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_Element"), pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_BorrowingIterator"),
-                               borrowingIteratorTy);
 
-  auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
-      ctx.getIdentifier("DereferenceResult"));
-  assert(
-      dereferenceResultDecl &&
-      "UnsafeCxxInputIterator must have a DereferenceResult associated type");
-  auto dereferenceResultTy =
-      rawIteratorConformance->getTypeWitness(dereferenceResultDecl);
-  assert(dereferenceResultTy &&
-         "valid conformance must have a Pointee witness");
-
-  if (dereferenceResultTy->getAnyPointerElementType()) {
-    // Only conform to CxxBorrowingSequence if `__operatorStar` returns
-    // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
-    assert(
-        (dereferenceResultTy->getAnyPointerElementType()->getCanonicalType() ==
-         pointeeTy->getCanonicalType()) &&
-        "incompatible Pointee and DereferenceResult associated types");
-    impl.addSynthesizedProtocolAttrs(decl,
-                                     {KnownProtocolKind::CxxBorrowingSequence});
-  }
+  conformToCxxBorrowingSequenceIfNedded(impl, decl, clangDecl,
+                                        rawIteratorConformance);
 
   // CxxSequence conformance.
   // Take the default definition of `Iterator` from CxxSequence protocol. This
@@ -919,6 +927,7 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   auto iteratorDecl = cxxSequenceProto->getAssociatedType(ctx.Id_Iterator);
   auto iteratorTy = iteratorDecl->getDefaultDefinitionType();
   // Substitute generic `Self` parameter.
+  auto declSelfTy = decl->getDeclaredInterfaceType();
   auto cxxSequenceSelfTy = cxxSequenceProto->getSelfInterfaceType();
   iteratorTy = iteratorTy.subst(
       [&](SubstitutableType *dependentType) {

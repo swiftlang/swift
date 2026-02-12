@@ -30,6 +30,5 @@
 // CHECK:   typealias Element = NonReferenceDereferenceOperator.Pointee
 // CHECK:   typealias _Element = NonReferenceDereferenceOperator.Pointee
 // CHECK:   typealias RawIterator = NonReferenceDereferenceOperator
-// CHECK:   typealias _BorrowingIterator = CxxBorrowingIterator<NonReferenceDereferenceOperatorSequence>
 // CHECK:   typealias Iterator = CxxIterator<NonReferenceDereferenceOperatorSequence>
 // CHECK: }
