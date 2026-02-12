@@ -761,7 +761,7 @@ extension Sequence {
   }
 #endif // !hasFeature(Embedded)
 
-  @_alwaysEmitIntoClient  @inline(__always)
+  @_alwaysEmitIntoClient  @_transparent
   public func _filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> [Element] {

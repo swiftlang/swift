@@ -643,7 +643,7 @@ extension Dictionary {
   @abi(
     __consuming func filter(
       _ isIncluded: (Element) throws -> Bool
-    ) rethrows -> [Key: Value]
+    ) throws -> [Key: Value]
   )
   internal __consuming func __rethrows_filter(
     _ isIncluded: (Element) throws -> Bool
