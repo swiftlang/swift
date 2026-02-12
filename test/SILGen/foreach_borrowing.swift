@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
+// RUN:     -Xllvm -sil-print-debuginfo \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
 // RUN:     -disable-availability-checking \
 // RUN:     %s | %FileCheck %s
@@ -113,5 +114,60 @@ func testBreakTargetBorrowingSequence() {
     if (element == 2){
         break
     }
+  }
+}
+
+
+// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
+  // Test that synthesized code has correct source locations for the borrowing foreach loop.
+  // The borrowing foreach desugars to:
+  //   let $x$generator = seq._makeBorrowingIterator()
+  //   while case let $span = $x$generator._nextSpan(maximumCount: Int.max),
+  //      !$span.isEmpty {
+  //       let $i = 0
+  //       let $count = $span.count
+  //       while $i < $count, case let x = $span[$i] {
+  //         $i = $i + 1
+  //         if x == val {
+  //           // body
+  //         }
+  //       }
+  //     }
+  //   }
+
+  // _makeBorrowingIterator() function_ref should be at "for" keyword location (172:3)
+  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
+  // CHECK: apply [[MAKE_BORROWING_IT]]{{.*}}, loc "{{.*}}":[[@LINE+30]]:18
+
+  // _nextSpan() function_ref should be at "for" keyword location
+  // CHECK: [[NEXT_SPAN:%.*]] = function_ref @$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF {{.*}}, loc "{{.*}}":[[@LINE+27]]:3
+  // CHECK: apply [[NEXT_SPAN]]{{.*}}, loc "{{.*}}":[[@LINE+26]]:3
+
+  // $span debug_value should be at "for" keyword location
+  // CHECK: debug_value {{.*}}, let, name "$span", loc "{{.*}}":[[@LINE+23]]:3
+
+  // Outer loop condition (!$span.isEmpty)
+  // CHECK: [[NOT_IS_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ {{.*}}, loc "{{.*}}":[[@LINE+20]]:3
+  // CHECK: apply [[NOT_IS_EMPTY]]{{.*}}, loc "{{.*}}":[[@LINE+19]]:3
+  // CHECK: cond_br {{.*}}, loc "{{.*}}":[[@LINE+18]]:3
+
+  // Inner loop condition ($i < $count)
+  // CHECK: function_ref @$sSi1loiySbSi_SitFZ  {{.*}}, loc "{{.*}}":[[@LINE+15]]:3
+  // CHECK: cond_br {{.*}}, loc "{{.*}}":[[@LINE+14]]:3
+
+  // Pattern variable "x" should be at its declaration location
+  // CHECK: debug_value {{.*}}, let, name "element", loc "{{.*}}":[[@LINE+11]]:7
+
+  // Where clause "==" operator function_ref
+  // CHECK: [[EQUALS:%.*]] = function_ref @$sSi2eeoiySbSi_SitFZ {{.*}}, loc "{{.*}}":[[@LINE+8]]:36
+  // Where clause "==" operator apply
+  // CHECK: apply [[EQUALS]]{{.*}}, loc "{{.*}}":[[@LINE+6]]:36
+  // Where clause condition extraction
+  // CHECK: struct_extract {{.*}} : $Bool, #Bool._value, loc "{{.*}}":[[@LINE+4]]:28
+  // Where clause conditional branch
+  // CHECK: cond_br {{.*}}, loc "{{.*}}":[[@LINE+2]]:28
+
+  for element in seq where element == val{
   }
 }
