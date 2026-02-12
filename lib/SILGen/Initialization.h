@@ -499,10 +499,8 @@ public:
 /// into this initialization should be discarded. This represents AnyPatterns
 /// (that is, 'var (_)') that bind to values without storing them.
 class BlackHoleInitialization : public Initialization {
-  bool isBorrowing = false;
-
 public:
-  BlackHoleInitialization(bool isBorrowing = false) : isBorrowing(isBorrowing) {}
+  BlackHoleInitialization() {}
 
   bool canSplitIntoTupleElements() const override {
     return true;
@@ -523,8 +521,6 @@ public:
   bool canPerformPackExpansionInitialization() const override {
     return true;
   }
-
-  bool isBorrow() override { return isBorrowing; }
 
   void performPackExpansionInitialization(SILGenFunction &SGF,
                                           SILLocation loc,

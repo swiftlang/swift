@@ -2241,8 +2241,7 @@ public enum StdLibVersion: String {
   case stdlib_6_0  = "6.0"
   case stdlib_6_1  = "6.1"
   case stdlib_6_2  = "6.2"
-  case stdlib_6_3  = "6.3"
-
+  
   var isAvailable: Bool {
     switch self {
     case .stdlib_5_7:
@@ -2259,8 +2258,6 @@ public enum StdLibVersion: String {
       return if #available(SwiftStdlib 6.1, *)  { true } else { false }
     case .stdlib_6_2:
       return if #available(SwiftStdlib 6.2, *)  { true } else { false }
-    case .stdlib_6_3:
-      return if #available(SwiftStdlib 6.3, *)  { true } else { false }
     }
   }
 }
