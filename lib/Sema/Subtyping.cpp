@@ -350,16 +350,6 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   }
 }
 
-static bool shouldBeConservativeWithProto(ProtocolDecl *proto) {
-  if (proto->isMarkerProtocol())
-    return true;
-
-  if (proto->isObjC())
-    return true;
-
-  return false;
-}
-
 static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
   return classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
 }
@@ -527,27 +517,11 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
         return ConflictFlag::Conformance;
     }
 
-    // If '$LHS conv $RHS' and '$RHS conforms P', does it follow
-    // that '$LHS conforms P'?
-    auto isConformanceTransitiveOnRHS = [rhsKind]() -> bool {
-      if (rhsKind == ConversionBehavior::None ||
-          rhsKind == ConversionBehavior::String ||
-          rhsKind == ConversionBehavior::Array ||
-          rhsKind == ConversionBehavior::Dictionary ||
-          rhsKind == ConversionBehavior::Set)
-        return true;
-
-      return false;
-    };
-
-    if (lhs->isTypeParameter() &&
-        isConformanceTransitiveOnRHS()) {
+    if (lhs->isTypeParameter()) {
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(lhs),
           [&](ProtocolDecl *proto) {
-            if (shouldBeConservativeWithProto(proto))
-              return false;
-            return !lookupConformance(rhs, proto);
+            return !checkTransitiveSubtypeConformance(cs, rhs, proto);
           });
       if (failed)
         return ConflictFlag::Conformance;
