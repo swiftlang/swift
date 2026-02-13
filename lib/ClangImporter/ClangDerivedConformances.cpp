@@ -831,7 +831,7 @@ static void conformToCxxBorrowingSequenceIfNedded(
   // CxxBorrowingSequence protocol. This type is currently
   // `CxxBorrowingIterator<Self>`.
   auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
-      ctx.getIdentifier("_BorrowingIterator"));
+      ctx.getIdentifier("BorrowingIterator"));
   if (!borrowingIteratorDecl)
     return;
   auto borrowingIteratorNominal =
@@ -853,7 +853,7 @@ static void conformToCxxBorrowingSequenceIfNedded(
   if (dereferenceResultTy && dereferenceResultTy->getAnyPointerElementType()) {
     // Only conform to CxxBorrowingSequence if `__operatorStar` returns
     // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("_BorrowingIterator"),
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
                                  borrowingIteratorTy);
     impl.addSynthesizedProtocolAttrs(decl,
                                      {KnownProtocolKind::CxxBorrowingSequence});
