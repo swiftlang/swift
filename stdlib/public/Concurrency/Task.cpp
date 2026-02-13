@@ -335,6 +335,19 @@ AsyncTask::~AsyncTask() {
     futureFragment()->destroy();
   }
 
+  // The initial task name record is special in that we allow it to stay until
+  // task destruction, since it is possible to read a name off a task handle,
+  // even after it completed; so drop it here:
+  if (hasInitialTaskNameRecord()) {
+    dropInitialTaskNameRecord();
+
+    #ifndef NDEBUG
+    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+    assert(oldStatus.getInnermostRecord() == NULL &&
+         "Status records should have been removed by this time!");
+    #endif
+  }
+
   Private.destroy();
 
   concurrency::trace::task_destroy(this);
@@ -1175,6 +1188,15 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   // ==== Initial Task records
   {
+
+    // Task name
+    // This record MUST be pushed before other initial records that should be dropped when the
+    // task completes; The task name record will be kept until we destroy the task, and therefore
+    // must be pushed onto the stack earlier than records which we intended to pop during task completion.
+    if (jobFlags.task_hasInitialTaskName()) {
+      task->pushInitialTaskName(taskName);
+    }
+
     // Task executor preference
     // If the task does not have a specific executor set already via create
     // options, and there is a task executor preference set in the parent, we
@@ -1185,11 +1207,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       // because the group takes a fast-path when attaching the child record.
       task->pushInitialTaskExecutorPreference(taskExecutor,
                                               /*owned=*/taskExecutorIsOwned);
-    }
-
-    // Task name
-    if (jobFlags.task_hasInitialTaskName()) {
-      task->pushInitialTaskName(taskName);
     }
   }
 

@@ -633,6 +633,20 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
+extension Task {
+
+  /// Return task's name, if it was set during its creation.
+  @available(StdlibDeploymentTarget 6.3, *)
+  public var name: String? {
+    if let name = _getTaskName(self._task) {
+      String(cString: name)
+    } else {
+      nil
+    }
+  }
+}
+
 // ==== Voluntary Suspension -----------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
@@ -792,11 +806,34 @@ public struct UnsafeCurrentTask {
   public func cancel() {
     unsafe _taskCancel(_task)
   }
+
+  /// Return task's name, if it was set during its creation.
+  @available(StdlibDeploymentTarget 6.3, *)
+  public var name: String? {
+    if let name = _getTaskName(self._task) {
+      String(cString: name)
+    } else {
+      nil
+    }
+  }
 }
 
-@available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
 extension UnsafeCurrentTask: Sendable { }
+
+extension ExecutorJob {
+  /// If this job is a swift concurrency task return the ``UnsafeCurrentTask`` handle for it.
+  ///
+  /// Not all jobs are tasks so this operation will return `nil` for kinds of jobs other than tasks.
+  @available(StdlibDeploymentTarget 6.3, *)
+  public var unsafeCurrentTask: UnsafeCurrentTask? {
+    guard _jobGetKind(self.context) == 0 else { // == JobKind::Task
+      return nil
+    }
+
+    return unsafeBitCast(self.context, to: UnsafeCurrentTask.self)
+  }
+}
 
 @available(SwiftStdlib 5.1, *)
 extension UnsafeCurrentTask: @unsafe Hashable {
@@ -987,6 +1024,10 @@ func _getCurrentThreadPriority() -> Int
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getCurrentTaskName")
 internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
+
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_task_getTaskName")
+internal func _getTaskName(_ job: Builtin.NativeObject) -> UnsafePointer<UInt8>?
 
 @available(SwiftStdlib 6.2, *)
 internal func _getCurrentTaskNameString() -> String? {

@@ -348,7 +348,7 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
-const char *swift_task_getTaskName(AsyncTask *task) {
+const char *swift::swift_task_getTaskName(AsyncTask *task) {
   if (!task) {
     return nullptr;
   }
