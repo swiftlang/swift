@@ -109,6 +109,9 @@ public func constParamNoreturn(_ ptr: RawSpan) {
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe constParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: CChar.self), size)
 }
 ------------------------------
@@ -120,6 +123,9 @@ public func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe mutParamNoreturn(_ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self), size)
 }
@@ -133,6 +139,9 @@ public func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe constReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)), byteCount: Int(size)), copying: ())
 }
 ------------------------------
@@ -144,6 +153,9 @@ public func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = unsafe ptr.withUnsafeMutableBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe mutReturnDependence(size, _ptrPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)), byteCount: Int(size)), copying: ())
 }

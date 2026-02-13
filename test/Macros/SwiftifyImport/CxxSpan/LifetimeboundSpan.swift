@@ -126,6 +126,9 @@ public func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: C
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc6(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)), copying: ())
 }
 ------------------------------
@@ -141,6 +144,9 @@ public func myFunc7(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: C
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc7(SpanOfInt(span), _ptrPtr.baseAddress!, count, size)), copying: ())
 }
 ------------------------------
@@ -155,6 +161,9 @@ public func myFunc8(_ ptr: RawSpan, _ span: Span<CInt>, _ count: CInt, _ size: C
     }
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc8(_ptrPtr.baseAddress!, SpanOfInt(span), count, size)), copying: ())
 }

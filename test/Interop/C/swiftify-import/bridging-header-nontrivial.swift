@@ -38,6 +38,9 @@ imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
     let _pPtr = unsafe p.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe foo(len, _pPtr.baseAddress!)
 }
 ------------------------------
@@ -48,6 +51,9 @@ imports for @__swiftmacro_So3bar15_SwiftifyImportfMp_.swift:
     let len = Int32(exactly: p.count)!
     let _pPtr = unsafe p.withUnsafeBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe bar(len, _pPtr.baseAddress!)
 }

@@ -44,6 +44,9 @@ public func myFunc2(_ ptr: inout MutableRawSpan?) {
     let _ptrPtr = unsafe ptr?.withUnsafeMutableBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe myFunc2(_ptrPtr?.baseAddress, len)
 }
 ------------------------------
@@ -57,8 +60,14 @@ public func myFunc3(_ ptr: inout MutableRawSpan?, _ ptr2: inout MutableRawSpan?)
     let _ptrPtr = unsafe ptr?.withUnsafeMutableBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr2)
     }
     return unsafe myFunc3(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
 }
@@ -71,6 +80,9 @@ public func myFunc4(_ ptr: inout MutableRawSpan?) -> MutableRawSpan? {
     let len = CInt(exactly: ptr?.byteCount ?? 0)!
     let _ptrPtr = unsafe ptr?.withUnsafeMutableBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe _swiftifyOverrideLifetime({ () in
       let _resultValue = unsafe myFunc4(_ptrPtr?.baseAddress, len)
