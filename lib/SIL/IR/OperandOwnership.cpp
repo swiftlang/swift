@@ -1094,8 +1094,6 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
 SHOULD_NEVER_VISIT_BUILTIN(TaskLocalValuePop)
-// SHOULD_NEVER_VISIT_BUILTIN(TaskCancellationShieldPush)
-// SHOULD_NEVER_VISIT_BUILTIN(TaskCancellationShieldPop)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

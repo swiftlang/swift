@@ -396,6 +396,45 @@ struct CancellableContinuation: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
+func test_outer_task_cancelled_inner_shielded_group() async {
+  print("==== ------------------------------------------------")
+  print(#function) // CHECK: test_outer_task_cancelled_inner_shielded_group
+
+  let task = Task {
+    // Cancel the outer task immediately
+    withUnsafeCurrentTask { $0?.cancel() }
+
+    print("Outer task, after cancel: isCancelled:\(Task.isCancelled)")
+    // CHECK: Outer task, after cancel: isCancelled:true
+
+    await withTaskCancellationShield {
+      print("Inside shield, isCancelled:\(Task.isCancelled)")
+      // CHECK: Inside shield, isCancelled:false
+
+      await withTaskGroup(of: Void.self) { group in
+        print("Inside task group, group.isCancelled:\(group.isCancelled)")
+        // CHECK: Inside task group, group.isCancelled:false
+
+        print("Inside task group, Task.isCancelled:\(Task.isCancelled)")
+        // CHECK: Inside task group, Task.isCancelled:false
+
+        group.addTask {
+          print("Child task, isCancelled:\(Task.isCancelled)")
+          // CHECK: Child task, isCancelled:false
+        }
+
+        await group.waitForAll()
+      }
+    }
+
+    print("After shield, isCancelled:\(Task.isCancelled)")
+    // CHECK: After shield, isCancelled:true
+  }
+
+  await task.value
+}
+
+@available(SwiftStdlib 6.4, *)
 @main struct Main {
   static func main() async {
     await test_task_cancel_shield()
@@ -408,6 +447,7 @@ struct CancellableContinuation: ~Copyable {
     await test_add_task_cancel_shield()
     await test_hasActiveCancellationShield()
     await test_task_isCancelled_instance_vs_static()
+    await test_outer_task_cancelled_inner_shielded_group()
     print("DONE")
   }
 }

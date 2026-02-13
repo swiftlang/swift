@@ -606,11 +606,6 @@ bool swift_task_isCancelled(AsyncTask* task);
 
 /// This is an options enum that is used to pass flags to
 /// swift_task_isCancelledWithFlags. It is meant to be a flexible toggle.
-///
-/// Since this is an options enum, so all values should be powers of 2.
-///
-/// NOTE: We are purposely leaving this as a uint64_t so that on all platforms
-/// this could be a pointer to a different enum instance if we need it to be.
 enum swift_task_is_cancelled_flag : uint64_t {
   /// We aren't passing any flags.
   /// Effectively this is a backwards compatible mode.

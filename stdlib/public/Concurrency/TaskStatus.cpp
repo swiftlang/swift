@@ -799,7 +799,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
 /// The caller must guarantee that this is called while holding the owning
 /// task's status record lock.
 void swift::_swift_taskGroup_cancel(TaskGroup *group) {
-  (void) group->statusCancel(); // TODO: do prevent the task group from being cancelled? I think probably no, we cancel and "don't observe", same as Task
+  (void) group->statusCancel();
 
   // Because only the owning task of the task group can modify the
   // child list of a task group status record, and it can only do so
