@@ -19,6 +19,7 @@
 /// - SeeAlso: https://en.cppreference.com/w/cpp/named_req/InputIterator
 public protocol UnsafeCxxInputIterator: Equatable {
   associatedtype Pointee: ~Copyable
+  associatedtype DereferenceResult
 
   /// Returns the unwrapped result of C++ `operator*()`.
   ///
@@ -32,16 +33,34 @@ public protocol UnsafeCxxInputIterator: Equatable {
   /// Generally, Swift creates this property automatically for C++ types that
   /// define pre-increment `operator++()`.
   func successor() -> Self
+
+  /// Returns a `UnsafePointer` to the current element.
+  ///
+  /// Generally, this is the result of `operator*()`
+  func __operatorStar() -> DereferenceResult
 }
 
 extension UnsafePointer: @unsafe UnsafeCxxInputIterator
-where Pointee: ~Copyable {}
+where Pointee: ~Copyable {
+  public typealias DereferenceResult = Self
+  @inlinable
+  public func __operatorStar() -> DereferenceResult {
+    return unsafe self
+  }
+}
 
 extension UnsafeMutablePointer: @unsafe UnsafeCxxInputIterator
-where Pointee: ~Copyable {}
+where Pointee: ~Copyable {
+  public typealias DereferenceResult = UnsafePointer<Self.Pointee>
+  @inlinable
+  public func __operatorStar() -> DereferenceResult {
+    return unsafe UnsafePointer(self)
+  }
+}
 
-extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
+extension Optional: @unsafe UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator {
   public typealias Pointee = Wrapped.Pointee
+  public typealias DereferenceResult = Wrapped.DereferenceResult
 
   @inlinable
   public var pointee: Pointee {
@@ -59,6 +78,14 @@ extension Optional: UnsafeCxxInputIterator where Wrapped: UnsafeCxxInputIterator
       return value.successor()
     }
     fatalError("Could not increment nullptr")
+  }
+
+  @inlinable
+  public func __operatorStar() -> DereferenceResult {
+    guard let value = self else {
+      fatalError("Could not dereference nullptr")
+    }
+    return unsafe value.__operatorStar()
   }
 }
 
