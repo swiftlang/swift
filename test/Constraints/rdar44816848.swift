@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -solver-disable-crash-on-valid-salvage
+// RUN: not --crash %target-swift-frontend -solver-enable-crash-on-valid-salvage -typecheck %s
 
 class A {}
 class B: A {}
