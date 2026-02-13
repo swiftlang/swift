@@ -69,6 +69,9 @@ public func nonnullSpan(_ ptr: RawSpan) {
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
 }
 ------------------------------
@@ -81,6 +84,9 @@ public func nullableSpan(_ ptr: RawSpan?) {
     let _ptrPtr = unsafe ptr?.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe nullableSpan(OpaquePointer(_ptrPtr?.baseAddress), size)
 }
 ------------------------------
@@ -92,6 +98,9 @@ public func impNullableSpan(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
 }

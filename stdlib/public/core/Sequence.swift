@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -752,17 +752,35 @@ extension Sequence {
   /// - Returns: An array of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  @_alwaysEmitIntoClient
+  public __consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     return try _filter(isIncluded)
   }
 
-  @_transparent
-  public func _filter(
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) throws -> [Element] {
+    try filter(isIncluded)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient  @_transparent
+  public func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
 
     var result = ContiguousArray<Element>()
 
@@ -776,6 +794,24 @@ extension Sequence {
 
     return Array(result)
   }
+
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of _filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_underscore_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !hasFeature(Embedded)
 
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.

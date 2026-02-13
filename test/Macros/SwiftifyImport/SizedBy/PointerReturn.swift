@@ -64,6 +64,9 @@ public func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
     let _pPtr = unsafe p.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe lifetimeDependentCopy(_pPtr.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 }
 ------------------------------
@@ -84,6 +87,9 @@ public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) ->
     let len1 = CInt(exactly: p.byteCount)!
     let _pPtr = unsafe p.withUnsafeMutableBytes {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(p)
     }
     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe lifetimeDependentCopyMut(_pPtr.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 }

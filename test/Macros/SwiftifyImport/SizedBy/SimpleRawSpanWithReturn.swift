@@ -23,6 +23,9 @@ public func myFunc(_ ptr: RawSpan) -> CInt {
     let _ptrPtr = unsafe ptr.withUnsafeBytes {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe myFunc(_ptrPtr.baseAddress!, size)
 }
 ------------------------------

@@ -64,6 +64,8 @@ using namespace swift;
 namespace {
 /// Collects name lookup results into the given tiny vector, for use in the
 /// various ClangImporter lookup routines.
+///
+/// Validates that the name we looked up matches the resulting imported name.
 class CollectLookupResults {
   DeclName name;
   TinyPtrVector<ValueDecl *> &result;
@@ -73,7 +75,10 @@ public:
       : name(name), result(result) {}
 
   void add(ValueDecl *imported) {
-    result.push_back(imported);
+    // Match by base name, since that is what MemberLookupTable is keyed on for
+    // laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
+    if (imported->getBaseName() == name.getBaseName())
+      result.push_back(imported);
 
     // Expand any macros introduced by the Clang importer.
     imported->visitAuxiliaryDecls([&](Decl *decl) {
@@ -486,10 +491,7 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
   const auto *CXXRecord =
       dyn_cast<clang::CXXRecordDecl>(Struct->getClangDecl());
 
-  if (!CXXRecord || !isa<StructDecl>(Struct))
-    // Do not synthesize successor() if this is not a C++ record, or if it is
-    // a foreign reference type (successor() needs to copy values of this type),
-    // which would be a ClassDecl rather than a StructDecl.
+  if (!CXXRecord)
     return nullptr;
 
   if (auto [it, inserted] = importedPointeeCache.try_emplace(Struct, nullptr);

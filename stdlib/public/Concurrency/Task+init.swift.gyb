@@ -296,9 +296,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// - Returns: A reference to the task.
 % end # IS_DEPRECATED
   ${"\n  ".join(adjust_availability(ALL_AVAILABILITY))}
-% if not IS_THROWING:
   @discardableResult
-% end
   public ${METHOD_VARIANT}(
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{

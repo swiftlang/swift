@@ -55,6 +55,9 @@ public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
     let _pPtr = unsafe p.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentCopy(_pPtr.baseAddress!, len1, len2), count: Int(len2)), copying: ())
 }
 ------------------------------

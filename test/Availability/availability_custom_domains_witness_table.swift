@@ -1,6 +1,4 @@
 // REQUIRES: swift_feature_CustomAvailability
-// XFAIL: OS=linux-android
-// XFAIL: OS=linux-androideabi
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-silgen -module-name main %s -verify \

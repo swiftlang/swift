@@ -9,19 +9,15 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx
+// REQUIRES: OS=linux-gnu
 
 // This test proved unstable on Linux so we disabled it while focus is elsewhere,
 // as it's not critical function, but it would be nice to restore it one day.
 
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
+#if canImport(Glibc)
   import Glibc
 #elseif canImport(Android)
   import Android
-#elseif os(Windows)
-  import CRT
 #else
 #error("Unsupported platform")
 #endif
@@ -49,17 +45,13 @@ func lockMutex() {
 
 func unlockMutex() {
   guard unsafe pthread_mutex_unlock(mutex) == 0 else {
-    fatalError("pthread_mutex_lock failed")
+    fatalError("pthread_mutex_unlock failed")
   }
 }
 
 
 func spawnThread(_ shouldCrash: Bool) {
-  #if os(Linux)
   var thread: pthread_t = 0
-  #elseif os(macOS)
-  var thread = pthread_t(nil)
-  #endif
   if shouldCrash {
     pthread_create(&thread, nil, { _ in
                                 // take mutex
@@ -99,7 +91,11 @@ while (true) {
   sleep(10)
 }
 
+// CHECK-NOT: backtraces will be missing information
+
 // CHECK: *** Program crashed: Bad pointer dereference at 0x{{0+}}4 ***
+
+// CHECK: {{Platform: .* Linux}}
 
 // make sure there are no threads before the crashing thread (rdar://164566321)
 // and check that we have some vaguely sane and symbolicated threads, including
@@ -109,8 +105,5 @@ while (true) {
 // CHECK-NOT: Thread {{[0-9]+( ".*")?}}:
 // CHECK: Thread {{[0-9]+}} {{(".*" )?}}crashed:
 // CHECK: {{0x[0-9a-f]+}} reallyCrashMe()
-
-// CHECK: Thread {{[0-9]*( ".*")?}}:
-// CHECK: {{0x[0-9a-f]+.*main.* CrashWithThreads}}
 
 // CHECK: Thread {{[0-9]*( ".*")?}}:

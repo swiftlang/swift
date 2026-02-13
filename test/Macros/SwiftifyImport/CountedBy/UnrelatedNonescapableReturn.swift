@@ -34,6 +34,9 @@ public func myFunc(_ ptr: Span<CInt>) -> NonescapableEnum {
     let _ptrPtr = unsafe ptr.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(ptr)
+    }
     return unsafe _swiftifyOverrideLifetime(unsafe myFunc(_ptrPtr.baseAddress!, len), copying: ())
 }
 ------------------------------
@@ -45,6 +48,9 @@ public func myFunc2(_ ptr: inout MutableSpan<CInt>, _ extraNE: inout Nonescapabl
     let len = CInt(exactly: ptr.count)!
     let _ptrPtr = unsafe ptr.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(ptr)
     }
     return unsafe _swiftifyOverrideLifetime(unsafe myFunc2(_ptrPtr.baseAddress!, len, &extraNE), copying: ())
 }
