@@ -29,6 +29,13 @@
 #include "bitset"
 #include "queue" // TODO: remove and replace with our own mpsc
 
+// Does the runtime integrate with libdispatch?
+#if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH SWIFT_CONCURRENCY_USES_DISPATCH
+#else
+#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
+#endif
+
 // Does the runtime provide priority escalation support?
 #ifndef SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH && \
