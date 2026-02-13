@@ -229,8 +229,10 @@ static void pruneDisjunctionImpl(
             llvm::errs() << " structural";
           if (reason.contains(ConflictFlag::Array))
             llvm::errs() << " array";
-          if (reason.contains(ConflictFlag::Dictionary))
-            llvm::errs() << " dictionary";
+          if (reason.contains(ConflictFlag::DictionaryKey))
+            llvm::errs() << " dictionary_key";
+          if (reason.contains(ConflictFlag::DictionaryValue))
+            llvm::errs() << " dictionary_value";
           if (reason.contains(ConflictFlag::Set))
             llvm::errs() << " set";
           if (reason.contains(ConflictFlag::Optional))

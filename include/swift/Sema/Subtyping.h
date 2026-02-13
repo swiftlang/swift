@@ -114,11 +114,12 @@ enum ConflictFlag : unsigned {
   Class = 1 << 2,
   Structural = 1 << 3,
   Array = 1 << 4,
-  Dictionary = 1 << 5,
-  Set = 1 << 6,
-  Optional = 1 << 7,
-  Double = 1 << 8,
-  Conformance = 1 << 9
+  DictionaryKey = 1 << 5,
+  DictionaryValue = 1 << 6,
+  Set = 1 << 7,
+  Optional = 1 << 8,
+  Double = 1 << 9,
+  Conformance = 1 << 10
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 

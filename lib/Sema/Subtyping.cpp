@@ -448,10 +448,14 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       break;
 
     case ConversionBehavior::Pointer:
-      // FIXME: Implement
+      // Too many Pointer-to-Pointer conversions to care about.
+      //
+      // FIXME: Eventually, the encoding here will be complete though, and this
+      // will be used by matchTypes().
       break;
 
     case ConversionBehavior::Array: {
+      // Array-to-Array conversions.
       auto subResult = canPossiblyConvertTo(
           cs,
           lhs->getArrayElementType(),
@@ -462,11 +466,34 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       break;
     }
     case ConversionBehavior::Dictionary: {
-      // FIXME: Implement
+      // Dictionary-to-Dictionary conversions.
+      auto lhsPair = *ConstraintSystem::isDictionaryType(lhs);
+      auto rhsPair = *ConstraintSystem::isDictionaryType(rhs);
+      auto keyResult = canPossiblyConvertTo(
+          cs,
+          lhsPair.first,
+          rhsPair.first, sig);
+      if (keyResult)
+        return keyResult | ConflictFlag::DictionaryKey;
+      auto valueResult = canPossiblyConvertTo(
+          cs,
+          lhsPair.second,
+          rhsPair.second, sig);
+      if (valueResult)
+        return valueResult | ConflictFlag::DictionaryKey;
       break;
     }
     case ConversionBehavior::Set: {
-      // FIXME: Implement
+      // Set-to-Set conversions.
+      auto lhsElt = *ConstraintSystem::isSetType(lhs);
+      auto rhsElt = *ConstraintSystem::isSetType(rhs);
+
+      auto subResult = canPossiblyConvertTo(
+          cs,
+          lhsElt,
+          rhsElt, sig);
+      if (subResult)
+        return subResult | ConflictFlag::Set;
       break;
     }
     case ConversionBehavior::Optional: {
@@ -542,11 +569,17 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     }
 
     case ConversionBehavior::AnyHashable:
-      // FIXME: Check if lhs definitely not Hashable
+      // FIXME: Check if lhs definitely not Hashable.
       break;
 
     case ConversionBehavior::Pointer:
-      // FIXME: Array, String, InOutType convert to pointers
+      // Array, String, and InOutType convert to pointers.
+      if (lhsKind != ConversionBehavior::Array &&
+          lhsKind != ConversionBehavior::String &&
+          lhsKind != ConversionBehavior::InOut) {
+        return ConflictFlag::Category;
+      }
+
       break;
 
     case ConversionBehavior::Optional: {
