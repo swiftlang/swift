@@ -66,26 +66,3 @@ Added: _$ss24_RuntimeFunctionCountersV07runtimebC7OffsetsSPys6UInt16VGvpZMV
 
 // Runtime Symbols
 Added: _swift_clearSensitive
-
-// BorrowingSequence + supporting symbols
-Added: _$s18_BorrowingIterators01_A8SequencePTl
-Added: _$s8_Elements18_BorrowingSequencePTl
-Added: _$s8_Elements26_BorrowingIteratorProtocolPTl
-Added: _$ss11InlineArrayVsRi__rlE22_makeBorrowingIterators4SpanVyq_GyF
-Added: _$ss11InlineArrayVyxq_Gs18_BorrowingSequencesRi__rlMc
-Added: _$ss18_BorrowingSequenceMp
-Added: _$ss18_BorrowingSequenceP01_A8IteratorAB_s01_aC8ProtocolTn
-Added: _$ss18_BorrowingSequenceP05_makeA8Iterator01_aD0QzyFTj
-Added: _$ss18_BorrowingSequenceP05_makeA8Iterator01_aD0QzyFTq
-Added: _$ss18_BorrowingSequencePs01_A8IteratorABQzRszRi0_zrlE04makeaC0xyF
-Added: _$ss18_BorrowingSequenceTL
-Added: _$ss26_BorrowingIteratorProtocolMp
-Added: _$ss26_BorrowingIteratorProtocolP5_skip2byS2i_tFTj
-Added: _$ss26_BorrowingIteratorProtocolP5_skip2byS2i_tFTq
-Added: _$ss26_BorrowingIteratorProtocolP9_nextSpan12maximumCounts0E0Vy8_ElementQzGSi_tFTj
-Added: _$ss26_BorrowingIteratorProtocolP9_nextSpan12maximumCounts0E0Vy8_ElementQzGSi_tFTq
-Added: _$ss26_BorrowingIteratorProtocolTL
-Added: _$ss4SpanVsRi_zrlE05_nextA012maximumCountAByxGSi_tF
-Added: _$ss4SpanVsRi_zrlE22_makeBorrowingIteratorAByxGyF
-Added: _$ss4SpanVyxGs18_BorrowingSequencesRi_zrlMc
-Added: _$ss4SpanVyxGs26_BorrowingIteratorProtocolsRi_zrlMc
