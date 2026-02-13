@@ -486,7 +486,7 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// use the task executor preference when we'd otherwise be running on
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
-    
+
     HasActiveTaskCancellationShield = 0x10000,
   };
 
@@ -539,8 +539,8 @@ public:
 
   /// Is the task currently cancelled?
   /// This does take into account cancellation shields, i.e. while a shield is active this function will always return 'false'.
-  bool isCancelled(bool ignoreShield = false) const { 
-    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield)); 
+  bool isCancelled(bool ignoreShield = false) const {
+    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield));
   }
   bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled() const {
@@ -549,8 +549,8 @@ public:
 #else
     return ActiveTaskStatus(Record, Flags | IsCancelled);
 #endif
-  }  
-  
+  }
+
   bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
   ActiveTaskStatus withCancellationShield() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -998,7 +998,6 @@ inline uint32_t AsyncTask::flagAsRunning() {
   dispatch_thread_override_info_s threadOverrideInfo;
   threadOverrideInfo = swift_dispatch_thread_get_current_override_qos_floor();
   qos_class_t overrideFloor = threadOverrideInfo.override_qos_floor;
-  qos_class_t basePriorityCeil = overrideFloor;
   qos_class_t taskBasePriority = (qos_class_t) _private().BasePriority;
 #endif
 
@@ -1019,13 +1018,15 @@ inline uint32_t AsyncTask::flagAsRunning() {
       // need to apply a self-override. In either case, call into dispatch to
       // do this.
       qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-      if (threadOverrideInfo.can_override && (taskBasePriority != basePriorityCeil || maxTaskPriority > overrideFloor)) {
+      if (threadOverrideInfo.can_override && (taskBasePriority != qos_class_self() || maxTaskPriority > overrideFloor)) {
         SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x and base priority %#x",
                              overrideFloor, this, maxTaskPriority, taskBasePriority);
 
-        dispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
+        uint32_t newDispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
+        if (!dispatchOpaquePriority) {
+          dispatchOpaquePriority = newDispatchOpaquePriority;
+        }
         overrideFloor = maxTaskPriority;
-        basePriorityCeil = taskBasePriority;
       }
 #endif
       // Set self as executor and remove escalation bit if any - the task's
@@ -1060,13 +1061,15 @@ inline uint32_t AsyncTask::flagAsRunning() {
       // need to apply a self-override. In either case, call into dispatch to
       // do this.
       qos_class_t maxTaskPriority = (qos_class_t) oldStatus.getStoredPriority();
-      if (threadOverrideInfo.can_override && (taskBasePriority != basePriorityCeil || maxTaskPriority > overrideFloor)) {
+      if (threadOverrideInfo.can_override && (taskBasePriority != qos_class_self() || maxTaskPriority > overrideFloor)) {
         SWIFT_TASK_DEBUG_LOG("[Override] Self-override thread with oq_floor %#x to match task %p's max priority %#x and base priority %#x",
                              overrideFloor, this, maxTaskPriority, taskBasePriority);
 
-        dispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
+        uint32_t newDispatchOpaquePriority = swift_dispatch_thread_override_self_with_base(maxTaskPriority, taskBasePriority);
+        if (!dispatchOpaquePriority) {
+          dispatchOpaquePriority = newDispatchOpaquePriority;
+        }
         overrideFloor = maxTaskPriority;
-        basePriorityCeil = taskBasePriority;
       }
 #endif
       // Set self as executor and remove escalation bit if any - the task's
@@ -1329,13 +1332,13 @@ inline bool AsyncTask::cancellationShieldPush() {
 
     auto newStatus = oldStatus.withCancellationShield();
     assert(newStatus.hasCancellationShield());
-    
+
     if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /* success */ std::memory_order_relaxed,
               /* failure */ std::memory_order_relaxed)) {
       return true; // we did successfully install the shield
     }
-  } 
+  }
 }
 
 inline void AsyncTask::cancellationShieldPop() {
@@ -1347,13 +1350,13 @@ inline void AsyncTask::cancellationShieldPop() {
 
     auto newStatus = oldStatus.withoutCancellationShield();
     assert(!newStatus.hasCancellationShield());
-    
+
     if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /* success */ std::memory_order_relaxed,
               /* failure */ std::memory_order_relaxed)) {
       return;
     }
-  } 
+  }
 }
 
 } // end namespace swift
