@@ -583,17 +583,17 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       sourceLocation: nil)
 
           if let hit = cache.lookup(path: theImages[imageNdx].path,
-                                    alternativePaths: alternativePaths) {
+                                    alternativePaths: alternativeSymbolFilePaths) {
             let symbolSource: (any SymbolSource)?
             let relativeAddress: ImageSource.Address
             switch hit {
               case let .elf32Image(image):
-                symbolSource = symbolLocator.findSymbolsFor(image: image)
+                symbolSource = symbolLocator.findSymbols(for: image)
                 relativeAddress = ImageSource.Address(
                   address - theImages[imageNdx].baseAddress
                 ) + image.imageBase
               case let .elf64Image(image):
-                symbolSource = symbolLocator.findSymbolsFor(image: image)
+                symbolSource = symbolLocator.findSymbols(for: image)
                 relativeAddress = ImageSource.Address(
                   address - theImages[imageNdx].baseAddress
                 ) + image.imageBase
@@ -630,7 +630,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       sourceLocation: nil)
 
           if let image = cache.lookup(path: theImages[imageNdx].path,
-                                      alternativePaths: alternativePaths) {
+                                      alternativePaths: alternativeSymbolFilePaths) {
             let symbolSource = symbolLocator.findSymbols(for: image)
             let relativeAddress = ImageSource.Address(
               address - theImages[imageNdx].baseAddress
