@@ -1483,7 +1483,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
     auto &ctx = getDecl()->getASTContext();
     if (assocConformance.first->isEqual(ctx.TheSelfType))
-      return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+      return cast<ProtocolDecl>(assocConformance.second)->isWeakImported(module);
 
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
     return depMemTy->getAssocType()->isWeakImported(module);
