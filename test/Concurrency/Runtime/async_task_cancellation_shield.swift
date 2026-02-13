@@ -324,6 +324,10 @@ func test_task_isCancelled_instance_vs_static() async {
 
     await withTaskCancellationShield {
       print("3. Inside shield, Task.isCancelled (static): \(Task.isCancelled)")
+      withUnsafeCurrentTask { unsafeTask in
+        print("3.1. Inside shield, unsafeCurrentTask.hasActiveCancellationShield: \(unsafeTask!.hasActiveCancellationShield)")
+        print("3.2. Inside shield, unsafeCurrentTask.isCancelled: \(unsafeTask!.isCancelled)")
+      }
       insideShieldCheckNow.signal()
       insideShield.wait()
     }
@@ -338,9 +342,13 @@ func test_task_isCancelled_instance_vs_static() async {
   print("2. task.isCancelled (instance): \(task.isCancelled)")
   proceed.signal()
 
+  // CHECK: 3.1. Inside shield, unsafeCurrentTask.hasActiveCancellationShield: true
+  // CHECK: 3.2. Inside shield, unsafeCurrentTask.isCancelled: true
+
   insideShieldCheckNow.wait()
-  // CHECK: 3. task.isCancelled (instance) (suspended while shielded): true
-  print("3. task.isCancelled (instance) (suspended while shielded): \(task.isCancelled)")
+  // CHECK: 3.3. task.isCancelled (instance) (suspended while shielded): true
+  print("3.3. task.isCancelled (instance) (suspended while shielded): \(task.isCancelled)")
+
 
   insideShield.signal()
   // CHECK: 5. After shield, Task.isCancelled (static): true

@@ -201,10 +201,29 @@ extension Task {
   /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
-  /// - SeeAlso: ``checkCancellation()``
+  /// ### Instance property isCancelled ignores Task Cancellation Shields
+  ///
+  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
+  /// are not contextual and therefore do not respect cancellation shields.
+  /// If a task was cancelled and is executing with an active cancellation shield,
+  /// these properties will return the _actual_ cancellation status of the task.
+  ///
+  /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
+  /// the cancellation status from inside the task.
+  ///
+  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``Task/checkCancellation()``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
-  @_transparent public var isCancelled: Bool {
-    _taskIsCancelled(_task)
+  @_transparent
+  public var isCancelled: Bool {
+    // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+      let ignoreTaskCancellationShield: UInt64 = 0x1
+      return unsafe _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
+    } else {
+      return _taskIsCancelled(_task)
+    }
   }
 }
 
@@ -215,7 +234,7 @@ extension Task where Success == Never, Failure == Never {
   /// After the value of this property becomes `true`, it remains `true` indefinitely.
   /// There is no way to uncancel a task.
   ///
-  /// ### Interaction with task cancellation shields
+  /// ### Interaction with Task Cancellation Shields
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
   /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
@@ -224,9 +243,13 @@ extension Task where Success == Never, Failure == Never {
   /// - SeeAlso: ``checkCancellation()``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public static var isCancelled: Bool {
-     unsafe withUnsafeCurrentTask { task in
-       unsafe task?.isCancelled ?? false
-     }
+    unsafe withUnsafeCurrentTask { task in
+      if #available(SwiftStdlib 6.4, *) {
+        unsafe task?._isCancelled(ignoreTaskCancellationShield: false) ?? false
+      } else {
+        unsafe task?.isCancelled ?? false
+      }
+    }
   }
 }
 

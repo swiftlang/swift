@@ -773,22 +773,50 @@ public struct UnsafeCurrentTask {
   /// a cancellation shield is active. Use ``Task/isCancelled`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
+  /// ### Instance property isCancelled ignores Task Cancellation Shields
+  ///
+  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
+  /// are not contextual and therefore do not respect cancellation shields. If a task
+  /// was cancelled and is executing
+  /// with an active cancellation shield, these properties will return the _actual_
+  /// cancellation status of the task.
+  ///
+  /// It is possible to determine if a shield is active and then actively determine
+  /// that the cancelled status should be temporarily ignored by using this pair of APIs:
+  ///
+  /// ```swift
+  /// withUnsafeCurrentTask { unsafeTask in
+  ///   if unsafeTask.hasActiveCancellationShield {
+  ///     false
+  ///   } else {
+  ///     unsafeTask.isCancelled
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// Which is equivalent to the contextually aware static `Task.isCancelled` property:
+  ///
+  /// ```swift
+  /// // Contextually aware, and equivalent to the snippet using UnsafeCurrentTask:
+  /// Task.isCancelled
+  /// ```
+  ///
+  /// - SeeAlso: ``Task/isCancelled``
   /// - SeeAlso: ``Task/checkCancellation()``
+  /// - SeeAlso: ``Task/hasActiveCancellationShield``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
-    unsafe _taskIsCancelled(_task)
+    if #available(SwiftStdlib 6.4, *) {
+      _isCancelled(ignoreTaskCancellationShield: true)
+    } else {
+      unsafe _taskIsCancelled(_task)
+    }
   }
 
   /// Check if the task is cancelled, optionally ignoring active cancellation shields.
-  ///
-  /// - Parameter ignoreTaskCancellationShield: If `true`, returns the actual cancellation
-  ///   state regardless of any active cancellation shields. If `false`, respects
-  ///   cancellation shields and returns `false` when a shield is active.
-  /// - Returns: `true` if the task is cancelled (considering shield settings), `false` otherwise.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   internal func _isCancelled(ignoreTaskCancellationShield: Bool) -> Bool {
-    // swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1
     let flags: UInt64 = ignoreTaskCancellationShield ? 0x1 : 0x0
     return unsafe _taskIsCancelledWithFlags(_task, flags: flags)
   }
@@ -811,6 +839,15 @@ public struct UnsafeCurrentTask {
   }
 
   /// Cancel the current task.
+  ///
+  /// The task will be immediately cancelled and cancellation will propagate towards any child tasks it has.
+  ///
+  /// ### Interaction with Task Cancellation Shields
+  /// Note that cancellation may not be observed if a task is currently executing with an
+  /// active task cancellation shield. Refer to cancellation shield documentation for detailed semantics.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``Task/hasActiveTaskCancellationShield``
   public func cancel() {
     unsafe _taskCancel(_task)
   }
