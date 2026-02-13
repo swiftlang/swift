@@ -515,6 +515,9 @@ EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 /// Import inherited non-public members when importing C++ classes.
 EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 
+/// Do not import non-field C++ record members until requested from Swift.
+EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
+
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
 // * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp

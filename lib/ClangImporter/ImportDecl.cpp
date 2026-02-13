@@ -947,6 +947,74 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+/// Whether to import a member decl when importing its parent record.
+///
+/// In theory this should just be isa<clang::FieldDecl>(decl), but currently
+/// various parts of ClangImporter still relies on eagerly importing non-field
+/// members (e.g., for deriving protocol conformances, etc.). This helper
+/// function encapsulates those edge cases.
+static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl) {
+  // Look through using decls to determine whether to import decl
+  while (auto *usd = dyn_cast<clang::UsingShadowDecl>(decl)) {
+    // VisitUsingShadowDecl() only imports types and non-constructor methods,
+    // so we mirror that logic here.
+    if (!isa<clang::TypeDecl, clang::CXXMethodDecl>(usd->getTargetDecl()))
+      break;
+    if (isa<clang::CXXConstructorDecl>(usd->getTargetDecl()))
+      break;
+    decl = usd->getTargetDecl();
+  }
+
+  if (auto *td = dyn_cast<clang::TagDecl>(decl);
+      td && !td->hasNameForLinkage()) {
+    // Need to import unnamed types eagerly, otherwise we cannot look them up
+    return true;
+  }
+
+  if (isa<clang::TypeDecl>(decl)) {
+    return false;
+  }
+
+  if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
+    switch (fn->getDeclName().getNameKind()) {
+    case clang::DeclarationName::CXXOperatorName:
+    case clang::DeclarationName::CXXConversionFunctionName:
+    case clang::DeclarationName::CXXConstructorName:
+      // Eagerly import operators, conversions, and constructors for now.
+      // Some of these are handled in special ways that require them to
+      // be eagerly available, e.g., in VisitCXXRecordDecl() and
+      // conformToCxxConvertibleToBoolIfNeeded().
+      return true;
+
+    case clang::DeclarationName::Identifier:
+      if (auto *md = dyn_cast<clang::CXXMethodDecl>(fn)) {
+        // Import virtual functions eagerly for now, those are synthesized
+        if (md->isVirtual())
+          return true;
+
+        // Always import begin() and end() eagerly, those are needed for
+        // iterator conformances
+        if (md->getMinRequiredArguments() == 0 &&
+            (md->getName() == "begin" || md->getName() == "end"))
+          return true;
+
+        // Name lookup doesn't know about these renamed methods, import eagerly
+        if (CXXMethodBridging(md).classify() !=
+            CXXMethodBridging::Kind::unknown)
+          return true;
+      }
+
+      // All other functions can be imported lazily
+      return false;
+    default:
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
 namespace {
   /// Search the member tables for this class and its superclasses and try to
   /// identify the nearest VarDecl that serves as a base for an override.  We
@@ -2548,6 +2616,17 @@ namespace {
           }
         }
 
+        // Record of all member names, even those we don't/fail to import,
+        // so that we can avoid synthesizing properties with name clashes.
+        // See also: CXXMethodBridging
+        if (nd->getDeclName().isIdentifier())
+          allMemberNames.insert(nd->getName());
+
+        if (Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCxxMembersLazily) &&
+            !shouldEagerlyImportClangRecordMember(nd))
+          continue;
+
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
 
         if (!member) {
@@ -2561,9 +2640,6 @@ namespace {
           }
           continue;
         }
-
-        if (nd->getDeclName().isIdentifier())
-          allMemberNames.insert(nd->getName());
 
         if (isa<TypeDecl>(member)) {
           // TODO: we have a problem lazily looking up unnamed members, so we
@@ -4557,6 +4633,32 @@ namespace {
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
+      // If the return type is a templated class, instantiate it. This must
+      // happen before we import the name of the method, as the name is affected
+      // by safety/unsafety of the return type. The safety detection logic
+      // (`IsSafeUseOfCxxDecl`) relies on the class being instantiated.
+      //
+      // This behavior is currently gated on ImportCxxMembersLazily to provide
+      // an easy off-ramp in case of qualification issues.
+      if (auto *returnedTmpl =
+              dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                  desugarIfElaborated(decl->getReturnType())->getAsTagDecl());
+          Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportCxxMembersLazily) &&
+          returnedTmpl && !returnedTmpl->getDefinition()) {
+        Impl.getClangSema().InstantiateClassTemplateSpecialization(
+            decl->getLocation(),
+            const_cast<clang::ClassTemplateSpecializationDecl *>(returnedTmpl),
+            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+            /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
+        // N.B. InstantiateClassTemplateSpecialization() returns true if it
+        //      encountered an error while instantiating the returned template.
+        //      Even if it does, we don't bail out here, and defer error
+        //      handling to later. This is because that handler may involve
+        //      things like import a method and mark it as unavailable, rather
+        //      than simply not import it at all.
+      }
+
       // The static `operator ()` introduced in C++ 23 is still callable as an
       // instance operator in C++, and we want to preserve the ability to call
       // it as an instance method in Swift as well for source compatibility.
