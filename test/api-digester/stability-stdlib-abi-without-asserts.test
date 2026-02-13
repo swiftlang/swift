@@ -90,7 +90,14 @@ Func AnyCollection.map(_:) has been removed
 Func AnyRandomAccessCollection.map(_:) has been removed
 Func AnySequence.map(_:) has been removed
 Func Collection.map(_:) has been removed
+Func RangeReplaceableCollection.filter(_:) has been removed
+Func Sequence._filter(_:) has been removed
+Func Sequence.filter(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func Dictionary.filter(_:) has been removed
+Func Set.filter(_:) has been removed
+Func Substring.filter(_:) has been removed
+Func _ArrayProtocol.filter(_:) has been removed
 Constructor Result.init(catching:) has been removed
 Func withoutActuallyEscaping(_:do:) has been renamed to Func __abi_withoutActuallyEscaping(_:do:)
 Func withoutActuallyEscaping(_:do:) has mangled name changing from 'Swift.withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B' to 'Swift.__abi_withoutActuallyEscaping<A, B>(_: A, do: (A) throws -> B) throws -> B'

@@ -891,12 +891,12 @@ extension _NativeDictionary { // High-level operations
 #endif
 
   @_alwaysEmitIntoClient
-  internal func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> _NativeDictionary<Key, Value> {
+  internal func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> _NativeDictionary<Key, Value> {
     try unsafe _UnsafeBitset.withTemporaryBitset(
       capacity: _storage._bucketCount
-    ) { bitset in
+    ) { (bitset: _UnsafeBitset) throws(E) -> _NativeDictionary<Key, Value> in
       var count = 0
       for unsafe bucket in unsafe hashTable {
         if try unsafe isIncluded(
