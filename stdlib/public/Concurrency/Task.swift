@@ -801,6 +801,9 @@ public struct UnsafeCurrentTask {
   /// Task.isCancelled
   /// ```
   ///
+  /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
+  /// the cancellation status from inside the task.
+  ///
   /// - SeeAlso: ``Task/isCancelled``
   /// - SeeAlso: ``Task/checkCancellation()``
   /// - SeeAlso: ``Task/hasActiveCancellationShield``
