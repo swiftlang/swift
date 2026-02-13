@@ -226,7 +226,7 @@ StdVectorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_3)
     var iterator = v.makeBorrowingIterator()
     var counter = 0
     while true {
-        let span = iterator._nextSpan()
+        let span = iterator.nextSpan()
         if (span.count == 0) { break }
         #if CPP20
         expectEqual(span.count, 5)
@@ -250,7 +250,7 @@ StdVectorTestSuite.test("VectorOfNonCopyable has contiguous iterator").require(.
     var iterator = v.makeBorrowingIterator()
     var counter = 0
     while true {
-        let span = iterator._nextSpan()
+        let span = iterator.nextSpan()
         if (span.count == 0) { break }
         #if CPP20
         expectEqual(span.count, 3)
