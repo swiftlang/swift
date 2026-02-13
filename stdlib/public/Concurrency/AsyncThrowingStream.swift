@@ -191,13 +191,17 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// When the buffer is full, discard the newly received element.
       ///
       /// This strategy enforces keeping at most the specified number of oldest values.
-      /// When the specified number is non-positive, the corresponding `AsyncThrowingStream` drops yielded values if no consumers is currently awaiting.
+      ///
+      /// - Note: If the specified number is non-positive no elements will be buffered. 
+      /// An iterator receives an element only if it is awaiting a value at the moment the continuation yields.
       case bufferingOldest(Int)
       
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
       /// This strategy enforces keeping at most the specified number of newest values.
-      /// When the specified number is non-positive, the corresponding `AsyncThrowingStream` drops yielded values if no consumers is currently awaiting.
+      ///
+      /// - Note: If the specified number is non-positive no elements will be buffered. 
+      /// An iterator receives an element only if it is awaiting a value at the moment the continuation yields.
       case bufferingNewest(Int)
     }
 
