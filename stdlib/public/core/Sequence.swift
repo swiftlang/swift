@@ -330,7 +330,7 @@ public protocol Sequence<Element>: BorrowingSequence {
   /// encapsulates its iteration state.
   associatedtype Iterator: IteratorProtocol where Iterator.Element == Element
 
-  @available(SwiftStdlib 6.3, *)
+  @available(SwiftStdlib 6.4, *)
   associatedtype BorrowingIterator:
     BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
     = BorrowingIteratorAdapter<Iterator>
@@ -456,10 +456,11 @@ public protocol Sequence<Element>: BorrowingSequence {
   ) rethrows -> R?
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 6.4, *)
 extension Sequence: @reparented BorrowingSequence
   where BorrowingIterator == BorrowingIteratorAdapter<Iterator>
 {
+  @available(SwiftStdlib 6.4, *)
   public func makeBorrowingIterator() -> BorrowingIterator {
     BorrowingIteratorAdapter(iterator: makeIterator())
   }
