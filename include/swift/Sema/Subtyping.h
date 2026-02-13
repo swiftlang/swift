@@ -38,17 +38,50 @@ class ConstraintSystem;
 std::optional<bool> isLikelyExactMatch(Type first, Type second);
 
 enum class ConversionBehavior : unsigned {
+  /// Most nominal types, archetypes, empty tuple.
   None,
+
+  /// String has no proper subtypes, but it has pointers as supertypes.
   String,
+
+  /// Classes can have subclasses and superclasses.
   Class,
+
+  /// AnyHashable is a supertype to all Hashable types.
   AnyHashable,
+
+  /// CGFloat and Double.
   Double,
+
+  /// We fold all pointer types into one for now. These have arrays and
+  /// strings as subtypes.
   Pointer,
+
+  /// Arrays convert to arrays, and they have pointers as supertypes.
   Array,
+
+  /// Dictionaries convert to dictionaries.
   Dictionary,
+
+  /// Sets convert to sets.
   Set,
+
+  /// Optionals convert to Optionals. Every type has an Optional of itself
+  /// as a supertype.
   Optional,
+
+  /// Function types and metatypes.
   Structural,
+
+  /// InOut types have Pointer types as supertypes.
+  InOut,
+
+  /// LValue types convert to InOut types. Every type has a subtype that is
+  /// the lvalue of itself.
+  LValue,
+
+  /// Everything else that we don't reason about for now, like
+  /// existentials and tuples.
   Unknown
 };
 
@@ -85,8 +118,7 @@ enum ConflictFlag : unsigned {
   Set = 1 << 6,
   Optional = 1 << 7,
   Double = 1 << 8,
-  Conformance = 1 << 9,
-  Mutability = 1 << 10
+  Conformance = 1 << 9
 };
 using ConflictReason = OptionSet<ConflictFlag>;
 

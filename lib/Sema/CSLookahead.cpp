@@ -107,11 +107,8 @@ static void pruneDisjunctionImpl(
 
   for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
     const auto &param = argFuncType->getParams()[i];
-    auto argType = cs.simplifyType(param.getPlainType());
-    // FIXME: This is gross, I know. The purpose is just to wrap the type
-    // with something that will give it ConversionBehavior::Unknown.
-    if (param.isInOut())
-      argType = InOutType::get(argType);
+    // FIXME: Get rid of the usage of InOutType here.
+    auto argType = cs.simplifyType(param.getOldType());
     argTypes[i] = argType;
   }
 
@@ -202,15 +199,11 @@ static void pruneDisjunctionImpl(
         if (paramFlags.isVariadic())
           continue;
 
-        auto paramType = param.getPlainType();
+        // FIXME: Get rid of the usage of InOutType here.
+        auto paramType = param.getOldType();
 
         if (paramFlags.isAutoClosure())
           paramType = paramType->castTo<AnyFunctionType>()->getResult();
-
-        // `inout` parameter accepts only l-value argument.
-        if (paramFlags.isInOut() && !argType->is<LValueType>()) {
-          // reason |= ConflictReason::Mutability;
-        }
 
         reason |= canPossiblyConvertTo(cs, argType, paramType, genericSig);
       }
@@ -246,8 +239,6 @@ static void pruneDisjunctionImpl(
             llvm::errs() << " structural";
           if (reason.contains(ConflictFlag::Conformance))
             llvm::errs() << " conformance";
-          if (reason.contains(ConflictFlag::Mutability))
-            llvm::errs() << " mutability";
           llvm::errs() << ")\n";
         }
 

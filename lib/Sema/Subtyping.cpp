@@ -112,6 +112,15 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
     result = false;
     break;
 
+  case ConversionBehavior::LValue:
+    ASSERT(false && "Must unwrap lvalue type first!");
+    break;
+
+  case ConversionBehavior::InOut:
+    // InOut types convert to mutable pointers.
+    addMutablePointers();
+    break;
+
   case ConversionBehavior::Unknown:
     // Can't say anything in this case.
     result = false;
@@ -142,9 +151,15 @@ bool ConstraintSystem::isConformanceTransitiveForSupertype(
 
 bool swift::constraints::checkTransitiveSupertypeConformance(
     ConstraintSystem &cs, Type type, ProtocolDecl *proto) {
+  // Every lvalue type can be converted to its object type, so
+  // we must consider conversions of the object type in this case.
+  if (auto *lvalueType = type->getAs<LValueType>())
+    type = lvalueType->getObjectType();
   auto behavior = getConversionBehavior(type);
   if (cs.isConformanceTransitiveForSupertype(behavior, proto)) {
-    return !cs.lookupConformance(type, proto).isInvalid();
+    // Unwrap InOut and LValue type.
+    return !cs.lookupConformance(type->getWithoutSpecifierType(), proto)
+        .isInvalid();
   }
   return true;
 }
@@ -205,6 +220,11 @@ bool ConstraintSystem::isConformanceTransitiveForSubtype(
     return result;
   }
 
+  case ConversionBehavior::InOut:
+  case ConversionBehavior::LValue:
+    // InOutType and LValueType have no proper subtypes.
+    return true;
+
   case ConversionBehavior::Optional:
     // FIXME: Check payload type.
     return false;
@@ -224,7 +244,9 @@ bool swift::constraints::checkTransitiveSubtypeConformance(
     ConstraintSystem &cs, Type type, ProtocolDecl *proto) {
   auto behavior = getConversionBehavior(type);
   if (cs.isConformanceTransitiveForSubtype(behavior, proto)) {
-    return !cs.lookupConformance(type, proto).isInvalid();
+    // Unwrap InOut and LValue type.
+    return !cs.lookupConformance(type->getWithoutSpecifierType(), proto)
+        .isInvalid();
   }
   return true;
 }
@@ -236,10 +258,12 @@ swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {
     return lhs->isEqual(rhs);
   }
 
+  // FIXME: Make this more precise.
   if (auto *lhsDecl = lhs->getAnyNominal()) {
-    // FIXME: Make this more precise.
-    auto *rhsDecl = rhs->getAnyNominal();
-    return lhsDecl == rhsDecl;
+    if (!rhs->is<TypeVariableType>() && !rhs->isTypeParameter()) {
+      auto *rhsDecl = rhs->getAnyNominal();
+      return lhsDecl == rhsDecl;
+    }
   }
 
   // FIXME: Handle other type kinds.
@@ -292,6 +316,12 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->is<FunctionType>() || type->is<MetatypeType>())
     return ConversionBehavior::Structural;
 
+  if (type->is<InOutType>())
+    return ConversionBehavior::InOut;
+
+  if (type->is<LValueType>())
+    return ConversionBehavior::LValue;
+
   return ConversionBehavior::Unknown;
 }
 
@@ -308,6 +338,10 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   }
   case ConversionBehavior::Set:
     return hasProperSubtypes(*ConstraintSystem::isSetType(type));
+  case ConversionBehavior::LValue:
+  case ConversionBehavior::InOut:
+    // LValueType and InOutType are invariant.
+    return false;
   case ConversionBehavior::Class:
   case ConversionBehavior::AnyHashable:
   case ConversionBehavior::Double:
@@ -338,6 +372,12 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   }
   case ConversionBehavior::AnyHashable:
     return false;
+  case ConversionBehavior::LValue:
+    // Every lvalue type is a subtype of its object type.
+    return true;
+  case ConversionBehavior::InOut:
+    // InOutType is a subtype of various pointer types.
+    return true;
   case ConversionBehavior::Array:
   case ConversionBehavior::Dictionary:
   case ConversionBehavior::Set:
@@ -445,13 +485,41 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
           != rhs->getCanonicalType()->getKind())
         return ConflictFlag::Structural;
       break;
+    case ConversionBehavior::InOut:
+    case ConversionBehavior::LValue: {
+      // InOut-to-InOut and LValue-to-LValue conversions are invariant.
+      auto result = isLikelyExactMatch(
+          lhs->getWithoutSpecifierType(),
+          rhs->getWithoutSpecifierType());
+      if (result.has_value() && !*result)
+        return ConflictFlag::Exact;
+
+      break;
+    }
     case ConversionBehavior::Unknown:
       break;
     }
 
+  // Every lvalue type is a subtype of its object type.
+  } else if (lhsKind == ConversionBehavior::LValue) {
+    if (rhsKind == ConversionBehavior::InOut) {
+      // LValue-to-InOut conversions are invariant.
+      auto result = isLikelyExactMatch(
+          lhs->getWithoutSpecifierType(),
+          rhs->getWithoutSpecifierType());
+      if (result.has_value() && !*result)
+        return ConflictFlag::Exact;
+
+    } else {
+      // Attempt LValue-to-RValue conversion.
+      return canPossiblyConvertTo(cs, lhs->getWithoutSpecifierType(),
+                                  rhs, sig);
+    }
+
   // Handle case where the kinds don't match, and we're not converting
   // from an unknown type.
-  } else if (lhsKind != ConversionBehavior::Unknown) {
+  } else if (lhsKind != ConversionBehavior::Unknown &&
+             lhsKind != ConversionBehavior::InOut) {
     switch (rhsKind) {
     case ConversionBehavior::Class: {
       // Archetypes can convert to classes.
@@ -492,6 +560,8 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       break;
     }
 
+    case ConversionBehavior::InOut:
+    case ConversionBehavior::LValue:
     case ConversionBehavior::None:
     case ConversionBehavior::String:
     case ConversionBehavior::Double:
@@ -506,6 +576,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     }
   }
 
+  // FIXME: Move this into isLikelyExactMatch()
   if (sig) {
     if (rhs->isTypeParameter()) {
       bool failed = llvm::any_of(
