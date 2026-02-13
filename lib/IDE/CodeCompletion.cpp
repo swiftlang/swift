@@ -1644,10 +1644,10 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
 
   assert(ParsedExpr || CurDeclContext);
 
+  auto &Ctx = CurDeclContext->getASTContext();
   SourceLoc CompletionLoc = ParsedExpr
                                 ? ParsedExpr->getLoc()
-                                : CurDeclContext->getASTContext()
-                                      .SourceMgr.getIDEInspectionTargetLoc();
+                                : Ctx.SourceMgr.getIDEInspectionTargetLoc();
   switch (Kind) {
   case CompletionKind::PostfixExpr:
   case CompletionKind::DotExpr: 
@@ -1754,15 +1754,25 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
     Lookup.setIsKeyPathExpr();
     Lookup.includeInstanceMembers();
 
-    if (ExprType) {
-      if (isDynamicLookup(*ExprType))
-        Lookup.setIsDynamicLookup();
+    // If we have a parsed expression we're doing member completion, otherwise
+    // unqualified completion.
+    if (auto *KeyPath = cast_or_null<KeyPathExpr>(ParsedExpr)) {
+      // Compute the Obj-C string, which will also type-check the key path.
+      (void)evaluateOrDefault(Ctx.evaluator,
+                              ObjCKeyPathStringRequest{KeyPath, CurDeclContext},
+                              nullptr);
+      if (auto BaseTy = KeyPath->getComponents().back().getComponentType()) {
+        // Use the Obj-C bridged type of the base if available.
+        if (auto BridgedTy = Ctx.getBridgedToObjC(CurDeclContext, BaseTy))
+          BaseTy = BridgedTy;
 
-      Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl(),
-                                     /*IncludeFunctionCallCompletions=*/true);
+        if (isDynamicLookup(BaseTy))
+          Lookup.setIsDynamicLookup();
+
+        Lookup.getValueExprCompletions(BaseTy);
+      }
     } else {
-      SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
-      Lookup.getValueCompletionsInDeclContext(Loc, KeyPathFilter,
+      Lookup.getValueCompletionsInDeclContext(CompletionLoc, KeyPathFilter,
                                               /*LiteralCompletions=*/false);
     }
     break;
