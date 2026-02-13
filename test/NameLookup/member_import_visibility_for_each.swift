@@ -83,7 +83,7 @@ func testAsync() async throws {
       }
   }
 
-  _ = Task {
+  Task {
     while !Task.isCancelled {
       do {
         for try await _ in getAsyncCounter(upTo: 3) {
