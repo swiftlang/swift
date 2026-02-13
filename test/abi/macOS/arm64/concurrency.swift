@@ -406,6 +406,7 @@ Added: _swift_task_cancellationShieldPop
 Added: _swift_task_hasActiveCancellationShield
 Added: _$sSct27hasActiveCancellationShieldSbvpMV
 Added: _$sScTss5NeverORszABRs_rlE27hasActiveCancellationShieldSbvpZMV
+Added: _swift_task_isCancelledWithFlags
 
 // UnsafeCurrentTask's _task became usable from inline
 Added: _$sSct5_taskBovg

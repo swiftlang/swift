@@ -807,7 +807,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     if #available(SwiftStdlib 6.4, *) {
-      _isCancelled(ignoreTaskCancellationShield: true)
+      unsafe _isCancelled(ignoreTaskCancellationShield: true)
     } else {
       unsafe _taskIsCancelled(_task)
     }
