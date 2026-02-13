@@ -34,6 +34,9 @@ imports for @__swiftmacro_So3foo15_SwiftifyImportfMp_.swift:
     let _pPtr = unsafe p.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(p)
+    }
     return unsafe foo(len, _pPtr.baseAddress!, x)
 }
 ------------------------------

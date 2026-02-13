@@ -52,6 +52,9 @@ public func myFunc3(_ _myFunc3_param0: Span<CInt>) {
     let __myFunc3_param0Ptr = unsafe _myFunc3_param0.withUnsafeBufferPointer {
         unsafe $0
     }
+    defer {
+        _fixLifetime(_myFunc3_param0)
+    }
     return unsafe myFunc3(__myFunc3_param0Ptr.baseAddress!, _myFunc3_param1)
 }
 ------------------------------
@@ -63,6 +66,9 @@ public func myFunc4(_ _myFunc4_param0: inout MutableSpan<CInt>) {
     let _myFunc4_param1 = CInt(exactly: _myFunc4_param0.count)!
     let __myFunc4_param0Ptr = unsafe _myFunc4_param0.withUnsafeMutableBufferPointer {
         unsafe $0
+    }
+    defer {
+        _fixLifetime(_myFunc4_param0)
     }
     return unsafe myFunc4(__myFunc4_param0Ptr.baseAddress!, _myFunc4_param1)
 }
