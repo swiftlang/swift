@@ -64,6 +64,8 @@ using namespace swift;
 namespace {
 /// Collects name lookup results into the given tiny vector, for use in the
 /// various ClangImporter lookup routines.
+///
+/// Validates that the name we looked up matches the resulting imported name.
 class CollectLookupResults {
   DeclName name;
   TinyPtrVector<ValueDecl *> &result;
@@ -73,7 +75,10 @@ public:
       : name(name), result(result) {}
 
   void add(ValueDecl *imported) {
-    result.push_back(imported);
+    // Match by base name, since that is what MemberLookupTable is keyed on for
+    // laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
+    if (imported->getBaseName() == name.getBaseName())
+      result.push_back(imported);
 
     // Expand any macros introduced by the Clang importer.
     imported->visitAuxiliaryDecls([&](Decl *decl) {

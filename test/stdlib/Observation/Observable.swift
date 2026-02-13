@@ -290,7 +290,7 @@ final class CowTest {
 @main
 struct Validator {
   @MainActor
-  static func main() {
+  static func main() async {
 
     
     let suite = TestSuite("Observable")
@@ -511,7 +511,100 @@ struct Validator {
       expectEqual(subject.container.id, startId)
     }
 
-    runAllTests()
+    suite.test("tracking changes willSet option") {
+      let changed = CapturedState(state: false)
+
+      let test = MiddleNamePerson()
+      withObservationTracking(options: .willSet) {
+        _blackHole(test.firstName)
+      } onChange: { _ in
+        changed.state = true
+      }
+
+      test.firstName = "c"
+      expectEqual(changed.state, true)
+      changed.state = false
+      test.firstName = "c"
+      expectEqual(changed.state, false)
+    }
+
+    suite.test("tracking changes didSet option") {
+      let changed = CapturedState(state: false)
+
+      let test = MiddleNamePerson()
+      withObservationTracking(options: .didSet) {
+        _blackHole(test.firstName)
+      } onChange: { _ in
+        changed.state = true
+      }
+
+      test.firstName = "c"
+      expectEqual(changed.state, true)
+      changed.state = false
+      test.firstName = "c"
+      expectEqual(changed.state, false)
+    }
+
+    suite.test("tracking changes willSet & didSet option") {
+        let changed = CapturedState(state: 0)
+
+        let test = MiddleNamePerson()
+        withObservationTracking(options: [.willSet, .didSet]) {
+          _blackHole(test.firstName)
+        } onChange: { _ in
+          changed.state += 1
+        }
+
+        test.firstName = "c"
+        expectEqual(changed.state, 2) // an event is triggered for both the willSet and the didSet
+        changed.state = 0
+        test.firstName = "c"
+        expectEqual(changed.state, 0)
+    }
+
+    suite.test("tracking changes deinit option") {
+        let changed = CapturedState(state: false)
+
+        var test: MiddleNamePerson? = MiddleNamePerson()
+        withObservationTracking(options: .deinit) {
+          _blackHole(test?.firstName)
+        } onChange: { _ in
+          changed.state = true
+        }
+
+        test?.firstName = "c"
+        expectEqual(changed.state, false)
+        changed.state = false
+        test?.firstName = "c"
+        expectEqual(changed.state, false)
+        test = nil
+        expectEqual(changed.state, true)
+    }
+
+    suite.test("continuous tracking") {
+      let changed = CapturedState(state: 0)
+      let test: MiddleNamePerson = MiddleNamePerson()
+      let token = withContinuousObservation(options: .didSet) { _ in
+        _blackHole(test.firstName)
+        changed.state += 1
+      }
+      // the sleeps here are intended to be a simulation of returning to the main run loop
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 1)
+      test.firstName = "c"
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 2)
+      test.firstName = "d"
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 3)
+      token.cancel()
+      try! await Task.sleep(for: .seconds(0.1)) // ensure a small grace w.r.t. cancellation
+      test.firstName = "e"
+      try! await Task.sleep(for: .seconds(0.1))
+      expectEqual(changed.state, 3)
+    }
+
+    await runAllTestsAsync()
   }
 }
 
