@@ -236,19 +236,20 @@ public struct AsyncStream<Element> {
     }
   }
 
-  final class _Context {
-    let storage: _Storage?
-    let produce: () async -> Element?
-
-    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
-      self.storage = storage
-      self.produce = produce
-    }
-
-    deinit {
-      storage?.cancel()
-    }
-  }
+  typealias _Context = AsyncThrowingStream<Element, Never>._Context
+//  final class _Context {
+//    let storage: _Storage?
+//    let produce: () async -> Element?
+//
+//    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
+//      self.storage = storage
+//      self.produce = produce
+//    }
+//
+//    deinit {
+//      storage?.cancel()
+//    }
+//  }
 
   let context: _Context
   

@@ -973,8 +973,8 @@ extension AsyncThrowingStream {
       try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
         do {
           return try unsafe await withUnsafeThrowingContinuation { continuation in
-            // TODO: is this the right way to convert to a properly typed continuation?
-            unsafe next(UnsafeContinuation(continuation.context))
+            // TODO: is this the right way to convert to a typed throws continuation?
+            unsafe next(UnsafeContinuation<Element?, Failure>(continuation.context))
           }
         } catch {
           // TODO: any way around this?
