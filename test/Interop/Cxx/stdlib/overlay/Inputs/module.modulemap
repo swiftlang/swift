@@ -16,3 +16,9 @@ module CustomSequence {
   requires cplusplus
   export *
 }
+
+module CustomBorrowingSequence {
+  header "custom-borrowing-sequence.h"
+  requires cplusplus
+  export *
+}

@@ -516,28 +516,24 @@ checkSuppressedConformancesRequirements(const NominalTypeDecl *nominal,
   // or ~Escapable, the synthesized protocol we're trying to conform to has
   // the same requirement.
 
-  auto isCxxKnownProtocol = [](const ProtocolDecl *protocol) {
-    auto protoKind = protocol->getKnownProtocolKind();
-    if (!protoKind.has_value())
-      return false;
-    switch (protoKind.value()) {
-#define CXX_PROTOCOL(Name)                                                     \
-  case KnownProtocolKind::Name:                                                \
-    return true;
-#include "swift/AST/KnownProtocols.def"
-    default:
-      return false;
-    }
-    return false;
-  };
-
   auto nominalAttrs = nominal->getAttrs();
+
   // For any protocol that is not part of the C++ stdlib overlay, we still
   // ignore the synthesized conformances when the `nominal` is ~Copyable or
   // ~Escapable
-  if (!isCxxKnownProtocol(protocol))
-    return !(nominalAttrs.hasAttribute<MoveOnlyAttr>() ||
-             nominalAttrs.hasAttribute<NonEscapableAttr>());
+  bool requiresInvertible = nominalAttrs.hasAttribute<MoveOnlyAttr>() ||
+                            nominalAttrs.hasAttribute<NonEscapableAttr>();
+  auto protoKind = protocol->getKnownProtocolKind();
+  if (!protoKind.has_value())
+    return !requiresInvertible;
+  switch (protoKind.value()) {
+#define CXX_PROTOCOL(Name)                                                     \
+  case KnownProtocolKind::Name:                                                \
+    break;
+#include "swift/AST/KnownProtocols.def"
+  default:
+    return !requiresInvertible;
+  }
 
   auto protoInverses = protocol->getInverseRequirements();
   auto hasInverseRequirement = [&](InvertibleProtocolKind kind) {
