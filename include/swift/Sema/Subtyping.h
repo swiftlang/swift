@@ -38,6 +38,7 @@ std::optional<bool> isLikelyExactMatch(Type first, Type second);
 
 enum class ConversionBehavior : unsigned {
   None,
+  String,
   Class,
   AnyHashable,
   Double,

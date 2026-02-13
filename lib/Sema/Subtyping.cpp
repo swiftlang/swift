@@ -51,6 +51,8 @@ swift::constraints::getConversionBehavior(Type type) {
   if (type->is<StructType>()) {
     if (type->isAnyHashable())
       return ConversionBehavior::AnyHashable;
+    else if (type->isString())
+      return ConversionBehavior::String;
     else if (type->isDouble() || type->isCGFloat())
       return ConversionBehavior::Double;
     else if (type->getAnyPointerElementType())
@@ -96,6 +98,7 @@ swift::constraints::getConversionBehavior(Type type) {
 bool swift::constraints::hasProperSubtypes(Type type) {
   switch (getConversionBehavior(type)) {
   case ConversionBehavior::None:
+  case ConversionBehavior::String:
     return false;
   case ConversionBehavior::Array:
     return hasProperSubtypes(type->getArrayElementType());
@@ -173,6 +176,10 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     case ConversionBehavior::Double:
       // There are only two types with this behavior, and they convert
       // to each other.
+      break;
+
+    case ConversionBehavior::String:
+      // String converts to String.
       break;
 
     case ConversionBehavior::AnyHashable:
@@ -265,6 +272,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     }
 
     case ConversionBehavior::None:
+    case ConversionBehavior::String:
     case ConversionBehavior::Double:
     case ConversionBehavior::Array:
     case ConversionBehavior::Dictionary:
@@ -284,7 +292,8 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       // FIXME: String converts to UnsafePointer<UInt8> which
       // can satisfy a conformance to P that String does not
       // satisfy. Encode this more thoroughly.
-      if (lhsKind == ConversionBehavior::None)
+      if (lhsKind == ConversionBehavior::None ||
+          lhsKind == ConversionBehavior::String)
         return !lhs->isString();
 
       return false;
@@ -307,6 +316,7 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
     // that '$LHS conforms P'?
     auto isConformanceTransitiveOnRHS = [rhsKind]() -> bool {
       if (rhsKind == ConversionBehavior::None ||
+          rhsKind == ConversionBehavior::String ||
           rhsKind == ConversionBehavior::Array ||
           rhsKind == ConversionBehavior::Dictionary ||
           rhsKind == ConversionBehavior::Set)
