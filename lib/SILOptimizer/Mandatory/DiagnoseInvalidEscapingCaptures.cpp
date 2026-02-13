@@ -314,21 +314,23 @@ static const SILValue tryGetPackFromIntermediaryInstruction(SILInstruction *inst
 
     // Follow the source of copy addr.
     if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
-      worklist.pushIfNotVisited(copyAddr->getSrc()->getDefiningInstruction());
+      if (auto *src = copyAddr->getSrc()->getDefiningInstruction())
+        worklist.pushIfNotVisited(src);
       continue;
     }
 
     // Follow the source of load inst.
     if (auto *load = dyn_cast<LoadInst>(inst)) {
-      worklist.pushIfNotVisited(load->getOperand()->getDefiningInstruction());
+      if (auto *src = load->getOperand()->getDefiningInstruction())
+        worklist.pushIfNotVisited(src);
       continue;
     }
 
     // Follow the value of a pack set, ideally to a tuple pack element addr
     // inst.
     if (auto *packElemSet = dyn_cast<PackElementSetInst>(inst)) {
-      worklist.pushIfNotVisited(
-          packElemSet->getValue()->getDefiningInstruction());
+      if (auto *valueDef = packElemSet->getValue()->getDefiningInstruction())
+        worklist.pushIfNotVisited(valueDef);
       continue;
     }
 
@@ -348,8 +350,8 @@ static const SILValue tryGetPackFromIntermediaryInstruction(SILInstruction *inst
       if (auto *arg = dyn_cast<SILArgument>(packElemGet->getPack())) {
         return arg;
       }
-      worklist.pushIfNotVisited(
-          packElemGet->getPack()->getDefiningInstruction());
+      if (auto *packDef = packElemGet->getPack()->getDefiningInstruction())
+        worklist.pushIfNotVisited(packDef);
       continue;
     }
   }
