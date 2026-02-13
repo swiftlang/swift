@@ -52,6 +52,29 @@ public struct CxxBorrowingIterator<T>: _BorrowingIteratorProtocol, ~Escapable, ~
   }
 
   @inlinable
+  public mutating func _skip(by offset: Int) -> Int {
+    var remainder = offset
+    while remainder > 0 {
+      let span = _nextSpan(maximumCount: remainder)
+      if span.isEmpty { break }
+      remainder &-= span.count
+    }
+    return offset &- remainder
+  }
+}
+
+// For non-contiguous iterators, we create a span of size one for each element
+@available(SwiftStdlib 6.3, *)
+extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T._Element: ~Copyable {
+  // FIXME methods `_skip(by:)` and `_nextSpan()` should be inherited from BorrowingSequence,
+  // but currently are not because of a bug. These will be removed once it gets fixed. 
+  @inlinable
+  @_lifetime(&self)
+  public mutating func _nextSpan() -> Span<_Element> {
+    _nextSpan(maximumCount: Int.max)
+  }
+
+  @inlinable
   @_lifetime(&self)
   public mutating func _nextSpan(maximumCount: Int) -> Span<_Element> {
     if self.current == self.end {
@@ -64,22 +87,34 @@ public struct CxxBorrowingIterator<T>: _BorrowingIteratorProtocol, ~Escapable, ~
         Span(_unsafeStart: ptr, count: 1),
         borrowing: self)
   }
+}
 
+// For contiguous iterators, we can make iteration more efficient by creating a span with multiple, contiguous, elements
+@available(SwiftStdlib 6.3, *)
+extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T._Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
   public mutating func _nextSpan() -> Span<_Element> {
     _nextSpan(maximumCount: Int.max)
   }
 
+  public var count: Int {
+    return Int(self.end - self.current)
+  }
+
   @inlinable
-  public mutating func _skip(by offset: Int) -> Int {
-    var remainder = offset
-    while remainder > 0 {
-      let span = _nextSpan(maximumCount: remainder)
-      if span.isEmpty { break }
-      remainder &-= span.count
+  @_lifetime(&self)
+  public mutating func _nextSpan(maximumCount: Int) -> Span<_Element> {
+    if self.current == self.end {
+      return Span()
     }
-    return offset &- remainder
+
+    let ptr = unsafe self.current.__operatorStar()
+    let distance = min(count, maximumCount)
+    self.current += T.RawIterator.Distance(distance)
+    return unsafe _cxxOverrideLifetime(
+        Span(_unsafeStart: ptr, count: distance),
+        borrowing: self)
   }
 }
 
