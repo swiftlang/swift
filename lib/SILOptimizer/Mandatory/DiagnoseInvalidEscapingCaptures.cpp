@@ -568,21 +568,25 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
       continue;
     }
 
-    // Follow indirection for defer
+    // Follow indirection for defer.
     if (auto *copyAddrInst = dyn_cast<CopyAddrInst>(user)) {
       // We came from the source, follow it to where its copied to
       if (oper->getOperandNumber() == CopyAddrInst::Src) {
         SILValue dest = copyAddrInst->getDest();
 
-        // Walk through address projections to find the base
+        // Walk through address projections to find the base.
         while (true) {
           if (auto *tuplePackInst = dyn_cast<TuplePackElementAddrInst>(dest)) {
             dest = tuplePackInst->getTuple();
-          } else if (auto *packInst = dyn_cast<PackElementGetInst>(dest)) {
-            dest = packInst->getPack();
-          } else {
-            break;
+            continue;
           }
+
+          if (auto *packInst = dyn_cast<PackElementGetInst>(dest)) {
+            dest = packInst->getPack();
+            continue;
+          }
+
+          break;
         }
 
         for (auto *use : dest->getUses())
