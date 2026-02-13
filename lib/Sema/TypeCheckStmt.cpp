@@ -3488,8 +3488,8 @@ public:
     stmts.push_back(buildMakeIterator());
     stmts.push_back(buildWhileStmt());
 
-    auto *braceStmt =
-        BraceStmt::create(ctx, stmt->getStartLoc(), stmts, stmt->getEndLoc());
+    auto *braceStmt = BraceStmt::createImplicit(ctx, stmt->getStartLoc(), stmts,
+                                                stmt->getEndLoc());
 
     bool HadError = StmtChecker(dc).typeCheckStmt(braceStmt);
     if (HadError)
