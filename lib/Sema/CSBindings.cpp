@@ -939,6 +939,62 @@ void BindingSet::finalizeUnresolvedMemberChainResult() {
   }
 }
 
+static std::optional<bool> subsumeBinding(const PotentialBinding &binding,
+                                          const PotentialBinding &existing) {
+  auto existingType = existing.BindingType;
+  auto result = isLikelyExactMatch(binding.BindingType, existingType);
+  if (result.has_value() && *result) {
+    // A binding can subsume another binding. Suppose we have two
+    // constraints:
+    // - X conv $T0
+    // - $T0 conv Y
+    //
+    // This gives us two potential bindings:
+    // - (subtypes of) X
+    // - (supertypes of) Y
+    //
+    // If X and Y are a match except that X has type variables and
+    // Y does not, we replace the subtype binding type with Y, and
+    // drop the supertype binding:
+    // - (subtypes of) Y
+    //
+    // Two more combinations are supported. Suppose as above that
+    // X is concrete and Y has type variables.
+    //
+    // Then:
+    // - (exact / subtypes of / supertypes of) X
+    // - (exact) Y
+    // becomes:
+    // - (exact) Y
+    //
+    // And finally:
+    // - (supertypes of) X
+    // - (supertypes of) Y
+    // becomes:
+    // - (supertypes of) Y
+    //
+    // This is unsound, but without it we get ambiguous solutions
+    // and performance problems in a couple of instances where we
+    // end up considering bindings like Int? vs $T0?, where $T0
+    // is subsequently bound to Int.
+    if (binding.Kind == AllowedBindingKind::Exact ||
+        existing.Kind == AllowedBindingKind::Supertypes) {
+      // If new type has a type variable it shouldn't
+      // be considered viable.
+      if (binding.BindingType->hasTypeVariable())
+        return false;
+
+      // If new type doesn't have any type variables,
+      // but existing binding does, let's replace existing
+      // binding with new one.
+      if (existingType->hasTypeVariable())
+        return true;
+    }
+  }
+
+  return std::nullopt;
+}
+
 void BindingSet::addBinding(PotentialBinding binding) {
   if (Bindings.count(binding))
     return;
@@ -970,74 +1026,34 @@ void BindingSet::addBinding(PotentialBinding binding) {
   // case. In the worst case, we'll produce lots of duplicate solutions
   // for this constraint system, which is problematic for overload
   // resolution.
-  if (auto *NTD = binding.BindingType->getAnyNominal()) {
-    for (auto existing = Bindings.begin(); existing != Bindings.end();
-         ++existing) {
-      auto existingType = existing->BindingType;
-
-      auto *existingNTD = existingType->getAnyNominal();
-      if (!existingNTD || NTD != existingNTD)
-        continue;
-
-      // A binding can subsume another binding. Suppose we have two
-      // constraints:
-      // - X conv $T0
-      // - $T0 conv Y
+  for (auto existing = Bindings.begin(); existing != Bindings.end();
+       ++existing) {
+    auto result = subsumeBinding(binding, *existing);
+    if (result == std::nullopt) {
+      // Record a new binding, unless it subsumed by something else.
+      continue;
+    } else if (*result) {
+      // First, remove all of the adjacent type variables associated
+      // with the existing binding.
       //
-      // This gives us two potential bindings:
-      // - (subtypes of) X
-      // - (supertypes of) Y
-      //
-      // If X and Y are a match except that X has type variables and
-      // Y does not, we replace the subtype binding type with Y, and
-      // drop the supertype binding:
-      // - (subtypes of) Y
-      //
-      // Two more combinations are supported. Suppose as above that
-      // X is concrete and Y has type variables.
-      //
-      // Then:
-      // - (exact / subtypes of / supertypes of) X
-      // - (exact) Y
-      // becomes:
-      // - (exact) Y
-      //
-      // And finally:
-      // - (supertypes of) X
-      // - (supertypes of) Y
-      // becomes:
-      // - (supertypes of) Y
-      //
-      // This is unsound, but without it we get ambiguous solutions
-      // and performance problems in a couple of instances where we
-      // end up considering bindings like Int? vs $T0?, where $T0
-      // is subsequently bound to Int.
-      if (!(binding.Kind == AllowedBindingKind::Exact ||
-            existing->Kind == AllowedBindingKind::Supertypes))
-        continue;
-
-      // If new type has a type variable it shouldn't
-      // be considered viable.
-      if (binding.BindingType->hasTypeVariable())
-        return;
-
-      // If new type doesn't have any type variables,
-      // but existing binding does, let's replace existing
-      // binding with new one.
-      if (existingType->hasTypeVariable()) {
-        // First, let's remove all of the adjacent type
-        // variables associated with this binding.
-        {
-          SmallPtrSet<TypeVariableType *, 4> referencedVars;
-          existingType->getTypeVariables(referencedVars);
-          for (auto *var : referencedVars)
-            AdjacentVars.erase(var);
-        }
-
-        // And now let's remove the binding itself.
-        Bindings.erase(existing);
-        break;
+      // FIXME: This is wrong, because we don't maintain a "reference
+      // count" for each adjacent variable, so we might remove one
+      // prematurely.
+      {
+        SmallPtrSet<TypeVariableType *, 4> referencedVars;
+        existing->BindingType->getTypeVariables(referencedVars);
+        for (auto *var : referencedVars)
+          AdjacentVars.erase(var);
       }
+
+      // Remove the existing binding.
+      Bindings.erase(existing);
+
+      // Fall through to add a new binding.
+      break;
+    } else {
+      // Drop the new binding.
+      return;
     }
   }
 
