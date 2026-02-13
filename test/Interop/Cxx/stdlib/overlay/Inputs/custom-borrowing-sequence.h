@@ -38,4 +38,16 @@ struct SWIFT_NONCOPYABLE NonReferenceDereferenceOperatorSequence {
   }
 };
 
+#if __cplusplus >= 202002L
+struct SWIFT_NONCOPYABLE ContiguousNonCopyableSequence {
+  int arr[5] = {10, 20, 30, 40, 50};
+  ConstContiguousIterator begin() const {
+    return ConstContiguousIterator(&arr[0]);
+  }
+  ConstContiguousIterator end() const {
+    return ConstContiguousIterator(&arr[5]);
+  }
+};
+#endif
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_BORROWING_SEQUENCE_H
