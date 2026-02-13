@@ -70,6 +70,11 @@ bool checkTransitiveSubtypeConformance(ConstraintSystem &cs,
 /// give a conservative approximation.
 bool hasProperSubtypes(Type type);
 
+/// Check if there exist any supertypes of the given type, other than
+/// the type itself, and those that every type T has, that is,
+/// Optional<T> and existentials.
+bool hasProperSupertypes(Type type);
+
 enum ConflictFlag : unsigned {
   Category = 1 << 0,
   Exact = 1 << 1,

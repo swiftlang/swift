@@ -319,6 +319,37 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   }
 }
 
+bool swift::constraints::hasProperSupertypes(Type type) {
+  switch (getConversionBehavior(type)) {
+  case ConversionBehavior::None:
+    if (auto *archetypeType = type->getAs<ArchetypeType>()) {
+      // An archetype is a subtype of its superclass.
+      if (archetypeType->getSuperclass())
+        return true;
+    }
+
+    return false;
+  case ConversionBehavior::String:
+    // Strings convert to pointers.
+    return true;
+  case ConversionBehavior::Class: {
+    auto *classDecl = type->getClassOrBoundGenericClass();
+    return classDecl->getSuperclassDecl();
+  }
+  case ConversionBehavior::AnyHashable:
+    return false;
+  case ConversionBehavior::Array:
+  case ConversionBehavior::Dictionary:
+  case ConversionBehavior::Set:
+  case ConversionBehavior::Double:
+  case ConversionBehavior::Pointer:
+  case ConversionBehavior::Optional:
+  case ConversionBehavior::Structural:
+  case ConversionBehavior::Unknown:
+    return true;
+  }
+}
+
 static bool shouldBeConservativeWithProto(ProtocolDecl *proto) {
   if (proto->isMarkerProtocol())
     return true;
