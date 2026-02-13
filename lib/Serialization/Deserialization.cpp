@@ -9587,16 +9587,18 @@ ModuleFile::maybeReadLifetimeDependence() {
 
   unsigned targetIndex;
   unsigned paramIndicesLength;
-  bool isImmortal;
+  bool hasImmortalSpecifier;
   bool isFromAnnotation;
+  bool dependsOnClosureContext;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
-      scratch, targetIndex, paramIndicesLength, isImmortal, isFromAnnotation,
-      hasInheritLifetimeParamIndices, hasScopeLifetimeParamIndices,
-      hasAddressableParamIndices, lifetimeDependenceData);
+      scratch, targetIndex, paramIndicesLength, hasImmortalSpecifier, isFromAnnotation,
+      dependsOnClosureContext, hasInheritLifetimeParamIndices,
+      hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector scopeLifetimeParamIndices(paramIndicesLength, false);
@@ -9630,9 +9632,12 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal, isFromAnnotation,
+      targetIndex,
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
           : nullptr,
-      nullptr);
+      nullptr,
+      {.hasImmortalSpecifier = hasImmortalSpecifier,
+       .isFromAnnotation = isFromAnnotation,
+       .dependsOnClosureContext = dependsOnClosureContext});
 }

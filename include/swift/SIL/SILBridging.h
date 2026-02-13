@@ -199,6 +199,7 @@ struct BridgedLifetimeDependenceInfo {
   SwiftUInt targetIndex;
   bool hasImmortalSpecifier;
   bool fromAnnotation;
+  bool dependsOnClosureContext;
 
   BRIDGED_INLINE BridgedLifetimeDependenceInfo(swift::LifetimeDependenceInfo info);
 

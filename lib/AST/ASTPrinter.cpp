@@ -558,6 +558,13 @@ static std::string getLifetimeDependenceInfoSourceListString(
     }
     return result;
   };
+  if (info.dependsOnClosureContext()) {
+    if (!isFirstSpecifier) {
+      lifetimeDependenceString += ", ";
+    }
+    lifetimeDependenceString += "self";
+    isFirstSpecifier = false;
+  }
   if (info.hasImmortalSpecifier()) {
     if (!isFirstSpecifier) {
       lifetimeDependenceString += ", ";
