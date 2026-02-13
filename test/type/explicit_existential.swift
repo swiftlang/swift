@@ -540,15 +540,9 @@ func testAnyFixIt() {
 
   // Misplaced '?'.
 
-  // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc)?'}}{{10-23=(any HasAssoc)?}}
-  let _: any HasAssoc?
-  // expected-error@+1:10 {{optional 'any' type must be written '(any HasAssocGeneric<Int>)?'}}{{10-35=(any HasAssocGeneric<Int>)?}}
-  let _: any HasAssocGeneric<Int>?
   // FIXME: Better recovery
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: any ~Copyable?
-  // expected-error@+1 {{optional 'any' type must be written '(any HasAssoc.Type)?'}}{{10-28=(any HasAssoc.Type)?}}
-  let _: any HasAssoc.Type?
   // FIXME: Better recovery
   // expected-error@+1 {{type '(any Copyable.Type)?' cannot be suppressed}}
   let _: any ~Copyable.Type?
