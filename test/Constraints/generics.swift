@@ -900,7 +900,7 @@ func rdar78623338() {
 // rdar://78781552 - crash in `getFunctionArgApplyInfo`
 func rdar78781552() {
   struct Test<Data, Content> where Data : RandomAccessCollection {
-    // expected-note@-1 {{where 'Data' = '(((Int) throws -> Bool) throws -> [Int])?'}}
+    // expected-note@-1 {{where 'Data' = '(((Int) throws(E) -> Bool) throws(E) -> [Int])?'}}
     // expected-note@-2 {{'init(data:filter:)' declared here}}
     // expected-note@-3 {{'Content' declared as parameter to type 'Test'}}
     var data: [Data]
@@ -909,11 +909,12 @@ func rdar78781552() {
 
   func test(data: [Int]?) {
     Test(data?.filter)
-    // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws -> Bool) throws -> [Int])?' conform to 'RandomAccessCollection'}}
+    // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' conform to 'RandomAccessCollection'}}
     // expected-error@-2 {{generic parameter 'Content' could not be inferred}} expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
-    // expected-error@-3 {{cannot convert value of type '(((Int) throws -> Bool) throws -> [Int])?' to expected argument type '[(((Int) throws -> Bool) throws -> [Int])?]'}}
+    // expected-error@-3 {{cannot convert value of type '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' to expected argument type '[(((Int) throws(E) -> Bool) throws(E) -> [Int])?]'}}
     // expected-error@-4 {{missing argument label 'data:' in call}}
     // expected-error@-5 {{missing argument for parameter 'filter' in call}}
+    // expected-error@-6 {{generic parameter 'E' could not be inferred}}
   }
 }
 
