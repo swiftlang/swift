@@ -28,6 +28,206 @@
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
+
+/// T conv $T0
+/// $T0 conforms P
+bool ConstraintSystem::isConformanceTransitiveForSupertype(
+    ConversionBehavior behavior, ProtocolDecl *proto) {
+  // Sendable conformance is too loose to conclude anything.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    return false;
+
+  auto key = std::make_pair(behavior, proto);
+  auto found = ConformanceTransitiveForSupertypeCache.find(key);
+  if (found != ConformanceTransitiveForSupertypeCache.end())
+    return found->second;
+
+  auto &ctx = getASTContext();
+
+  // Enumerate possible nominal supertypes of a type having the
+  // given conversion behavior.
+  SmallVector<NominalTypeDecl *, 4> declsToCheck;
+
+  if (behavior != ConversionBehavior::Optional) {
+    // Every T converts to Optional<T>.
+    if (auto *optionalDecl = ctx.getOptionalDecl())
+      declsToCheck.push_back(optionalDecl);
+  }
+
+  // Every hashable T converts to AnyHashable.
+  // FIXME: Actually check if the type is hashable.
+  if (auto *anyHashableDecl = ctx.getAnyHashableDecl())
+    declsToCheck.push_back(anyHashableDecl);
+
+  auto addPointers = [&]() {
+    declsToCheck.push_back(ctx.getUnsafePointerDecl());
+    declsToCheck.push_back(ctx.getUnsafeRawPointerDecl());
+  };
+
+  auto addMutablePointers = [&]() {
+    addPointers();
+    declsToCheck.push_back(ctx.getUnsafeMutablePointerDecl());
+    declsToCheck.push_back(ctx.getUnsafeMutableRawPointerDecl());
+  };
+
+  bool result = true;
+
+  switch (behavior) {
+  case ConversionBehavior::None:
+  case ConversionBehavior::Class:
+  case ConversionBehavior::Dictionary:
+  case ConversionBehavior::Set:
+  case ConversionBehavior::Optional:
+  case ConversionBehavior::AnyHashable:
+    break;
+
+  case ConversionBehavior::String:
+    // Strings convert to UnsafePointer.
+    addPointers();
+    break;
+
+  case ConversionBehavior::Array:
+    addPointers();
+    break;
+
+  case ConversionBehavior::Pointer:
+    addMutablePointers();
+    break;
+
+  case ConversionBehavior::Double:
+    // Note this is funny, but valid. We return false if
+    // either Double or CGFloat conform to the protocol,
+    // so the only "transitive" protocols in this case
+    // are those that neither CGFloat nor Double conform
+    // to.
+    if (auto *doubleDecl = ctx.getDoubleDecl())
+      declsToCheck.push_back(doubleDecl);
+    if (auto *cgFloatDecl = ctx.getCGFloatDecl())
+      declsToCheck.push_back(cgFloatDecl);
+    break;
+
+  case ConversionBehavior::Structural:
+    // FIXME: Metatypes and functions.
+    result = false;
+    break;
+
+  case ConversionBehavior::Unknown:
+    // Can't say anything in this case.
+    result = false;
+    break;
+  }
+
+  if (result) {
+    // Check if any of our nominal types conform.
+    // If they do, then conformance is not transitive.
+    for (auto *decl : declsToCheck) {
+      SmallVector<ProtocolConformance *, 1> results;
+      decl->lookupConformance(proto, results);
+      if (!results.empty()) {
+        result = false;
+        break;
+      }
+    }
+  }
+
+  // Cache the result.
+  bool inserted =
+    ConformanceTransitiveForSupertypeCache.insert(
+      std::make_pair(key, result)).second;
+  ASSERT(inserted);
+
+  return result;
+}
+
+bool swift::constraints::checkTransitiveSupertypeConformance(
+    ConstraintSystem &cs, Type type, ProtocolDecl *proto) {
+  auto behavior = getConversionBehavior(type);
+  if (cs.isConformanceTransitiveForSupertype(behavior, proto)) {
+    return !cs.lookupConformance(type, proto).isInvalid();
+  }
+  return true;
+}
+
+/// $T0 conv T
+/// $T0 conforms P
+bool ConstraintSystem::isConformanceTransitiveForSubtype(
+    ConversionBehavior behavior, ProtocolDecl *proto) {
+  // Sendable conformance is too loose to conclude anything.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    return false;
+
+  switch (behavior) {
+  case ConversionBehavior::None:
+  case ConversionBehavior::String:
+  case ConversionBehavior::Array:
+  case ConversionBehavior::Dictionary:
+  case ConversionBehavior::Set:
+    // All subtypes of these have the same nominal type.
+    return true;
+
+  case ConversionBehavior::Class:
+    // If a subclass conforms, so does the superclass.
+    return true;
+
+  case ConversionBehavior::Double: {
+    auto key = std::make_pair(behavior, proto);
+    auto found = ConformanceTransitiveForSubtypeCache.find(key);
+    if (found != ConformanceTransitiveForSubtypeCache.end())
+      return found->second;
+
+    SmallVector<NominalTypeDecl *, 4> declsToCheck;
+
+    auto &ctx = getASTContext();
+    if (auto *cgFloatDecl = ctx.getCGFloatDecl())
+      declsToCheck.push_back(cgFloatDecl);
+    if (auto *doubleDecl = ctx.getDoubleDecl())
+      declsToCheck.push_back(doubleDecl);
+
+    bool result = false;
+    for (auto *decl : declsToCheck) {
+      SmallVector<ProtocolConformance *, 1> results;
+      decl->lookupConformance(proto, results);
+      if (!results.empty()) {
+        result = false;
+        break;
+      }
+    }
+
+    result = true;
+
+    // Cache the result.
+    bool inserted =
+      ConformanceTransitiveForSubtypeCache.insert(
+        std::make_pair(key, result)).second;
+    ASSERT(inserted);
+
+    return result;
+  }
+
+  case ConversionBehavior::Optional:
+    // FIXME: Check payload type.
+    return false;
+
+  case ConversionBehavior::AnyHashable:
+  case ConversionBehavior::Pointer:
+    // FIXME: Check pointer types.
+    return false;
+
+  case ConversionBehavior::Structural:
+  case ConversionBehavior::Unknown:
+    return false;
+  }
+}
+
+bool swift::constraints::checkTransitiveSubtypeConformance(
+    ConstraintSystem &cs, Type type, ProtocolDecl *proto) {
+  auto behavior = getConversionBehavior(type);
+  if (cs.isConformanceTransitiveForSubtype(behavior, proto)) {
+    return !cs.lookupConformance(type, proto).isInvalid();
+  }
+  return true;
+}
 
 std::optional<bool>
 swift::constraints::isLikelyExactMatch(Type lhs, Type rhs) {

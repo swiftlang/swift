@@ -68,6 +68,9 @@ struct DeclReferenceType;
 class PreparedOverload;
 struct PreparedOverloadBuilder;
 
+// Subtyping.h
+enum class ConversionBehavior : unsigned;
+
 } // end namespace constraints
 
 // Forward declare some TypeChecker related functions
@@ -3736,6 +3739,36 @@ public:
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.
   ProtocolConformanceRef lookupConformance(Type type, ProtocolDecl *P);
+
+  /// We memoize the computation in the below.
+  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
+      ConformanceTransitiveForSupertypeCache;
+
+  /// Suppose we are given a type T with the given conversion behavior,
+  /// and a protocol P, with the following setup:
+  /// - T conv $T0
+  /// - $T0 conforms P
+  /// The question is, does this imply that T must conform to P? This
+  /// returns true if so, false otherwise.
+  ///
+  /// Also see Subtyping.h, checkTranstiveSupertypeConformance().
+  bool isConformanceTransitiveForSupertype(ConversionBehavior behavior,
+                                           ProtocolDecl *proto);
+
+  /// We memoize the computation in the below.
+  llvm::DenseMap<std::pair<ConversionBehavior, ProtocolDecl *>, bool>
+      ConformanceTransitiveForSubtypeCache;
+
+  /// Suppose we are given a type T with the given conversion behavior,
+  /// and a protocol P, with the following setup:
+  /// - $T0 conv T
+  /// - $T0 conforms P
+  /// The question is, does this imply that T must conform to P? This
+  /// returns true if so, false otherwise.
+  ///
+  /// Also see Subtyping.h, checkTranstiveSubtypeConformance().
+  bool isConformanceTransitiveForSubtype(ConversionBehavior behavior,
+                                         ProtocolDecl *proto);
 
   /// Wrapper over swift::adjustFunctionTypeForConcurrency that passes along
   /// the appropriate closure-type and opening extraction functions.

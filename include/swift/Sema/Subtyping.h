@@ -22,6 +22,7 @@
 namespace swift {
 
 class GenericSignature;
+class ProtocolDecl;
 class Type;
 
 namespace constraints {
@@ -53,6 +54,16 @@ enum class ConversionBehavior : unsigned {
 
 /// Classify the possible conversions having this type as result type.
 ConversionBehavior getConversionBehavior(Type type);
+
+/// Suppose we are given a type T and a protocol P, and T conv U for
+/// some type U; if U conforms to P, does it follow that T conforms to P?
+bool checkTransitiveSupertypeConformance(ConstraintSystem &cs,
+                                         Type type, ProtocolDecl *proto);
+
+/// Suppose we are given a type T and a protocol P, and U conv T for
+/// some type U; if U conforms to P, does it follow that T conforms to P?
+bool checkTransitiveSubtypeConformance(ConstraintSystem &cs,
+                                       Type type, ProtocolDecl *proto);
 
 /// Check if there exist any subtypes of the given type, other than
 /// the type itself. If the type contains type variables, this will
