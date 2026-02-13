@@ -256,3 +256,34 @@ public struct ProtoSet<T: Proto> {
 
 // DIAG-ALIAS-OVERRIDDEN: warning: ignoring -alias-module-names-in-module-interface (overridden by -enable-module-selectors-in-module-interface)
 // DIAG-ALIAS-NOT-OVERRIDDEN-NOT: warning: ignoring -alias-module-names-in-module-interface (overridden by -enable-module-selectors-in-module-interface)
+
+// rdar://169720990 -- complicated protocol hierarchy with typealias in protocol
+
+// CHECK-LABEL: class TypeAliasNestClass
+public final class TypeAliasNestClass<GenericParam: TypeAliasNestProtocol>: TypeAliasNestProtocol {
+  // CHECK: typealias AssociatedType4 =
+  // CHECK-ENABLED-SAME: TestCase::TypeAliasNestClass<GenericParam>.AssociatedType1.AssociatedType4
+  // CHECK-DISABLED-SAME: TestCase.TypeAliasNestClass<GenericParam>.AssociatedType1.AssociatedType4
+  // CHECK-PRESERVE-SAME: AssociatedType1.AssociatedType4
+  // CHECK-ALIAS-SAME: Module___TestCase.TypeAliasNestClass<GenericParam>.AssociatedType1.AssociatedType4
+  public typealias AssociatedType4 = AssociatedType1.AssociatedType4
+
+  public typealias AssociatedType1 = GenericParam.AssociatedType1
+}
+
+public protocol TypeAliasNestProtocol {
+  associatedtype AssociatedType1: AssociatedType1Protocol
+}
+
+public protocol AssociatedType1Protocol {
+  associatedtype AssociatedType2: AssociatedType2Protocol
+  typealias AssociatedType4 = AssociatedType2.AssociatedType3.AssociatedType4
+}
+
+public protocol AssociatedType2Protocol {
+  associatedtype AssociatedType3: AssociatedType3Protocol
+}
+
+public protocol AssociatedType3Protocol {
+  associatedtype AssociatedType4
+}
