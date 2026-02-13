@@ -517,27 +517,11 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
   }
 
   if (sig) {
-    // If '$LHS conv $RHS' and '$LHS conforms P', does it follow
-    // that '$RHS conforms P'?
-    auto isConformanceTransitiveOnLHS = [lhsKind, lhs]() -> bool {
-      // FIXME: String converts to UnsafePointer<UInt8> which
-      // can satisfy a conformance to P that String does not
-      // satisfy. Encode this more thoroughly.
-      if (lhsKind == ConversionBehavior::None ||
-          lhsKind == ConversionBehavior::String)
-        return !lhs->isString();
-
-      return false;
-    };
-
-    if (rhs->isTypeParameter() &&
-        isConformanceTransitiveOnLHS()) {
+    if (rhs->isTypeParameter()) {
       bool failed = llvm::any_of(
           sig->getRequiredProtocols(rhs),
           [&](ProtocolDecl *proto) {
-            if (shouldBeConservativeWithProto(proto))
-              return false;
-            return !lookupConformance(lhs, proto);
+            return !checkTransitiveSupertypeConformance(cs, lhs, proto);
           });
       if (failed)
         return ConflictFlag::Conformance;
