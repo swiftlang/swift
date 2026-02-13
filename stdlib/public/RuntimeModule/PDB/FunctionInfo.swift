@@ -22,6 +22,7 @@ struct FunctionInfo {
     case local
   }
 
+  var rawName: String?
   var name: String
   var address: UInt32
   var length: UInt32

@@ -70,17 +70,7 @@ class MultiStreamFile {
 
   convenience init?(path: String) {
     #if os(Windows)
-    guard let handle: HANDLE =
-            (path.withCString(encodedAs: UTF16.self) { lpwszPath in
-               CreateFileW(lpwszPath,
-                           GENERIC_READ,
-                           DWORD(FILE_SHARE_READ),
-                           nil,
-                           DWORD(OPEN_EXISTING),
-                           DWORD(FILE_ATTRIBUTE_NORMAL),
-                           nil)
-             })
-    else {
+    guard let handle: HANDLE = win32_open(path: path) else {
       return nil
     }
     if handle == INVALID_HANDLE_VALUE {
@@ -642,6 +632,20 @@ fileprivate func safe_read(
     if ret >= 0 || (ret < 0 && errno != EINTR) {
       return ret
     }
+  }
+}
+#endif
+
+#if os(Windows)
+fileprivate func win32_open(path: String) -> HANDLE? {
+  return path.withCString(encodedAs: UTF16.self) { lpwszPath in
+    CreateFileW(lpwszPath,
+                GENERIC_READ,
+                DWORD(FILE_SHARE_READ),
+                nil,
+                DWORD(OPEN_EXISTING),
+                DWORD(FILE_ATTRIBUTE_NORMAL),
+                nil)
   }
 }
 #endif

@@ -25,7 +25,7 @@ extension PDBFile: SymbolSource {
       return nil
     }
 
-    return SymbolSource.Symbol(name: symbolLookup.name,
+    return SymbolSource.Symbol(name: symbolLookup.rawName ?? symbolLookup.name,
                                offset: Int(symbolLookup.offset),
                                size: nil)
   }

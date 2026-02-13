@@ -411,9 +411,41 @@ public class PDBFile {
       return nil
     }
 
-    // We don't need to scan the main symbol stream, because all of the
-    // function symbols will be in the modules' symbol streams, and there
-    // is more information in those streams than there is in the main one.
+    // We scan the main symbol stream, because that contains the raw names
+    // of the symbols; the module streams only contain "demangled" versions
+    // which in the case of Swift don't actually match what we'd normally do.
+    var rawNames : [UInt32:String] = [:]
+    if var symbols = open(stream: .symbolRecords) {
+      do {
+        while !symbols.atEnd {
+          let pos = symbols.offset
+
+          let length = try symbols.read(as: UInt16.self)
+          if length == 0 {
+            break
+          }
+
+          let type = try symbols.read(as: UInt16.self)
+
+          if type == S_PUB32 {
+            let info = try symbols.read(as: PDB_CV_PUBSYM32.self)
+            let section = Int(info.seg) - 1
+
+            if section >= 0 && section < sections.count {
+              let rawName = try symbols.readString()
+              let address = sections[Int(info.seg) - 1].virtualAddress + info.off
+
+              rawNames[address] = rawName
+            }
+          }
+
+          _ = symbols.seek(offset: pos + Int(length) + 2)
+        }
+      } catch {
+        print(error)
+        return nil
+      }
+    }
 
     do {
       // Read the individual module streams
@@ -454,7 +486,8 @@ public class PDBFile {
             let scope: FunctionInfo.Scope
               = (type == S_LPROC32 || type == S_LPROC32_ID) ? .local : .global
 
-            functions.append(FunctionInfo(name: name,
+            functions.append(FunctionInfo(rawName: rawNames[address],
+                                          name: name,
                                           address: address,
                                           length: info.len,
                                           scope: scope,
@@ -809,6 +842,7 @@ public class PDBFile {
   }
 
   public struct SymbolLookup: CustomStringConvertible {
+    public var rawName: String?
     public var name: String
     public var offset: UInt32
     public var sourceLocation: SourceLocation?
@@ -858,7 +892,8 @@ public class PDBFile {
 
     let sourceLocation = lookup(address: address, in: module)
 
-    return SymbolLookup(name: function.name,
+    return SymbolLookup(rawName: function.rawName,
+                        name: function.name,
                         offset: address - function.address,
                         sourceLocation: sourceLocation)
   }
