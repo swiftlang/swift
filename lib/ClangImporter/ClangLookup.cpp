@@ -491,10 +491,7 @@ ClangImporter::Implementation::lookupAndImportPointee(NominalTypeDecl *Struct) {
   const auto *CXXRecord =
       dyn_cast<clang::CXXRecordDecl>(Struct->getClangDecl());
 
-  if (!CXXRecord || !isa<StructDecl>(Struct))
-    // Do not synthesize successor() if this is not a C++ record, or if it is
-    // a foreign reference type (successor() needs to copy values of this type),
-    // which would be a ClassDecl rather than a StructDecl.
+  if (!CXXRecord)
     return nullptr;
 
   if (auto [it, inserted] = importedPointeeCache.try_emplace(Struct, nullptr);
