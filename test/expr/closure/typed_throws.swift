@@ -19,12 +19,11 @@ func testClosures() {
   // expected-error@-1{{invalid conversion from throwing function of type '() throws(MyError) -> ()'}}
 
   let _: () throws(MyError) -> Void = {
-    // NOTE: under full typed throws, this should succeed
-    throw MyError.fail // expected-error{{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
+    throw MyError.fail // Ok
   }
 
   let _: () throws(MyError) -> Void = {
-    throw .fail // expected-error{{type 'any Error' has no member 'fail'}}
+    throw .fail // Ok
   }
 
   // FIXME: Terrible diagnostic.

@@ -12389,11 +12389,27 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     parameters.push_back(param);
   }
 
-  // Propagate @Sendable from the contextual type to the closure.
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
+    // Propagate @Sendable from the contextual type to the closure.
     if (contextualFnType->isSendable())
       closureExtInfo = closureExtInfo.withSendable();
+
+    auto inferredThrownErrorType =
+        inferredClosureType->getEffectiveThrownErrorTypeOrNever();
+    // In a typed throws context a `throws` closure (as determined from the
+    // body or an explicit type) assumes an error type of the context that is
+    // defaulted to `any Error`. Do nothing if closure is either non-throwing
+    // or has an explicit typed throws annotation.
+    if (inferredThrownErrorType->isErrorExistentialType()) {
+      if (auto errorTy = contextualFnType->getThrownError()) {
+        closureExtInfo = closureExtInfo.withThrows(/*throws=*/true, errorTy);
+        // The error type has to be a supertype of `any Error`.
+        addConstraint(
+            ConstraintKind::Subtype, inferredThrownErrorType, errorTy,
+            getConstraintLocator(closure, LocatorPathElt::ThrownErrorType()));
+      }
+    }
   }
 
   // Propagate sending result from the contextual type to the closure.
