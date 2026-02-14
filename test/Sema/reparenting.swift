@@ -41,6 +41,7 @@ extension Invalid: @reparented Q & R {}
 @objc protocol ObjCProto {}
 extension ObjCProto: @reparented Q {}
 // expected-error @-1 {{@objc protocol 'ObjCProto' cannot be '@reparented'}}
+// expected-error @-2 {{'ObjCProto' must directly inherit from 'Q' in order to be reparented}}
 
 
 
