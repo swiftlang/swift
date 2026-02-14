@@ -33,9 +33,7 @@ public func libraryFunc(_ s: some Derived) {
   print(s.existing())
 
 #if IncludeNewProto
-  if #available(macOS 12, *) { // FIXME: this doesn't properly guard the block.
-    print(s.new())
-  }
+  print(s.new())
 #endif
 
   print("libraryFunc end")
