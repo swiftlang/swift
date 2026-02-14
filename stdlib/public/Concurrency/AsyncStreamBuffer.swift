@@ -64,6 +64,7 @@ extension AsyncStream {
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
       var terminal: Bool = false
+      var hasLoggedMultipleAwaiters = false
 
       init(limit: Continuation.BufferingPolicy) {
         unsafe self.limit = limit
@@ -248,7 +249,14 @@ extension AsyncStream {
         unlock()
       }
       if hasMultipleAwaiters {
-        onMultipleAwaitersDetected()
+        lock()
+        if !(unsafe state.hasLoggedMultipleAwaiters) {
+          unsafe state.hasLoggedMultipleAwaiters = true
+          unlock() // don't wrap `onMultipleAwaiters` in the lock; it might re-log to this same `AsyncStream`
+          onMultipleAwaitersDetected()
+        } else {
+          unlock()
+        }
       }
     }
 
@@ -297,6 +305,7 @@ extension AsyncThrowingStream {
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
       var terminal: Terminal?
+      var hasLoggedMultipleAwaiters = false
 
       init(limit: Continuation.BufferingPolicy) {
         unsafe self.limit = limit
@@ -520,7 +529,14 @@ extension AsyncThrowingStream {
         unlock()
       }
       if hasMultipleAwaiters {
-        onMultipleAwaitersDetected()
+        lock()
+        if !(unsafe state.hasLoggedMultipleAwaiters) {
+          unsafe state.hasLoggedMultipleAwaiters = true
+          unlock() // don't wrap `onMultipleAwaiters` in the lock; it might re-log to this same `AsyncStream`
+          onMultipleAwaitersDetected()
+        } else {
+          unlock()
+        }
       }
     }
 
@@ -606,25 +622,11 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return storage
   }
 }
-
-public func _onMultipleAwaitersDetectedHook(
-  _ newValue: ((() -> ()) -> ())?
-) {
-  onMultipleAwaitersDetectedHook = newValue
-}
-
-@inline(never)
 fileprivate func onMultipleAwaitersDetected() {
-  let original = {
-    unsafe logFailedCheck("SWIFT ASYNCSTREAM: used by multiple awaiters!")
-  }
-  if let onMultipleAwaitersDetectedHook {
-    onMultipleAwaitersDetectedHook(original)
-  } else {
-    original()
-  }
+  swift_asyncstream_multiple_awaiters()
 }
 
-var onMultipleAwaitersDetectedHook: ((() -> ()) -> ())?
+@_silgen_name("swift_asyncstream_multiple_awaiters")
+internal func swift_asyncstream_multiple_awaiters()
 
 #endif

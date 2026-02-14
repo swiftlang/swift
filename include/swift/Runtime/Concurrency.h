@@ -939,6 +939,10 @@ void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
 extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);
 
+/// SPI helper to log multiple awaiters on the same `AsyncStream` or `AsyncThrowingStream`.
+extern "C" SWIFT_CC(swift)
+void swift_asyncstream_multiple_awaiters();
+
 /// Drain the queue
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueue [[noreturn]]();
