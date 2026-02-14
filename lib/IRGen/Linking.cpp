@@ -1489,8 +1489,15 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return depMemTy->getAssocType()->isWeakImported(module);
   }
 
-  case Kind::BaseConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor: {
+    auto baseProto = getAssociatedConformance().second;
+
+    // The base protocol might be reparented and less available.
+    if (baseProto->isWeakImported(module))
+      return true;
+
     return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+  }
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {
