@@ -102,8 +102,7 @@ set(runtime_compile_flags
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
   "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
-  "-disable-upcoming-feature;MemberImportVisibility"
-  "-g")
+  "-disable-upcoming-feature;MemberImportVisibility")
 
 ###TODO: Add these when we add static linking support
 #
@@ -158,8 +157,6 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
 
   LINK_FLAGS
     ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}
-    "-use-ld=lld"
-    "-Xlinker;/debug"
 
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
