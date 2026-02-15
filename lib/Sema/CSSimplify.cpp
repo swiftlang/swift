@@ -1839,19 +1839,21 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
           return std::nullopt;
 
         if (Type optObject = argTy->getOptionalObjectType()) {
-          Type unwrapped = optObject->lookThroughAllOptionalTypes();
-          if (unwrapped->isAnyExistentialType()) {
-            auto layout = unwrapped->getExistentialLayout();
-            if (!layout.requiresClass()) {
+          if (paramTy->getOptionalObjectType()) {
+            Type unwrapped = optObject->lookThroughAllOptionalTypes();
+            if (unwrapped->isAnyExistentialType()) {
+              auto layout = unwrapped->getExistentialLayout();
+              if (!layout.requiresClass()) {
 
-              auto openedAfterPeel = shouldOpenExistentialCallArgument(
-                  callee, paramIdx, paramTy, unwrapped, argExpr, cs);
+                auto openedAfterPeel = shouldOpenExistentialCallArgument(
+                    callee, paramIdx, paramTy, unwrapped, argExpr, cs);
 
-              if (openedAfterPeel) {
-                cs.recordFix(ForceOptional::create(
-                    cs, argTy, unwrapped, cs.getConstraintLocator(loc)));
+                if (openedAfterPeel) {
+                  cs.recordFix(ForceOptional::create(
+                      cs, argTy, unwrapped, cs.getConstraintLocator(loc)));
 
-                return openedAfterPeel;
+                  return openedAfterPeel;
+                }
               }
             }
           }
