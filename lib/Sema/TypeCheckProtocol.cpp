@@ -3783,6 +3783,17 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
       return false;
     }
   }
+
+  // FIXME: The proper fix is to handle pack expansion types in the
+  // ASTPrinter's type substitution logic (TypeTransformContext). This
+  // workaround avoids the crash by skipping stub generation for requirements
+  // whose interface type contains a pack expansion, since setBaseType()
+  // triggers substitution that fails on these types.
+  if (auto interfaceType = Requirement->getInterfaceType()) {
+    if (interfaceType->hasPackExpansionType())
+      return false;
+  }
+
   // FIXME: Infer body indentation from the source rather than hard-coding
   // 4 spaces.
   ASTContext &Ctx = Requirement->getASTContext();
