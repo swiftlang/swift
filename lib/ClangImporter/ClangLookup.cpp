@@ -93,7 +93,7 @@ public:
         return;
 
       // Only produce results that match the requested name.
-      if (!valueDecl->getName().matchesRef(name))
+      if (valueDecl->getBaseName() != name.getBaseName())
         return;
 
       result.push_back(valueDecl);
