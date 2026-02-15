@@ -13,9 +13,9 @@ func testConditionListTrailingComma() {
 
     if true, { print("if-body") } else if true, { print("else-if-body") } else { print("else-body") }
 
-    if true, { if true { { } } } // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+    if true, { if true { { } } } // expected-error {{statement beginning with '{' is interpreted as a closure expression}} expected-note {{did you mean to use a 'do' statement?}}
 
-    { if true, { print(0) } } // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+    { if true, { print(0) } } // expected-error {{statement beginning with '{' is interpreted as a closure expression}} expected-note {{did you mean to use a 'do' statement?}}
 
     ( if true, { print(0) } ) // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}} expected-error {{'if' must have an unconditional 'else' to be used as expression}}
 

@@ -92,7 +92,7 @@ func test13811882() {
 /// statement
 do {
   var inSubcall = true 
-  {  // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+  {  // expected-error {{statement beginning with '{' is interpreted as a closure expression}} expected-note {{did you mean to use a 'do' statement?}}
   }  
   inSubcall = false
 

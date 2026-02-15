@@ -943,7 +943,7 @@ var fvs_explicitClosure: () -> Void {
 var fvs_implicitClosure: () -> Void {
     get { { print("howdy") } }
     set {
-        { print("howdy") } // expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
+        { print("howdy") } // expected-error {{statement beginning with '{' is interpreted as a closure expression}} expected-note {{did you mean to use a 'do' statement?}}
     }
 }
 
