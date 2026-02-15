@@ -234,12 +234,6 @@ void Image::scanELF(const llvm::object::ELFObjectFileBase *O) {
   } else {
     return;
   }
-
-  // FIXME: ReflectionContext tries to read bits of the ELF structure that
-  // aren't normally mapped by a phdr. Until that's fixed,
-  // allow access to the whole file 1:1 in address space that isn't otherwise
-  // mapped.
-  Segments.push_back({HeaderAddress, O->getData()});
 }
 
 void Image::scanCOFF(const llvm::object::COFFObjectFile *O) {

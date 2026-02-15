@@ -102,17 +102,25 @@ template <unsigned char ELFClass> struct ELFTraits;
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
   using Header = const struct llvm::ELF::Elf32_Ehdr;
-  using Section = const struct llvm::ELF::Elf32_Shdr;
+  using SectionHeader = const struct llvm::ELF::Elf32_Shdr;
+  using ProgramHeader = const struct llvm::ELF::Elf32_Phdr;
   using Offset = llvm::ELF::Elf32_Off;
   using Size = llvm::ELF::Elf32_Word;
+  using Word = llvm::ELF::Elf32_Word;
+  using Half = llvm::ELF::Elf32_Half;
+  using Pointer = uint32_t;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS32;
 };
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
   using Header = const struct llvm::ELF::Elf64_Ehdr;
-  using Section = const struct llvm::ELF::Elf64_Shdr;
+  using SectionHeader = const struct llvm::ELF::Elf64_Shdr;
+  using ProgramHeader = const struct llvm::ELF::Elf64_Phdr;
   using Offset = llvm::ELF::Elf64_Off;
   using Size = llvm::ELF::Elf64_Xword;
+  using Word = llvm::ELF::Elf64_Word;
+  using Half = llvm::ELF::Elf64_Half;
+  using Pointer = uint64_t;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS64;
 };
 
@@ -530,255 +538,172 @@ public:
       RemoteAddress ImageStart,
       std::optional<llvm::sys::MemoryBlock> FileBuffer,
       llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
-    // When reading from the FileBuffer we can simply return a pointer to
-    // the underlying data.
-    // When reading from the process, we need to keep the memory around
-    // until the end of the function, so we store it inside ReadDataBuffer.
-    // We do this so in both cases we can return a simple pointer.
-    std::vector<MemoryReader::ReadBytesResult> ReadDataBuffer;
-    auto readData = [&](uint64_t Offset, uint64_t Size) -> const void * {
-      if (FileBuffer.has_value()) {
-        auto Buffer = FileBuffer.value();
-        if (Offset + Size > Buffer.allocatedSize())
-          return nullptr;
-        return (const void *)((uint64_t)Buffer.base() + Offset);
-      } else {
-        MemoryReader::ReadBytesResult Buf =
-            this->getReader().readBytes(ImageStart + Offset, Size);
-        if (!Buf)
-          return nullptr;
-        ReadDataBuffer.push_back(std::move(Buf));
-        return ReadDataBuffer.back().get();
-      }
+
+    // ELF headers contain "pointers" from different address spaces.
+    // One address space refers to the object file at rest. These are "offsets".
+    // `e_shoff`, `p_phoff`, `sh_offset`, etc...
+    //
+    // The other address space refers to where the data is located after reading
+    // the value into memory. These are "addresses". `sh_addr`, `p_vaddr`.
+    //
+    // NOTE: Headers that have both an offset and an address field may place
+    // the data in a location that is different than simply adding the image
+    // base offset to the offset. If both are present, the address field should
+    // be preferred.
+    std::vector<MemoryReader::ReadBytesResult> readBuffer;
+    auto readData = [&](uint64_t offset, uint64_t size) -> const void* {
+      MemoryReader::ReadBytesResult buf =
+        this->getReader().readBytes(ImageStart + offset, size);
+      if (!buf) return nullptr;
+      readBuffer.push_back(std::move(buf));
+      return readBuffer.back().get();
     };
 
-    const void *Buf = readData(0, sizeof(typename T::Header));
-    if (!Buf)
+    const typename T::Header * ehdr =
+      reinterpret_cast<const typename T::Header*>(readData(0, sizeof(typename T::Header)));
+    if(!ehdr)
       return {};
-    auto Hdr = reinterpret_cast<const typename T::Header *>(Buf);
-    assert(Hdr->getFileClass() == T::ELFClass && "invalid ELF file class");
+    assert(ehdr->getFileClass() == T::ELFClass && "incorrect ELF file class");
 
-    // From the header, grab information about the section header table.
-    uint64_t SectionHdrAddress = Hdr->e_shoff;
-    uint16_t SectionHdrNumEntries = Hdr->e_shnum;
-    uint16_t SectionEntrySize = Hdr->e_shentsize;
-
-    if (sizeof(typename T::Section) > SectionEntrySize)
-      return {};
-
-    // Special handling for large amount of sections.
-    // From the elf man page, describing e_shnum:
+    // If e_phnum is PN_XNUM(0xffff), the actual number of program headers is
+    // stored in the `sh_info` field of the first section header.
     //
-    // If the number of entries in the section header table is
-    // larger than or equal to SHN_LORESERVE (0xff00), e_shnum
-    // holds the value zero and the real number of entries in the
-    // section header table is held in the sh_size member of the
-    // initial entry in section header table.  Otherwise, the
-    // sh_size member of the initial entry in the section header
-    // table holds the value zero.
-    if (SectionHdrNumEntries == 0 && SectionEntrySize > 0) {
-      auto SecBuf = readData(SectionHdrAddress, sizeof(typename T::Section));
-      if (!SecBuf)
+    // Section headers are not guaranteed to be visible after loading an ELF
+    // object, making it difficult to reliably access that info.
+    //
+    // This is an out-of-spec extension to ELF implemented in Linux and FreeBSD.
+    // Realistically, there are very few binaries with even 100 program headers,
+    // so hitting 65k is highly unlikely. If we find we need to deal with them,
+    // we will need to hunt down the original object file, parse out the first
+    // section header, and read the `sh_info` field from the raw object file.
+    typename T::Word ePhnum = ehdr->e_phnum;
+    if (ePhnum == /*PN_XNUM*/ 0xffff) {
+      if (ehdr->e_shoff == 0 || ehdr->e_shnum == 0) {
+        assert(false && "Too many program headers to read safely");
         return {};
-      const typename T::Section *FirstSectHdr =
-          reinterpret_cast<const typename T::Section *>(SecBuf);
-      SectionHdrNumEntries = FirstSectHdr->sh_size;
-    }
-
-    if (SectionHdrNumEntries == 0)
-      return {};
-
-    // Collect all the section headers, we need them to look up the
-    // reflection sections (by name) and the string table.
-    // We read the section headers from the FileBuffer, since they are
-    // not mapped in the child process.
-    std::vector<const typename T::Section *> SecHdrVec;
-    for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
-      uint64_t Offset = SectionHdrAddress + (I * SectionEntrySize);
-      auto SecBuf = readData(Offset, sizeof(typename T::Section));
-      if (!SecBuf)
+      }
+      const typename T::SectionHeader * sectionHdr =
+        reinterpret_cast<typename T::SectionHeader *>(readData(ehdr->e_shoff + llvm::ELF::SHN_UNDEF, sizeof(typename T::SectionHeader)));
+      if (sectionHdr == nullptr)
         return {};
-      const typename T::Section *SecHdr =
-          reinterpret_cast<const typename T::Section *>(SecBuf);
-
-      SecHdrVec.push_back(SecHdr);
+      ePhnum = sectionHdr->sh_info;
     }
 
-    // This provides quick access to the section header string table index.
-    // We also here handle the unlikely even where the section index overflows
-    // and it's just a pointer to secondary storage (SHN_XINDEX).
-    uint32_t SecIdx = Hdr->e_shstrndx;
-    if (SecIdx == llvm::ELF::SHN_XINDEX) {
-      assert(!SecHdrVec.empty() && "malformed ELF object");
-      SecIdx = SecHdrVec[0]->sh_link;
+    struct SectionRange {
+      typename T::Pointer start;
+      typename T::Pointer stop;
+    };
+
+    struct MetadataTable {
+      typename T::Pointer version;
+      typename T::Pointer base;
+      typename T::Pointer unused0;
+      typename T::Pointer unused1;
+
+      SectionRange protocols;
+      SectionRange protocol_conformances;
+      SectionRange type_metadata;
+      SectionRange typeref;
+      SectionRange reflstr;
+      SectionRange fieldmd;
+      SectionRange assocty;
+      SectionRange replace;
+      SectionRange replac2;
+      SectionRange builtin;
+      SectionRange capture;
+      SectionRange mpenum;
+      SectionRange accessible_functions;
+      SectionRange runtime_attributes;
+      SectionRange tests;
+    };
+
+    const MetadataTable* metadataTable = nullptr;
+    const typename T::ProgramHeader * phdrs = reinterpret_cast<const typename T::ProgramHeader*>(
+        readData(ehdr->e_phoff, sizeof(typename T::ProgramHeader) * ePhnum));
+    for (unsigned idx = 0; !metadataTable && idx < ePhnum; ++idx) {
+      const typename T::ProgramHeader* phdr = phdrs + idx;
+      assert(phdr && "Failed to load program header");
+      if (phdr->p_type != llvm::ELF::PT_NOTE) continue;
+
+      // PT_NOTE layout
+      // namesz (4 bytes)
+      // descsz (4 bytes)
+      // type   (4 bytes)
+      // name   (namesz bytes)
+      // desc   (descsz bytes)
+      struct PT_NOTE_HEADER {
+        uint32_t namesz;
+        uint32_t descsz;
+        uint32_t type;
+      };
+
+      // Looking for the note with the name "swift6" and the type "0",
+      // representing the metadata table.
+      // Each note segment can contain multiple notes. The Swift metadata table
+      // (currently) only contains one, so we only need to check the first one.
+      // Looking for name: 'swift6\0', and type: 0x73356d64 ('s5md')
+      const PT_NOTE_HEADER* note_hdr = reinterpret_cast<const PT_NOTE_HEADER*>(readData(phdr->p_vaddr, sizeof(PT_NOTE_HEADER)));
+      if (!note_hdr || note_hdr->namesz == 0) continue;
+
+      const char* name = reinterpret_cast<const char*>(readData(
+            phdr->p_vaddr + sizeof(PT_NOTE_HEADER),
+            note_hdr->namesz));
+
+      if(!name || *name == '\0') continue;
+
+      if(strncmp(name, "swift6", 6) != 0) continue;
+      if (note_hdr->type != 0x73356d64) continue;
+      assert(note_hdr->descsz == sizeof(MetadataTable) && "Note format mismatched\n");
+      /// Offset past the section header, the name, and the 1 alignment byte
+      const uint64_t tableOffset = sizeof(PT_NOTE_HEADER) + note_hdr->namesz + 1;
+      metadataTable = reinterpret_cast<const MetadataTable *>(readData(
+            phdr->p_vaddr + tableOffset,
+            note_hdr->descsz));
     }
-
-    assert(SecIdx < SecHdrVec.size() && "malformed ELF object");
-
-    const typename T::Section *SecHdrStrTab = SecHdrVec[SecIdx];
-    typename T::Offset StrTabOffset = SecHdrStrTab->sh_offset;
-    typename T::Size StrTabSize = SecHdrStrTab->sh_size;
-
-    auto StrTabBuf = readData(StrTabOffset, StrTabSize);
-    if (!StrTabBuf)
-      return {};
-    auto StrTab = reinterpret_cast<const char *>(StrTabBuf);
-    bool Error = false;
-
-    // GNU ld and lld both merge sections regardless of the
-    // `SHF_GNU_RETAIN` flag.  gold, presently, does not.  The Swift
-    // compiler has a couple of switches that control whether or not
-    // the reflection sections are stripped; when these are enabled,
-    // it will _not_ set `SHF_GNU_RETAIN` on the reflection metadata
-    // sections.  However, `swiftrt.o` contains declarations of the
-    // sections _with_ the `SHF_GNU_RETAIN` flag set, which makes
-    // sense since at runtime we will only expect to be able to access
-    // reflection metadata that we said we wanted to exist at runtime.
-    //
-    // The upshot is that when linking with gold, we can end up with
-    // two sets of reflection metadata sections.  In a normal build
-    // where the compiler flags are the same for every linked object,
-    // we'll have *either* all retained *or* all un-retained sections
-    // (the retained sections will still exist because of `swiftrt.o`,
-    // but will be empty).  The only time we'd expect to have a mix is
-    // where some code was compiled with a different setting of the
-    // metadata stripping flags.  If that happens, the code below will
-    // simply add both sets of reflection sections, with the retained
-    // ones added first.
-    //
-    // See also https://sourceware.org/bugzilla/show_bug.cgi?id=31415.
-    auto findELFSectionByName =
-        [&](llvm::StringRef Name, bool Retained) -> std::pair<RemoteRef<void>, uint64_t> {
-          if (Error)
-            return {nullptr, 0};
-          // Now for all the sections, find their name.
-          for (const typename T::Section *Hdr : SecHdrVec) {
-            // Skip unused headers
-            if (Hdr->sh_type == llvm::ELF::SHT_NULL)
-              continue;
-            uint32_t Offset = Hdr->sh_name;
-            const char *Start = (const char *)StrTab + Offset;
-            uint64_t StringSize = strnlen(Start, StrTabSize - Offset);
-            if (StringSize > StrTabSize - Offset) {
-              Error = true;
-              break;
-            }
-            std::string SecName(Start, StringSize);
-            if (SecName != Name)
-              continue;
-            if (Retained != bool(Hdr->sh_flags & llvm::ELF::SHF_GNU_RETAIN))
-              continue;
-            RemoteAddress SecStart = ImageStart + Hdr->sh_addr;
-            auto SecSize = Hdr->sh_size;
-            MemoryReader::ReadBytesResult SecBuf;
-            if (FileBuffer.has_value()) {
-              // sh_offset gives us the offset to the section in the file,
-              // while sh_addr gives us the offset in the process.
-              auto Offset = Hdr->sh_offset;
-              if (FileBuffer->allocatedSize() < Offset + SecSize) {
-                Error = true;
-                break;
-              }
-              auto *Buf = malloc(SecSize);
-              SecBuf = MemoryReader::ReadBytesResult(
-                  Buf, [](const void *ptr) { free(const_cast<void *>(ptr)); });
-              memcpy((void *)Buf,
-                     (const void *)((uint64_t)FileBuffer->base() + Offset),
-                     SecSize);
-            } else {
-              SecBuf = this->getReader().readBytes(SecStart, SecSize);
-            }
-            if (!SecBuf)
-              return {nullptr, 0};
-            auto SecContents = RemoteRef<void>(SecStart, SecBuf.get());
-            savedBuffers.push_back(std::move(SecBuf));
-            return {SecContents, SecSize};
-          }
-          return {nullptr, 0};
-        };
-
-    SwiftObjectFileFormatELF ObjectFileFormat;
-    auto FieldMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::fieldmd), true);
-    auto AssocTySec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::assocty), true);
-    auto BuiltinTySec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin), true);
-    auto CaptureSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::capture), true);
-    auto TypeRefMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref), true);
-    auto ReflStrMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr), true);
-    auto ConformMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::conform), true);
-    auto MPEnumMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum), true);
-
-    if (Error)
+    if (metadataTable == nullptr)
       return {};
 
-    std::optional<uint32_t> result = {};
+    auto readSection = [&](const SectionRange & range) -> std::pair<RemoteRef<void>, uint64_t> {
+      const RemoteAddress secStart = ImageStart + range.start;
+      const uint64_t secSize = range.stop - range.start;
 
-    // We succeed if at least one of the sections is present in the
-    // ELF executable.
-    if (FieldMdSec.first || AssocTySec.first || BuiltinTySec.first ||
-        CaptureSec.first || TypeRefMdSec.first || ReflStrMdSec.first ||
-        ConformMdSec.first || MPEnumMdSec.first) {
-      ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
-                             {AssocTySec.first, AssocTySec.second},
-                             {BuiltinTySec.first, BuiltinTySec.second},
-                             {CaptureSec.first, CaptureSec.second},
-                             {TypeRefMdSec.first, TypeRefMdSec.second},
-                             {ReflStrMdSec.first, ReflStrMdSec.second},
-                             {ConformMdSec.first, ConformMdSec.second},
-                             {MPEnumMdSec.first, MPEnumMdSec.second},
-                             PotentialModuleNames};
-      result = this->addReflectionInfo(info);
-    }
+      MemoryReader::ReadBytesResult section =
+        this->getReader().readBytes(secStart, secSize);
+      if (!section)
+        return {nullptr, 0};
+      auto sectionContentRef = RemoteRef<void>(secStart, section.get());
+      savedBuffers.push_back(std::move(section));
+      return { sectionContentRef, secSize };
+    };
 
-    // Also check for the non-retained versions of the sections; we'll
-    // only return a single reflection info ID if both are found (and it'll
-    // be the one for the retained sections if we have them), but we'll
-    // still add all the reflection information.
-    FieldMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::fieldmd), false);
-    AssocTySec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::assocty), false);
-    BuiltinTySec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::builtin), false);
-    CaptureSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::capture), false);
-    TypeRefMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::typeref), false);
-    ReflStrMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr), false);
-    ConformMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::conform), false);
-    MPEnumMdSec = findELFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum), false);
+#define INSERT_METADATA_SECTION(range) \
+    auto range = readSection(metadataTable->range)
+    INSERT_METADATA_SECTION(fieldmd);
+    INSERT_METADATA_SECTION(assocty);
+    INSERT_METADATA_SECTION(builtin);
+    INSERT_METADATA_SECTION(capture);
+    INSERT_METADATA_SECTION(typeref);
+    INSERT_METADATA_SECTION(reflstr);
+    INSERT_METADATA_SECTION(protocol_conformances);
+    INSERT_METADATA_SECTION(mpenum);
+#undef INSERT_METADATA_SECTION
+#define INSERT_METADATA_SECTION(range) \
+    { range.first, range.second }
 
-    if (Error)
-      return {};
+    ReflectionInfo info = {
+      INSERT_METADATA_SECTION(fieldmd),
+      INSERT_METADATA_SECTION(assocty),
+      INSERT_METADATA_SECTION(builtin),
+      INSERT_METADATA_SECTION(capture),
+      INSERT_METADATA_SECTION(typeref),
+      INSERT_METADATA_SECTION(reflstr),
+      INSERT_METADATA_SECTION(protocol_conformances),
+      INSERT_METADATA_SECTION(mpenum),
+      PotentialModuleNames
+    };
 
-    if (FieldMdSec.first || AssocTySec.first || BuiltinTySec.first ||
-        CaptureSec.first || TypeRefMdSec.first || ReflStrMdSec.first ||
-        ConformMdSec.first || MPEnumMdSec.first) {
-      ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
-                             {AssocTySec.first, AssocTySec.second},
-                             {BuiltinTySec.first, BuiltinTySec.second},
-                             {CaptureSec.first, CaptureSec.second},
-                             {TypeRefMdSec.first, TypeRefMdSec.second},
-                             {ReflStrMdSec.first, ReflStrMdSec.second},
-                             {ConformMdSec.first, ConformMdSec.second},
-                             {MPEnumMdSec.first, MPEnumMdSec.second},
-                             PotentialModuleNames};
-      auto rid = this->addReflectionInfo(info);
-      if (!result)
-        result = rid;
-    }
-
-    return result;
+#undef INSERT_METADATA_SECTION
+    return this->addReflectionInfo(info);
   }
 
   /// Parses metadata information from an ELF image. Because the Section

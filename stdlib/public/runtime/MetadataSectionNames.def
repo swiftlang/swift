@@ -14,12 +14,12 @@
 #error "HANDLE_SWIFT_SECTION(elfname, coffname) not defined"
 #endif
 
+// NOTE: This table is ABI. Don't rearrange it!
+// NOTE: If adding fields, remember to add the field to ReflectionContext.h
 
 HANDLE_SWIFT_SECTION(swift5_protocols, sw5prt)
-
 HANDLE_SWIFT_SECTION(swift5_protocol_conformances, sw5prtc)
 HANDLE_SWIFT_SECTION(swift5_type_metadata, sw5tymd)
-
 HANDLE_SWIFT_SECTION(swift5_typeref, sw5tyrf)
 HANDLE_SWIFT_SECTION(swift5_reflstr, sw5rfst)
 HANDLE_SWIFT_SECTION(swift5_fieldmd, sw5flmd)

@@ -80,11 +80,13 @@ struct ElfNoteHeader {
   uint32_t type;
 };
 
-struct  SectionRange {
+struct SectionRange {
   uintptr_t start;
   uintptr_t stop;
 };
 
+// If you update this table, remember to update the reader in
+// ReflectionContext.h!
 struct MetadataSections {
   uintptr_t version;
   uintptr_t base;
@@ -97,7 +99,7 @@ struct MetadataSections {
 #undef HANDLE_SWIFT_SECTION
 };
 
-struct SwiftMetadataNote {
+struct __attribute__((__packed__)) SwiftMetadataNote {
   ElfNoteHeader header;
   char name[8]; // "swift6\0" + 1 byte(s) of padding
 
@@ -123,11 +125,11 @@ const static SwiftMetadataNote swiftMetadataNote = {
     .namesz = 7,                               // namesz: "swift6\0"
     .descsz = sizeof(MetadataSections),
     .type = SWIFT_METADATA_SEGMENT_TYPE,
-  },
+  },                                           // 4 + 4 + 4 = 12,  0x0c
   .name = {
     's', 'w', 'i', 'f', 't', '6', '\0',
-    '\0', // padding
-  },
+    static_cast<char>(0xff), // padding
+  },                                           // 12 + 7 + 1 = 20, 0x14
   .sections = {
     .version = 5,
     .base = reinterpret_cast<uintptr_t>(&__ehdr_start),
