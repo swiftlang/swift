@@ -33,7 +33,6 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -137,8 +136,8 @@ directRecordMemberLookup(ClangImporter &Importer,
 
   auto *lookupTable = Importer.findLookupTable(clangModule);
 
-  auto foundDecls = lookupTable->lookup(
-      SerializedSwiftName(name.getBaseName()), EffectiveClangContext());
+  auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
+                                        EffectiveClangContext());
 
   // lookup() just gives us all decls in the module of the given name.
   // Make sure that `clangDecl` is the parent of all the members we found.
