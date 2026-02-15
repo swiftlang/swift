@@ -74,23 +74,22 @@ lookupCxxTypeMember(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
   R.suppressDiagnostics();
   Sema.LookupQualifiedName(R, const_cast<clang::CXXRecordDecl *>(Rec));
 
-  if (auto *td = R.getAsSingle<clang::TypeDecl>()) {
-    if (auto *paths = R.getBasePaths()) {
-      // For inherited type member, check access of the single CXXBasePath
-      if (paths->front().Access != clang::AS_public)
-        return nullptr;
-    } else {
-      // For direct (non-inherited) type member, check its access directly
-      if (td->getAccess() != clang::AS_public)
-        return nullptr;
-    }
+  if (!R.isSingleResult())
+    return nullptr; // Result was absent or ambiguous
 
-    if (mustBeComplete &&
-        !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
-      return nullptr;
-    return td;
-  }
-  return nullptr;
+  auto it = R.begin();
+  if (it->getAccess() != clang::AS_public)
+    return nullptr; // Cannot be access from derived class
+
+  auto *td = dyn_cast<clang::TypeDecl>(it.getDecl());
+  if (!td)
+    return nullptr; // Was not a clang::TypeDecl
+
+  if (mustBeComplete &&
+      !Sema.isCompleteType({}, td->getASTContext().getTypeDeclType(td)))
+    return nullptr;
+
+  return td;
 }
 
 /// Alternative to `NominalTypeDecl::lookupDirect`.
