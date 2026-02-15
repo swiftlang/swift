@@ -7355,18 +7355,16 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
 
     if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
       ManagedValue value = SGF.B.createLoadTake(E, optTemp->getManagedAddress());
-      if (value.getType().isTrivial(SGF.F))
-        return RValue(SGF, {value}, subType.getASTType());
-      return RValue(SGF, {value}, subType.getASTType());
+      return RValue(SGF, E, subASTType, value);
     }
 
-    return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+    return RValue(SGF, E, subASTType, optTemp->getManagedAddress());
   }
 
   if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
     ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
-      return RValue(SGF, {mv}, subType.getASTType());
+      return RValue(SGF, E, subASTType, mv);
     mv = SGF.B.createMoveValue(E, mv);
     // Set the flag so we check this.
     cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
@@ -7377,7 +7375,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
           MarkUnresolvedNonCopyableValueInst::CheckKind::
               ConsumableAndAssignable);
     }
-    return RValue(SGF, {mv}, subType.getASTType());
+    return RValue(SGF, E, subASTType, mv);
   }
 
   // If we aren't loadable, then create a temporary initialization and
@@ -7406,7 +7404,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
   }
   optTemp->finishInitialization(SGF);
-  return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+  return RValue(SGF, E, subASTType, optTemp->getManagedAddress());
 }
 
 RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {

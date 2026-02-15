@@ -72,3 +72,19 @@ func testAddressOnlyVar<T : P>(_ t: T.Type) {
   k = T.value
   let _ = consume k
 }
+
+struct HasAny {
+  var ex: Any
+}
+
+// Regression test for https://github.com/swiftlang/swift/issues/87074
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testConsumeTupleBinding{{.*}}
+func testConsumeTupleBinding(_ s: HasAny) {
+  let tup = (s, 0)
+  _ = consume tup
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}testConsumeTupleLiteral{{.*}}
+func testConsumeTupleLiteral(_ s: HasAny) {
+  _ = consume (s, 0)
+}
