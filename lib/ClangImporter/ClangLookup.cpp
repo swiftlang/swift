@@ -67,17 +67,17 @@ namespace {
 ///
 /// Validates that the name we looked up matches the resulting imported name.
 class CollectLookupResults {
-  DeclName name;
+  /// Match by base name, since that is what MemberLookupTable is keyed on for
+  /// laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
+  DeclBaseName name;
   TinyPtrVector<ValueDecl *> &result;
 
 public:
-  CollectLookupResults(DeclName name, TinyPtrVector<ValueDecl *> &result)
+  CollectLookupResults(DeclBaseName name, TinyPtrVector<ValueDecl *> &result)
       : name(name), result(result) {}
 
   void add(ValueDecl *imported) {
-    // Match by base name, since that is what MemberLookupTable is keyed on for
-    // laziness (i.e., see type of MemberLookupTable::isLazilyComplete).
-    if (imported->getBaseName() == name.getBaseName())
+    if (imported->getBaseName() == name)
       result.push_back(imported);
 
     // Expand any macros introduced by the Clang importer.
@@ -93,7 +93,7 @@ public:
         return;
 
       // Only produce results that match the requested name.
-      if (valueDecl->getBaseName() != name.getBaseName())
+      if (valueDecl->getBaseName() != name)
         return;
 
       result.push_back(valueDecl);
@@ -192,7 +192,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   auto foundDecls = lookupTable->lookup(SerializedSwiftName(name.getBaseName()),
                                         EffectiveClangContext());
 
-  CollectLookupResults collector(name, result);
+  CollectLookupResults collector(name.getBaseName(), result);
   llvm::SmallPtrSet<clang::NamedDecl *, 8> seenDecls;
   for (auto entry : foundDecls) {
     auto *foundDecl = entry.dyn_cast<clang::NamedDecl *>();
@@ -347,7 +347,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   // The set of declarations we found.
   TinyPtrVector<ValueDecl *> result;
-  CollectLookupResults collector(name, result);
+  CollectLookupResults collector(name.getBaseName(), result);
 
   // Find the results that are actually a member of "recordDecl".
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
