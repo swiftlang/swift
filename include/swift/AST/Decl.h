@@ -545,7 +545,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2+2,
     StaticSpelling : 2
   );
-
+  
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+2+8+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
