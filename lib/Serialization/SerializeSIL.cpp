@@ -608,6 +608,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
   if (!F.section().empty())
     ++numTrailingRecords;
+  if (!F.wasmImportModuleName().empty())
+    ++numTrailingRecords;
+  if (!F.wasmImportFieldName().empty())
+    ++numTrailingRecords;
 
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
@@ -648,6 +652,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // record count above.
   writeExtraStringIfNonEmpty(ExtraStringFlavor::AsmName, F.asmName());
   writeExtraStringIfNonEmpty(ExtraStringFlavor::Section, F.section());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportModule,
+                             F.wasmImportModuleName());
+  writeExtraStringIfNonEmpty(ExtraStringFlavor::WasmImportName,
+                             F.wasmImportFieldName());
 
   if (NoBody)
     return;
