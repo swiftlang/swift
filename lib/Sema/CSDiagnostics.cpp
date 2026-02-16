@@ -6604,6 +6604,13 @@ bool InvalidPackElement::diagnoseAsError() {
   return true;
 }
 
+bool PackElementWithNesting::diagnoseAsError() {
+  emitDiagnostic(diag::nested_each_not_allowed);
+  for (PackElementExpr *innerPackElement : innerPackElements)
+    emitDiagnosticAt(innerPackElement->getLoc(), diag::note_inner_each);
+  return true;
+}
+
 bool InvalidPackReference::diagnoseAsError() {
   auto patternType =
       getPatternTypeOfSingleUnlabeledPackExpansionTuple(packType);

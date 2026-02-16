@@ -34,6 +34,7 @@
 #include "swift/Sema/OverloadChoice.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
 
@@ -1502,6 +1503,35 @@ AllowInvalidPackElement::create(ConstraintSystem &cs,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInvalidPackElement(cs, packElementType, locator);
+}
+
+bool AllowPackElementWithNesting::coalesceAndDiagnose(
+    const Solution &solution, ArrayRef<ConstraintFix *> fixes,
+    bool asNote) const {
+  SmallVector<PackElementExpr *, 4> innerPackElements{innerPackElement};
+
+  for (auto *otherFix : fixes) {
+    if (auto *fix = otherFix->getAs<AllowPackElementWithNesting>())
+      innerPackElements.push_back(fix->innerPackElement);
+  }
+
+  PackElementWithNesting failure(solution, innerPackElements, getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool AllowPackElementWithNesting::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  SmallVector<PackElementExpr *, 4> innerPackElements{innerPackElement};
+  PackElementWithNesting failure(solution, innerPackElements, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowPackElementWithNesting *
+AllowPackElementWithNesting::create(ConstraintSystem &cs,
+                                    PackElementExpr *innerPackElement,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowPackElementWithNesting(cs, innerPackElement, locator);
 }
 
 bool AllowInvalidPackReference::diagnose(const Solution &solution,

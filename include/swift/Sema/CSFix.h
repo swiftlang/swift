@@ -440,6 +440,9 @@ enum class FixKind : uint8_t {
   /// Allow 'each' applied to a non-pack type.
   AllowInvalidPackElement,
 
+  // Allow 'each' applied to an expression containing another 'each'.
+  AllowPackElementWithNesting,
+
   /// Allow pack references outside of pack expansions.
   AllowInvalidPackReference,
 
@@ -2207,6 +2210,35 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowInvalidPackElement;
+  }
+};
+
+class AllowPackElementWithNesting final : public ConstraintFix {
+  PackElementExpr *innerPackElement;
+
+  AllowPackElementWithNesting(ConstraintSystem &cs,
+                              PackElementExpr *innerPackElement,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowPackElementWithNesting, locator),
+        innerPackElement(innerPackElement) {}
+
+public:
+  std::string getName() const override {
+    return "allow pack element with nested 'each'";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool coalesceAndDiagnose(const Solution &solution,
+                           ArrayRef<ConstraintFix *> fixes,
+                           bool asNote = false) const override;
+
+  static AllowPackElementWithNesting *create(ConstraintSystem &cs,
+                                             PackElementExpr *innerPackElement,
+                                             ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowPackElementWithNesting;
   }
 };
 
