@@ -132,7 +132,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks,
   bool AttrParamHasLabel;
   bool IsInSil = false;
   bool HasSpace = false;
-  bool PreferFunctionReferencesToCalls = false;
   bool AttTargetIsIndependent = false;
   std::optional<DeclKind> AttTargetDK;
   std::optional<StmtKind> ParentStmtKind;
@@ -330,10 +329,8 @@ void CodeCompletionCallbacksImpl::completeDotExpr(CodeCompletionExpr *E,
     return;
 
   Kind = CompletionKind::DotExpr;
-  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
+  if (ParseExprSelectorContext != ObjCSelectorContext::None)
     CompleteExprSelectorContext = ParseExprSelectorContext;
-  }
 
   ParsedExpr = E->getBase();
   this->DotLoc = DotLoc;
@@ -357,7 +354,6 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExp
 
   Kind = CompletionKind::PostfixExprBeginning;
   if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
     CompleteExprSelectorContext = ParseExprSelectorContext;
     if (CompleteExprSelectorContext == ObjCSelectorContext::MethodSelector) {
       addSelectorModifierKeywords(CompletionContext.getResultSink());
@@ -393,10 +389,8 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(CodeCompletionExpr *E,
 
   HasSpace = hasSpace;
   Kind = CompletionKind::PostfixExpr;
-  if (ParseExprSelectorContext != ObjCSelectorContext::None) {
-    PreferFunctionReferencesToCalls = true;
+  if (ParseExprSelectorContext != ObjCSelectorContext::None)
     CompleteExprSelectorContext = ParseExprSelectorContext;
-  }
 
   ParsedExpr = E->getBase();
   CodeCompleteTokenExpr = E;
@@ -1723,11 +1717,6 @@ void CodeCompletionCallbacksImpl::readyForTypeChecking(SourceFile *SrcFile) {
   } else if (isa_and_nonnull<SuperRefExpr>(ParsedExpr)) {
     Lookup.setIsSuperRefExpr();
   }
-
-  if (isInsideObjCSelector())
-    Lookup.includeInstanceMembers();
-  if (PreferFunctionReferencesToCalls)
-    Lookup.setPreferFunctionReferencesToCalls();
 
   switch (Kind) {
   case CompletionKind::None:
