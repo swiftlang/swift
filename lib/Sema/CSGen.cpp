@@ -3803,7 +3803,8 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
+          ObjCKeyPathStringRequest req{keyPath, cs.DC};
+          (void)evaluateOrDefault(cs.getASTContext().evaluator, req, nullptr);
         }
       }
 
