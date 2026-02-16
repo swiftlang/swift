@@ -1080,6 +1080,9 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
 // second is an address to our generic Value.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
 
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
+
 #undef BUILTIN_OPERAND_OWNERSHIP
 
 #define SHOULD_NEVER_VISIT_BUILTIN(ID)                                         \

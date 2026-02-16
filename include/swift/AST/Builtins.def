@@ -1236,6 +1236,16 @@ BUILTIN_MISC_OPERATION(TaskLocalValuePush, "taskLocalValuePush", "", Special)
 /// Signature: () -> ()
 BUILTIN_MISC_OPERATION(TaskLocalValuePop, "taskLocalValuePop", "", Special)
 
+/// Equivalent to calling swift_task_cancellationShieldPush.
+///
+/// Signature: () -> (Bool)
+BUILTIN_MISC_OPERATION(TaskCancellationShieldPush, "taskCancellationShieldPush", "", Special)
+
+/// Equivalent to calling swift_task_cancellationShieldPop.
+///
+/// Signature: () -> ()
+BUILTIN_MISC_OPERATION(TaskCancellationShieldPop, "taskCancellationShieldPop", "", Special)
+
 #undef BUILTIN_TYPE_TRAIT_OPERATION
 #undef BUILTIN_UNARY_OPERATION
 #undef BUILTIN_BINARY_PREDICATE
