@@ -5730,12 +5730,11 @@ public:
            lhs.Kind == rhs.Kind &&
            // `OptionSet` intentionally does not offer `==` in favor of
            // requiring `containsOnly`.
-           std::equal(lhs.ParamFlags.begin(), lhs.ParamFlags.end(),
-                      rhs.ParamFlags.begin(), rhs.ParamFlags.end(),
-                      [&](const InvalidParameterFlags &lhs,
-                          const InvalidParameterFlags &rhs) {
-                        return lhs.containsOnly(rhs);
-                      });
+           llvm::equal(lhs.ParamFlags, rhs.ParamFlags,
+                       [&](const InvalidParameterFlags &lhs,
+                           const InvalidParameterFlags &rhs) {
+                         return lhs.containsOnly(rhs);
+                       });
   }
 
   friend bool operator!=(const DynamicMemberLookupSubscriptEligibility &lhs,
