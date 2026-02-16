@@ -7614,7 +7614,7 @@ private:
     setIndices(Indices);
   }
 
-  /// Returns the given as a `BoundGenericType` if it is a
+  /// Returns the given type as a `BoundGenericType` if it is a
   /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
   /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
   static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
