@@ -140,6 +140,8 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
     llvm::consumeError(phdrs.takeError());
   }
 
+  // Create mutable copies of segment data to apply relocations
+  std::vector<std::string> relocatedData;
   for (auto &ph : *phdrs) {
     if (ph.p_filesz == 0)
       continue;
@@ -148,7 +150,9 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
     if (contents.empty() || contents.size() != ph.p_filesz)
       continue;
 
-    Segments.push_back({ph.p_vaddr, contents});
+    // Create mutable copy for relocation application
+    relocatedData.emplace_back(contents.data(), contents.size());
+    Segments.push_back({ph.p_vaddr, StringRef()});
     HeaderAddress = std::min(HeaderAddress, (uint64_t)ph.p_vaddr);
   }
 
@@ -157,12 +161,38 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
   auto resolverSupports = resolver.first;
   auto resolve = resolver.second;
 
-  if (!resolverSupports || !resolve)
+  if (!resolverSupports || !resolve) {
+    // Even without a resolver, update segments to point to our copies
+    for (size_t i = 0; i < Segments.size(); ++i) {
+      RelocatedSegmentStorage.push_back(std::move(relocatedData[i]));
+      Segments[i].Contents = RelocatedSegmentStorage.back();
+    }
     return;
+  }
 
   auto machine = O->getELFFile().getHeader().e_machine;
   auto relativeRelocType = llvm::object::getELFRelativeRelocationType(machine);
   auto globDatRelocType = getELFGlobDatRelocationType(machine);
+
+  // Helper to find which segment contains an address and apply relocation
+  auto applyRelocationToSegment = [&](uint64_t addr, uint64_t value) -> bool {
+    for (size_t i = 0; i < Segments.size(); ++i) {
+      uint64_t segStart = Segments[i].Addr;
+      uint64_t segEnd = segStart + relocatedData[i].size();
+
+      if (addr >= segStart && addr < segEnd) {
+        uint64_t offset = addr - segStart;
+        // Ensure we have enough space for the pointer
+        if (offset + sizeof(typename ELFT::uint) <= relocatedData[i].size()) {
+          // Write the relocated value in target endianness
+          typename ELFT::uint relocValue = value;
+          memcpy(&relocatedData[i][offset], &relocValue, sizeof(relocValue));
+          return true;
+        }
+      }
+    }
+    return false;
+  };
 
   for (auto &S : static_cast<const llvm::object::ELFObjectFileBase *>(O)
                      ->dynamic_relocation_sections()) {
@@ -174,8 +204,11 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
       // have to do that ourselves.
       if (isRela && R.getType() == relativeRelocType) {
         auto rela = O->getRela(R.getRawDataRefImpl());
-        DynamicRelocations.insert(
-            {R.getOffset(), {{}, HeaderAddress + rela->r_addend}});
+        uint64_t relocatedValue = HeaderAddress + rela->r_addend;
+
+        // Apply the relocation to the segment
+        applyRelocationToSegment(R.getOffset(), relocatedValue);
+        DynamicRelocations.insert({R.getOffset(), {{}, relocatedValue}});
         continue;
       }
 
@@ -212,6 +245,12 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
       uint64_t offset = resolve(R.getType(), R.getOffset(), 0, 0, 0);
       DynamicRelocations.insert({R.getOffset(), {*name, offset}});
     }
+  }
+
+  // Move relocated data to persistent storage and update segment StringRefs
+  for (size_t i = 0; i < Segments.size(); ++i) {
+    RelocatedSegmentStorage.push_back(std::move(relocatedData[i]));
+    Segments[i].Contents = RelocatedSegmentStorage.back();
   }
 }
 
