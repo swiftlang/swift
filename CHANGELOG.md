@@ -6,7 +6,7 @@
 ## Swift (next)
 
 * [SE-0504]():
-  Introduced Task Cancellation Shields which allow to temporary prevent the observation of task
+  Introduced Task Cancellation Shields which temporarily prevent the observation of task
   cancellation in a given scope. This functionality is intended for use with cleanup actions which
   may otherwise not have run to completion (since their implementation may have been checking for
   cancellation and returning early). It may also be used within `defer` blocks to conveniently
