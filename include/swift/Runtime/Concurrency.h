@@ -604,6 +604,26 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
+/// This is an options enum that is used to pass flags to
+/// swift_task_isCancelledWithFlags. It is meant to be a flexible toggle.
+enum swift_task_is_cancelled_flag : uint64_t {
+  /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode.
+  swift_task_is_cancelled_flag_None = 0x0,
+
+  /// Ignore any active cancellation shield and return the actual cancellation
+  /// state of the task.
+  swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1,
+};
+
+/// Check if the task is cancelled.
+///
+/// \param task The task to check cancellation status for.
+/// \param flags Flags controlling the behavior of the check.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCancelledWithFlags(AsyncTask* task,
+                                     swift_task_is_cancelled_flag flags);
+
 /// Returns the current priority of the task which is >= base priority of the
 /// task. This function does not exist in the base ABI of this library and must
 /// be deployment limited
@@ -720,6 +740,23 @@ void swift_task_localValuePop();
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
+
+/// Install a task cancellation shield in the current task.
+///
+/// Returns `true` if the shield was installed and we need to pop it when leaving the shielded scope.
+/// Returns `false` if the shield was not installed, because there was one already active.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_cancellationShieldPush();
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancellationShieldPop();
+
+/// Check if the current task has an active cancellation shield.
+///
+/// Returns `true` if a cancellation shield is currently active for the given task.
+/// Returns `false` if no shield is active.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_hasActiveCancellationShield(AsyncTask *task);
 
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.
