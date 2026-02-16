@@ -894,6 +894,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@_disfavoredOverload // prefer typed throws variant
 @unsafe
 public func withUnsafeContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
@@ -938,6 +939,22 @@ public func withUnsafeThrowingContinuation<T>(
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
     unsafe fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+nonisolated(nonsending)
+public func withUnsafeContinuation<T, Failure: Error>(
+  _ fn: (UnsafeContinuation<T, Failure>) -> Void
+) async throws(Failure) -> sending T {
+  do {
+    return try await Builtin.withUnsafeThrowingContinuation {
+      unsafe fn(UnsafeContinuation<T, Failure>($0))
+    }
+  } catch {
+    throw error as! Failure // as!-safe since the continuation throws Failure
   }
 }
 

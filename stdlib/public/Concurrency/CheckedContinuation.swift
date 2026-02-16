@@ -307,6 +307,24 @@ public func withCheckedContinuation<T>(
   }
 }
 
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+nonisolated(nonsending)
+public func withCheckedContinuation<T, Failure: Error>(
+  function: String = #function,
+  _ body: (CheckedContinuation<T, Failure>) -> Void
+) async throws(Failure) -> sending T {
+  do {
+    return try await Builtin.withUnsafeThrowingContinuation {
+      let unsafeContinuation = unsafe UnsafeContinuation<T, Failure>($0)
+      return body(unsafe CheckedContinuation(continuation: unsafeContinuation,
+                                             function: function))
+    }
+  } catch {
+    throw (error as! Failure) // as!-safe since the continuation throws Failure
+  }
+}
+
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
 // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
 // to the type checker.
