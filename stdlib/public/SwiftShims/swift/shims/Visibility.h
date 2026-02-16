@@ -293,6 +293,13 @@
 #define SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_LIBRARY_VISIBILITY
 #endif
 
+// Used when declaring functions in a static compatibility library
+#if defined(__cplusplus)
+#define SWIFT_RUNTIME_COMPATIBILITY extern "C" SWIFT_LIBRARY_VISIBILITY
+#else
+#define SWIFT_RUNTIME_COMPATIBILITY SWIFT_LIBRARY_VISIBILITY
+#endif
+
 #if __has_builtin(__builtin_expect)
 #define SWIFT_LIKELY(expression) (__builtin_expect(!!(expression), 1))
 #define SWIFT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
