@@ -3368,7 +3368,7 @@ public:
 
     printRec(S->getBody(), Label::optional("body"));
 
-    printRec(S->getCachedDesugaredStmt(), Label::optional("desugared_loop"));
+    printRec(S->getCachedDesugaredStmt(), Label::always("desugared_loop"));
 
     printFoot();
   }
