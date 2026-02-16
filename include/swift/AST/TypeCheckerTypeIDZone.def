@@ -668,7 +668,8 @@ SWIFT_REQUEST(TypeChecker, IsCustomAvailabilityDomainPermanentlyEnabled,
               SeparatelyCached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
-              evaluator::SideEffect(SourceFile *), Cached, NoLocationInfo)
+              evaluator::SideEffect(SourceFile *),
+              Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, DynamicMemberLookupSubscriptRequest,
               std::optional<DynamicMemberLookupSubscriptRequest::Result>
