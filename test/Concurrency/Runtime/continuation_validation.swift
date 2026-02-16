@@ -56,6 +56,44 @@ func test_isolation_withCheckedThrowingContinuation() async {
   }
 }
 
+enum MyError: Error {
+  case fail
+}
+
+// Typed throws variants (nonisolated(nonsending))
+@MainActor
+@available(SwiftStdlib 5.1, *)
+func test_isolation_withCheckedContinuation_typedThrows() async {
+  try! await withCheckedContinuation { (continuation: CheckedContinuation<Void, MyError>) in
+    MainActor.shared.assertIsolated() // OK
+    continuation.resume()
+  }
+}
+@MainActor
+@available(SwiftStdlib 5.1, *)
+func test_isolation_withCheckedContinuation_typedThrows_never() async {
+  await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+    MainActor.shared.assertIsolated() // OK
+    continuation.resume()
+  }
+}
+@MainActor
+@available(SwiftStdlib 5.1, *)
+func test_isolation_withUnsafeContinuation_typedThrows() async {
+  try! await withUnsafeContinuation { (continuation: UnsafeContinuation<Void, MyError>) in
+    MainActor.shared.assertIsolated() // OK
+    continuation.resume()
+  }
+}
+@MainActor
+@available(SwiftStdlib 5.1, *)
+func test_isolation_withUnsafeContinuation_typedThrows_never() async {
+  await withUnsafeContinuation { (continuation: UnsafeContinuation<Void, Never>) in
+    MainActor.shared.assertIsolated() // OK
+    continuation.resume()
+  }
+}
+
 @main struct Main {
   static func main() async {
     let tests = TestSuite("ContinuationValidation")
@@ -89,6 +127,28 @@ func test_isolation_withCheckedThrowingContinuation() async {
           c.resume(returning: ())
           c.resume(returning: ())
         }
+      }
+
+      // Typed throws variants (nonisolated(nonsending))
+      tests.test("withCheckedContinuation (typed throws): continuation should be on calling isolation") {
+        await Task.detached {
+          await test_isolation_withCheckedContinuation_typedThrows()
+        }.value
+      }
+      tests.test("withCheckedContinuation (typed throws, Never): continuation should be on calling isolation") {
+        await Task.detached {
+          await test_isolation_withCheckedContinuation_typedThrows_never()
+        }.value
+      }
+      tests.test("withUnsafeContinuation (typed throws): continuation should be on calling isolation") {
+        await Task.detached {
+          await test_isolation_withUnsafeContinuation_typedThrows()
+        }.value
+      }
+      tests.test("withUnsafeContinuation (typed throws, Never): continuation should be on calling isolation") {
+        await Task.detached {
+          await test_isolation_withUnsafeContinuation_typedThrows_never()
+        }.value
       }
     }
 
