@@ -585,7 +585,8 @@ extension AsyncThrowingStream {
 
     @unsafe struct State {
 //      var continuation: UnsafeContinuation<Element?, Failure>?
-      var continuations = unsafe [UnsafeContinuation<Element?, Failure>]()
+      var continuations = unsafe [UnsafeContinuation<Result<Element?, Failure>, Never>]()
+//      var continuations = unsafe [UnsafeContinuation<Element?, Failure>]()
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -683,7 +684,7 @@ extension AsyncThrowingStream {
           }
           let toSend = unsafe state.pending.removeFirst()
           unlock()
-          unsafe continuation.resume(returning: toSend)
+          unsafe continuation.resume(returning: .success(toSend))
         } else if let terminal = unsafe state.terminal {
           result = .terminated
           // TODO: figure this out
@@ -692,9 +693,10 @@ extension AsyncThrowingStream {
           unlock()
           switch terminal {
           case .finished:
-            unsafe continuation.resume(returning: nil)
+            unsafe continuation.resume(returning: .success(nil))
           case .failed(let error):
-            unsafe continuation.resume(throwing: error)
+            unsafe continuation.resume(returning: .failure(error))
+//            unsafe continuation.resume(throwing: error)
           }
         } else {
           switch limit {
@@ -707,7 +709,7 @@ extension AsyncThrowingStream {
           }
 
           unlock()
-          unsafe continuation.resume(returning: value)
+          unsafe continuation.resume(returning: .success(value))
         }
       } else {
         if unsafe state.terminal == nil {
@@ -909,9 +911,10 @@ extension AsyncThrowingStream {
       for unsafe continuation in unsafe continuations {
         switch terminal {
         case .finished:
-          unsafe continuation.resume(returning: nil)
+          unsafe continuation.resume(returning: .success(nil))
         case .failed(let error):
-          unsafe continuation.resume(throwing: error)
+          unsafe continuation.resume(returning: .failure(error))
+//          unsafe continuation.resume(throwing: error)
         }
       }
     }
@@ -944,14 +947,14 @@ extension AsyncThrowingStream {
     }
      */
 
-    func next(_ continuation: UnsafeContinuation<Element?, Failure>) {
+    func next(_ continuation: UnsafeContinuation<Result<Element?, Failure>, Never>) {
       lock()
       unsafe state.continuations.append(continuation)
       if unsafe state.pending.count > 0 {
         let cont = unsafe state.continuations.removeFirst()
         let toSend = unsafe state.pending.removeFirst()
         unlock()
-        unsafe cont.resume(returning: toSend)
+        unsafe cont.resume(returning: .success(toSend))
       } else if let terminal = unsafe state.terminal {
         let cont = unsafe state.continuations.removeFirst()
         // TODO: throwing variant does this state transition here...
@@ -960,9 +963,10 @@ extension AsyncThrowingStream {
         unlock()
         switch terminal {
         case .finished:
-          unsafe cont.resume(returning: nil)
+          unsafe cont.resume(returning: .success(nil))
         case .failed(let error):
-          unsafe cont.resume(throwing: error)
+          unsafe cont.resume(returning: .failure(error))
+//          unsafe cont.resume(throwing: error)
         }
       } else {
         unlock()
@@ -970,19 +974,13 @@ extension AsyncThrowingStream {
     }
 
     func next() async throws(Failure) -> Element? {
-      try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
-        do {
-          return try unsafe await withUnsafeThrowingContinuation { continuation in
-            // TODO: is this the right way to convert to a typed throws continuation?
-            unsafe next(UnsafeContinuation<Element?, Failure>(continuation.context))
-          }
-        } catch {
-          // TODO: any way around this?
-          throw error as! Failure
+      try await withTaskCancellationHandler {
+        unsafe await withUnsafeContinuation {
+          unsafe self.next($0)
         }
       } onCancel: { [cancel] in
         cancel()
-      }
+      }.get()
     }
 
 //    func next() async throws(Failure) -> Element? {
