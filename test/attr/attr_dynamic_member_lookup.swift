@@ -661,7 +661,7 @@ func testOverrideSubscript(a: BaseClass, b: DerivedClassWithOverriddenDefault) {
   let _: String = b.magic
 }
 
-// Overriding with a different default value is valid.
+// Overriding without a default value is invalid.
 class DerivedClassWithMissingDefault : BaseClass {
   // expected-error @+1 {{'@dynamicMemberLookup' requires 'magic' to have a default value}} {{71-71= = <#Default#>}}
   override subscript(dynamicMember member: String, magic: StaticString) -> String {
