@@ -76,3 +76,15 @@ protocol Rectangle: Shape {}
 protocol Square: Rectangle {}
 extension Square : @reparented Shape {}
 // expected-error@-1 {{'Square' must directly inherit from 'Shape' in order to be reparented}}
+
+
+
+protocol MultiReparenting1: Q {}
+extension MultiReparenting1:
+                             @reparented Q,   // expected-note {{'MultiReparenting1' previously '@reparented' by 'Q' here}}
+                             @reparented Q {} // expected-error {{cannot have multiple declarations of 'MultiReparenting1' being '@reparented' by 'Q'}}
+
+protocol MultiReparenting2: R, Q {}
+extension MultiReparenting2: @reparented R {} // expected-note {{previously '@reparented' by 'R' here}}
+extension MultiReparenting2: @reparented Q {}
+extension MultiReparenting2: @reparented R {} // expected-error {{cannot have multiple declarations of 'MultiReparenting2' being '@reparented' by 'R'}}
