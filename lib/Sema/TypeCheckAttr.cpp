@@ -2117,22 +2117,22 @@ void AttributeChecker::visitDynamicMemberLookupAttr(
   //
   //   1. Subscripts which are both valid for fulfilling the requirement, and
   //      are accessible from outside the type
-  //   2. Subscripts which have a `dynamicMember` argument/parameter label for
+  //   2. Subscripts which are valid for fulfilling the requirement but which
+  //      are inaccessible from outside the type
+  //   3. Subscripts which have a `dynamicMember` argument/parameter label for
   //      at least one parameter (so are considered for validation) but which
   //      are invalid
-  //   3. Subscripts which are valid for fulfilling the requirement but which
-  //      are inaccessible from outside the type
   //   4. Subscripts which _would_ be valid if a `dynamicMember` argument label
   //      were inserted for their first argument (we can offer a fix-it)
   //
   // If we have any of (1), the attribute requirements will be considered
   // fulfilled and we won't diagnose; if not, then we'll go through (2), (3),
   // and (4) in order and produce diagnostics/fix-its for the first non-empty
-  // group. (3) produces warnings in the current language mode, which will be
+  // group. (2) produces warnings in the current language mode, which will be
   // upgraded to errors in the next language mode (hence the separate diagnostic
   // stages).
-  SmallVector<DynamicMemberLookupSubscriptEligibility> invalid,
-      validButInacessible, potentiallyValid;
+  SmallVector<DynamicMemberLookupSubscriptEligibility> validButInacessible,
+      invalid, potentiallyValid;
 
   auto requiredAccessScope = decl->getFormalAccessScope();
   auto accessDC = requiredAccessScope.getDeclContext();
@@ -2158,22 +2158,13 @@ void AttributeChecker::visitDynamicMemberLookupAttr(
     }
   }
 
-  if (!invalid.empty()) {
-    for (auto &candidate : invalid) {
-      candidate.diagnose();
-    }
-
-    attr->setInvalid();
-    return;
-  }
-
   if (!validButInacessible.empty()) {
     auto futureVersion = version::Version::getFutureMajorLanguageVersion();
     bool shouldError = ctx.isLanguageModeAtLeast(futureVersion);
 
-    // Diagnose as an error in resilient modules regardless of language
-    // version since this will break the swiftinterface. Don't diagnose
-    // cases in existing swiftinterface files, though.
+    // Diagnose as an error in resilient modules regardless of language version
+    // since this will break the swiftinterface. Don't diagnose cases in
+    // existing swiftinterface files, though.
     shouldError |= decl->getModuleContext()->isResilient() &&
                    !decl->getDeclContext()->isInSwiftinterface();
 
@@ -2190,7 +2181,16 @@ void AttributeChecker::visitDynamicMemberLookupAttr(
 
     if (shouldError) {
       attr->setInvalid();
+      return;
     }
+  }
+
+  if (!invalid.empty()) {
+    for (auto &candidate : invalid) {
+      candidate.diagnose();
+    }
+
+    attr->setInvalid();
     return;
   }
 

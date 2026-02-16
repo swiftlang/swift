@@ -457,6 +457,7 @@ public struct Accessible5 {
   }
 }
 
+// expected-non-resilient-error @+1 {{'@dynamicMemberLookup' requires 'Inaccessible1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 public struct Inaccessible1 {
   // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-3=public }}
@@ -466,6 +467,7 @@ public struct Inaccessible1 {
   }
 }
 
+// expected-non-resilient-error @+1 {{'@dynamicMemberLookup' requires 'Inaccessible2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 public struct Inaccessible2 {
   // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{21-29=public}}
@@ -475,6 +477,7 @@ public struct Inaccessible2 {
   }
 }
 
+// expected-non-resilient-error @+1 {{'@dynamicMemberLookup' requires 'Inaccessible3' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 internal struct Inaccessible3 {
   // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-10=internal}}
@@ -484,6 +487,7 @@ internal struct Inaccessible3 {
   }
 }
 
+// expected-non-resilient-error @+1 {{'@dynamicMemberLookup' requires 'Inaccessible4' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 private struct Inaccessible4 {
   // expected-non-resilient-warning @+2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type; this will be an error in a future Swift language mode}}{{3-10=fileprivate}}
@@ -493,6 +497,7 @@ private struct Inaccessible4 {
   }
 }
 
+// expected-non-resilient-error @+1 {{'@dynamicMemberLookup' requires 'Inaccessible5' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 public struct Inaccessible5 {
   internal struct Nested { }
