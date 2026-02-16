@@ -391,7 +391,9 @@ bool swift::constraints::hasProperSupertypes(Type type) {
 }
 
 static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
-  return classDecl->getAttrs().getAttribute<ObjCBridgedAttr>()->getObjCClass();
+  if (auto *attr = classDecl->getAttrs().getAttribute<ObjCBridgedAttr>())
+    return attr->getObjCClass();
+  return nullptr;
 }
 
 ConflictReason swift::constraints::canPossiblyConvertTo(
@@ -419,12 +421,14 @@ ConflictReason swift::constraints::canPossiblyConvertTo(
       // Toll-free bridging CF -> ObjC.
       if (lhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
           rhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
-        lhsDecl = getBridgedObjCClass(lhsDecl);
+        if (auto *lhsBridged = getBridgedObjCClass(lhsDecl))
+          lhsDecl = lhsBridged;
 
       // Toll-free bridging ObjC -> CF.
       } else if (lhsDecl->getForeignClassKind() != ClassDecl::ForeignKind::CFType &&
                  rhsDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-        rhsDecl = getBridgedObjCClass(rhsDecl);
+        if (auto *rhsBridged = getBridgedObjCClass(rhsDecl))
+          rhsDecl = rhsBridged;
       }
 
       // Check for a subclassing relationship.
