@@ -52,524 +52,9 @@ func _lock(_ ptr: UnsafeRawPointer)
 func _unlock(_ ptr: UnsafeRawPointer)
 #endif
 
-/*
-internal enum _StreamInternals<Element, Failure: Error> {
-
-  internal enum BufferingPolicy {
-    case unbounded
-    case bufferingOldest(Int)
-    case bufferingNewest(Int)
-  }
-
-  internal enum Termination: Sendable {
-    case finished(Failure?)
-    case cancelled
-  }
-
-  internal enum YieldResult {
-    case enqueued(remaining: Int)
-    case dropped(Element)
-    case terminated
-  }
-
-  @safe
-  internal final class Storage: @unchecked Sendable {
-    typealias TerminationHandler = @Sendable (Termination) -> Void
-
-    enum Terminal {
-      case finished
-      case failed(Failure)
-    }
-
-    @unsafe struct State {
-      var continuations = unsafe [UnsafeContinuation<Element?, Failure>]()
-      var pending = _Deque<Element>()
-      let limit: BufferingPolicy
-      var onTermination: TerminationHandler?
-      var terminal: Terminal?
-
-      init(limit: BufferingPolicy) {
-        unsafe self.limit = limit
-      }
-    }
-
-    // Stored as a singular structured assignment for initialization
-    var state: State
-
-    private init(_doNotCallMe: ()) {
-      fatalError("Storage must be initialized by create")
-    }
-
-    deinit {
-      unsafe state.onTermination?(.cancelled)
-    }
-
-    static func create(limit: BufferingPolicy) -> Storage {
-      let minimumCapacity = _lockWordCount()
-      let storage = unsafe Builtin.allocWithTailElems_1(
-        Storage.self,
-        minimumCapacity._builtinWordValue,
-        UnsafeRawPointer.self
-      )
-
-      let state =
-      unsafe UnsafeMutablePointer<State>(Builtin.addressof(&storage.state))
-      unsafe state.initialize(to: State(limit: limit))
-      let ptr = unsafe UnsafeRawPointer(
-        Builtin.projectTailElems(storage, UnsafeRawPointer.self))
-      unsafe _lockInit(ptr)
-      return storage
-    }
-  }
-}
-
-extension _StreamInternals.Storage {
-  private func lock() {
-    let ptr =
-      unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-    unsafe _lock(ptr)
-  }
-
-  private func unlock() {
-    let ptr =
-      unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-    unsafe _unlock(ptr)
-  }
-
-  func getOnTermination() -> TerminationHandler? {
-    lock()
-    let handler = unsafe state.onTermination
-    unlock()
-    return handler
-  }
-
-  func setOnTermination(_ newValue: TerminationHandler?) {
-    lock()
-    unsafe withExtendedLifetime(state.onTermination) {
-      unsafe state.onTermination = newValue
-      unlock()
-    }
-  }
-}
-
-extension _StreamInternals.Storage {
-
-  @Sendable func cancel() {
-    lock()
-    // swap out the handler before we invoke it to prevent double cancel
-    let handler = unsafe state.onTermination
-    unsafe state.onTermination = nil
-    unlock()
-
-    // handler must be invoked before yielding nil for termination
-    handler?(.cancelled)
-
-    finish()
-  }
-
-  func yield(_ value: __owned Element) -> _StreamInternals.YieldResult {
-    var result: _StreamInternals.YieldResult
-    lock()
-    let limit = unsafe state.limit
-    let count = unsafe state.pending.count
-
-    if unsafe !state.continuations.isEmpty {
-      let continuation = unsafe state.continuations.removeFirst()
-      if count > 0 {
-        if unsafe state.terminal == nil {
-          switch limit {
-          case .unbounded:
-            unsafe state.pending.append(value)
-            result = .enqueued(remaining: .max)
-          case .bufferingOldest(let limit):
-            if count < limit {
-              unsafe state.pending.append(value)
-              result = .enqueued(remaining: limit - (count + 1))
-            } else {
-              result = .dropped(value)
-            }
-          case .bufferingNewest(let limit):
-            if count < limit {
-              unsafe state.pending.append(value)
-              result = .enqueued(remaining: limit - (count + 1))
-            } else if count > 0 {
-              result = unsafe .dropped(state.pending.removeFirst())
-              unsafe state.pending.append(value)
-            } else {
-              result = .dropped(value)
-            }
-          }
-        } else {
-          result = .terminated
-        }
-        let toSend = unsafe state.pending.removeFirst()
-        unlock()
-        unsafe continuation.resume(returning: toSend)
-      } else if let terminal = unsafe state.terminal {
-        result = .terminated
-        // TODO: figure this out
-        // throwing variant zero'd the `continuation` here – what's the analog?
-        unsafe state.terminal = .finished // ?? why do we do this?
-        unlock()
-        switch terminal {
-        case .finished:
-          unsafe continuation.resume(returning: nil)
-        case .failed(let error):
-          unsafe continuation.resume(throwing: error)
-        }
-      } else {
-        switch limit {
-        case .unbounded:
-          result = .enqueued(remaining: .max)
-        case .bufferingNewest(let limit):
-          result = .enqueued(remaining: limit)
-        case .bufferingOldest(let limit):
-          result = .enqueued(remaining: limit)
-        }
-
-        unlock()
-        unsafe continuation.resume(returning: value)
-      }
-    } else {
-      if unsafe state.terminal == nil {
-        switch limit {
-        case .unbounded:
-          result = .enqueued(remaining: .max)
-          unsafe state.pending.append(value)
-        case .bufferingOldest(let limit):
-          if count < limit {
-            result = .enqueued(remaining: limit - (count + 1))
-            unsafe state.pending.append(value)
-          } else {
-            result = .dropped(value)
-          }
-        case .bufferingNewest(let limit):
-          if count < limit {
-            unsafe state.pending.append(value)
-            result = .enqueued(remaining: limit - (count + 1))
-          } else if count > 0 {
-            result = unsafe .dropped(state.pending.removeFirst())
-            unsafe state.pending.append(value)
-          } else {
-            result = .dropped(value)
-          }
-        }
-      } else {
-        result = .terminated
-      }
-      unlock()
-    }
-    return result
-  }
-
-  func finish(throwing error: __owned Failure? = nil) {
-    lock()
-    let handler = unsafe state.onTermination
-    unsafe state.onTermination = nil
-    if unsafe state.terminal == nil {
-      if let failure = error {
-        unsafe state.terminal = .failed(failure)
-      } else {
-        unsafe state.terminal = .finished
-      }
-    }
-
-    guard unsafe !state.continuations.isEmpty else {
-      unlock()
-      handler?(.finished(error))
-      return
-    }
-
-    let terminal = unsafe state.terminal! // FIXME: don't force
-
-    // Hold on to the continuations to resume outside the lock.
-    let continuations = unsafe state.continuations
-    unsafe state.continuations.removeAll()
-
-    unlock()
-    handler?(.finished(error))
-
-    // TODO: verify the appropriate unification of the two impls
-    for unsafe continuation in unsafe continuations {
-      switch terminal {
-      case .finished:
-        unsafe continuation.resume(returning: nil)
-      case .failed(let error):
-        unsafe continuation.resume(throwing: error)
-      }
-    }
-  }
-
-  func next(_ continuation: UnsafeContinuation<Element?, Failure>) {
-    lock()
-    unsafe state.continuations.append(continuation)
-    if unsafe state.pending.count > 0 {
-      let cont = unsafe state.continuations.removeFirst()
-      let toSend = unsafe state.pending.removeFirst()
-      unlock()
-      unsafe cont.resume(returning: toSend)
-    } else if let terminal = unsafe state.terminal {
-      let cont = unsafe state.continuations.removeFirst()
-      // TODO: throwing variant does this state transition here...
-      // why, and do we need to do it?
-//      unsafe state.terminal = .finished
-      unlock()
-      switch terminal {
-      case .finished:
-        unsafe cont.resume(returning: nil)
-      case .failed(let error):
-        unsafe cont.resume(throwing: error)
-      }
-    } else {
-      unlock()
-    }
-
-  }
-
-  func next() async throws(Failure) -> Element? {
-    try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
-      do {
-        return try unsafe await withUnsafeThrowingContinuation { continuation in
-          // TODO: is this the right way to convert to a properly typed continuation?
-          unsafe next(UnsafeContinuation(continuation.context))
-        }
-      } catch {
-        // TODO: any way around this?
-        throw error as! Failure
-      }
-    } onCancel: { [cancel] in
-      cancel()
-    }
-  }
-}
- */
-
 @available(SwiftStdlib 5.1, *)
 extension AsyncStream {
   typealias _Storage = AsyncThrowingStream<Element, Never>._Storage
-
-//  @safe
-//  internal final class _Storage: @unchecked Sendable {
-//    typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
-//
-//    @unsafe struct State {
-//      var continuations = unsafe [UnsafeContinuation<Element?, Never>]()
-//      var pending = _Deque<Element>()
-//      let limit: Continuation.BufferingPolicy
-//      var onTermination: TerminationHandler?
-//      var terminal: Bool = false
-//
-//      init(limit: Continuation.BufferingPolicy) {
-//        unsafe self.limit = limit
-//      }
-//    }
-//    // Stored as a singular structured assignment for initialization
-//    var state: State
-//
-//    private init(_doNotCallMe: ()) {
-//      fatalError("Storage must be initialized by create")
-//    }
-//
-//    deinit {
-//      unsafe state.onTermination?(.cancelled)
-//    }
-//
-//    private func lock() {
-//      let ptr =
-//        unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-//      unsafe _lock(ptr)
-//    }
-//
-//    private func unlock() {
-//      let ptr =
-//        unsafe UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
-//      unsafe _unlock(ptr)
-//    }
-//
-//    func getOnTermination() -> TerminationHandler? {
-//      lock()
-//      let handler = unsafe state.onTermination
-//      unlock()
-//      return handler
-//    }
-//
-//    func setOnTermination(_ newValue: TerminationHandler?) {
-//      lock()
-//      unsafe withExtendedLifetime(state.onTermination) {
-//        unsafe state.onTermination = newValue
-//        unlock()
-//      }
-//    }
-//
-//    @Sendable func cancel() {
-//      lock()
-//      // swap out the handler before we invoke it to prevent double cancel
-//      let handler = unsafe state.onTermination
-//      unsafe state.onTermination = nil
-//      unlock()
-//
-//      // handler must be invoked before yielding nil for termination
-//      handler?(.cancelled)
-//
-//      finish()
-//    }
-//
-//    func yield(_ value: __owned Element) -> Continuation.YieldResult {
-//      var result: Continuation.YieldResult
-//      lock()
-//      let limit = unsafe state.limit
-//      let count = unsafe state.pending.count
-//
-//      if unsafe !state.continuations.isEmpty {
-//        let continuation = unsafe state.continuations.removeFirst()
-//        if count > 0 {
-//          if unsafe !state.terminal {
-//            switch limit {
-//            case .unbounded:
-//              unsafe state.pending.append(value)
-//              result = .enqueued(remaining: .max)
-//            case .bufferingOldest(let limit):
-//              if count < limit {
-//                unsafe state.pending.append(value)
-//                result = .enqueued(remaining: limit - (count + 1))
-//              } else {
-//                result = .dropped(value)
-//              }
-//            case .bufferingNewest(let limit):
-//              if count < limit {
-//                unsafe state.pending.append(value)
-//                result = .enqueued(remaining: limit - (count + 1))
-//              } else if count > 0 {
-//                result = unsafe .dropped(state.pending.removeFirst())
-//                unsafe state.pending.append(value)
-//              } else {
-//                result = .dropped(value)
-//              }
-//            }
-//          } else {
-//            result = .terminated
-//          }
-//          let toSend = unsafe state.pending.removeFirst()
-//          unlock()
-//          unsafe continuation.resume(returning: toSend)
-//        } else if unsafe state.terminal {
-//          result = .terminated
-//          unlock()
-//          unsafe continuation.resume(returning: nil)
-//        } else {
-//          switch limit {
-//          case .unbounded:
-//            result = .enqueued(remaining: .max)
-//          case .bufferingNewest(let limit):
-//            result = .enqueued(remaining: limit)
-//          case .bufferingOldest(let limit):
-//            result = .enqueued(remaining: limit)
-//          }
-//
-//          unlock()
-//          unsafe continuation.resume(returning: value)
-//        }
-//      } else {
-//        if unsafe !state.terminal {
-//          switch limit {
-//          case .unbounded:
-//            result = .enqueued(remaining: .max)
-//            unsafe state.pending.append(value)
-//          case .bufferingOldest(let limit):
-//            if count < limit {
-//              result = .enqueued(remaining: limit - (count + 1))
-//              unsafe state.pending.append(value)
-//            } else {
-//              result = .dropped(value)
-//            }
-//          case .bufferingNewest(let limit):
-//            if count < limit {
-//              unsafe state.pending.append(value)
-//              result = .enqueued(remaining: limit - (count + 1))
-//            } else if count > 0 {
-//              result = unsafe .dropped(state.pending.removeFirst())
-//              unsafe state.pending.append(value)
-//            } else {
-//              result = .dropped(value)
-//            }
-//          }
-//        } else {
-//          result = .terminated
-//        }
-//        unlock()
-//      }
-//      return result
-//    }
-//
-//    func finish() {
-//      lock()
-//      let handler = unsafe state.onTermination
-//      unsafe state.onTermination = nil
-//      unsafe state.terminal = true
-//
-//      guard unsafe !state.continuations.isEmpty else {
-//        unlock()
-//        handler?(.finished)
-//        return
-//      }
-//
-//      // Hold on to the continuations to resume outside the lock.
-//      let continuations = unsafe state.continuations
-//      unsafe state.continuations.removeAll()
-//
-//      unlock()
-//      handler?(.finished)
-//
-//      for unsafe continuation in unsafe continuations {
-//        unsafe continuation.resume(returning: nil)
-//      }
-//    }
-//
-//    func next(_ continuation: UnsafeContinuation<Element?, Never>) {
-//      lock()
-//      unsafe state.continuations.append(continuation)
-//      if unsafe state.pending.count > 0 {
-//        let cont = unsafe state.continuations.removeFirst()
-//        let toSend = unsafe state.pending.removeFirst()
-//        unlock()
-//        unsafe cont.resume(returning: toSend)
-//      } else if unsafe state.terminal {
-//        let cont = unsafe state.continuations.removeFirst()
-//        unlock()
-//        unsafe cont.resume(returning: nil)
-//      } else {
-//        unlock()
-//      }
-//
-//    }
-//
-//    func next() async -> Element? {
-//      await withTaskCancellationHandler {
-//        unsafe await withUnsafeContinuation {
-//          unsafe next($0)
-//        }
-//      } onCancel: { [cancel] in
-//        cancel()
-//      }
-//    }
-//
-//    static func create(limit: Continuation.BufferingPolicy) -> _Storage {
-//      let minimumCapacity = _lockWordCount()
-//      let storage = unsafe Builtin.allocWithTailElems_1(
-//        _Storage.self,
-//          minimumCapacity._builtinWordValue,
-//          UnsafeRawPointer.self
-//      )
-//
-//      let state =
-//        unsafe UnsafeMutablePointer<State>(Builtin.addressof(&storage.state))
-//      unsafe state.initialize(to: State(limit: limit))
-//      let ptr = unsafe UnsafeRawPointer(
-//        Builtin.projectTailElems(storage, UnsafeRawPointer.self))
-//      unsafe _lockInit(ptr)
-//      return storage
-//    }
-//  }
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -584,9 +69,7 @@ extension AsyncThrowingStream {
     }
 
     @unsafe struct State {
-//      var continuation: UnsafeContinuation<Element?, Failure>?
       var continuations = unsafe [UnsafeContinuation<Result<Element?, Failure>, Never>]()
-//      var continuations = unsafe [UnsafeContinuation<Element?, Failure>]()
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -696,7 +179,6 @@ extension AsyncThrowingStream {
             unsafe continuation.resume(returning: .success(nil))
           case .failed(let error):
             unsafe continuation.resume(returning: .failure(error))
-//            unsafe continuation.resume(throwing: error)
           }
         } else {
           switch limit {
@@ -743,143 +225,6 @@ extension AsyncThrowingStream {
       return result
     }
 
-    /*
-    func yield(_ value: __owned Element) -> Continuation.YieldResult {
-      var result: Continuation.YieldResult
-      lock()
-      let limit = unsafe state.limit
-      let count = unsafe state.pending.count
-      if let continuation = unsafe state.continuation {
-        if count > 0 {
-          if unsafe state.terminal == nil {
-            switch limit {
-            case .unbounded:
-              result = .enqueued(remaining: .max)
-              unsafe state.pending.append(value)
-            case .bufferingOldest(let limit):
-              if count < limit {
-                result = .enqueued(remaining: limit - (count + 1))
-                unsafe state.pending.append(value)
-              } else {
-                result = .dropped(value)
-              }
-            case .bufferingNewest(let limit):
-              if count < limit {
-                unsafe state.pending.append(value)
-                result = .enqueued(remaining: limit - (count + 1))
-              } else if count > 0 {
-                result = unsafe .dropped(state.pending.removeFirst())
-                unsafe state.pending.append(value)
-              } else {
-                result = .dropped(value)
-              }
-            }
-          } else {
-            result = .terminated
-          }
-          unsafe state.continuation = nil
-          let toSend = unsafe state.pending.removeFirst()
-          unlock()
-          unsafe continuation.resume(returning: toSend)
-        } else if let terminal = unsafe state.terminal {
-          result = .terminated
-          unsafe state.continuation = nil
-          unsafe state.terminal = .finished
-          unlock()
-          switch terminal {
-          case .finished:
-            unsafe continuation.resume(returning: nil)
-          case .failed(let error):
-            unsafe continuation.resume(throwing: error)
-          }
-        } else {
-          switch limit {
-          case .unbounded:
-            result = .enqueued(remaining: .max)
-          case .bufferingOldest(let limit):
-            result = .enqueued(remaining: limit)
-          case .bufferingNewest(let limit):
-            result = .enqueued(remaining: limit)
-          }
-
-          unsafe state.continuation = nil
-          unlock()
-          unsafe continuation.resume(returning: value)
-        }
-      } else {
-        if unsafe state.terminal == nil {
-          switch limit {
-          case .unbounded:
-            result = .enqueued(remaining: .max)
-            unsafe state.pending.append(value)
-          case .bufferingOldest(let limit):
-            if count < limit {
-              result = .enqueued(remaining: limit - (count + 1))
-              unsafe state.pending.append(value)
-            } else {
-              result = .dropped(value)
-            }
-          case .bufferingNewest(let limit):
-            if count < limit {
-              unsafe state.pending.append(value)
-              result = .enqueued(remaining: limit - (count + 1))
-            } else if count > 0 {
-              result = unsafe .dropped(state.pending.removeFirst())
-              unsafe state.pending.append(value)
-            } else {
-              result = .dropped(value)
-            }
-          }
-        } else {
-          result = .terminated
-        }
-        unlock()
-      }
-      return result
-    }
-     */
-
-    /*
-    func finish(throwing error: __owned Failure? = nil) {
-      lock()
-      let handler = unsafe state.onTermination
-      unsafe state.onTermination = nil
-      if unsafe state.terminal == nil {
-        if let failure = error {
-          unsafe state.terminal = .failed(failure)
-        } else {
-          unsafe state.terminal = .finished
-        }
-      }
-
-      if let continuation = unsafe state.continuation {
-        if unsafe state.pending.count > 0 {
-          unsafe state.continuation = nil
-          let toSend = unsafe state.pending.removeFirst()
-          unlock()
-          handler?(.finished(error))
-          unsafe continuation.resume(returning: toSend)
-        } else if let terminal = unsafe state.terminal {
-          unsafe state.continuation = nil
-          unlock()
-          handler?(.finished(error))
-          switch terminal {
-          case .finished:
-            unsafe continuation.resume(returning: nil)
-          case .failed(let error):
-            unsafe continuation.resume(throwing: error)
-          }
-        } else {
-          unlock()
-          handler?(.finished(error))
-        }
-      } else {
-        unlock()
-        handler?(.finished(error))
-      }
-    }
-     */
-
     func finish(throwing error: __owned Failure? = nil) {
       lock()
       let handler = unsafe state.onTermination
@@ -914,38 +259,9 @@ extension AsyncThrowingStream {
           unsafe continuation.resume(returning: .success(nil))
         case .failed(let error):
           unsafe continuation.resume(returning: .failure(error))
-//          unsafe continuation.resume(throwing: error)
         }
       }
     }
-
-    /*
-    func next(_ continuation: UnsafeContinuation<Element?, Failure>) {
-      lock()
-      if unsafe state.continuation == nil {
-        if unsafe state.pending.count > 0 {
-          let toSend = unsafe state.pending.removeFirst()
-          unlock()
-          unsafe continuation.resume(returning: toSend)
-        } else if let terminal = unsafe state.terminal {
-          unsafe state.terminal = .finished
-          unlock()
-          switch terminal {
-          case .finished:
-            unsafe continuation.resume(returning: nil)
-          case .failed(let error):
-            unsafe continuation.resume(throwing: error)
-          }
-        } else {
-          unsafe state.continuation = unsafe continuation
-          unlock()
-        }
-      } else {
-        unlock()
-        fatalError("attempt to await next() on more than one task")
-      }
-    }
-     */
 
     func next(_ continuation: UnsafeContinuation<Result<Element?, Failure>, Never>) {
       lock()
@@ -959,14 +275,13 @@ extension AsyncThrowingStream {
         let cont = unsafe state.continuations.removeFirst()
         // TODO: throwing variant does this state transition here...
         // why, and do we need to do it?
-  //      unsafe state.terminal = .finished
+        unsafe state.terminal = .finished
         unlock()
         switch terminal {
         case .finished:
           unsafe cont.resume(returning: .success(nil))
         case .failed(let error):
           unsafe cont.resume(returning: .failure(error))
-//          unsafe cont.resume(throwing: error)
         }
       } else {
         unlock()
@@ -982,20 +297,6 @@ extension AsyncThrowingStream {
         cancel()
       }.get()
     }
-
-//    func next() async throws(Failure) -> Element? {
-//      try await withTaskCancellationHandler { () async throws(Failure) -> Element? in
-//        do {
-//          try unsafe await withUnsafeThrowingContinuation { continuation in
-//            unsafe next(UnsafeContinuation(continuation.context))
-//          }
-//        } catch {
-//          throw error as! Failure
-//        }
-//      } onCancel: { [cancel] in
-//        cancel()
-//      }
-//    }
 
     static func create(limit: Continuation.BufferingPolicy) -> _Storage {
       let minimumCapacity = _lockWordCount()
@@ -1069,4 +370,58 @@ final class _AsyncStreamCriticalStorage<Contents>: @unchecked Sendable {
     return storage
   }
 }
+
+// MARK: Conversion Shims
+
+extension AsyncThrowingStream.Continuation.YieldResult {
+
+  internal var nonThrowingRepresentation: AsyncStream<Element>.Continuation.YieldResult {
+    switch self {
+    case .dropped(let element): .dropped(element)
+    case .enqueued(let remaining): .enqueued(remaining: remaining)
+    case .terminated: .terminated
+    }
+  }
+}
+
+extension AsyncStream.Continuation.BufferingPolicy {
+  internal var throwingRepresentation: AsyncThrowingStream<Element, Never>.Continuation.BufferingPolicy {
+    switch self {
+    case .bufferingNewest(let limit): .bufferingNewest(limit)
+    case .bufferingOldest(let limit): .bufferingOldest(limit)
+    case .unbounded: .unbounded
+    }
+  }
+}
+
+extension AsyncThrowingStream.Continuation.BufferingPolicy {
+
+  internal var nonThrowingRepresentation: AsyncStream<Element>.Continuation.BufferingPolicy {
+    switch self {
+    case .bufferingNewest(let limit): .bufferingNewest(limit)
+    case .bufferingOldest(let limit): .bufferingOldest(limit)
+    case .unbounded: .unbounded
+    }
+  }
+}
+
+extension AsyncStream.Continuation.Termination {
+  internal var throwingRepresentation: AsyncThrowingStream<Element, Never>.Continuation.Termination {
+    switch self {
+    case .finished: .finished(nil)
+    case .cancelled: .cancelled
+    }
+  }
+}
+
+extension AsyncThrowingStream.Continuation.Termination {
+
+  internal var nonThrowingRepresentation: AsyncStream<Element>.Continuation.Termination {
+    switch self {
+    case .finished: .finished
+    case .cancelled: .cancelled
+    }
+  }
+}
+
 #endif
