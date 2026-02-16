@@ -159,8 +159,8 @@ lookupInClangDecl(Decl *swiftDecl, DeclName name) {
 
       if (foundCtxDecl->getCanonicalDecl() == whereCanonical) {
         result.push_back(entry);
-      } else if (isa<clang::EnumDecl>(foundCtxDecl) &&
-                 isa<clang::EnumConstantDecl>(found)) {
+      } else if (auto *ED = dyn_cast<clang::EnumDecl>(foundCtxDecl);
+                 ED && !ED->isScoped() && isa<clang::EnumConstantDecl>(found)) {
         // Enum constants can be found in the parent context of the enum decl.
         auto *enumCtx = dyn_cast<clang::Decl>(foundCtxDecl->getDeclContext());
         if (enumCtx && enumCtx->getCanonicalDecl() == whereCanonical)
@@ -201,7 +201,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     auto *foundCtx = foundDecl->getDeclContext();
 
     if (auto *ED = dyn_cast<clang::EnumDecl>(foundCtx);
-        ED && isa<clang::EnumConstantDecl>(foundDecl)) {
+        ED && !ED->isScoped() && isa<clang::EnumConstantDecl>(foundDecl)) {
       // enum constants are found in the enum decl's parent
       foundCtx = ED->getDeclContext();
     }
