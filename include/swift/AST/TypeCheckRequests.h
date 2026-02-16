@@ -5691,9 +5691,8 @@ public:
     // We can offer a fix-it to insert a `dynamicMember` argument label iff the
     // subscript is only missing the label itself.
     return !DynamicMemberIdx && Kind &&
-           ParamFlags[0].toRaw() ==
-               llvm::to_underlying(
-                   InvalidParameterFlag::DynamicMemberMissingArgumentLabel) &&
+           ParamFlags[0].containsOnly(
+               InvalidParameterFlag::DynamicMemberMissingArgumentLabel) &&
            std::all_of(ParamFlags.begin() + 1, ParamFlags.end(),
                        [&](const InvalidParameterFlags &f) { return !f; });
   }
