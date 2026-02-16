@@ -40,7 +40,6 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SetVector.h"
-#include <algorithm>
 #include <set>
 
 using namespace swift;
