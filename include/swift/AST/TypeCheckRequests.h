@@ -33,6 +33,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/Basic/TypeID.h"
@@ -5677,7 +5678,7 @@ public:
       SmallVector<InvalidParameterFlags> paramFlags)
       : Decl(decl), DynamicMemberIdx(dynamicMemberIdx), Kind(kind),
         ParamFlags(paramFlags) {
-    assert(decl->getIndices()->size() == paramFlags.size());
+    ASSERT(decl->getIndices()->size() == paramFlags.size());
   }
 
   bool isValid() const {
