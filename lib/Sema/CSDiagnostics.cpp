@@ -2552,7 +2552,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
     // need to repeat here.
     auto keyPathType =
         SD->getDynamicMemberLookupKeyPathType(/*useDC=*/std::nullopt);
-    assert(keyPathType && "KeyPath-based dynamic member lookup subscripts must "
+    ASSERT(keyPathType && "KeyPath-based dynamic member lookup subscripts must "
                           "have a valid dynamic member type");
 
     auto memberLoc = getConstraintLocator(
