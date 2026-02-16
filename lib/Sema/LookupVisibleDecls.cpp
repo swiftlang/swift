@@ -1125,7 +1125,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
                       NL_QualifiedDefault | NL_ProtocolMembers, subscripts);
 
   for (ValueDecl *VD : subscripts) {
-    auto *subscript = cast<SubscriptDecl>(VD);
+    auto *subscript = dyn_cast<SubscriptDecl>(VD);
     if (!subscript || subscript->getDynamicMemberLookupKind(dc) !=
                           SubscriptDecl::DynamicMemberLookupKind::KeyPath) {
       continue;
