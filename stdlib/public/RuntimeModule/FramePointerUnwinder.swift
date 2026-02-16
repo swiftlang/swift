@@ -89,7 +89,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   private mutating func isAsyncPC(_ pc: Address) -> Bool {
     // On Linux, we need to examine the PC to see if this is an async frame
     #if os(Linux)
-    let address = Backtrace.Address(pc)
+    guard let address = Backtrace.Address(pc) else {
+      return false
+    }
 
     if let images = images,
        let imageNdx = images.indexOfImage(at: address) {
