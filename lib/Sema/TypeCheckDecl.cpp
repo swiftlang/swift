@@ -3457,6 +3457,11 @@ bool DynamicMemberLookupSubscriptEligibility::diagnose() {
           .fixItInsertAfter(param->getEndLoc(), " = <#Default#>");
       diagnosed = true;
     }
+
+    // At least one flag has been set (or else we would have continued early);
+    // light-weight sanity check that we'll be reporting we've diagnosed at
+    // least once.
+    ASSERT(diagnosed);
   }
 
   return diagnosed;
