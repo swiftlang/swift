@@ -58,7 +58,6 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
-#include <algorithm>
 #include <optional>
 
 using namespace swift;
