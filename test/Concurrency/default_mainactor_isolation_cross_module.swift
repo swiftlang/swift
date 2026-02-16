@@ -29,7 +29,7 @@
 import SwiftOperators
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 import SwiftSyntaxBuilder
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntaxMacros
 
 public struct AddConformanceMacro: ExtensionMacro {
   public static func expansion(
