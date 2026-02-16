@@ -5707,11 +5707,10 @@ public:
 
   /// If invalid, produces diagnostics describing the ineligibility.
   ///
-  /// Uses the `SubscriptDecl`'s AST context for diagnostics unless an explicit
-  /// diagnostic engine is given.
+  /// Uses the diagnostic engine belonging to the `SubscriptDecl`'s AST context.
   ///
   /// Returns whether an error diagnostic was produced.
-  bool diagnose(DiagnosticEngine *diags = nullptr);
+  bool diagnose();
 
   friend llvm::hash_code
   hash_value(const DynamicMemberLookupSubscriptEligibility &e) {

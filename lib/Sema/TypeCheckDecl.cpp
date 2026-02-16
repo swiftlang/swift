@@ -3386,84 +3386,80 @@ SourceLoc PrettyPrintDeclRequest::evaluate(Evaluator &eval, const Decl *decl) co
   return memBufferStartLoc.getAdvancedLoc(targetDeclOffsetInBuffer);
 }
 
-bool DynamicMemberLookupSubscriptEligibility::diagnose(
-    DiagnosticEngine *diags) {
-  if (!diags) {
-    diags = &Decl->getASTContext().Diags;
-  }
-
-  auto outputError = false;
+bool DynamicMemberLookupSubscriptEligibility::diagnose() {
+  auto &diags = Decl->getASTContext().Diags;
   auto *indices = Decl->getIndices();
   if (isEligibleForArgumentLabelFixIt()) {
     auto *param = const_cast<ParamDecl *>(indices->get(0));
     diags
-        ->diagnose(param,
-                   diag::invalid_dynamic_member_subscript_invalid_arg_label,
-                   param)
+        .diagnose(param,
+                  diag::invalid_dynamic_member_subscript_invalid_arg_label,
+                  param)
         .highlight(param->getSourceRange())
         .fixItInsert(param->getParameterNameLoc(), "dynamicMember ");
-    outputError = true;
-  } else {
-    for (auto idx : range(0, indices->size())) {
-      auto flags = ParamFlags[idx];
-      if (!flags) {
-        continue;
-      }
+    return true;
+  }
 
-      auto *param = const_cast<ParamDecl *>(indices->get(idx));
-      if (flags & InvalidParameterFlag::DynamicMemberMissingParameterLabel) {
-        // Technically, a `ParamDecl` can't have an argument label without a
-        // parameter label, but we treat `dynamicMember:` as if it were an
-        // argument label and offer to insert a new "parameter" label.
-        diags
-            ->diagnose(
-                param,
-                diag::invalid_dynamic_member_subscript_missing_param_label,
-                param)
-            .highlight(param->getSourceRange())
-            .fixItInsertAfter(param->getParameterNameLoc(), " <#label#>");
-        outputError = true;
-      }
+  auto diagnosed = false;
+  for (auto idx : range(0, indices->size())) {
+    auto flags = ParamFlags[idx];
+    if (!flags) {
+      continue;
+    }
 
-      if (flags & InvalidParameterFlag::DynamicMemberInvalidArgumentLabel) {
-        auto diag = diags->diagnose(
-            param, diag::invalid_dynamic_member_subscript_invalid_arg_label,
-            param);
-        if (param->getArgumentName().is("_")) {
-          diag.highlight(param->getSourceRange())
-              .fixItReplace(
-                  SourceRange(
-                      param->getArgumentNameLoc(),
-                      param->getArgumentNameLoc().getAdvancedLocOrInvalid(1)),
-                  "dynamicMember");
-        }
-      }
+    auto *param = const_cast<ParamDecl *>(indices->get(idx));
+    if (flags & InvalidParameterFlag::DynamicMemberMissingParameterLabel) {
+      // Technically, a `ParamDecl` can't have an argument label without a
+      // parameter label, but we treat `dynamicMember:` as if it were an
+      // argument label and offer to insert a new "parameter" label.
+      diags
+          .diagnose(param,
+                    diag::invalid_dynamic_member_subscript_missing_param_label,
+                    param)
+          .highlight(param->getSourceRange())
+          .fixItInsertAfter(param->getParameterNameLoc(), " <#label#>");
+      diagnosed = true;
+    }
 
-      if (flags & InvalidParameterFlag::DynamicMemberInvalidOrder) {
-        diags->diagnose(
-            param, diag::invalid_dynamic_member_subscript_invalid_order, param);
-        outputError = true;
+    if (flags & InvalidParameterFlag::DynamicMemberInvalidArgumentLabel) {
+      auto diag = diags.diagnose(
+          param, diag::invalid_dynamic_member_subscript_invalid_arg_label,
+          param);
+      if (param->getArgumentName().is("_")) {
+        diag.highlight(param->getSourceRange())
+            .fixItReplace(
+                SourceRange(
+                    param->getArgumentNameLoc(),
+                    param->getArgumentNameLoc().getAdvancedLocOrInvalid(1)),
+                "dynamicMember");
       }
+      diagnosed = true;
+    }
 
-      if (flags & InvalidParameterFlag::DynamicMemberInvalidType) {
-        diags->diagnose(
-            param, diag::invalid_dynamic_member_subscript_invalid_type, param);
-        outputError = true;
-      }
+    if (flags & InvalidParameterFlag::DynamicMemberInvalidOrder) {
+      diags.diagnose(
+          param, diag::invalid_dynamic_member_subscript_invalid_order, param);
+      diagnosed = true;
+    }
 
-      if (flags & InvalidParameterFlag::ParameterMissingDefaultValue) {
-        diags
-            ->diagnose(param,
-                       diag::invalid_dynamic_member_subscript_missing_default,
-                       param)
-            .highlight(param->getSourceRange())
-            .fixItInsertAfter(param->getEndLoc(), " = <#Default#>");
-        outputError = true;
-      }
+    if (flags & InvalidParameterFlag::DynamicMemberInvalidType) {
+      diags.diagnose(param, diag::invalid_dynamic_member_subscript_invalid_type,
+                     param);
+      diagnosed = true;
+    }
+
+    if (flags & InvalidParameterFlag::ParameterMissingDefaultValue) {
+      diags
+          .diagnose(param,
+                    diag::invalid_dynamic_member_subscript_missing_default,
+                    param)
+          .highlight(param->getSourceRange())
+          .fixItInsertAfter(param->getEndLoc(), " = <#Default#>");
+      diagnosed = true;
     }
   }
 
-  return outputError;
+  return diagnosed;
 }
 
 DynamicMemberLookupSubscriptRequest::Result
