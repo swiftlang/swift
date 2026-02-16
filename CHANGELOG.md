@@ -5,6 +5,21 @@
 
 ## Swift (next)
 
+* [SE-0504]():
+  Introduced Task Cancellation Shields which allow to temporary prevent the observation of task
+  cancellation in a given scope. This functionality is intended for use with cleanup actions which
+  may otherwise not have run to completion (since their implementation may have been checking for
+  cancellation and returning early). It may also be used within `defer` blocks to conveniently
+  express such guaranteed-to-run-to-completion cleanups.
+
+  ```swift
+  Task.isCancelled // true
+  withTaskCancellationShield {
+    Task.isCancelled // false
+    cleanup() 
+  }
+  ```
+
 * Calling from Objective-C into into asynchronous Swift APIs will now attempt use `Task.immediate`
   instead of `Task` when available. This reduces the initial enqueue delay which Task would incur
   (by enqueueing on the global pool before calling the async target), and can improve performance
@@ -10991,6 +11006,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
+[SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
