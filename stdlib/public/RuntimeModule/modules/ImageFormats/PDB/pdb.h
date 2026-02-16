@@ -1,4 +1,4 @@
-//===--- codeview.h - Definitions of CodwView structures for Swift --------===//
+//===--- codeview.h - Definitions of CodeView structures for Swift --------===//
 //
 // This source file is part of the Swift.org open source project
 //

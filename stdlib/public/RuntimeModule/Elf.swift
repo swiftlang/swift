@@ -999,17 +999,6 @@ protocol ElfSymbolTableProtocol {
 }
 
 @available(Backtracing 6.2, *)
-protocol ElfSymbolLookupProtocol {
-  associatedtype Traits: ElfTraits
-  typealias CallSiteInfo = DwarfReader<ElfImage<Traits>>.CallSiteInfo
-  typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
-
-  func lookupSymbol(address: Traits.Address) -> ImageSymbol?
-  func inlineCallSites(at address: Traits.Address) -> ArraySlice<CallSiteInfo>
-  func sourceLocation(for address: Traits.Address) throws -> SourceLocation?
-}
-
-@available(Backtracing 6.2, *)
 struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
   typealias Traits = SomeElfTraits
 
@@ -1158,8 +1147,7 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
 }
 
 @available(Backtracing 6.2, *)
-final class ElfImage<SomeElfTraits: ElfTraits>
-  : DwarfSource, ElfSymbolLookupProtocol {
+final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
   typealias Traits = SomeElfTraits
   typealias SymbolTable = ElfSymbolTable<SomeElfTraits>
 
@@ -1650,16 +1638,6 @@ final class ElfImage<SomeElfTraits: ElfTraits>
 
     _symbolTable = localTable
     return localTable
-  }
-
-  public func lookupSymbol(address: Traits.Address) -> ImageSymbol? {
-    let relativeAddress = address - Traits.Address(baseAddress)
-    guard let symbol = symbolTable.lookupSymbol(address: relativeAddress) else {
-      return nil
-    }
-
-    return ImageSymbol(name: symbol.name,
-                       offset: Int(relativeAddress - symbol.value))
   }
 
   static var pathSeparator: String { "/" }
