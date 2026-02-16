@@ -2425,12 +2425,10 @@ namespace {
 
       auto appliedWrappers =
           solution.getAppliedPropertyWrappers(memberLoc->getAnchor());
-      
       args = coerceCallArguments(
           args, fullSubscriptTy, subscriptRef, nullptr,
           locator.withPathElement(ConstraintLocator::ApplyArgument),
           appliedWrappers);
-      
       if (!args)
         return nullptr;
 
