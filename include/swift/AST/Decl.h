@@ -542,7 +542,7 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2+2,
+  SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
   
