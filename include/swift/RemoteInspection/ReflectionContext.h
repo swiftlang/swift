@@ -551,17 +551,19 @@ public:
     // base offset to the offset. If both are present, the address field should
     // be preferred.
     std::vector<MemoryReader::ReadBytesResult> readBuffer;
-    auto readData = [&](uint64_t offset, uint64_t size) -> const void* {
+    auto readData = [&](uint64_t offset, uint64_t size) -> const void * {
       MemoryReader::ReadBytesResult buf =
-        this->getReader().readBytes(ImageStart + offset, size);
-      if (!buf) return nullptr;
+          this->getReader().readBytes(ImageStart + offset, size);
+      if (!buf)
+        return nullptr;
       readBuffer.push_back(std::move(buf));
       return readBuffer.back().get();
     };
 
-    const typename T::Header * ehdr =
-      reinterpret_cast<const typename T::Header*>(readData(0, sizeof(typename T::Header)));
-    if(!ehdr)
+    const typename T::Header *ehdr =
+        reinterpret_cast<const typename T::Header *>(
+            readData(0, sizeof(typename T::Header)));
+    if (!ehdr)
       return {};
     assert(ehdr->getFileClass() == T::ELFClass && "incorrect ELF file class");
 
@@ -582,8 +584,10 @@ public:
         assert(false && "Too many program headers to read safely");
         return {};
       }
-      const typename T::SectionHeader * sectionHdr =
-        reinterpret_cast<typename T::SectionHeader *>(readData(ehdr->e_shoff + llvm::ELF::SHN_UNDEF, sizeof(typename T::SectionHeader)));
+      const typename T::SectionHeader *sectionHdr =
+          reinterpret_cast<typename T::SectionHeader *>(
+              readData(ehdr->e_shoff + llvm::ELF::SHN_UNDEF,
+                       sizeof(typename T::SectionHeader)));
       if (sectionHdr == nullptr)
         return {};
       ePhnum = sectionHdr->sh_info;
@@ -617,13 +621,15 @@ public:
       SectionRange tests;
     };
 
-    const MetadataTable* metadataTable = nullptr;
-    const typename T::ProgramHeader * phdrs = reinterpret_cast<const typename T::ProgramHeader*>(
-        readData(ehdr->e_phoff, sizeof(typename T::ProgramHeader) * ePhnum));
+    const MetadataTable *metadataTable = nullptr;
+    const typename T::ProgramHeader *phdrs =
+        reinterpret_cast<const typename T::ProgramHeader *>(readData(
+            ehdr->e_phoff, sizeof(typename T::ProgramHeader) * ePhnum));
     for (unsigned idx = 0; !metadataTable && idx < ePhnum; ++idx) {
-      const typename T::ProgramHeader* phdr = phdrs + idx;
+      const typename T::ProgramHeader *phdr = phdrs + idx;
       assert(phdr && "Failed to load program header");
-      if (phdr->p_type != llvm::ELF::PT_NOTE) continue;
+      if (phdr->p_type != llvm::ELF::PT_NOTE)
+        continue;
 
       // PT_NOTE layout
       // namesz (4 bytes)
@@ -642,42 +648,48 @@ public:
       // Each note segment can contain multiple notes. The Swift metadata table
       // (currently) only contains one, so we only need to check the first one.
       // Looking for name: 'swift6\0', and type: 0x73356d64 ('s5md')
-      const PT_NOTE_HEADER* note_hdr = reinterpret_cast<const PT_NOTE_HEADER*>(readData(phdr->p_vaddr, sizeof(PT_NOTE_HEADER)));
-      if (!note_hdr || note_hdr->namesz == 0) continue;
+      const PT_NOTE_HEADER *note_hdr = reinterpret_cast<const PT_NOTE_HEADER *>(
+          readData(phdr->p_vaddr, sizeof(PT_NOTE_HEADER)));
+      if (!note_hdr || note_hdr->namesz == 0)
+        continue;
 
-      const char* name = reinterpret_cast<const char*>(readData(
-            phdr->p_vaddr + sizeof(PT_NOTE_HEADER),
-            note_hdr->namesz));
+      const char *name = reinterpret_cast<const char *>(
+          readData(phdr->p_vaddr + sizeof(PT_NOTE_HEADER), note_hdr->namesz));
 
-      if(!name || *name == '\0') continue;
+      if (!name || *name == '\0')
+        continue;
 
-      if(strncmp(name, "swift6", 6) != 0) continue;
-      if (note_hdr->type != 0x73356d64) continue;
-      assert(note_hdr->descsz == sizeof(MetadataTable) && "Note format mismatched\n");
+      if (strncmp(name, "swift6", 6) != 0)
+        continue;
+      if (note_hdr->type != 0x73356d64)
+        continue;
+      assert(note_hdr->descsz == sizeof(MetadataTable) &&
+             "Note format mismatched\n");
       /// Offset past the section header, the name, and the 1 alignment byte
-      const uint64_t tableOffset = sizeof(PT_NOTE_HEADER) + note_hdr->namesz + 1;
-      metadataTable = reinterpret_cast<const MetadataTable *>(readData(
-            phdr->p_vaddr + tableOffset,
-            note_hdr->descsz));
+      const uint64_t tableOffset =
+          sizeof(PT_NOTE_HEADER) + note_hdr->namesz + 1;
+      metadataTable = reinterpret_cast<const MetadataTable *>(
+          readData(phdr->p_vaddr + tableOffset, note_hdr->descsz));
     }
     if (metadataTable == nullptr)
       return {};
 
-    auto readSection = [&](const SectionRange & range) -> std::pair<RemoteRef<void>, uint64_t> {
+    auto readSection =
+        [&](const SectionRange &range) -> std::pair<RemoteRef<void>, uint64_t> {
       const RemoteAddress secStart = ImageStart + range.start;
       const uint64_t secSize = range.stop - range.start;
 
       MemoryReader::ReadBytesResult section =
-        this->getReader().readBytes(secStart, secSize);
+          this->getReader().readBytes(secStart, secSize);
       if (!section)
         return {nullptr, 0};
       auto sectionContentRef = RemoteRef<void>(secStart, section.get());
       savedBuffers.push_back(std::move(section));
-      return { sectionContentRef, secSize };
+      return {sectionContentRef, secSize};
     };
 
-#define INSERT_METADATA_SECTION(range) \
-    auto range = readSection(metadataTable->range)
+#define INSERT_METADATA_SECTION(range)                                         \
+  auto range = readSection(metadataTable->range)
     INSERT_METADATA_SECTION(fieldmd);
     INSERT_METADATA_SECTION(assocty);
     INSERT_METADATA_SECTION(builtin);
@@ -687,20 +699,17 @@ public:
     INSERT_METADATA_SECTION(protocol_conformances);
     INSERT_METADATA_SECTION(mpenum);
 #undef INSERT_METADATA_SECTION
-#define INSERT_METADATA_SECTION(range) \
-    { range.first, range.second }
+#define INSERT_METADATA_SECTION(range) {range.first, range.second}
 
-    ReflectionInfo info = {
-      INSERT_METADATA_SECTION(fieldmd),
-      INSERT_METADATA_SECTION(assocty),
-      INSERT_METADATA_SECTION(builtin),
-      INSERT_METADATA_SECTION(capture),
-      INSERT_METADATA_SECTION(typeref),
-      INSERT_METADATA_SECTION(reflstr),
-      INSERT_METADATA_SECTION(protocol_conformances),
-      INSERT_METADATA_SECTION(mpenum),
-      PotentialModuleNames
-    };
+    ReflectionInfo info = {INSERT_METADATA_SECTION(fieldmd),
+                           INSERT_METADATA_SECTION(assocty),
+                           INSERT_METADATA_SECTION(builtin),
+                           INSERT_METADATA_SECTION(capture),
+                           INSERT_METADATA_SECTION(typeref),
+                           INSERT_METADATA_SECTION(reflstr),
+                           INSERT_METADATA_SECTION(protocol_conformances),
+                           INSERT_METADATA_SECTION(mpenum),
+                           PotentialModuleNames};
 
 #undef INSERT_METADATA_SECTION
     return this->addReflectionInfo(info);

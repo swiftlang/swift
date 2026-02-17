@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImageInspectionCommon.h"
-#include "swift/shims/MetadataSections.h"
 #include "swift/Runtime/Backtrace.h"
 #include "swift/Runtime/Config.h"
+#include "swift/shims/MetadataSections.h"
 
 #include <cstddef>
 #include <new>
@@ -21,30 +21,30 @@
 #if SWIFT_ENABLE_BACKTRACING
 // Drag in a symbol from the backtracer, to force the static linker to include
 // the code.
-static const void *__backtraceRef __attribute__((used, retain))
-  = (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
+static const void *__backtraceRef __attribute__((used, retain)) =
+    (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
 #endif
 
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
-# define DECLARE_EMPTY_METADATA_SECTION(name) __asm__("\t.section " #name ",\"R\",@\n");
+#define DECLARE_EMPTY_METADATA_SECTION(name)                                   \
+  __asm__("\t.section " #name ",\"R\",@\n");
 
-#define BOUNDS_VISIBILITY __attribute__((__visibility__("hidden"), \
-                                         __aligned__(1)))
+#define BOUNDS_VISIBILITY                                                      \
+  __attribute__((__visibility__("hidden"), __aligned__(1)))
 
-#define DECLARE_BOUNDS(name)                            \
-  BOUNDS_VISIBILITY extern const char __start_##name;   \
+#define DECLARE_BOUNDS(name)                                                   \
+  BOUNDS_VISIBILITY extern const char __start_##name;                          \
   BOUNDS_VISIBILITY extern const char __stop_##name;
 
-#define DECLARE_SWIFT_SECTION(name)             \
-  DECLARE_EMPTY_METADATA_SECTION(name)          \
+#define DECLARE_SWIFT_SECTION(name)                                            \
+  DECLARE_EMPTY_METADATA_SECTION(name)                                         \
   DECLARE_BOUNDS(name)
 
 // These may or may not be present, depending on compiler switches; it's
 // worth calling them out as a result.
-#define DECLARE_SWIFT_REFLECTION_SECTION(name)  \
-  DECLARE_SWIFT_SECTION(name)
+#define DECLARE_SWIFT_REFLECTION_SECTION(name) DECLARE_SWIFT_SECTION(name)
 
 extern "C" {
 DECLARE_SWIFT_SECTION(swift5_protocols)
@@ -74,17 +74,18 @@ static swift::MetadataSections sections{};
 }
 
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
-__attribute__((__constructor__))
-static void swift_image_constructor() {
+__attribute__((__constructor__)) static void swift_image_constructor() {
 #define SWIFT_SECTION_RANGE(name)                                              \
-  { reinterpret_cast<uintptr_t>(&__start_##name),                              \
-    static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
+  {                                                                            \
+    reinterpret_cast<uintptr_t>(&__start_##name),                              \
+        static_cast<uintptr_t>(&__stop_##name - &__start_##name)               \
+  }
 
-  ::new (&sections) swift::MetadataSections {
+  ::new (&sections) swift::MetadataSections{
       swift::CurrentSectionMetadataVersion,
 
-      // NOTE: Multi images in a single process is not yet stabilized in WebAssembly
-      // toolchain outside of Emscripten.
+      // NOTE: Multi images in a single process is not yet stabilized in
+      // WebAssembly toolchain outside of Emscripten.
       nullptr,
 
       nullptr,
