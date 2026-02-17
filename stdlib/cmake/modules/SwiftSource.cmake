@@ -1037,7 +1037,7 @@ function(_compile_swift_files
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}"
       CUSTOM_TARGET_NAME ${file_path_target}
       OUTPUT "${file_path}"
-      DEPENDS "${file_path}.tmp")
+      DEPENDS "${file_path}.tmp" ${source_files})
   endif()
 
   # If this platform/architecture combo supports backward deployment to old
@@ -1069,7 +1069,7 @@ function(_compile_swift_files
         "${line_directive_tool}"
         "${file_path_target}"
         ${swift_compiler_tool_dep}
-        ${source_files} ${SWIFTFILE_DEPENDS}
+        ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${copy_legacy_layouts_dep}
       COMMENT "Compiling ${first_output}")
@@ -1113,7 +1113,7 @@ function(_compile_swift_files
           "${line_directive_tool}"
           "${file_path_target}"
           ${swift_compiler_tool_dep}
-          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
@@ -1142,7 +1142,7 @@ function(_compile_swift_files
           "${line_directive_tool}"
           "${file_path_target}"
           ${swift_compiler_tool_dep}
-          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
@@ -1183,7 +1183,6 @@ function(_compile_swift_files
           "${line_directive_tool}"
           "${file_path_target}"
           ${swift_compiler_tool_dep}
-          ${source_files}
           ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${obj_dirs_dependency_target}
@@ -1215,7 +1214,7 @@ function(_compile_swift_files
             "${line_directive_tool}"
             "${file_path_target}"
             ${swift_compiler_tool_dep}
-            ${source_files} ${SWIFTFILE_DEPENDS}
+            ${SWIFTFILE_DEPENDS}
             ${swift_ide_test_dependency}
             ${copy_legacy_layouts_dep}
           COMMENT "Generating ${maccatalyst_module_file_static}")
@@ -1240,7 +1239,7 @@ function(_compile_swift_files
           "${line_directive_tool}"
           "${file_path_target}"
           ${swift_compiler_tool_dep}
-          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${SWIFTFILE_DEPENDS}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sib_file}"
         EXCLUDE_FROM_ALL)
@@ -1260,7 +1259,7 @@ function(_compile_swift_files
           "${line_directive_tool}"
           "${file_path_target}"
           ${swift_compiler_tool_dep}
-          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${SWIFTFILE_DEPENDS}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sibopt_file}"
         EXCLUDE_FROM_ALL)
@@ -1281,7 +1280,7 @@ function(_compile_swift_files
           "${line_directive_tool}"
           "${file_path_target}"
           ${swift_compiler_tool_dep}
-          ${source_files} ${SWIFTFILE_DEPENDS}
+          ${SWIFTFILE_DEPENDS}
           ${copy_legacy_layouts_dep}
           COMMENT "Generating ${sibgen_file}"
           EXCLUDE_FROM_ALL)
