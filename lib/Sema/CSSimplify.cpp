@@ -12392,8 +12392,13 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   // Propagate @Sendable from the contextual type to the closure.
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
-    if (contextualFnType->isSendable())
-      closureExtInfo = closureExtInfo.withSendable();
+    if (!closureExtInfo.isSendable()) {
+      if (auto sendTy = contextualFnType->getSendableDependentType()) {
+        closureExtInfo = closureExtInfo.withSendableDependentType(sendTy);
+      } else if (contextualFnType->isSendable()) {
+        closureExtInfo = closureExtInfo.withSendable();
+      }
+    }
   }
 
   // Propagate sending result from the contextual type to the closure.
