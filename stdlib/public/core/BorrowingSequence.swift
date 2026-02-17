@@ -148,6 +148,7 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
 
 @available(SwiftStdlib 6.4, *)
 extension Sequence {
+  @_disfavoredOverload
   @_transparent
   public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
     BorrowingIteratorAdapter(iterator: makeIterator())
