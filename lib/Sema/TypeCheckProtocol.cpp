@@ -877,6 +877,24 @@ RequirementMatch swift::matchWitness(
         return RequirementMatch(witness, MatchKind::AsyncConflict);
       }
 
+      {
+        auto getLifetimes = [](ValueDecl *decl, AnyFunctionType *type) {
+          if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+            // Lack of lifetimes is equivalent to an empty list of lifetimes.
+            return afd->getLifetimeDependencies().value_or(
+                ArrayRef<LifetimeDependenceInfo>{});
+          }
+          return type->getLifetimeDependencies();
+        };
+
+        auto witnessLifetimes = getLifetimes(witness, witnessFnType);
+        auto reqLifetimes = getLifetimes(req, reqFnType);
+        if (!matchLifetimeDependencies(witnessLifetimes,
+                                       reqLifetimes)) {
+          return RequirementMatch(witness, MatchKind::LifetimeConflict);
+        }
+      }
+
       if (!reqThrownError) {
         // Save the thrown error types of the requirement and witness so we
         // can check them later.
@@ -3288,6 +3306,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     }
     diags.diagnose(witness, diag::protocol_witness_borrow_mutate_conflict,
                    diagMsg);
+    break;
+  }
+  case MatchKind::LifetimeConflict: {
+    diags.diagnose(match.Witness, diag::protocol_witness_lifetime_conflict);
     break;
   }
   }

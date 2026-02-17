@@ -3337,6 +3337,8 @@ NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
      "candidate is explicitly '@nonobjc'", ())
+NOTE(protocol_witness_lifetime_conflict, none,
+     "candidate's lifetime dependencies do not match those specified by protocol", ())
 NOTE(protocol_witness_enum_case_payload, none,
      "candidate is an enum case with associated values, "
      "but protocol does not allow it", ())
