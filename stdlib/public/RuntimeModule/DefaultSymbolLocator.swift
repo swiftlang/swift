@@ -208,7 +208,14 @@ public class DefaultSymbolLocator: SymbolLocator {
       }
     }
 
-    return nil
+    // Otherwise, return the image itself
+    let source = toSymbolSource(result)
+    if let uuid = image.uuid {
+      cache[.uuid(uuid)] = source
+    } else if let path = image.path {
+      cache[.path(path)] = source
+    }
+    return source
   }
 
   private func findSymbolsForPeCoff(image: any Image) -> (any SymbolSource)? {
@@ -351,11 +358,17 @@ public class DefaultSymbolLocator: SymbolLocator {
       }
     }
 
-    if let uuid, let age {
-      cache[.uuidAndAge(uuid, age)] = result
-    } else if let path = image.path {
+    if let result {
+      if let uuid, let age {
+        cache[.uuidAndAge(uuid, age)] = result
+      } else if let path = image.path {
         cache[.path(path)] = result
+      }
     }
+
+    // Note: for PE-COFF, we assume that the COFF symbol table is empty,
+    // which is usually the case, so we only return the PE-COFF image if
+    // it has DWARF data.
 
     return result
   }
