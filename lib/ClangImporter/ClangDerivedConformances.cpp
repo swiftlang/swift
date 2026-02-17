@@ -937,23 +937,11 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       },
       LookUpConformanceInModule());
 
-  auto borrowingIteratorDecl = cxxSequenceProto->getAssociatedType(
-      ctx.getIdentifier("BorrowingIterator"));
-  assert(borrowingIteratorDecl &&
-         "CxxSequence must have a BorrowingIterator associated type");
-  auto borrowingIteratorNominal =
-      borrowingIteratorDecl->getDefaultDefinitionType()->getAnyNominal();
-
-  // Substitute generic `Self` and `Element` parameters.
-  auto borrowingIteratorTy = BoundGenericType::get(
-      borrowingIteratorNominal, Type(), {iteratorTy});
-
   impl.addSynthesizedTypealias(decl, ctx.Id_Element, pointeeTy);
   impl.addSynthesizedTypealias(decl, ctx.Id_Iterator, iteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
-  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
-                               borrowingIteratorTy);
+
   // Not conforming the type to CxxSequence protocol here:
   // The current implementation of CxxSequence triggers extra copies of the C++
   // collection when creating a CxxIterator instance. It needs a more efficient
