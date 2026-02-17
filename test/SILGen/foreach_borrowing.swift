@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types \
-// RUN:     -Xllvm -sil-print-debuginfo \
+// RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
 // RUN:     -disable-availability-checking \
 // RUN:     %s | %FileCheck %s
@@ -71,7 +71,7 @@ func testContinueTargetBorrowingSequence() {
   // CHECK: cond_br {{.*}}, [[INNER_LOOP_BODY:bb4]]
   // CHECK: [[INNER_LOOP_BODY]]:
   // Continue condition
-  // CHECK: cond_br {{.*}}, [[CONTINUE_BB:bb5]], [[PRINT_BB:bb6]]
+  // CHECK: cond_br {{.*}}, [[CONTINUE_BB:bb5]], [[PRINT_BB:bb6]], {{.*}} isImplicit: false
   // CHECK: [[CONTINUE_BB]]:
   // CHECK: br [[INNER_LOOP_HEADER]]
   // CHECK: [[PRINT_BB]]:
