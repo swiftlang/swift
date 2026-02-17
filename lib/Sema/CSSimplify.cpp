@@ -3259,9 +3259,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     for (auto &fromDep : func1->getLifetimeDependencies()) {
       auto toDep = func2->getLifetimeDependenceFor(fromDep.getTargetIndex());
       if (toDep) {
-        // If a dependency is present for the same target in both types, then
-        // the dependency must match.
-        if (fromDep != *toDep) {
+        // We can only safely convert to the destination type if it has lifetime
+        // dependencies that are at least as constrained as those of the source.
+        if (fromDep.satisfies(*toDep)) {
           return getTypeMatchFailure(locator);
         }
         

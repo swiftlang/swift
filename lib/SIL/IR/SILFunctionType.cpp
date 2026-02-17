@@ -2956,6 +2956,8 @@ static CanSILFunctionType getSILFunctionType(
   auto lowerLifetimeDependence
     = [&](const LifetimeDependenceInfo &formalDeps,
           unsigned target) -> LifetimeDependenceInfo {
+      auto flags = formalDeps.getFlags();
+
       if (target == parameterMap.size()) {
         // The target is the result, represented by the number of parameters.
         // Parameters may have been added if there were closure captures, so
@@ -2963,13 +2965,29 @@ static CanSILFunctionType getSILFunctionType(
         target = inputs.size();
       }
 
-      auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
-        if (!formal) {
+      auto lowerIndexSet = [&](IndexSubset *formal, bool withClosureContextDependence) -> IndexSubset * {
+        // We are lowering a dependence on the closure context, so the resulting
+        // SIL function cannot have one.
+        flags.dependsOnClosureContext = false;
+
+        if (!formal && !withClosureContextDependence) {
           return nullptr;
         }
         
         SmallBitVector loweredIndices;
-        loweredIndices.resize(parameterMap.size());      
+
+        // With a formal dependence on the closure context, add a lowered
+        // dependence on each capture.
+        if (withClosureContextDependence) {
+          loweredIndices.resize(inputs.size());
+          
+          for (unsigned j = parameterMap.size(); j < inputs.size(); ++j) {
+            loweredIndices[j] = true;
+          }
+        } else {
+          loweredIndices.resize(parameterMap.size());
+        }
+        
         for (unsigned j = 0; j < parameterMap.size(); ++j) {
           int formalIndex = parameterMap[j];
           if (formalIndex < 0) {
@@ -2984,20 +3002,23 @@ static CanSILFunctionType getSILFunctionType(
         
         return IndexSubset::get(TC.Context, loweredIndices);
       };
-      
+
+      // A formal dependence on the closure context corresponds to an inherited
+      // dependence on every capture.
       IndexSubset *inheritIndicesSet
-        = lowerIndexSet(formalDeps.getInheritIndices());
+        = lowerIndexSet(formalDeps.getInheritIndices(), formalDeps.dependsOnClosureContext());
       IndexSubset *scopeIndicesSet
-        = lowerIndexSet(formalDeps.getScopeIndices());
+        = lowerIndexSet(formalDeps.getScopeIndices(), false);
       
       // If the original formal parameter dependencies were lowered away
       // entirely (such as if they were of `()` type), then there is effectively
-      // no dependency, leaving behind an immortal value.
+      // no dependency, leaving behind a value that is either immortal, or
+      // depends on the function's closure context.
       if (!inheritIndicesSet && !scopeIndicesSet) {
-        return LifetimeDependenceInfo(
-            nullptr, nullptr, target,
-            /*hasImmortalSpecifier*/ true,
-            /*fromAnnotation*/ formalDeps.isFromAnnotation());
+        if (!flags.dependsOnClosureContext)
+          flags.hasImmortalSpecifier = true;
+        return LifetimeDependenceInfo(nullptr, nullptr, target,
+                                      flags);
       }
       
       SmallBitVector addressableDeps = scopeIndicesSet
@@ -3015,10 +3036,8 @@ static CanSILFunctionType getSILFunctionType(
         : nullptr;
 
       return LifetimeDependenceInfo(
-        inheritIndicesSet, scopeIndicesSet, target,
-        formalDeps.hasImmortalSpecifier(),
-        /*fromAnnotation*/ formalDeps.isFromAnnotation(), addressableSet,
-        condAddressableSet);
+        inheritIndicesSet, scopeIndicesSet, target, addressableSet,
+        condAddressableSet, flags);
     };
   // Lower parameter dependencies.
   for (unsigned i = 0; i < parameterMap.size(); ++i) {
