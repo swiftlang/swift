@@ -1504,38 +1504,20 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
     conformances.push_back(ctx.getSelfConformance(protocol));
   }
 
-  // Search extensions of the protocol for reparented conformances.
-  for (auto *ext : protocol->getExtensions()) {
-    // No valid reparentings can appear outside the protocol's module.
-    if (ext->getModuleContext() != protocol->getModuleContext())
-      continue;
+  for (auto &[newBase, ext, index] : protocol->getReparentingProtocols()) {
+    // We say that 'Self' is what conforms to the @reparented entry.
+    auto conformingType = protocol->getDeclaredInterfaceType();
+    auto const &entry = ext->getInherited().getEntry(index);
+    assert(entry.isReparented());
 
-    auto inheritedTypes = InheritedTypes(ext);
-    for (unsigned i : inheritedTypes.getIndices()) {
-      auto const &entry = inheritedTypes.getEntry(i);
-      if (!entry.isReparented())
-        continue;
+    auto loc = entry.getLoc();
+    if (!loc)
+      loc = ext->getLoc();
 
-      // We may not have already validated the inherited entry.
-      Type inheritedTy =
-          inheritedTypes.getResolvedType(i, TypeResolutionStage::Structural);
-
-      auto baseTy = inheritedTy->getAs<ProtocolType>();
-      if (!baseTy)
-        continue;
-
-      auto baseProto = baseTy->getDecl();
-      assert(baseProto);
-
-      // We say that 'Self' is what conforms to the inherited entry.
-      auto conformingType = protocol->getDeclaredInterfaceType();
-      auto *conf = ctx.getNormalConformance(
-          conformingType, baseTy->getDecl(), entry.getLoc(),
-          entry.getTypeRepr(), /*dc=*/ext, ProtocolConformanceState::Incomplete,
-          ProtocolConformanceFlags::Reparented);
-
-      conformances.push_back(conf);
-    }
+    conformances.push_back(ctx.getNormalConformance(
+        conformingType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
+        ProtocolConformanceState::Incomplete,
+        ProtocolConformanceFlags::Reparented));
   }
 
   return conformances;
