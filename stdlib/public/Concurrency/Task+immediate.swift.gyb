@@ -35,7 +35,7 @@ import Swift
 
 @available(SwiftStdlib 6.2, *)
 % if IS_THROWING:
-extension Task { // throwing Failure error type
+extension Task { // typed throwing Failure error type
 % else:
 extension Task where Failure == ${FAILURE_TYPE} {
 % end
@@ -76,7 +76,9 @@ extension Task where Failure == ${FAILURE_TYPE} {
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
+% if not IS_THROWING:
   @discardableResult
+% end
   public static func ${METHOD_NAME}(
     name: String? = nil,
     priority: TaskPriority? = nil,
