@@ -561,6 +561,9 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
   fatalError("Unsupported combination of encodings")
 }
 
+#if _runtime(_ObjC)
+
+// Logically this should go in StringBridge.swift, but I'd have to make the stuff it calls `internal` instead of `fileprivate` to do that
 @c public func _unicodeBuffersEqual(
   bytes rawLHS: UnsafeRawPointer,
   count lhsCount: Int,
@@ -594,3 +597,4 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
   }
   fatalError("Unsupported combination of encodings")
 }
+#endif
