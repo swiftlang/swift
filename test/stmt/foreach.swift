@@ -5,10 +5,10 @@ struct BadContainer1 {
 }
 
 func bad_containers_1(bc: BadContainer1) {
-  for e in bc { } // expected-error{{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
+  for e in bc { } // expected-error {{for-in loop requires 'BadContainer1' to conform to 'Sequence'}}
 }
 
-struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
+struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'BorrowingSequence'}} expected-error {{type 'BadContainer2' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   var generate : Int
 }
 
@@ -16,7 +16,7 @@ func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
 }
 
-struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
+struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'BorrowingSequence'}} expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   func makeIterator() { } // expected-note{{candidate can not infer 'Iterator' = '()' because '()' is not a nominal type and so can't conform to 'IteratorProtocol'}}
 }
 
@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'BorrowingSequence'}} expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
