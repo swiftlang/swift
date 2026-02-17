@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2024-2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,7 +19,9 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeRepr.h"
@@ -27,6 +29,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 
 #define DEBUG_TYPE "LifetimeDependence"
@@ -490,9 +493,6 @@ class LifetimeDependenceChecker {
   // represent the function result.
   const unsigned resultIndex;
 
-  // The result or yield type of the function.
-  Type resultInterfaceType;
-
   // The result or yield type of the function being checked in its generic
   // environment.
   Type resultTy;
@@ -562,17 +562,6 @@ public:
     return parameterInfos[paramIndex];
   }
 
-  Type getInterfaceTypeForIndex(unsigned paramOrResultIndex) {
-    if (paramOrResultIndex == resultIndex)
-      return resultInterfaceType;
-
-    if (implicitSelfParamInfo &&
-        paramOrResultIndex == implicitSelfParamInfo->index)
-      return implicitSelfParamInfo->getInterfaceType();
-
-    return parameterInfos[paramOrResultIndex].getInterfaceType();
-  }
-
   Type getEnvTypeForIndex(unsigned paramOrResultIndex) {
     if (paramOrResultIndex == resultIndex)
       return resultTy;
@@ -585,7 +574,7 @@ public:
   }
 
 private:
-  static auto collectLifetimeEntries(DeclAttributes const &attrs) {
+  static auto collectDeclLifetimeEntries(DeclAttributes const &attrs) {
     decltype(lifetimeEntries) lifetimeEntries;
     for (auto attr : attrs.getAttributes<LifetimeAttr>()) {
       lifetimeEntries.push_back(attr->getLifetimeEntry());
@@ -593,8 +582,17 @@ private:
     return lifetimeEntries;
   }
 
-  static auto collectParameterInfo(ParameterList const *params,
-                                   DeclContext *DC) {
+  static auto collectFunctionTypeLifetimeEntries(
+    ArrayRef<LifetimeTypeAttr *> lifetimeAttrs) {
+    decltype(lifetimeEntries) lifetimeEntries;
+    for (auto *attr : lifetimeAttrs) {
+      lifetimeEntries.push_back(attr->getLifetimeEntry());
+    }
+    return lifetimeEntries;
+  }
+
+  static auto collectDeclParameterInfo(ParameterList const *params,
+                                       DeclContext *DC) {
     decltype(parameterInfos) parameterInfos;
     for (auto [index, param] : enumerate(*params)) {
       parameterInfos.push_back(
@@ -604,22 +602,46 @@ private:
     return parameterInfos;
   }
 
+  static auto collectFunctionTypeParameterInfo(FunctionTypeRepr *funcRepr,
+                                               AnyFunctionType *funcType,
+                                               GenericEnvironment *env) {
+    decltype(parameterInfos) parameterInfos;
+
+    // We only ever use the second names of function type parameters for
+    // lifetimes.
+    ArrayRef<Param> params = funcType->getParams();
+    ArrayRef<TupleTypeReprElement> argReprs =
+      funcRepr->getArgsTypeRepr()->getElements();
+
+    assert(params.size() == argReprs.size());
+    for (auto [index, param] : enumerate(params)) {
+      auto const &arg = argReprs[index];
+      parameterInfos.push_back(
+        {param, (unsigned)index,
+           // If an argument has no second name, use the location of its type.
+           arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
+           GenericEnvironment::mapTypeIntoEnvironment(
+               env, param.getPlainType())});
+    }
+    return parameterInfos;
+  }
+
 public:
   LifetimeDependenceChecker(AbstractFunctionDecl *afd)
-      : lifetimeEntries(collectLifetimeEntries(afd->getAttrs())),
-        parameterInfos(collectParameterInfo(afd->getParameters(), afd)),
+      : lifetimeEntries(collectDeclLifetimeEntries(afd->getAttrs())),
+        parameterInfos(collectDeclParameterInfo(afd->getParameters(), afd)),
         afd(afd), ctx(afd->getDeclContext()->getASTContext()),
         sourceFile(afd->getParentSourceFile()),
         escapableDecl(ctx.getProtocol(
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(afd->getGenericEnvironment()),
         resultIndex(getResultIndex(afd)),
-        resultInterfaceType(getResultOrYieldInterface(afd)),
-        resultTy(afd->mapTypeIntoEnvironment(resultInterfaceType)),
+        resultTy(afd->mapTypeIntoEnvironment(getResultOrYieldInterface(afd))),
         returnLoc(getReturnLoc(afd)),
         implicitSelfParamInfo(getSelfParamInfo(afd)),
         depBuilder(resultIndex),
-        isImplicit(afd->isImplicit()), isInit(isa<ConstructorDecl>(afd)),
+        isImplicit(afd->isImplicit()),
+        isInit(isa<ConstructorDecl>(afd)),
         hasUnsafeNonEscapableResult(
             afd->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {}
 
@@ -627,35 +649,24 @@ public:
                             AnyFunctionType *funcType,
                             ArrayRef<LifetimeTypeAttr *> lifetimeAttrs,
                             DeclContext *dc, GenericEnvironment *env)
-      : afd(nullptr), ctx(funcType->getASTContext()),
+      : lifetimeEntries(collectFunctionTypeLifetimeEntries(lifetimeAttrs)),
+        parameterInfos(
+          collectFunctionTypeParameterInfo(funcRepr, funcType, env)),
+        afd(nullptr), ctx(funcType->getASTContext()),
         sourceFile(dc->getParentSourceFile()),
+        escapableDecl(ctx.getProtocol(
+            swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
+        genericEnv(env),
         resultIndex(funcType->getParams().size()),
+        resultTy(
+          GenericEnvironment::mapTypeIntoEnvironment(env,
+                                                     funcType->getResult())),
         returnLoc(funcRepr->getResultTypeRepr()->getLoc()),
-        implicitSelfParamInfo(std::nullopt), depBuilder(resultIndex),
-        isImplicit(false), isInit(false), hasUnsafeNonEscapableResult(false) {
-    for (auto functionLifetimeEntry : lifetimeAttrs)
-      lifetimeEntries.push_back(functionLifetimeEntry->getLifetimeEntry());
-
-    // We only ever use the second names of function type parameters for
-    // lifetimes.
-    auto const params = funcType->getParams();
-    auto const argReprs = funcRepr->getArgsTypeRepr()->getElements();
-
-    resultTy =
-        GenericEnvironment::mapTypeIntoEnvironment(env, funcType->getResult());
-
-    assert(params.size() == argReprs.size());
-    for (unsigned paramIndex = 0; paramIndex < params.size(); ++paramIndex) {
-      auto const &parameter = params[paramIndex];
-      auto const &arg = argReprs[paramIndex];
-      parameterInfos.push_back(
-          {parameter, paramIndex,
-           // If an argument has no second name, use the location of its type.
-           arg.SecondNameLoc.isValid() ? arg.SecondNameLoc : arg.Type->getLoc(),
-           GenericEnvironment::mapTypeIntoEnvironment(
-               env, parameter.getPlainType())});
-    }
-  }
+        implicitSelfParamInfo(std::nullopt),
+        depBuilder(resultIndex),
+        isImplicit(false),
+        isInit(false),
+        hasUnsafeNonEscapableResult(false) {}
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
@@ -775,8 +786,8 @@ public:
     auto const resultIndex = getResultIndex(eed);
     LifetimeDependenceBuilder depBuilder(resultIndex);
     auto *parentEnum = eed->getParentEnum();
-    auto enumType =
-        parentEnum->mapTypeIntoEnvironment(parentEnum->getDeclaredInterfaceType());
+    auto enumType = parentEnum->mapTypeIntoEnvironment(
+      parentEnum->getDeclaredInterfaceType());
 
     // Add early bailout for imported enums.
     if (parentEnum->hasClangNode()) {
@@ -992,6 +1003,138 @@ protected:
     assert(kind == LifetimeDependenceKind::Scope);
     return loweredOwnership == ValueOwnership::Shared ||
            loweredOwnership == ValueOwnership::InOut;
+  }
+
+
+  // ==========================================================================
+  // MARK: Same-type inference
+  // ==========================================================================
+
+  /// Is 'sourceEnvType' Escapable under any of the conformance requirements in
+  /// 'targetReqs'?
+  ///
+  /// If true, we will infer a default dependency because a lifetime requirement
+  /// in the source is always present in the target. The source may have
+  /// additional lifetime requirements which are not copied to the
+  /// target. Conversely, the target may depend on multiple sources.
+  ///
+  /// Example:
+  ///
+  ///    struct NE1: ~Escapable {}
+  ///    struct NE2: ~Escapable {}
+  ///    func foo(arg: NE1?) -> NE1 // DEFAULT: @_lifetime(copy arg)
+  ///    func foo(arg: NE1?) -> NE2 // ERROR: missing annotation
+  ///
+  /// Invariant: hasSameTypeRequirement can only return true when
+  /// hasGuaranteedLifetime is also true.
+  ///
+  bool hasSameTypeRequirement(Type sourceEnvType,
+                              const llvm::SmallDenseSet<Type> &targetReqs) {
+
+    LLVM_DEBUG(llvm::dbgs() << "\nSource Type: " << sourceEnvType << "\n");
+    SmallVector<Type, 4> sourceReqs;
+    if (!collectRequiredTypesForNonEscapable(sourceEnvType, sourceReqs)) {
+      return false;
+    }
+    if (sourceReqs.empty()) {
+      // The source is unconditionally Escapable.
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "\nSource reqs:\n";
+               for (auto sourceReq : sourceReqs) {
+                 sourceReq.dump(llvm::dbgs());
+               });
+    return llvm::any_of(sourceReqs, [&](Type sourceReq) {
+      return targetReqs.contains(sourceReq);
+    });
+  }
+
+  bool collectRequiredTypesForNonEscapable(Type envType,
+                                           SmallVectorImpl<Type> &inverseReqs) {
+    if (envType->hasError()) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Error Type: " << envType << "\n");
+      return false;
+    }
+    auto confRef = lookupConformance(envType, escapableDecl);
+    if (confRef.isInvalid()) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Outer non-Escapable Type: " << envType << "\n");
+      inverseReqs.push_back(envType);
+      return true;
+    }
+    return collectRequiredTypesRecursively(confRef, inverseReqs);
+  }
+
+  bool collectRequiredTypesRecursively(ProtocolConformanceRef confRef,
+                                       SmallVectorImpl<Type> &inverseReqs) {
+
+    LLVM_DEBUG(llvm::dbgs() << "Collect for conformance:\n";
+               confRef.print(llvm::dbgs());
+               llvm::dbgs() << "\n");
+
+    if (confRef.isAbstract()) {
+      // Abstract conformances unconditionally conform.
+      return true;
+    }
+    if (confRef.isPack()) {
+      // Parameters packs cannot yet suppress Escapable, so bailout.
+      return false;
+      /* TODO:
+      PackType *packType = confRef.getPack()->getType();
+      for (auto subConfRef : confRef.getPack()->getPatternConformances()) {
+        if (!collectRequiredTypesRecursively(subConfRef, inverseReqs)) {
+          return false;
+        }
+      }
+      return true;
+      */
+    }
+    if (confRef.isConcrete()) {
+      ProtocolConformance *conformance = confRef.getConcrete();
+      switch (conformance->getKind()) {
+      case ProtocolConformanceKind::Self:
+      case ProtocolConformanceKind::Builtin:
+      case ProtocolConformanceKind::Normal:
+        // These types conform without requiring another type.
+        return true;
+      case ProtocolConformanceKind::Inherited:
+        // InheritedConformance is not allowed for suppressible protocols.
+        return true;
+      case ProtocolConformanceKind::Specialized:
+        // fall through to the recursive implementation.
+        break;
+      }
+      SubstitutionMap subMap = conformance->getSubstitutionMap();
+      // Use the 'subMap' signature, not the conformance signature.
+      GenericSignature subSig = subMap.getGenericSignature();
+      auto subConformances = subMap.getConformances();
+      for (auto &req : subSig.getRequirements()) {
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+
+        // GenericSignature's conformance Requirements line up with
+        // subMap.getConformances().
+        ProtocolConformanceRef subConfRef = subConformances.front();
+        subConformances = subConformances.slice(1);
+        if (subConfRef.isInvalid()) {
+          Type envType = req.getFirstType().subst(subMap);
+          LLVM_DEBUG(llvm::dbgs() << "Nested non-Escapable Type: "
+                     << envType << "\n");
+          inverseReqs.push_back(envType);
+          continue;
+        }
+        if (subConfRef.getProtocol()
+            ->isSpecificProtocol(KnownProtocolKind::Escapable)) {
+          if (!collectRequiredTypesRecursively(subConfRef, inverseReqs)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+    // unknown conformance kind
+    return false;
   }
 
   // ==========================================================================
@@ -1348,20 +1491,42 @@ protected:
   }
 
   // Infer a dependency to the ~Escapable result from all parameters of the same
-  // type.
+  // type. More generally, infer a dependency on any parameter type for which
+  // Escapable conformance requires the result type to be Escapable.
+  //
+  //     @_lifetime(copy a) // OK: Optional<T>: Escapable requires T: Escapable
+  //     func foo<T: ~Escapable>(a: T?) -> T {
+  //
   void inferNonEscapableResultOnSameTypeParam() {
-    // The function declaration's substituted result type.
-    CanType canResultTy = resultTy->getCanonicalType();
-
+    // Check that no @_lifetime annotation is present for the function result.
     TargetDeps *targetDeps = depBuilder.getInferredTargetDeps(resultIndex);
     if (!targetDeps)
       return;
 
+    LLVM_DEBUG(llvm::dbgs() << "\nTarget Type: " << resultTy << "\n");
+    SmallVector<Type, 4> targetReqList;
+    if (!collectRequiredTypesForNonEscapable(resultTy, targetReqList)) {
+      // Unable to evaluate conformance requirements.
+      return;
+    }
+    if (targetReqList.empty()) {
+      // The target is unconditionally Escapable.
+      return;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "\nTarget reqs:\n";
+               for (auto targetReq : targetReqList) {
+                 targetReq.dump(llvm::dbgs());
+               });
+    llvm::SmallDenseSet<Type> targetReqs;
+    for (Type targetReq : targetReqList) {
+      targetReqs.insert(targetReq);
+    }
+
     // Ignore mutating self. An 'inout' modifier effectively makes the parameter
     // a different type for lifetime inference.
     if (hasImplicitSelfParam() && !implicitSelfParamInfo->param.isInOut()) {
-      if (implicitSelfParamInfo->typeInContext->getCanonicalType() ==
-          canResultTy) {
+      if (hasSameTypeRequirement(implicitSelfParamInfo->typeInContext,
+                                 targetReqs)) {
         targetDeps->inheritIndices.set(implicitSelfParamInfo->index);
       }
     }
@@ -1377,11 +1542,9 @@ protected:
       if (paramInfo.param.isInOut())
         continue;
 
-      CanType paramTy = paramInfo.typeInContext->getCanonicalType();
-      if (paramTy != canResultTy)
-        continue;
-
-      targetDeps->inheritIndices.set(paramIndex);
+      if (hasSameTypeRequirement(paramInfo.typeInContext, targetReqs)) {
+        targetDeps->inheritIndices.set(paramIndex);
+      }
     }
   }
 
