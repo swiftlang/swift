@@ -104,6 +104,29 @@ std::string LifetimeEntry::getString() const {
 }
 
 namespace swift {
+bool matchLifetimeDependencies(
+    const ArrayRef<LifetimeDependenceInfo> from,
+    const ArrayRef<LifetimeDependenceInfo> to) {
+
+  // Require each LifetimeDependenceInfo in 'from' to have a corresponding
+  // LifetimeDependenceInfo in 'to', but not necessarily vice-versa.
+  if (from.size() > to.size())
+    return false;
+
+  // If from and to are the same array, they naturally match. This case should
+  // be reasonably common because lifetime dependence info is canonicalized.
+  if (from.data() == to.data() && from.size() == to.size())
+    return true;
+
+  for (const auto &fromDep : from) {
+    // For each LifetimeDependenceInfo in 'from', there must be one in 'to' that
+    // satisfies it.
+    const auto toDep = getLifetimeDependenceFor(to, fromDep.getTargetIndex());
+    if (!toDep || !fromDep.convertibleTo(*toDep))
+      return false;
+  }
+  return true;
+}
 
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
@@ -1858,6 +1881,48 @@ LifetimeDependenceInfo::getFromAST(
   return LifetimeDependenceChecker(funcRepr, funcType, lifetimeAttributes, dc,
                                    env)
       .checkFuncType();
+}
+
+bool LifetimeDependenceInfo::convertibleTo(
+    const LifetimeDependenceInfo &other) const {
+  // Pointer equality is sufficient for checking lifetimes are equal because
+  // they are canonicalized.
+  //
+  // We ignore the "isFromAnnotation" flag because it should not affect lifetime
+  // checking.
+
+  // The target must be the same.
+  if (this->getTargetIndex() != other.getTargetIndex()) {
+    return false;
+  }
+
+  // Immortal lifetimes are the least restrictive, so only immortal lifetimes
+  // can convert to them.
+  if (other.isImmortal()) {
+    return this->isImmortal();
+  }
+
+  // Accordingly, immortal lifetimes can convert to any non-immortal lifetimes.
+  if (this->isImmortal()) {
+    return true;
+  }
+
+  // a ⊆ b. A nullptr is an empty set.
+  const auto isSubset = [](IndexSubset *a, IndexSubset *b) {
+    // The empty set is a subset of every set, and every set is a subset of
+    // itself.
+    if (!a || a == b)
+      return true;
+    // The set a is non-empty, so it cannot be a subset if b is empty.
+    if (!b)
+      return false;
+    return a->isSubsetOf(b);
+  };
+
+  return isSubset(this->getInheritIndices(), other.getInheritIndices()) &&
+         isSubset(this->getAddressableIndices(),
+                  other.getAddressableIndices()) &&
+         isSubset(this->getScopeIndices(), other.getScopeIndices());
 }
 
 void LifetimeDependenceInfo::dump() const {

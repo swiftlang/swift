@@ -390,9 +390,27 @@ public:
   bool operator!=(const LifetimeDependenceInfo &other) const {
     return !(*this == other);
   }
-  
+
+  /// Whether the other LifetimeDependenceInfo is at least as restrictive as
+  /// this. If this is the case, a parameter or result with the other
+  /// LifetimeDependenceInfo can be assumed to satisfy this
+  /// LifetimeDependenceInfo's dependencies.
+  bool convertibleTo(const LifetimeDependenceInfo &other) const;
+
   SWIFT_DEBUG_DUMPER(dump());
 };
+
+/// Check whether a function with lifetime dependencies `from` can safely be
+/// treated as one with lifetime dependencies `to`.
+///
+/// Calls `LifetimeDependenceInfo::convertibleTo` to compare entries.
+///
+/// This compares members of from and to with the same targetIndex, so the
+/// result is independent of their order, but it takes O(n^2) time. Considering
+/// that n <= 2 for most functions, the function should still be reasonably fast.
+bool matchLifetimeDependencies(
+    const ArrayRef<LifetimeDependenceInfo> from,
+    const ArrayRef<LifetimeDependenceInfo> to);
 
 std::optional<LifetimeDependenceInfo>
 getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
