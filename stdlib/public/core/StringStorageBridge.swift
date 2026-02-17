@@ -146,13 +146,13 @@ extension _AbstractStringStorage {
     ptr: UnsafeRawPointer,
     count otherCount: Int,
     encoding: UInt
-  ) {
+  ) -> Bool {
     let ourEncoding = if isASCII {
       _cocoaASCIIEncoding
     } else {
       _cocoaUTF8Encoding
     }
-    return _unicodeBuffersEqual(
+    return unsafe _unicodeBuffersEqual(
       bytes: start,
       count: count,
       encoding: ourEncoding,
@@ -204,7 +204,7 @@ extension _AbstractStringStorage {
       
       if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
         let asciiBuffer = unsafe RawSpan(
-          _unchecked: ascii,
+          _unsafeStart: ascii,
           count: otherUTF16Length
         )
         return isEqual(
@@ -219,7 +219,7 @@ extension _AbstractStringStorage {
       
       if let utf16Ptr = unsafe _stdlib_binary_CFStringGetCharactersPtr(other) {
         let utf16Buffer = unsafe RawSpan(
-          _unchecked: utf16Ptr,
+          _unsafeStart: utf16Ptr,
           count: otherUTF16Length
         )
         return isEqual(
@@ -352,7 +352,7 @@ extension __StringStorage {
     count: Int,
     encoding: UInt
   ) -> Int8 {
-    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding)
+    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding) ? 1 : 0
   }
   
   @objc(copyWithZone:)
@@ -477,7 +477,7 @@ extension __SharedStringStorage {
     count: Int,
     encoding: UInt
   ) -> Int8 {
-    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding)
+    return _isEqualToBuffer(ptr: ptr, count: count, encoding: encoding) ? 1 : 0
   }
 
   @objc(copyWithZone:)

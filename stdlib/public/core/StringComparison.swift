@@ -501,9 +501,9 @@ fileprivate func isEqual(
   if lhs.byteCount != rhs.byteCount {
     return false
   }
-  return lhs.withUnsafeBytes { lhsBuffer in
-    return rhs.withUnsafeBytes { rhsBuffer in
-      return 0 == memcmp(
+  return unsafe lhs.withUnsafeBytes { lhsBuffer in
+    return unsafe rhs.withUnsafeBytes { rhsBuffer in
+      return 0 == _swift_stdlib_memcmp(
         lhsBuffer.baseAddress.unsafelyUnwrapped,
         rhsBuffer.baseAddress.unsafelyUnwrapped,
         lhs.byteCount
@@ -556,6 +556,40 @@ internal func isEqual<LHSEncoding: _UnicodeEncoding, RHSEncoding: _UnicodeEncodi
     return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
   }
   if lhsEnc == Unicode.UTF16.self && rhsEnc == Unicode.ASCII.self {
+    return isEqual(asciiBytes: rhs, utf16Bytes: lhs)
+  }
+  fatalError("Unsupported combination of encodings")
+}
+
+@c public func _unicodeBuffersEqual(
+  bytes rawLHS: UnsafeRawPointer,
+  count lhsCount: Int,
+  encoding lhsEnc: UInt,
+  bytes rawRHS: UnsafeRawPointer,
+  count rhsCount: Int,
+  encoding rhsEnc: UInt
+) -> Bool {
+  let lhs = unsafe RawSpan(_unsafeStart: rawLHS, byteCount: lhsCount)
+  let rhs = unsafe RawSpan(_unsafeStart: rawRHS, byteCount: rhsCount)
+  if let trivialCheck = lhs.contentsAreTriviallyIdentical(to: rhs) {
+    return trivialCheck
+  }
+  // ASCII == UTF8 can just use memcmp
+  if (lhsEnc == rhsEnc) ||
+     (lhsEnc == _cocoaASCIIEncoding && rhsEnc == _cocoaUTF8Encoding) ||
+     (lhsEnc == _cocoaUTF8Encoding && rhsEnc == _cocoaASCIIEncoding) {
+    return isEqual(bytes: lhs, bytes: rhs)
+  }
+  if lhsEnc == _cocoaUTF8Encoding && rhsEnc == _cocoaUTF16Encoding {
+    return isEqual(utf8Bytes: lhs, utf16Bytes: rhs)
+  }
+  if lhsEnc == _cocoaUTF16Encoding && rhsEnc == _cocoaUTF8Encoding {
+    return isEqual(utf8Bytes: rhs, utf16Bytes: lhs)
+  }
+  if lhsEnc == _cocoaASCIIEncoding && rhsEnc == _cocoaUTF16Encoding {
+    return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
+  }
+  if lhsEnc == _cocoaUTF16Encoding && rhsEnc == _cocoaASCIIEncoding {
     return isEqual(asciiBytes: rhs, utf16Bytes: lhs)
   }
   fatalError("Unsupported combination of encodings")

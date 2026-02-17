@@ -702,41 +702,6 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   }
 }
 
-@c public func _unicodeBuffersEqual(
-  bytes rawLHS: UnsafeRawPointer,
-  count lhsCount: Int,
-  encoding lhsEnc: UInt,
-  bytes rawRHS: UnsafeRawPointer,
-  count rhsCount: Int,
-  encoding rhsEnc: UInt
-) -> Bool {
-  let lhs = RawSpan(_unchecked: rawLHS, byteCount: lhsCount)
-  let rhs = RawSpan(_unchecked: rawRHS, byteCount: rhsCount)
-  if let trivialCheck = lhs.contentsAreTriviallyIdentical(to: rhs) {
-    return trivialCheck
-  }
-  // ASCII == UTF8 can just use memcmp
-  if (lhsEnc == rhsEnc) ||
-     (lhsEnc == _cocoaASCIIEncoding && rhsEnc == _cocoaUTF8Encoding) ||
-     (lhsEnc == _cocoaUTF8Encoding && rhsEnc == _cocoaASCIIEncoding) {
-    return isEqual(bytes: lhs, bytes: rhs)
-  }
-  if lhsEnc == _cocoaUTF8Encoding && rhsEnc == _cocoaUTF16Encoding {
-    return isEqual(utf8Bytes: lhs, utf16Bytes: rhs)
-  }
-  if lhsEnc == _cocoaUTF16Encoding && rhsEnc == _cocoaUTF8Encoding {
-    return isEqual(utf8Bytes: rhs, utf16Bytes: lhs)
-  }
-  if lhsEnc == _cocoaASCIIEncoding && rhsEnc == _cocoaUTF16Encoding {
-    return isEqual(asciiBytes: lhs, utf16Bytes: rhs)
-  }
-  if lhsEnc == _cocoaUTF16Encoding && rhsEnc == _cocoaASCIIEncoding {
-    return isEqual(asciiBytes: rhs, utf16Bytes: lhs)
-  }
-  fatalError("Unsupported combination of encodings")
-}
-
-
 // At runtime, this class is derived from `__SwiftNativeNSStringBase`,
 // which is derived from `NSString`.
 //
