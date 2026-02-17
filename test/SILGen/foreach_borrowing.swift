@@ -171,3 +171,13 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   for element in seq where element == val{
   }
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
+  // CHECK: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+1]]:7 isImplicit: false
+  for element in seq {
+      if (element.value == 0){
+          continue
+      }
+  }
+}
