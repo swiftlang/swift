@@ -23,6 +23,16 @@
 // RUN: %target-clang -fsyntax-only %t/Client-Swift.h
 // RUN: %FileCheck %s --input-file %t/Client-Swift.h --check-prefix CHECK-COMPAT
 
+/// @_spiOnly import
+// RUN: %target-swift-frontend -typecheck -I %t %t/Client.swift -D SPIONLY \
+// RUN:   -sdk %clang-importer-sdk -swift-version 6 -enable-library-evolution \
+// RUN:   -disable-objc-attr-requires-foundation-module \
+// RUN:   -emit-module-interface-path %t/Client.swiftinterface \
+// RUN:   -emit-objc-header-path %t/Client-Swift.h
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface)
+// RUN: %target-clang -fsyntax-only %t/Client-Swift.h
+// RUN: %FileCheck %s --input-file %t/Client-Swift.h --check-prefix CHECK-COMPAT
+
 /// Check where we still raise errors
 // RUN: %target-swift-frontend -typecheck -I %t %t/Client.swift -D ERRORS \
 // RUN:   -sdk %clang-importer-sdk -swift-version 6 -enable-library-evolution \
@@ -60,6 +70,8 @@ void stillUnusableFromInlinable(); // expected-note {{global function 'stillUnus
 
 #if IOI
   @_implementationOnly import Lib
+#elseif SPIONLY
+  @_spiOnly import Lib
 #else
   internal import Lib // expected-note {{type alias 'MyDouble' imported as 'internal' from 'Lib' here}}
   // expected-note @-1 {{global function 'stillUnusableFromInlinable()' imported as 'internal' from 'Lib' here}}

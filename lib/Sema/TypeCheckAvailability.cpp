@@ -273,8 +273,8 @@ const {
     case DisallowedOriginKind::NonPublicImport:
     case DisallowedOriginKind::InternalBridgingHeaderImport:
     case DisallowedOriginKind::ImplementationOnly:
-      return DiagnosticBehavior::Ignore;
     case DisallowedOriginKind::SPIOnly:
+      return DiagnosticBehavior::Ignore;
     case DisallowedOriginKind::SPIImported:
     case DisallowedOriginKind::SPILocal:
     case DisallowedOriginKind::MissingImport:
