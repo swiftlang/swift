@@ -485,6 +485,9 @@ void SILCombiner::processInstruction(SILInstruction *I,
             // ```
             !hasAddressOperands(svi) &&
 
+            // Don't risk sinking mark_dependence out of the lifetime of the base value.
+            !isa<MarkDependenceInst>(svi) &&
+
             SILValue(svi)->getOwnershipKind() == OwnershipKind::Owned) {
           // Try to sink the value. If we sank the value and deleted it,
           // return. If we didn't optimize or sank but we are still able to
