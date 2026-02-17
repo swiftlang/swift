@@ -226,7 +226,7 @@ void taskInvokeWithExclusionValue(AsyncTask *task,
   // thread.  If the task suspends somewhere, it should update the
   // task status appropriately; we don't need to update it afterwards.
   [[maybe_unused]]
-  auto [mayRun, dispatchOpaquePriority] = task->flagAsRunning(allowedStealerExclusionValue, removeEnqueued);
+  auto [mayRun, dispatchOpaquePriority] = task->flagAsRunningFromEnqueued(allowedStealerExclusionValue, removeEnqueued);
   if (mayRun) {
     // Update the active task in the current thread.
     auto oldTask = ActiveTask::swap(task);
@@ -245,8 +245,8 @@ void taskInvokeWithExclusionValue(AsyncTask *task,
   } else {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // This balances with the retain in taskEnqueueDirectOrSteal which happens
-    // when adding the first stealer after a direct enqueue. That is, when
-    // that function causes flagAsRunning to return false for the direct
+    // when adding the first stealer after a direct enqueue. That is, when that
+    // function causes flagAsRunningFromEnqueued to return false for the direct
     // enqueue, it does a retain in case that direct enqueue lives for a long
     // time. This is where we release that retain as it is no longer needed.
     if (removeEnqueued) {

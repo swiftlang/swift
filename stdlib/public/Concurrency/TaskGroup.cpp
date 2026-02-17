@@ -1824,10 +1824,7 @@ reevaluate_if_taskgroup_has_results:;
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
     if (hasSuspended) {
-      // This is safe to call because we were just
-      // running this Task so its BasePriority (which is
-      // immutable) should've already been set on the thread.
-      waitingTask->flagAsRunningImmediately();
+      waitingTask->flagAsRunningFromSuspended();
     }
 
     // Success! We are allowed to poll.

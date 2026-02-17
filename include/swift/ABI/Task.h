@@ -91,7 +91,9 @@ public:
     DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
-  // Reserved for the use of the scheduler.
+  // Reserved for the use of the scheduler. Since Task stealers
+  // allow a Task to be intrusively enqueued at any point of its
+  // lifecycle, this data must never be used by the runtime.
   void *SchedulerPrivate[2];
 
   /// WARNING: DO NOT MOVE.
@@ -422,7 +424,7 @@ public:
   ///       running -> completed
   ///       running -> enqueued
   ///
-  /// The 4 methods below are how a task switches from one state to another.
+  /// The methods below are how a task switches from one state to another.
 
   /// Flag that this task is now running.  This can update
   /// the priority stored in the job flags if the priority has been
@@ -431,44 +433,27 @@ public:
   /// Generally this should be done immediately after updating
   /// ActiveTask.
   ///
-  /// This function returns two values. The first, boolean, value
-  /// reports if the Task was successfully marked as running. The second
-  /// is an opaque value used to later reset some properties of the
-  /// thread. There are two cases described below for their meaning.
+  /// A task can become running either by first being enqueued, or directly
+  /// from being suspended. There is a separate function for each of these
+  /// scenarios, `flagAsRunningFromSuspended` and `flagAsRunningFromEnqueued`.
   ///
-  /// When Dispatch is used as the default
-  /// executor and priority escalation is enabled:
-  /// * If the opaque value is non-zero, it must be passed
-  ///   to swift_dispatch_thread_reset_override_self.
-  ///   before returning to the executor.
-  /// * If the opaque value is zero, it may be ignored or passed to
-  ///   the aforementioned function (which will ignore values of zero).
-  /// * This function is failable. If this function returns
-  ///   false, no more setup of the environment should be done
-  ///   and runInFullyEstablishedContext must not be called.
-  /// * If this function is being called directly from swift_task_run (i.e.
-  ///   not indirect through an AsyncTaskStealer), then removeEnqueued must
-  ///   be true since the Task must be marked as no longer enqueued on either
-  ///   the success or failure path to allow enqueuing the Task directly
-  ///   again. If this function is being called from an AsyncTaskStealer
-  ///   (we did not dequeue the Task directly), then this argument must
-  ///   be false so that the Task's enqueued status is not changed.
-  /// * If this function is called via an AsyncTaskStealer, the
-  ///   allowedExclusionValue must be the one encoded in the stealer.
-  /// * Otherwise, when this function is called from
-  ///   the Task directly, allowedExclusionValue must be
-  ///   the value encoded in the Task's private data.
-  /// * The exclusion value allows both the Task's intrusive link
-  ///   and one or more AsyncTaskStealers to be enqueued at the same
-  ///   time, with different exclusion values, and all but the one
-  ///   most recently enqueued will have this function return false.
+  /// flagAsRunningFromEnqueued can be invoked from 2 contexts - from
+  /// the intrusively linked Task itself or from a Task Stealer. As such,
+  /// it needs to be failable such that only the Job with the correct
+  /// allowedExclusionValue invokes the task successfully. If we failed
+  /// to transition the task to running, the remaining setup needs
+  /// to short-circuit and the task cannot be invoked by the caller.
   ///
-  /// For all other default executors, or
-  /// when priority escalation is not enabled:
-  /// * This function will always return true.
-  /// * allowedExclusionValue is ignored (and is expected to always be zero).
-  /// * The opaque return value will always be zero and may be ignored.
-  std::pair<bool, uint32_t> flagAsRunning(uint8_t allowedExclusionValue, bool removeEnqueued);
+  /// flagAsRunningFromEnqueued's invokeFlags argument lets us know which
+  /// context we are being called from which informs further decisions
+  /// about lifetime management and future enqueue semantics of the task.
+  ///
+  /// The second return value is an opaque value used to restore the state of
+  /// the thread before returning to the context invoking this Task (either the
+  /// executor or the caller of Task.immediate). When fagAsRunning succeeds,
+  /// Dispatch is the default executor, and priority escalation is enabled,
+  /// this value must be passed to swift_dispatch_thread_reset_override_self.
+  std::pair<bool, uint32_t> flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, bool removeEnqueued);
 
   /// This variant of flagAsRunning may be called if you are resumming
   /// immediately after suspending. That is, you are on the same thread,
@@ -477,7 +462,7 @@ public:
   /// cleanup work. This is intended for situations such as awaiting
   /// where you may mark yourself as suspended but find out during
   /// atomic state update that you may actually resume immediately.
-  void flagAsRunningImmediately();
+  void flagAsRunningFromSuspended();
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.
@@ -502,7 +487,7 @@ public:
   /// Check whether this task has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   ///
-  /// \param ignoreShield if cancellation shield should be ignored.
+  /// \param ignoreShield if cancellation shield should be ignored. 
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
   bool isCancelled(bool ignoreShield) const;
 
@@ -570,7 +555,7 @@ public:
   // ==== Cancellation Shields -------------------------------------------------
 
   /// Install a cancellation shield in this task.
-  /// Returns true if the shield was installed, and false if there was already
+  /// Returns true if the shield was installed, and false if there was already 
   /// one active and this action didn't change anything.
   bool cancellationShieldPush();
 

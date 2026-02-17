@@ -494,18 +494,18 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
 
+    HasActiveTaskCancellationShield = 0x10000,
+
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     /// The Task's intrusive link or a Stealer may only run if its exclusion
     /// value is equal to this value. This number increases only when escalating
     /// a Task while it is dependent on the Dispatch default global executor.
     ///
-    /// This value is currently set to 8 bits because JobPriority is
-    /// 8 bits so in theory, that is the most number of times a Task
-    /// may be escalated in such a way that this value increases.
-    /// In reality, there are only 5 values of JobPriority so this
+    /// There are only 5 values of JobPriority and this value can only
+    /// increase at most once for each priority transition so this
     /// could just use 3 bits (along with PriorityMask) if needed.
-    StealerExclusionShift = 16,
-    StealerExclusionMask = 0xFF0000,
+    StealerExclusionShift = 20,
+    StealerExclusionMask = 0xF00000,
 #endif
   };
 
@@ -1090,7 +1090,6 @@ struct ThreadPriorityManager {
         opaquePriority = previousPriority;
       }
       overrideFloor = maxTaskPriority;
-      basePriorityCeil = taskBasePriority;
     }
   }
 
@@ -1117,7 +1116,7 @@ static inline uint32_t taskFlagAsRunningWithoutDependency(AsyncTask &task, bool 
   // been enqueued onto an executor since the last suspension
   assert(!oldStatus.hasTaskDependency());
 
-  SWIFT_TASK_DEBUG_LOG("%p->flagAsRunning() with no task dependency", &task);
+  SWIFT_TASK_DEBUG_LOG("%p->taskFlagAsRunningWithoutDependency()", &task);
   assert(task._private().dependencyRecord == nullptr);
 
   while (true) {
@@ -1149,7 +1148,7 @@ static inline uint32_t taskFlagAsRunningWithoutDependency(AsyncTask &task, bool 
 #endif
 }
 
-inline void AsyncTask::flagAsRunningImmediately() {
+inline void AsyncTask::flagAsRunningFromSuspended() {
   // The intention of this function is to only be called in places where
   // the thread is already set up for the correct base priority. If the
   // base priority doesn't need to change, dispatch should return zero
@@ -1182,7 +1181,7 @@ inline void AsyncTask::flagAsRunningImmediately() {
   // executor. If it was a dependency on an executor, that would
   // make our assumptions about not racing with stealers invalid
   auto dependencyRecord = _private().dependencyRecord;
-  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
+  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunningFromSuspended() and remove dependencyRecord %p",
                        this, dependencyRecord);
   // We can't directly assert that dependencyRecord->DependencyKind
   // != EnqueuedOnExecutor but that is the expected condition here
@@ -1209,7 +1208,7 @@ inline void AsyncTask::flagAsRunningImmediately() {
   return;
 }
 
-inline std::pair<bool, uint32_t> AsyncTask::flagAsRunning(uint8_t allowedExclusionValue, bool removeEnqueued) {
+inline std::pair<bool, uint32_t> AsyncTask::flagAsRunningFromEnqueued(uint8_t allowedExclusionValue, bool removeEnqueued) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   auto threadPriorityManager = ThreadPriorityManager(*this);
 
@@ -1236,7 +1235,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunning(uint8_t allowedExclusi
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     assert(oldStatus.getStealerExclusionValue() == allowedExclusionValue);
 #endif
-    SWIFT_TASK_DEBUG_LOG("flagAsRunning succeeds for %p with no dependency record", this);
+    SWIFT_TASK_DEBUG_LOG("flagAsRunningFromEnqueued succeeds for %p with no dependency record", this);
     return {true, taskFlagAsRunningWithoutDependency(*this, true)};
   }
 
@@ -1248,7 +1247,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunning(uint8_t allowedExclusi
   // we can't even assert that the record isn't null here (because this
   // value isn't atomic, if it was, we could bail out early if it was null).
   auto dependencyRecord = _private().dependencyRecord;
-  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunning() and remove dependencyRecord %p",
+  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsRunningFromEnqueued() and remove dependencyRecord %p",
                   this, dependencyRecord);
 
   if (!removeStatusRecordIf(this, dependencyRecord, oldStatus, [&](ActiveTaskStatus oldStatus,
@@ -1278,7 +1277,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunning(uint8_t allowedExclusi
     if (removeEnqueued) {
       taskRemoveEnqueued(this);
     }
-    SWIFT_TASK_DEBUG_LOG("flagAsRunning fails for %p on record removal", this);
+    SWIFT_TASK_DEBUG_LOG("flagAsRunningFromEnqueued fails for %p on record removal", this);
     return {false, 0};
   }
 
@@ -1294,7 +1293,7 @@ inline std::pair<bool, uint32_t> AsyncTask::flagAsRunning(uint8_t allowedExclusi
   if (removeEnqueued) {
     taskRemoveEnqueued(this);
   }
-  SWIFT_TASK_DEBUG_LOG("flagAsRunning succeeds for %p", this);
+  SWIFT_TASK_DEBUG_LOG("flagAsRunningFromEnqueued succeeds for %p", this);
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   return {true, threadPriorityManager.opaquePriority};
 #else
@@ -1367,7 +1366,8 @@ taskEnqueueDirectOrSteal(AsyncTask *task, SerialExecutorRef newExecutor,
       auto currentStealerExclusionValue = oldStatus.getStealerExclusionValue();
       auto newStealerExclusionValue = currentStealerExclusionValue;
       if (__builtin_add_overflow(currentStealerExclusionValue, 1,
-                                 &newStealerExclusionValue)) {
+                                 &newStealerExclusionValue) ||
+          newStealerExclusionValue > 0xF) {
         assert(false && "Somehow overflowed stealer exclusion value");
       }
       SWIFT_TASK_DEBUG_LOG("Updating exclusion value from %d to %d",
