@@ -246,7 +246,7 @@ StringBridgeTests.test("Foundation Buffer Comparison SPI") {
     file: StaticString = #filePath,
     line: UInt = #line
   ) {
-    let loc = SourceLoc(file, line, comment: "test data")
+    let loc = SourceLoc(String(file), line, comment: "test data")
 
     let result = lhs.withBytesInEncoding(lhsEncoding) { lhsPtr, lhsCount in
       rhs.withBytesInEncoding(rhsEncoding) { rhsPtr, rhsCount in
