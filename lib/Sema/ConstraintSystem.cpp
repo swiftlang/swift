@@ -2611,6 +2611,39 @@ static bool diagnoseAmbiguity(
     }
   }
 
+  // If there are multiple kinds of fixes associated with this overload set,
+  // prefer diagnosing the fixes that are common to all viable solutions instead
+  // of immediately falling back to a generic ambiguity diagnostic.
+  {
+    llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
+                    SmallVector<std::pair<const Solution *,
+                                          const ConstraintFix *>, 4>>
+        fixesByKind;
+
+    for (const auto &entry : aggregateFix) {
+      auto *fix = entry.second;
+      fixesByKind[{fix->getKind(), fix->getLocator()}].push_back(entry);
+    }
+
+    bool diagnosedCommonFix = false;
+    for (auto &entry : fixesByKind) {
+      auto &commonFixes = entry.second;
+
+      llvm::SmallPtrSet<const Solution *, 4> affectedSolutions;
+      for (const auto &fix : commonFixes)
+        affectedSolutions.insert(fix.first);
+
+      if (affectedSolutions.size() != solutions.size())
+        continue;
+
+      diagnosedCommonFix |=
+          commonFixes.front().second->diagnoseForAmbiguity(commonFixes);
+    }
+
+    if (diagnosedCommonFix)
+      return true;
+  }
+
   auto *decl = *localAmbiguity.begin();
   auto *commonCalleeLocator = ambiguity.locator;
 
